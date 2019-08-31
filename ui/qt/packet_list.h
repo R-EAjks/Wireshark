@@ -16,10 +16,10 @@
 #include "protocol_preferences_menu.h"
 #include <ui/qt/models/related_packet_delegate.h>
 #include <ui/qt/utils/field_information.h>
+#include <ui/qt/widgets/fixedcolumn_treeview.h>
 
 #include <QMenu>
 #include <QTime>
-#include <QTreeView>
 #include <QPainter>
 
 class PacketListHeader;
@@ -35,7 +35,7 @@ class QTimerEvent;
 // Does that mean we're permanently stuck at a maximum of 2^31-1 packets
 // per capture?
 //
-class PacketList : public QTreeView
+class PacketList : public FixedColumnTreeView
 {
     Q_OBJECT
 public:
@@ -68,7 +68,6 @@ public:
     void thaw(bool restore_selection = false);
     void clear();
     void writeRecent(FILE *rf);
-    bool contextMenuActive();
     QString getFilterFromRowAndColumn(QModelIndex idx);
     void resetColorized();
     QString getPacketComment(guint c_number);
@@ -95,7 +94,7 @@ public:
 protected:
 
     void selectionChanged(const QItemSelection & selected, const QItemSelection & deselected) override;
-    virtual void contextMenuEvent(QContextMenuEvent *event) override;
+    virtual QMenu * contextMenu(QModelIndex at) override;
     void timerEvent(QTimerEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
     virtual void mousePressEvent (QMouseEvent *event) override;
@@ -197,6 +196,8 @@ private slots:
     void drawNearOverlay();
     void updatePackets(bool redraw);
     void ctxDecodeAsDialog();
+    void ctxFixColumn();
+    void ctxResetFixedColumns(int column = -1);
 };
 
 #endif // PACKET_LIST_H

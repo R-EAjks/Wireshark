@@ -2787,7 +2787,7 @@ void MainWindow::matchFieldFilter(FilterAction::Action action, FilterAction::Act
 {
     QString field_filter;
 
-    if (packet_list_->contextMenuActive() || packet_list_->hasFocus()) {
+    if (packet_list_->isContextMenuActive() || packet_list_->hasFocus()) {
         field_filter = packet_list_->getFilterFromRowAndColumn(packet_list_->currentIndex());
     } else if (capture_file_.capFile() && capture_file_.capFile()->finfo_selected) {
         char *tmp_field = proto_construct_match_selected_string(capture_file_.capFile()->finfo_selected,
@@ -2797,7 +2797,7 @@ void MainWindow::matchFieldFilter(FilterAction::Action action, FilterAction::Act
     }
 
     if (field_filter.isEmpty()) {
-        QString err = tr("No filter available. Try another %1.").arg(packet_list_->contextMenuActive() ? tr("column") : tr("item"));
+        QString err = tr("No filter available. Try another %1.").arg(packet_list_->isContextMenuActive() ? tr("column") : tr("item"));
         wsApp->pushStatus(WiresharkApplication::TemporaryStatus, err);
         return;
     }

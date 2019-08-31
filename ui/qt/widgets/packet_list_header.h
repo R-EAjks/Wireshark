@@ -57,6 +57,8 @@ signals:
 
     void columnsChanged();
 
+    void fixColumns(int);
+
 private:
 
     capture_file * cap_file_;
@@ -64,6 +66,11 @@ private:
     int lastSize;
 
     void setSectionVisibility();
+
+private slots:
+    void ctxFixColumn();
+    void ctxResetFixedColumns();
+
 };
 
 #endif
