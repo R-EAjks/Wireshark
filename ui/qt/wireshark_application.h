@@ -165,6 +165,7 @@ private:
     void storeCustomColorsInRecent();
     void clearDynamicMenuGroupItems();
     void initializeIcons();
+    void updateTheme();
 
 protected:
     bool event(QEvent *event);

@@ -559,7 +559,12 @@ void WiresharkApplication::setLastOpenDir(const char *dir_name)
 bool WiresharkApplication::event(QEvent *event)
 {
     QString display_filter = NULL;
-    if (event->type() == QEvent::FileOpen) {
+    switch (event->type()) {
+    case QEvent::ApplicationPaletteChange:
+        updateTheme();
+        break;
+    case QEvent::FileOpen:
+    {
         QFileOpenEvent *foe = static_cast<QFileOpenEvent *>(event);
         if (foe && foe->file().length() > 0) {
             QString cf_path(foe->file());
@@ -570,6 +575,9 @@ bool WiresharkApplication::event(QEvent *event)
             }
         }
         return true;
+    }
+    default:
+        break;
     }
     return QApplication::event(event);
 }
@@ -757,9 +765,7 @@ WiresharkApplication::WiresharkApplication(int &argc,  char **argv) :
 #endif
     qApp->setStyleSheet(app_style_sheet);
 
-    // If our window text is lighter than the window background, assume the theme is dark.
-    QPalette gui_pal = qApp->palette();
-    prefs_set_gui_theme_is_dark(gui_pal.windowText().color().value() > gui_pal.window().color().value());
+    updateTheme();
 
 #if defined(HAVE_SOFTWARE_UPDATE) && defined(Q_OS_WIN)
     connect(this, SIGNAL(softwareUpdateQuit()), this, SLOT(quit()), Qt::QueuedConnection);
@@ -898,6 +904,21 @@ void WiresharkApplication::initializeIcons()
         normal_icon_.addFile(icon_path);
         icon_path = QString(":/wsicon/wsiconcap%1.png").arg(icon_size);
         capture_icon_.addFile(icon_path);
+    }
+}
+
+void WiresharkApplication::updateTheme()
+{
+    // If our window text is lighter than the window background, assume the theme is dark.
+    QPalette gui_pal = qApp->palette();
+    bool is_dark = gui_pal.windowText().color().value() > gui_pal.window().color().value();
+    prefs_set_gui_theme_is_dark(is_dark);
+    if (is_dark && strcmp(get_profile_name(), DEFAULT_PROFILE) == 0) {
+        set_profile_name(DEFAULT_DARK_PROFILE);
+        emit profileNameChanged(DEFAULT_DARK_PROFILE);
+    } else if (!is_dark && strcmp(get_profile_name(), DEFAULT_DARK_PROFILE) == 0) {
+        set_profile_name(DEFAULT_PROFILE);
+        emit profileNameChanged(DEFAULT_PROFILE);
     }
 }
 
