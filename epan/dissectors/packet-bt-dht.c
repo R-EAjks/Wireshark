@@ -278,6 +278,20 @@ dissect_bt_dht_values(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint
       proto_tree_add_item( value_tree, hf_port, tvb, offset+4, 2, ENC_BIG_ENDIAN);
       proto_item_append_text(value_ti, ":%u)", tvb_get_ntohs( tvb, offset+4 ));
     }
+    else if (string_len == 18)
+    {
+      /* 16 bytes ip, 2 bytes port */
+      peer_index += 1;
+
+      value_ti = proto_tree_add_item( sub_tree, hf_bt_dht_peer, tvb, offset, 18, ENC_NA );
+      proto_item_append_text(value_ti, " %d", peer_index);
+      value_tree = proto_item_add_subtree( value_ti, ett_bt_dht_peers);
+
+      proto_tree_add_item( value_tree, hf_ip6, tvb, offset, 16, ENC_NA);
+      proto_item_append_text(value_ti, " (IPv6/Port: [%s]", tvb_ip6_to_str(tvb, offset));
+      proto_tree_add_item( value_tree, hf_port, tvb, offset+16, 2, ENC_BIG_ENDIAN);
+      proto_item_append_text(value_ti, ":%u)", tvb_get_ntohs( tvb, offset+16 ));
+    }
     else
     {
       /* truncated data */
