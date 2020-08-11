@@ -293,7 +293,7 @@ dissect_bt_dht_values(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint
   }
 
   proto_item_set_text( ti, "%s: %d peers", label, peer_index );
-  col_append_fstr( pinfo->cinfo, COL_INFO, "reply=%d peers ", peer_index );
+  col_append_fstr( pinfo->cinfo, COL_INFO, " reply=%d peers", peer_index );
   *result = wmem_strdup_printf(wmem_packet_scope(), "%d peers", peer_index);
 
   return offset;
@@ -361,7 +361,7 @@ dissect_bt_dht_nodes(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint 
     offset += string_len;
   }
   proto_item_set_text( ti, "%s: %d nodes", label, node_index );
-  col_append_fstr( pinfo->cinfo, COL_INFO, " reply=%d nodes ", node_index );
+  col_append_fstr( pinfo->cinfo, COL_INFO, " reply=%d nodes", node_index );
   *result = wmem_strdup_printf(wmem_packet_scope(), "%d", node_index);
 
   return offset;
