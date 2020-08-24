@@ -15,7 +15,7 @@ clang-format_all:
   allow_failure: true
 
 
-clang-format_diff:
+merge-request:clang-format_diff:
   stage: .pre
   image: wireshark/wireshark-ubuntu-dev
   only:
