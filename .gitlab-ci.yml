@@ -1,3 +1,44 @@
+clang-format_all:
+  stage: .pre
+  image: wireshark/wireshark-ubuntu-dev
+  when: manual
+  before_script:
+    - apt-get update && apt-get install -y git clang-format
+  script:
+    - error_msg="Detected formatting issues with clang-format!"
+    - find . -type f -not -path "./epan/wslua/*" -name "*.c" -o -name "*.h" -o -name  "*.cpp" | xargs clang-format --style=file --dry-run 2>&1 | tee formatting_issues.txt
+    - if [[ -s formatting_issues.txt ]]; then echo $error_msg; false; fi
+  artifacts:
+    when: on_failure
+    paths:
+    - formatting_issues.txt
+  allow_failure: true
+
+
+clang-format_diff:
+  stage: .pre
+  image: wireshark/wireshark-ubuntu-dev
+  only:
+   - merge_requests
+  before_script:
+    - apt-get update && apt-get install -y git clang-format
+  script:
+    - error_msg="Detected formatting issues with clang-format!"
+    - success_msg="No formatting issues were detected."
+    - curl https://gitlab.com/api/v4/projects/wireshark%2Fwireshark/merge_requests/$CI_MERGE_REQUEST_IID/changes -s | jq -r '.changes | .[] | .new_path,.old_path'|sort -u > modified_files.txt
+    - cat modified_files | grep -v "/epan/wslua/" | grep -v "/epan/wslua/" | grep -E "\.(c|h|cpp)$|" > files_to_check.txt
+    - cat files_to_check.txt | xargs clang-format -i --verbose -style file
+    - git diff --stat | tee > reformatted_files.txt
+    - git diff > formatting_issues.diff
+    - if [[ -s reformatted_files.txt ]]; then echo $error_message; false; else echo $success_msg; fi
+  artifacts:
+    when: on_failure
+    paths:
+    - reformatted_files.txt
+    - formatting_issues.txt
+  allow_failure: true
+
+
 .build: &build
   stage: build
   after_script:
