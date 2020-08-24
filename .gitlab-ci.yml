@@ -391,3 +391,36 @@ merge-req:windows:
     - msbuild "/consoleloggerparameters:PerformanceSummary;NoSummary" /maxcpucount Wireshark.sln
     - msbuild "/consoleloggerparameters:PerformanceSummary;NoSummary" test-programs.vcxproj
     - ctest -C RelWithDebInfo --parallel 3 --force-new-ctest-process --verbose
+
+# Validate doxygen is proper for modified files
+merge-req:doxygen_diff:
+  stage: build
+  image: wireshark/wireshark-ubuntu-dev
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  variables:
+    ERROR_MSG: "Detected Doxygen documentation issues! See doxygen_errors.txt for details"
+    SUCCESS_MSG: "No Doxygen documentation issues were detected."
+  script:
+    # Extract the list of modified files
+    - curl https://gitlab.com/api/v4/projects/wireshark%2Fwireshark/merge_requests/$CI_MERGE_REQUEST_IID/changes -s | jq -r '.changes | .[] | .new_path'|sort -u > modified_files.txt
+    - if [[ ! -s modified_files.txt ]]; then echo "No files to check! Exiting."; true; exit; fi
+    - echo "The following files will be analyzed for doxygen errors:"
+    - cat modified_files.txt
+    # Update the doxygen config to avoid errors caused by obsolete values
+    - doxygen -u doxygen.cfg.in
+    # Set "WARN_IF_UNDOCUMENTED" to "YES" to be extra noisy.
+    - sed -Ei 's/^WARN_IF_UNDOCUMENTED   = NO/WARN_IF_UNDOCUMENTED   = YES/' doxygen.cfg.in
+    - export FILES=`cat modified_files.txt | tr '\n' ' '`
+    - mkdir build
+    - cd build
+    - cmake ..
+    - cd ..
+    - (cat build/doxygen.cfg; echo "INPUT = $FILES") | doxygen - 2>&1 > doxygen_output.txt | tee doxygen_errors.txt
+    - if [[ -s doxygen_errors.txt ]]; then echo $ERROR_MSG; false; else echo $SUCCESS_MSG; true; fi
+  artifacts:
+    when: on_failure
+    paths:
+    - doxygen_errors.txt
+    - doxygen_output.txt
+  allow_failure: true
