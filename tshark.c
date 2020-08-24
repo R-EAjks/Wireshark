@@ -142,6 +142,7 @@
 #define LONGOPT_HEXDUMP                 LONGOPT_BASE_APPLICATION+7
 #define LONGOPT_SELECTED_FRAME          LONGOPT_BASE_APPLICATION+8
 #define LONGOPT_PRINT_TIMERS            LONGOPT_BASE_APPLICATION+9
+#define LONGOPT_FIELDS_XPATH            LONGOPT_BASE_APPLICATION+10
 
 capture_file cfile;
 
@@ -190,6 +191,8 @@ static print_stream_t *print_stream = NULL;
 static char *output_file_name;
 
 static output_fields_t* output_fields  = NULL;
+
+static gboolean fields_xpath = FALSE;
 
 static gboolean no_duplicate_keys = FALSE;
 static proto_node_children_grouper_func node_children_grouper = proto_node_group_children_by_unique;
@@ -535,6 +538,8 @@ print_usage(FILE *output)
     fprintf(output, "  -e <field>               field to print if -Tfields selected (e.g. tcp.port,\n");
     fprintf(output, "                           _ws.col.info)\n");
     fprintf(output, "                           this option can be repeated to print multiple fields\n");
+    fprintf(output, "  --fields-xpath           distinguish fields by their location, uses XPath as field name\n");
+    fprintf(output, "                           Applicable for -e <field> and for -T ek|json|pdml\n");
     fprintf(output, "  -E<fieldsoption>=<value> set options for output when -Tfields selected:\n");
     fprintf(output, "     bom=y|n               print a UTF-8 BOM\n");
     fprintf(output, "     header=y|n            switch headers on and off\n");
@@ -944,6 +949,7 @@ main(int argc, char *argv[])
         {"hexdump", ws_required_argument, NULL, LONGOPT_HEXDUMP},
         {"selected-frame", ws_required_argument, NULL, LONGOPT_SELECTED_FRAME},
         {"print-timers", ws_no_argument, NULL, LONGOPT_PRINT_TIMERS},
+		{"fields-xpath", ws_no_argument, NULL, LONGOPT_FIELDS_XPATH},
         {0, 0, 0, 0}
     };
     gboolean             arg_error = FALSE;
@@ -1453,6 +1459,9 @@ main(int argc, char *argv[])
                 arg_error = TRUE;
 #endif
                 break;
+            case LONGOPT_FIELDS_XPATH:
+              fields_xpath = TRUE;
+              break;
             case 'e':
                 /* Field entry */
                 {
@@ -4605,7 +4614,7 @@ print_packet(capture_file *cf, epan_dissect_t *edt)
                 return !ferror(stdout);
             }
             if (print_details) {
-                write_pdml_proto_tree(output_fields, edt, &cf->cinfo, stdout, dissect_color);
+                write_pdml_proto_tree(output_fields, fields_xpath, edt, &cf->cinfo, stdout, dissect_color);
                 printf("\n");
                 return !ferror(stdout);
             }
@@ -4627,7 +4636,7 @@ print_packet(capture_file *cf, epan_dissect_t *edt)
             if (print_summary)
                 ws_assert_not_reached();
             if (print_details) {
-                write_json_proto_tree(output_fields, print_dissections_expanded,
+                write_json_proto_tree(output_fields, fields_xpath, print_dissections_expanded,
                         print_hex, edt, &cf->cinfo, node_children_grouper, &jdumper);
                 return !ferror(stdout);
             }
@@ -4637,14 +4646,14 @@ print_packet(capture_file *cf, epan_dissect_t *edt)
             if (print_summary)
                 ws_assert_not_reached();
             if (print_details) {
-                write_json_proto_tree(output_fields, print_dissections_none,
+                write_json_proto_tree(output_fields, fields_xpath, print_dissections_none,
                         TRUE, edt, &cf->cinfo, node_children_grouper, &jdumper);
                 return !ferror(stdout);
             }
             break;
 
         case WRITE_EK:
-            write_ek_proto_tree(output_fields, print_summary, print_hex,
+            write_ek_proto_tree(output_fields, fields_xpath, print_summary, print_hex,
                     edt, &cf->cinfo, stdout);
             return !ferror(stdout);
 
@@ -4662,6 +4671,7 @@ print_packet(capture_file *cf, epan_dissect_t *edt)
         if (!print_line(print_stream, 0, separator))
             return FALSE;
     }
+
     return TRUE;
 }
 

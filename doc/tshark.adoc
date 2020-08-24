@@ -325,6 +325,22 @@ If the protocol summary contains only the protocol name
 will be printed.
 --
 
+--fields-xpath::
++
+--
+Distinguish displayed fields specified by -e <field> by their location
+in protocol tree. Applicable for -e <field> and if -T ek|json|pdml output
+is selected. This option will change the output by replacing the field name
+and replace it as XPath as field name. And the output field values are then
+grouped by their location in protocol tree.
+
+This is useful when decoding complex protocol, where protocol fields
+can be repeated multiple times in protocol tree. By this the collected field
+can be exactly identified.
+
+Example: *tshark -r ./test/captures/camel2.pcap -T ek --fields-xpath -e camel.invokeId -e camel*
+--
+
 -E  <field print option>::
 +
 --

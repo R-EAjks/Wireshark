@@ -90,3 +90,21 @@ class TestOutputFormats:
         ''' Check that the option -j works with -Tek.'''
         check_outputformat("ek", extra_args=['-j', 'dhcp'], expected="dhcp-filter.ek",
             multiline=True, env=base_env)
+
+    def test_outputformat_ek_select_field_fields_xpath(self, check_outputformat, base_env):
+        '''Checks that the -e and --fields_xpath option works with -Tek.'''
+        check_outputformat("ek", "camel2.pcap", extra_args=['--fields-xpath', '-c2', '-ecamel.local'], expected=[
+            {"index":{"_index":"packets-2005-11-24","_type":"doc"}},
+            {"timestamp":"1132834565000","layers":{"/camel_opcode[1]/camel_local[1]":["0"]}},
+            {"index":{"_index":"packets-2005-11-24","_type":"doc"}},
+            {"timestamp":"1132834566000","layers":{"/camel_opcode[2]/camel_local[1]":["20"],"/camel_opcode[1]/camel_local[1]":["23"]}}
+        ], multiline=True, env=base_env)
+
+    def test_outputformat_ek_select_field_fields_xpath_hex(self, check_outputformat, base_env):
+        '''Checks that the -e and --fields_xpath option works with -Tek.'''
+        check_outputformat("ek", "camel2.pcap", extra_args=['-x', '--fields-xpath', '-c2', '-ecamel.local'], expected=[
+        {"index":{"_index":"packets-2005-11-24","_type":"doc"}},
+        {"timestamp":"1132834565000","layers":{"/camel_opcode[1]/camel_local[1]":["00","0"]}},
+        {"index":{"_index":"packets-2005-11-24","_type":"doc"}},
+        {"timestamp":"1132834566000","layers":{"/camel_opcode[2]/camel_local[1]":["14","20"],"/camel_opcode[1]/camel_local[1]":["17","23"]}}
+        ], multiline=True, env=base_env)
