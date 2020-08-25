@@ -16,7 +16,6 @@ clang-format_all:
     - formatting_issues.txt
   allow_failure: true
 
-
 merge-request:clang-format_diff:
   stage: .pre
   image: wireshark/wireshark-ubuntu-dev
@@ -40,7 +39,6 @@ merge-request:clang-format_diff:
     - reformatted_files.txt
     - formatting_issues.txt
   allow_failure: true
-
 
 .build: &build
   stage: build
