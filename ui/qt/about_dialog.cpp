@@ -195,6 +195,11 @@ FolderListModel::FolderListModel(QObject * parent):
 
     /* temp */
     appendRow(QStringList() << tr("Temp") << g_get_tmp_dir() << tr("untitled capture files"));
+    
+    /* current profile */
+    appendRow(QStringList() << tr("Current profile")
+            << gchar_free_to_qstring(get_persconffile_path("", TRUE))
+            << tr("profile specific configuration files"));
 
     /* pers conf */
     appendRow(QStringList() << tr("Personal configuration")

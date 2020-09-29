@@ -602,6 +602,11 @@ about_folders(void)
   /* temp */
   printf("%-21s\t%s\n", "Temp:", g_get_tmp_dir());
 
+  /* current profile */
+  path = get_persconffile_path("", TRUE);
+  printf("%-21s\t%s\n", "Current profile:", path);
+  g_free(path);
+
   /* pers conf */
   path = get_persconffile_path("", FALSE);
   printf("%-21s\t%s\n", "Personal configuration:", path);
@@ -1176,6 +1181,11 @@ main(int argc, char *argv[])
         exit_status = INVALID_OPTION;
         goto clean_exit;
       }
+      break;
+    case 'G':
+      cmdarg_err("-G only valid as first option");
+      exit_status = INVALID_OPTION;
+      goto clean_exit;
       break;
     case 'j':
       if (protocolfilter) {
