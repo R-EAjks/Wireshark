@@ -36,6 +36,7 @@ import re
 import argparse
 import time
 import struct
+import array
 from threading import Thread
 
 ERROR_USAGE          = 0
@@ -387,7 +388,7 @@ def extcap_capture(interface, fifo, control_in, control_out, in_delay, in_verify
                     control_write(fn_out, CTRL_ARG_NONE, CTRL_CMD_INFORMATION, "Turn action finished.")
                     button_disabled = False
 
-            out = ("%s|%04X%s|%s" % (remote.strip(), len(message), message, verify)).encode("utf8")
+            out = ("%02X%s%02X%s%c" % (len(remote), remote.strip(), len(message), message.strip(), verify)).encode("utf8")
             fh.write(pcap_fake_package(out, fake_ip))
             time.sleep(delay)
 
