@@ -31,6 +31,7 @@
 
 #include <config.h>
 #include <epan/packet.h>
+#include <epan/address.h>
 #include <epan/wmem/wmem.h>
 
 #define TPLINK_SMARTHOME_PORT 9999			/* TP-Link Smart Home devices use this port on both TCP and UDP */
@@ -65,11 +66,11 @@ dissect_tplink_smarthome(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 	tplink_smarthome_tree = proto_item_add_subtree(ti, ett_tplink_smarthome);		/* and add it to the display tree */
 
 	switch (pinfo->ptype) {									/* look at the IP port type */
-		case 3:										/* UDP */
+		case PT_UDP:									/* UDP */
 			if (len < 2) return 0;							/* don't dissect unless it contains enough to hold minimum valid JSON i.e. '{}' */
 			start = 0;								/* and the JSON message starts immediately */
 			break;
-		case 2:										/* TCP */
+		case PT_TCP:									/* TCP */
 			if (len < (4 + 2)) return 0;						/* don't dissect unless it has the msg length plus minimal JSON */
 			proto_tree_add_item(tplink_smarthome_tree,
 					hf_tplink_smarthome_Len, tvb, 0, 4, ENC_BIG_ENDIAN);	/* decode the the 4 byte message length field pre-pended in a TCP message, */
