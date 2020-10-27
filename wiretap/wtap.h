@@ -290,6 +290,8 @@ extern "C" {
 #define WTAP_ENCAP_ETW                          212
 #define WTAP_ENCAP_ERI_ENB_LOG                  213
 #define WTAP_ENCAP_ZBNCP			214
+#define WTAP_ENCAP_G3_CENELEC                   215
+#define WTAP_ENCAP_G3_FCC_ARIB                  216
 
 /* After adding new item here, please also add new item to encap_table_base array */
 

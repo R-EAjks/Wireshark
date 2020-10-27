@@ -48,7 +48,7 @@ void proto_reg_handoff_6lowpan(void);
 #define LOWPAN_PATTERN_BC0_BITS         8
 #define LOWPAN_PATTERN_IPHC             0x03    /* See draft-ietf-6lowpan-hc-15.txt */
 #define LOWPAN_PATTERN_IPHC_BITS        3
-#define LOWPAN_PATTERN_ESC              0x7f
+#define LOWPAN_PATTERN_ESC              0x40
 #define LOWPAN_PATTERN_ESC_BITS         8
 #define LOWPAN_PATTERN_MESH             0x02
 #define LOWPAN_PATTERN_MESH_BITS        2
@@ -330,6 +330,10 @@ static int hf_6lowpan_udp_dst = -1;
 static int hf_6lowpan_udp_len = -1;
 static int hf_6lowpan_udp_checksum = -1;
 
+/* Escape header fields. */
+static int hf_6lowpan_esc_header = -1;
+static int hf_6lowpan_esc_eet = -1;
+
 /* Broadcast header fields. */
 static int hf_6lowpan_bcast_seqnum = -1;
 
@@ -367,6 +371,7 @@ static gint ett_6lowpan_iphc = -1;
 static gint ett_lowpan_routing_header_dispatch = -1;
 static gint ett_6lowpan_nhc_ext = -1;
 static gint ett_6lowpan_nhc_udp = -1;
+static gint ett_6lowpan_esc = -1;
 static gint ett_6lowpan_bcast = -1;
 static gint ett_6lowpan_mesh = -1;
 static gint ett_6lowpan_mesh_flags = -1;
@@ -380,6 +385,7 @@ static expert_field ei_6lowpan_bad_ext_header_length = EI_INIT;
 /* Subdissector handles. */
 static dissector_handle_t       handle_6lowpan;
 static dissector_handle_t       ipv6_handle;
+static dissector_handle_t       g3data_handle;
 
 /* Value Strings */
 static const value_string lowpan_patterns [] = {
@@ -507,6 +513,15 @@ static const true_false_string bit_K_RPL = {
     "2 bytes"
 };
 
+/* Range Strings */
+static const range_string esc_extension_types [] = {
+    { 0,   0,          "Reserved" },
+    { 1,   31,         "ITU-T G.9903 and ITU-T G.9905" },
+    { 32,  254,        "Unassigned" },
+    { 255, 255,        "Reserved" },
+    { 0, 0, NULL }
+};
+
 /* Reassembly Data */
 static int hf_6lowpan_fragments = -1;
 static int hf_6lowpan_fragment = -1;
@@ -607,6 +622,7 @@ static void         prefs_6lowpan_apply         (void);
 static int          dissect_6lowpan             (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data);
 static tvbuff_t *   dissect_6lowpan_ipv6        (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
 static tvbuff_t *   dissect_6lowpan_hc1         (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gint dgram_size, const guint8 *siid, const guint8 *diid);
+static tvbuff_t *   dissect_6lowpan_esc         (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data);
 static tvbuff_t *   dissect_6lowpan_bc0         (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
 static tvbuff_t *   dissect_6lowpan_iphc        (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gint dgram_size, const guint8 *siid, const guint8 *diid);
 static struct lowpan_nhdr *
@@ -1270,6 +1286,9 @@ dissect_6lowpan(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data 
     }
     else if (tvb_get_bits8(next, 0, LOWPAN_PATTERN_IPHC_BITS) == LOWPAN_PATTERN_IPHC) {
         next = dissect_6lowpan_iphc(next, pinfo, lowpan_tree, -1, src_iid, dst_iid);
+    }
+    else if (tvb_get_bits8(next, 0, LOWPAN_PATTERN_ESC_BITS) == LOWPAN_PATTERN_ESC) {
+        next = dissect_6lowpan_esc(next, pinfo, lowpan_tree, data);
     }
     /* Unknown 6LoWPAN dispatch type */
     else {
@@ -2632,6 +2651,49 @@ dissect_6lowpan_iphc_nhc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gi
 
 /*FUNCTION:------------------------------------------------------
  *  NAME
+ *      dissect_6lowpan_esc
+ *  DESCRIPTION
+ *      Dissector routine for a 6LoWPAN Escape header.
+ *
+ *  PARAMETERS
+ *      tvb             ; packet buffer.
+ *      pinfo           ; packet info.
+ *      tree            ; 6LoWPAN display tree.
+ *      dgram_size      ; Datagram size (or <0 if not fragmented).
+ *      siid            ; Source Interface ID.
+ *      diid            ; Destination Interface ID.
+ *  RETURNS
+ *      tvbuff_t *      ; The remaining payload to be parsed or NULL on error.
+ *---------------------------------------------------------------
+ */
+static tvbuff_t *
+dissect_6lowpan_esc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
+{
+    gint                offset = 0;
+    guint8              esc_extension_type = 0;
+    proto_tree *        esc_tree;
+
+    /* Retrieve the Escape Header extension type (dispatch byte) */
+    esc_extension_type = tvb_get_guint8(tvb, 1);
+
+    /* Create a tree for the Escape header. */
+    esc_tree = proto_tree_add_subtree(tree, tvb, offset, 2, ett_6lowpan_esc, NULL, "Escape Header");
+    proto_tree_add_item(esc_tree, hf_6lowpan_esc_header, tvb, offset, 1, ENC_NA);
+    proto_tree_add_item(esc_tree, hf_6lowpan_esc_eet, tvb, offset + 1, 1, ENC_NA);
+
+    if ((esc_extension_type >= 1) && (esc_extension_type <= 31) && g3data_handle) {
+        /* Dissect ITU-T G.9903 or ITU-T G.9905 */
+        call_dissector_with_data(g3data_handle, tvb, pinfo, tree, data);
+        return NULL;
+    } else {
+        offset += 2;
+    }
+
+    return tvb_new_subset_remaining(tvb, offset);
+} /* dissect_6lowpan_esc */
+
+/*FUNCTION:------------------------------------------------------
+ *  NAME
  *      dissect_6lowpan_bc0
  *  DESCRIPTION
  *      Dissector routine for a 6LoWPAN broadcast header.
@@ -3389,6 +3451,14 @@ proto_register_6lowpan(void)
           { "UDP checksum",                   "6lowpan.udp.checksum",
             FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
 
+        /* Escape header fields. */
+        { &hf_6lowpan_esc_header,
+          { "Escape header ID",               "6lowpan.esc",
+            FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+        { &hf_6lowpan_esc_eet,
+          { "ESC Extension Type",             "6lowpan.esc.eet",
+            FT_UINT8, BASE_HEX|BASE_RANGE_STRING, RVALS(esc_extension_types), 0x0, NULL, HFILL }},
+
         /* Broadcast header fields. */
         { &hf_6lowpan_bcast_seqnum,
           { "Sequence number",                "6lowpan.bcast.seqnum",
@@ -3567,6 +3637,7 @@ proto_register_6lowpan(void)
         &ett_lowpan_routing_header_dispatch,
         &ett_6lowpan_nhc_ext,
         &ett_6lowpan_nhc_udp,
+        &ett_6lowpan_esc,
         &ett_6lowpan_bcast,
         &ett_6lowpan_mesh,
         &ett_6lowpan_mesh_flags,
@@ -3723,6 +3794,8 @@ proto_reg_handoff_6lowpan(void)
 
     dissector_add_uint("btl2cap.psm", BTL2CAP_PSM_LE_IPSP, handle_6lowpan);
     dissector_add_for_decode_as("btl2cap.cid", handle_6lowpan);
+
+    g3data_handle = find_dissector("g3data");
 } /* proto_reg_handoff_6lowpan */
 
 

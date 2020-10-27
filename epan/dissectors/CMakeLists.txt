@@ -369,6 +369,7 @@ set(DISSECTOR_PUBLIC_HEADERS
 	packet-frame.h
 	packet-ftam.h
 	packet-ftdi-ft.h
+	packet-g3.h
 	packet-geonw.h
 	packet-giop.h
 	packet-gluster.h
@@ -1114,6 +1115,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ftdi-mpsse.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ftp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-fw1.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-g3.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-g723.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-gadu-gadu.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-gbcs.c
