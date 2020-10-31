@@ -31,6 +31,7 @@ static gint ett_git = -1;
 static gint hf_git_packet_len = -1;
 static gint hf_git_packet_data = -1;
 static gint hf_git_packet_terminator = -1;
+static gint hf_git_protocol_version = -1;
 
 #define PNAME  "Git Smart Protocol"
 #define PSNAME "Git"
@@ -98,6 +99,9 @@ dissect_git_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data 
 
     proto_tree_add_item(git_tree, hf_git_packet_data, tvb, offset+4,
                         plen-4, ENC_NA);
+
+    proto_tree_add_item(git_tree, hf_git_protocol_version, tvb,
+                        offset+4, plen-4, ENC_NA);
   }
 
   return tvb_captured_length(tvb);
@@ -123,6 +127,10 @@ proto_register_git(void)
     },
     { &hf_git_packet_terminator,
       { "Terminator packet", "git.terminator", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL },
+    },
+    { &hf_git_protocol_version,
+      { "Protocol version", "git.protocol_version", FT_STRING, BASE_NONE, NULL
+      0x0,"Git Protocol Version", HFILL },
     },
   };
 
