@@ -1245,7 +1245,9 @@ main(int argc, char *argv[])
             memset(&st_tm,0,sizeof(struct tm));
 
             if (!(och=strptime(optarg,"%Y-%m-%d %T", &st_tm))) {
-                goto invalid_time;
+                if (!(och=strptime(optarg,"%s", &st_tm))) {
+                    goto invalid_time;
+                }
             }
 
             /* Sub-second support: see if the time is followed by a '.' */
