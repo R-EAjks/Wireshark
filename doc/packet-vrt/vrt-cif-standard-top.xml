@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration xmlns:xi="http://www.w3.org/2001/XInclude">
+<!--
+   Consider putting each cifMap in its own file and including them from a master list
+   <xi:include href="filename.xml" />  
+-->
+   <xi:include href="vrt-cif-standard.xml" />
+
+</configuration>

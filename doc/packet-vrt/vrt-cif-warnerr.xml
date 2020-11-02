@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<warnErrMap>
+   <!-- The configuration descriptions  encoded by this file were extracted from: ANSI/VITA 49.2-2017: VITA Radio 
+        Transport (VRT) Standard for Electromagnetic Spectrum: Signals and Applications, August 3, 2017. 
+        Copyright (c) 2017 by VITA -->
+   <!-- Describe the Warning/Error bit mask encoding for the class -->
+   <bit index="31" name="not executed" descript="" />
+   <bit index="30" name="device fail" descript="" />
+   <bit index="29" name="unsupported" descript="" />
+   <bit index="28" name="out-of-range" descript="" />
+   <bit index="27" name="precision limit" descript="" />
+   <bit index="26" name="invalid" descript="" />
+   <bit index="25" name="timestamp" descript="" />
+   <bit index="24" name="power level" descript="" />
+   <bit index="23" name="distortion" descript="" />
+   <bit index="22" name="in-band power" descript="" />
+   <bit index="21" name="out-band power" descript="" />
+   <bit index="20" name="co-site interference" descript="" />
+   <bit index="19" name="regional interference" descript="" />
+</warnErrMap>
