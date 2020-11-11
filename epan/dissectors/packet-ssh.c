@@ -498,8 +498,13 @@ static wmem_map_t   *ssh_kex_keys;
 #define SSH_FILEXFER_ATTR_EXTENDED      0x80000000
 
 #define CIPHER_AES128_CTR               0x00010001
+#define CIPHER_AES192_CTR               0x00010003
+#define CIPHER_AES256_CTR               0x00010004
 #define CIPHER_AES128_CBC               0x00020001
+#define CIPHER_AES192_CBC               0x00020002
+#define CIPHER_AES256_CBC               0x00020004
 #define CIPHER_AES128_GCM               0x00040001
+//#define CIPHER_AES192_GCM               0x00040002	-- does not exist
 #define CIPHER_AES256_GCM               0x00040004
 
 static const value_string ssh_direction_vals[] = {
@@ -1986,10 +1991,16 @@ ssh_keylog_read_file(void)
     }
 
     /* File format: each line follows the format "<cookie> <key>".
-     * <cookie> is the hex-encoded (client or server) cookie (32 characters) of
-     * endpoint whose private random is disclosed . <key> is the private random
-     * number that is used to generate the DH negotiation (length depends on 
-     * algorithm).
+     * <cookie> is the hex-encoded (client or server) 16 bytes cookie
+     * (32 characters) found in the SSH_MSG_KEXINIT of the endpoint whose
+     * private random is disclosed.
+     * <key> is the private random number that is used to generate the DH
+     * negotiation (length depends on algorithm). In RFC4253 it is called
+     * x for the client and y for the server.
+     * For openssh and DH group exchange, it can be retrieved using
+     * DH_get0_key(kex->dh, NULL, &server_random)
+     * For openssh and curve25519, it can be found in function kex_c25519_enc
+     * in variable server_key.
      *
      * Example:
      *  90d886612f9c35903db5bb30d11f23c2 DEF830C22F6C927E31972FFB20B46C96D0A5F2D5E7BE5A3A8804D6BFC431619ED10AF589EEDFF4750DEA00EFD7AFDB814B6F3528729692B1F2482041521AE9DC
@@ -2684,12 +2695,22 @@ ssh_decryption_set_cipher_id(struct ssh_peer_data *peer)
         peer->cipher_id = CIPHER_AES128_GCM;
     } else if (0 == strcmp(cipher_name, "aes128-gcm")) {
         peer->cipher_id = CIPHER_AES128_GCM;
-    } else if (0 == strcmp(cipher_name, "aes128-cbc")) {
-        peer->cipher_id = CIPHER_AES128_CBC;
-    } else if (0 == strcmp(cipher_name, "aes128-ctr")) {
-        peer->cipher_id = CIPHER_AES128_CTR;
     } else if (0 == strcmp(cipher_name, "aes256-gcm@openssh.com")) {
         peer->cipher_id = CIPHER_AES256_GCM;
+    } else if (0 == strcmp(cipher_name, "aes256-gcm")) {
+        peer->cipher_id = CIPHER_AES256_GCM;
+    } else if (0 == strcmp(cipher_name, "aes128-cbc")) {
+        peer->cipher_id = CIPHER_AES128_CBC;
+    } else if (0 == strcmp(cipher_name, "aes192-cbc")) {
+        peer->cipher_id = CIPHER_AES192_CBC;
+    } else if (0 == strcmp(cipher_name, "aes256-cbc")) {
+        peer->cipher_id = CIPHER_AES256_CBC;
+    } else if (0 == strcmp(cipher_name, "aes128-ctr")) {
+        peer->cipher_id = CIPHER_AES128_CTR;
+    } else if (0 == strcmp(cipher_name, "aes192-ctr")) {
+        peer->cipher_id = CIPHER_AES192_CTR;
+    } else if (0 == strcmp(cipher_name, "aes256-ctr")) {
+        peer->cipher_id = CIPHER_AES256_CTR;
     } else {
         peer->cipher = NULL;
         g_debug("decryption not supported: %s", cipher_name);
@@ -2736,17 +2757,18 @@ ssh_decryption_setup_cipher(struct ssh_peer_data *peer_data,
             g_debug("ssh: can't set chacha20 cipher key");
             return;
         }
-    } else if (CIPHER_AES128_CBC == peer_data->cipher_id) {
-        if (gcry_cipher_open(hd1, GCRY_CIPHER_AES128, GCRY_CIPHER_MODE_CBC, GCRY_CIPHER_CBC_CTS)) {
+    } else if (CIPHER_AES128_CBC == peer_data->cipher_id  || CIPHER_AES192_CBC == peer_data->cipher_id || CIPHER_AES256_CBC == peer_data->cipher_id) {
+        gint iKeyLen = CIPHER_AES128_CBC == peer_data->cipher_id?16:CIPHER_AES192_CBC == peer_data->cipher_id?24:32;
+        if (gcry_cipher_open(hd1, CIPHER_AES128_CBC == peer_data->cipher_id?GCRY_CIPHER_AES128:CIPHER_AES192_CBC == peer_data->cipher_id?GCRY_CIPHER_AES192:GCRY_CIPHER_AES256, GCRY_CIPHER_MODE_CBC, GCRY_CIPHER_CBC_CTS)) {
             gcry_cipher_close(*hd1);
-            g_debug("ssh: can't open aes128 cipher handle");
+            g_debug("ssh: can't open aes%d cipher handle", iKeyLen*8);
             return;
         }
-        gchar k1[16], iv1[16];
+        gchar k1[32], iv1[16];
         if(key->data){
-            memcpy(k1, key->data, 16);
+            memcpy(k1, key->data, iKeyLen);
         }else{
-            memset(k1, 0, 16);
+            memset(k1, 0, iKeyLen);
         }
         if(iv->data){
             memcpy(iv1, iv->data, 16);
@@ -2754,33 +2776,35 @@ ssh_decryption_setup_cipher(struct ssh_peer_data *peer_data,
             memset(iv1, 0, 16);
         }
 
-        g_debug("ssh: cipher is aes128-cbc");
-        print_hex(k1, 16, "key");
+        g_debug("ssh: cipher is aes%d-cbc", iKeyLen*8);
+        print_hex(k1, iKeyLen, "key");
         print_hex(iv1, 16, "iv");
 
-        if ((err = gcry_cipher_setkey(*hd1, k1, 16))) {
+        if ((err = gcry_cipher_setkey(*hd1, k1, iKeyLen))) {
             gcry_cipher_close(*hd1);
-            g_debug("ssh: can't set aes128 cipher key");
+            g_debug("ssh: can't set aes%d cipher key", iKeyLen*8);
             return;
         }
 
         if ((err = gcry_cipher_setiv(*hd1, iv1, 16))) {
             gcry_cipher_close(*hd1);
-            g_debug("ssh: can't set aes128 cipher iv");
+            g_debug("ssh: can't set aes%d cipher iv", iKeyLen*8);
             g_debug("libgcrypt: %d %s %s", gcry_err_code(err), gcry_strsource(err), gcry_strerror(err));
             return;
         }
-    } else if (CIPHER_AES128_CTR == peer_data->cipher_id) {
-        if (gcry_cipher_open(hd1, GCRY_CIPHER_AES128, GCRY_CIPHER_MODE_CTR, 0)) {
+
+    } else if (CIPHER_AES128_CTR == peer_data->cipher_id  || CIPHER_AES192_CTR == peer_data->cipher_id || CIPHER_AES256_CTR == peer_data->cipher_id) {
+        gint iKeyLen = CIPHER_AES128_CTR == peer_data->cipher_id?16:CIPHER_AES192_CTR == peer_data->cipher_id?24:32;
+        if (gcry_cipher_open(hd1, CIPHER_AES128_CTR == peer_data->cipher_id?GCRY_CIPHER_AES128:CIPHER_AES192_CTR == peer_data->cipher_id?GCRY_CIPHER_AES192:GCRY_CIPHER_AES256, GCRY_CIPHER_MODE_CTR, 0)) {
             gcry_cipher_close(*hd1);
-            g_debug("ssh: can't open aes128 cipher handle");
+            g_debug("ssh: can't open aes%d cipher handle", iKeyLen*8);
             return;
         }
-        gchar k1[16], iv1[16];
+        gchar k1[32], iv1[16];
         if(key->data){
-            memcpy(k1, key->data, 16);
+            memcpy(k1, key->data, iKeyLen);
         }else{
-            memset(k1, 0, 16);
+            memset(k1, 0, iKeyLen);
         }
         if(iv->data){
             memcpy(iv1, iv->data, 16);
@@ -2788,36 +2812,37 @@ ssh_decryption_setup_cipher(struct ssh_peer_data *peer_data,
             memset(iv1, 0, 16);
         }
 
-        g_debug("ssh: cipher is aes128-ctr");
-        print_hex(k1, 16, "key");
+        g_debug("ssh: cipher is aes%d-ctr", iKeyLen*8);
+        print_hex(k1, iKeyLen, "key");
         print_hex(iv1, 16, "iv");
 
-        if ((err = gcry_cipher_setkey(*hd1, k1, 16))) {
+        if ((err = gcry_cipher_setkey(*hd1, k1, iKeyLen))) {
             gcry_cipher_close(*hd1);
-            g_debug("ssh: can't set aes128 cipher key");
+            g_debug("ssh: can't set aes%d cipher key", iKeyLen*8);
             return;
         }
 
         if ((err = gcry_cipher_setctr(*hd1, iv1, 16))) {
             gcry_cipher_close(*hd1);
-            g_debug("ssh: can't set aes128 cipher iv");
+            g_debug("ssh: can't set aes%d cipher iv", iKeyLen*8);
             g_debug("libgcrypt: %d %s %s", gcry_err_code(err), gcry_strsource(err), gcry_strerror(err));
             return;
         }
 
 
-    } else if (CIPHER_AES128_GCM == peer_data->cipher_id) {
-        if (gcry_cipher_open(hd1, GCRY_CIPHER_AES128, GCRY_CIPHER_MODE_GCM, 0)) {
+    } else if (CIPHER_AES128_GCM == peer_data->cipher_id  || CIPHER_AES256_GCM == peer_data->cipher_id) {
+        gint iKeyLen = CIPHER_AES128_GCM == peer_data->cipher_id?16:32;
+        if (gcry_cipher_open(hd1, CIPHER_AES128_GCM == peer_data->cipher_id?GCRY_CIPHER_AES128:GCRY_CIPHER_AES256, GCRY_CIPHER_MODE_GCM, 0)) {
             gcry_cipher_close(*hd1);
-            g_debug("ssh: can't open aes128 cipher handle");
+            g_debug("ssh: can't open aes%d cipher handle", iKeyLen*8);
             return;
         }
 
-        gchar k1[16], iv2[12];
+        gchar k1[32], iv2[12];
         if(key->data){
-            memcpy(k1, key->data, 16);
+            memcpy(k1, key->data, iKeyLen);
         }else{
-            memset(k1, 0, 16);
+            memset(k1, 0, iKeyLen);
         }
         if(iv->data){
             memcpy(peer_data->iv, iv->data, 12);
@@ -2825,12 +2850,12 @@ ssh_decryption_setup_cipher(struct ssh_peer_data *peer_data,
             memset(iv2, 0, 12);
         }
 
-        print_hex(k1, 16, "key");
+        print_hex(k1, iKeyLen, "key");
         print_hex(peer_data->iv, 12, "iv");
 
-        if ((err = gcry_cipher_setkey(*hd1, k1, 16))) {
+        if ((err = gcry_cipher_setkey(*hd1, k1, iKeyLen))) {
             gcry_cipher_close(*hd1);
-            g_debug("ssh: can't set aes128 cipher key");
+            g_debug("ssh: can't set aes%d cipher key", iKeyLen*8);
             return;
         }
 
@@ -2929,7 +2954,7 @@ g_debug("~~~~: %s->sequence_number++ > %d", is_response?"serveur":"client", peer
 if(message_length>32768){return tvb_captured_length(tvb);}
 
         plain = (gchar *)wmem_alloc0(pinfo->pool, message_length+4);
-        plain[0] = plain_length_buf[0]; plain[1] = plain_length_buf[1]; plain[2] = plain_length_buf[2]; plain[3] = plain_length_buf[3]; 
+        plain[0] = plain_length_buf[0]; plain[1] = plain_length_buf[1]; plain[2] = plain_length_buf[2]; plain[3] = plain_length_buf[3];
         const gchar *ctext2 = (const gchar *)tvb_get_ptr(tvb, offset+4,
                 message_length);
 
@@ -2964,7 +2989,7 @@ if(message_length>32768){return tvb_captured_length(tvb);}
             dump_ssh_style(ctext2, message_length+4+mac_len, is_response?"s2c encrypted":"c2s encrypted");
             dump_ssh_style(plain, message_length+4, "plain text seq=%d", seqnr);
 
-    } else if (CIPHER_AES128_GCM == peer_data->cipher_id) {
+    } else if (CIPHER_AES128_GCM == peer_data->cipher_id || CIPHER_AES256_GCM == peer_data->cipher_id) {
 
         mac_len = peer_data->mac_length;
         message_length = tvb_reported_length_remaining(tvb, offset) - 4 - mac_len;
@@ -3029,7 +3054,7 @@ if(message_length>32768){return tvb_captured_length(tvb);}
                 return offset;
             }
 
-            
+
             if ((err = gcry_cipher_reset(peer_data->cipher))) {
                 g_debug ("aes-gcm, gcry_cipher_reset failed: %s\n",
                     gpg_strerror (err));
@@ -3057,7 +3082,9 @@ if(message_length>32768){return tvb_captured_length(tvb);}
                 tree, tvb, pinfo);
 */
 
-    } else if (CIPHER_AES128_CBC == peer_data->cipher_id || CIPHER_AES128_CTR == peer_data->cipher_id) {
+    } else if (CIPHER_AES128_CBC == peer_data->cipher_id || CIPHER_AES128_CTR == peer_data->cipher_id || 
+        CIPHER_AES192_CBC == peer_data->cipher_id || CIPHER_AES192_CTR == peer_data->cipher_id || 
+        CIPHER_AES256_CBC == peer_data->cipher_id || CIPHER_AES256_CTR == peer_data->cipher_id) {
 
         mac_len = peer_data->mac_length;
         message_length = tvb_reported_length_remaining(tvb, offset) - 4 - mac_len;
@@ -3117,7 +3144,7 @@ if(message_length>32768){return tvb_captured_length(tvb);}
                 offset += remaining;
                 return tvb_captured_length(tvb);
             }else{
-            
+
                 if (ssh_desegment && pinfo->can_desegment) {
                     /*
                      * Yes - would an SSH header starting at this offset
@@ -3144,7 +3171,7 @@ if(message_length>32768){return tvb_captured_length(tvb);}
                     }
                 }
 
-            
+
                 message_length = message_length_decrypted;
                 message->plain_data = (gchar *)wmem_alloc(wmem_file_scope(), message_length+4);
                 memcpy(message->plain_data, peer_data->fragment_plain0, 16);
@@ -5014,8 +5041,7 @@ proto_register_ssh(void)
     ssh_master_key_map = g_hash_table_new(ssl_hash, ssl_equal);
     prefs_register_filename_preference(ssh_module, "keylog_file", "Key log filename",
             "The path to the file which contains a list of key exchange secrets in the following format:\n"
-            "\"<key-type> <hex-encoded-key>\" (without quotes or leading spaces).\n"
-            "<key-type> is one of: curve25519. ",
+            "\"<hex-encoded-cookie> <hex-encoded-key>\" (without quotes or leading spaces).\n",
             &pref_keylog_file, FALSE);
 
     ssh_kex_keys = wmem_map_new_autoreset(wmem_epan_scope(), wmem_file_scope(),
