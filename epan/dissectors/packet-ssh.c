@@ -128,6 +128,12 @@ typedef struct {
 } ssh_packet_info_t;
 #endif
 
+typedef struct _ssh_channel_info_t {
+    guint  channel_number;
+    dissector_handle_t subdissector_handle;
+    struct _ssh_channel_info_t* next;
+} ssh_channel_info_t;
+
 struct ssh_peer_data {
     guint   counter;
 
@@ -169,6 +175,8 @@ struct ssh_peer_data {
     ssh_bignum      *bn_cookie;
     guint8           iv[12];
 #endif
+
+    ssh_channel_info_t *channel_info;
 };
 
 struct ssh_flow_data {
@@ -332,41 +340,12 @@ static int hf_ssh_subsystem_name_len = -1;
 static int hf_ssh_subsystem_name = -1;
 static int hf_ssh_channel_window_adjust = -1;
 static int hf_ssh_channel_data_len = -1;
-static int hf_ssh_sftp_len = -1;
-static int hf_ssh_sftp_type = -1;
-static int hf_ssh_sftp_version = -1;
-static int hf_ssh_sftp_id = -1;
-static int hf_ssh_sftp_path_len = -1;
-static int hf_ssh_sftp_path = -1;
-static int hf_ssh_sftp_pflags = -1;
-static int hf_ssh_sftp_fxp_name_count = -1;
-static int hf_ssh_sftp_name_fn_len = -1;
-static int hf_ssh_sftp_name_fn = -1;
-static int hf_ssh_sftp_name_ln_len = -1;
-static int hf_ssh_sftp_name_ln = -1;
-static int hf_ssh_sftp_attrs_flags = -1;
-static int hf_ssh_sftp_attrs_size = -1;
-static int hf_ssh_sftp_attrs_uid = -1;
-static int hf_ssh_sftp_attrs_gid = -1;
-static int hf_ssh_sftp_attrs_permissions = -1;
-static int hf_ssh_sftp_attrs_atime = -1;
-static int hf_ssh_sftp_attrs_mtime = -1;
-static int hf_ssh_sftp_attrs_extended_count = -1;
-static int hf_ssh_sftp_handle_len = -1;
-static int hf_ssh_sftp_handle = -1;
-static int hf_ssh_sftp_status = -1;
-static int hf_ssh_sftp_error_message_len = -1;
-static int hf_ssh_sftp_error_message = -1;
 static int hf_ssh_exit_status = -1;
 static int hf_ssh_disconnect_reason = -1;
 static int hf_ssh_disconnect_description_length = -1;
 static int hf_ssh_disconnect_description = -1;
 static int hf_ssh_lang_tag_length = -1;
 static int hf_ssh_lang_tag = -1;
-static int hf_ssh_sftp_offset = -1;
-static int hf_ssh_sftp_length = -1;
-static int hf_ssh_sftp_data_len = -1;
-static int hf_ssh_sftp_data = -1;
 
 static int hf_ssh_blob_p = -1;
 static int hf_ssh_blob_e = -1;
@@ -382,14 +361,13 @@ static gint ett_userauth_pk_signautre = -1;
 static gint ett_key_init = -1;
 static gint ett_ssh1 = -1;
 static gint ett_ssh2 = -1;
-static gint ett_sftp = -1;
-static gint ett_sftp_attrs = -1;
 
 static expert_field ei_ssh_packet_length = EI_INIT;
 
 static gboolean ssh_desegment = TRUE;
 
 static dissector_handle_t ssh_handle;
+static dissector_handle_t sftp_handle=NULL;
 
 #ifdef SSH_DECRYPTION_SUPPORTED
 static const char   *pref_keylog_file;
@@ -458,44 +436,6 @@ static wmem_map_t   *ssh_kex_keys;
 
 /* 128-191 reserved for client protocols */
 /* 192-255 local extensions */
-
-#define SSH_FXP_INIT                1
-#define SSH_FXP_VERSION             2
-#define SSH_FXP_OPEN                3
-#define SSH_FXP_CLOSE               4
-#define SSH_FXP_READ                5
-#define SSH_FXP_WRITE               6
-#define SSH_FXP_LSTAT               7
-#define SSH_FXP_FSTAT               8
-#define SSH_FXP_SETSTAT             9
-#define SSH_FXP_FSETSTAT           10
-#define SSH_FXP_OPENDIR            11
-#define SSH_FXP_READDIR            12
-#define SSH_FXP_REMOVE             13
-#define SSH_FXP_MKDIR              14
-#define SSH_FXP_RMDIR              15
-#define SSH_FXP_REALPATH           16
-#define SSH_FXP_STAT               17
-#define SSH_FXP_RENAME             18
-#define SSH_FXP_READLINK           19
-#define SSH_FXP_LINK               21
-#define SSH_FXP_BLOCK              22
-#define SSH_FXP_UNBLOCK            23
-
-#define SSH_FXP_STATUS            101
-#define SSH_FXP_HANDLE            102
-#define SSH_FXP_DATA              103
-#define SSH_FXP_NAME              104
-#define SSH_FXP_ATTRS             105
-
-#define SSH_FXP_EXTENDED          200
-#define SSH_FXP_EXTENDED_REPLY    201
-
-#define SSH_FILEXFER_ATTR_SIZE          0x00000001
-#define SSH_FILEXFER_ATTR_UIDGID        0x00000002
-#define SSH_FILEXFER_ATTR_PERMISSIONS   0x00000004
-#define SSH_FILEXFER_ATTR_ACMODTIME     0x00000008
-#define SSH_FILEXFER_ATTR_EXTENDED      0x80000000
 
 #define CIPHER_AES128_CTR               0x00010001
 #define CIPHER_AES192_CTR               0x00010003
@@ -573,40 +513,6 @@ static const value_string ssh1_msg_vals[] = {
     {SSH1_CMSG_USER,                     "User"},
     {0, NULL}
 };
-
-static const value_string ssh2_sftp_vals[] = {
-    {SSH_FXP_INIT,                       "SSH_FXP_INIT"},
-    {SSH_FXP_VERSION,                    "SSH_FXP_VERSION"},
-    {SSH_FXP_OPEN,                       "SSH_FXP_OPEN"},
-    {SSH_FXP_CLOSE,                      "SSH_FXP_CLOSE"},
-    {SSH_FXP_READ,                       "SSH_FXP_READ"},
-    {SSH_FXP_WRITE,                      "SSH_FXP_WRITE"},
-    {SSH_FXP_LSTAT,                      "SSH_FXP_LSTAT"},
-    {SSH_FXP_FSTAT,                      "SSH_FXP_FSTAT"},
-    {SSH_FXP_SETSTAT,                    "SSH_FXP_SETSTAT"},
-    {SSH_FXP_FSETSTAT,                   "SSH_FXP_FSETSTAT"},
-    {SSH_FXP_OPENDIR,                    "SSH_FXP_OPENDIR"},
-    {SSH_FXP_READDIR,                    "SSH_FXP_READDIR"},
-    {SSH_FXP_REMOVE,                     "SSH_FXP_REMOVE"},
-    {SSH_FXP_MKDIR,                      "SSH_FXP_MKDIR"},
-    {SSH_FXP_RMDIR,                      "SSH_FXP_RMDIR"},
-    {SSH_FXP_REALPATH,                   "SSH_FXP_REALPATH"},
-    {SSH_FXP_STAT,                       "SSH_FXP_STAT"},
-    {SSH_FXP_RENAME,                     "SSH_FXP_RENAME"},
-    {SSH_FXP_READLINK,                   "SSH_FXP_READLINK"},
-    {SSH_FXP_LINK,                       "SSH_FXP_LINK"},
-    {SSH_FXP_BLOCK,                      "SSH_FXP_BLOCK"},
-    {SSH_FXP_UNBLOCK,                    "SSH_FXP_UNBLOCK"},
-    {SSH_FXP_STATUS,                     "SSH_FXP_STATUS"},
-    {SSH_FXP_HANDLE,                     "SSH_FXP_HANDLE"},
-    {SSH_FXP_DATA,                       "SSH_FXP_DATA"},
-    {SSH_FXP_NAME,                       "SSH_FXP_NAME"},
-    {SSH_FXP_ATTRS,                      "SSH_FXP_ATTRS"},
-    {SSH_FXP_EXTENDED,                   "SSH_FXP_EXTENDED"},
-    {SSH_FXP_EXTENDED_REPLY,             "SSH_FXP_EXTENDED_REPLY"},
-    {0, NULL}
-};
-
 
 static int ssh_dissect_key_init(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree,
         int is_response,
@@ -690,9 +596,11 @@ static gboolean ssh_decrypt_chacha20(gcry_cipher_hd_t hd, guint32 seqnr,
         guint32 counter, const guchar *ctext, guint ctext_len,
         guchar *plain, guint plain_len);
 
-static int ssh_dissect_decrypted_packet(gchar *plaintext, guint plaintext_len,
-        gchar *mac, guint mac_len, proto_tree *tree, tvbuff_t *tvb,
-        packet_info *pinfo, gboolean *need_desegmentation);
+static int ssh_dissect_decrypted_packet(tvbuff_t *tvb, packet_info *pinfo, 
+        struct ssh_peer_data *peer_data, proto_tree *tree, 
+        gchar *plaintext, guint plaintext_len,
+        gchar *mac, guint mac_len, 
+        gboolean *need_desegmentation);
 static void ssh_dissect_transport_generic(tvbuff_t *packet_tvb, packet_info *pinfo,
         /*struct ssh_flow_data *global_data,*/ int offset, proto_item *msg_type_tree,
         /*int is_response,*/ guint msg_code);
@@ -703,7 +611,7 @@ static void ssh_dissect_userauth_specific(tvbuff_t *packet_tvb, packet_info *pin
         /*struct ssh_flow_data *global_data,*/ int offset, proto_item *msg_type_tree,
         /*int is_response,*/ guint msg_code);
 static void ssh_dissect_connection_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
-        /*struct ssh_flow_data *global_data,*/ int offset, proto_item *msg_type_tree,
+        struct ssh_peer_data *peer_data, int offset, proto_item *msg_type_tree,
         /*int is_response,*/ guint msg_code);
 static void ssh_dissect_connection_generic(tvbuff_t *packet_tvb, packet_info *pinfo,
         /*struct ssh_flow_data *global_data,*/ int offset, proto_item *msg_type_tree,
@@ -714,10 +622,9 @@ static void ssh_dissect_public_key_blob(tvbuff_t *packet_tvb, packet_info *pinfo
 static void ssh_dissect_public_key_signature(tvbuff_t *packet_tvb, packet_info *pinfo,
         /*struct ssh_flow_data *global_data,*/ int offset, proto_item *msg_type_tree
         /*int is_response*/);
-static int ssh_dissect_sftp(tvbuff_t *packet_tvb, packet_info *pinfo,
-        int offset, proto_item *msg_type_tree);
-static int ssh_dissect_sftp_attrs(tvbuff_t *packet_tvb, packet_info *pinfo,
-        int offset, proto_item *msg_type_tree);
+
+static dissector_handle_t get_subdissector_for_channel(struct ssh_peer_data *peer_data, guint uiNumChannel);
+static void set_subdissector_for_channel(struct ssh_peer_data *peer_data, guint uiNumChannel, guint8* subsystem_name);
 
 /* other defines */
 typedef enum {
@@ -3231,7 +3138,7 @@ g_debug("Remlen %d %d", tvb_reported_length_remaining(tvb, offset), tvb_reported
     }
 
     if(plain){
-        ssh_dissect_decrypted_packet(plain, message_length+4, mac, mac_len, tree, tvb, pinfo, need_desegmentation);
+        ssh_dissect_decrypted_packet(tvb, pinfo, peer_data, tree, plain, message_length+4, mac, mac_len, need_desegmentation);
     }
 
     offset += message_length + peer_data->mac_length + 4;
@@ -3320,9 +3227,11 @@ static int
 //        struct ssh_flow_data *global_data,
 //        int offset, proto_tree *tree, int is_response,
 //        gboolean *need_desegmentation)
-ssh_dissect_decrypted_packet(gchar *plaintext, guint plaintext_len,
-        gchar *mac, guint mac_len, proto_tree *tree, tvbuff_t *tvb,
-        packet_info *pinfo, gboolean *need_desegmentation)
+ssh_dissect_decrypted_packet(tvbuff_t *tvb, packet_info *pinfo, 
+        struct ssh_peer_data *peer_data, proto_tree *tree, 
+        gchar *plaintext, guint plaintext_len,
+        gchar *mac, guint mac_len, 
+        gboolean *need_desegmentation)
 {
     int offset = 0;      // TODO:
 
@@ -3458,7 +3367,7 @@ ssh_dissect_decrypted_packet(gchar *plaintext, guint plaintext_len,
         proto_tree_add_item(msg_type_tree, hf_ssh2_msg_code, packet_tvb, offset, 1, ENC_BIG_ENDIAN);
         offset+=1;
         // TODO: offset = ssh_dissect_connection_channel(packet_tvb, pinfo, global_data, offset, msg_type_tree, is_response, msg_code);
-        ssh_dissect_connection_specific(packet_tvb, pinfo, offset, msg_type_tree, msg_code);
+        ssh_dissect_connection_specific(packet_tvb, pinfo, peer_data, offset, msg_type_tree, msg_code);
     }
 
     /* Reserved for client protocols (128-191) */
@@ -3619,7 +3528,7 @@ ssh_dissect_userauth_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
 
 static void
 ssh_dissect_connection_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
-        /*struct ssh_flow_data *global_data,*/ int offset, proto_item *msg_type_tree,
+        struct ssh_peer_data *peer_data, int offset, proto_item *msg_type_tree,
         /*int is_response,*/ guint msg_code)
 {
         (void)pinfo;
@@ -3651,6 +3560,8 @@ ssh_dissect_connection_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
                 proto_tree_add_item(msg_type_tree, hf_ssh_channel_window_adjust, packet_tvb, offset, 4, ENC_BIG_ENDIAN);         // TODO: maintain count of transfered bytes and window size
                 offset += 4;
         }else if(msg_code==SSH_MSG_CHANNEL_DATA){
+                guint   uiNumChannel;
+                uiNumChannel = tvb_get_ntohl(packet_tvb, offset) ;
                 proto_tree_add_item(msg_type_tree, hf_ssh_connection_recipient_channel, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
                 offset += 4;
 // TODO: process according to the type of channel
@@ -3658,7 +3569,11 @@ ssh_dissect_connection_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
                 slen = tvb_get_ntohl(packet_tvb, offset) ;
                 proto_tree_add_item(msg_type_tree, hf_ssh_channel_data_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
                 offset += 4;
-                ssh_dissect_sftp(packet_tvb, pinfo, offset, msg_type_tree);
+                tvbuff_t *next_tvb = tvb_new_subset_remaining(packet_tvb, offset);
+                dissector_handle_t subdissector_handle = get_subdissector_for_channel(peer_data, uiNumChannel);
+                if(subdissector_handle){
+                        call_dissector(subdissector_handle, next_tvb, pinfo, msg_type_tree);
+                }
                 offset += slen;
         }else if(msg_code==SSH_MSG_CHANNEL_EOF){
                 proto_tree_add_item(msg_type_tree, hf_ssh_connection_recipient_channel, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
@@ -3667,6 +3582,8 @@ ssh_dissect_connection_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
                 proto_tree_add_item(msg_type_tree, hf_ssh_connection_recipient_channel, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
                 offset += 4;
         }else if(msg_code==SSH_MSG_CHANNEL_REQUEST){
+                guint   uiNumChannel;
+                uiNumChannel = tvb_get_ntohl(packet_tvb, offset) ;
                 proto_tree_add_item(msg_type_tree, hf_ssh_connection_recipient_channel, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
                 offset += 4;
                 guint8* request_name;
@@ -3683,6 +3600,8 @@ ssh_dissect_connection_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
                         slen = tvb_get_ntohl(packet_tvb, offset) ;
                         proto_tree_add_item(msg_type_tree, hf_ssh_subsystem_name_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
                         offset += 4;
+                        guint8* subsystem_name = tvb_get_string_enc(wmem_packet_scope(), packet_tvb, offset, slen, ENC_ASCII|ENC_NA);
+                        set_subdissector_for_channel(peer_data, uiNumChannel, subsystem_name);
                         proto_tree_add_item(msg_type_tree, hf_ssh_subsystem_name, packet_tvb, offset, slen, ENC_BIG_ENDIAN);
                         offset += slen;
                 }else if (0 == strcmp(request_name, "exit-status")) {
@@ -3695,330 +3614,39 @@ ssh_dissect_connection_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
         }
 }
 
-static int ssh_dissect_sftp(tvbuff_t *packet_tvb, packet_info *pinfo,
-        int offset, proto_item *msg_type_tree)
+static dissector_handle_t
+get_subdissector_for_channel(struct ssh_peer_data *peer_data, guint uiNumChannel)
 {
-        int offset0 = offset;
-        guint   plen;
-        guint   slen;
-        plen = tvb_get_ntohl(packet_tvb, offset) ;
-        wmem_strbuf_t *title = wmem_strbuf_new(wmem_packet_scope(), "SFTP");
-        proto_item * sftp_tree = proto_tree_add_subtree(msg_type_tree, packet_tvb, offset, -1, ett_sftp, NULL, NULL);
-        proto_tree_add_item(sftp_tree, hf_ssh_sftp_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-        offset += 4;
-        guint8  typ;
-        typ = tvb_get_guint8(packet_tvb, offset) ;
-        proto_tree_add_item(sftp_tree, hf_ssh_sftp_type, packet_tvb, offset, 1, ENC_BIG_ENDIAN);
-        offset += 1;
-        if(typ==SSH_FXP_INIT){
-                int ver = tvb_get_ntohl(packet_tvb, offset) ;
-                wmem_strbuf_append_printf(title, " SSH_FXP_INIT (%d) version %d", typ, ver);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_version, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-        }else if(typ==SSH_FXP_VERSION){
-                int ver = tvb_get_ntohl(packet_tvb, offset) ;
-                wmem_strbuf_append_printf(title, " SSH_FXP_VERSION (%d) version %d", typ, ver);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_version, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-        }else if(typ==SSH_FXP_OPEN){
-                int id = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_id, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                slen = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_path_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                guint8 * path = tvb_get_string_enc(wmem_packet_scope(), packet_tvb, offset, slen, ENC_UTF_8);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_path, packet_tvb, offset, slen, ENC_UTF_8);
-                offset += slen;
-//                int pflags = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_pflags, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                slen = ssh_dissect_sftp_attrs(packet_tvb, pinfo, offset, sftp_tree);
-                offset += slen;
-                wmem_strbuf_append_printf(title, " SSH_FXP_OPEN (%d) id=%d [%s]", typ, id, path);
-        }else if(typ==SSH_FXP_CLOSE){
-                int id = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_id, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                slen = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_handle_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                gchar * handle = tvb_bytes_to_str(wmem_packet_scope(), packet_tvb, offset, slen);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_handle, packet_tvb, offset, slen, ENC_BIG_ENDIAN);
-                offset += slen;
-                wmem_strbuf_append_printf(title, " SSH_FXP_CLOSE (%d) id=%d {%s}", typ, id, handle);
-        }else if(typ==SSH_FXP_READ){
-                int id = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_id, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                slen = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_handle_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                gchar * handle = tvb_bytes_to_str(wmem_packet_scope(), packet_tvb, offset, slen);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_handle, packet_tvb, offset, slen, ENC_BIG_ENDIAN);
-                offset += slen;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_offset, packet_tvb, offset, 8, ENC_BIG_ENDIAN);
-                offset += 8;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_length, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                wmem_strbuf_append_printf(title, " SSH_FXP_READ (%d) id=%d {%s}", typ, id, handle);
-        }else if(typ==SSH_FXP_WRITE){
-                int id = tvb_get_ntohl(packet_tvb, offset);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_id, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                slen = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_handle_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                gchar * handle = tvb_bytes_to_str(wmem_packet_scope(), packet_tvb, offset, slen);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_handle, packet_tvb, offset, slen, ENC_BIG_ENDIAN);
-                offset += slen;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_offset, packet_tvb, offset, 8, ENC_BIG_ENDIAN);
-                offset += 8;
-                int dlen = tvb_get_ntohl(packet_tvb, offset);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_data_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_data, packet_tvb, offset, dlen, ENC_BIG_ENDIAN);
-                offset += dlen;
-                wmem_strbuf_append_printf(title, " SSH_FXP_WRITE (%d) id=%d {%s} len=%d", typ, id, handle, dlen);
-        }else if(typ==SSH_FXP_LSTAT){
-                int id = tvb_get_ntohl(packet_tvb, offset);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_id, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                slen = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_path_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                guint8 * path = tvb_get_string_enc(wmem_packet_scope(), packet_tvb, offset, slen, ENC_UTF_8);
-                wmem_strbuf_append_printf(title, " SSH_FXP_LSTAT (%d) id=%d [%s]", typ, id, path);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_path, packet_tvb, offset, slen, ENC_UTF_8);
-                offset += slen;
-        }else if(typ==SSH_FXP_FSTAT){
-                int id = tvb_get_ntohl(packet_tvb, offset);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_id, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                slen = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_handle_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                gchar * handle = tvb_bytes_to_str(wmem_packet_scope(), packet_tvb, offset, slen);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_handle, packet_tvb, offset, slen, ENC_BIG_ENDIAN);
-                offset += slen;
-                wmem_strbuf_append_printf(title, " SSH_FXP_FSTAT (%d) id=%d {%s}", typ, id, handle);
-        }else if(typ==SSH_FXP_SETSTAT){
-                int id = tvb_get_ntohl(packet_tvb, offset);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_id, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                slen = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_path_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                guint8 * path = tvb_get_string_enc(wmem_packet_scope(), packet_tvb, offset, slen, ENC_UTF_8);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_path, packet_tvb, offset, slen, ENC_UTF_8);
-                offset += slen;
-                slen = ssh_dissect_sftp_attrs(packet_tvb, pinfo, offset, sftp_tree);
-                proto_item_set_len(sftp_tree, slen);
-                offset += slen;
-                wmem_strbuf_append_printf(title, " SSH_FXP_SETSTAT (%d) id=%d [%s]", typ, id, path);
-//        }else if(typ==SSH_FXP_FSETSTAT){
-        }else if(typ==SSH_FXP_OPENDIR){
-                int id = tvb_get_ntohl(packet_tvb, offset);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_id, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                slen = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_path_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                guint8 * path = tvb_get_string_enc(wmem_packet_scope(), packet_tvb, offset, slen, ENC_UTF_8);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_path, packet_tvb, offset, slen, ENC_UTF_8);
-                offset += slen;
-                wmem_strbuf_append_printf(title, " SSH_FXP_OPENDIR (%d) id=%d [%s]", typ, id, path);
-        }else if(typ==SSH_FXP_READDIR){
-                int id = tvb_get_ntohl(packet_tvb, offset);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_id, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                slen = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_handle_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                gchar * handle = tvb_bytes_to_str(wmem_packet_scope(), packet_tvb, offset, slen);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_handle, packet_tvb, offset, slen, ENC_BIG_ENDIAN);
-                offset += slen;
-                wmem_strbuf_append_printf(title, " SSH_FXP_READDIR (%d) id=%d {%s}", typ, id, handle);
-        }else if(typ==SSH_FXP_REMOVE){
-                int id = tvb_get_ntohl(packet_tvb, offset);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_id, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                slen = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_path_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                guint8 * path = tvb_get_string_enc(wmem_packet_scope(), packet_tvb, offset, slen, ENC_UTF_8);
-                wmem_strbuf_append_printf(title, " SSH_FXP_REMOVE (%d) id=%d [%s]", typ, id, path);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_path, packet_tvb, offset, slen, ENC_UTF_8);
-                offset += slen;
-//        }else if(typ==SSH_FXP_MKDIR){
-//        }else if(typ==SSH_FXP_RMDIR){
-        }else if(typ==SSH_FXP_REALPATH){
-                int id = tvb_get_ntohl(packet_tvb, offset);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_id, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                slen = tvb_get_ntohl(packet_tvb, offset);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_path_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                guint8 * path = tvb_get_string_enc(wmem_packet_scope(), packet_tvb, offset, slen, ENC_UTF_8);
-                wmem_strbuf_append_printf(title, " SSH_FXP_REALPATH (%d) id=%d [%s]", typ, id, path);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_path, packet_tvb, offset, slen, ENC_UTF_8);
-                offset += slen;
-        }else if(typ==SSH_FXP_STAT){
-                int id = tvb_get_ntohl(packet_tvb, offset);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_id, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                slen = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_path_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                guint8 * path = tvb_get_string_enc(wmem_packet_scope(), packet_tvb, offset, slen, ENC_UTF_8);
-                wmem_strbuf_append_printf(title, " SSH_FXP_STAT (%d) id=%d [%s]", typ, id, path);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_path, packet_tvb, offset, slen, ENC_UTF_8);
-                offset += slen;
-        }else if(typ==SSH_FXP_RENAME){
-                int id = tvb_get_ntohl(packet_tvb, offset);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_id, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                slen = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_path_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                guint8 * oldpath = tvb_get_string_enc(wmem_packet_scope(), packet_tvb, offset, slen, ENC_UTF_8);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_path, packet_tvb, offset, slen, ENC_UTF_8);
-                offset += slen;
-                slen = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_path_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                guint8 * newpath = tvb_get_string_enc(wmem_packet_scope(), packet_tvb, offset, slen, ENC_UTF_8);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_path, packet_tvb, offset, slen, ENC_UTF_8);
-                offset += slen;
-                wmem_strbuf_append_printf(title, " SSH_FXP_STAT (%d) id=%d [%s] > [%s]", typ, id, oldpath, newpath);
-//        }else if(typ==SSH_FXP_READLINK){
-//        }else if(typ==SSH_FXP_SYMLINK){
-        }else if(typ==SSH_FXP_STATUS){
-                int id = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_id, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                int code = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_status, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                slen = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_error_message_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                guint8 * err_msg = tvb_get_string_enc(wmem_packet_scope(), packet_tvb, offset, slen, ENC_UTF_8);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_error_message, packet_tvb, offset, slen, ENC_UTF_8);
-                offset += slen;
-                slen = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_lang_tag_length, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                proto_tree_add_item(sftp_tree, hf_ssh_lang_tag, packet_tvb, offset, slen, ENC_BIG_ENDIAN);
-                offset += slen;
-                wmem_strbuf_append_printf(title, " SSH_FXP_STATUS (%d) id=%d code=%d [%s]", typ, id, code, err_msg);
-        }else if(typ==SSH_FXP_HANDLE){
-                int id = tvb_get_ntohl(packet_tvb, offset);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_id, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                slen = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_handle_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                gchar * handle = tvb_bytes_to_str(wmem_packet_scope(), packet_tvb, offset, slen);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_handle, packet_tvb, offset, slen, ENC_BIG_ENDIAN);
-                offset += slen;
-                wmem_strbuf_append_printf(title, " SSH_FXP_HANDLE (%d) id=%d {%s}", typ, id, handle);
-        }else if(typ==SSH_FXP_DATA){
-                int id = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_id, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                int dlen = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_data_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_data, packet_tvb, offset, dlen, ENC_BIG_ENDIAN);
-                offset += dlen;
-                wmem_strbuf_append_printf(title, " SSH_FXP_DATA (%d) id=%d len=%d", typ, id, dlen);
-        }else if(typ==SSH_FXP_NAME){
-                wmem_strbuf_append_printf(title, " SSH_FXP_NAME (%d)", typ);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_id, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                guint count = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_fxp_name_count, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                guint cnt;
-                for(cnt=0;cnt<count;cnt++){
-                        slen = tvb_get_ntohl(packet_tvb, offset) ;
-                        proto_tree_add_item(sftp_tree, hf_ssh_sftp_name_fn_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                        offset += 4;
-                        proto_tree_add_item(sftp_tree, hf_ssh_sftp_name_fn, packet_tvb, offset, slen, ENC_UTF_8);
-                        offset += slen;
-                        slen = tvb_get_ntohl(packet_tvb, offset) ;
-                        proto_tree_add_item(sftp_tree, hf_ssh_sftp_name_ln_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                        offset += 4;
-                        proto_tree_add_item(sftp_tree, hf_ssh_sftp_name_ln, packet_tvb, offset, slen, ENC_UTF_8);
-                        offset += slen;
-                        slen = ssh_dissect_sftp_attrs(packet_tvb, pinfo, offset, sftp_tree);
-                        offset += slen;
-                }
-        }else if(typ==SSH_FXP_ATTRS){
-                int id = tvb_get_ntohl(packet_tvb, offset);
-                wmem_strbuf_append_printf(title, " SSH_FXP_ATTRS (%d) id=%d", typ, id);
-                proto_tree_add_item(sftp_tree, hf_ssh_sftp_id, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
-                slen = ssh_dissect_sftp_attrs(packet_tvb, pinfo, offset, sftp_tree);
-                proto_item_set_len(sftp_tree, slen);
-                offset += slen;
-//        }else if(typ==SSH_FXP_EXTENDED){
-//        }else if(typ==SSH_FXP_EXTENDED_REPLY){
-        }else{
-                wmem_strbuf_append_printf(title, " unknown (%d)", typ);
-                offset += plen;
+        ssh_channel_info_t *ci = peer_data->channel_info;
+        while(ci){
+            if(ci->channel_number==uiNumChannel){return ci->subdissector_handle;}
+            ci = ci->next;
         }
-        proto_item_set_text(sftp_tree, "%s", wmem_strbuf_get_str(title));
-        proto_item_set_len(sftp_tree, plen+4);
-        return offset-offset0;
+        g_debug("Error lookin up channel %d", uiNumChannel);
+        return NULL;
 }
 
-static int ssh_dissect_sftp_attrs(tvbuff_t *packet_tvb, packet_info *pinfo,
-        int offset, proto_item *msg_type_tree)
+static void
+set_subdissector_for_channel(struct ssh_peer_data *peer_data, guint uiNumChannel, guint8* subsystem_name)
 {
-        wmem_strbuf_t *title = wmem_strbuf_new(wmem_packet_scope(), "SFTP attributes");
-        proto_item * sftp_attrs_tree = proto_tree_add_subtree(msg_type_tree, packet_tvb, offset, -1, ett_sftp_attrs, NULL, NULL);
-
-        int offset0 = offset;
-        guint flags = tvb_get_ntohl(packet_tvb, offset) ;
-        proto_tree_add_item(sftp_attrs_tree, hf_ssh_sftp_attrs_flags, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-        offset += 4;
-        if(flags & SSH_FILEXFER_ATTR_SIZE){
-                proto_tree_add_item(sftp_attrs_tree, hf_ssh_sftp_attrs_size, packet_tvb, offset, 8, ENC_BIG_ENDIAN);
-                offset += 8;
+        ssh_channel_info_t *ci = NULL;
+        ssh_channel_info_t **pci = &peer_data->channel_info;
+        while(*pci){
+            if ((*pci)->channel_number == uiNumChannel) {
+                ci = *pci;
+                break;
+            }
+            pci = &(*pci)->next;
         }
-        if(flags & SSH_FILEXFER_ATTR_UIDGID){
-                proto_tree_add_item(sftp_attrs_tree, hf_ssh_sftp_attrs_uid, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-                offset += 4;
+        if(!ci){
+            ci = wmem_new(wmem_file_scope(), ssh_channel_info_t);
+            *pci = ci;
         }
-        if(flags & SSH_FILEXFER_ATTR_UIDGID){
-            proto_tree_add_item(sftp_attrs_tree, hf_ssh_sftp_attrs_gid, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-            offset += 4;
+        if(0 == strcmp(subsystem_name, "sftp")) {
+            ci->subdissector_handle = sftp_handle;
+        } else {
+            ci->subdissector_handle = NULL;
         }
-        if(flags & SSH_FILEXFER_ATTR_PERMISSIONS){
-            proto_tree_add_item(sftp_attrs_tree, hf_ssh_sftp_attrs_permissions, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-            offset += 4;
-        }
-        if(flags & SSH_FILEXFER_ATTR_ACMODTIME){
-            proto_tree_add_item(sftp_attrs_tree, hf_ssh_sftp_attrs_atime, packet_tvb, offset, 4, ENC_TIME_SECS);
-            offset += 4;
-        }
-        if(flags & SSH_FILEXFER_ATTR_ACMODTIME){
-            proto_tree_add_item(sftp_attrs_tree, hf_ssh_sftp_attrs_mtime, packet_tvb, offset, 4, ENC_TIME_SECS);
-            offset += 4;
-        }
-        if(flags & SSH_FILEXFER_ATTR_EXTENDED){
-            proto_tree_add_item(sftp_attrs_tree, hf_ssh_sftp_attrs_extended_count, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
-            offset += 4;
-        }
-
-        proto_item_set_text(sftp_attrs_tree, "%s", wmem_strbuf_get_str(title));
-        proto_item_set_len(sftp_attrs_tree, offset - offset0);
-
-        return offset - offset0;
-
-(void)pinfo;
 }
 
 static void
@@ -4838,12 +4466,12 @@ proto_register_ssh(void)
             NULL, HFILL }},
 
         { &hf_ssh_subsystem_name,
-          { "Subsystem name length",  "ssh.subsystem_name_length",
+          { "Subsystem name",  "ssh.subsystem_name",
             FT_STRING, BASE_NONE, NULL, 0x0,
             NULL, HFILL }},
 
         { &hf_ssh_exit_status,
-          { "Subsystem name length",  "ssh.exit_status",
+          { "Exit status",  "ssh.exit_status",
             FT_UINT32, BASE_HEX, NULL, 0x0,
             NULL, HFILL }},
 
@@ -4857,151 +4485,6 @@ proto_register_ssh(void)
             FT_UINT32, BASE_DEC, NULL, 0x0,
             NULL, HFILL }},
 
-        { &hf_ssh_sftp_len,
-          { "SFTP packet length",  "ssh.sftp_packet_length",
-            FT_UINT32, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_type,
-          { "SFTP packet type",  "ssh.sftp_packet_type",
-            FT_UINT8, BASE_DEC, VALS(ssh2_sftp_vals), 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_version,
-          { "SFTP version",  "ssh.sftp_version",
-            FT_UINT32, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_id,
-          { "SFTP id",  "ssh.sftp_id",
-            FT_UINT32, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_path_len,
-          { "SFTP path length",  "ssh.sftp_path_len",
-            FT_UINT32, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_path,
-          { "SFTP path",  "ssh.sftp_path",
-            FT_STRING, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_pflags,
-          { "SFTP pflags",  "ssh.sftp_pflags",
-            FT_UINT32, BASE_HEX, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_fxp_name_count,
-          { "SFTP count",  "ssh.sftp_name_count",
-            FT_UINT32, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_name_fn_len,
-          { "SFTP name file name length",  "ssh.sftp_name_fn_len",
-            FT_UINT32, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_name_fn,
-          { "SFTP name file name",  "ssh.sftp_name_fn",
-            FT_STRING, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_name_ln_len,
-          { "SFTP name long name length",  "ssh.sftp_name_nn_len",
-            FT_UINT32, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_name_ln,
-          { "SFTP name long name",  "ssh.sftp_name_ln",
-            FT_STRING, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_attrs_flags,
-          { "SFTP attributes flags",  "ssh.sftp_attrs.flags",
-            FT_UINT32, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_attrs_size,
-          { "SFTP attributes file size",  "ssh.sftp_attrs.size",
-            FT_UINT64, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_attrs_uid,
-          { "SFTP attributes uid",  "ssh.sftp_attrs.uid",
-            FT_UINT32, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_attrs_gid,
-          { "SFTP attributes gid",  "ssh.sftp_attrs.gid",
-            FT_UINT32, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_attrs_permissions,
-          { "SFTP attributes permissions",  "ssh.sftp_attrs.permissions",
-            FT_UINT32, BASE_OCT, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_attrs_atime,
-          { "SFTP attributes access time",  "ssh.sftp_attrs.atime",
-            FT_ABSOLUTE_TIME, ABSOLUTE_TIME_LOCAL, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_attrs_mtime,
-          { "SFTP attributes modification time",  "ssh.sftp_attrs.mtime",
-            FT_ABSOLUTE_TIME, ABSOLUTE_TIME_LOCAL, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_attrs_extended_count,
-          { "SFTP attributes extended count",  "ssh.sftp_attrs.extended_count",
-            FT_UINT32, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_offset,
-          { "SFTP offset",  "ssh.sftp_offset",
-            FT_UINT64, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_length,
-          { "SFTP length",  "ssh.sftp_length",
-            FT_UINT32, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_handle_len,
-          { "SFTP handle length",  "ssh.sftp_handle_len",
-            FT_UINT32, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_handle,
-          { "SFTP handle",  "ssh.sftp_handle",
-            FT_BYTES, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_status,
-          { "SFTP error/status code",  "ssh.sftp_status",
-            FT_UINT32, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_error_message_len,
-          { "SFTP error message length",  "ssh.sftp_error_message_len",
-            FT_UINT32, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_error_message,
-          { "SFTP error message",  "ssh.sftp_error_message",
-            FT_STRING, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_data_len,
-          { "SFTP data length",  "ssh.sftp_data_len",
-            FT_UINT32, BASE_DEC, NULL, 0x0,
-            NULL, HFILL }},
-
-        { &hf_ssh_sftp_data,
-          { "SFTP data",  "ssh.sftp_data",
-            FT_BYTES, BASE_NONE, NULL, 0x0,
-            NULL, HFILL }},
-
     };
 
     static gint *ett[] = {
@@ -5012,8 +4495,6 @@ proto_register_ssh(void)
         &ett_userauth_pk_signautre,
         &ett_ssh1,
         &ett_ssh2,
-        &ett_sftp,
-        &ett_sftp_attrs,
         &ett_key_init
     };
 
@@ -5059,6 +4540,7 @@ proto_reg_handoff_ssh(void)
     dissector_add_uint_range_with_preference("tcp.port", TCP_RANGE_SSH, ssh_handle);
     dissector_add_uint("sctp.port", SCTP_PORT_SSH, ssh_handle);
     dissector_add_uint("sctp.ppi", SSH_PAYLOAD_PROTOCOL_ID, ssh_handle);
+    sftp_handle = find_dissector("sftp");
 }
 
 /*
