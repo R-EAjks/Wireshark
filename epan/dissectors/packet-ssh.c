@@ -2268,7 +2268,6 @@ ssh_kex_shared_secret(gint kex_type, ssh_bignum *pub, ssh_bignum *priv, ssh_bign
 //        dump_ssh_style(secret->data, secret->length, "shared secret");
     }else if(kex_type==SSH_KEX_DH_GROUP1 || kex_type==SSH_KEX_DH_GROUP14 || kex_type==SSH_KEX_DH_GROUP16 || kex_type==SSH_KEX_DH_GROUP18){
         gcry_mpi_t m = NULL;
-// diffie-hellman-group14-sha1
         if(kex_type==SSH_KEX_DH_GROUP1){
             static const guint8 p[] = {
                     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xC9, 0x0F, 0xDA, 0xA2, 0x21, 0x68, 0xC2, 0x34, 
@@ -3123,66 +3122,8 @@ ssh_decrypt_chacha20(gcry_cipher_hd_t hd,
             (counter && gcry_cipher_setiv(hd, iv, 16) == 0)) &&
             gcry_cipher_decrypt(hd, plain, plain_len, ctext, ctext_len) == 0;
 }
-#if 0
-static void
-ssh_dissect_decrypted_packet(gchar *plaintext, guint plaintext_len,
-        gchar *mac, guint mac_len, proto_tree *tree, tvbuff_t *tvb,
-        packet_info *pinfo)
-{
-    guint padding_len = plaintext[4];
-    guint packet_len = pntoh32(plaintext) - padding_len - 1;
-    tvbuff_t *packet_tvb = tvb_new_child_real_data(tvb, plaintext, plaintext_len, plaintext_len);
-    tvbuff_t *mac_tvb = tvb_new_child_real_data(tvb, mac, mac_len, mac_len);
-    add_new_data_source(pinfo, packet_tvb, "Decrypted Packet");
-    add_new_data_source(pinfo, mac_tvb, "Packet Mac");
-    proto_tree_add_item(tree, hf_ssh_packet_length, packet_tvb, 0, 4, ENC_BIG_ENDIAN);
-    proto_tree_add_item(tree, hf_ssh_padding_length, packet_tvb, 4, 1, ENC_BIG_ENDIAN);
-    proto_tree_add_item(tree, hf_ssh_padding_length, packet_tvb, 4, 1, ENC_BIG_ENDIAN);xyz
-//    proto_tree_add_item(tree, hf_ssh_payload, packet_tvb, 5, packet_len, ENC_BIG_ENDIAN);
-    proto_tree_add_item(tree, hf_ssh_padding_string, packet_tvb, packet_len + 5, padding_len, ENC_BIG_ENDIAN);
-    proto_tree_add_item(tree, hf_ssh_mac_string, mac_tvb, 0, mac_len, ENC_BIG_ENDIAN);
-#if 0
-    guint packet_len  = pntoh32(plaintext);
-    guint padding_len = plaintext[4];
-    guint payload_len = packet_len - padding_len - 1;
-    g_debug("packet len=%d padding len=%d payload len=%d", packet_len, padding_len, payload_len);
-
-    col_append_sep_fstr(pinfo->cinfo, COL_INFO, NULL, "Encrypted packet (len=%d)", packet_len);
-/*
-    int offset = 0;
-    if (tree) {
-//        proto_tree_add_uint(tree, hf_ssh_packet_length, tvb, offset, 4, packet_len);
-        proto_tree_add_item(tree, hf_ssh_packet_length_encrypted, tvb, offset, 4, ENC_NA);
-        proto_tree_add_item(tree, hf_ssh_encrypted_packet, tvb, offset+4, packet_len, ENC_NA);
-        proto_tree_add_item(tree, hf_ssh_mac_string, tvb, offset+4+packet_len, mac_len, ENC_NA);
-    }
-*/
-//    tvbuff_t *packet_tvb = tvb_new_child_real_data(tvb, plaintext, plaintext_len, plaintext_len);
-    tvbuff_t *packet_tvb = tvb_new_child_real_data(tvb, plaintext, packet_len, packet_len);
-//(void)packet_tvb;
-(void)mac;
-(void)mac_len;
-(void)tree;
-(void)pinfo;
-(void)plaintext_len;
-(void)tvb;
-    add_new_data_source(pinfo, packet_tvb, "Decrypted Packet");
-//    proto_tree_add_item(tree, hf_ssh_packet_length, packet_tvb, 0, 4, ENC_BIG_ENDIAN);
-/*    tvbuff_t *mac_tvb = tvb_new_child_real_data(tvb, mac, mac_len, mac_len);
-    add_new_data_source(pinfo, mac_tvb, "Packet Mac");
-    proto_tree_add_item(tree, hf_ssh_padding_length, packet_tvb, 4, 1, ENC_BIG_ENDIAN);
-    proto_tree_add_item(tree, hf_ssh_payload, packet_tvb, 5, payload_len, ENC_BIG_ENDIAN);
-    proto_tree_add_item(tree, hf_ssh_padding_string, packet_tvb, payload_len + 5, padding_len, ENC_BIG_ENDIAN);
-    proto_tree_add_item(tree, hf_ssh_mac_string, mac_tvb, 0, mac_len, ENC_BIG_ENDIAN);*/
-#endif
-}
-#endif // 0
 
 static int
-//ssh_dissect_decrypted_packet(tvbuff_t *tvb, packet_info *pinfo,
-//        struct ssh_flow_data *global_data,
-//        int offset, proto_tree *tree, int is_response,
-//        gboolean *need_desegmentation)
 ssh_dissect_decrypted_packet(tvbuff_t *tvb, packet_info *pinfo, 
         struct ssh_peer_data *peer_data, proto_tree *tree, 
         gchar *plaintext, guint plaintext_len,
@@ -3362,8 +3303,7 @@ ssh_dissect_decrypted_packet(tvbuff_t *tvb, packet_info *pinfo,
 
 static void
 ssh_dissect_transport_generic(tvbuff_t *packet_tvb, packet_info *pinfo,
-        /*struct ssh_flow_data *global_data,*/ int offset, proto_item *msg_type_tree,
-        /*int is_response,*/ guint msg_code)
+        int offset, proto_item *msg_type_tree, guint msg_code)
 {
         (void)pinfo;
         if(msg_code==SSH_MSG_DISCONNECT){
@@ -3397,8 +3337,7 @@ ssh_dissect_transport_generic(tvbuff_t *packet_tvb, packet_info *pinfo,
 
 static void
 ssh_dissect_userauth_generic(tvbuff_t *packet_tvb, packet_info *pinfo,
-        /*struct ssh_flow_data *global_data,*/ int offset, proto_item *msg_type_tree,
-        /*int is_response,*/ guint msg_code)
+        int offset, proto_item *msg_type_tree, guint msg_code)
 {
         (void)pinfo;
         if(msg_code==SSH_MSG_USERAUTH_REQUEST){
@@ -3462,8 +3401,7 @@ ssh_dissect_userauth_generic(tvbuff_t *packet_tvb, packet_info *pinfo,
 
 static void
 ssh_dissect_userauth_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
-        /*struct ssh_flow_data *global_data,*/ int offset, proto_item *msg_type_tree,
-        /*int is_response,*/ guint msg_code)
+        int offset, proto_item *msg_type_tree, guint msg_code)
 {
         (void)pinfo;
         if(msg_code==SSH_MSG_USERAUTH_PK_OK){
@@ -3485,7 +3423,7 @@ ssh_dissect_userauth_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
 static void
 ssh_dissect_connection_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
         struct ssh_peer_data *peer_data, int offset, proto_item *msg_type_tree,
-        /*int is_response,*/ guint msg_code)
+        guint msg_code)
 {
         (void)pinfo;
         if(msg_code==SSH_MSG_CHANNEL_OPEN){
@@ -3607,8 +3545,7 @@ set_subdissector_for_channel(struct ssh_peer_data *peer_data, guint uiNumChannel
 
 static void
 ssh_dissect_connection_generic(tvbuff_t *packet_tvb, packet_info *pinfo,
-        /*struct ssh_flow_data *global_data,*/ int offset, proto_item *msg_type_tree,
-        /*int is_response,*/ guint msg_code)
+        int offset, proto_item *msg_type_tree, guint msg_code)
 {
         (void)pinfo;
         if(msg_code==SSH_MSG_GLOBAL_REQUEST){
@@ -3629,8 +3566,7 @@ ssh_dissect_connection_generic(tvbuff_t *packet_tvb, packet_info *pinfo,
 
 static void
 ssh_dissect_public_key_blob(tvbuff_t *packet_tvb, packet_info *pinfo,
-        /*struct ssh_flow_data *global_data,*/ int offset, proto_item *msg_type_tree
-        /*int is_response*/)
+        int offset, proto_item *msg_type_tree)
 {
         (void)pinfo;
         guint   slen;
@@ -3645,8 +3581,7 @@ ssh_dissect_public_key_blob(tvbuff_t *packet_tvb, packet_info *pinfo,
 
 static void
 ssh_dissect_public_key_signature(tvbuff_t *packet_tvb, packet_info *pinfo,
-        /*struct ssh_flow_data *global_data,*/ int offset, proto_item *msg_type_tree
-        /*int is_response*/)
+        int offset, proto_item *msg_type_tree)
 {
         (void)pinfo;
         guint   slen;
@@ -3661,88 +3596,6 @@ ssh_dissect_public_key_signature(tvbuff_t *packet_tvb, packet_info *pinfo,
         proto_tree_add_item(msg_type_tree, hf_ssh_pk_sig_s, packet_tvb, offset, slen, ENC_BIG_ENDIAN);
         offset += slen;
 }
-
-/* Links SSH packet with the real packet data. {{{ */
-#if 0
-SshPacketInfo *
-ssh_add_packet_info(gint proto, packet_info *pinfo, guint8 key)
-{
-    SshPacketInfo *pi = (SshPacketInfo *)p_get_proto_data(wmem_file_scope(), pinfo, proto, key);
-    if (!pi) {
-        pi = wmem_new0(wmem_file_scope(), SshPacketInfo);
-        pi->srcport = pinfo->srcport;
-        pi->destport = pinfo->destport;
-        pi->messages = NULL;
-        p_add_proto_data(wmem_file_scope(), pinfo, proto, key, pi);
-    }
-
-    return pi;
-}
-
-/**
- * Remembers the decrypted TLS record fragment (TLSInnerPlaintext in TLS 1.3) to
- * avoid the need for a decoder in the second pass. Additionally, it remembers
- * sequence numbers (for reassembly and Follow TLS Stream).
- *
- * @param proto The protocol identifier (proto_ssl or proto_dtls).
- * @param pinfo The packet where the record originates from.
- * @param data Decrypted data to store in the record.
- * @param data_len Length of decrypted record data.
- * @param record_id The identifier for this record within the current packet.
- * @param flow Information about sequence numbers, etc.
- * @param type TLS Content Type (such as handshake or application_data).
- * @param curr_layer_num_ssl The layer identifier for this TLS session.
- */
-void
-ssh_add_record_info(gint proto, packet_info *pinfo, const guchar *data, gint data_len, gint record_id, SshFlow *flow, ContentType type, guint8 key)
-{
-    SshRecordInfo* rec, **prec;
-    SshPacketInfo *pi = ssh_add_packet_info(proto, pinfo, key);
-
-    rec = wmem_new(wmem_file_scope(), SshRecordInfo);
-    rec->plain_data = (guchar *)wmem_memdup(wmem_file_scope(), data, data_len);
-    rec->data_len = data_len;
-    rec->id = record_id;
-    rec->type = type;
-    rec->next = NULL;
-
-//    if (flow && type == SSL_ID_APP_DATA) {
-    if (flow) {
-        rec->seq = flow->byte_seq;
-        rec->flow = flow;
-        flow->byte_seq += data_len;
-        ssh_debug_printf("%s stored decrypted record seq=%d nxtseq=%d flow=%p\n",
-                         G_STRFUNC, rec->seq, rec->seq + data_len, (void*)flow);
-    }
-
-    /* Remember decrypted records. */
-    prec = &pi->records;
-    while (*prec) prec = &(*prec)->next;
-    *prec = rec;
-}
-
-/* search in packet data for the specified id; return a newly created tvb for the associated data */
-tvbuff_t*
-ssh_get_record_info(tvbuff_t *parent_tvb, int proto, packet_info *pinfo, gint record_id, guint8 key, SshRecordInfo **matched_record)
-{
-    SshRecordInfo* rec;
-    SshPacketInfo* pi;
-    pi = (SshPacketInfo *)p_get_proto_data(wmem_file_scope(), pinfo, proto, key);
-
-    if (!pi)
-        return NULL;
-
-    for (rec = pi->records; rec; rec = rec->next)
-        if (rec->id == record_id) {
-            *matched_record = rec;
-            /* link new real_data_tvb with a parent tvb so it is freed when frame dissection is complete */
-            return tvb_new_child_real_data(parent_tvb, rec->plain_data, rec->data_len, rec->data_len);
-        }
-
-    return NULL;
-}
-#endif
-/* Links SSH packet with the real packet data. }}} */
 
 #ifdef SSH_DECRYPT_DEBUG /* {{{ */
 
@@ -3830,9 +3683,7 @@ ssh_print_data(const gchar* name, const guchar* data, size_t len)
 static void
 ssh_secrets_block_callback(const void *secrets, guint size)
 {
-//    ssh_keylog_process_lines(&ssh_master_key_map, (const guint8 *)secrets, size);
-//    ssh_keylog_process_line(&ssh_master_key_map, (const guint8 *)secrets);
-    ssh_keylog_process_lines(/*&ssh_master_key_map,*/ (const guint8 *)secrets, size);
+    ssh_keylog_process_lines((const guint8 *)secrets, size);
 }
 
 /* Functions for SSH random hashtables. {{{ */
