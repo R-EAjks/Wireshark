@@ -94,12 +94,6 @@ typedef struct {
 typedef struct {
     guint8  *data;
     guint   length;
-    guint8  type;
-} ssh_kex_pub_key;
-
-typedef struct {
-    guint8  *data;
-    guint   length;
 } ssh_enc_key;
 
 #define SSH_KEX_CURVE25519 0x00010000
@@ -199,8 +193,8 @@ struct ssh_flow_data {
     gchar           *session_id;
     guint           session_id_length;
     gchar           *chain;
-    ssh_kex_pub_key *kex_e;
-    ssh_kex_pub_key *kex_f;
+    ssh_bignum      *kex_e;
+    ssh_bignum      *kex_f;
     ssh_bignum      *kex_gex_p;                 // Group modulo
     ssh_bignum      *kex_gex_g;                 // Group generator
     ssh_bignum      *secret;
@@ -375,7 +369,6 @@ static dissector_handle_t sftp_handle=NULL;
 #ifdef SSH_DECRYPTION_SUPPORTED
 static const char   *pref_keylog_file;
 static FILE         *ssh_keylog_file;
-static wmem_map_t   *ssh_kex_keys;
 #endif
 
 // 29418/tcp: Gerrit Code Review
@@ -562,11 +555,7 @@ static void ssh_keylog_read_file(void);
 static void ssh_keylog_process_line(const char *line);
 static void ssh_keylog_process_lines(/*const ssh_master_key_map_t *mk_map, */const guint8 *data, guint datalen);
 static void ssh_keylog_reset(void);
-static void ssh_keylog_add_keys(guint8 *priv, guint priv_length,
-        gchar *type_string);
 static ssh_bignum *ssh_kex_make_bignum(const guint8 *data, guint length);
-static ssh_kex_pub_key *ssh_kex_make_pub_key(guint8 *data, guint length,
-        gchar type);
 static void ssh_read_e(tvbuff_t *tvb, int offset,
         struct ssh_flow_data *global_data);
 static void ssh_read_f(tvbuff_t *tvb, int offset,
@@ -574,7 +563,7 @@ static void ssh_read_f(tvbuff_t *tvb, int offset,
 static ssh_bignum * ssh_read_mpint(tvbuff_t *tvb, int offset);
 static void ssh_keylog_hash_write_secret(tvbuff_t *tvb, int offset,
         struct ssh_flow_data *global_data);
-static ssh_bignum *ssh_kex_shared_secret(gint kex_type, ssh_kex_pub_key *pub, ssh_bignum *priv, ssh_bignum *modulo);
+static ssh_bignum *ssh_kex_shared_secret(gint kex_type, ssh_bignum *pub, ssh_bignum *priv, ssh_bignum *modulo);
 static void ssh_hash_buffer_put_string(wmem_array_t *buffer, const gchar *string,
         guint len);
 static void ssh_hash_buffer_put_uint32(wmem_array_t *buffer, guint val);
@@ -2064,7 +2053,6 @@ ssh_keylog_process_line(const char *line)
             converted[i] = c;
         }
         g_debug("ssh: JH key accepted");
-        ssh_keylog_add_keys(converted, key_len, key);
         g_free(converted);
         g_strfreev(split);
 
@@ -2129,7 +2117,6 @@ dump_ssh_style(cookie, cookie_len, "cookie");
             bn_cookie->data[i] = c;
         }
         g_debug("ssh: JH key accepted");
-        ssh_keylog_add_keys(converted, key_len, cookie);
         g_free(converted);
         g_hash_table_insert(ssh_master_key_map, bn_cookie, priv);
         g_strfreev(split);
@@ -2186,32 +2173,6 @@ ssh_kex_hash_type(gchar *type)
     return 0;
 }
 
-static void
-ssh_keylog_add_keys(guint8 *priv, guint priv_length, gchar *type_string)
-{
-    guint type = ssh_kex_type(type_string);
-    ssh_kex_pub_key *pub = ssh_kex_make_pub_key(NULL, priv_length, type);
-
-    if (SSH_KEX_CURVE25519 == type) {
-        if (crypto_scalarmult_curve25519_base(pub->data, priv)) {
-            g_debug("cannot compute curve25519 public key");
-            return;
-        }
-    } else if (SSH_KEX_DH_GEX == type) {
-        g_debug("ssh_keylog_add_keys");
-
-    } else {
-        g_debug("key type %s not supported", type_string);
-        return;
-    }
-
-    if (!wmem_map_contains(ssh_kex_keys, pub)) {
-        ssh_bignum *value = ssh_kex_make_bignum(NULL, priv_length);
-        memcpy(value->data, priv, priv_length);
-        wmem_map_insert(ssh_kex_keys, pub, value);
-    }
-}
-
 static ssh_bignum *
 ssh_kex_make_bignum(const guint8 *data, guint length)
 {
@@ -2226,28 +2187,12 @@ ssh_kex_make_bignum(const guint8 *data, guint length)
     return bn;
 }
 
-static ssh_kex_pub_key *
-ssh_kex_make_pub_key(guint8 *data, guint length, gchar type)
-{
-    ssh_kex_pub_key *key = wmem_new0(wmem_file_scope(), ssh_kex_pub_key);
-    key->data = (guint8 *)wmem_alloc0(wmem_file_scope(), length);
-
-    if (data) {
-        memcpy(key->data, data, length);
-    }
-
-    key->length = length;
-    key->type = type;
-    return key;
-}
-
 static void
 ssh_read_e(tvbuff_t *tvb, int offset, struct ssh_flow_data *global_data)
 {
     // store the client's public part (e) for later usage
     int length = tvb_get_ntohl(tvb, offset);
-    guint type = ssh_kex_type(global_data->kex);
-    global_data->kex_e = ssh_kex_make_pub_key(NULL, length, type);
+    global_data->kex_e = ssh_kex_make_bignum(NULL, length);
     tvb_memcpy(tvb, global_data->kex_e->data, offset + 4, length);
 }
 
@@ -2256,8 +2201,7 @@ ssh_read_f(tvbuff_t *tvb, int offset, struct ssh_flow_data *global_data)
 {
     // store the server's public part (f) for later usage
     int length = tvb_get_ntohl(tvb, offset);
-    guint type = ssh_kex_type(global_data->kex);
-    global_data->kex_f = ssh_kex_make_pub_key(NULL, length, type);
+    global_data->kex_f = ssh_kex_make_bignum(NULL, length);
     tvb_memcpy(tvb, global_data->kex_f->data, offset + 4, length);
 }
 
@@ -2472,7 +2416,7 @@ dump_ssh_style((char *)wmem_array_get_raw(global_data->kex_shared_secret), wmem_
 
 // the purpose of this function is to deal with all different kex methods
 static ssh_bignum *
-ssh_kex_shared_secret(gint kex_type, ssh_kex_pub_key *pub, ssh_bignum *priv, ssh_bignum *modulo)
+ssh_kex_shared_secret(gint kex_type, ssh_bignum *pub, ssh_bignum *priv, ssh_bignum *modulo)
 {
     g_debug("JH: ssh_kex_shared_secret");
     ssh_bignum *secret = ssh_kex_make_bignum(NULL, pub->length);
@@ -2778,22 +2722,6 @@ static void ssh_derive_symmetric_key(ssh_bignum *secret, gchar *exchange_hash,
 
     result_key->length = need;
     print_hex(result_key->data, result_key->length, "key");
-}
-
-static guint
-ssh_kex_pub_key_hash(gconstpointer v1)
-{
-    const ssh_kex_pub_key *key1 = (const ssh_kex_pub_key *)v1;
-    return wmem_strong_hash(key1->data, key1->length);
-}
-
-static gboolean
-ssh_kex_pub_key_equal(gconstpointer v1, gconstpointer v2)
-{
-    const ssh_kex_pub_key *key1 = (const ssh_kex_pub_key *)v1;
-    const ssh_kex_pub_key *key2 = (const ssh_kex_pub_key *)v2;
-    return key1->type == key2->type && key1->length == key2->length &&
-        !memcmp(key1->data, key2->data, key1->length);
 }
 
 static void
@@ -4729,9 +4657,6 @@ proto_register_ssh(void)
             "The path to the file which contains a list of key exchange secrets in the following format:\n"
             "\"<hex-encoded-cookie> <hex-encoded-key>\" (without quotes or leading spaces).\n",
             &pref_keylog_file, FALSE);
-
-    ssh_kex_keys = wmem_map_new_autoreset(wmem_epan_scope(), wmem_file_scope(),
-                                          ssh_kex_pub_key_hash, ssh_kex_pub_key_equal);
 
     secrets_register_type(SECRETS_TYPE_SSH, ssh_secrets_block_callback);
 #endif
