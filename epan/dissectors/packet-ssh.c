@@ -91,11 +91,6 @@ typedef struct {
     guint   length;
 } ssh_bignum;
 
-typedef struct {
-    guint8  *data;
-    guint   length;
-} ssh_enc_key;
-
 #define SSH_KEX_CURVE25519 0x00010000
 #define SSH_KEX_DH_GEX     0x00020000
 #define SSH_KEX_DH_GROUP1  0x00030001
@@ -120,7 +115,6 @@ typedef struct _ssh_message_info_t {
 
 typedef struct {
     gboolean from_server;
-    guint32 offset;
     ssh_message_info_t * messages;
 } ssh_packet_info_t;
 #endif
@@ -208,7 +202,7 @@ struct ssh_flow_data {
     wmem_array_t    *kex_gex_bits_max;
     wmem_array_t    *kex_shared_secret;
     gboolean        do_decrypt;
-    ssh_enc_key     new_keys[6];
+    ssh_bignum      new_keys[6];
 #endif
 };
 
@@ -573,11 +567,11 @@ static void ssh_derive_symmetric_keys(ssh_bignum *shared_secret,
         struct ssh_flow_data *global_data);
 static void ssh_derive_symmetric_key(ssh_bignum *shared_secret,
         gchar *exchange_hash, guint hash_length, gchar id,
-        ssh_enc_key *result_key, struct ssh_flow_data *global_data);
+        ssh_bignum *result_key, struct ssh_flow_data *global_data);
 
 static void ssh_decryption_set_cipher_id(struct ssh_peer_data *peer);
 static void ssh_decryption_setup_cipher(struct ssh_peer_data *peer,
-        ssh_enc_key *iv, ssh_enc_key *key);
+        ssh_bignum *iv, ssh_bignum *key);
 static void ssh_increment_message_number(packet_info *pinfo,
         struct ssh_flow_data *global_data, gboolean is_response);
 static guint ssh_decrypt_packet(tvbuff_t *tvb, packet_info *pinfo,
@@ -593,26 +587,20 @@ static int ssh_dissect_decrypted_packet(tvbuff_t *tvb, packet_info *pinfo,
         gchar *mac, guint mac_len, 
         gboolean *need_desegmentation);
 static void ssh_dissect_transport_generic(tvbuff_t *packet_tvb, packet_info *pinfo,
-        /*struct ssh_flow_data *global_data,*/ int offset, proto_item *msg_type_tree,
-        /*int is_response,*/ guint msg_code);
+        int offset, proto_item *msg_type_tree, guint msg_code);
 static void ssh_dissect_userauth_generic(tvbuff_t *packet_tvb, packet_info *pinfo,
-        /*struct ssh_flow_data *global_data,*/ int offset, proto_item *msg_type_tree,
-        /*int is_response,*/ guint msg_code);
+        int offset, proto_item *msg_type_tree, guint msg_code);
 static void ssh_dissect_userauth_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
-        /*struct ssh_flow_data *global_data,*/ int offset, proto_item *msg_type_tree,
-        /*int is_response,*/ guint msg_code);
+        int offset, proto_item *msg_type_tree, guint msg_code);
 static void ssh_dissect_connection_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
         struct ssh_peer_data *peer_data, int offset, proto_item *msg_type_tree,
-        /*int is_response,*/ guint msg_code);
+        guint msg_code);
 static void ssh_dissect_connection_generic(tvbuff_t *packet_tvb, packet_info *pinfo,
-        /*struct ssh_flow_data *global_data,*/ int offset, proto_item *msg_type_tree,
-        /*int is_response,*/ guint msg_code);
+        int offset, proto_item *msg_type_tree, guint msg_code);
 static void ssh_dissect_public_key_blob(tvbuff_t *packet_tvb, packet_info *pinfo,
-        /*struct ssh_flow_data *global_data,*/ int offset, proto_item *msg_type_tree
-        /*int is_response*/ );
+        int offset, proto_item *msg_type_tree);
 static void ssh_dissect_public_key_signature(tvbuff_t *packet_tvb, packet_info *pinfo,
-        /*struct ssh_flow_data *global_data,*/ int offset, proto_item *msg_type_tree
-        /*int is_response*/);
+        int offset, proto_item *msg_type_tree);
 
 static dissector_handle_t get_subdissector_for_channel(struct ssh_peer_data *peer_data, guint uiNumChannel);
 static void set_subdissector_for_channel(struct ssh_peer_data *peer_data, guint uiNumChannel, guint8* subsystem_name);
@@ -626,12 +614,6 @@ typedef enum {
     SSH_ID_HEARTBEAT               = 0x18,
     SSH_ID_TLS12_CID               = 0x19
 } ContentType;
-
-/* XXX Should we use GByteArray instead? */
-typedef struct _StringInfo {
-    guchar  *data;      /* Backing storage which may be larger than data_len */
-    guint    data_len;  /* Length of the meaningful part of data */
-} StringInfo;
 
 #define SSH_DEBUG_USE_STDERR "-"
 
@@ -655,20 +637,12 @@ typedef struct _SshHsFragment {
     struct _SshHsFragment *next;
 } SshHsFragment;
 
-#if 0
-SshPacketInfo * ssh_add_packet_info(gint proto, packet_info *pinfo, guint8 key);
-void ssh_add_record_info(gint proto, packet_info *pinfo, const guchar *data, gint data_len, gint record_id, SshFlow *flow, ContentType type, guint8 key);
-tvbuff_t* ssh_get_record_info(tvbuff_t *parent_tvb, int proto, packet_info *pinfo, gint record_id, guint8 key, SshRecordInfo **matched_record);
-#endif
-
 #define SSH_DECRYPT_DEBUG
 #ifdef SSH_DECRYPT_DEBUG
 extern void
 ssh_debug_printf(const gchar* fmt,...) G_GNUC_PRINTF(1,2);
 extern void
 ssh_print_data(const gchar* name, const guchar* data, size_t len);
-extern void
-ssh_print_string(const gchar* name, const StringInfo* data);
 extern void
 ssh_set_debug(const gchar* name);
 extern void
@@ -823,9 +797,6 @@ dissect_ssh(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
         (void)err;
 #endif
         conversation_add_proto_data(conversation, proto_ssh, global_data);
-
-//AFAC        SshPacketInfo *pi = ssh_add_packet_info(proto_ssh, pinfo, 0);
-//AFAC        (void)pi;
     }
 
     peer_data = &global_data->peer_data[is_response];
@@ -1149,10 +1120,6 @@ ssh_tree_add_hostkey(tvbuff_t *tvb, int offset, proto_tree *parent_tree,
     ssh_hash_buffer_put_string(global_data->kex_server_host_key_blob, data, key_len);
 g_debug("JH:%s - E xxxxxxxxxxxxxxxxxxxx", __FUNCTION__);
 g_debug("JH:%s adding %d bytes to kex_server_host_key_blob new len=%d", __FUNCTION__, key_len, global_data->kex_server_host_key_blob?wmem_array_get_count(global_data->kex_server_host_key_blob):(guint)-1);
-
-
-//    gchar *group_data = (gchar *)wmem_alloc(wmem_packet_scope(), global_data->kex_gex_p->length + global_data->kex_gex_g->length);
-//    memcpy(group_data, string, length);
 
 #else
     // ignore unused parameter complaint
@@ -1934,7 +1901,7 @@ ssh_keylog_read_file(void)
 }
 
 static void
-ssh_keylog_process_lines(/*const ssh_master_key_map_t *mk_map, */const guint8 *data, guint datalen)
+ssh_keylog_process_lines(const guint8 *data, guint datalen)
 {
     const char *next_line = (const char *)data;
     const char *line_end = next_line + datalen;
@@ -1958,58 +1925,6 @@ ssh_keylog_process_lines(/*const ssh_master_key_map_t *mk_map, */const guint8 *d
         gchar * strippedline = g_strndup(line, linelen);
         ssh_keylog_process_line(strippedline);
         g_free(strippedline);
-
-#if 0
-        GMatchInfo *mi;
-        if (g_regex_match_full(regex, line, linelen, 0, G_REGEX_MATCH_ANCHORED, &mi, NULL)) {
-            gchar *hex_key, *hex_pre_ms_or_ms;
-            StringInfo *key = wmem_new(wmem_file_scope(), StringInfo);
-            StringInfo *pre_ms_or_ms = NULL;
-            GHashTable *ht = NULL;
-
-            /* Is the PMS being supplied with the PMS_CLIENT_RANDOM
-             * otherwise we will use the Master Secret
-             */
-            hex_pre_ms_or_ms = g_match_info_fetch_named(mi, "master_secret");
-            if (hex_pre_ms_or_ms == NULL || !*hex_pre_ms_or_ms) {
-                g_free(hex_pre_ms_or_ms);
-                hex_pre_ms_or_ms = g_match_info_fetch_named(mi, "pms");
-            }
-            if (hex_pre_ms_or_ms == NULL || !*hex_pre_ms_or_ms) {
-                g_free(hex_pre_ms_or_ms);
-                hex_pre_ms_or_ms = g_match_info_fetch_named(mi, "derived_secret");
-            }
-            /* There is always a match, otherwise the regex is wrong. */
-            DISSECTOR_ASSERT(hex_pre_ms_or_ms && strlen(hex_pre_ms_or_ms));
-
-            /* convert from hex to bytes and save to hashtable */
-            pre_ms_or_ms = wmem_new(wmem_file_scope(), StringInfo);
-            from_hex(pre_ms_or_ms, hex_pre_ms_or_ms, strlen(hex_pre_ms_or_ms));
-            g_free(hex_pre_ms_or_ms);
-
-            /* Find a master key from any format (CLIENT_RANDOM, SID, ...) */
-            for (unsigned i = 0; i < G_N_ELEMENTS(mk_groups); i++) {
-                ssl_master_key_match_group_t *g = &mk_groups[i];
-                hex_key = g_match_info_fetch_named(mi, g->re_group_name);
-                if (hex_key && *hex_key) {
-                    ssl_debug_printf("    matched %s\n", g->re_group_name);
-                    ht = g->master_key_ht;
-                    from_hex(key, hex_key, strlen(hex_key));
-                    g_free(hex_key);
-                    break;
-                }
-                g_free(hex_key);
-            }
-            DISSECTOR_ASSERT(ht); /* Cannot be reached, or regex is wrong. */
-
-            g_hash_table_insert(ht, key, pre_ms_or_ms);
-
-        } else {
-            ssl_debug_printf("    unrecognized line\n");
-        }
-        /* always free match info even if there is no match. */
-        g_match_info_free(mi);
-#endif
     }
 }
 
@@ -2018,9 +1933,9 @@ ssh_keylog_process_line(const char *line)
 {
     g_debug("ssh: process line: %s", line);
 
-    gchar **split = g_strsplit(line, " ", 3);
-    gchar *key, *value;
-    int key_len, cookie_len;
+    gchar **split = g_strsplit(line, " ", 2);
+    gchar *cookie, *key;
+    int cookie_len, key_len;
 
     if (g_strv_length(split) < 2) {
         g_debug("ssh keylog: invalid format");
@@ -2028,106 +1943,63 @@ ssh_keylog_process_line(const char *line)
         return;
     }
 
-    key = split[0];
-    value = split[1];
-
-    if (!strcmp(key, "curve25519")) {
-        key_len = 32;
-        value = split[1];
-
-        gchar hexbyte[3] = {0, 0, 0};
-        guint8 c;
-        gchar *converted = g_new(gchar, key_len);
-
-        for (int i = 0; i < key_len; i ++) {
-            hexbyte[0] = value[i * 2];
-            hexbyte[1] = value[i * 2 + 1];
-
-            if (!ws_hexstrtou8(hexbyte, NULL, &c)) {
-                g_debug("ssh: can't process key, invalid hex number: %s", hexbyte);
-                g_free(converted);
-                g_strfreev(split);
-                return;
-            }
-
-            converted[i] = c;
-        }
-        g_debug("ssh: JH key accepted");
-        g_free(converted);
-        g_strfreev(split);
-
-
-//    } else if (!strcmp(key, "diffie-hellman-group-exchange")) {
-// diffie-hellman-group-exchange [cookie of corresponding key] [key]
-    } else  {
 // [cookie of corresponding key] [key]
-        gchar *cookie = split[0];
-        gchar *random = split[1];
-        key_len = strlen(random);
-        cookie_len = strlen(cookie);
-dump_ssh_style(random, key_len, "random");
+    cookie = split[0];
+    key = split[1];
+
+    key_len = strlen(key);
+    cookie_len = strlen(cookie);
 dump_ssh_style(cookie, cookie_len, "cookie");
-        if(key_len & 1){
-            g_debug("ssh keylog: invalid format (key could at least be even!)");
-            g_strfreev(split);
-            return;
-        }
-        if(cookie_len & 1){
-            g_debug("ssh keylog: invalid format (cookie could at least be even!)");
-            g_strfreev(split);
-            return;
-        }
-        ssh_bignum * bn_cookie = ssh_kex_make_bignum(NULL, cookie_len/2);
-        ssh_bignum * priv;
-        guint8 c;
-        gchar *converted = g_new(gchar, key_len/2);
-        for (int i = 0; i < key_len/2; i ++) {
-            gchar v0 = random[i * 2];
-            gint8 h0 = (v0>='0' && v0<='9')?v0-'0':(v0>='a' && v0<='f')?v0-'a'+10:(v0>='A' && v0<='F')?v0-'A'+10:-1;
-            gchar v1 = random[i * 2 + 1];
-            gint8 h1 = (v1>='0' && v1<='9')?v1-'0':(v1>='a' && v1<='f')?v1-'a'+10:(v1>='A' && v1<='F')?v1-'A'+10:-1;
-
-            if (h0==-1 || h1==-1) {
-                g_debug("ssh: can't process key, invalid hex number: %c%c", v0, v1);
-                g_free(converted);
-                g_strfreev(split);
-                return;
-            }
-
-            c = (h0 << 4) | h1;
-
-            converted[i] = c;
-        }
-        priv = ssh_kex_make_bignum(converted, key_len/2);
-        for (int i = 0; i < cookie_len/2; i ++) {
-            gchar v0 = cookie[i * 2];
-            gint8 h0 = (v0>='0' && v0<='9')?v0-'0':(v0>='a' && v0<='f')?v0-'a'+10:(v0>='A' && v0<='F')?v0-'A'+10:-1;
-            gchar v1 = cookie[i * 2 + 1];
-            gint8 h1 = (v1>='0' && v1<='9')?v1-'0':(v1>='a' && v1<='f')?v1-'a'+10:(v1>='A' && v1<='F')?v1-'A'+10:-1;
-
-            if (h0==-1 || h1==-1) {
-                g_debug("ssh: can't process cookie, invalid hex number: %c%c", v0, v1);
-                g_free(converted);
-                g_strfreev(split);
-                return;
-            }
-
-            c = (h0 << 4) | h1;
-
-            bn_cookie->data[i] = c;
-        }
-        g_debug("ssh: JH key accepted");
-        g_free(converted);
-        g_hash_table_insert(ssh_master_key_map, bn_cookie, priv);
-        g_strfreev(split);
-/*
-    } else {
-        g_debug("ssh: key exchange method not supported");
+dump_ssh_style(key, key_len, "key");
+    if(key_len & 1){
+        g_debug("ssh keylog: invalid format (key could at least be even!)");
         g_strfreev(split);
         return;
-*/
+    }
+    if(cookie_len & 1){
+        g_debug("ssh keylog: invalid format (cookie could at least be even!)");
+        g_strfreev(split);
+        return;
+    }
+    ssh_bignum * bn_cookie = ssh_kex_make_bignum(NULL, cookie_len/2);
+    ssh_bignum * bn_priv   = ssh_kex_make_bignum(NULL, key_len/2);
+    guint8 c;
+    for (int i = 0; i < key_len/2; i ++) {
+        gchar v0 = key[i * 2];
+        gint8 h0 = (v0>='0' && v0<='9')?v0-'0':(v0>='a' && v0<='f')?v0-'a'+10:(v0>='A' && v0<='F')?v0-'A'+10:-1;
+        gchar v1 = key[i * 2 + 1];
+        gint8 h1 = (v1>='0' && v1<='9')?v1-'0':(v1>='a' && v1<='f')?v1-'a'+10:(v1>='A' && v1<='F')?v1-'A'+10:-1;
+
+        if (h0==-1 || h1==-1) {
+            g_debug("ssh: can't process key, invalid hex number: %c%c", v0, v1);
+            g_strfreev(split);
+            return;
+        }
+
+        c = (h0 << 4) | h1;
+
+        bn_priv->data[i] = c;
     }
 
+    for (int i = 0; i < cookie_len/2; i ++) {
+        gchar v0 = cookie[i * 2];
+        gint8 h0 = (v0>='0' && v0<='9')?v0-'0':(v0>='a' && v0<='f')?v0-'a'+10:(v0>='A' && v0<='F')?v0-'A'+10:-1;
+        gchar v1 = cookie[i * 2 + 1];
+        gint8 h1 = (v1>='0' && v1<='9')?v1-'0':(v1>='a' && v1<='f')?v1-'a'+10:(v1>='A' && v1<='F')?v1-'A'+10:-1;
+
+        if (h0==-1 || h1==-1) {
+            g_debug("ssh: can't process cookie, invalid hex number: %c%c", v0, v1);
+            g_strfreev(split);
+            return;
+        }
+
+        c = (h0 << 4) | h1;
+
+        bn_cookie->data[i] = c;
+    }
+    g_debug("ssh: JH key accepted");
+    g_hash_table_insert(ssh_master_key_map, bn_cookie, bn_priv);
+    g_strfreev(split);
 }
 
 static void
@@ -2240,63 +2112,14 @@ ssh_keylog_hash_write_secret(tvbuff_t *tvb, int offset,
 
     priv = (ssh_bignum *)g_hash_table_lookup(ssh_master_key_map, global_data->peer_data[SERVER_PEER_DATA].bn_cookie);
     if(priv){
-//        gcry_mpi_scan(&b, GCRYMPI_FMT_USG, global_data->kex_e->data, global_data->kex_e->length, NULL);
         secret = ssh_kex_shared_secret(kex_type, global_data->kex_e, priv, global_data->kex_gex_p);
     }else{
         priv = (ssh_bignum *)g_hash_table_lookup(ssh_master_key_map, global_data->peer_data[CLIENT_PEER_DATA].bn_cookie);
         if(priv){
-//            gcry_mpi_scan(&b, GCRYMPI_FMT_USG, global_data->kex_f->data, global_data->kex_f->length, NULL);
             secret = ssh_kex_shared_secret(kex_type, global_data->kex_f, priv, global_data->kex_gex_p);
         }
     }
 
-#if 0
-    if (!priv) {
-        priv = (ssh_bignum *)wmem_map_lookup(ssh_kex_keys, &global_data->kex_f);
-
-        // we have the server's private key
-        if (priv) {
-            secret = ssh_kex_shared_secret(global_data->kex_e, priv);
-        }
-    // we have the client's private key
-    } else {
-        secret = ssh_kex_shared_secret(global_data->kex_f, priv);
-    }
-
-    if (!secret) {
-        gcry_mpi_t b = NULL;
-        ssh_bignum * bn_random = (ssh_bignum *)g_hash_table_lookup(ssh_master_key_map, global_data->peer_data[SERVER_PEER_DATA].bn_cookie);
-        if(bn_random){
-            gcry_mpi_scan(&b, GCRYMPI_FMT_USG, global_data->kex_e->data, global_data->kex_e->length, NULL);
-        }else{
-            bn_random = (ssh_bignum *)g_hash_table_lookup(ssh_master_key_map, global_data->peer_data[CLIENT_PEER_DATA].bn_cookie);
-            if(bn_random){
-                gcry_mpi_scan(&b, GCRYMPI_FMT_USG, global_data->kex_f->data, global_data->kex_f->length, NULL);
-            }
-        }
-        if(bn_random){
-            secret = ssh_kex_make_bignum(NULL, global_data->kex_gex_p->length);
-            gcry_mpi_t d = NULL, e = NULL, m = NULL;
-            size_t result_len = 0;
-            d = gcry_mpi_new(global_data->kex_gex_p->length*8);
-            gcry_mpi_scan(&e, GCRYMPI_FMT_USG, bn_random->data, bn_random->length, NULL);
-            gcry_mpi_scan(&m, GCRYMPI_FMT_USG, global_data->kex_gex_p->data, global_data->kex_gex_p->length, NULL);
-            gcry_mpi_powm(d, b, e, m);                 // gcry_mpi_powm(d, b, e, m)    => d = b^e % m
-            gcry_mpi_print(GCRYMPI_FMT_USG, secret->data, secret->length, &result_len, d);
-            secret->length = (guint)result_len;        // Should not be larger than what fits in a 32-bit unsigned integer...
-            gcry_mpi_release(d);
-            gcry_mpi_release(b);
-            gcry_mpi_release(e);
-            gcry_mpi_release(m);
-//            dump_bignum(secret, "shared secret");
-            print_hex(secret->data, secret->length, "ssh: JH shared secret");
-            dump_ssh_style(secret->data, secret->length, "shared secret");
-        }else{
-            g_debug("no server random, cannot create key!");
-        }
-
-    }
-#endif
     if (!secret) {
         g_debug("ssh decryption: no private key for this session");
         global_data->do_decrypt = FALSE;
@@ -2672,7 +2495,7 @@ static void ssh_derive_symmetric_keys(ssh_bignum *secret, gchar *exchange_hash,
 }
 
 static void ssh_derive_symmetric_key(ssh_bignum *secret, gchar *exchange_hash,
-        guint hash_length, gchar id, ssh_enc_key *result_key,
+        guint hash_length, gchar id, ssh_bignum *result_key,
         struct ssh_flow_data *global_data)
 {
     gcry_md_hd_t hd;
@@ -2759,7 +2582,7 @@ ssh_decryption_set_cipher_id(struct ssh_peer_data *peer)
 
 static void
 ssh_decryption_setup_cipher(struct ssh_peer_data *peer_data,
-        ssh_enc_key *iv, ssh_enc_key *key)
+        ssh_bignum *iv, ssh_bignum *key)
 {
     gcry_error_t err;
     gcry_cipher_hd_t *hd1, *hd2;
@@ -4002,11 +3825,6 @@ ssh_print_data(const gchar* name, const guchar* data, size_t len)
     }
 }
 
-void
-ssh_print_string(const gchar* name, const StringInfo* data)
-{
-    ssh_print_data(name, data->data, data->data_len);
-}
 #endif /* SSH_DECRYPT_DEBUG }}} */
 
 static void
