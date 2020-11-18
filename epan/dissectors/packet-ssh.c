@@ -120,7 +120,8 @@ typedef struct {
 #endif
 
 typedef struct _ssh_channel_info_t {
-    guint  channel_number;
+    guint  client_channel_number;
+    guint  server_channel_number;
     dissector_handle_t subdissector_handle;
     struct _ssh_channel_info_t* next;
 } ssh_channel_info_t;
@@ -166,8 +167,7 @@ struct ssh_peer_data {
     ssh_bignum      *bn_cookie;
     guint8           iv[12];
 #endif
-
-    ssh_channel_info_t *channel_info;
+    struct ssh_flow_data * global_data;
 };
 
 struct ssh_flow_data {
@@ -204,6 +204,7 @@ struct ssh_flow_data {
     gboolean        do_decrypt;
     ssh_bignum      new_keys[6];
 #endif
+    ssh_channel_info_t *channel_info;
 };
 
 static GHashTable * ssh_master_key_map = NULL;
@@ -364,6 +365,8 @@ static dissector_handle_t sftp_handle=NULL;
 static const char   *pref_keylog_file;
 static FILE         *ssh_keylog_file;
 #endif
+
+static const gchar *ssh_debug_file_name     = NULL;
 
 // 29418/tcp: Gerrit Code Review
 #define TCP_RANGE_SSH  "22,29418"
@@ -783,6 +786,9 @@ dissect_ssh(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
         global_data->peer_data[SERVER_PEER_DATA].bn_cookie = NULL;
         global_data->peer_data[CLIENT_PEER_DATA].in_fragment = 0;
         global_data->peer_data[SERVER_PEER_DATA].in_fragment = 0;
+        global_data->peer_data[CLIENT_PEER_DATA].global_data = global_data;
+        global_data->peer_data[SERVER_PEER_DATA].global_data = global_data;
+        global_data->channel_info = NULL;
         global_data->kex_client_version = wmem_array_new(wmem_file_scope(), 1);
         global_data->kex_server_version = wmem_array_new(wmem_file_scope(), 1);
         global_data->kex_client_key_exchange_init = wmem_array_new(wmem_file_scope(), 1);
@@ -1118,9 +1124,6 @@ ssh_tree_add_hostkey(tvbuff_t *tvb, int offset, proto_tree *parent_tree,
 #ifdef SSH_DECRYPTION_SUPPORTED
     gchar *data = (gchar *)tvb_memdup(wmem_packet_scope(), tvb, last_offset + 4, key_len);
     ssh_hash_buffer_put_string(global_data->kex_server_host_key_blob, data, key_len);
-g_debug("JH:%s - E xxxxxxxxxxxxxxxxxxxx", __FUNCTION__);
-g_debug("JH:%s adding %d bytes to kex_server_host_key_blob new len=%d", __FUNCTION__, key_len, global_data->kex_server_host_key_blob?wmem_array_get_count(global_data->kex_server_host_key_blob):(guint)-1);
-
 #else
     // ignore unused parameter complaint
     (void)global_data;
@@ -1289,11 +1292,11 @@ ssh_dissect_key_exchange(tvbuff_t *tvb, packet_info *pinfo,
                 // the client sent SSH_MSG_NEWKEYS
                 if (!is_response) {
                     ssh_decryption_set_cipher_id(&global_data->peer_data[CLIENT_PEER_DATA]);
-                    g_debug("JH: Activating new keys for CLIENT => SERVER");
+                    g_debug("Activating new keys for CLIENT => SERVER");
                     ssh_decryption_setup_cipher(&global_data->peer_data[CLIENT_PEER_DATA], &global_data->new_keys[0], &global_data->new_keys[2]);
                 }else{
                     ssh_decryption_set_cipher_id(&global_data->peer_data[SERVER_PEER_DATA]);
-                    g_debug("JH: Activating new keys for SERVER => CLIENT");
+                    g_debug("Activating new keys for SERVER => CLIENT");
                     ssh_decryption_setup_cipher(&global_data->peer_data[SERVER_PEER_DATA], &global_data->new_keys[1], &global_data->new_keys[3]);
                 }
 
@@ -1949,8 +1952,6 @@ ssh_keylog_process_line(const char *line)
 
     key_len = strlen(key);
     cookie_len = strlen(cookie);
-dump_ssh_style(cookie, cookie_len, "cookie");
-dump_ssh_style(key, key_len, "key");
     if(key_len & 1){
         g_debug("ssh keylog: invalid format (key could at least be even!)");
         g_strfreev(split);
@@ -1997,7 +1998,7 @@ dump_ssh_style(key, key_len, "key");
 
         bn_cookie->data[i] = c;
     }
-    g_debug("ssh: JH key accepted");
+
     g_hash_table_insert(ssh_master_key_map, bn_cookie, bn_priv);
     g_strfreev(split);
 }
@@ -2126,16 +2127,6 @@ ssh_keylog_hash_write_secret(tvbuff_t *tvb, int offset,
         return;
     }
 
-char a2h[] = "0123456789ABCDEF";
-gchar *sbuf = (gchar *)wmem_alloc0(wmem_packet_scope(), 1024*1024);
-size_t cnts;
-for(cnts=0;cnts<secret->length;cnts++){
-    sbuf[2*cnts+0] = a2h[(secret->data[cnts] >> 4) & 0xF];
-    sbuf[2*cnts+1] = a2h[(secret->data[cnts] >> 0) & 0xF];
-}
-sbuf[2*cnts+0] = 0;
-g_debug("%s l=%d\n%s", "secret", secret->length, sbuf);
-
     // shared secret data needs to be written as an mpint, and we need it later
     if (secret->data[0] & 0x80) {         // Stored in Big endian?
 //    if (secret->data[secret->length-1] & 0x80) {         // Stored in Little endian?
@@ -2263,9 +2254,7 @@ ssh_kex_shared_secret(gint kex_type, ssh_bignum *pub, ssh_bignum *priv, ssh_bign
         gcry_mpi_release(b);
         gcry_mpi_release(e);
         gcry_mpi_release(m);
-//        dump_bignum(secret, "shared secret");
-//        print_hex(secret->data, secret->length, "ssh: JH shared secret");
-//        dump_ssh_style(secret->data, secret->length, "shared secret");
+
     }else if(kex_type==SSH_KEX_DH_GROUP1 || kex_type==SSH_KEX_DH_GROUP14 || kex_type==SSH_KEX_DH_GROUP16 || kex_type==SSH_KEX_DH_GROUP18){
         gcry_mpi_t m = NULL;
         if(kex_type==SSH_KEX_DH_GROUP1){
@@ -2425,7 +2414,6 @@ ssh_kex_shared_secret(gint kex_type, ssh_bignum *pub, ssh_bignum *priv, ssh_bign
         }
     }
 
-    print_hex(secret->data, secret->length, "ssh: JH shared secret");
     dump_ssh_style(secret->data, secret->length, "shared secret");
 
     return secret;
@@ -3511,9 +3499,10 @@ ssh_dissect_connection_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
 static dissector_handle_t
 get_subdissector_for_channel(struct ssh_peer_data *peer_data, guint uiNumChannel)
 {
-        ssh_channel_info_t *ci = peer_data->channel_info;
+        ssh_channel_info_t *ci = peer_data->global_data->channel_info;
         while(ci){
-            if(ci->channel_number==uiNumChannel){return ci->subdissector_handle;}
+            guint channel_number = &peer_data->global_data->peer_data[SERVER_PEER_DATA]==peer_data?ci->client_channel_number:ci->server_channel_number;
+            if(channel_number==uiNumChannel){return ci->subdissector_handle;}
             ci = ci->next;
         }
         g_debug("Error lookin up channel %d", uiNumChannel);
@@ -3524,9 +3513,11 @@ static void
 set_subdissector_for_channel(struct ssh_peer_data *peer_data, guint uiNumChannel, guint8* subsystem_name)
 {
         ssh_channel_info_t *ci = NULL;
-        ssh_channel_info_t **pci = &peer_data->channel_info;
+        ssh_channel_info_t **pci = &peer_data->global_data->channel_info;
+        int is_server = &peer_data->global_data->peer_data[SERVER_PEER_DATA]==peer_data;
         while(*pci){
-            if ((*pci)->channel_number == uiNumChannel) {
+            guint channel_number = is_server?(*pci)->client_channel_number:(*pci)->server_channel_number;
+            if (channel_number == uiNumChannel) {
                 ci = *pci;
                 break;
             }
@@ -4326,6 +4317,11 @@ proto_register_ssh(void)
             "The path to the file which contains a list of key exchange secrets in the following format:\n"
             "\"<hex-encoded-cookie> <hex-encoded-key>\" (without quotes or leading spaces).\n",
             &pref_keylog_file, FALSE);
+
+    prefs_register_filename_preference(ssh_module, "debug_file", "SSH debug file",
+        "Redirect SSH debug to the file specified. Leave empty to disable debugging "
+        "or use \"" SSH_DEBUG_USE_STDERR "\" to redirect output to stderr.",
+        &ssh_debug_file_name, TRUE);
 
     secrets_register_type(SECRETS_TYPE_SSH, ssh_secrets_block_callback);
 #endif
