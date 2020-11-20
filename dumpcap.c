@@ -252,6 +252,7 @@ typedef struct _loop_data {
 #endif
     GArray   *pcaps;               /**< Array of capture_src's on which we're capturing */
     gboolean  pcapng_passthrough;  /**< We have one source and it's pcapng. Pass its SHB and IDBs through. */
+    gboolean  passed_shb_through;  /**< We've passed one SHB through from the input file */
     guint8   *saved_shb;           /**< SHB to write when we have one pcapng input */
     GArray   *saved_idbs;          /**< Array of saved_idb_t, written when we have a new section or output file. */
     GRWLock   saved_shb_idb_lock;  /**< Saved IDB RW mutex */
@@ -3738,7 +3739,15 @@ do_file_switch_or_stop(capture_options *capture_opts)
             if (!quiet)
                 report_packet_count(global_ld.inpkts_to_sync_pipe);
             global_ld.inpkts_to_sync_pipe = 0;
-            report_new_capture_file(capture_opts->save_file);
+
+            /*
+             * If we're in pcapng passthrough mode, we haven't yet written
+             * an SHB, so we must not yet say we have a new capture file,
+             * as the file is empty and, if we're a capture child, our
+             * parent won't be able to open it.
+             */
+            if (!global_ld.pcapng_passthrough)
+                report_new_capture_file(capture_opts->save_file);
         } else {
             /* File switch failed: stop here */
             global_ld.go = FALSE;
@@ -3925,7 +3934,15 @@ capture_loop_start(capture_options *capture_opts, gboolean *stats_known, struct 
            update its windows to indicate that we have a live capture in
            progress. */
         fflush(global_ld.pdh);
-        report_new_capture_file(capture_opts->save_file);
+
+        /*
+         * If we're in pcapng passthrough mode, we haven't yet written
+         * an SHB, so we must not yet say we have a new capture file,
+         * as the file is empty and, if we're a capture child, our
+         * parent won't be able to open it.
+         */
+        if (!global_ld.pcapng_passthrough)
+            report_new_capture_file(capture_opts->save_file);
     }
 
     if (capture_opts->has_file_interval) {
@@ -4424,14 +4441,47 @@ capture_loop_write_pcapng_cb(capture_src *pcap_src, const pcapng_block_header_t 
             global_ld.go = FALSE;
             global_ld.err = err;
             pcap_src->dropped++;
-        } else if (bh->block_type == BLOCK_TYPE_EPB || bh->block_type == BLOCK_TYPE_SPB || bh->block_type == BLOCK_TYPE_SYSTEMD_JOURNAL) {
-            /* count packet only if we actually have an EPB or SPB */
+        } else {
+            switch (bh->block_type) {
+            case BLOCK_TYPE_SHB:
+                /*
+                 * OK, we should be writing this only if we're in
+                 * passthrough mode - see above.
+                 *
+                 * If we're in "capture child" mode, and are writing
+                 * a pcapng file, we must not send an SP_FILE message
+                 * until we've written an SHB; otherwise, the attempt
+                 * by our parent to open the capture file will fail.
+                 *
+                 * In passthrough mode, we didn't write out an SHB
+                 * when we created the file, as we were waiting for
+                 * an SHB to show up on the input pipe, so we didn't
+                 * send an SP_FILE message.  We now have an SHB, and
+                 * have written it and flushed it to the file, so we
+                 * can now send the SP_FILE message, if we haven't
+                 * sent one already.
+                 */
+                if (!global_ld.passed_shb_through) {
+                    report_new_capture_file(global_capture_opts.save_file);
+                    global_ld.passed_shb_through = TRUE;
+                }
+                break;
+
+            case BLOCK_TYPE_EPB:
+            case BLOCK_TYPE_SPB:
+            case BLOCK_TYPE_PB:
+            case BLOCK_TYPE_SYSTEMD_JOURNAL:
+                /*
+                 * These are the block types that turn into records.
+                 */
 #if defined(DEBUG_DUMPCAP) || defined(DEBUG_CHILD_DUMPCAP)
-            g_log(LOG_DOMAIN_CAPTURE_CHILD, G_LOG_LEVEL_INFO,
-                  "Wrote a pcapng block type %u of length %d captured on interface %u.",
-                   bh->block_type, bh->block_total_length, pcap_src->interface_id);
+                g_log(LOG_DOMAIN_CAPTURE_CHILD, G_LOG_LEVEL_INFO,
+                      "Wrote a pcapng block type %u of length %d captured on interface %u.",
+                       bh->block_type, bh->block_total_length, pcap_src->interface_id);
 #endif
-            capture_loop_wrote_one_packet(pcap_src);
+                capture_loop_wrote_one_packet(pcap_src);
+                break;
+            }
         }
     }
 }
@@ -4862,6 +4912,7 @@ main(int argc, char *argv[])
     /* Initialize the pcaps list and IDBs */
     global_ld.pcaps = g_array_new(FALSE, FALSE, sizeof(capture_src *));
     global_ld.pcapng_passthrough = FALSE;
+    global_ld.passed_shb_through = FALSE;
     global_ld.saved_shb = NULL;
     global_ld.saved_idbs = g_array_new(FALSE, TRUE, sizeof(saved_idb_t));
 
