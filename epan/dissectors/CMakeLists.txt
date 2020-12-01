@@ -1746,7 +1746,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-smb-direct.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-smb.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-smb2.c
-	${CMAKE_CURRENT_SOURCE_DIR}/packet-smcr.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-smc.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-sml.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-smp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-smpp.c
@@ -1774,6 +1774,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-sscop.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ssh.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-sstp.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-ssyncp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-stanag4607.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-starteam.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-stat-notify.c

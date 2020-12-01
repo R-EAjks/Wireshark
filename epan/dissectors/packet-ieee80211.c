@@ -25269,8 +25269,8 @@ dissect_ieee80211_common(tvbuff_t *tvb, packet_info *pinfo,
     if (HAS_HT_CONTROL(FCF_FLAGS(fcf))) {
       /*
        * Management frames with the Order bit set have an HT Control field;
-       * see 8.2.4.1.10 "Order field".  If they're not HT frames, they should
-       * never have the Order bit set.
+       * see IEEE 802.11-2016 section 9.2.4.1.10 "+HTC/Order subfield".
+       * If they're not HT frames, they should never have the Order bit set.
        */
       hdr_len += 4;
       htc_len = 4;
@@ -25354,77 +25354,69 @@ dissect_ieee80211_common(tvbuff_t *tvb, packet_info *pinfo,
   case DATA_FRAME:
     hdr_len = (FCF_ADDR_SELECTOR(fcf) == DATA_ADDR_T4) ? DATA_LONG_HDR_LEN : DATA_SHORT_HDR_LEN;
 
-    if ((option_flags & IEEE80211_COMMON_OPT_NORMAL_QOS) && DATA_FRAME_IS_QOS(frame_type_subtype)) {
-      /* QoS frame */
-      qosoff = hdr_len;
-      hdr_len += 2; /* Include the QoS field in the header length */
+    if (option_flags & IEEE80211_COMMON_OPT_NORMAL_QOS) {
+      if (DATA_FRAME_IS_QOS(frame_type_subtype)) {
+        /* QoS frame */
+        qosoff = hdr_len;
+        hdr_len += 2; /* Include the QoS field in the header length */
 
-      if (HAS_HT_CONTROL(FCF_FLAGS(fcf))) {
-        /*
-         * QoS data frames with the Order bit set have an HT Control field;
-         * see 8.2.4.1.10 "Order field".  If they're not HT frames, they
-         * should never have the Order bit set.
-         */
-        hdr_len += 4;
-        htc_len = 4;
-      }
-
-      /*
-       * Does it look as if we have a mesh header?
-       * Look at the Mesh Control subfield of the QoS field and at the
-       * purported mesh flag fields.
-       */
-      qos_control = tvb_get_letohs(tvb, qosoff);
-      if (tvb_bytes_exist(tvb, hdr_len, 1)) {
-        meshoff = hdr_len;
-        mesh_flags = tvb_get_guint8(tvb, meshoff);
-        if (has_mesh_control(fcf, qos_control, mesh_flags)) {
-          /* Yes, add the length of that in as well. */
-          meshctl_len = find_mesh_control_length(mesh_flags);
-          hdr_len += meshctl_len;
+        if (HAS_HT_CONTROL(FCF_FLAGS(fcf))) {
+          /*
+           * QoS data frames with the Order bit set have an HT Control field;
+           * see IEEE 802.16 section 9.2.4.1.10 "+HTC/Order subfield".
+           * If they're not HT frames, they should never have the Order bit set.
+           */
+          hdr_len += 4;
+          htc_len = 4;
         }
-      }
-    } else if ((option_flags & IEEE80211_COMMON_OPT_NORMAL_QOS) && !DATA_FRAME_IS_QOS(frame_type_subtype)) {
 
-      if (HAS_HT_CONTROL(FCF_FLAGS(fcf))) {
         /*
-         * QoS data frames with the Order bit set have an HT Control field;
-         * see 8.2.4.1.10 "Order field".  If they're not HT frames, they
-         * should never have the Order bit set.
+         * Does it look as if we have a mesh header?
+         * Look at the Mesh Control subfield of the QoS field and at the
+         * purported mesh flag fields.
          */
-        hdr_len += 4;
-        htc_len = 4;
-      }
-
-      /*
-       * For locally originated mesh frames, the QoS header may be added by the
-       * hardware, and no present in wireshark captures.  This poses a problem
-       * as the QoS header indicates the presence of the mesh control header.
-       *
-       * Instead of QoS, we use a few heuristics to determine the presence of
-       * the mesh control header, which is tricky because it can have a
-       * variable length.
-       *
-       * Assume minimal length, and then correct if wrong.
-       */
-      meshctl_len = find_mesh_control_length(0);
-      if (tvb_bytes_exist(tvb, hdr_len, meshctl_len)) {
-        meshoff = hdr_len;
-        mesh_flags = tvb_get_guint8(tvb, meshoff);
-        /* now find correct length */
-        meshctl_len = find_mesh_control_length(mesh_flags);
-        /* ... and try to read two bytes of next header */
-        if (tvb_bytes_exist(tvb, hdr_len, meshctl_len + 2)) {
-          guint16 next_header = tvb_get_letohs(tvb, meshoff + meshctl_len);
-          if (has_mesh_control_local(fcf, mesh_flags, next_header)) {
+        qos_control = tvb_get_letohs(tvb, qosoff);
+        if (tvb_bytes_exist(tvb, hdr_len, 1)) {
+          meshoff = hdr_len;
+          mesh_flags = tvb_get_guint8(tvb, meshoff);
+          if (has_mesh_control(fcf, qos_control, mesh_flags)) {
             /* Yes, add the length of that in as well. */
+            meshctl_len = find_mesh_control_length(mesh_flags);
             hdr_len += meshctl_len;
-            break;
           }
         }
+      } else {
+        /*
+         * For locally originated mesh frames, the QoS header may be added
+         * by the hardware, and no present in wireshark captures.  This
+         * poses a problem as the QoS header indicates the presence of the
+         * mesh control header.
+         *
+         * Instead of QoS, we use a few heuristics to determine the presence
+         * of the mesh control header, which is tricky because it can have a
+         * variable length.
+         *
+         * Assume minimal length, and then correct if wrong.
+         */
+        meshctl_len = find_mesh_control_length(0);
+        if (tvb_bytes_exist(tvb, hdr_len, meshctl_len)) {
+          meshoff = hdr_len;
+          mesh_flags = tvb_get_guint8(tvb, meshoff);
+          /* now find correct length */
+          meshctl_len = find_mesh_control_length(mesh_flags);
+          /* ... and try to read two bytes of next header */
+          if (tvb_bytes_exist(tvb, hdr_len, meshctl_len + 2)) {
+            guint16 next_header = tvb_get_letohs(tvb, meshoff + meshctl_len);
+            if (has_mesh_control_local(fcf, mesh_flags, next_header)) {
+              /* Yes, add the length of that in as well. */
+              hdr_len += meshctl_len;
+              break;
+            }
+          }
+        }
+        /* failed to find a mesh header */
+        meshctl_len = 0;
       }
-      /* failed to find a mesh header */
-      meshctl_len = 0;
     }
     break;
 
@@ -26754,79 +26746,78 @@ dissect_ieee80211_common(tvbuff_t *tvb, packet_info *pinfo,
           call_dissector(llc_handle, msdu_tvb, pinfo, subframe_tree);
           msdu_offset = roundup2(msdu_offset+msdu_length, 4);
         } while (tvb_reported_length_remaining(next_tvb, msdu_offset) > 14);
+      } else {
+        /* I guess some bridges take Netware Ethernet_802_3 frames,
+           which are 802.3 frames (with a length field rather than
+           a type field, but with no 802.2 header in the payload),
+           and just stick the payload into an 802.11 frame.  I've seen
+           captures that show frames of that sort.
 
-        break;
-      }
-      /* I guess some bridges take Netware Ethernet_802_3 frames,
-         which are 802.3 frames (with a length field rather than
-         a type field, but with no 802.2 header in the payload),
-         and just stick the payload into an 802.11 frame.  I've seen
-         captures that show frames of that sort.
+           We also handle some odd form of encapsulation in which a
+           complete Ethernet frame is encapsulated within an 802.11
+           data frame, with no 802.2 header.  This has been seen
+           from some hardware.
 
-         We also handle some odd form of encapsulation in which a
-         complete Ethernet frame is encapsulated within an 802.11
-         data frame, with no 802.2 header.  This has been seen
-         from some hardware.
+           On top of that, at least at some point it appeared that
+           the OLPC XO sent out frames with two bytes of 0 between
+           the "end" of the 802.11 header and the beginning of
+           the payload. Something similar has also been observed
+           with Atheros chipsets. There the sequence control field
+           seems repeated.
 
-         On top of that, at least at some point it appeared that
-         the OLPC XO sent out frames with two bytes of 0 between
-         the "end" of the 802.11 header and the beginning of
-         the payload. Something similar has also been observed
-         with Atheros chipsets. There the sequence control field
-         seems repeated.
+           So, if the packet doesn't start with 0xaa 0xaa:
 
-         So, if the packet doesn't start with 0xaa 0xaa:
+             we first use the same scheme that linux-wlan-ng does to detect
+             those encapsulated Ethernet frames, namely looking to see whether
+             the frame either starts with 6 octets that match the destination
+             address from the 802.11 header or has 6 octets that match the
+             source address from the 802.11 header following the first 6 octets,
+             and, if so, treat it as an encapsulated Ethernet frame;
 
-           we first use the same scheme that linux-wlan-ng does to detect
-           those encapsulated Ethernet frames, namely looking to see whether
-           the frame either starts with 6 octets that match the destination
-           address from the 802.11 header or has 6 octets that match the
-           source address from the 802.11 header following the first 6 octets,
-           and, if so, treat it as an encapsulated Ethernet frame;
-
-           otherwise, we use the same scheme that we use in the Ethernet
-           dissector to recognize Netware 802.3 frames, namely checking
-           whether the packet starts with 0xff 0xff and, if so, treat it
-           as an encapsulated IPX frame, and then check whether the
-           packet starts with 0x00 0x00 and, if so, treat it as an OLPC
-           frame, or check the packet starts with the repetition of the
-           sequence control field and, if so, treat it as an Atheros frame. */
-      heur_dtbl_entry_t  *hdtbl_entry;
-      if (dissector_try_heuristic(heur_subdissector_list, next_tvb, pinfo, tree, &hdtbl_entry, NULL)) {
-        pinfo->fragmented = save_fragmented;
-        goto end_of_wlan; /* heuristics dissector handled it. */
-      }
-      encap_type = ENCAP_802_2;
-      if (tvb_bytes_exist(next_tvb, 0, 2)) {
-        octet1 = tvb_get_guint8(next_tvb, 0);
-        octet2 = tvb_get_guint8(next_tvb, 1);
-        if ((octet1 != 0xaa) || (octet2 != 0xaa)) {
-          if ((tvb_memeql(next_tvb, 6, (const guint8 *)pinfo->dl_src.data, 6) == 0) ||
-              (tvb_memeql(next_tvb, 0, (const guint8 *)pinfo->dl_dst.data, 6) == 0))
-            encap_type = ENCAP_ETHERNET;
-          else if ((octet1 == 0xff) && (octet2 == 0xff))
-            encap_type = ENCAP_IPX;
-          else if (((octet1 == 0x00) && (octet2 == 0x00)) ||
-                   (((octet2 << 8) | octet1) == seq_control)) {
-            proto_tree_add_item(tree, hf_ieee80211_mysterious_olpc_stuff, next_tvb, 0, 2, ENC_NA);
-            next_tvb = tvb_new_subset_remaining(next_tvb, 2);
+             otherwise, we use the same scheme that we use in the Ethernet
+             dissector to recognize Netware 802.3 frames, namely checking
+             whether the packet starts with 0xff 0xff and, if so, treat it
+             as an encapsulated IPX frame, and then check whether the
+             packet starts with 0x00 0x00 and, if so, treat it as an OLPC
+             frame, or check the packet starts with the repetition of the
+             sequence control field and, if so, treat it as an Atheros frame. */
+        heur_dtbl_entry_t  *hdtbl_entry;
+        if (dissector_try_heuristic(heur_subdissector_list, next_tvb, pinfo, tree, &hdtbl_entry, NULL)) {
+          pinfo->fragmented = save_fragmented;
+          goto end_of_wlan; /* heuristics dissector handled it. */
+        }
+        encap_type = ENCAP_802_2;
+        if (tvb_bytes_exist(next_tvb, 0, 2)) {
+          octet1 = tvb_get_guint8(next_tvb, 0);
+          octet2 = tvb_get_guint8(next_tvb, 1);
+          if ((octet1 != 0xaa) || (octet2 != 0xaa)) {
+            if ((tvb_memeql(next_tvb, 6, (const guint8 *)pinfo->dl_src.data, 6) == 0) ||
+                (tvb_memeql(next_tvb, 0, (const guint8 *)pinfo->dl_dst.data, 6) == 0))
+              encap_type = ENCAP_ETHERNET;
+            else if ((octet1 == 0xff) && (octet2 == 0xff))
+              encap_type = ENCAP_IPX;
+            else if (((octet1 == 0x00) && (octet2 == 0x00)) ||
+                     (((octet2 << 8) | octet1) == seq_control)) {
+              proto_tree_add_item(tree, hf_ieee80211_mysterious_olpc_stuff, next_tvb, 0, 2, ENC_NA);
+              next_tvb = tvb_new_subset_remaining(next_tvb, 2);
+            }
           }
         }
-      }
 
-      switch (encap_type) {
+        switch (encap_type) {
 
-      case ENCAP_802_2:
-        call_dissector(llc_handle, next_tvb, pinfo, tree);
-        break;
+        case ENCAP_802_2:
+          call_dissector(llc_handle, next_tvb, pinfo, tree);
+          break;
 
-      case ENCAP_ETHERNET:
-        call_dissector(eth_withoutfcs_handle, next_tvb, pinfo, tree);
-        break;
+        case ENCAP_ETHERNET:
+          call_dissector(eth_withoutfcs_handle, next_tvb, pinfo, tree);
+          break;
 
-      case ENCAP_IPX:
-        call_dissector(ipx_handle, next_tvb, pinfo, tree);
-        break;
+        case ENCAP_IPX:
+          call_dissector(ipx_handle, next_tvb, pinfo, tree);
+          break;
+        }
       }
       break;
 

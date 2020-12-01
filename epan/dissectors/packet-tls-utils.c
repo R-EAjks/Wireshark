@@ -2461,7 +2461,7 @@ static gboolean from_hex(StringInfo* out, const char* in, gsize hex_len) {
 #define SSL_HMAC gcry_md_hd_t
 
 static inline gint
-ssl_hmac_init(SSL_HMAC* md, const void * key, gint len, gint algo)
+ssl_hmac_init(SSL_HMAC* md, gint algo)
 {
     gcry_error_t  err;
     const char   *err_str, *err_src;
@@ -2473,9 +2473,32 @@ ssl_hmac_init(SSL_HMAC* md, const void * key, gint len, gint algo)
         ssl_debug_printf("ssl_hmac_init(): gcry_md_open failed %s/%s", err_str, err_src);
         return -1;
     }
-    gcry_md_setkey (*(md), key, len);
     return 0;
 }
+
+static inline gint
+ssl_hmac_setkey(SSL_HMAC* md, const void * key, gint len)
+{
+    gcry_error_t  err;
+    const char   *err_str, *err_src;
+
+    err = gcry_md_setkey (*(md), key, len);
+    if (err != 0) {
+        err_str = gcry_strerror(err);
+        err_src = gcry_strsource(err);
+        ssl_debug_printf("ssl_hmac_setkey(): gcry_md_setkey failed %s/%s", err_str, err_src);
+        return -1;
+    }
+    return 0;
+}
+
+static inline gint
+ssl_hmac_reset(SSL_HMAC* md)
+{
+    gcry_md_reset(*md);
+    return 0;
+}
+
 static inline void
 ssl_hmac_update(SSL_HMAC* md, const void* data, gint len)
 {
@@ -2535,6 +2558,12 @@ static inline void
 ssl_md_cleanup(SSL_MD* md)
 {
     gcry_md_close(*(md));
+}
+
+static inline void
+ssl_md_reset(SSL_MD* md)
+{
+    gcry_md_reset(*md);
 }
 
 /* md5 /sha abstraction layer */
@@ -3088,22 +3117,23 @@ tls_hash(StringInfo *secret, StringInfo *seed, gint md,
     A = seed->data;
     A_l = seed->data_len;
 
+    ssl_hmac_init(&hm, md);
     while (left) {
         /* A(i) = HMAC_hash(secret, A(i-1)) */
-        ssl_hmac_init(&hm, secret->data, secret->data_len, md);
+        ssl_hmac_setkey(&hm, secret->data, secret->data_len);
         ssl_hmac_update(&hm, A, A_l);
         A_l = sizeof(_A); /* upper bound len for hash output */
         ssl_hmac_final(&hm, _A, &A_l);
-        ssl_hmac_cleanup(&hm);
         A = _A;
 
         /* HMAC_hash(secret, A(i) + seed) */
-        ssl_hmac_init(&hm, secret->data, secret->data_len, md);
+        ssl_hmac_reset(&hm);
+        ssl_hmac_setkey(&hm, secret->data, secret->data_len);
         ssl_hmac_update(&hm, A, A_l);
         ssl_hmac_update(&hm, seed->data, seed->data_len);
         tmp_l = sizeof(tmp); /* upper bound len for hash output */
         ssl_hmac_final(&hm, tmp, &tmp_l);
-        ssl_hmac_cleanup(&hm);
+        ssl_hmac_reset(&hm);
 
         /* ssl_hmac_final puts the actual digest output size in tmp_l */
         tocpy = MIN(left, tmp_l);
@@ -3111,6 +3141,7 @@ tls_hash(StringInfo *secret, StringInfo *seed, gint md,
         ptr += tocpy;
         left -= tocpy;
     }
+    ssl_hmac_cleanup(&hm);
     out->data_len = out_len;
 
     ssl_print_string("hash out", out);
@@ -4328,7 +4359,9 @@ tls_check_mac(SslDecoder*decoder, gint ct, gint ver, guint8* data,
     ssl_debug_printf("tls_check_mac mac type:%s md %d\n",
         ssl_cipher_suite_dig(decoder->cipher_suite)->name, md);
 
-    if (ssl_hmac_init(&hm,decoder->mac_key.data,decoder->mac_key.data_len,md) != 0)
+    if (ssl_hmac_init(&hm,md) != 0)
+        return -1;
+    if (ssl_hmac_setkey(&hm,decoder->mac_key.data,decoder->mac_key.data_len) != 0)
         return -1;
 
     /* hash sequence number */
@@ -4408,9 +4441,7 @@ ssl3_check_mac(SslDecoder*decoder,int ct,guint8* data,
 
     /* get partial digest */
     ssl_md_final(&mc,dgst,&len);
-    ssl_md_cleanup(&mc);
-
-    ssl_md_init(&mc,md);
+    ssl_md_reset(&mc);
 
     /* hash mac key */
     ssl_md_update(&mc,decoder->mac_key.data,decoder->mac_key.data_len);
@@ -4443,8 +4474,11 @@ dtls_check_mac(SslDecoder*decoder, gint ct,int ver, guint8* data,
     ssl_debug_printf("dtls_check_mac mac type:%s md %d\n",
         ssl_cipher_suite_dig(decoder->cipher_suite)->name, md);
 
-    if (ssl_hmac_init(&hm,decoder->mac_key.data,decoder->mac_key.data_len,md) != 0)
+    if (ssl_hmac_init(&hm,md) != 0)
         return -1;
+    if (ssl_hmac_setkey(&hm,decoder->mac_key.data,decoder->mac_key.data_len) != 0)
+        return -1;
+
     ssl_debug_printf("dtls_check_mac seq: %" G_GUINT64_FORMAT " epoch: %d\n",decoder->seq,decoder->epoch);
     /* hash sequence number */
     phton64(buf, decoder->seq);
@@ -5973,7 +6007,7 @@ tls_keylog_process_lines(const ssl_master_key_map_t *mk_map, const guint8 *data,
 
             g_hash_table_insert(ht, key, pre_ms_or_ms);
 
-        } else {
+        } else if (linelen > 0 && line[0] != '#') {
             ssl_debug_printf("    unrecognized line\n");
         }
         /* always free match info even if there is no match. */

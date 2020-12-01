@@ -1038,7 +1038,7 @@ endmacro()
 # The minimum package list
 find_package(Git)
 reset_find_package(GLIB2 GLIB2_MAIN_INCLUDE_DIR GLIB2_INTERNAL_INCLUDE_DIR)
-find_package(GLIB2 "2.32.0" REQUIRED)
+find_package(GLIB2 "2.36.0" REQUIRED)
 include_directories(SYSTEM ${GLIB2_INCLUDE_DIRS})
 reset_find_package(GMODULE2)
 find_package(GMODULE2)
@@ -1050,7 +1050,6 @@ find_package(GCRYPT "1.4.2" REQUIRED)
 reset_find_package(CARES)
 find_package(CARES "1.5.0" REQUIRED)
 find_package(LEX REQUIRED)
-find_package(YACC REQUIRED)
 find_package(Perl REQUIRED)
 
 if(CMAKE_VERSION VERSION_LESS "3.12")
@@ -1883,9 +1882,12 @@ if(WIN32)
 		list (APPEND OPTIONAL_DLLS "${CARES_DLL_DIR}/${CARES_DLL}")
 		list (APPEND OPTIONAL_PDBS "${CARES_DLL_DIR}/${CARES_PDB}")
 	endif(CARES_FOUND)
-	if (MAXMINDDB_FOUND)
-		list (APPEND OPTIONAL_DLLS "${MAXMINDDB_DLL_DIR}/${MAXMINDDB_DLL}")
-	endif(MAXMINDDB_FOUND)
+	# vcpkg's libmaxminddb is static-only for now. This can be uncommented when
+	# https://github.com/maxmind/libmaxminddb/commit/3998f42bdb6678cbaa1a543057e5c81ba1668ac2
+	# percolates up to vcpkg.
+	# if (MAXMINDDB_FOUND)
+	# 	list (APPEND OPTIONAL_DLLS "${MAXMINDDB_DLL_DIR}/${MAXMINDDB_DLL}")
+	# endif(MAXMINDDB_FOUND)
 	if (LIBSSH_FOUND)
 		list (APPEND OPTIONAL_DLLS "${LIBSSH_DLL_DIR}/${LIBSSH_DLL}")
 	endif(LIBSSH_FOUND)
@@ -2833,6 +2835,8 @@ if (MAXMINDDB_FOUND)
 	set(mmdbresolve_LIBS
 		# Note: libmaxminddb is not GPL-2 compatible.
 		${MAXMINDDB_LIBRARY}
+		# Needed for CMake-built libmaxminddb.lib <= 1.43.
+		${WIN_WS2_32_LIBRARY}
 	)
 	set(mmdbresolve_FILES
 		mmdbresolve.c

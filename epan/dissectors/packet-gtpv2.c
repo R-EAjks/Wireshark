@@ -930,8 +930,6 @@ static expert_field ei_gtpv2_apn_too_long = EI_INIT;
 #define GTPV2_RAN_INFORMATION_RELAY     152
 #define GTPV2_DL_DATA_NOTIF_ACK        177
 
-static void dissect_gtpv2_ie_common(tvbuff_t * tvb, packet_info * pinfo _U_, proto_tree * tree, gint offset, guint8 message_type, session_args_t * args);
-
 /* Table 6.1-1: Message types for GTPv2 */
 static const value_string gtpv2_message_type_vals[] = {
     {  0, "Reserved"},
@@ -5127,6 +5125,7 @@ dissect_gtpv2_F_container(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, p
     proto_tree_add_item(tree, hf_gtpv2_container_type, tvb, offset, 1, ENC_BIG_ENDIAN);
     container_type = tvb_get_guint8(tvb, offset);
     offset += 1;
+    length--;
     if (   (message_type == GTPV2_FORWARD_RELOCATION_REQ)
         || (message_type == GTPV2_CONTEXT_RESPONSE)
         || (message_type == GTPV2_RAN_INFORMATION_RELAY)) {
@@ -5189,7 +5188,8 @@ dissect_gtpv2_F_container(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, p
             * relocation procedure. The Container Type shall be set to 3.
             */
             sub_tree = proto_tree_add_subtree(tree, tvb, offset, length, ett_gtpv2_eutran_con, NULL, "E-UTRAN transparent container");
-            proto_tree_add_expert(sub_tree, pinfo, &ei_gtpv2_ie_data_not_dissected, tvb, offset, length - offset);
+            new_tvb = tvb_new_subset_remaining(tvb, offset);
+            dissect_s1ap_SourceeNB_ToTargeteNB_TransparentContainer_PDU(new_tvb, pinfo, sub_tree, NULL);
             return;
         default:
             break;
@@ -5206,15 +5206,25 @@ dissect_gtpv2_F_container(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, p
             break;
         }
     }
+    if (message_type == GTPV2_FORWARD_RELOCATION_RESP) {
 
-    /* 7.3.2 Forward Relocation Response
-     * E-UTRAN Transparent Container
-     * This IE is conditionally included only during a handover to
-     * E-UTRAN and contains the radio-related and core network
-     * information. If the Cause IE contains the value "Request
-     * accepted", this IE shall be included.
-     */
-    proto_tree_add_expert(tree, pinfo, &ei_gtpv2_ie_data_not_dissected, tvb, offset, length-offset);
+    /* 7.3.2 Forward Relocation Response */
+        switch (container_type) {
+        case 3:
+            /* E-UTRAN transparent container
+             * This IE shall be included to contain the "Target to Source Transparent Container"
+             * during a handover to E-UTRAN, 5GS to EPS handover and EPS to 5GS handover.
+             * If the Cause IE contains the value "Request accepted". The Container Type shall be set to 3.
+             */
+            sub_tree = proto_tree_add_subtree(tree, tvb, offset, length, ett_gtpv2_eutran_con, NULL, "E-UTRAN transparent container");
+            new_tvb = tvb_new_subset_remaining(tvb, offset);
+            dissect_s1ap_TargeteNB_ToSourceeNB_TransparentContainer_PDU(new_tvb, pinfo, sub_tree, NULL);
+            return;
+        default:
+            break;
+        }
+    }
+    proto_tree_add_expert(tree, pinfo, &ei_gtpv2_ie_data_not_dissected, tvb, offset, length);
 
 }
 
@@ -8472,7 +8482,7 @@ track_gtpv2_session(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, gtpv
     }
 }
 
-static void
+void
 dissect_gtpv2_ie_common(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, gint offset, guint8 message_type, session_args_t * args)
 {
     proto_tree *ie_tree;
