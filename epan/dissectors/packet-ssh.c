@@ -2472,12 +2472,17 @@ ssh_decryption_setup_cipher(struct ssh_peer_data *peer_data,
 
         gchar k1[32];
         gchar k2[32];
-        memcpy(k1, key->data, 32);
-        memcpy(k2, key->data + 32, 32);
+        if(key->data){
+            memcpy(k1, key->data, 32);
+            memcpy(k2, key->data + 32, 32);
+        }else{
+            memset(k1, 0, 32);
+            memset(k2, 0, 32);
+        }
 
         ssh_debug_printf("ssh: cipher is chacha20\n");
-        ssh_print_data("key", key->data, 64);
-
+        ssh_print_data("key 1", k1, 32);
+        ssh_print_data("key 2", k2, 32);
 
         if ((err = gcry_cipher_setkey(*hd1, k1, 32))) {
             gcry_cipher_close(*hd1);
