@@ -1236,11 +1236,11 @@ add_custom_target(dist
 )
 
 if(GNUTLS_FOUND AND NOT GNUTLS_VERSION VERSION_LESS "3.4.0")
-	# While all Linux and Windows builds have PKCS #11 support enabled,
-	# macos-setup.sh explicitly disables it using --without-p11-kit.
+	# Calculating public keys from PKCS #11 private keys requires GnuTLS
+	# 3.4.0 or greater.
 	#
-	# Require at least GnuTLS 3.4.0 such that public keys can be calculated
-	# from PKCS #11 private keys.
+	# Check that the support is present in case GnuTLS was compiled
+	# --without-p11-kit as macos-setup.sh did until recently.
 	include(CheckSymbolExists)
 	cmake_push_check_state()
 	if(WIN32)
@@ -1816,6 +1816,7 @@ set(INSTALL_FILES
 	${CMAKE_BINARY_DIR}/doc/mergecap.html
 	${CMAKE_BINARY_DIR}/doc/randpkt.html
 	${CMAKE_BINARY_DIR}/doc/randpktdump.html
+	${CMAKE_BINARY_DIR}/doc/etwdump.html
 	${CMAKE_BINARY_DIR}/doc/rawshark.html
 	${CMAKE_BINARY_DIR}/doc/reordercap.html
 	${CMAKE_BINARY_DIR}/doc/sshdump.html
@@ -3170,6 +3171,7 @@ set(CLEAN_C_FILES
 	${dftest_FILES}
 	${randpkt_FILES}
 	${randpktdump_FILES}
+	${etwdump_FILES}
 	${udpdump_FILES}
 	${text2pcap_FILES}
 	${mergecap_FILES}

@@ -52,12 +52,18 @@ fi
 # While tar, in newer versions of macOS, can uncompress xz'ed tarballs,
 # it can't do so in older versions, and xz isn't provided with macOS.
 #
-XZ_VERSION=5.2.3
+XZ_VERSION=5.2.5
 
 #
 # Some packages need lzip to unpack their current source.
 #
-LZIP_VERSION=1.19
+LZIP_VERSION=1.21
+
+#
+# The version of libPCRE on Catalina is insufficient to build glib due to
+# missing UTF-8 support.
+#
+PCRE_VERSION=8.44
 
 #
 # CMake is required to do the build.
@@ -86,17 +92,17 @@ NINJA_VERSION=${NINJA_VERSION-1.8.2}
 #
 # The following libraries and tools are required even to build only TShark.
 #
-GETTEXT_VERSION=0.19.8.1
-GLIB_VERSION=2.37.6
+GETTEXT_VERSION=0.21
+GLIB_VERSION=2.58.3
 PKG_CONFIG_VERSION=0.29.2
 #
 # libgpg-error is required for libgcrypt.
 #
-LIBGPG_ERROR_VERSION=1.37
+LIBGPG_ERROR_VERSION=1.39
 #
 # libgcrypt is required.
 #
-LIBGCRYPT_VERSION=1.8.5
+LIBGCRYPT_VERSION=1.8.7
 
 #
 # One or more of the following libraries are required to build Wireshark.
@@ -129,7 +135,7 @@ fi
 # the optional libraries are required by other optional libraries.
 #
 LIBSMI_VERSION=0.4.8
-GNUTLS_VERSION=3.6.14
+GNUTLS_VERSION=3.6.15
 if [ "$GNUTLS_VERSION" ]; then
     #
     # We'll be building GnuTLS, so we may need some additional libraries.
@@ -143,22 +149,29 @@ if [ "$GNUTLS_VERSION" ]; then
     #
     # And, in turn, Nettle requires GMP.
     #
-    GMP_VERSION=6.2.0
+    GMP_VERSION=6.2.1
+
+    #
+    # And p11-kit
+    P11KIT_VERSION=0.23.21
+
+    # Which requires libtasn1
+    LIBTASN1_VERSION=4.16.0
 fi
 # Use 5.2.4, not 5.3, for now; lua_bitop.c hasn't been ported to 5.3
 # yet, and we need to check for compatibility issues (we'd want Lua
 # scripts to work with 5.1, 5.2, and 5.3, as long as they only use Lua
 # features present in all three versions)
 LUA_VERSION=5.2.4
-SNAPPY_VERSION=1.1.4
+SNAPPY_VERSION=1.1.8
 ZSTD_VERSION=1.4.2
 LIBXML2_VERSION=2.9.9
-LZ4_VERSION=1.7.5
+LZ4_VERSION=1.9.2
 SBC_VERSION=1.3
 CARES_VERSION=1.15.0
 LIBSSH_VERSION=0.9.0
 # mmdbresolve
-MAXMINDDB_VERSION=1.3.2
+MAXMINDDB_VERSION=1.4.3
 NGHTTP2_VERSION=1.39.2
 SPANDSP_VERSION=0.0.6
 SPEEXDSP_VERSION=1.2.0
@@ -172,7 +185,7 @@ BCG729_VERSION=1.0.2
 ILBC_VERSION=2.0.2
 OPUS_VERSION=1.3.1
 PYTHON3_VERSION=3.7.1
-BROTLI_VERSION=1.0.7
+BROTLI_VERSION=1.0.9
 # minizip
 ZLIB_VERSION=1.2.11
 # Uncomment to enable automatic updates using Sparkle
@@ -303,6 +316,42 @@ uninstall_lzip() {
         fi
 
         installed_lzip_version=""
+    fi
+}
+
+install_pcre() {
+    if [ "$PCRE_VERSION" -a ! -f pcre-$PCRE_VERSION-done ] ; then
+        echo "Downloading, building, and installing pcre:"
+        [ -f pcre-$PCRE_VERSION.tar.bz2 ] || curl -L -O https://ftp.pcre.org/pub/pcre/pcre-$PCRE_VERSION.tar.bz2 || exit 1
+        $no_build && echo "Skipping installation" && return
+        bzcat pcre-$PCRE_VERSION.tar.bz2 | tar xf - || exit 1
+        cd pcre-$PCRE_VERSION
+        ./configure --enable-unicode-properties || exit 1
+        make $MAKE_BUILD_OPTS || exit 1
+        $DO_MAKE_INSTALL || exit 1
+        cd ..
+        touch pcre-$PCRE_VERSION-done
+    fi
+}
+
+uninstall_pcre() {
+    if [ ! -z "$installed_pcre_version" ] ; then
+        echo "Uninstalling pcre:"
+        cd pcre-$installed_pcre_version
+        $DO_MAKE_UNINSTALL || exit 1
+        make distclean || exit 1
+        cd ..
+        rm pcre-$installed_pcre_version-done
+
+        if [ "$#" -eq 1 -a "$1" = "-r" ] ; then
+            #
+            # Get rid of the previously downloaded and unpacked version.
+            #
+            rm -rf pcre-$installed_pcre_version
+            rm -rf pcre-$installed_pcre_version.tar.bz2
+        fi
+
+        installed_pcre_version=""
     fi
 }
 
@@ -704,6 +753,7 @@ uninstall_pkg_config() {
 
 install_glib() {
     if [ ! -f glib-$GLIB_VERSION-done ] ; then
+set -x
         echo "Downloading, building, and installing GLib:"
         glib_dir=`expr $GLIB_VERSION : '\([0-9][0-9]*\.[0-9][0-9]*\).*'`
         #
@@ -741,6 +791,9 @@ install_glib() {
         # developer tools, there is a /usr/include directory).
         #
         includedir=`xcrun --show-sdk-path 2>/dev/null`/usr/include
+	if [ ! -f ./configure ]; then
+	    ./autogen.sh
+        fi
         if grep -qs '#define.*MACOSX' $includedir/ffi/fficonfig.h
         then
             # It's defined, nothing to do
@@ -753,6 +806,7 @@ install_glib() {
         $DO_MAKE_INSTALL || exit 1
         cd ..
         touch glib-$GLIB_VERSION-done
+set +x
     fi
 }
 
@@ -1073,6 +1127,90 @@ uninstall_gmp() {
     fi
 }
 
+install_libtasn1() {
+    if [ "$LIBTASN1_VERSION" -a ! -f libtasn1-$LIBTASN1_VERSION-done ] ; then
+        echo "Downloading, building, and installing libtasn1:"
+        [ -f libtasn1-$LIBTASN1_VERSION.tar.gz ] || curl -L -O https://ftpmirror.gnu.org/libtasn1/libtasn1-$LIBTASN1_VERSION.tar.gz || exit 1
+        $no_build && echo "Skipping installation" && return
+        gzcat libtasn1-$LIBTASN1_VERSION.tar.gz | tar xf - || exit 1
+        cd libtasn1-$LIBTASN1_VERSION
+        CFLAGS="$CFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" CXXFLAGS="$CXXFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" LDFLAGS="$LDFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" ./configure || exit 1
+        make $MAKE_BUILD_OPTS || exit 1
+        $DO_MAKE_INSTALL || exit 1
+        cd ..
+        touch libtasn1-$LIBTASN1_VERSION-done
+    fi
+}
+
+uninstall_libtasn1() {
+    if [ ! -z "$installed_libtasn1_version" ] ; then
+        #
+        # p11-kit depends on this, so uninstall it.
+        #
+        uninstall_p11_kit "$@"
+
+        echo "Uninstalling libtasn1:"
+        cd nettle-$installed_libtasn1_version
+        $DO_MAKE_UNINSTALL || exit 1
+        make distclean || exit 1
+        cd ..
+        rm libtasn1-$installed_libtasn1_version-done
+
+        if [ "$#" -eq 1 -a "$1" = "-r" ] ; then
+            #
+            # Get rid of the previously downloaded and unpacked version.
+            #
+            rm -rf libtasn1-$installed_libtasn1_version
+            rm -rf libtasn1-$installed_libtasn1_version.tar.gz
+        fi
+
+        installed_libtasn1_version=""
+    fi
+}
+
+install_p11_kit() {
+    if [ "$P11KIT_VERSION" -a ! -f p11-kit-$P11KIT_VERSION-done ] ; then
+        echo "Downloading, building, and installing p11-kit:"
+        [ -f p11-kit-$P11KIT_VERSION.tar.xz ] || curl -L -O https://github.com/p11-glue/p11-kit/releases/download/$P11KIT_VERSION/p11-kit-$P11KIT_VERSION.tar.xz || exit 1
+        $no_build && echo "Skipping installation" && return
+        xzcat p11-kit-$P11KIT_VERSION.tar.xz | tar xf - || exit 1
+        cd p11-kit-$P11KIT_VERSION
+        # Same hack for libffi missing pkg-config files as GLib
+        includedir=`xcrun --show-sdk-path 2>/dev/null`/usr/include
+        LIBFFI_CFLAGS="-I $includedir/ffi" LIBFFI_LIBS="-lffi" CFLAGS="$CFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" CXXFLAGS="$CXXFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" LDFLAGS="$LDFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" ./configure --without-trust-paths || exit 1
+        make $MAKE_BUILD_OPTS || exit 1
+        $DO_MAKE_INSTALL || exit 1
+        cd ..
+        touch p11-kit-$P11KIT_VERSION-done
+    fi
+}
+
+uninstall_p11_kit() {
+    if [ ! -z "$installed_p11_kit_version" ] ; then
+        #
+        # Nettle depends on this, so uninstall it.
+        #
+        uninstall_nettle "$@"
+
+        echo "Uninstalling p11-kit:"
+        cd p11-kit-$installed_p11_kit_version
+        $DO_MAKE_UNINSTALL || exit 1
+        make distclean || exit 1
+        cd ..
+        rm p11-kit-$installed_p11_kit_version-done
+
+        if [ "$#" -eq 1 -a "$1" = "-r" ] ; then
+            #
+            # Get rid of the previously downloaded and unpacked version.
+            #
+            rm -rf p11-kit-$installed_p11_kit_version
+            rm -rf p11-kit-$installed_p11_kit_version.tar.xz
+        fi
+
+        installed_p11_kit_version=""
+    fi
+}
+
 install_nettle() {
     if [ "$NETTLE_VERSION" -a ! -f nettle-$NETTLE_VERSION-done ] ; then
         echo "Downloading, building, and installing Nettle:"
@@ -1080,7 +1218,7 @@ install_nettle() {
         $no_build && echo "Skipping installation" && return
         gzcat nettle-$NETTLE_VERSION.tar.gz | tar xf - || exit 1
         cd nettle-$NETTLE_VERSION
-        CFLAGS="$CFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" CXXFLAGS="$CXXFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" LDFLAGS="$LDFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" ./configure --with-libgcrypt --without-p11-kit || exit 1
+        CFLAGS="$CFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" CXXFLAGS="$CXXFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" LDFLAGS="$LDFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" ./configure || exit 1
         make $MAKE_BUILD_OPTS || exit 1
         $DO_MAKE_INSTALL || exit 1
         cd ..
@@ -1141,7 +1279,7 @@ install_gnutls() {
             bzcat gnutls-$GNUTLS_VERSION.tar.bz2 | tar xf - || exit 1
         fi
         cd gnutls-$GNUTLS_VERSION
-        CFLAGS="$CFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" CXXFLAGS="$CXXFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" LDFLAGS="$LDFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" ./configure --with-included-libtasn1 --with-included-unistring --without-p11-kit --disable-guile || exit 1
+        CFLAGS="$CFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" CXXFLAGS="$CXXFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" LDFLAGS="$LDFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" ./configure --with-included-unistring --disable-guile || exit 1
         make $MAKE_BUILD_OPTS || exit 1
         $DO_MAKE_INSTALL || exit 1
         cd ..
@@ -1216,14 +1354,16 @@ uninstall_lua() {
 install_snappy() {
     if [ "$SNAPPY_VERSION" -a ! -f snappy-$SNAPPY_VERSION-done ] ; then
         echo "Downloading, building, and installing snappy:"
-        [ -f snappy-$SNAPPY_VERSION.tar.gz ] || curl -L -O https://github.com/google/snappy/releases/download/$SNAPPY_VERSION/snappy-$SNAPPY_VERSION.tar.gz || exit 1
+        [ -f snappy-$SNAPPY_VERSION.tar.gz ] || curl -L -o snappy-$SNAPPY_VERSION.tar.gz https://github.com/google/snappy/archive/$SNAPPY_VERSION.tar.gz || exit 1
         $no_build && echo "Skipping installation" && return
         gzcat snappy-$SNAPPY_VERSION.tar.gz | tar xf - || exit 1
         cd snappy-$SNAPPY_VERSION
-        CFLAGS="$CFLAGS -D_FORTIFY_SOURCE=0 $VERSION_MIN_FLAGS $SDKFLAGS" CXXFLAGS="$CXXFLAGS -D_FORTIFY_SOURCE=0 $VERSION_MIN_FLAGS $SDKFLAGS" LDFLAGS="$LDFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" ./configure || exit 1
+        mkdir build_dir
+        cd build_dir
+        MACOSX_DEPLOYMENT_TARGET=$min_osx_target SDKROOT="$SDKPATH" cmake ../ || exit 1
         make $MAKE_BUILD_OPTS || exit 1
         $DO_MAKE_INSTALL || exit 1
-        cd ..
+        cd ../..
         touch snappy-$SNAPPY_VERSION-done
     fi
 }
@@ -2200,6 +2340,28 @@ install_all() {
         uninstall_gmp -r
     fi
 
+    if [ ! -z "$installed_p11_kit_version" -a \
+              "$installed_p11_kit_version" != "$P11KIT_VERSION" ] ; then
+        echo "Installed p11-kit version is $installed_p11_kit_version"
+        if [ -z "$P11KIT_VERSION" ] ; then
+            echo "p11-kit is not requested"
+        else
+            echo "Requested p11-kit version is $P11KIT_VERSION"
+        fi
+        uninstall_p11_kit -r
+    fi
+
+    if [ ! -z "$installed_libtasn1_version" -a \
+              "$installed_libtasn1_version" != "$LIBTASN1_VERSION" ] ; then
+        echo "Installed libtasn1 version is $installed_libtasn1_version"
+        if [ -z "$LIBTASN1_VERSION" ] ; then
+            echo "libtasn1 is not requested"
+        else
+            echo "Requested libtasn1 version is $LIBTASN1_VERSION"
+        fi
+        uninstall_libtasn1 -r
+    fi
+
     if [ ! -z "$installed_libgcrypt_version" -a \
               "$installed_libgcrypt_version" != "$LIBGCRYPT_VERSION" ] ; then
         echo "Installed libgcrypt version is $installed_libgcrypt_version"
@@ -2362,6 +2524,17 @@ install_all() {
         uninstall_autoconf -r
     fi
 
+    if [ ! -z "$installed_pcre_version" -a \
+              "$installed_pcre_version" != "$PCRE_VERSION" ] ; then
+        echo "Installed pcre version is $installed_pcre_version"
+        if [ -z "$PCRE_VERSION" ] ; then
+            echo "pcre is not requested"
+        else
+            echo "Requested pcre version is $PCRE_VERSION"
+        fi
+        uninstall_pcre -r
+    fi
+
     if [ ! -z "$installed_lzip_version" -a \
               "$installed_lzip_version" != "$LZIP_VERSION" ] ; then
         echo "Installed lzip version is $installed_lzip_version"
@@ -2429,6 +2602,8 @@ install_all() {
 
     install_lzip
 
+    install_pcre
+
     install_autoconf
 
     install_automake
@@ -2488,6 +2663,10 @@ install_all() {
     install_libgcrypt
 
     install_gmp
+
+    install_libtasn1
+
+    install_p11_kit
 
     install_nettle
 
@@ -2592,6 +2771,10 @@ uninstall_all() {
 
         uninstall_nettle
 
+        uninstall_p11_kit
+
+        uninstall_libtasn1
+
         uninstall_gmp
 
         uninstall_libgcrypt
@@ -2626,6 +2809,8 @@ uninstall_all() {
         uninstall_automake
 
         uninstall_autoconf
+
+        uninstall_pcre
 
         uninstall_lzip
 
@@ -2734,6 +2919,7 @@ then
 
     installed_xz_version=`ls xz-*-done 2>/dev/null | sed 's/xz-\(.*\)-done/\1/'`
     installed_lzip_version=`ls lzip-*-done 2>/dev/null | sed 's/lzip-\(.*\)-done/\1/'`
+    installed_pcre_version=`ls pcre-*-done 2>/dev/null | sed 's/pcre-\(.*\)-done/\1/'`
     installed_autoconf_version=`ls autoconf-*-done 2>/dev/null | sed 's/autoconf-\(.*\)-done/\1/'`
     installed_automake_version=`ls automake-*-done 2>/dev/null | sed 's/automake-\(.*\)-done/\1/'`
     installed_libtool_version=`ls libtool-*-done 2>/dev/null | sed 's/libtool-\(.*\)-done/\1/'`
@@ -2749,6 +2935,8 @@ then
     installed_libgpg_error_version=`ls libgpg-error-*-done 2>/dev/null | sed 's/libgpg-error-\(.*\)-done/\1/'`
     installed_libgcrypt_version=`ls libgcrypt-*-done 2>/dev/null | sed 's/libgcrypt-\(.*\)-done/\1/'`
     installed_gmp_version=`ls gmp-*-done 2>/dev/null | sed 's/gmp-\(.*\)-done/\1/'`
+    installed_libtasn1_version=`ls libtasn1-*-done 2>/dev/null | sed 's/libtasn1-\(.*\)-done/\1/'`
+    installed_p11_kit_version=`ls p11-kit-*-done 2>/dev/null | sed 's/p11-kit-\(.*\)-done/\1/'`
     installed_nettle_version=`ls nettle-*-done 2>/dev/null | sed 's/nettle-\(.*\)-done/\1/'`
     installed_gnutls_version=`ls gnutls-*-done 2>/dev/null | sed 's/gnutls-\(.*\)-done/\1/'`
     installed_lua_version=`ls lua-*-done 2>/dev/null | sed 's/lua-\(.*\)-done/\1/'`
