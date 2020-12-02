@@ -131,6 +131,7 @@ struct ssh_peer_data {
 
     guint32 frame_version_start;
     guint32 frame_version_end;
+    int frame_version_end_offset;
 
     guint32 frame_key_start;
     guint32 frame_key_end;
@@ -742,7 +743,7 @@ dissect_ssh(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
         gboolean after_version_start = (peer_data->frame_version_start == 0 ||
             pinfo->num >= peer_data->frame_version_start);
         gboolean before_version_end = (peer_data->frame_version_end == 0 ||
-            pinfo->num <= peer_data->frame_version_end);
+            pinfo->num < peer_data->frame_version_end) || (pinfo->num == peer_data->frame_version_end && offset<peer_data->frame_version_end_offset);
 
         need_desegmentation = FALSE;
         last_offset = offset;
@@ -761,6 +762,7 @@ dissect_ssh(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 
             if (!need_desegmentation) {
                 peer_data->frame_version_end = pinfo->num;
+                peer_data->frame_version_end_offset = offset;
                 global_data->version = version;
             }
         } else {
@@ -1453,6 +1455,7 @@ ssh_dissect_protocol(tvbuff_t *tvb, packet_info *pinfo,
 {
     guint   remain_length;
     gint    linelen, protolen;
+    guint   new_version = SSH_VERSION_UNKNOWN;
 
     /*
      *  If the first packet do not contain the banner,
@@ -1464,14 +1467,18 @@ ssh_dissect_protocol(tvbuff_t *tvb, packet_info *pinfo,
         return offset;
     }
 
-    if (!is_response) {
-        if (tvb_strncaseeql(tvb, offset, "SSH-2.", 6) == 0) {
-            *(version) = SSH_VERSION_2;
-        } else if (tvb_strncaseeql(tvb, offset, "SSH-1.99-", 9) == 0) {
-            *(version) = SSH_VERSION_2;
-        } else if (tvb_strncaseeql(tvb, offset, "SSH-1.", 6) == 0) {
-            *(version) = SSH_VERSION_1;
-        }
+    if (tvb_strncaseeql(tvb, offset, "SSH-2.", 6) == 0) {
+        new_version = SSH_VERSION_2;
+    } else if (tvb_strncaseeql(tvb, offset, "SSH-1.99-", 9) == 0) {
+        new_version = SSH_VERSION_2;
+    } else if (tvb_strncaseeql(tvb, offset, "SSH-1.", 6) == 0) {
+        new_version = SSH_VERSION_1;
+    }
+    if(*(version)!=SSH_VERSION_UNKNOWN && *(version)!=new_version){
+        *(version) = SSH_VERSION_1;
+        g_debug("Warning: Client and Server do not agree on version number.");
+    }else if(new_version!=SSH_VERSION_UNKNOWN){
+        *(version) = new_version;
     }
 
     /*
