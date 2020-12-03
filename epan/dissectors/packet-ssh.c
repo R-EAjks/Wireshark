@@ -855,6 +855,8 @@ ssh_dissect_ssh2(tvbuff_t *tvb, packet_info *pinfo,
 
             if (!*need_desegmentation) {
                 ssh_increment_message_number(pinfo, global_data, is_response);
+            }else{
+                break;
             }
         } else {
             if(!*need_desegmentation){
