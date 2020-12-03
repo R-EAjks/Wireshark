@@ -822,10 +822,7 @@ dissect_btle(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
     gint                   previous_proto;
     wmem_list_frame_t     *list_data;
     proto_item            *item;
-    guint                  window_size;
-    guint                  window_offset;
-    guint                  data_interval;
-    guint                  data_timeout;
+    guint                  item_value;
     guint8                 btle_pdu_type = BTLE_PDU_TYPE_UNKNOWN;
 
     list_data = wmem_list_frame_prev(wmem_list_tail(pinfo->layers));
@@ -1155,23 +1152,23 @@ dissect_btle(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
             proto_tree_add_item(link_layer_data_tree, hf_link_layer_data_crc_init, tvb, offset, 3, ENC_LITTLE_ENDIAN);
             offset += 3;
 
-            item = proto_tree_add_item_ret_uint(link_layer_data_tree, hf_link_layer_data_window_size, tvb, offset, 1, ENC_LITTLE_ENDIAN, &window_size);
-            proto_item_append_text(item, " (%g msec)", window_size*1.25);
+            item = proto_tree_add_item_ret_uint(link_layer_data_tree, hf_link_layer_data_window_size, tvb, offset, 1, ENC_LITTLE_ENDIAN, &item_value);
+            proto_item_append_text(item, " (%g msec)", item_value*1.25);
             offset += 1;
 
-            item = proto_tree_add_item_ret_uint(link_layer_data_tree, hf_link_layer_data_window_offset, tvb, offset, 2, ENC_LITTLE_ENDIAN, &window_offset);
-            proto_item_append_text(item, " (%g msec)", window_offset*1.25);
+            item = proto_tree_add_item_ret_uint(link_layer_data_tree, hf_link_layer_data_window_offset, tvb, offset, 2, ENC_LITTLE_ENDIAN, &item_value);
+            proto_item_append_text(item, " (%g msec)", item_value*1.25);
             offset += 2;
 
-            item = proto_tree_add_item_ret_uint(link_layer_data_tree, hf_link_layer_data_interval, tvb, offset, 2, ENC_LITTLE_ENDIAN, &data_interval);
-            proto_item_append_text(item, " (%g msec)", data_interval*1.25);
+            item = proto_tree_add_item_ret_uint(link_layer_data_tree, hf_link_layer_data_interval, tvb, offset, 2, ENC_LITTLE_ENDIAN, &item_value);
+            proto_item_append_text(item, " (%g msec)", item_value*1.25);
             offset += 2;
 
             proto_tree_add_item(link_layer_data_tree, hf_link_layer_data_latency, tvb, offset, 2, ENC_LITTLE_ENDIAN);
             offset += 2;
 
-            item = proto_tree_add_item_ret_uint(link_layer_data_tree, hf_link_layer_data_timeout, tvb, offset, 2, ENC_LITTLE_ENDIAN, &data_timeout);
-            proto_item_append_text(item, " (%u msec)", data_timeout*10);
+            item = proto_tree_add_item_ret_uint(link_layer_data_tree, hf_link_layer_data_timeout, tvb, offset, 2, ENC_LITTLE_ENDIAN, &item_value);
+            proto_item_append_text(item, " (%u msec)", item_value*10);
             offset += 2;
 
             sub_item = proto_tree_add_item(link_layer_data_tree, hf_link_layer_data_channel_map, tvb, offset, 5, ENC_NA);
@@ -1869,19 +1866,23 @@ dissect_btle(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 
             switch (control_opcode) {
             case 0x00: /* LL_CONNECTION_UPDATE_REQ */
-                proto_tree_add_item(btle_tree, hf_control_window_size, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+                item = proto_tree_add_item_ret_uint(btle_tree, hf_control_window_size, tvb, offset, 1, ENC_LITTLE_ENDIAN, &item_value);
+                proto_item_append_text(item, " (%g msec)", item_value*1.25);
                 offset += 1;
 
-                proto_tree_add_item(btle_tree, hf_control_window_offset, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+                item = proto_tree_add_item_ret_uint(btle_tree, hf_control_window_offset, tvb, offset, 2, ENC_LITTLE_ENDIAN, &item_value);
+                proto_item_append_text(item, " (%g msec)", item_value*1.25);
                 offset += 2;
 
-                proto_tree_add_item(btle_tree, hf_control_interval, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+                item = proto_tree_add_item_ret_uint(btle_tree, hf_control_interval, tvb, offset, 2, ENC_LITTLE_ENDIAN, &item_value);
+                proto_item_append_text(item, " (%g msec)", item_value*1.25);
                 offset += 2;
 
                 proto_tree_add_item(btle_tree, hf_control_latency, tvb, offset, 2, ENC_LITTLE_ENDIAN);
                 offset += 2;
 
-                proto_tree_add_item(btle_tree, hf_control_timeout, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+                item = proto_tree_add_item_ret_uint(btle_tree, hf_control_timeout, tvb, offset, 2, ENC_LITTLE_ENDIAN, &item_value);
+                proto_item_append_text(item, " (%u msec)", item_value*10);
                 offset += 2;
 
                 proto_tree_add_item(btle_tree, hf_control_instant, tvb, offset, 2, ENC_LITTLE_ENDIAN);
