@@ -52,7 +52,7 @@ static const guchar e_msg[] = "</msg>";
 static const guchar s_rawmsg[] = "<rawMsg";
 
 #define RINGBUFFER_START_SIZE G_MAXINT
-#define RINGBUFFER_CHUNK_SIZE 2048
+#define RINGBUFFER_CHUNK_SIZE 1024
 
 #define MAX_NAME_LEN 64
 #define MAX_PROTO_LEN 16
@@ -603,45 +603,64 @@ end:
 #undef STRNSTR
 }
 
+/* Read from fh and store into buffer, until buffer contains needle.
+ * Returns location of needle once found, or NULL if it's never found
+ * (due to either EOF or read error).
+ */
+static guint8 *
+read_until(GByteArray *buffer, const guchar *needle, FILE_T fh, int *err, gchar **err_info)
+{
+	guint8 read_buffer[RINGBUFFER_CHUNK_SIZE];
+	guint8 *found_it;
+	gint bytes_read = 0;
+
+	while (NULL == (found_it = g_strstr_len(buffer->data, buffer->len, needle))) {
+		bytes_read = file_read(read_buffer, RINGBUFFER_CHUNK_SIZE, fh);
+		if (bytes_read < 0) {
+			*err = file_error(fh, err_info);
+			break;
+		}
+		if (bytes_read == 0) {
+			break;
+		}
+		g_byte_array_append(buffer, read_buffer, bytes_read);
+	}
+	return found_it;
+}
+
 static gboolean
 nettrace_read(wtap *wth, wtap_rec *rec, Buffer *buf, int *err, gchar **err_info, gint64 *data_offset)
 {
 	nettrace_3gpp_32_423_file_info_t *file_info = (nettrace_3gpp_32_423_file_info_t *)wth->priv;
-	gint bytes_read = 0;
+	guint8 *buf_start;
 	guint8 *msg_start, *msg_end;
 	guint msg_offset = 0;
-	guint msg_len = 0;
+	gsize msg_len = 0;
 	gboolean status = FALSE;
-	guint8 buffer[RINGBUFFER_CHUNK_SIZE];
 
-	/* Make sure we have a start and end of message in our buffer */
-	msg_end = g_strstr_len(file_info->buffer->data, file_info->buffer->len, e_msg);
+	/* Make sure we have a start and end of message in our buffer -- end first */
+	msg_end = read_until(file_info->buffer, e_msg, wth->fh, err, err_info);
 	if (msg_end == NULL) {
-		/* We don't, get some more file data */
-		bytes_read = file_read(buffer, RINGBUFFER_CHUNK_SIZE, wth->fh);
-		if (bytes_read < 0) {
-			*err = file_error(wth->fh, err_info);
-			goto cleanup;
-		}
-		if (bytes_read == 0){
-			goto cleanup;
-		}
-		g_byte_array_append(file_info->buffer, buffer, bytes_read);
-		msg_end = g_strstr_len(file_info->buffer->data, file_info->buffer->len, e_msg);
+		goto end;
 	}
-	if (msg_end == NULL) {
-		/* Still no message end, so we must be at the end of the file */
-		goto cleanup;
-	}
-	msg_start = g_strstr_len(file_info->buffer->data, file_info->buffer->len, s_msg);
+
+	buf_start = file_info->buffer->data;
+	/* Now search backwards for the message start
+	 * (doing it this way should skip over any empty "<msg ... />" tags we have)
+	 */
+	msg_start = g_strrstr_len(buf_start, msg_end - buf_start, s_msg);
 	if (msg_start == NULL || msg_start > msg_end) {
-		goto cleanup;
+		*err_info = g_strdup_printf("Found \"%s\" without matching \"%s\"", e_msg, s_msg);
+		*err = WTAP_ERR_BAD_FILE;
+		goto end;
 	}
 
 	/* We know we have a message, what's its offset from the buffer start? */
-	msg_offset = msg_start - file_info->buffer->data;
+	msg_offset = msg_start - buf_start;
 	msg_end += CLEN(e_msg);
 	msg_len = msg_end - msg_start;
+
+	/* Tell Wireshark to put is at the start of the "<msg" for seek_read later */
 	*data_offset = file_info->start_offset + msg_offset;
 
 	/* pass all of <msg....</msg> to nettrace_msg_to_packet() */
@@ -654,10 +673,10 @@ nettrace_read(wtap *wth, wtap_rec *rec, Buffer *buf, int *err, gchar **err_info,
 	g_byte_array_remove_range(file_info->buffer, 0, msg_len);
 	file_info->start_offset += msg_len;
 
-cleanup:
+end:
 	if (status == FALSE) {
 		/* There's no more to read. Empty out the buffer */
-		g_byte_array_remove_range(file_info->buffer, 0, file_info->buffer->len);
+		g_byte_array_set_size(file_info->buffer, 0);
 	}
 
 	return status;
@@ -668,40 +687,25 @@ nettrace_seek_read(wtap *wth, gint64 seek_off, wtap_rec *rec, Buffer *buf, int *
 {
 	nettrace_3gpp_32_423_file_info_t *file_info = (nettrace_3gpp_32_423_file_info_t *)wth->priv;
 	gboolean status = FALSE;
-	gint bytes_read = 0;
 	guint8 *msg_end;
 	guint msg_len = 0;
-	guint8 buffer[RINGBUFFER_CHUNK_SIZE]; // TODO: change to dynamic allocation
 
 	/* We stored the offset of the "<msg" for this packet */
 	if (file_seek(wth->random_fh, seek_off, SEEK_SET, err) == -1)
 		return FALSE;
 
-	bytes_read = file_read(buffer, RINGBUFFER_CHUNK_SIZE, wth->random_fh);
-	if (bytes_read < 0) {
-		*err = file_error(wth->random_fh, err_info);
-		goto cleanup;
-	}
-	if (bytes_read == 0){
-		goto cleanup;
-	}
-
-	msg_end = g_strstr_len(buffer, bytes_read, e_msg);
+	msg_end = read_until(file_info->buffer, e_msg, wth->random_fh, err, err_info);
 	if (msg_end == NULL) {
-		g_warning("nettrace: unable to find message end in %d bytes from %ld",
-				bytes_read, seek_off);
-		goto cleanup;
+		return FALSE;
 	}
 	msg_end += CLEN(e_msg);
-	msg_len = msg_end - buffer;
+	msg_len = msg_end - file_info->buffer->data;
 
-	status = nettrace_msg_to_packet(file_info, rec, buf, buffer, msg_len, err, err_info);
-
-cleanup:
+	status = nettrace_msg_to_packet(file_info, rec, buf, file_info->buffer->data, msg_len, err, err_info);
+	g_byte_array_set_size(file_info->buffer, 0);
 	return status;
 }
 
-/* classic wtap: close capture file */
 static void
 nettrace_close(wtap *wth)
 {
