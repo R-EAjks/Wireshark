@@ -466,6 +466,7 @@ nettrace_msg_to_packet(nettrace_3gpp_32_423_file_info_t *file_info, wtap_rec *re
 		*packet_buf++ = EXP_PDU_TAG_PROTO_NAME;
 		*packet_buf++ = 0;
 		*packet_buf++ = tag_str_len;
+		memset(packet_buf, 0, tag_str_len);
 		memcpy(packet_buf, proto_name_str, proto_str_len);
 		packet_buf += tag_str_len;
 	}
@@ -474,6 +475,7 @@ nettrace_msg_to_packet(nettrace_3gpp_32_423_file_info_t *file_info, wtap_rec *re
 		*packet_buf++ = EXP_PDU_TAG_DISSECTOR_TABLE_NAME;
 		*packet_buf++ = 0;
 		*packet_buf++ = tag_str_len;
+		memset(packet_buf, 0, tag_str_len);
 		memcpy(packet_buf, dissector_table_str, dissector_table_str_len);
 		packet_buf += tag_str_len;
 
