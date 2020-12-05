@@ -1813,7 +1813,7 @@ dissect_someip_payload_parameter(tvbuff_t* tvb, packet_info* pinfo, proto_tree *
 
 /* add a flexible size length field, -1 for error*/
 static gint64
-dissect_someip_payload_length_field(tvbuff_t* tvb, packet_info* pinfo, proto_tree *subtree, gint offset, gint length_of_length_field) {
+dissect_someip_payload_length_field(tvbuff_t* tvb, packet_info* pinfo, proto_tree *subtree, gint offset, gint length_of_length_field, const guint encoding) {
     guint32 tmp = 0;
 
     switch (length_of_length_field) {
@@ -1821,10 +1821,10 @@ dissect_someip_payload_length_field(tvbuff_t* tvb, packet_info* pinfo, proto_tre
         proto_tree_add_item_ret_uint(subtree, hf_payload_length_field_8bit, tvb, offset, length_of_length_field / 8, ENC_NA, &tmp);
         break;
     case 16:
-        proto_tree_add_item_ret_uint(subtree, hf_payload_length_field_16bit, tvb, offset, length_of_length_field / 8, ENC_BIG_ENDIAN, &tmp);
+        proto_tree_add_item_ret_uint(subtree, hf_payload_length_field_16bit, tvb, offset, length_of_length_field / 8, encoding, &tmp);
         break;
     case 32:
-        proto_tree_add_item_ret_uint(subtree, hf_payload_length_field_32bit, tvb, offset, length_of_length_field / 8, ENC_BIG_ENDIAN, &tmp);
+        proto_tree_add_item_ret_uint(subtree, hf_payload_length_field_32bit, tvb, offset, length_of_length_field / 8, encoding, &tmp);
         break;
     default:
         proto_tree_add_expert_format(subtree, pinfo, &ef_someip_payload_config_error, tvb, offset, 0,
@@ -2105,7 +2105,8 @@ dissect_someip_payload_string(tvbuff_t* tvb, packet_info* pinfo, proto_tree *tre
     if (config->length_of_length == 0) {
         length = config->max_length;
     } else {
-        tmp = dissect_someip_payload_length_field(tvb, pinfo, subtree, offset, config->length_of_length);
+        /* XXX: Assume payload length field has same endianness as string? */
+        tmp = dissect_someip_payload_length_field(tvb, pinfo, subtree, offset, config->length_of_length, config->big_endian ? ENC_BIG_ENDIAN : ENC_LITTLE_ENDIAN);
         if (tmp < 0) {
             /* error */
             return config->length_of_length / 8;
@@ -2120,17 +2121,22 @@ dissect_someip_payload_string(tvbuff_t* tvb, packet_info* pinfo, proto_tree *tre
     }
 
     if (strcmp(config->encoding, "utf-8") == 0) {
-        str_encoding = ENC_UTF_8;
+        str_encoding = ENC_UTF_8|ENC_NA;
     } else if (strcmp(config->encoding, "utf-16") == 0) {
         str_encoding = ENC_UTF_16;
+        if (config->big_endian) {
+            str_encoding |= ENC_BIG_ENDIAN;
+        } else {
+            str_encoding |= ENC_LITTLE_ENDIAN;
+        }
     } else {
-        str_encoding = ENC_ASCII;
+        str_encoding = ENC_ASCII|ENC_NA;
     }
 
     buf = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, length, str_encoding);
 
     /* sanitizing buffer */
-    if (str_encoding == ENC_ASCII || str_encoding == ENC_UTF_8) {
+    if (str_encoding & ENC_ASCII || str_encoding & ENC_UTF_8) {
         for (i = 0; i < length; i++) {
             if (buf[i] > 0x00 && buf[i] < 0x20) {
                 buf[i] = 0x20;
@@ -2175,7 +2181,8 @@ dissect_someip_payload_struct(tvbuff_t* tvb, packet_info* pinfo, proto_tree *tre
     };
 
     if (config->length_of_length != 0) {
-        length = dissect_someip_payload_length_field(tvb, pinfo, subtree, offset, config->length_of_length);
+        /* XXX: structs don't have a endianness configuration option (yet?) */
+        length = dissect_someip_payload_length_field(tvb, pinfo, subtree, offset, config->length_of_length, ENC_BIG_ENDIAN);
         if (length < 0) {
             /* error */
             return config->length_of_length / 8;
@@ -2236,7 +2243,8 @@ dissect_someip_payload_array_dim_length(tvbuff_t* tvb, packet_info* pinfo, proto
 
     if (config->dims[current_dim].length_of_length > 0) {
         /* we are filling the length with number of bytes we found in the packet */
-        tmp = dissect_someip_payload_length_field(tvb, pinfo, tree, offset, config->dims[current_dim].length_of_length);
+        /* XXX: arrays don't have a endianness configuration (yet?) */
+        tmp = dissect_someip_payload_length_field(tvb, pinfo, tree, offset, config->dims[current_dim].length_of_length, ENC_BIG_ENDIAN);
         if (tmp < 0) {
             /* leave *length = -1 */
             return config->dims[current_dim].length_of_length/8;
@@ -2463,7 +2471,8 @@ dissect_someip_payload_union(tvbuff_t* tvb, packet_info* pinfo, proto_tree *tree
     ti = proto_tree_add_string_format(tree, hf_payload_str_union, tvb, offset_orig, 0, name, "union %s [%s]", name, config->name);
     subtree = proto_item_add_subtree(ti, ett_someip_union);
 
-    tmp = dissect_someip_payload_length_field(tvb, pinfo, subtree, offset_orig, config->length_of_length);
+    /* XXX: unions don't have a endianness configuration option (yet?) */
+    tmp = dissect_someip_payload_length_field(tvb, pinfo, subtree, offset_orig, config->length_of_length, ENC_BIG_ENDIAN);
     if (tmp == -1) {
         return 8 * (offset - offset_orig) + (offset_bits - 0);
     } else {
