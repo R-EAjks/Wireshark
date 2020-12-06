@@ -69,6 +69,7 @@ typedef struct tpncp_data_field_info
     enum SpecialFieldType special_type;
     guchar size;
     guchar sign;
+    gint   since;
     struct tpncp_data_field_info *p_next;
 } tpncp_data_field_info;
 
@@ -132,7 +133,7 @@ enum AddressFamily {
 
 static void
 dissect_tpncp_data(guint data_id, packet_info *pinfo, tvbuff_t *tvb, proto_tree *ltree,
-                   gint *offset, tpncp_data_field_info *data_fields_info, guint encoding)
+                   gint *offset, tpncp_data_field_info *data_fields_info, gint ver, guint encoding)
 {
     gint8 g_char;
     guint8 g_uchar;
@@ -145,6 +146,8 @@ dissect_tpncp_data(guint data_id, packet_info *pinfo, tvbuff_t *tvb, proto_tree 
     const gint initial_offset = *offset;
 
     for (field = &data_fields_info[data_id]; field; field = field->p_next) {
+        if (field->since > 0 && field->since > ver)
+            continue;
         switch (field->special_type) {
         case TPNCP_OPEN_CHANNEL_START:
             open_channel_start = *offset;
@@ -307,7 +310,7 @@ dissect_tpncp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
                     "TPNCP Event: %s (%d)",
                     val_to_str_const(id, tpncp_events_id_vals, "Unknown"), id);
                 dissect_tpncp_data(id, pinfo, tvb, event_tree, &offset, tpncp_events_info_db,
-                                   encoding);
+                                   ver, encoding);
             }
         }
     } else  if (try_val_to_str(id, tpncp_commands_id_vals)) {
@@ -319,7 +322,7 @@ dissect_tpncp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
                 "TPNCP Command: %s (%d)",
                 val_to_str_const(id, tpncp_commands_id_vals, "Unknown"), id);
             dissect_tpncp_data(id, pinfo, tvb, command_tree, &offset, tpncp_commands_info_db,
-                               encoding);
+                               ver, encoding);
         }
     }
 
@@ -565,7 +568,7 @@ init_tpncp_data_fields_info(tpncp_data_field_info *data_fields_info, FILE *file)
     guchar size;
     enum SpecialFieldType special_type;
     gboolean sign, is_address_family;
-    guint idx;
+    guint idx, since;
     tpncp_data_field_info *field = NULL;
     hf_register_info hf_entr;
     gboolean* registered_struct_ids = wmem_alloc0_array(wmem_epan_scope(), gboolean, MAX_TPNCP_DB_SIZE);
@@ -698,6 +701,7 @@ init_tpncp_data_fields_info(tpncp_data_field_info *data_fields_info, FILE *file)
     /* Register standard data. */
     while (fgetline(tpncp_db_entry, MAX_TPNCP_DB_ENTRY_LEN, file)) {
         special_type = TPNCP_NORMAL;
+        since = 0;
         g_snprintf(entry_copy, MAX_TPNCP_DB_ENTRY_LEN, "%s", tpncp_db_entry);
         if (!strncmp(tpncp_db_entry, "#####", 5)) {
             hf_size--;
@@ -869,6 +873,7 @@ init_tpncp_data_fields_info(tpncp_data_field_info *data_fields_info, FILE *file)
         field->size = size;
         field->array_dim = array_dim;
         field->special_type = is_address_family ? TPNCP_ADDRESS_FAMILY : special_type;
+        field->since = since;
     }
 
     return 0;
