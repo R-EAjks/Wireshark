@@ -748,6 +748,8 @@ init_tpncp_data_fields_info(tpncp_data_field_info *data_fields_info, FILE *file)
             special_type = RTP_STATE_OFFSET;
         else if (data_id == 1611 && name[0] == 'c' && strstr(name, "configuration_type_updated"))
             special_type = TPNCP_CHANNEL_CONFIGURATION;
+        else if (data_id == 4 && strstr(name, "secondary_rtp_seq_num"))
+            since = 7401;
         sign = !!((gboolean) g_ascii_strtoll(tmp, NULL, 10));
         if ((tmp = strtok(NULL, " ")) == NULL) {
             report_failure(
