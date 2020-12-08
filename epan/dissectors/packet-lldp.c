@@ -108,6 +108,7 @@ static int hf_lldp_network_address_family = -1;
 static int hf_port_id_ip4 = -1;
 static int hf_port_id_ip6 = -1;
 static int hf_time_to_live = -1;
+static int hf_pdu_type = -1;
 static int hf_mgn_address_len = -1;
 static int hf_mgn_address_subtype = -1;
 static int hf_mgn_addr_ipv4 = -1;
@@ -1726,6 +1727,7 @@ dissect_lldp_time_to_live(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, g
 	guint32 dataLen = 0;
 
 	proto_tree	*time_to_live_tree;
+	proto_item	*ti;
 
 	/* Get tlv type */
 	tempShort = tvb_get_ntohs(tvb, offset);
@@ -1741,9 +1743,19 @@ dissect_lldp_time_to_live(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, g
 		col_append_fstr(pinfo->cinfo, COL_INFO, "%u ", tempShort);
 	}
 
-	/* Set port tree */
-	time_to_live_tree = proto_tree_add_subtree_format(tree, tvb, offset, (dataLen + 2),
-							  ett_time_to_live, NULL, "Time To Live = %u sec", tempShort);
+	/* LLDPDU types: IEEE 802.1AB-2016 9.1.2 */
+	if (tempShort != 0) {
+		time_to_live_tree = proto_tree_add_subtree_format(tree, tvb, offset, dataLen + 2,
+					  ett_time_to_live, NULL, "Time To Live = %u sec", tempShort);
+		ti = proto_tree_add_none_format(time_to_live_tree, hf_pdu_type, tvb, offset, dataLen + 2, "Normal LLDPDU");
+		proto_item_set_generated(ti);
+	} else {
+		time_to_live_tree = proto_tree_add_subtree_format(tree, tvb, offset, dataLen + 2,
+					  ett_time_to_live, NULL, "Discard all info for this MSAP (Time To Live = 0)");
+		ti = proto_tree_add_none_format(time_to_live_tree, hf_pdu_type, tvb, offset, dataLen + 2, "Shutdown LLDPDU");
+		// FIXME: Verify that only ChassisID, PortID, TTL and optionally END TLVs are present
+		proto_item_set_generated(ti);
+	}
 
 	proto_tree_add_item(time_to_live_tree, hf_lldp_tlv_type, tvb, offset, 2, ENC_BIG_ENDIAN);
 	proto_tree_add_item(time_to_live_tree, hf_lldp_tlv_len, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -4745,6 +4757,10 @@ proto_register_lldp(void)
 		},
 		{ &hf_time_to_live,
 			{ "Seconds", "lldp.time_to_live", FT_UINT16, BASE_DEC,
+			NULL, 0, NULL, HFILL }
+		},
+		{ &hf_pdu_type,
+			{ "PDU Type", "lldp.pdu_type", FT_NONE, BASE_NONE,
 			NULL, 0, NULL, HFILL }
 		},
 		{ &hf_mgn_address_len,
