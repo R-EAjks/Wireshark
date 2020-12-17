@@ -11549,7 +11549,7 @@ dissect_PNIO_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         dissect_PNIO_RSI(tvb, 0, pinfo, tree, drep);
         return TRUE;
     }
-    
+
     /* this PN-RT packet doesn't seem to be PNIO specific */
     return FALSE;
 }

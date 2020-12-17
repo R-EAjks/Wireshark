@@ -907,7 +907,7 @@ dissect_pn_rt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
     /* update column info now */
     if (u16FrameID == 0xFE02)
     {
-        g_snprintf(szFieldSummary, "%s", "");
+        g_snprintf(szFieldSummary, sizeof(szFieldSummary), "%s", "");
     }
     col_add_str(pinfo->cinfo, COL_INFO, szFieldSummary);
     col_set_str(pinfo->cinfo, COL_PROTOCOL, pszProtShort);
