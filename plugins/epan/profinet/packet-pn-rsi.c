@@ -1,4 +1,4 @@
-﻿/* packet-pn-rsi.c
+/* packet-pn-rsi.c
  * Routines for PN-RSI
  * packet dissection.
  *
