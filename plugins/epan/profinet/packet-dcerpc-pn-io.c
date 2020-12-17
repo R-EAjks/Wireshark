@@ -989,7 +989,7 @@ static const value_string pn_io_block_type[] = {
     { 0x0231, "MrpInstanceDataAdjust"},
     { 0x0232, "MrpInstanceDataReal"},
     { 0x0233, "MrpInstanceDataCheck"},
-	{ 0x0241, "PDRsiInstances"},
+    { 0x0241, "PDRsiInstances"},
     { 0x0240, "PDInterfaceDataReal"},
     { 0x0250, "PDInterfaceAdjust"},
     { 0x0251, "PDPortStatistic"},
@@ -10778,7 +10778,7 @@ dissect_RecordDataRead(tvbuff_t *tvb, int offset,
     case(0xf870):   /* PE_EntityFilterData*/
     case(0xf871):   /* PE_EntityStatusData*/
     case(0xf880) : /* AssetManagementData */
-    case(0xf8f1):   /* PDRsiInstances */			
+    case(0xf8f1):   /* PDRsiInstances */
         offset = dissect_block(tvb, offset, pinfo, tree, drep, &u16Index, &u32RecDataLen, &ar);
         break;
 
@@ -11549,7 +11549,7 @@ dissect_PNIO_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         dissect_PNIO_RSI(tvb, 0, pinfo, tree, drep);
         return TRUE;
     }
-	
+    
     /* this PN-RT packet doesn't seem to be PNIO specific */
     return FALSE;
 }

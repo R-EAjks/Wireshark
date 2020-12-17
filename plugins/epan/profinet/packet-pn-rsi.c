@@ -100,7 +100,6 @@ static gint ett_pn_rsi_rta = -1;
 static gint ett_pn_io_pd_rsi_instance = -1;
 
 static expert_field ei_pn_rsi_error = EI_INIT;
-static expert_field ei_pn_io_block_version = EI_INIT;
 
 static const range_string pn_rsi_alarm_endpoint[] = {
     { 0x0000, 0x7FFF, "RSI Initiator Instance (ISAP) or RSI Responder Instance (RSAP)" },
@@ -158,11 +157,11 @@ static const value_string pn_rsi_add_flags_notification[] = {
 };
 
 static const range_string pn_rsi_seq_num[] = {
-	{ 0x0000, 0x7FFF, "synchronization and transmission between initiator and responser" },
-	{ 0x8000, 0xFFFD, "Reserved" },
-	{ 0xFFFE, 0xFFFE, "synchronize initiator and responder for establishment of an AR" },
-	{ 0xFFFF, 0xFFFF, "Reserved" },
-	{ 0, 0, NULL }
+    { 0x0000, 0x7FFF, "synchronization and transmission between initiator and responser" },
+    { 0x8000, 0xFFFD, "Reserved" },
+    { 0xFFFE, 0xFFFE, "synchronize initiator and responder for establishment of an AR" },
+    { 0xFFFF, 0xFFFF, "Reserved" },
+    { 0, 0, NULL }
 };
 
 static const range_string pn_rsi_var_part_len[] = {
@@ -222,12 +221,12 @@ static const range_string pn_rsi_interface[] = {
 };
 
 /*static const string_string pn_rsi_sw_revision_prefix[] = {
-	{ "V", "officially released version" },
-	{ "R", "Revision" },
-	{ "P", "Prototype" },
-	{ "U", "Under Test (Field Test)" },
-	{ "T", "Test Device" },
-	{ 0, NULL }
+    { "V", "officially released version" },
+    { "R", "Revision" },
+    { "P", "Prototype" },
+    { "U", "Under Test (Field Test)" },
+    { "T", "Test Device" },
+    { 0, NULL }
 };*/
 
 int dissect_blocks(tvbuff_t *tvb, int offset,
@@ -271,7 +270,7 @@ static reassembly_table pn_rsi_reassembly_table;
 void
 pn_rsi_reassemble_init(void)
 {
-	reassembly_table_register(&pn_rsi_reassembly_table, &addresses_reassembly_table_functions);
+    reassembly_table_register(&pn_rsi_reassembly_table, &addresses_reassembly_table_functions);
 }
 
 static gint ett_pn_rsi_segments = -1;
@@ -280,115 +279,115 @@ static gint ett_pn_rsi_segment = -1;
 static gint ett_pn_rsi_data_payload = -1;
 
 static const fragment_items pn_rsi_frag_items = {
-	&ett_pn_rsi_segment,
-	&ett_pn_rsi_segments,
-	&hf_pn_rsi_segments,
-	&hf_pn_rsi_segment,
-	&hf_pn_rsi_segment_overlap,
-	&hf_pn_rsi_segment_overlap_conflict,
-	&hf_pn_rsi_segment_multiple_tails,
-	&hf_pn_rsi_segment_too_long_segment,
-	&hf_pn_rsi_segment_error,
-	&hf_pn_rsi_segment_count,
-	&hf_pn_rsi_reassembled_in,
-	&hf_pn_rsi_reassembled_length,
-	/* Reassembled data field */
-	NULL,
-	"segments"
+    &ett_pn_rsi_segment,
+    &ett_pn_rsi_segments,
+    &hf_pn_rsi_segments,
+    &hf_pn_rsi_segment,
+    &hf_pn_rsi_segment_overlap,
+    &hf_pn_rsi_segment_overlap_conflict,
+    &hf_pn_rsi_segment_multiple_tails,
+    &hf_pn_rsi_segment_too_long_segment,
+    &hf_pn_rsi_segment_error,
+    &hf_pn_rsi_segment_count,
+    &hf_pn_rsi_reassembled_in,
+    &hf_pn_rsi_reassembled_length,
+    /* Reassembled data field */
+    NULL,
+    "segments"
 };
 
-int
+static int
 dissect_pn_rta_remaining_user_data_bytes(tvbuff_t *tvb, int offset, packet_info *pinfo _U_,
-	proto_tree *tree, guint8 *drep, guint32 length, guint8 u8MoreFrag)
+    proto_tree *tree, guint8 *drep, guint32 length, guint8 u8MoreFrag)
 {
-	fragment_head  *fd_frag;
-	fragment_head  *fd_reass;
-	conversation_t *conv;
-	tvbuff_t       *next_tvb;
-	proto_item     *pn_rsi_tree_item;
-	proto_item     *payload_item = NULL;
-	proto_item     *payload_tree = NULL;
-	gboolean        update_col_info = TRUE;
+    fragment_head  *fd_frag;
+    fragment_head  *fd_reass;
+    conversation_t *conv;
+    tvbuff_t       *next_tvb;
+    proto_item     *pn_rsi_tree_item;
+    proto_item     *payload_item = NULL;
+    proto_item     *payload_tree = NULL;
+    gboolean        update_col_info = TRUE;
 
-	if (pinfo->srcport != 0 && pinfo->destport != 0) {
-		/* COTP over RFC1006/TCP, try reassembling */
-		conv = find_conversation(pinfo->fd->num, &pinfo->src, &pinfo->dst, ENDPOINT_NONE,
-			pinfo->srcport, pinfo->destport, 0);
-		if (!conv) {
-			conv = conversation_new(pinfo->fd->num, &pinfo->src, &pinfo->dst, ENDPOINT_NONE,
-				pinfo->srcport, pinfo->destport, 0);
-		}
+    if (pinfo->srcport != 0 && pinfo->destport != 0) {
+        /* COTP over RFC1006/TCP, try reassembling */
+        conv = find_conversation(pinfo->fd->num, &pinfo->src, &pinfo->dst, ENDPOINT_NONE,
+            pinfo->srcport, pinfo->destport, 0);
+        if (!conv) {
+            conv = conversation_new(pinfo->fd->num, &pinfo->src, &pinfo->dst, ENDPOINT_NONE,
+                pinfo->srcport, pinfo->destport, 0);
+        }
 
-		/* XXX - don't know if this will work with multiple segmented Ack's in a single TCP stream */
-		fd_frag = fragment_get(&pn_rsi_reassembly_table, pinfo, conv->conv_index, NULL);
-		fd_reass = fragment_get_reassembled_id(&pn_rsi_reassembly_table, pinfo, conv->conv_index);
-	}
-	else {
-		/* plain COTP transport (without RFC1006/TCP), try reassembling */
-		conv = find_conversation(pinfo->fd->num, &pinfo->src, &pinfo->dst, ENDPOINT_NONE,
-			pinfo->clnp_srcref, pinfo->clnp_dstref, 0);
-		if (!conv) {
-			conv = conversation_new(pinfo->fd->num, &pinfo->src, &pinfo->dst, ENDPOINT_NONE,
-				pinfo->clnp_srcref, pinfo->clnp_dstref, 0);
-		}
+        /* XXX - don't know if this will work with multiple segmented Ack's in a single TCP stream */
+        fd_frag = fragment_get(&pn_rsi_reassembly_table, pinfo, conv->conv_index, NULL);
+        fd_reass = fragment_get_reassembled_id(&pn_rsi_reassembly_table, pinfo, conv->conv_index);
+    }
+    else {
+        /* plain COTP transport (without RFC1006/TCP), try reassembling */
+        conv = find_conversation(pinfo->fd->num, &pinfo->src, &pinfo->dst, ENDPOINT_NONE,
+            pinfo->clnp_srcref, pinfo->clnp_dstref, 0);
+        if (!conv) {
+            conv = conversation_new(pinfo->fd->num, &pinfo->src, &pinfo->dst, ENDPOINT_NONE,
+                pinfo->clnp_srcref, pinfo->clnp_dstref, 0);
+        }
 
-		/* XXX - don't know if this will work with multiple segmented Ack's in a single TCP stream */
-		fd_frag = fragment_get(&pn_rsi_reassembly_table, pinfo, conv->conv_index, NULL);
-		fd_reass = fragment_get_reassembled_id(&pn_rsi_reassembly_table, pinfo, conv->conv_index);
-	}
+        /* XXX - don't know if this will work with multiple segmented Ack's in a single TCP stream */
+        fd_frag = fragment_get(&pn_rsi_reassembly_table, pinfo, conv->conv_index, NULL);
+        fd_reass = fragment_get_reassembled_id(&pn_rsi_reassembly_table, pinfo, conv->conv_index);
+    }
 
-	/* is this packet containing a "standalone" segment? */
-	if (!u8MoreFrag && !fd_frag && !fd_reass) {
-		/* "standalone" segment, simply show payload and return */
-		offset = dissect_blocks(tvb, offset, pinfo, tree, drep);
-		return offset;
-	}
+    /* is this packet containing a "standalone" segment? */
+    if (!u8MoreFrag && !fd_frag && !fd_reass) {
+        /* "standalone" segment, simply show payload and return */
+        offset = dissect_blocks(tvb, offset, pinfo, tree, drep);
+        return offset;
+    }
 
-	/* multiple segments */
-	if (!pinfo->fd->visited && conv != NULL) {
-		/* we haven't seen it before, add to list of segments */
-		fragment_add_seq_next(&pn_rsi_reassembly_table, tvb, offset, pinfo, conv->conv_index,
-			NULL /*Data comes from tvb as in packet-icmp-template.c */,
-			length,
-			u8MoreFrag);
+    /* multiple segments */
+    if (!pinfo->fd->visited && conv != NULL) {
+        /* we haven't seen it before, add to list of segments */
+        fragment_add_seq_next(&pn_rsi_reassembly_table, tvb, offset, pinfo, conv->conv_index,
+            NULL /*Data comes from tvb as in packet-icmp-template.c */,
+            length,
+            u8MoreFrag);
 
-		fd_reass = fragment_get_reassembled_id(&pn_rsi_reassembly_table, pinfo, conv->conv_index);
-	}
+        fd_reass = fragment_get_reassembled_id(&pn_rsi_reassembly_table, pinfo, conv->conv_index);
+    }
 
-	/* update display */
-	col_append_fstr(pinfo->cinfo, COL_INFO, " [%sPN IO RSI Segment]",
-		u8MoreFrag ? "" : "Last ");
+    /* update display */
+    col_append_fstr(pinfo->cinfo, COL_INFO, " [%sPN IO RSI Segment]",
+        u8MoreFrag ? "" : "Last ");
 
-	/* reassembling completed? */
-	if (fd_reass != NULL) {
-		/* is this the packet to show the reassembed payload in? */
-		if (pinfo->fd->num == fd_reass->reassembled_in) {
-			next_tvb = process_reassembled_data(tvb, 0, pinfo,
-				"Reassembled PN IO RSI packet", fd_reass, &pn_rsi_frag_items, &update_col_info, tree);
+    /* reassembling completed? */
+    if (fd_reass != NULL) {
+        /* is this the packet to show the reassembed payload in? */
+        if (pinfo->fd->num == fd_reass->reassembled_in) {
+            next_tvb = process_reassembled_data(tvb, 0, pinfo,
+                "Reassembled PN IO RSI packet", fd_reass, &pn_rsi_frag_items, &update_col_info, tree);
 
-			/* XXX - create new parent tree item "Reassembled Data Segments" */
-			payload_item = proto_tree_add_item(tree, hf_pn_rsi_data_payload, next_tvb, 0, tvb_captured_length(next_tvb), FALSE);
-			payload_tree = proto_item_add_subtree(payload_item, ett_pn_rsi_data_payload);
+            /* XXX - create new parent tree item "Reassembled Data Segments" */
+            payload_item = proto_tree_add_item(tree, hf_pn_rsi_data_payload, next_tvb, 0, tvb_captured_length(next_tvb), ENC_NA);
+            payload_tree = proto_item_add_subtree(payload_item, ett_pn_rsi_data_payload);
 
-			offset = dissect_blocks(next_tvb, 0, pinfo, payload_tree, drep);
+            offset = dissect_blocks(next_tvb, 0, pinfo, payload_tree, drep);
 
-			/* the toplevel fragment subtree is now behind all desegmented data,
-			* move it right behind the DE2 tree item */
-			pn_rsi_tree_item = proto_tree_get_parent(tree);
+            /* the toplevel fragment subtree is now behind all desegmented data,
+            * move it right behind the DE2 tree item */
+            // pn_rsi_tree_item = proto_tree_get_parent(tree);
 
-		}
-		else {
-			/* segment of a multiple segment payload */
-			proto_item *pi;
+        }
+        else {
+            /* segment of a multiple segment payload */
+            proto_item *pi;
 
-			pn_rsi_tree_item = proto_tree_get_parent(tree);
-			pi = proto_tree_add_uint(pn_rsi_tree_item, hf_pn_rsi_reassembled_in,
-				tvb, 0, 0, fd_reass->reassembled_in);
-			PROTO_ITEM_SET_GENERATED(pi);
-		}
-	}
+            pn_rsi_tree_item = proto_tree_get_parent(tree);
+            pi = proto_tree_add_uint(pn_rsi_tree_item, hf_pn_rsi_reassembled_in,
+                tvb, 0, 0, fd_reass->reassembled_in);
+            PROTO_ITEM_SET_GENERATED(pi);
+        }
+    }
 
-	return offset;
+    return offset;
 }
 
 /* dissect a PN-IO RSI SVCS block (on top of PN-RT protocol) */
@@ -408,13 +407,13 @@ dissect_RSI_SVCS_block(tvbuff_t *tvb, int offset,
         offset = dissect_dcerpc_uint32(tvb, offset, pinfo, sub_tree, drep,
             hf_pn_rsi_rsp_max_length, &u32RspMaxLength);
     }
-	else if (u8MoreFrag == 0)
-	{
-		proto_item_append_text(sub_item, ", RSI Header of SVCS is at first segment");
-	}
+    else if (u8MoreFrag == 0)
+    {
+        proto_item_append_text(sub_item, ", RSI Header of SVCS is at first segment");
+    }
 
-	offset = dissect_pn_rta_remaining_user_data_bytes(tvb, offset, pinfo, sub_tree, drep,
-		tvb_captured_length_remaining(tvb, offset), u8MoreFrag);
+    offset = dissect_pn_rta_remaining_user_data_bytes(tvb, offset, pinfo, sub_tree, drep,
+        tvb_captured_length_remaining(tvb, offset), u8MoreFrag);
     return offset;
 }
 
@@ -435,28 +434,28 @@ dissect_RSI_CONN_block(tvbuff_t *tvb, int offset,
     sub_item = proto_tree_add_item(tree, hf_pn_rsi_conn_block, tvb, offset, 0, ENC_NA);
     sub_tree = proto_item_add_subtree(sub_item, ett_pn_rsi_conn_block);
 
-	if (u32FOpnumOffsetOffset == 0) {
+    if (u32FOpnumOffsetOffset == 0) {
 
-		offset = dissect_dcerpc_uint32(tvb, offset, pinfo, sub_tree, drep,
-			hf_pn_rsi_rsp_max_length, &u32RspMaxLength);
-		offset = dissect_dcerpc_uint16(tvb, offset, pinfo, sub_tree, drep,
-			hf_pn_rsi_vendor_id, &u16VendorId);
-		offset = dissect_dcerpc_uint16(tvb, offset, pinfo, sub_tree, drep,
-			hf_pn_rsi_device_id, &u16DeviceId);
-		offset = dissect_dcerpc_uint16(tvb, offset, pinfo, sub_tree, drep,
-			hf_pn_rsi_instance_id, &u16InstanceId);
-		offset = dissect_dcerpc_uint8(tvb, offset, pinfo, sub_tree, drep,
-			hf_pn_rsi_interface, &u8RsiInterface);
+        offset = dissect_dcerpc_uint32(tvb, offset, pinfo, sub_tree, drep,
+            hf_pn_rsi_rsp_max_length, &u32RspMaxLength);
+        offset = dissect_dcerpc_uint16(tvb, offset, pinfo, sub_tree, drep,
+            hf_pn_rsi_vendor_id, &u16VendorId);
+        offset = dissect_dcerpc_uint16(tvb, offset, pinfo, sub_tree, drep,
+            hf_pn_rsi_device_id, &u16DeviceId);
+        offset = dissect_dcerpc_uint16(tvb, offset, pinfo, sub_tree, drep,
+            hf_pn_rsi_instance_id, &u16InstanceId);
+        offset = dissect_dcerpc_uint8(tvb, offset, pinfo, sub_tree, drep,
+            hf_pn_rsi_interface, &u8RsiInterface);
 
-		offset = dissect_pn_padding(tvb, offset, pinfo, sub_tree, 1);
-	}
-	else if (u8MoreFrag == 0)
-	{
-		proto_item_append_text(sub_item, ", RSI Header of CONN is at first segment");
-	}
+        offset = dissect_pn_padding(tvb, offset, pinfo, sub_tree, 1);
+    }
+    else if (u8MoreFrag == 0)
+    {
+        proto_item_append_text(sub_item, ", RSI Header of CONN is at first segment");
+    }
 
-	offset = dissect_pn_rta_remaining_user_data_bytes(tvb, offset, pinfo, sub_tree, drep,
-		tvb_captured_length_remaining(tvb, offset), u8MoreFrag);
+    offset = dissect_pn_rta_remaining_user_data_bytes(tvb, offset, pinfo, sub_tree, drep,
+        tvb_captured_length_remaining(tvb, offset), u8MoreFrag);
 
     return offset;
 }
@@ -526,18 +525,18 @@ static int
 dissect_RSI_RSP_block(tvbuff_t *tvb, int offset,
     packet_info *pinfo, proto_tree *tree, guint8 *drep, guint8 u8MoreFrag, guint32 u32FOpnumOffsetOffset)
 {
-	if (u32FOpnumOffsetOffset == 0)
-	{
-		offset = dissect_PNIO_status(tvb, offset, pinfo, tree, drep);
-	}
+    if (u32FOpnumOffsetOffset == 0)
+    {
+        offset = dissect_PNIO_status(tvb, offset, pinfo, tree, drep);
+    }
 
-	else if (u8MoreFrag == 0)
-	{
-		proto_item_append_text(tree, ", RSI Header of RSP is at first fragmented frame");
-	}
+    else if (u8MoreFrag == 0)
+    {
+        proto_item_append_text(tree, ", RSI Header of RSP is at first fragmented frame");
+    }
 
-	offset = dissect_pn_rta_remaining_user_data_bytes(tvb, offset, pinfo, tree, drep,
-		tvb_captured_length_remaining(tvb, offset), u8MoreFrag);
+    offset = dissect_pn_rta_remaining_user_data_bytes(tvb, offset, pinfo, tree, drep,
+        tvb_captured_length_remaining(tvb, offset), u8MoreFrag);
     return offset;
 }
 
@@ -548,10 +547,10 @@ dissect_FRSP_RTA_block(tvbuff_t *tvb, int offset,
 {
     guint32    u32FOpnumOffset;
     guint32    u32FOpnumOffsetOpnum;
-	guint32    u32FOpnumOffsetOffset;
+    guint32    u32FOpnumOffsetOffset;
     offset = dissect_FOpnumOffset(tvb, offset, pinfo, tree, drep, &u32FOpnumOffset);
     u32FOpnumOffsetOpnum = (u32FOpnumOffset & 0x1F000000) >> 24;
-	u32FOpnumOffsetOffset = u32FOpnumOffset & 0x00FFFFFF;
+    u32FOpnumOffsetOffset = u32FOpnumOffset & 0x00FFFFFF;
     switch (u32FOpnumOffsetOpnum) {
     case(0x0):    /* Connect */
         col_append_str(pinfo->cinfo, COL_INFO, "Connect response");
@@ -732,29 +731,29 @@ dissect_PDRsiInstances_block(tvbuff_t *tvb, int offset,
     guint16    u16DeviceId;
     guint16    u16InstanceId;
     guint8     u8RsiInterface;
-	const int  deviceType_size       = 25;
-	const int  orderID_size          = 20;
-	const int  IMserialnumber_size   = 16;
-	const int  HWrevision_size       = 5;
-	const int  SWrevisionprefix_size = 1;
-	const int  SWrevision_size       = 9;
-	char      *deviceType;
-	char      *orderID;
-	char      *IMserialnumber;
-	char      *HWrevision;
-	char      *SWrevisionprefix;
-	char      *SWrevision;
+    const int  deviceType_size       = 25;
+    const int  orderID_size          = 20;
+    const int  IMserialnumber_size   = 16;
+    const int  HWrevision_size       = 5;
+    const int  SWrevisionprefix_size = 1;
+    const int  SWrevision_size       = 9;
+    char      *deviceType;
+    char      *orderID;
+    char      *IMserialnumber;
+    char      *HWrevision;
+    char      *SWrevisionprefix;
+    char      *SWrevision;
 
     if (u8BlockVersionHigh != 1 || u8BlockVersionLow != 0) {
-		expert_add_info_format(pinfo, item, &ei_pn_io_block_version,
-			"Block version %u.%u not implemented yet!", u8BlockVersionHigh, u8BlockVersionLow);
-		return offset;
+        expert_add_info_format(pinfo, item, &ei_pn_rsi_error,
+            "Block version %u.%u not implemented yet!", u8BlockVersionHigh, u8BlockVersionLow);
+        return offset;
     }
 
     offset = dissect_dcerpc_uint16(tvb, offset, pinfo, tree, drep, 
-		hf_pn_rsi_number_of_entries, &u16NumberOfEntries);
+        hf_pn_rsi_number_of_entries, &u16NumberOfEntries);
 
-	proto_item_append_text(item, ": NumberOfEntries:%u", u16NumberOfEntries);
+    proto_item_append_text(item, ": NumberOfEntries:%u", u16NumberOfEntries);
 
     while (u16NumberOfEntries > 0) {
         u16NumberOfEntries--;
@@ -775,63 +774,63 @@ dissect_PDRsiInstances_block(tvbuff_t *tvb, int offset,
         offset = dissect_dcerpc_uint8(tvb, offset, pinfo, sub_tree, drep,
             hf_pn_rsi_interface, &u8RsiInterface);
 
-		proto_item_append_text(sub_item, ": VendorID:%u, DeviceID:%u, InstanceID:%u, RsiInterface:%u",
-			u16VendorId, u16DeviceId, u16InstanceId, u8RsiInterface);
+        proto_item_append_text(sub_item, ": VendorID:%u, DeviceID:%u, InstanceID:%u, RsiInterface:%u",
+            u16VendorId, u16DeviceId, u16InstanceId, u8RsiInterface);
 
         /* Padding */
         offset = dissect_pn_padding(tvb, offset, pinfo, sub_tree, 1);
     }
 
-	/* SystemIdentification */
-	/* DeviceType */
-	deviceType = (char *)wmem_alloc(wmem_packet_scope(), deviceType_size + 1);
-	tvb_memcpy(tvb, (guint8 *)deviceType, offset, 25);
-	deviceType[deviceType_size] = '\0';
-	proto_tree_add_string(tree, hf_pn_rsi_device_type, tvb, offset, deviceType_size, deviceType);
-	offset += deviceType_size + 1;
+    /* SystemIdentification */
+    /* DeviceType */
+    deviceType = (char *)wmem_alloc(wmem_packet_scope(), deviceType_size + 1);
+    tvb_memcpy(tvb, (guint8 *)deviceType, offset, 25);
+    deviceType[deviceType_size] = '\0';
+    proto_tree_add_string(tree, hf_pn_rsi_device_type, tvb, offset, deviceType_size, deviceType);
+    offset += deviceType_size + 1;
 
-	/* Blank */
+    /* Blank */
 
-	/* OrderID */
-	orderID = (char *)wmem_alloc(wmem_packet_scope(), orderID_size + 1);
-	tvb_memcpy(tvb, (guint8 *)orderID, offset, 20);
-	orderID[orderID_size] = '\0';
-	proto_tree_add_string(tree, hf_pn_rsi_order_id, tvb, offset, orderID_size, orderID);
-	offset += orderID_size + 1;
+    /* OrderID */
+    orderID = (char *)wmem_alloc(wmem_packet_scope(), orderID_size + 1);
+    tvb_memcpy(tvb, (guint8 *)orderID, offset, 20);
+    orderID[orderID_size] = '\0';
+    proto_tree_add_string(tree, hf_pn_rsi_order_id, tvb, offset, orderID_size, orderID);
+    offset += orderID_size + 1;
 
-	/* Blank */
+    /* Blank */
 
-	/* IM_Serial_Number */
-	IMserialnumber = (char *)wmem_alloc(wmem_packet_scope(), IMserialnumber_size + 1);
-	tvb_memcpy(tvb, (guint8 *)IMserialnumber, offset, 16);
-	IMserialnumber[IMserialnumber_size] = '\0';
-	proto_tree_add_string(tree, hf_pn_rsi_im_serial_number, tvb, offset, IMserialnumber_size, IMserialnumber);
-	offset += IMserialnumber_size + 1;
+    /* IM_Serial_Number */
+    IMserialnumber = (char *)wmem_alloc(wmem_packet_scope(), IMserialnumber_size + 1);
+    tvb_memcpy(tvb, (guint8 *)IMserialnumber, offset, 16);
+    IMserialnumber[IMserialnumber_size] = '\0';
+    proto_tree_add_string(tree, hf_pn_rsi_im_serial_number, tvb, offset, IMserialnumber_size, IMserialnumber);
+    offset += IMserialnumber_size + 1;
 
-	/* Blank */
+    /* Blank */
 
-	/* HWRevision */
-	HWrevision = (char *)wmem_alloc(wmem_packet_scope(), HWrevision_size + 1);
-	tvb_memcpy(tvb, (guint8 *)HWrevision, offset, 5);
-	HWrevision[HWrevision_size] = '\0';
-	proto_tree_add_string(tree, hf_pn_rsi_hw_revision, tvb, offset, HWrevision_size, HWrevision);
-	offset += HWrevision_size + 1;
+    /* HWRevision */
+    HWrevision = (char *)wmem_alloc(wmem_packet_scope(), HWrevision_size + 1);
+    tvb_memcpy(tvb, (guint8 *)HWrevision, offset, 5);
+    HWrevision[HWrevision_size] = '\0';
+    proto_tree_add_string(tree, hf_pn_rsi_hw_revision, tvb, offset, HWrevision_size, HWrevision);
+    offset += HWrevision_size + 1;
 
-	/* Blank */
+    /* Blank */
 
-	/* SWRevisionPrefix */
-	SWrevisionprefix = (char *)wmem_alloc(wmem_packet_scope(), SWrevisionprefix_size + 1);
-	tvb_memcpy(tvb, (guint8 *)SWrevisionprefix, offset, 1);
-	SWrevisionprefix[SWrevisionprefix_size] = '\0';
-	proto_tree_add_string(tree, hf_pn_rsi_sw_revision_prefix, tvb, offset, SWrevisionprefix_size, SWrevisionprefix);
-	offset += SWrevisionprefix_size;
+    /* SWRevisionPrefix */
+    SWrevisionprefix = (char *)wmem_alloc(wmem_packet_scope(), SWrevisionprefix_size + 1);
+    tvb_memcpy(tvb, (guint8 *)SWrevisionprefix, offset, 1);
+    SWrevisionprefix[SWrevisionprefix_size] = '\0';
+    proto_tree_add_string(tree, hf_pn_rsi_sw_revision_prefix, tvb, offset, SWrevisionprefix_size, SWrevisionprefix);
+    offset += SWrevisionprefix_size;
 
-	/* SWRevision */
-	SWrevision = (char *)wmem_alloc(wmem_packet_scope(), SWrevision_size + 1);
-	tvb_memcpy(tvb, (guint8 *)SWrevision, offset, 9);
-	SWrevision[SWrevision_size] = '\0';
-	proto_tree_add_string(tree, hf_pn_rsi_sw_revision, tvb, offset, SWrevision_size, SWrevision);
-	offset += SWrevision_size;
+    /* SWRevision */
+    SWrevision = (char *)wmem_alloc(wmem_packet_scope(), SWrevision_size + 1);
+    tvb_memcpy(tvb, (guint8 *)SWrevision, offset, 9);
+    SWrevision[SWrevision_size] = '\0';
+    proto_tree_add_string(tree, hf_pn_rsi_sw_revision, tvb, offset, SWrevision_size, SWrevision);
+    offset += SWrevision_size;
     return offset;
 }
 
@@ -969,101 +968,101 @@ init_pn_rsi(int proto)
             FT_NONE, BASE_NONE, NULL, 0x0,
             NULL, HFILL }
         },
-		{ &hf_pn_rsi_number_of_entries,
-		  { "NumberOfEntries", "pn_rsi.number_of_entries",
-			FT_UINT16, BASE_HEX, NULL, 0x0,
-			NULL, HFILL }
-		},
-		{ &hf_pn_rsi_pd_rsi_instance,
-		  { "PDRsiInstance", "pn_rsi.pd_rsi_instance",
-			FT_NONE, BASE_NONE, NULL, 0x0,
-			NULL, HFILL }
-		},
-		{ &hf_pn_rsi_device_type,
-		  { "DeviceType", "pn_rsi.device_type",
-			FT_STRING, BASE_NONE, NULL, 0x0,
-			NULL, HFILL }
-		},
-		{ &hf_pn_rsi_order_id,
-		  { "OrderID", "pn_rsi.order_id",
-			FT_STRING, BASE_NONE, NULL, 0x0,
-			NULL, HFILL }
-		},
-		{ &hf_pn_rsi_im_serial_number,
-		  { "IM_Serial_Number", "pn_rsi.im_serial_number",
-			FT_STRING, BASE_NONE, NULL, 0x0,
-			NULL, HFILL }
-		},
-		{ &hf_pn_rsi_hw_revision,
-		  { "HWRevision", "pn_rsi.hw_revision",
-			FT_STRING, BASE_NONE, NULL, 0x0,
-			NULL, HFILL }
-		},
-		{ &hf_pn_rsi_sw_revision_prefix,
-		  { "SWRevisionPrefix", "pn_rsi.sw_revision_prefix",
-			FT_STRING, BASE_NONE, NULL, 0x0,
-			NULL, HFILL }
-		},
-		{ &hf_pn_rsi_sw_revision,
-		  { "SWRevision", "pn_rsi.sw_revision",
-			FT_STRING, BASE_NONE, NULL, 0x0,
-			NULL, HFILL }
-		},
-			/*&hf_pn_rsi_segment_too_long_segment,
-			&hf_pn_rsi_segment_error,
-			&hf_pn_rsi_segment_count,
-			&hf_pn_rsi_reassembled_in,
-			&hf_pn_rsi_reassembled_length,*/
-		{ &hf_pn_rsi_segment,
-		  { "RSI Segment", "pn_rsi.segment", 
-			FT_FRAMENUM, BASE_NONE, NULL, 0x0,
-			NULL, HFILL } 
-		},
-		{ &hf_pn_rsi_segments,
-		  { "PN RSI Segments", "pn_rsi.segments", 
-			FT_NONE, BASE_NONE, NULL, 0x0,
-		    NULL, HFILL } 
-		},
-		{ &hf_pn_rsi_segment_overlap,
-		  { "Segment overlap", "pn_rsi.segment.overlap", 
-			FT_BOOLEAN, BASE_NONE, NULL, 0x0,
-			"Segment overlaps with other segments", HFILL } 
-		},
-		{ &hf_pn_rsi_segment_overlap_conflict,
-		  { "Conflicting data in segment overlap", "pn_rsi.segment.overlap.conflict", 
-			FT_BOOLEAN, BASE_NONE, NULL, 0x0,
-			"Overlapping segments contained conflicting data", HFILL } 
-		},
-		{ &hf_pn_rsi_segment_multiple_tails,
-		  { "Multiple tail segments found", "pn_rsi.segment.multipletails", 
-			FT_BOOLEAN, BASE_NONE, NULL, 0x0,
-			"Several tails were found when reassembling the packet", HFILL } 
-		},
-	    { &hf_pn_rsi_segment_too_long_segment,
-		  { "Segment too long", "pn_rsi.segment.toolongsegment", 
-			FT_BOOLEAN, BASE_NONE, NULL, 0x0,
-			"Segment contained data past end of packet", HFILL } 
-		},
-		{ &hf_pn_rsi_segment_error,
-		  { "Reassembly error", "pn_rsi.segment.error", 
-			FT_FRAMENUM, BASE_NONE, NULL, 0x0,
-			"Reassembly error due to illegal segments", HFILL } 
-		},
-		{ &hf_pn_rsi_segment_count,
-		  { "Segment count", "pn_rsi.segment.count", 
-			FT_UINT32, BASE_DEC, NULL, 0x0,
-			NULL, HFILL } 
-		},
-		{ &hf_pn_rsi_reassembled_in,
-		  { "Reassembled pn_rsi in frame", "pn_rsi.reassembled_in", 
-			FT_FRAMENUM, BASE_NONE, NULL, 0x0,
-			"This pn_rsi packet is reassembled in this frame", HFILL } 
-		},
-		{ &hf_pn_rsi_reassembled_length,
-		  { "Reassembled pn_rsi length", "pn_rsi.reassembled.length", 
-			FT_UINT32, BASE_DEC, NULL, 0x0,
-			"The total length of the reassembled payload", HFILL } 
-		},
+        { &hf_pn_rsi_number_of_entries,
+          { "NumberOfEntries", "pn_rsi.number_of_entries",
+            FT_UINT16, BASE_HEX, NULL, 0x0,
+            NULL, HFILL }
+        },
+        { &hf_pn_rsi_pd_rsi_instance,
+          { "PDRsiInstance", "pn_rsi.pd_rsi_instance",
+            FT_NONE, BASE_NONE, NULL, 0x0,
+            NULL, HFILL }
+        },
+        { &hf_pn_rsi_device_type,
+          { "DeviceType", "pn_rsi.device_type",
+            FT_STRING, BASE_NONE, NULL, 0x0,
+            NULL, HFILL }
+        },
+        { &hf_pn_rsi_order_id,
+          { "OrderID", "pn_rsi.order_id",
+            FT_STRING, BASE_NONE, NULL, 0x0,
+            NULL, HFILL }
+        },
+        { &hf_pn_rsi_im_serial_number,
+          { "IM_Serial_Number", "pn_rsi.im_serial_number",
+            FT_STRING, BASE_NONE, NULL, 0x0,
+            NULL, HFILL }
+        },
+        { &hf_pn_rsi_hw_revision,
+          { "HWRevision", "pn_rsi.hw_revision",
+            FT_STRING, BASE_NONE, NULL, 0x0,
+            NULL, HFILL }
+        },
+        { &hf_pn_rsi_sw_revision_prefix,
+          { "SWRevisionPrefix", "pn_rsi.sw_revision_prefix",
+            FT_STRING, BASE_NONE, NULL, 0x0,
+            NULL, HFILL }
+        },
+        { &hf_pn_rsi_sw_revision,
+          { "SWRevision", "pn_rsi.sw_revision",
+            FT_STRING, BASE_NONE, NULL, 0x0,
+            NULL, HFILL }
+        },
+            /*&hf_pn_rsi_segment_too_long_segment,
+            &hf_pn_rsi_segment_error,
+            &hf_pn_rsi_segment_count,
+            &hf_pn_rsi_reassembled_in,
+            &hf_pn_rsi_reassembled_length,*/
+        { &hf_pn_rsi_segment,
+          { "RSI Segment", "pn_rsi.segment",
+            FT_FRAMENUM, BASE_NONE, NULL, 0x0,
+            NULL, HFILL }
+        },
+        { &hf_pn_rsi_segments,
+          { "PN RSI Segments", "pn_rsi.segments",
+            FT_NONE, BASE_NONE, NULL, 0x0,
+            NULL, HFILL }
+        },
+        { &hf_pn_rsi_segment_overlap,
+          { "Segment overlap", "pn_rsi.segment.overlap",
+            FT_BOOLEAN, BASE_NONE, NULL, 0x0,
+            "Segment overlaps with other segments", HFILL }
+        },
+        { &hf_pn_rsi_segment_overlap_conflict,
+          { "Conflicting data in segment overlap", "pn_rsi.segment.overlap.conflict",
+            FT_BOOLEAN, BASE_NONE, NULL, 0x0,
+            "Overlapping segments contained conflicting data", HFILL }
+        },
+        { &hf_pn_rsi_segment_multiple_tails,
+          { "Multiple tail segments found", "pn_rsi.segment.multipletails",
+            FT_BOOLEAN, BASE_NONE, NULL, 0x0,
+            "Several tails were found when reassembling the packet", HFILL }
+        },
+        { &hf_pn_rsi_segment_too_long_segment,
+          { "Segment too long", "pn_rsi.segment.toolongsegment",
+            FT_BOOLEAN, BASE_NONE, NULL, 0x0,
+            "Segment contained data past end of packet", HFILL }
+        },
+        { &hf_pn_rsi_segment_error,
+          { "Reassembly error", "pn_rsi.segment.error",
+            FT_FRAMENUM, BASE_NONE, NULL, 0x0,
+            "Reassembly error due to illegal segments", HFILL }
+        },
+        { &hf_pn_rsi_segment_count,
+          { "Segment count", "pn_rsi.segment.count",
+            FT_UINT32, BASE_DEC, NULL, 0x0,
+            NULL, HFILL }
+        },
+        { &hf_pn_rsi_reassembled_in,
+          { "Reassembled pn_rsi in frame", "pn_rsi.reassembled_in",
+            FT_FRAMENUM, BASE_NONE, NULL, 0x0,
+            "This pn_rsi packet is reassembled in this frame", HFILL }
+        },
+        { &hf_pn_rsi_reassembled_length,
+          { "Reassembled pn_rsi length", "pn_rsi.reassembled.length",
+            FT_UINT32, BASE_DEC, NULL, 0x0,
+            "The total length of the reassembled payload", HFILL }
+        },
         { &hf_pn_rsi_data_payload,
           { "PN IO RSI Data Payload", "pn_rsi.data_payload",
             FT_NONE, BASE_NONE, NULL, 0x0,
@@ -1079,10 +1078,10 @@ init_pn_rsi(int proto)
         &ett_pn_rsi_svcs_block,
         &ett_pn_rsi_add_flags,
         &ett_pn_rsi_rta,
-		&ett_pn_io_pd_rsi_instance,
-		&ett_pn_rsi_segments,
-		&ett_pn_rsi_segment,
-		&ett_pn_rsi_data_payload
+        &ett_pn_io_pd_rsi_instance,
+        &ett_pn_rsi_segments,
+        &ett_pn_rsi_segment,
+        &ett_pn_rsi_data_payload
     };
 
     static ei_register_info ei[] = {
@@ -1099,7 +1098,5 @@ init_pn_rsi(int proto)
     expert_pn_rsi = expert_register_protocol(proto_pn_rsi);
     expert_register_field_array(expert_pn_rsi, ei, array_length(ei));
 
-	register_init_routine(pn_rsi_reassemble_init);
+    register_init_routine(pn_rsi_reassemble_init);
 }
-
-
