@@ -286,22 +286,22 @@ static const value_string pn_dcp_suboption_device[] = {
 };
 
 static const true_false_string pn_dcp_rsi_properties_value_bit0[] =
-    { "IP stack not available", "IP stack available" };
+    {{ "IP stack not available", "IP stack available" }};
 
 static const true_false_string pn_dcp_rsi_properties_value_bit1[] =
-    { "CLRPC Interface not available", "CLRPC Interface available" };
+    {{ "CLRPC Interface not available", "CLRPC Interface available" }};
 
 static const true_false_string pn_dcp_rsi_properties_value_bit2[] =
-    { "RSI AR Interface not available", "RSI AR Interface available" };
+    {{ "RSI AR Interface not available", "RSI AR Interface available" }};
 
 static const true_false_string pn_dcp_rsi_properties_value_bit3[] =
-    { "RSI AR Read Implicit Interface not available", "RSI AR Read Implicit Interface available" };
+    {{ "RSI AR Read Implicit Interface not available", "RSI AR Read Implicit Interface available" }};
 
 static const true_false_string pn_dcp_rsi_properties_value_bit4[] =
-    { "RSI CIM Interface not available", "RSI CIM Interface available" };
+    {{ "RSI CIM Interface not available", "RSI CIM Interface available" }};
 
 static const true_false_string pn_dcp_rsi_properties_value_bit5[] =
-    { "RSI CIM Read Implicit Interface not available", "RSI CIM Read Implicit Interface available" };
+    {{ "RSI CIM Read Implicit Interface not available", "RSI CIM Read Implicit Interface available" }};
 
 #define PNDCP_SUBOPTION_DHCP_CLIENT_ID  61
 #define PNDCP_SUBOPTION_DHCP_CONTROL_FOR_ADDRESS_RES  255
