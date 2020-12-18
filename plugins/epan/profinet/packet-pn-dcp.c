@@ -303,11 +303,6 @@ static const true_false_string pn_dcp_rsi_properties_value_bit4[] =
 static const true_false_string pn_dcp_rsi_properties_value_bit5[] =
     { "RSI CIM Read Implicit Interface not available", "RSI CIM Read Implicit Interface available" };
 
-static const value_string pn_dcp_rsi_properties_value_otherbits[] = {
-    { 0x0000, "Reserved" },
-    { 0, NULL }
-};
-
 #define PNDCP_SUBOPTION_DHCP_CLIENT_ID  61
 #define PNDCP_SUBOPTION_DHCP_CONTROL_FOR_ADDRESS_RES  255
 
@@ -945,7 +940,7 @@ dissect_PNDCP_Suboption_Device(tvbuff_t *tvb, int offset, packet_info *pinfo,
         proto_tree_add_boolean(sub_tree, hf_pn_dcp_rsi_properties_value_bit3, tvb, offset, 2, rsi_properties_value);
         proto_tree_add_boolean(sub_tree, hf_pn_dcp_rsi_properties_value_bit4, tvb, offset, 2, rsi_properties_value);
         proto_tree_add_boolean(sub_tree, hf_pn_dcp_rsi_properties_value_bit5, tvb, offset, 2, rsi_properties_value);
-        proto_tree_add_boolean(sub_tree, hf_pn_dcp_rsi_properties_value_otherbits, tvb, offset, 2, rsi_properties_value);
+        proto_tree_add_uint(sub_tree, hf_pn_dcp_rsi_properties_value_otherbits, tvb, offset, 2, rsi_properties_value);
 
         offset = offset + 2;
 
@@ -1674,7 +1669,7 @@ proto_register_pn_dcp (void)
 
         { &hf_pn_dcp_rsi_properties_value_otherbits,
           { "RsiPropertiesValue.Bit6-15", "pn_dcp.suboption_device_rsi_properties_value_otherbits",
-            FT_BOOLEAN, 16, VALS(pn_dcp_rsi_properties_value_otherbits), 0xFFC0,
+            FT_UINT16, BASE_HEX, NULL, 0xFFC0,
             NULL, HFILL } },
 
         { &hf_pn_dcp_vendor_id_high,
