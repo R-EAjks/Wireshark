@@ -115,6 +115,11 @@ static QHash<int, QList<QAction *> > dynamic_menu_groups_;
 static QHash<int, QList<QAction *> > added_menu_groups_;
 static QHash<int, QList<QAction *> > removed_menu_groups_;
 
+// Packet Menu actions
+static QList<QAction *> dynamic_packet_menu_actions;
+static QList<QAction *> dynamic_packet_menu_actions_connected;
+static QList<QAction *> dynamic_packet_menu_actions_not_connected;
+
 QString WiresharkApplication::window_title_separator_ = QString::fromUtf8(" " UTF8_MIDDLE_DOT " ");
 
 // QMimeDatabase parses a large-ish XML file and can be slow to initialize.
@@ -865,6 +870,35 @@ void WiresharkApplication::emitStatCommandSignal(const QString &menu_path, const
 void WiresharkApplication::emitTapParameterSignal(const QString cfg_abbr, const QString arg, void *userdata)
 {
     emit openTapParameterDialog(cfg_abbr, arg, userdata);
+}
+
+/*
+ * Used for registering custom packet menus
+ */
+void WiresharkApplication::appendPacketMenu(QAction* funnel_action)
+{
+    dynamic_packet_menu_actions.append(funnel_action);
+    dynamic_packet_menu_actions_not_connected.append(funnel_action);
+}
+
+void WiresharkApplication::connectPacketMenuActions(FunnelStatistics* funnelstatistics)
+{
+    // Connect menus, then move to avoid connect()-ing twice
+    for( int i=0; i<dynamic_packet_menu_actions_not_connected.count(); ++i )
+    {
+        QAction* myAction = dynamic_packet_menu_actions_not_connected[i];
+        connect(myAction, SIGNAL(triggered(bool)), funnelstatistics, SLOT(funnelActionTriggeredPacketData()));
+        dynamic_packet_menu_actions_connected.append(myAction);
+    }
+
+    dynamic_packet_menu_actions_not_connected.clear();
+
+    return;
+}
+
+QList<QAction *> WiresharkApplication::getPacketMenuActions()
+{
+    return dynamic_packet_menu_actions;
 }
 
 // XXX Combine statistics and funnel routines into addGroupItem + groupItems?

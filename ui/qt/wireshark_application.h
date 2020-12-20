@@ -27,6 +27,8 @@
 
 #include "capture_event.h"
 
+#include "ui/qt/funnel_statistics.h"
+
 struct _e_prefs;
 
 class QAction;
@@ -97,6 +99,9 @@ public:
     QList<QAction *> removedMenuGroupItems(int group);
     void clearAddedMenuGroupItems();
     void clearRemovedMenuGroupItems();
+    QList<QAction*> getPacketMenuActions();
+    void connectPacketMenuActions(FunnelStatistics *funnelstatistics);
+    void appendPacketMenu(QAction* funnel_action);
 
     void allSystemsGo();
     void emitLocalInterfaceEvent(const char *ifname, int added, int up);

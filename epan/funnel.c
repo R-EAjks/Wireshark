@@ -150,6 +150,77 @@ void funnel_cleanup(void)
     funnel_clear_menu(&registered_menus);
 }
 
+/**
+ * Represents a single menu entry and callback
+ */
+typedef struct _funnel_packet_menu_t {
+    char *name;
+    char *required_fields;
+    funnel_packet_menu_callback callback;
+    gpointer callback_data;
+    gboolean retap;
+    struct _funnel_packet_menu_t* next;
+} funnel_packet_menu_t;
+
+/*
+ * List of all registered funnel_packet_menu_t's
+ */
+static funnel_packet_menu_t* registered_packet_menus = NULL;
+
+/*
+ * Inserts a funnel_packet_menu_t into a list of funnel_packet_menu_t's
+ */
+static void funnel_insert_packet_menu (funnel_packet_menu_t** menu_list, funnel_packet_menu_t *menu)
+{
+    if (!(*menu_list))  {
+        *menu_list = menu;
+    } else {
+        funnel_packet_menu_t* c;
+        for (c = *menu_list; c->next; c = c->next);
+        c->next = menu;
+    }
+}
+
+/*
+ * Entry point for Lua code to register a packet menu
+ *
+ * Stores the menu name and callback from the Lua code
+ * into registered_packet_menus so that the
+ * Wireshark GUI code can retrieve it with
+ * funnel_register_all_packet_menus().
+ */
+void funnel_register_packet_menu(const char *name,
+                                 const char *required_fields,
+                                 funnel_packet_menu_callback callback,
+                                 gpointer callback_data,
+                                 gboolean retap)
+{
+    funnel_packet_menu_t* m = g_new0(funnel_packet_menu_t, 1);
+    m->name = g_strdup(name);
+    m->required_fields = g_strdup(required_fields);
+    m->callback = callback;
+    m->callback_data = callback_data;
+    m->retap = retap;
+    m->next = NULL;
+
+    funnel_insert_packet_menu(&registered_packet_menus, m);
+}
+
+/*
+ * Entry point for Wireshark GUI to obtain all registered packet menus
+ *
+ * Calls the supplied callback for each packet menu registered with
+ * funnel_register_packet_menu().
+ */
+void funnel_register_all_packet_menus(funnel_registration_packet_cb_t r_cb)
+{
+    funnel_packet_menu_t* c;
+    for (c = registered_packet_menus; c; c = c->next) {
+        r_cb(c->name,c->required_fields,c->callback,c->callback_data,c->retap);
+    }
+}
+
+
 /*
  * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
  *

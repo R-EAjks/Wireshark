@@ -118,6 +118,37 @@ WS_DLL_PUBLIC void funnel_reload_menus(funnel_deregistration_cb_t d_cb,
                                        funnel_registration_cb_t r_cb);
 WS_DLL_PUBLIC void funnel_cleanup(void);
 
+typedef void (* funnel_packet_menu_callback)(gpointer, GPtrArray*);
+
+/*
+ * Signature of callback function to register packet menu entries
+ */
+typedef void (*funnel_registration_packet_cb_t)(const char *name,
+                                         const char *required_fields,
+                                         funnel_packet_menu_callback callback,
+                                         gpointer callback_data,
+                                         gboolean retap);
+
+/*
+ * Entry point for Wireshark GUI to obtain all registered packet menus
+ * @param funnel_registration_packet_cb_t function which will called to register each packet menu entry
+ */
+WS_DLL_PUBLIC void funnel_register_all_packet_menus(funnel_registration_packet_cb_t r_cb);
+
+/*
+ * Entry point for Lua code to register a packet menu
+ * @param name packet menu item's name
+ * @param required_fields fields required to be present for the packet menu to be displayed
+ * @param callback function called when the menu item is invoked. The function must take one argument and return nothing.
+ * @param callback_data ???????
+ * @param retap ???????
+ */
+WS_DLL_PUBLIC void funnel_register_packet_menu(const char *name,
+                                 const char *required_fields,
+                                 funnel_packet_menu_callback callback,
+                                 gpointer callback_data,
+                                 gboolean retap);
+
 extern void initialize_funnel_ops(void);
 
 extern void funnel_dump_all_text_windows(void);
