@@ -748,7 +748,7 @@ init_tpncp_data_fields_info(tpncp_data_field_info *data_fields_info, FILE *file)
             special_type = TPNCP_SECURITY_START;
         else if (name[0] == 's' && !strcmp(name, "security_cmd_offset"))
             special_type = TPNCP_SECURITY_OFFSET;
-        else if (name[0] == 's' && !strcmp(name, "ssrc"))
+        else if (data_id != 1611 && name[0] == 's' && !strcmp(name, "ssrc"))
             special_type = RTP_STATE_START;
         else if (name[0] == 'r' && !strcmp(name, "rtp_tx_state_ssrc"))
             special_type = RTP_STATE_START;
