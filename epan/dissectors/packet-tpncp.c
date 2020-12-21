@@ -160,8 +160,7 @@ dissect_tpncp_data(guint data_id, packet_info *pinfo, tvbuff_t *tvb, proto_tree 
             break;
         }
         case TPNCP_SECURITY_START:
-            if (*offset < security_offset)
-                *offset = security_offset;
+            *offset = security_offset;
             open_channel_start = -1;
             security_offset = 0;
             break;
@@ -171,15 +170,13 @@ dissect_tpncp_data(guint data_id, packet_info *pinfo, tvbuff_t *tvb, proto_tree 
                 rtp_state_offset += initial_offset + 4; /* The offset starts after CID */
             break;
         case RTP_STATE_START:
-            if (*offset < rtp_state_offset)
-                *offset = rtp_state_offset;
+            *offset = rtp_state_offset;
             rtp_state_offset = 0;
             if (rtp_tx_state_offset == 0) {
                 rtp_state_size = (tvb_reported_length_remaining(tvb, *offset) - 4) / 2;
                 rtp_tx_state_offset = *offset + rtp_state_size;
             } else {
-                if (*offset < rtp_tx_state_offset)
-                    *offset = rtp_tx_state_offset;
+                *offset = rtp_tx_state_offset;
                 rtp_tx_state_offset += rtp_state_size;
             }
             break;
@@ -191,8 +188,7 @@ dissect_tpncp_data(guint data_id, packet_info *pinfo, tvbuff_t *tvb, proto_tree 
                 gint channel_configuration_size = tvb_reported_length_remaining(tvb, *offset) / 2;
                 channel_b_offset = *offset + channel_configuration_size;
             } else {
-                if (*offset < channel_b_offset)
-                    *offset = channel_b_offset;
+                *offset = channel_b_offset;
                 channel_b_offset = 0;
             }
             break;
