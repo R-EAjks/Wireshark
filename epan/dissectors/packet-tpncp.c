@@ -574,7 +574,7 @@ init_tpncp_data_fields_info(tpncp_data_field_info *data_fields_info, FILE *file)
     guchar size;
     enum SpecialFieldType special_type;
     gboolean sign, is_address_family;
-    guint idx, since;
+    guint idx, since, ip_addr_field;
     tpncp_data_field_info *field = NULL;
     hf_register_info hf_entr;
     gboolean* registered_struct_ids = wmem_alloc0_array(wmem_epan_scope(), gboolean, MAX_TPNCP_DB_SIZE);
@@ -703,6 +703,7 @@ init_tpncp_data_fields_info(tpncp_data_field_info *data_fields_info, FILE *file)
         hf_size++;
 
     is_address_family = FALSE;
+    ip_addr_field = 0;
 
     /* Register standard data. */
     while (fgetline(tpncp_db_entry, MAX_TPNCP_DB_ENTRY_LEN, file)) {
@@ -792,10 +793,11 @@ init_tpncp_data_fields_info(tpncp_data_field_info *data_fields_info, FILE *file)
             continue;
         }
 
-        if (special_type == TPNCP_IP_ADDR) {
+        if (ip_addr_field > 0) {
             // ip address that comes after address family has 4 fields: ip_addr_0, ip_addr_1, 2 and 3
             // On these cases, ignore 1, 2 and 3 and enlarge the field size of 0 to 128
             char *seq = (char*)name + strlen(name) - 2;
+            --ip_addr_field;
             if (seq > name && *seq == '_') {
                 if (seq[1] >= '1' && seq[1] <= '3')
                     continue;
@@ -803,6 +805,10 @@ init_tpncp_data_fields_info(tpncp_data_field_info *data_fields_info, FILE *file)
                 if (is_address_family) {
                     *seq = 0;
                     size = 128;
+                    special_type = TPNCP_IP_ADDR;
+                } else {
+                    report_warning("Bad address form. Field name: %s", name);
+                    ip_addr_field = 0;
                 }
             }
         }
@@ -833,8 +839,10 @@ init_tpncp_data_fields_info(tpncp_data_field_info *data_fields_info, FILE *file)
                 hf_entr.hfinfo.strings = NULL;
             } else {
                 hf_entr.hfinfo.strings = VALS(tpncp_enums_id_vals[enum_val]);
-                if (!strcmp(tmp, "AddressFamily"))
+                if (!strcmp(tmp, "AddressFamily")) {
                     is_address_family = TRUE;
+                    ip_addr_field = 4;
+                }
             }
         } else {
             hf_entr.hfinfo.strings = NULL;
