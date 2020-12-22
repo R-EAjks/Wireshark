@@ -11,6 +11,9 @@
 # https://hub.docker.com/r/wireshark/wireshark-opensuse-15.2-dev
 # https://hub.docker.com/r/wireshark/wireshark-ubuntu-dev
 
+variables:
+  CCACHE_DIR: "${CI_PROJECT_DIR}/ccache"
+
 .build: &build
   stage: build
   after_script:
@@ -34,8 +37,6 @@
     - export LANG=en_US.UTF-8
     - export PYTEST_ADDOPTS=--skip-missing-programs=dumpcap,rawshark
     - mkdir -p ccache
-    - export CCACHE_BASEDIR=${PWD}
-    - export CCACHE_DIR=${PWD}/ccache
     - ccache --show-stats
     - export DEB_BUILD_OPTIONS=nocheck
     - export DH_QUIET=1
@@ -50,6 +51,8 @@
     # setcap restricts our library paths
     - CFLAGS=-Wl,-rpath=$(pwd)/run CXXFLAGS=-Wl,-rpath=$(pwd)/run cmake -GNinja $CMAKE_ARGS ..
     - ninja
+    - ninja install
+    - ninja shellcheck
     - ninja test-programs
     - chown -R user .
     - if [ -f run/dumpcap ]; then setcap cap_net_raw,cap_net_admin+eip run/dumpcap; fi
@@ -75,21 +78,16 @@ build:ubuntu-dist:
   script:
     - perl ../tools/make-version.pl --set-release || ../perl make-version.pl --set-release
     - cmake -G Ninja $CMAKE_ARGS -DENABLE_CCACHE=ON ..
-    - ninja install
-    # - XXX The master Buildbot config built and copied the API reference
-    - packaging/source/git-export-release.sh -d .
-    - for digest in sha256 rmd160 sha1 ; do openssl $digest wireshark-*.tar.xz ; done
-    # XXX Should these be in test:ubuntu?
-    # - ninja test-programs
-    # - chown -R user .
-    # - if [ -f run/dumpcap ]; then setcap cap_net_raw,cap_net_admin+eip run/dumpcap; fi
-    # - su user -c pytest-3
-    - ninja shellcheck
-  # We're still building tarballs on Buildbot. Leave this disabled for now
-  # in order to avoid confusion.
-  # artifacts:
-  #   paths:
-  #     - wireshark-*.tar.xz
+    - cd $CI_PROJECT_DIR
+    - build/packaging/source/git-export-release.sh -d .
+  after_script:
+    # - ccache --max-size $( du --summarize --block-size=1M "$CI_PROJECT_DIR/build" | awk '{printf ("%dM", $1 * 1.5)}' )
+    - for digest in sha256 rmd160 sha1 ; do openssl $digest wireshark-*.tar.* ; done
+    # This will break if we produce multiple tarballs, which is arguably a good thing.
+    - if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ] && [ -n "$S3_DESTINATION_DIST" ] ; then aws s3 cp wireshark-*.tar.* "$S3_DESTINATION_DIST/" ; fi
+  artifacts:
+    paths:
+      - wireshark-*.tar.*
 
 # The custom CentOS 7 image pre-installs dependencies and compilers to speed up the build:
 # https://hub.docker.com/r/wireshark/wireshark-centos-7-dev
@@ -269,6 +267,8 @@ merge-req:commit-checks:
     - docker
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  variables:
+    GIT_DEPTH: 10
   script:
     # build-ubuntu puts us in `build`.
     - cd ..
@@ -281,6 +281,8 @@ merge-req:ubuntu-dpkg:
     - docker
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  variables:
+    GIT_DEPTH: 10
   script:
     # build-ubuntu puts us in `build`.
     - cd ..
@@ -297,9 +299,10 @@ merge-req:ubuntu-gcc-ctest:
     - docker
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  variables:
+    GIT_DEPTH: 10
   script:
     # build-ubuntu puts us in `build`.
-    - perl ../tools/make-version.pl --set-release || ../perl make-version.pl --set-release
     - CC=gcc CXX=g++ cmake -DENABLE_EXTRA_COMPILER_WARNINGS=on -DCMAKE_EXPORT_COMPILE_COMMANDS=on -DENABLE_CCACHE=ON -G Ninja ..
     - ninja
     - ninja test-programs
@@ -312,11 +315,15 @@ merge-req:ubuntu-clang-other-tests:
     - docker
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  variables:
+    GIT_DEPTH: 10
   script:
     # build-ubuntu puts us in `build`.
     - cd ..
     - python3 tools/checklicenses.py
     - ./tools/cppcheck/cppcheck.sh -l 1 -x | tee cppcheck_report.xml
+    - ./tools/check_typed_item_calls.py --commits 1 | tee item_calls_check.txt
+    - ./tools/check_tfs.py --commits 1 | tee tfs_check.txt
     - if [[ -s "cppcheck_report.xml" ]]; then cppcheck-htmlreport --file cppcheck_report.xml  --report-dir . ; fi
     - cd build
     - cmake -DENABLE_EXTRA_COMPILER_WARNINGS=on -DENABLE_CHECKHF_CONFLICT=on -DCMAKE_EXPORT_COMPILE_COMMANDS=on -DENABLE_CCACHE=ON -G Ninja ..
@@ -328,6 +335,8 @@ merge-req:ubuntu-clang-other-tests:
     paths:
       - cppcheck_report.xml
       - cppcheck_report.html
+      - item_calls_check.txt
+      - tfs_check.txt
 
 # XXX This is still beta:
 # https://docs.gitlab.com/ee/user/gitlab_com/index.html#windows-shared-runners-beta
@@ -342,6 +351,8 @@ merge-req:windows:
     # The wireshark-windows-dev image is only available via a dedicated runner.
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_PROJECT_URL =~ /.*gitlab.com\/wireshark\/wireshark/'
       when: always
+  variables:
+    GIT_DEPTH: 10
   before_script:
     # XXX Find a better location.
     - cmd.exe /c "set CI_PIPELINE_SOURCE"
@@ -362,7 +373,6 @@ merge-req:windows:
     #- cmd.exe /c "set"
     #- Get-Location
   script:
-    - perl tools/make-version.pl --set-release
     - mkdir build
     - cd build
     - cmake -G "Visual Studio 16 2019" -A x64 -DENABLE_LTO=off ..

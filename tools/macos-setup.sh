@@ -815,7 +815,14 @@ uninstall_glib() {
         echo "Uninstalling GLib:"
         cd glib-$installed_glib_version
         $DO_MAKE_UNINSTALL || exit 1
-        make distclean || exit 1
+        #
+        # This appears to delete dependencies out from under other
+        # Makefiles in the tree, causing it to fail.  At least until
+        # that gets fixed, if it ever gets fixed, we just ignore the
+        # exit status of "make distclean"
+        #
+        # make distclean || exit 1
+        make distclean || echo "Ignoring make distclean failure" 1>&2
         cd ..
         rm glib-$installed_glib_version-done
 
@@ -1448,7 +1455,12 @@ uninstall_zstd() {
         echo "Uninstalling zstd:"
         cd zstd-$installed_zstd_version
         $DO_MAKE_UNINSTALL || exit 1
-        make distclean || exit 1
+        #
+        # zstd has no configure script, so there's no need for
+        # "make distclean", and the Makefile supplied with it
+        # has no "make distclean" rule; just do "make clean".
+        #
+        make clean || exit 1
         cd ..
         rm zstd-$installed_zstd_version-done
 
@@ -2106,6 +2118,17 @@ install_minizip() {
         [ -f zlib-$ZLIB_VERSION.tar.gz ] || curl -L -o zlib-$ZLIB_VERSION.tar.gz https://zlib.net/zlib-$ZLIB_VERSION.tar.gz || exit 1
         $no_build && echo "Skipping installation" && return
         gzcat zlib-$ZLIB_VERSION.tar.gz | tar xf - || exit 1
+        #
+        # minizip ships both with a minimal Makefile that doesn't
+        # support "make install", "make uninstall", or "make distclean",
+        # and with a Makefile.am file that, if we do an autoreconf,
+        # gives us a configure script, and a Makefile.in that, if we run
+        # the configure script, gives us a Makefile that supports ll of
+        # those targets, and that installs a pkg-config .pc file for
+        # minizip.
+        #
+        # So that's what we do.
+        #
         cd zlib-$ZLIB_VERSION/contrib/minizip || exit 1
         LIBTOOLIZE=glibtoolize autoreconf --force --install
         CFLAGS="$CFLAGS -D_FORTIFY_SOURCE=0 $VERSION_MIN_FLAGS $SDKFLAGS" CXXFLAGS="$CXXFLAGS -D_FORTIFY_SOURCE=0 $VERSION_MIN_FLAGS $SDKFLAGS" LDFLAGS="$LDFLAGS $VERSION_MIN_FLAGS $SDKFLAGS" ./configure || exit 1
@@ -2124,7 +2147,7 @@ uninstall_minizip() {
         make distclean || exit 1
         cd ../../..
 
-        rm zlib-$installed_minizip_version-done
+        rm minizip-$installed_minizip_version-done
 
         if [ "$#" -eq 1 ] && [ "$1" = "-r" ] ; then
             #
