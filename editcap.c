@@ -155,10 +155,10 @@ GPtrArray *capture_comments = NULL;
 #define MAX_SELECTIONS 512
 static struct select_item     selectfrm[MAX_SELECTIONS];
 static guint                  max_selected              = 0;
-static int                    keep_em                   = 0;
+static gboolean               keep_em                   = FALSE;
 static int                    out_file_type_subtype     = WTAP_FILE_TYPE_SUBTYPE_PCAPNG; /* default to pcapng   */
 static int                    out_frame_type            = -2; /* Leave frame type alone */
-static int                    verbose                   = 0;  /* Not so verbose         */
+static gboolean               verbose                   = FALSE; /* Not so verbose         */
 static struct time_adjustment time_adj                  = {NSTIME_INIT_ZERO, 0}; /* no adjustment */
 static nstime_t               relative_time_window      = NSTIME_INIT_ZERO; /* de-dup time window */
 static double                 err_prob                  = -1.0;
@@ -1467,7 +1467,12 @@ invalid_time:
             break;
 
         case 'r':
-            keep_em = !keep_em;  /* Just invert */
+            if (keep_em) {
+                cmdarg_err("-r was specified twice");
+                ret = INVALID_OPTION;
+                goto clean_exit;
+            }
+            keep_em = TRUE;
             break;
 
         case 's':
@@ -1501,7 +1506,12 @@ invalid_time:
             break;
 
         case 'v':
-            verbose = !verbose;  /* Just invert */
+            if (verbose) {
+                cmdarg_err("-v was specified twice");
+                ret = INVALID_OPTION;
+                goto clean_exit;
+            }
+            verbose = TRUE;
             break;
 
         case 'V':
@@ -1714,7 +1724,7 @@ invalid_time:
         if (add_selection(argv[i], &max_packet_number) == FALSE)
             break;
 
-    if (keep_em == FALSE)
+    if (!keep_em)
         max_packet_number = G_MAXUINT;
 
     if (dup_detect || dup_detect_by_time) {
