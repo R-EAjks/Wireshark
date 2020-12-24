@@ -1,6 +1,7 @@
 /* packet-btbredr_rf.c
  * Routines for Bluetooth Pseudoheader for BR/EDR Baseband
  *
+ * Copyright 2020, Thomas Sailer <t.sailer@alumni.ethz.ch>
  * Copyright 2014, Michal Labedzki for Tieto Corporation
  * Copyright 2014, Dominic Spill <dominicgs@gmail.com>
  *
@@ -57,6 +58,20 @@ static int hf_packet_header_flow_control = -1;
 static int hf_packet_header_acknowledge_indication = -1;
 static int hf_packet_header_sequence_number = -1;
 static int hf_packet_header_header_error_check = -1;
+static int hf_packet_header_broken_lt_addr = -1;
+static int hf_packet_header_broken_type = -1;
+static int hf_packet_header_broken_type_any = -1;
+static int hf_packet_header_broken_type_sco_br = -1;
+static int hf_packet_header_broken_type_esco_br = -1;
+static int hf_packet_header_broken_type_esco_edr = -1;
+static int hf_packet_header_broken_type_acl_br = -1;
+static int hf_packet_header_broken_type_acl_edr = -1;
+static int hf_packet_header_broken_type_csb_br = -1;
+static int hf_packet_header_broken_type_csb_edr = -1;
+static int hf_packet_header_broken_flow_control = -1;
+static int hf_packet_header_broken_acknowledge_indication = -1;
+static int hf_packet_header_broken_sequence_number = -1;
+static int hf_packet_header_broken_header_error_check = -1;
 static int hf_flags = -1;
 static int hf_flags_reserved_15_14 = -1;
 static int hf_flags_mic_pass = -1;
@@ -102,6 +117,7 @@ static expert_field ei_unexpected_data = EI_INIT;
 static expert_field ei_reserved_not_zero = EI_INIT;
 static expert_field ei_incorrect_packet_header_or_hec = EI_INIT;
 static expert_field ei_packet_header_with_hec_not_checked = EI_INIT;
+static expert_field ei_broken_packet_header_format = EI_INIT;
 
 static gint ett_btbredr_rf = -1;
 static gint ett_flags = -1;
@@ -325,7 +341,7 @@ static guint8 reverse_bits(guint8 value)
             (value & 0x02) << 5 | (value & 0x01) << 7;
 }
 
-static gboolean check_hec(guint8 uap, guint32 header)
+static gboolean broken_check_hec(guint8 uap, guint32 header)
 {
     guint8   hec;
     guint16  header_data;
@@ -349,6 +365,18 @@ static gboolean check_hec(guint8 uap, guint32 header)
     return lfsr == hec;
 }
 
+static gboolean check_hec(guint8 uap, guint32 header)
+{
+    static const guint32 crc_poly_rev_bt_hec = 0xe5;
+    header &= 0x3ffff;
+    header ^= uap & 0xff;
+    for (guint i = 0; i < 10; ++i) {
+        header ^= (crc_poly_rev_bt_hec << 1) & -(header & 1);
+        header >>= 1;
+    }
+    return !header;
+}
+
 static gint
 dissect_btbredr_rf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
@@ -356,12 +384,13 @@ dissect_btbredr_rf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
     proto_tree         *btbredr_rf_tree;
     proto_item         *flags_item;
     proto_tree         *flags_tree;
-    proto_item         *header_item;
+    proto_item         *header_item = NULL;
     proto_tree         *header_tree;
     proto_item         *reserved_item;
     proto_item         *hec_item = NULL;
     gint                offset = 0;
     gint                hf_x;
+    gint                header_mode;
     guint16             flags;
     guint8              payload_and_transport;
     gint16              packet_type = PACKET_TYPE_UNKNOWN;
@@ -441,61 +470,134 @@ dissect_btbredr_rf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
     proto_tree_add_item(btbredr_rf_tree, hf_x, tvb, offset, 1, ENC_NA);
     offset += 1;
 
+    if (!(flags & FLAGS_PACKET_HEADER_AND_BR_EDR_PAYLOAD_DEWHITENED) ||
+            !(flags & FLAGS_REFERENCE_UPPER_ADDRES_PART_VALID))
+        header_mode = -1;
+    else if (check_hec(tvb_get_guint8(tvb, offset - 1), tvb_get_guint32(tvb, offset, ENC_LITTLE_ENDIAN)))
+        header_mode = 1;
+    else if (broken_check_hec(tvb_get_guint8(tvb, offset - 1), tvb_get_guint32(tvb, offset, ENC_LITTLE_ENDIAN)))
+        header_mode = 2;
+    else
+        header_mode = 0;
+
     if (!(flags & FLAGS_PACKET_HEADER_AND_BR_EDR_PAYLOAD_DEWHITENED)) {
        proto_tree_add_item(btbredr_rf_tree, hf_whitened_packet_header, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    } else {
+    } else if (header_mode == 2) {
+        // broken header format
         header_item = proto_tree_add_item(btbredr_rf_tree, hf_packet_header, tvb, offset, 4, ENC_LITTLE_ENDIAN);
         header_tree = proto_item_add_subtree(header_item, ett_bluetooth_header);
 
         proto_tree_add_item(header_tree, hf_packet_header_reserved, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-        proto_tree_add_item(header_tree, hf_packet_header_lt_addr, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(header_tree, hf_packet_header_broken_lt_addr, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 
         if (payload_and_transport == (TRANSPORT_SCO | PAYLOAD_BR)) {
-            proto_tree_add_item(header_tree, hf_packet_header_type_sco_br, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+            proto_tree_add_item(header_tree, hf_packet_header_broken_type_sco_br, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 
             packet_type = (tvb_get_guint8(tvb, offset + 1) >> 3) & 0xF;
             packet_type_str = val_to_str_const(packet_type, packet_type_sco_br_vals, "Unknown");
             packet_type_table = packet_type_sco_br_table;
         } else if (payload_and_transport == (TRANSPORT_eSCO | PAYLOAD_BR)) {
-            proto_tree_add_item(header_tree, hf_packet_header_type_esco_br, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+            proto_tree_add_item(header_tree, hf_packet_header_broken_type_esco_br, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 
             packet_type = (tvb_get_guint8(tvb, offset + 1) >> 3) & 0xF;
             packet_type_str = val_to_str_const(packet_type, packet_type_esco_br_vals, "Unknown");
             packet_type_table = packet_type_esco_br_table;
         } else if (payload_and_transport == (TRANSPORT_eSCO | PAYLOAD_EDR_2) || payload_and_transport == (TRANSPORT_eSCO | PAYLOAD_EDR_3)) {
-            proto_tree_add_item(header_tree, hf_packet_header_type_esco_edr, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+            proto_tree_add_item(header_tree, hf_packet_header_broken_type_esco_edr, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 
             packet_type = (tvb_get_guint8(tvb, offset + 1) >> 3) & 0xF;
             packet_type_str = val_to_str_const(packet_type, packet_type_esco_edr_vals, "Unknown");
             packet_type_table = packet_type_esco_edr_table;
         } else if (payload_and_transport == (TRANSPORT_ACL | PAYLOAD_BR)) {
-            proto_tree_add_item(header_tree, hf_packet_header_type_acl_br, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+            proto_tree_add_item(header_tree, hf_packet_header_broken_type_acl_br, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 
             packet_type = (tvb_get_guint8(tvb, offset + 1) >> 3) & 0xF;
             packet_type_str = val_to_str_const(packet_type, packet_type_acl_br_vals, "Unknown");
             packet_type_table = packet_type_acl_br_table;
         } else if (payload_and_transport == (TRANSPORT_ACL | PAYLOAD_EDR_2) || payload_and_transport == (TRANSPORT_ACL | PAYLOAD_EDR_3)) {
-            proto_tree_add_item(header_tree, hf_packet_header_type_acl_edr, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+            proto_tree_add_item(header_tree, hf_packet_header_broken_type_acl_edr, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 
             packet_type = (tvb_get_guint8(tvb, offset + 1) >> 3) & 0xF;
             packet_type_str = val_to_str_const(packet_type, packet_type_acl_edr_vals, "Unknown");
             packet_type_table = packet_type_acl_edr_table;
         } else if (payload_and_transport == (TRANSPORT_CSB | PAYLOAD_BR)) {
-            proto_tree_add_item(header_tree, hf_packet_header_type_csb_br, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+            proto_tree_add_item(header_tree, hf_packet_header_broken_type_csb_br, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 
             packet_type = (tvb_get_guint8(tvb, offset + 1) >> 3) & 0xF;
             packet_type_str = val_to_str_const(packet_type, packet_type_csb_br_vals, "Unknown");
             packet_type_table = packet_type_csb_br_table;
         } else if (payload_and_transport == (TRANSPORT_CSB | PAYLOAD_EDR_2) || payload_and_transport == (TRANSPORT_ACL | PAYLOAD_EDR_3)) {
-            proto_tree_add_item(header_tree, hf_packet_header_type_csb_edr, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+            proto_tree_add_item(header_tree, hf_packet_header_broken_type_csb_edr, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 
             packet_type = (tvb_get_guint8(tvb, offset + 1) >> 3) & 0xF;
             packet_type_str = val_to_str_const(packet_type, packet_type_csb_edr_vals, "Unknown");
             packet_type_table = packet_type_csb_edr_table;
         } else if ((payload_and_transport >> 4) == TRANSPORT_ANY) {
-            proto_tree_add_item(header_tree, hf_packet_header_type_any, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+            proto_tree_add_item(header_tree, hf_packet_header_broken_type_any, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 
             packet_type = (tvb_get_guint8(tvb, offset + 1) >> 3) & 0xF;
+            packet_type_str = val_to_str_const(packet_type, packet_type_any_vals, "Unknown");
+        } else {
+            proto_tree_add_item(header_tree, hf_packet_header_broken_type, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        }
+
+        proto_tree_add_item(header_tree, hf_packet_header_broken_flow_control, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(header_tree, hf_packet_header_broken_acknowledge_indication, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(header_tree, hf_packet_header_broken_sequence_number, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        hec_item = proto_tree_add_item(header_tree, hf_packet_header_broken_header_error_check, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    } else {
+        // header format according to Core_v5.2.pdf Vol 2 Part B Chapter 6.4
+        header_item = proto_tree_add_item(btbredr_rf_tree, hf_packet_header, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        header_tree = proto_item_add_subtree(header_item, ett_bluetooth_header);
+
+        proto_tree_add_item(header_tree, hf_packet_header_lt_addr, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+
+        if (payload_and_transport == (TRANSPORT_SCO | PAYLOAD_BR)) {
+            proto_tree_add_item(header_tree, hf_packet_header_type_sco_br, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+
+            packet_type = (tvb_get_guint8(tvb, offset) >> 3) & 0xF;
+            packet_type_str = val_to_str_const(packet_type, packet_type_sco_br_vals, "Unknown");
+            packet_type_table = packet_type_sco_br_table;
+        } else if (payload_and_transport == (TRANSPORT_eSCO | PAYLOAD_BR)) {
+            proto_tree_add_item(header_tree, hf_packet_header_type_esco_br, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+
+            packet_type = (tvb_get_guint8(tvb, offset) >> 3) & 0xF;
+            packet_type_str = val_to_str_const(packet_type, packet_type_esco_br_vals, "Unknown");
+            packet_type_table = packet_type_esco_br_table;
+        } else if (payload_and_transport == (TRANSPORT_eSCO | PAYLOAD_EDR_2) || payload_and_transport == (TRANSPORT_eSCO | PAYLOAD_EDR_3)) {
+            proto_tree_add_item(header_tree, hf_packet_header_type_esco_edr, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+
+            packet_type = (tvb_get_guint8(tvb, offset) >> 3) & 0xF;
+            packet_type_str = val_to_str_const(packet_type, packet_type_esco_edr_vals, "Unknown");
+            packet_type_table = packet_type_esco_edr_table;
+        } else if (payload_and_transport == (TRANSPORT_ACL | PAYLOAD_BR)) {
+            proto_tree_add_item(header_tree, hf_packet_header_type_acl_br, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+
+            packet_type = (tvb_get_guint8(tvb, offset) >> 3) & 0xF;
+            packet_type_str = val_to_str_const(packet_type, packet_type_acl_br_vals, "Unknown");
+            packet_type_table = packet_type_acl_br_table;
+        } else if (payload_and_transport == (TRANSPORT_ACL | PAYLOAD_EDR_2) || payload_and_transport == (TRANSPORT_ACL | PAYLOAD_EDR_3)) {
+            proto_tree_add_item(header_tree, hf_packet_header_type_acl_edr, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+
+            packet_type = (tvb_get_guint8(tvb, offset) >> 3) & 0xF;
+            packet_type_str = val_to_str_const(packet_type, packet_type_acl_edr_vals, "Unknown");
+            packet_type_table = packet_type_acl_edr_table;
+        } else if (payload_and_transport == (TRANSPORT_CSB | PAYLOAD_BR)) {
+            proto_tree_add_item(header_tree, hf_packet_header_type_csb_br, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+
+            packet_type = (tvb_get_guint8(tvb, offset) >> 3) & 0xF;
+            packet_type_str = val_to_str_const(packet_type, packet_type_csb_br_vals, "Unknown");
+            packet_type_table = packet_type_csb_br_table;
+        } else if (payload_and_transport == (TRANSPORT_CSB | PAYLOAD_EDR_2) || payload_and_transport == (TRANSPORT_ACL | PAYLOAD_EDR_3)) {
+            proto_tree_add_item(header_tree, hf_packet_header_type_csb_edr, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+
+            packet_type = (tvb_get_guint8(tvb, offset) >> 3) & 0xF;
+            packet_type_str = val_to_str_const(packet_type, packet_type_csb_edr_vals, "Unknown");
+            packet_type_table = packet_type_csb_edr_table;
+        } else if ((payload_and_transport >> 4) == TRANSPORT_ANY) {
+            proto_tree_add_item(header_tree, hf_packet_header_type_any, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+
+            packet_type = (tvb_get_guint8(tvb, offset) >> 3) & 0xF;
             packet_type_str = val_to_str_const(packet_type, packet_type_any_vals, "Unknown");
         } else {
             proto_tree_add_item(header_tree, hf_packet_header_type, tvb, offset, 4, ENC_LITTLE_ENDIAN);
@@ -505,12 +607,14 @@ dissect_btbredr_rf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
         proto_tree_add_item(header_tree, hf_packet_header_acknowledge_indication, tvb, offset, 4, ENC_LITTLE_ENDIAN);
         proto_tree_add_item(header_tree, hf_packet_header_sequence_number, tvb, offset, 4, ENC_LITTLE_ENDIAN);
         hec_item = proto_tree_add_item(header_tree, hf_packet_header_header_error_check, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(header_tree, hf_packet_header_reserved, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     }
 
-    if ((flags & FLAGS_REFERENCE_UPPER_ADDRES_PART_VALID) &&
-            (flags & FLAGS_PACKET_HEADER_AND_BR_EDR_PAYLOAD_DEWHITENED) &&
-            !check_hec(tvb_get_guint8(tvb, offset - 1), tvb_get_guint32(tvb, offset, ENC_LITTLE_ENDIAN))) {
+    if (header_mode < 0) {
         expert_add_info(pinfo, hec_item, &ei_incorrect_packet_header_or_hec);
+    }
+    if (header_mode == 2) {
+        expert_add_info(pinfo, header_item, &ei_broken_packet_header_format);
     }
     if (!((flags & FLAGS_REFERENCE_UPPER_ADDRES_PART_VALID) &&
             (flags & FLAGS_PACKET_HEADER_AND_BR_EDR_PAYLOAD_DEWHITENED))) {
@@ -693,77 +797,147 @@ proto_register_btbredr_rf(void)
             FT_UINT32, BASE_HEX, NULL, 0x00,
             NULL, HFILL }
         },
+        {  &hf_packet_header_lt_addr,
+            { "LT_ADDR",                                        "btbredr_rf.packet_header.lt_addr",
+            FT_UINT32, BASE_HEX, NULL, 0x00000007,
+            NULL, HFILL }
+        },
+        {  &hf_packet_header_type,
+            { "Type",                                           "btbredr_rf.packet_header.type",
+            FT_UINT32, BASE_HEX, NULL, 0x00000078,
+            NULL, HFILL }
+        },
+        {  &hf_packet_header_type_any,
+            { "Type",                                           "btbredr_rf.packet_header.type",
+            FT_UINT32, BASE_HEX, VALS(packet_type_any_vals), 0x00000078,
+            NULL, HFILL }
+        },
+        {  &hf_packet_header_type_sco_br,
+            { "Type",                                           "btbredr_rf.packet_header.type",
+            FT_UINT32, BASE_HEX, VALS(packet_type_sco_br_vals), 0x00000078,
+            NULL, HFILL }
+        },
+        {  &hf_packet_header_type_esco_br,
+            { "Type",                                           "btbredr_rf.packet_header.type",
+            FT_UINT32, BASE_HEX, VALS(packet_type_esco_br_vals), 0x00000078,
+            NULL, HFILL }
+        },
+        {  &hf_packet_header_type_esco_edr,
+            { "Type",                                           "btbredr_rf.packet_header.type",
+            FT_UINT32, BASE_HEX, VALS(packet_type_esco_edr_vals), 0x00000078,
+            NULL, HFILL }
+        },
+        {  &hf_packet_header_type_acl_br,
+            { "Type",                                           "btbredr_rf.packet_header.type",
+            FT_UINT32, BASE_HEX, VALS(packet_type_acl_br_vals), 0x00000078,
+            NULL, HFILL }
+        },
+        {  &hf_packet_header_type_acl_edr,
+            { "Type",                                           "btbredr_rf.packet_header.type",
+            FT_UINT32, BASE_HEX, VALS(packet_type_acl_edr_vals), 0x00000078,
+            NULL, HFILL }
+        },
+        {  &hf_packet_header_type_csb_br,
+            { "Type",                                           "btbredr_rf.packet_header.type",
+            FT_UINT32, BASE_HEX, VALS(packet_type_csb_br_vals), 0x00000078,
+            NULL, HFILL }
+        },
+        {  &hf_packet_header_type_csb_edr,
+            { "Type",                                           "btbredr_rf.packet_header.type",
+            FT_UINT32, BASE_HEX, VALS(packet_type_csb_edr_vals), 0x00000078,
+            NULL, HFILL }
+        },
+        {  &hf_packet_header_flow_control,
+            { "Flow Control",                                   "btbredr_rf.packet_header.flow_control",
+            FT_BOOLEAN, 32, NULL, 0x00000080,
+            NULL, HFILL }
+        },
+        {  &hf_packet_header_acknowledge_indication,
+            { "ARQN",                                           "btbredr_rf.packet_header.arqn",
+            FT_BOOLEAN, 32, NULL, 0x00000100,
+            "Acknowledge Indication", HFILL }
+        },
+        {  &hf_packet_header_sequence_number,
+            { "SEQN",                                           "btbredr_rf.packet_header.seqn",
+            FT_BOOLEAN, 32, NULL, 0x00000200,
+            "Sequence Number", HFILL }
+        },
+        {  &hf_packet_header_header_error_check,
+            { "HEC",                                            "btbredr_rf.packet_header.hec",
+            FT_UINT32, BASE_HEX, NULL, 0x0003FC00,
+            "Header Error Check", HFILL }
+        },
         {  &hf_packet_header_reserved,
             { "Reserved",                                       "btbredr_rf.packet_header.reserved",
             FT_UINT32, BASE_HEX, NULL, 0xFFFC0000,
             NULL, HFILL }
         },
-        {  &hf_packet_header_lt_addr,
+        {  &hf_packet_header_broken_lt_addr,
             { "LT_ADDR",                                        "btbredr_rf.packet_header.lt_addr",
             FT_UINT32, BASE_HEX, NULL, 0x00038000,
             NULL, HFILL }
         },
-        {  &hf_packet_header_type,
+        {  &hf_packet_header_broken_type,
             { "Type",                                           "btbredr_rf.packet_header.type",
             FT_UINT32, BASE_HEX, NULL, 0x00007800,
             NULL, HFILL }
         },
-        {  &hf_packet_header_type_any,
+        {  &hf_packet_header_broken_type_any,
             { "Type",                                           "btbredr_rf.packet_header.type",
             FT_UINT32, BASE_HEX, VALS(packet_type_any_vals), 0x00007800,
             NULL, HFILL }
         },
-        {  &hf_packet_header_type_sco_br,
+        {  &hf_packet_header_broken_type_sco_br,
             { "Type",                                           "btbredr_rf.packet_header.type",
             FT_UINT32, BASE_HEX, VALS(packet_type_sco_br_vals), 0x00007800,
             NULL, HFILL }
         },
-        {  &hf_packet_header_type_esco_br,
+        {  &hf_packet_header_broken_type_esco_br,
             { "Type",                                           "btbredr_rf.packet_header.type",
             FT_UINT32, BASE_HEX, VALS(packet_type_esco_br_vals), 0x00007800,
             NULL, HFILL }
         },
-        {  &hf_packet_header_type_esco_edr,
+        {  &hf_packet_header_broken_type_esco_edr,
             { "Type",                                           "btbredr_rf.packet_header.type",
             FT_UINT32, BASE_HEX, VALS(packet_type_esco_edr_vals), 0x00007800,
             NULL, HFILL }
         },
-        {  &hf_packet_header_type_acl_br,
+        {  &hf_packet_header_broken_type_acl_br,
             { "Type",                                           "btbredr_rf.packet_header.type",
             FT_UINT32, BASE_HEX, VALS(packet_type_acl_br_vals), 0x00007800,
             NULL, HFILL }
         },
-        {  &hf_packet_header_type_acl_edr,
+        {  &hf_packet_header_broken_type_acl_edr,
             { "Type",                                           "btbredr_rf.packet_header.type",
             FT_UINT32, BASE_HEX, VALS(packet_type_acl_edr_vals), 0x00007800,
             NULL, HFILL }
         },
-        {  &hf_packet_header_type_csb_br,
+        {  &hf_packet_header_broken_type_csb_br,
             { "Type",                                           "btbredr_rf.packet_header.type",
             FT_UINT32, BASE_HEX, VALS(packet_type_csb_br_vals), 0x00007800,
             NULL, HFILL }
         },
-        {  &hf_packet_header_type_csb_edr,
+        {  &hf_packet_header_broken_type_csb_edr,
             { "Type",                                           "btbredr_rf.packet_header.type",
             FT_UINT32, BASE_HEX, VALS(packet_type_csb_edr_vals), 0x00007800,
             NULL, HFILL }
         },
-        {  &hf_packet_header_flow_control,
+        {  &hf_packet_header_broken_flow_control,
             { "Flow Control",                                   "btbredr_rf.packet_header.flow_control",
             FT_BOOLEAN, 32, NULL, 0x00000400,
             NULL, HFILL }
         },
-        {  &hf_packet_header_acknowledge_indication,
+        {  &hf_packet_header_broken_acknowledge_indication,
             { "ARQN",                                           "btbredr_rf.packet_header.arqn",
             FT_BOOLEAN, 32, NULL, 0x00000200,
             "Acknowledge Indication", HFILL }
         },
-        {  &hf_packet_header_sequence_number,
+        {  &hf_packet_header_broken_sequence_number,
             { "SEQN",                                           "btbredr_rf.packet_header.seqn",
             FT_BOOLEAN, 32, NULL, 0x00000100,
             "Sequence Number", HFILL }
         },
-        {  &hf_packet_header_header_error_check,
+        {  &hf_packet_header_broken_header_error_check,
             { "HEC",                                            "btbredr_rf.packet_header.hec",
             FT_UINT32, BASE_HEX, NULL, 0x000000FF,
             "Header Error Check", HFILL }
@@ -878,6 +1052,7 @@ proto_register_btbredr_rf(void)
         { &ei_reserved_not_zero,                  { "btbredr_rf.reserved_not_zero",                  PI_PROTOCOL, PI_WARN, "Reserved values are not zeros", EXPFILL }},
         { &ei_incorrect_packet_header_or_hec,     { "btbredr_rf.incorrect_packet_header_or_hec",     PI_PROTOCOL, PI_WARN, "Incorrect Packet Header or HEC", EXPFILL }},
         { &ei_packet_header_with_hec_not_checked, { "btbredr_rf.packet_header_with_hec_not_checked", PI_PROTOCOL, PI_NOTE, "Packet Header with HEC is not checked", EXPFILL }},
+        { &ei_broken_packet_header_format,        { "btbredr_rf.broken_packet_header_format",        PI_PROTOCOL, PI_WARN, "Broken Packet Header Format", EXPFILL }},
     };
 
     proto_btbredr_rf = proto_register_protocol("Bluetooth Pseudoheader for BR/EDR", "BT BR/EDR RF", "btbredr_rf");
