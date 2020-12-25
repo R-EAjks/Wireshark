@@ -285,23 +285,8 @@ static const value_string pn_dcp_suboption_device[] = {
     { 0, NULL }
 };
 
-static const true_false_string pn_dcp_rsi_properties_value_bit0[] =
-    {{ "IP stack available", "IP stack not available" }};
-
-static const true_false_string pn_dcp_rsi_properties_value_bit1[] =
-    {{ "CLRPC Interface available", "CLRPC Interface not available" }};
-
-static const true_false_string pn_dcp_rsi_properties_value_bit2[] =
-    {{ "RSI AR Interface available", "RSI AR Interface not available" }};
-
-static const true_false_string pn_dcp_rsi_properties_value_bit3[] =
-    {{ "RSI AR Read Implicit Interface available", "RSI AR Read Implicit Interface not available" }};
-
-static const true_false_string pn_dcp_rsi_properties_value_bit4[] =
-    {{ "RSI CIM Interface available", "RSI CIM Interface not available" }};
-
-static const true_false_string pn_dcp_rsi_properties_value_bit5[] =
-    {{ "RSI CIM Read Implicit Interface available", "RSI CIM Read Implicit Interface not available" }};
+static const true_false_string pn_dcp_rsi_properties_value_bit[] =
+    { { "Available", "Not available" } };
 
 #define PNDCP_SUBOPTION_DHCP_CLIENT_ID  61
 #define PNDCP_SUBOPTION_DHCP_CONTROL_FOR_ADDRESS_RES  255
@@ -638,7 +623,6 @@ dissect_PNDCP_Suboption_Device(tvbuff_t *tvb, int offset, packet_info *pinfo,
     proto_tree *sub_tree;
     guint8    instance_id_high;
     guint8    instance_id_low;
-    guint16   rsi_properties_value;
     conversation_t    *conversation;
     stationInfo       *station_info;
 
@@ -932,15 +916,18 @@ dissect_PNDCP_Suboption_Device(tvbuff_t *tvb, int offset, packet_info *pinfo,
         sub_item = proto_tree_add_item(tree, hf_pn_dcp_rsi_properties_value, tvb, offset, 2, ENC_BIG_ENDIAN);
         sub_tree = proto_item_add_subtree(sub_item, ett_pn_dcp_rsi_properties_value);
 
-        rsi_properties_value = tvb_get_guint16(tvb, offset, ENC_BIG_ENDIAN);
+        static int* const flags[] = {
+            &hf_pn_dcp_rsi_properties_value_bit0,
+            &hf_pn_dcp_rsi_properties_value_bit1,
+            &hf_pn_dcp_rsi_properties_value_bit2,
+            &hf_pn_dcp_rsi_properties_value_bit3,
+            &hf_pn_dcp_rsi_properties_value_bit4,
+            &hf_pn_dcp_rsi_properties_value_bit5,
+            &hf_pn_dcp_rsi_properties_value_otherbits,
+            NULL
+        };
 
-        proto_tree_add_boolean(sub_tree, hf_pn_dcp_rsi_properties_value_bit0, tvb, offset, 2, rsi_properties_value);
-        proto_tree_add_boolean(sub_tree, hf_pn_dcp_rsi_properties_value_bit1, tvb, offset, 2, rsi_properties_value);
-        proto_tree_add_boolean(sub_tree, hf_pn_dcp_rsi_properties_value_bit2, tvb, offset, 2, rsi_properties_value);
-        proto_tree_add_boolean(sub_tree, hf_pn_dcp_rsi_properties_value_bit3, tvb, offset, 2, rsi_properties_value);
-        proto_tree_add_boolean(sub_tree, hf_pn_dcp_rsi_properties_value_bit4, tvb, offset, 2, rsi_properties_value);
-        proto_tree_add_boolean(sub_tree, hf_pn_dcp_rsi_properties_value_bit5, tvb, offset, 2, rsi_properties_value);
-        proto_tree_add_uint(sub_tree, hf_pn_dcp_rsi_properties_value_otherbits, tvb, offset, 2, rsi_properties_value);
+        proto_tree_add_bitmask(sub_tree, tvb, offset, hf_pn_dcp_rsi_properties_value, ett_pn_dcp_rsi_properties_value, flags, ENC_BIG_ENDIAN);
 
         offset = offset + 2;
 
@@ -1638,37 +1625,37 @@ proto_register_pn_dcp (void)
             NULL, HFILL } },
 
         { &hf_pn_dcp_rsi_properties_value_bit0,
-          { "RsiPropertiesValue.Bit0", "pn_dcp.suboption_device_rsi_properties_value.bit0",
-            FT_BOOLEAN, 16, TFS(pn_dcp_rsi_properties_value_bit0), 0x0001,
+          { "IP Stack", "pn_dcp.suboption_device_rsi_properties_value.bit0",
+            FT_BOOLEAN, 16, TFS(pn_dcp_rsi_properties_value_bit), 0x0001,
             NULL, HFILL } },
 
         { &hf_pn_dcp_rsi_properties_value_bit1,
-          { "RsiPropertiesValue.Bit1", "pn_dcp.suboption_device_rsi_properties_value.bit1",
-            FT_BOOLEAN, 16, TFS(pn_dcp_rsi_properties_value_bit1), 0x0002,
+          { "CLRPC Interface", "pn_dcp.suboption_device_rsi_properties_value.bit1",
+            FT_BOOLEAN, 16, TFS(pn_dcp_rsi_properties_value_bit), 0x0002,
             NULL, HFILL } },
 
         { &hf_pn_dcp_rsi_properties_value_bit2,
-          { "RsiPropertiesValue.Bit2", "pn_dcp.suboption_device_rsi_properties_value.bit2",
-            FT_BOOLEAN, 16, TFS(pn_dcp_rsi_properties_value_bit2), 0x0004,
+          { "RSI AR Interface", "pn_dcp.suboption_device_rsi_properties_value.bit2",
+            FT_BOOLEAN, 16, TFS(pn_dcp_rsi_properties_value_bit), 0x0004,
             NULL, HFILL } },
 
         { &hf_pn_dcp_rsi_properties_value_bit3,
-          { "RsiPropertiesValue.Bit3", "pn_dcp.suboption_device_rsi_properties_value.bit3",
-            FT_BOOLEAN, 16, TFS(pn_dcp_rsi_properties_value_bit3), 0x0008,
+          { "RSI AR Read Implicit Interface", "pn_dcp.suboption_device_rsi_properties_value.bit3",
+            FT_BOOLEAN, 16, TFS(pn_dcp_rsi_properties_value_bit), 0x0008,
             NULL, HFILL } },
 
         { &hf_pn_dcp_rsi_properties_value_bit4,
-          { "RsiPropertiesValue.Bit4", "pn_dcp.suboption_device_rsi_properties_value.bit4",
-            FT_BOOLEAN, 16, TFS(pn_dcp_rsi_properties_value_bit4), 0x0010,
+          { "RSI CIM Interface", "pn_dcp.suboption_device_rsi_properties_value.bit4",
+            FT_BOOLEAN, 16, TFS(pn_dcp_rsi_properties_value_bit), 0x0010,
             NULL, HFILL } },
 
         { &hf_pn_dcp_rsi_properties_value_bit5,
-          { "RsiPropertiesValue.Bit5", "pn_dcp.suboption_device_rsi_properties_value.bit5",
-            FT_BOOLEAN, 16, TFS(pn_dcp_rsi_properties_value_bit5), 0x0020,
+          { "RSI CIM Read Implicit Interface", "pn_dcp.suboption_device_rsi_properties_value.bit5",
+            FT_BOOLEAN, 16, TFS(pn_dcp_rsi_properties_value_bit), 0x0020,
             NULL, HFILL } },
 
         { &hf_pn_dcp_rsi_properties_value_otherbits,
-          { "RsiPropertiesValue.Bit6-15", "pn_dcp.suboption_device_rsi_properties_value_otherbits",
+          { "RsiPropertiesValue.Bit6-15", "pn_dcp.suboption_device_rsi_properties_value.otherbits",
             FT_UINT16, BASE_HEX, NULL, 0xFFC0,
             NULL, HFILL } },
 
