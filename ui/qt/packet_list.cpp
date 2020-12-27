@@ -53,6 +53,7 @@
 #include <ui/qt/widgets/drag_label.h>
 #include <ui/qt/filter_action.h>
 #include <ui/qt/decode_as_dialog.h>
+#include <ui/qt/main_window.h>
 
 #include <QAction>
 #include <QActionGroup>
@@ -643,6 +644,47 @@ void PacketList::contextMenuEvent(QContextMenuEvent *event)
     ctx_menu->addAction(window()->findChild<QAction *>("actionEditPacketComment"));
 
     ctx_menu->addSeparator();
+
+    // Code for custom right-click menus from Lua's register_packet_menu()
+    GPtrArray *packet_data = NULL;
+    GHashTable *packet_fields_lookup = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+    if (cap_file_ && cap_file_->edt && cap_file_->edt->tree) {
+        packet_data = proto_all_finfos(cap_file_->edt->tree);
+
+        for (guint i = packet_data->len - 1; i > 0 ; i --) {
+            field_info *fi = (field_info *)g_ptr_array_index (packet_data, i);
+            header_field_info *hfinfo = fi->hfinfo;
+            g_hash_table_add(packet_fields_lookup, g_strdup(hfinfo->abbrev));
+        }
+    }
+
+    // The FunnelStatistics object is needed to connect the GUI menu to the FunnelAction
+    MainWindow *main_window = qobject_cast<MainWindow *>(wsApp->mainWindow());
+    if (main_window){
+        wsApp->connectPacketMenuActions(main_window->getFunnelStatistics());
+
+        QList<QAction *> myPacketMenuActions = wsApp->getPacketMenuActions();
+        for( int i=0; i<myPacketMenuActions.count(); ++i )
+        {
+            FunnelAction* packetAction = dynamic_cast<FunnelAction *>(myPacketMenuActions[i]);
+            bool missing_required_field = false;
+
+            for (gchar **required_field = packetAction->getPacketRequiredFields(); *required_field ; required_field++) {
+                if (!g_hash_table_contains(packet_fields_lookup, *required_field) ){
+                    missing_required_field = true;
+                    break;
+                }
+            }
+
+            if (missing_required_field){
+                continue;
+            }
+
+            packetAction->setPacketData(packet_data);
+            ctx_menu->addAction(packetAction);
+        }
+    }
+    g_hash_table_destroy(packet_fields_lookup);
 
     ctx_menu->addAction(window()->findChild<QAction *>("actionViewEditResolvedName"));
     ctx_menu->addSeparator();

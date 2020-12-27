@@ -55,48 +55,74 @@ static void progress_window_update(struct progdlg *progress_dialog, float percen
 static void progress_window_destroy(struct progdlg *progress_dialog);
 }
 
-class FunnelAction : public QAction
-{
-public:
-    FunnelAction(QString title, funnel_menu_callback callback, gpointer callback_data, gboolean retap, QObject *parent = nullptr) :
+FunnelAction::FunnelAction(QString title, funnel_menu_callback callback, gpointer callback_data, gboolean retap, QObject *parent = nullptr) :
         QAction(parent),
         title_(title),
         callback_(callback),
         callback_data_(callback_data),
         retap_(retap)
-    {
-        // Use "&&" to get a real ampersand in the menu item.
-        title.replace('&', "&&");
+{
+    // Use "&&" to get a real ampersand in the menu item.
+    title.replace('&', "&&");
 
-        setText(title);
-        setObjectName(FunnelStatistics::actionName());
+    setText(title);
+    setObjectName(FunnelStatistics::actionName());
+    packet_required_fields = NULL;
+}
+
+FunnelAction::~FunnelAction(){
+    if (packet_required_fields != NULL){
+        g_strfreev(packet_required_fields);
+        packet_required_fields = NULL;
     }
+}
 
-    funnel_menu_callback callback() const {
-        return callback_;
+funnel_menu_callback FunnelAction::callback() {
+    return callback_;
+}
+
+QString FunnelAction::title() const {
+    return title_;
+}
+
+void FunnelAction::triggerCallback() {
+    if (callback_) {
+        callback_(callback_data_);
     }
+}
 
-    QString title() const {
-        return title_;
+void FunnelAction::setPacketCallback(funnel_packet_menu_callback packet_callback){
+    packet_callback_ = packet_callback;
+}
+
+void FunnelAction::setPacketRequiredFields(const char *required_fields_str){
+    if (packet_required_fields != NULL){
+        g_strfreev(packet_required_fields);
+        packet_required_fields = NULL;
     }
+    packet_required_fields = g_strsplit(required_fields_str, ",", -1);
+}
 
-    void triggerCallback() {
-        if (callback_) {
-            callback_(callback_data_);
-        }
+gchar ** FunnelAction::getPacketRequiredFields(){
+    return packet_required_fields;
+}
+
+
+void FunnelAction::setPacketData(GPtrArray* finfos){
+    packet_data_ = finfos;
+}
+
+void FunnelAction::triggerPacketCallback(){
+    if (packet_callback_) {
+        packet_callback_(callback_data_, packet_data_);
     }
+}
 
-    bool retap() {
-        if (retap_) return true;
-        return false;
-    }
+bool FunnelAction::retap() {
+    if (retap_) return true;
+    return false;
+}
 
-private:
-    QString title_;
-    funnel_menu_callback callback_;
-    gpointer callback_data_;
-    gboolean retap_;
-};
 
 static QHash<int, QList<FunnelAction *> > funnel_actions_;
 const QString FunnelStatistics::action_name_ = "FunnelStatisticsAction";
@@ -214,6 +240,12 @@ void FunnelStatistics::displayFilterTextChanged(const QString &filter)
     display_filter_ = filter.toUtf8();
 }
 
+void FunnelStatistics::funnelActionTriggeredPacketData()
+{
+    FunnelAction *funnel_action = dynamic_cast<FunnelAction *>(sender());
+    if (!funnel_action) return;
+    funnel_action->triggerPacketCallback();
+}
 
 /* The GTK+ code says "finish this." We shall follow its lead */
 // XXX Finish this.
@@ -330,6 +362,21 @@ static void register_menu_cb(const char *name,
     funnel_actions_[group] << funnel_action;
 }
 
+/*
+ * Callback used to register packet menus in the GUI.
+ */
+static void register_packet_menu_cb(const char *name,
+                             const char *required_fields,
+                             funnel_packet_menu_callback callback,
+                             gpointer callback_data,
+                             gboolean retap)
+{
+    FunnelAction *funnel_action = new FunnelAction(name, NULL, callback_data, retap, wsApp);
+    funnel_action->setPacketRequiredFields(required_fields);
+    funnel_action->setPacketCallback(callback);
+    wsApp->appendPacketMenu(funnel_action);
+}
+
 static void deregister_menu_cb(funnel_menu_callback callback)
 {
     foreach (int group, funnel_actions_.keys()) {
@@ -353,6 +400,7 @@ register_tap_listener_qt_funnel(void)
 {
     funnel_register_all_menus(register_menu_cb);
     menus_registered = TRUE;
+    funnel_register_all_packet_menus(register_packet_menu_cb);
 }
 
 void

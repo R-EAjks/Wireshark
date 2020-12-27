@@ -11,6 +11,7 @@
 #define FUNNELSTATISTICS_H
 
 #include <QObject>
+#include <QAction>
 
 #include "capture_file.h"
 #include "funnel_text_dialog.h"
@@ -19,6 +20,8 @@
 struct _funnel_ops_t;
 struct _funnel_progress_window_t;
 struct progdlg;
+
+typedef void (* funnel_packet_menu_callback)(gpointer, GPtrArray*);
 
 class FunnelStatistics : public QObject
 {
@@ -42,6 +45,7 @@ signals:
 
 public slots:
     void funnelActionTriggered();
+    void funnelActionTriggeredPacketData();
     void displayFilterTextChanged(const QString &filter);
 
 private:
@@ -52,6 +56,31 @@ private:
     CaptureFile &capture_file_;
     QByteArray display_filter_;
     QString prepared_filter_;
+};
+
+class FunnelAction : public QAction
+{
+public:
+    FunnelAction(QString title, funnel_menu_callback callback, gpointer callback_data, gboolean retap, QObject *parent);
+    ~FunnelAction();
+    funnel_menu_callback callback();
+    QString title() const;
+    void triggerCallback();
+    void triggerPacketCallback();
+    void setPacketCallback(funnel_packet_menu_callback packet_callback);
+    void setPacketData(GPtrArray* finfos);
+    void setPacketRequiredFields(const char *required_fields_str);
+    gchar** getPacketRequiredFields();
+    bool retap();
+
+private:
+    QString title_;
+    funnel_menu_callback callback_;
+    gpointer callback_data_;
+    gboolean retap_;
+    funnel_packet_menu_callback packet_callback_;
+    GPtrArray* packet_data_;
+    gchar **packet_required_fields;
 };
 
 extern "C" {

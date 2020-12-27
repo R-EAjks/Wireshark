@@ -2989,6 +2989,11 @@ frame_data * MainWindow::frameDataForRow(int row) const
     return Q_NULLPTR;
 }
 
+FunnelStatistics *MainWindow::getFunnelStatistics()
+{
+    return funnel_statistics_;
+}
+
 /*
  * Editor modelines
  *

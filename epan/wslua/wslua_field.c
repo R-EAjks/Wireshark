@@ -186,7 +186,7 @@ WSLUA_METAMETHOD FieldInfo__call(lua_State* L) {
             {
                 ByteArray ba = g_byte_array_new();
                 tvbuff_t* tvb = (tvbuff_t *) fvalue_get(&fi->ws_fi->value);
-                g_byte_array_append(ba, (const guint8 *)tvb_memdup(wmem_packet_scope(), tvb, 0,
+                g_byte_array_append(ba, (const guint8 *)tvb_memdup(wmem_file_scope(), tvb, 0,
                                             tvb_captured_length(tvb)), tvb_captured_length(tvb));
                 pushByteArray(L,ba);
                 return 1;
