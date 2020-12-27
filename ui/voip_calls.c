@@ -326,7 +326,7 @@ add_to_graph(voip_calls_tapinfo_t *tapinfo, packet_info *pinfo, epan_dissect_t *
         return;
     }
 
-    gai = (seq_analysis_item_t *)g_malloc0(sizeof(seq_analysis_item_t));
+    gai = g_new0(seq_analysis_item_t, 1);
     gai->frame_number = pinfo->num;
     copy_address(&(gai->src_addr),src_addr);
     copy_address(&(gai->dst_addr),dst_addr);
@@ -446,7 +446,7 @@ static void insert_to_graph_t38(voip_calls_tapinfo_t *tapinfo, packet_info *pinf
     gboolean  inserted;
     gchar     time_str[COL_MAX_LEN];
 
-    new_gai = (seq_analysis_item_t *)g_malloc0(sizeof(seq_analysis_item_t));
+    new_gai = g_new0(seq_analysis_item_t, 1);
     new_gai->frame_number = frame_num;
     copy_address(&(new_gai->src_addr),src_addr);
     copy_address(&(new_gai->dst_addr),dst_addr);
@@ -731,7 +731,7 @@ rtp_draw(void *tap_offset_ptr)
                         (rtp_listinfo->is_srtp)?"SRTP":"RTP", rtp_listinfo->packet_count,
                         duration/1000,(duration%1000), rtp_listinfo->id.ssrc);
             } else {
-                new_gai = (seq_analysis_item_t *)g_malloc0(sizeof(seq_analysis_item_t));
+                new_gai = g_new0(seq_analysis_item_t, 1);
                 new_gai->frame_number = rtp_listinfo->start_fd->num;
                 copy_address(&(new_gai->src_addr),&(rtp_listinfo->id.src_addr));
                 copy_address(&(new_gai->dst_addr),&(rtp_listinfo->id.dst_addr));
@@ -816,7 +816,7 @@ rtp_packet_draw(void *tap_offset_ptr)
 
                     /* add the RTP item to the graph if was not there*/
                     if (rtp_listinfo->start_fd->num<gai->frame_number || !voip_calls_graph_list) {
-                        new_gai = g_malloc0(sizeof(seq_analysis_item_t));
+                        new_gai = g_new0(seq_analysis_item_t, 1);
                         new_gai->frame_number = rtp_listinfo->start_fd->num;
                         copy_address(&(new_gai->src_addr),&(rtp_listinfo->src_addr));
                         copy_address(&(new_gai->dst_addr),&(rtp_listinfo->dst_addr));
@@ -940,7 +940,7 @@ t38_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *edt, const 
 
         /* not in the list? then create a new entry */
         if (callsinfo==NULL) {
-            callsinfo = (voip_calls_info_t *)g_malloc0(sizeof(voip_calls_info_t));
+            callsinfo = g_new0(voip_calls_info_t, 1);
             callsinfo->call_active_state = VOIP_ACTIVE;
             callsinfo->call_state = VOIP_UNKNOWN;
             callsinfo->from_identity=g_strdup("T38 Media only");
@@ -1135,7 +1135,7 @@ sip_calls_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *edt ,
         if (tapinfo->fs_option == FLOW_ALL ||
                 (tapinfo->fs_option == FLOW_ONLY_INVITES &&
                  strcmp(pi->request_method,"INVITE")==0)) {
-            callsinfo = (voip_calls_info_t *)g_malloc0(sizeof(voip_calls_info_t));
+            callsinfo = g_new0(voip_calls_info_t, 1);
             callsinfo->call_active_state = VOIP_ACTIVE;
             callsinfo->call_state = VOIP_CALL_SETUP;
             callsinfo->from_identity=g_strdup(pi->tap_from_addr);
@@ -1144,7 +1144,7 @@ sip_calls_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *edt ,
             callsinfo->start_fd=pinfo->fd;
             callsinfo->start_rel_ts=pinfo->rel_ts;
             callsinfo->protocol=VOIP_SIP;
-            callsinfo->prot_info=g_malloc(sizeof(sip_calls_info_t));
+            callsinfo->prot_info=g_new(sip_calls_info_t, 1);
             callsinfo->free_prot_info = free_sip_info;
             callsinfo->call_id = g_strdup(pi->tap_call_id);
             tmp_sipinfo = (sip_calls_info_t *)callsinfo->prot_info;
@@ -1373,7 +1373,7 @@ isup_calls_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *edt,
        -i.e. if this session is a call*/
 
     if ((callsinfo==NULL) &&(pi->message_type==1)) {
-        callsinfo = (voip_calls_info_t *)g_malloc0(sizeof(voip_calls_info_t));
+        callsinfo = g_new0(voip_calls_info_t, 1);
         callsinfo->call_active_state = VOIP_ACTIVE;
         callsinfo->call_state = VOIP_UNKNOWN;
         copy_address(&(callsinfo->initial_speaker),&(pinfo->src));
@@ -1382,7 +1382,7 @@ isup_calls_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *edt,
         callsinfo->protocol       = VOIP_ISUP;
         callsinfo->from_identity  = g_strdup(pi->calling_number);
         callsinfo->to_identity    = g_strdup(pi->called_number);
-        callsinfo->prot_info      = g_malloc(sizeof(isup_calls_info_t));
+        callsinfo->prot_info      = g_new(isup_calls_info_t, 1);
         callsinfo->free_prot_info = g_free;
         tmp_isupinfo              = (isup_calls_info_t *)callsinfo->prot_info;
         tmp_isupinfo->opc         = tapinfo->mtp3_opc;
@@ -1789,7 +1789,7 @@ q931_calls_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *edt,
 
         /* if it is a new call, add it to the list */
         if (!callsinfo) {
-            callsinfo = (voip_calls_info_t *)g_malloc0(sizeof(voip_calls_info_t));
+            callsinfo = g_new0(voip_calls_info_t, 1);
             callsinfo->call_active_state = VOIP_ACTIVE;
             callsinfo->call_state = VOIP_CALL_SETUP;
             callsinfo->from_identity=g_strdup(tapinfo->q931_calling_number);
@@ -1798,7 +1798,7 @@ q931_calls_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *edt,
             callsinfo->start_fd=pinfo->fd;
             callsinfo->start_rel_ts=pinfo->rel_ts;
             callsinfo->protocol=VOIP_AC_ISDN;
-            callsinfo->prot_info=g_malloc(sizeof(actrace_isdn_calls_info_t));
+            callsinfo->prot_info=g_new(actrace_isdn_calls_info_t, 1);
             callsinfo->free_prot_info = g_free;
             tmp_actrace_isdn_info=(actrace_isdn_calls_info_t *)callsinfo->prot_info;
             tmp_actrace_isdn_info->crv=tapinfo->q931_crv;
@@ -2007,7 +2007,7 @@ h225_calls_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *edt,
 
     /* not in the list? then create a new entry */
     if (callsinfo==NULL) {
-        callsinfo = (voip_calls_info_t *)g_malloc0(sizeof(voip_calls_info_t));
+        callsinfo = g_new0(voip_calls_info_t, 1);
         callsinfo->call_active_state = VOIP_ACTIVE;
         callsinfo->call_state = VOIP_UNKNOWN;
         callsinfo->from_identity=g_strdup("");
@@ -2016,7 +2016,7 @@ h225_calls_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *edt,
         callsinfo->start_fd=pinfo->fd;
         callsinfo->start_rel_ts=pinfo->rel_ts;
         callsinfo->protocol=VOIP_H323;
-        callsinfo->prot_info=g_malloc(sizeof(h323_calls_info_t));
+        callsinfo->prot_info=g_new(h323_calls_info_t, 1);
         callsinfo->free_prot_info = free_h225_info;
 
         tmp_h323info = (h323_calls_info_t *)callsinfo->prot_info;
@@ -2059,7 +2059,7 @@ h225_calls_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *edt,
 
         /* this is still IPv4 only, because the dissector is */
         if (pi->is_h245 == TRUE) {
-            h245_add = (h245_address_t *)g_malloc(sizeof (h245_address_t));
+            h245_add = g_new(h245_address_t, 1);
             alloc_address_wmem(NULL, &h245_add->h245_address, AT_IPv4, 4, &pi->h245_address);
             h245_add->h245_port = pi->h245_port;
             add_h245_Address(tmp_h323info, h245_add);
@@ -2650,7 +2650,7 @@ mgcp_calls_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *edt,
 
     /* not in the list? then create a new entry */
     if (callsinfo==NULL) {
-        callsinfo = (voip_calls_info_t *)g_malloc0(sizeof(voip_calls_info_t));
+        callsinfo = g_new0(voip_calls_info_t, 1);
         callsinfo->call_active_state = VOIP_ACTIVE;
         callsinfo->call_state = VOIP_CALL_SETUP;
         if (fromEndpoint) {
@@ -2664,7 +2664,7 @@ mgcp_calls_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *edt,
         callsinfo->start_fd=pinfo->fd;
         callsinfo->start_rel_ts=pinfo->rel_ts;
         callsinfo->protocol=VOIP_MGCP;
-        callsinfo->prot_info=g_malloc(sizeof(mgcp_calls_info_t));
+        callsinfo->prot_info=g_new(mgcp_calls_info_t, 1);
         callsinfo->free_prot_info = g_free;
         tmp_mgcpinfo=(mgcp_calls_info_t *)callsinfo->prot_info;
         tmp_mgcpinfo->endpointId = g_strdup(pi->endpointId);
@@ -2863,7 +2863,7 @@ actrace_calls_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *e
 
         /* if it is a new call, add it to the list */
         if (!callsinfo) {
-            callsinfo = (voip_calls_info_t *)g_malloc0(sizeof(voip_calls_info_t));
+            callsinfo = g_new0(voip_calls_info_t, 1);
             callsinfo->call_active_state = VOIP_ACTIVE;
             callsinfo->call_state = VOIP_CALL_SETUP;
             callsinfo->from_identity=g_strdup("N/A");
@@ -2872,7 +2872,7 @@ actrace_calls_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *e
             callsinfo->start_fd=pinfo->fd;
             callsinfo->start_rel_ts=pinfo->rel_ts;
             callsinfo->protocol=VOIP_AC_CAS;
-            callsinfo->prot_info=g_malloc(sizeof(actrace_cas_calls_info_t));
+            callsinfo->prot_info=g_new(actrace_cas_calls_info_t, 1);
             callsinfo->free_prot_info = g_free;
 
             tmp_actrace_cas_info=(actrace_cas_calls_info_t *)callsinfo->prot_info;
@@ -2997,7 +2997,7 @@ h248_calls_packet_common(voip_calls_tapinfo_t *tapinfo, packet_info *pinfo, epan
 
     if (callsinfo==NULL) {
 
-        callsinfo = (voip_calls_info_t *)g_malloc0(sizeof(voip_calls_info_t));
+        callsinfo = g_new0(voip_calls_info_t, 1);
         callsinfo->call_state = VOIP_NO_STATE;
         callsinfo->call_active_state = VOIP_ACTIVE;
         callsinfo->from_identity = g_strdup_printf("%s : %.8x", mgw_addr, cmd->ctx->id);
@@ -3161,7 +3161,7 @@ sccp_calls(voip_calls_tapinfo_t *tapinfo, packet_info *pinfo, epan_dissect_t *ed
     }
 
     if (callsinfo==NULL) {
-        callsinfo = (voip_calls_info_t *)g_malloc0(sizeof(voip_calls_info_t));
+        callsinfo = g_new0(voip_calls_info_t, 1);
         callsinfo->call_state = VOIP_CALL_SETUP;
         callsinfo->call_active_state = VOIP_ACTIVE;
         if ( assoc->calling_party ) {
@@ -3404,7 +3404,7 @@ unistim_calls_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *e
             /* If new add to list */
             if (callsinfo==NULL) {
 
-                callsinfo = (voip_calls_info_t *)g_malloc0(sizeof(voip_calls_info_t));
+                callsinfo = g_new0(voip_calls_info_t, 1);
                 callsinfo->call_active_state = VOIP_ACTIVE;
                 callsinfo->call_state = VOIP_CALL_SETUP;
                 callsinfo->from_identity=g_strdup_printf("%x",pi->termid);
@@ -3418,7 +3418,7 @@ unistim_calls_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *e
                 callsinfo->start_rel_ts=pinfo->rel_ts;
 
                 callsinfo->protocol=VOIP_UNISTIM;
-                callsinfo->prot_info=g_malloc(sizeof(unistim_info_t));
+                callsinfo->prot_info=g_new(unistim_info_t, 1);
 
                 tmp_unistim_info = (unistim_info_t *)callsinfo->prot_info;
 
@@ -3660,7 +3660,7 @@ unistim_calls_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *e
              * ineffective.
              * Sometimes calls start immediately with open stream.
              */
-            callsinfo = (voip_calls_info_t *)g_malloc0(sizeof(voip_calls_info_t));
+            callsinfo = g_new0(voip_calls_info_t, 1);
             callsinfo->call_active_state = VOIP_ACTIVE;
             callsinfo->call_state = VOIP_CALL_SETUP;
             callsinfo->from_identity=g_strdup("UNKNOWN");
@@ -3673,7 +3673,7 @@ unistim_calls_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *e
             callsinfo->start_rel_ts=pinfo->rel_ts;
 
             callsinfo->protocol=VOIP_UNISTIM;
-            callsinfo->prot_info=g_malloc(sizeof(unistim_info_t));
+            callsinfo->prot_info=g_new(unistim_info_t, 1);
 
             tmp_unistim_info = (unistim_info_t *)callsinfo->prot_info;
 
@@ -3893,13 +3893,13 @@ skinny_calls_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *ed
         phone = &(pinfo->src);
 
     if (callsinfo==NULL) {
-        callsinfo = (voip_calls_info_t *)g_malloc0(sizeof(voip_calls_info_t));
+        callsinfo = g_new0(voip_calls_info_t, 1);
         callsinfo->call_state = VOIP_NO_STATE;
         callsinfo->call_active_state = VOIP_ACTIVE;
         /* callsinfo->from_identity = g_strdup_printf("%s : %.8x", "Skinny", 1); */
         callsinfo->from_identity = g_strdup("");
         callsinfo->to_identity = g_strdup("");
-        callsinfo->prot_info = g_malloc(sizeof(skinny_calls_info_t));
+        callsinfo->prot_info = g_new(skinny_calls_info_t, 1);
         callsinfo->free_prot_info = g_free;
         tmp_skinnyinfo = (skinny_calls_info_t *)callsinfo->prot_info;
         tmp_skinnyinfo->callId = si->callId ? si->callId : si->passThroughPartyId;
@@ -4049,10 +4049,10 @@ iax2_calls_packet( void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *edt
         /* We only care about real calls, i.e., no registration stuff */
         if (ii->ftype != AST_FRAME_IAX ||  ii->csub != IAX_COMMAND_NEW)
             return TAP_PACKET_DONT_REDRAW;
-        callsinfo = (voip_calls_info_t *)g_malloc0(sizeof(voip_calls_info_t));
+        callsinfo = g_new0(voip_calls_info_t, 1);
         callsinfo->call_state = VOIP_NO_STATE;
         callsinfo->call_active_state = VOIP_ACTIVE;
-        callsinfo->prot_info=g_malloc(sizeof(iax2_info_t));
+        callsinfo->prot_info=g_new(iax2_info_t, 1);
         callsinfo->free_prot_info = free_iax2_info;
         tmp_iax2info = (iax2_info_t *)callsinfo->prot_info;
 
@@ -4173,7 +4173,7 @@ voip_calls_packet(void *tap_offset_ptr, packet_info *pinfo, epan_dissect_t *edt,
     }
 
     if (callsinfo == NULL) {
-        callsinfo = (voip_calls_info_t *)g_malloc0(sizeof(voip_calls_info_t));
+        callsinfo = g_new0(voip_calls_info_t, 1);
         callsinfo->call_active_state = pi->call_active_state;
         callsinfo->call_state = pi->call_state;
         callsinfo->call_id=g_strdup((pi->call_id)?pi->call_id:"");
