@@ -196,8 +196,11 @@ dissect_sv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* dat
 	guint sv_length = 0;
 	proto_item *item;
 	proto_tree *tree;
-	proto_item *reserve1_item = NULL;
-	proto_tree *reserve1_tree = NULL;
+
+	static int * const reserve1_flags[] = {
+		&hf_sv_reserve1_s_bit,
+		NULL
+	};
 
 	asn1_ctx_t asn1_ctx;
 
@@ -216,12 +219,9 @@ dissect_sv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* dat
 	proto_tree_add_item_ret_uint(tree, hf_sv_length, tvb, offset + 2, 2, ENC_BIG_ENDIAN, &sv_length);
 
 	/* Reserved 1 */
-	reserve1_item = proto_tree_add_item(tree, hf_sv_reserve1, tvb, offset + 4,
-						2, ENC_BIG_ENDIAN);
-	reserve1_tree = proto_item_add_subtree(reserve1_item, ett_reserve1);
-	/* Reserved 1: Individual S (Simulated) bit  */
-	proto_tree_add_item(reserve1_tree, hf_sv_reserve1_s_bit, tvb, offset + 4,
-						2, ENC_BIG_ENDIAN);
+	proto_tree_add_bitmask(tree, tvb, offset + 4, hf_sv_reserve1, ett_reserve1,
+						reserve1_flags, ENC_BIG_ENDIAN);
+
 
 	/* Reserved 2 */
 	proto_tree_add_item(tree, hf_sv_reserve2, tvb, offset + 6, 2, ENC_BIG_ENDIAN);
