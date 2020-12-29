@@ -60,6 +60,7 @@ protected:
 signals:
     void selectRtpStream(rtpstream_id_t *id);
     void deselectRtpStream(rtpstream_id_t *id);
+    void openRtpStreamDialog();
 
 private slots:
     void updateWidgets();
@@ -112,7 +113,6 @@ private:
     void panAxes(int x_pixels, int y_pixels);
     void resetAxes(bool keep_lower = false);
     void goToAdjacentPacket(bool next);
-    RtpStreamDialog *getRtpStreamDialog();
 
     static gboolean addFlowSequenceItem(const void *key, void *value, void *userdata);
 };

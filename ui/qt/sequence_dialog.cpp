@@ -722,24 +722,10 @@ void SequenceDialog::on_actionZoomOut_triggered()
     zoomXAxis(false);
 }
 
-RtpStreamDialog *SequenceDialog::getRtpStreamDialog()
-{
-    if (!rtp_stream_dialog_) {
-       rtp_stream_dialog_ = new RtpStreamDialog(*this, cap_file_);
-       connect(this, SIGNAL(selectRtpStream(rtpstream_id_t *)), rtp_stream_dialog_, SLOT(selectRtpStream(rtpstream_id_t *)));
-       connect(this, SIGNAL(deselectRtpStream(rtpstream_id_t *)), rtp_stream_dialog_, SLOT(deselectRtpStream(rtpstream_id_t *)));
-    }
-
-    return rtp_stream_dialog_;
-}
-
 void SequenceDialog::on_actionSelectRtpStream_triggered()
 {
-    RtpStreamDialog *dialog;
-
     if (current_rtp_sai_ && GA_INFO_TYPE_RTP == current_rtp_sai_->info_type) {
-        dialog = getRtpStreamDialog();
-        dialog->show();
+        emit openRtpStreamDialog();
         emit selectRtpStream((rtpstream_id_t *)current_rtp_sai_->info_ptr);
         raise();
     }
@@ -747,11 +733,8 @@ void SequenceDialog::on_actionSelectRtpStream_triggered()
 
 void SequenceDialog::on_actionDeselectRtpStream_triggered()
 {
-    RtpStreamDialog *dialog;
-
     if (current_rtp_sai_ && GA_INFO_TYPE_RTP == current_rtp_sai_->info_type) {
-        dialog = getRtpStreamDialog();
-        dialog->show();
+        emit openRtpStreamDialog();
         emit deselectRtpStream((rtpstream_id_t *)current_rtp_sai_->info_ptr);
         raise();
     }
