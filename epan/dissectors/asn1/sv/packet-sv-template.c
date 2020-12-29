@@ -257,7 +257,7 @@ void proto_register_sv(void) {
 
 		{ &hf_sv_reserve1_s_bit,
 		{ "Simulated",	"sv.reserve1.s_bit",
-		  FT_BOOLEAN, 16, NULL, F_RESERVE1_S_BIT, "BOOLEAN", HFILL } },
+		  FT_BOOLEAN, 16, NULL, F_RESERVE1_S_BIT, NULL, HFILL } },
 
 		{ &hf_sv_reserve2,
 		{ "Reserved 2",	"sv.reserve2", FT_UINT16, BASE_HEX_DEC, NULL, 0x0, NULL, HFILL }},
