@@ -336,9 +336,10 @@ void proto_reg_handoff_btbredr_rf(void);
 
 static guint8 reverse_bits(guint8 value)
 {
-    return (value & 0x80) >> 7 | (value & 0x40) >> 5 | (value & 0x20) >> 3 |
-            (value & 0x10) >> 1 | (value & 0x08) << 1 | (value & 0x04) << 3 |
-            (value & 0x02) << 5 | (value & 0x01) << 7;
+    value = ((value >> 1) & 0x55) | ((value << 1) & 0xaa);
+    value = ((value >> 2) & 0x33) | ((value << 2) & 0xcc);
+    value = ((value >> 4) & 0x0f) | ((value << 4) & 0xf0);
+    return value;
 }
 
 static gboolean broken_check_hec(guint8 uap, guint32 header)
@@ -369,11 +370,9 @@ static gboolean check_hec(guint8 uap, guint32 header)
 {
     static const guint32 crc_poly_rev_bt_hec = 0xe5;
     header &= 0x3ffff;
-    header ^= uap & 0xff;
-    for (guint i = 0; i < 10; ++i) {
+    header ^= reverse_bits(uap) & 0xff;
+    for (guint i = 0; i < 10; ++i, header >>= 1)
         header ^= (crc_poly_rev_bt_hec << 1) & -(header & 1);
-        header >>= 1;
-    }
     return !header;
 }
 
@@ -392,6 +391,7 @@ dissect_btbredr_rf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
     gint                hf_x;
     gint                header_mode;
     guint16             flags;
+    guint8              uap;
     guint8              payload_and_transport;
     gint16              packet_type = PACKET_TYPE_UNKNOWN;
     const gchar        *packet_type_str = "Unknown";
@@ -468,17 +468,25 @@ dissect_btbredr_rf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
     else
         hf_x = hf_invalid_reference_upper_addres_part;
     proto_tree_add_item(btbredr_rf_tree, hf_x, tvb, offset, 1, ENC_NA);
+    uap = tvb_get_guint8(tvb, offset);
     offset += 1;
 
-    if (!(flags & FLAGS_PACKET_HEADER_AND_BR_EDR_PAYLOAD_DEWHITENED) ||
-            !(flags & FLAGS_REFERENCE_UPPER_ADDRES_PART_VALID))
-        header_mode = -1;
-    else if (check_hec(tvb_get_guint8(tvb, offset - 1), tvb_get_guint32(tvb, offset, ENC_LITTLE_ENDIAN)))
-        header_mode = 1;
-    else if (broken_check_hec(tvb_get_guint8(tvb, offset - 1), tvb_get_guint32(tvb, offset, ENC_LITTLE_ENDIAN)))
-        header_mode = 2;
-    else
-        header_mode = 0;
+    {
+        guint32 hdr = tvb_get_guint32(tvb, offset, ENC_LITTLE_ENDIAN);
+        gboolean have_uap = !!(flags & FLAGS_REFERENCE_UPPER_ADDRES_PART_VALID);
+        gboolean is_fhs = ((hdr >> 3) & 0x0f) == 2;
+        gboolean is_broken_fhs = ((hdr >> 11) & 0x0f) == 2;
+        if (!(flags & FLAGS_PACKET_HEADER_AND_BR_EDR_PAYLOAD_DEWHITENED))
+            header_mode = -1;
+        else if ((have_uap || is_fhs) && check_hec(is_fhs ? 0 : uap, hdr))
+            header_mode = 1;
+        else if ((have_uap || is_broken_fhs) && broken_check_hec(is_broken_fhs ? 0 : uap, hdr))
+            header_mode = 2;
+        else if (!have_uap)
+            header_mode = -1;
+        else
+            header_mode = 0;
+    }
 
     if (!(flags & FLAGS_PACKET_HEADER_AND_BR_EDR_PAYLOAD_DEWHITENED)) {
        proto_tree_add_item(btbredr_rf_tree, hf_whitened_packet_header, tvb, offset, 4, ENC_LITTLE_ENDIAN);
@@ -610,15 +618,21 @@ dissect_btbredr_rf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
         proto_tree_add_item(header_tree, hf_packet_header_reserved, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     }
 
-    if (header_mode < 0) {
-        expert_add_info(pinfo, hec_item, &ei_incorrect_packet_header_or_hec);
-    }
-    if (header_mode == 2) {
-        expert_add_info(pinfo, header_item, &ei_broken_packet_header_format);
-    }
-    if (!((flags & FLAGS_REFERENCE_UPPER_ADDRES_PART_VALID) &&
-            (flags & FLAGS_PACKET_HEADER_AND_BR_EDR_PAYLOAD_DEWHITENED))) {
+    switch (header_mode) {
+    case -1:
         expert_add_info(pinfo, hec_item, &ei_packet_header_with_hec_not_checked);
+        break;
+
+    case 0:
+        expert_add_info(pinfo, hec_item, &ei_incorrect_packet_header_or_hec);
+        break;
+
+    case 2:
+        expert_add_info(pinfo, header_item, &ei_broken_packet_header_format);
+        break;
+
+    default:
+        break;
     }
 
     offset += 4;
