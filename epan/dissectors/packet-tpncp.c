@@ -319,26 +319,23 @@ dissect_tpncp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
                                    ver, encoding);
             }
         }
-    } else  if (try_val_to_str(id, tpncp_commands_id_vals)) {
-        proto_tree_add_uint(tpncp_tree, hf_tpncp_command_id, tvb, 8, 4, id);
-        offset += 12;
-        if (tpncp_commands_info_db[id].size) {
-            command_tree = proto_tree_add_subtree_format(
-                tree, tvb, offset, -1, ett_tpncp_body, NULL,
-                "TPNCP Command: %s (%d)",
-                val_to_str_const(id, tpncp_commands_id_vals, "Unknown"), id);
-            dissect_tpncp_data(id, pinfo, tvb, command_tree, &offset, tpncp_commands_info_db,
-                               ver, encoding);
-        }
-    }
-
-    if (pinfo->srcport == UDP_PORT_TPNCP_TRUNKPACK ||
-        pinfo->srcport == HA_PORT_TPNCP_TRUNKPACK) {
         col_add_fstr(pinfo->cinfo, COL_INFO,
                      "EvID=%s(%d), SeqNo=%d, CID=%d, Len=%d, Ver=%d",
                      val_to_str_const(id, tpncp_events_id_vals, "Unknown"),
                      id, seq_number, cid, fullLength, ver);
     } else {
+        if (try_val_to_str(id, tpncp_commands_id_vals)) {
+            proto_tree_add_uint(tpncp_tree, hf_tpncp_command_id, tvb, 8, 4, id);
+            offset += 12;
+            if (tpncp_commands_info_db[id].size) {
+                command_tree = proto_tree_add_subtree_format(
+                    tree, tvb, offset, -1, ett_tpncp_body, NULL,
+                    "TPNCP Command: %s (%d)",
+                    val_to_str_const(id, tpncp_commands_id_vals, "Unknown"), id);
+                dissect_tpncp_data(id, pinfo, tvb, command_tree, &offset, tpncp_commands_info_db,
+                                   ver, encoding);
+            }
+        }
         col_add_fstr(pinfo->cinfo, COL_INFO,
                      "CmdID=%s(%d), SeqNo=%d, CID=%d, Len=%d, Ver=%d",
                      val_to_str_const(id, tpncp_commands_id_vals, "Unknown"),
