@@ -310,7 +310,7 @@ dissect_tpncp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
             proto_tree_add_uint(tpncp_tree, hf_tpncp_event_id, tvb, 8, 4, id);
             proto_tree_add_int(tpncp_tree, hf_tpncp_cid, tvb, 12, 4, cid);
             offset += 16;
-            if (tpncp_events_info_db[id].size) {
+            if (tpncp_events_info_db[id].size && tvb_reported_length_remaining(tvb, offset) > 0) {
                 event_tree = proto_tree_add_subtree_format(
                     tree, tvb, offset, -1, ett_tpncp_body, NULL,
                     "TPNCP Event: %s (%d)",
@@ -327,7 +327,7 @@ dissect_tpncp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
         if (try_val_to_str(id, tpncp_commands_id_vals)) {
             proto_tree_add_uint(tpncp_tree, hf_tpncp_command_id, tvb, 8, 4, id);
             offset += 12;
-            if (tpncp_commands_info_db[id].size) {
+            if (tpncp_commands_info_db[id].size && tvb_reported_length_remaining(tvb, offset) > 0) {
                 command_tree = proto_tree_add_subtree_format(
                     tree, tvb, offset, -1, ett_tpncp_body, NULL,
                     "TPNCP Command: %s (%d)",
