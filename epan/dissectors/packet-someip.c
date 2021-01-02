@@ -2120,17 +2120,22 @@ dissect_someip_payload_string(tvbuff_t* tvb, packet_info* pinfo, proto_tree *tre
     }
 
     if (strcmp(config->encoding, "utf-8") == 0) {
-        str_encoding = ENC_UTF_8;
+        str_encoding = ENC_UTF_8 | ENC_NA;
     } else if (strcmp(config->encoding, "utf-16") == 0) {
         str_encoding = ENC_UTF_16;
+        if (config->big_endian) {
+            str_encoding |= ENC_BIG_ENDIAN;
+        } else {
+            str_encoding |= ENC_LITTLE_ENDIAN;
+        }
     } else {
-        str_encoding = ENC_ASCII;
+        str_encoding = ENC_ASCII | ENC_NA;
     }
 
     buf = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, length, str_encoding);
 
     /* sanitizing buffer */
-    if (str_encoding == ENC_ASCII || str_encoding == ENC_UTF_8) {
+    if (str_encoding & ENC_ASCII || str_encoding & ENC_UTF_8) {
         for (i = 0; i < length; i++) {
             if (buf[i] > 0x00 && buf[i] < 0x20) {
                 buf[i] = 0x20;
