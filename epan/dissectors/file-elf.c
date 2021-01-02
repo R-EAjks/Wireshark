@@ -512,7 +512,6 @@ static const value_string symbol_table_other_vals[] = {
     { 0, NULL }
 };
 
-
 static const value_string symbol_table_info_bind_vals[] = {
     {  0,   "Local" },
     {  1,   "Global" },
@@ -598,7 +597,6 @@ static const range_string dynamic_tag_rvals[] = {
     { 0x70000000, 0x7fffffff,   "Processor Specific" },
     { 0, 0, NULL }
 };
-
 
 typedef struct _segment_info_t {
     guint64        offset;
@@ -932,7 +930,6 @@ dissect_eh_frame_hdr(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *segment_
     proto_tree_add_item(segment_tree, hf_elf_eh_frame_hdr_eh_frame_ptr, tvb, offset, efp_length, machine_encoding);
     offset += efp_length;
 
-
     if (fde_count_length == LENGTH_ULEB128) {
         fde_count_length = tvb_get_varint(tvb, offset, FT_VARINT_MAX_LEN, &fde_count, ENC_VARINT_PROTOBUF);
     } else if (fde_count_length == LENGTH_LEB128) {
@@ -994,7 +991,6 @@ dissect_eh_frame_hdr(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *segment_
 
     return offset;
 }
-
 
 static gint
 dissect_eh_frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *segment_tree,
@@ -1269,7 +1265,6 @@ dissect_elf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
                 tvb_get_ntoh64(tvb, offset) : tvb_get_letoh64(tvb, offset);
     }
     offset += register_size;
-
 
     if (register_size == REGISTER_32_SIZE) {
         proto_tree_add_item(header_tree, hf_elf_shoff, tvb, offset,
@@ -2314,7 +2309,6 @@ proto_register_elf(void)
             FT_UINT8, BASE_DEC_HEX, NULL, 0x00,
             "The encoding format of the entries in the binary search table. A value of DW_EH_PE_omit indicates the binary search table is not present.", HFILL }
         },
-
 
         { &hf_elf_eh_frame_hdr_eh_frame_ptr,
             { "Exception Frame Pointer",                    "elf.eh_frame_hdr.eh_frame_ptr",
