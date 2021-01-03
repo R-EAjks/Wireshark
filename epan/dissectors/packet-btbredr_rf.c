@@ -42,6 +42,7 @@ static int hf_invalid_reference_lower_address_part = -1;
 static int hf_reference_upper_addres_part = -1;
 static int hf_invalid_reference_upper_addres_part = -1;
 static int hf_whitened_packet_header = -1;
+static int hf_invalid_packet_header = -1;
 static int hf_packet_header = -1;
 static int hf_packet_header_reserved = -1;
 static int hf_packet_header_lt_addr = -1;
@@ -372,8 +373,15 @@ static gboolean check_hec(guint8 uap, guint32 header)
     header &= 0x3ffff;
     header ^= reverse_bits(uap) & 0xff;
     for (guint i = 0; i < 10; ++i, header >>= 1)
-        header ^= (crc_poly_rev_bt_hec << 1) & -(header & 1);
+        if (header & 1)
+            header ^= (crc_poly_rev_bt_hec << 1);
     return !header;
+}
+
+static gboolean
+is_reserved_lap(guint32 lap)
+{
+    return (lap >= 0x9e8b00) && (lap <= 0x9e8b3f);
 }
 
 static gint
@@ -391,6 +399,7 @@ dissect_btbredr_rf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
     gint                hf_x;
     gint                header_mode;
     guint16             flags;
+    guint32             lap;
     guint8              uap;
     guint8              payload_and_transport;
     gint16              packet_type = PACKET_TYPE_UNKNOWN;
@@ -454,6 +463,7 @@ dissect_btbredr_rf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
     offset += 2;
 
     proto_tree_add_item(btbredr_rf_tree, hf_lower_address_part, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    lap = tvb_get_guint32(tvb, offset, ENC_LITTLE_ENDIAN) & 0xffffff;
     offset += 4;
 
     if (flags & FLAGS_REFERENCE_LOWER_ADDRESS_PART_VALID)
@@ -474,13 +484,16 @@ dissect_btbredr_rf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
     {
         guint32 hdr = tvb_get_guint32(tvb, offset, ENC_LITTLE_ENDIAN);
         gboolean have_uap = !!(flags & FLAGS_REFERENCE_UPPER_ADDRES_PART_VALID);
-        gboolean is_fhs = ((hdr >> 3) & 0x0f) == 2;
-        gboolean is_broken_fhs = ((hdr >> 11) & 0x0f) == 2;
-        if (!(flags & FLAGS_PACKET_HEADER_AND_BR_EDR_PAYLOAD_DEWHITENED))
+        gboolean is_inquiry = is_reserved_lap(lap);
+        gboolean is_inquiry_fhs = is_inquiry && (((hdr >> 3) & 0x0f) == 2);
+        gboolean is_inquiry_broken_fhs = is_inquiry && (((hdr >> 11) & 0x0f) == 2);
+        if (is_inquiry && !(is_inquiry_fhs || is_inquiry_broken_fhs))
+            header_mode = -2;
+        else if (!(flags & FLAGS_PACKET_HEADER_AND_BR_EDR_PAYLOAD_DEWHITENED))
             header_mode = -1;
-        else if ((have_uap || is_fhs) && check_hec(is_fhs ? 0 : uap, hdr))
+        else if ((have_uap || is_inquiry_fhs) && check_hec(is_inquiry_fhs ? 0 : uap, hdr))
             header_mode = 1;
-        else if ((have_uap || is_broken_fhs) && broken_check_hec(is_broken_fhs ? 0 : uap, hdr))
+        else if ((have_uap || is_inquiry_broken_fhs) && broken_check_hec(is_inquiry_broken_fhs ? 0 : uap, hdr))
             header_mode = 2;
         else if (!have_uap)
             header_mode = -1;
@@ -488,8 +501,10 @@ dissect_btbredr_rf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
             header_mode = 0;
     }
 
-    if (!(flags & FLAGS_PACKET_HEADER_AND_BR_EDR_PAYLOAD_DEWHITENED)) {
-       proto_tree_add_item(btbredr_rf_tree, hf_whitened_packet_header, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    if (header_mode == -1) {
+        proto_tree_add_item(btbredr_rf_tree, hf_whitened_packet_header, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    } else if (header_mode == -2) {
+        proto_tree_add_item(btbredr_rf_tree, hf_invalid_packet_header, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     } else if (header_mode == 2) {
         // broken header format
         header_item = proto_tree_add_item(btbredr_rf_tree, hf_packet_header, tvb, offset, 4, ENC_LITTLE_ENDIAN);
@@ -553,7 +568,7 @@ dissect_btbredr_rf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
         proto_tree_add_item(header_tree, hf_packet_header_broken_acknowledge_indication, tvb, offset, 4, ENC_LITTLE_ENDIAN);
         proto_tree_add_item(header_tree, hf_packet_header_broken_sequence_number, tvb, offset, 4, ENC_LITTLE_ENDIAN);
         hec_item = proto_tree_add_item(header_tree, hf_packet_header_broken_header_error_check, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    } else {
+    } else if (header_mode >= 0) {
         // header format according to Core_v5.2.pdf Vol 2 Part B Chapter 6.4
         header_item = proto_tree_add_item(btbredr_rf_tree, hf_packet_header, tvb, offset, 4, ENC_LITTLE_ENDIAN);
         header_tree = proto_item_add_subtree(header_item, ett_bluetooth_header);
@@ -619,6 +634,10 @@ dissect_btbredr_rf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
     }
 
     switch (header_mode) {
+    case -2:
+        col_set_str(pinfo->cinfo, COL_INFO, (lap == 0x9e8b33) ? "GIAC" : "DIAC");
+        break;
+
     case -1:
         expert_add_info(pinfo, hec_item, &ei_packet_header_with_hec_not_checked);
         break;
@@ -803,6 +822,11 @@ proto_register_btbredr_rf(void)
         },
         {  &hf_whitened_packet_header,
             { "Whitened Packet Header",                         "btbredr_rf.whitened.packet_header",
+            FT_UINT32, BASE_HEX, NULL, 0x00,
+            NULL, HFILL }
+        },
+        {  &hf_invalid_packet_header,
+            { "Invalid Packet Header",                          "btbredr_rf.invalid.packet_header",
             FT_UINT32, BASE_HEX, NULL, 0x00,
             NULL, HFILL }
         },
