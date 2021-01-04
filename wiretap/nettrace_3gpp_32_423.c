@@ -682,7 +682,7 @@ nettrace_read(wtap *wth, wtap_rec *rec, Buffer *buf, int *err, gchar **err_info,
 	/* Now search backwards for the message start
 	 * (doing it this way should skip over any empty "<msg ... />" tags we have)
 	 */
-	msg_start = g_strrstr_len(buf_start, msg_end - buf_start, c_s_msg);
+	msg_start = g_strrstr_len(buf_start, (guint)(msg_end - buf_start), c_s_msg);
 	if (msg_start == NULL || msg_start > msg_end) {
 		*err_info = g_strdup_printf("Found \"%s\" without matching \"%s\"", c_e_msg, c_s_msg);
 		*err = WTAP_ERR_BAD_FILE;
@@ -694,7 +694,7 @@ nettrace_read(wtap *wth, wtap_rec *rec, Buffer *buf, int *err, gchar **err_info,
 	msg_end += CLEN(c_e_msg);
 	msg_len = msg_end - msg_start;
 
-	/* Tell Wireshark to put is at the start of the "<msg" for seek_read later */
+	/* Tell Wireshark to put us at the start of the "<msg" for seek_read later */
 	*data_offset = file_info->start_offset + msg_offset;
 
 	/* pass all of <msg....</msg> to nettrace_msg_to_packet() */
@@ -704,7 +704,11 @@ nettrace_read(wtap *wth, wtap_rec *rec, Buffer *buf, int *err, gchar **err_info,
 	 * Re-use msg_len to get the length of the data we're done with.
 	 */
 	msg_len = msg_end - file_info->buffer->data;
-	g_byte_array_remove_range(file_info->buffer, 0, msg_len);
+	while (G_UNLIKELY(msg_len > G_MAXUINT)) {
+		g_byte_array_remove_range(file_info->buffer, 0, G_MAXUINT);
+		msg_len -= G_MAXUINT;
+	}
+	g_byte_array_remove_range(file_info->buffer, 0, (guint)msg_len);
 	file_info->start_offset += msg_len;
 
 end:
@@ -736,7 +740,7 @@ nettrace_seek_read(wtap *wth, gint64 seek_off, wtap_rec *rec, Buffer *buf, int *
 		return FALSE;
 	}
 	msg_end += CLEN(c_e_msg);
-	msg_len = msg_end - file_info->buffer->data;
+	msg_len = (guint)(msg_end - file_info->buffer->data);
 
 	status = nettrace_msg_to_packet(file_info, rec, buf, file_info->buffer->data, msg_len, err, err_info);
 	g_byte_array_set_size(file_info->buffer, 0);
@@ -925,7 +929,7 @@ nettrace_3gpp_32_423_file_open(wtap *wth, int *err, gchar **err_info)
 
 	/* Ok it's our file. From here we'll need to free memory */
 	file_info = g_new0(nettrace_3gpp_32_423_file_info_t, 1);
-	curr_pos = nettrace_parse_begin_time(curr_pos, bytes_read-(curr_pos-magic_buf), &file_info->start_time);
+	curr_pos = nettrace_parse_begin_time(curr_pos, (guint)(bytes_read - (curr_pos - magic_buf)), &file_info->start_time);
 	file_info->start_offset = start_offset + (curr_pos - magic_buf);
 	file_info->buffer = g_byte_array_sized_new(RINGBUFFER_START_SIZE);
 	g_byte_array_append(file_info->buffer, curr_pos, bytes_read-(curr_pos-magic_buf));
