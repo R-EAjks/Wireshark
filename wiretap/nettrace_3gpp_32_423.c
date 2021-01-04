@@ -690,9 +690,9 @@ nettrace_read(wtap *wth, wtap_rec *rec, Buffer *buf, int *err, gchar **err_info,
 	}
 
 	/* We know we have a message, what's its offset from the buffer start? */
-	msg_offset = msg_start - buf_start;
+	msg_offset = (guint)(msg_start - buf_start);
 	msg_end += CLEN(c_e_msg);
-	msg_len = msg_end - msg_start;
+	msg_len = (guint)(msg_end - msg_start);
 
 	/* Tell Wireshark to put us at the start of the "<msg" for seek_read later */
 	*data_offset = file_info->start_offset + msg_offset;
@@ -932,7 +932,7 @@ nettrace_3gpp_32_423_file_open(wtap *wth, int *err, gchar **err_info)
 	curr_pos = nettrace_parse_begin_time(curr_pos, (guint)(bytes_read - (curr_pos - magic_buf)), &file_info->start_time);
 	file_info->start_offset = start_offset + (curr_pos - magic_buf);
 	file_info->buffer = g_byte_array_sized_new(RINGBUFFER_START_SIZE);
-	g_byte_array_append(file_info->buffer, curr_pos, bytes_read-(curr_pos-magic_buf));
+	g_byte_array_append(file_info->buffer, curr_pos, (guint)(bytes_read - (curr_pos - magic_buf)));
 
 	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_NETTRACE_3GPP_32_423;
 	wth->file_encap = WTAP_ENCAP_WIRESHARK_UPPER_PDU;
