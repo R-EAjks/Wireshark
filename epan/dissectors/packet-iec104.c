@@ -18,6 +18,7 @@
 #include "config.h"
 
 #include <math.h> /* floor */
+#include <stdio.h>
 
 #include <epan/packet.h>
 #include <epan/prefs.h>
@@ -94,16 +95,16 @@ static int proto_iec60870_asdu = -1;
 /* APCI types */
 
 /* Type I is only lowest bit set to 0 */
-#define I_TYPE		0
-#define S_TYPE		1
-#define U_TYPE		3
+#define I_TYPE		  0
+#define S_TYPE		  1
+#define U_TYPE		  3
 #define APCI_TYPE_UNKNOWN 4
 
 static const value_string apci_types [] = {
 	{ I_TYPE,		"I" },
 	{ S_TYPE,		"S" },
 	{ U_TYPE,		"U" },
-	{ 0, NULL }
+	{ 0,                   NULL }
 };
 
 /* Constants relative to the filed, independent of the field position in the byte */
@@ -114,6 +115,7 @@ static const value_string apci_types [] = {
 #define U_STOPDT_CON	 	0x08
 #define U_TESTFR_ACT 		0x10
 #define U_TESTFR_CON	 	0x20
+
 static const value_string u_types[] = {
 	{ U_STARTDT_ACT,		"STARTDT act" },
 	{ U_STARTDT_CON, 		"STARTDT con" },
@@ -124,16 +126,17 @@ static const value_string u_types[] = {
 	{ 0, NULL }
 };
 
-/* ASDU types (TypeId) */
-#define M_SP_NA_1  1    /* single-point information 								*/
-#define M_SP_TA_1  2    /* single-point information with time tag 	 					*/
-#define M_DP_NA_1  3    /* double-point information 								*/
-#define M_DP_TA_1  4    /* double-point information with time tag 						*/
-#define M_ST_NA_1  5    /* step position information 								*/
-#define M_ST_TA_1  6    /* step position information with time tag 						*/
-#define M_BO_NA_1  7    /* bitstring of 32 bits 								*/
-#define M_BO_TA_1  8    /* bitstring of 32 bits with time tag 							*/
-#define M_ME_NA_1  9    /* measured value, normalized value 							*/
+/* ASDU types (TypeId) defined in 60870-5-101 7.2.1.1 Definition of the semantics of the values of the TYPE IDENTIFICATION field */
+
+#define M_SP_NA_1  1     /* single-point information 								*/
+#define M_SP_TA_1  2     /* single-point information with time tag 	 					*/
+#define M_DP_NA_1  3     /* double-point information 								*/
+#define M_DP_TA_1  4     /* double-point information with time tag 						*/
+#define M_ST_NA_1  5     /* step position information 								*/
+#define M_ST_TA_1  6     /* step position information with time tag 						*/
+#define M_BO_NA_1  7     /* bitstring of 32 bits 								*/
+#define M_BO_TA_1  8     /* bitstring of 32 bits with time tag 							*/
+#define M_ME_NA_1  9     /* measured value, normalized value 							*/
 #define M_ME_TA_1  10    /* measured value, normalized value with time tag 					*/
 #define M_ME_NB_1  11    /* measured value, scaled value 							*/
 #define M_ME_TB_1  12    /* measured value, scaled value with time tag 						*/
@@ -143,6 +146,9 @@ static const value_string u_types[] = {
 #define M_IT_TA_1  16    /* integrated totals with time tag 							*/
 #define M_PS_NA_1  20    /* packed single-point information with status change detection 			*/
 #define M_ME_ND_1  21    /* measured value, normalized value without quality descriptor 			*/
+
+/* <22..29> := reserved for further compatible definitions */
+
 #define M_SP_TB_1  30    /* single-point information with time tag CP56Time2a 					*/
 #define M_DP_TB_1  31    /* double-point information with time tag CP56Time2a 					*/
 #define M_ST_TB_1  32    /* step position information with time tag CP56Time2a 					*/
@@ -154,7 +160,11 @@ static const value_string u_types[] = {
 #define M_EP_TD_1  38    /* event of protection equipment with time tag CP56Time2a 				*/
 #define M_EP_TE_1  39    /* packed start events of protection equipment with time tag CP56Time2a 		*/
 #define M_EP_TF_1  40    /* packed output circuit information of protection equipment with time tag CP56Time2a 	*/
+
+/* <41..44> := reserved for further compatible definitions */
+
 #define S_IT_TC_1  41    /* integrated totals containing time tagged security statistics			*/
+
 #define C_SC_NA_1  45    /* single command 									*/
 #define C_DC_NA_1  46    /* double command 									*/
 #define C_RC_NA_1  47    /* regulating step command 								*/
@@ -169,7 +179,13 @@ static const value_string u_types[] = {
 #define C_SE_TB_1  62    /* set point command, scaled value with time tag CP56Time2a 				*/
 #define C_SE_TC_1  63    /* set point command, short floating-point number with time tag CP56Time2a 		*/
 #define C_BO_TA_1  64    /* bitstring of 32 bits with time tag CP56Time2a 					*/
+
+/* <65..69> := reserved for further compatible definitions */
+
 #define M_EI_NA_1  70    /* end of initialization 								*/
+
+/* <71..99> := reserved for further compatible definitions */
+
 #define S_CH_NA_1  81    /* authentication challenge								*/
 #define S_RP_NA_1  82    /* authentication reply								*/
 #define S_AR_NA_1  83    /* aggressive mode authentication request session key status request			*/
@@ -183,16 +199,25 @@ static const value_string u_types[] = {
 #define S_UK_NA_1  93    /* update key change symmetric								*/
 #define S_UA_NA_1  94    /* update key change asymmetric							*/
 #define S_UC_NA_1  95    /* update key change confirmation							*/
+
 #define C_IC_NA_1  100    /* interrogation command 								*/
 #define C_CI_NA_1  101    /* counter interrogation command 							*/
 #define C_RD_NA_1  102    /* read command 									*/
 #define C_CS_NA_1  103    /* clock synchronization command 							*/
+#define C_TS_NA_1  104    /* test command                                                                       */
 #define C_RP_NA_1  105    /* reset process command 								*/
+#define C_CD_NA_1  106    /* delay acquisition command                                                          */
 #define C_TS_TA_1  107    /* test command with time tag CP56Time2a 						*/
+
+/* <108..109> := reserved for further compatible definitions */
+
 #define P_ME_NA_1  110    /* parameter of measured value, normalized value 					*/
 #define P_ME_NB_1  111    /* parameter of measured value, scaled value 						*/
 #define P_ME_NC_1  112    /* parameter of measured value, short floating-point number 				*/
 #define P_AC_NA_1  113    /* parameter activation 								*/
+
+/* <114..119> := reserved for further compatible definitions */
+
 #define F_FR_NA_1  120    /* file ready 									*/
 #define F_SR_NA_1  121    /* section ready 									*/
 #define F_SC_NA_1  122    /* call directory, select file, call file, call section 				*/
@@ -201,6 +226,7 @@ static const value_string u_types[] = {
 #define F_SG_NA_1  125    /* segment 										*/
 #define F_DR_TA_1  126    /* directory 										*/
 #define F_SC_NB_1  127    /* Query Log - Request archive file 							*/
+
 static const value_string asdu_types [] = {
 	{  M_SP_NA_1,		"M_SP_NA_1" },
 	{  M_SP_TA_1,		"M_SP_TA_1" },
@@ -446,7 +472,7 @@ static const td_asdu_length asdu_length [] = {
 	{ 0, 0 }
 };
 
-/* Cause of Transmission (CauseTx) */
+/* Cause of Transmission (CauseTx) defined in 60870-5-101 7.2.3 */
 #define Per_Cyc         1
 #define Back            2
 #define Spont           3
@@ -826,10 +852,9 @@ static const value_string iec60870_101_ctrl_func_sec_to_pri_values[] = {
 
 /* Misc. functions for dissection of signal values */
 
-/* ====================================================================
-   Dissects the CP24Time2a time (Three octet binary time)
-   that starts 'offset' bytes in 'tvb'.
-   ==================================================================== */
+/******************************************************************************************************/
+/* Dissects the CP24Time2a time (Three octet binary time) that starts 'offset' bytes in 'tvb'         */
+/******************************************************************************************************/
 static void get_CP24Time(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	guint16 ms;
@@ -860,10 +885,9 @@ static void get_CP24Time(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_heade
 	(*offset) ++;
 }
 
-/* ====================================================================
-   Dissects the CP56Time2a time (Seven octet binary time)
-   that starts 'offset' bytes in 'tvb'.
-   ==================================================================== */
+/******************************************************************************************************/
+/* Dissects the CP56Time2a time (Seven octet binary time) that starts 'offset' bytes in 'tvb'         */
+/******************************************************************************************************/
 static void get_CP56Time(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	guint16 ms;
@@ -938,10 +962,9 @@ static void get_CP56Time(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_heade
 	(*offset) ++;
 }
 
-/* ====================================================================
-   Information object address (Identifier)
-   ASDU -> Inform Object #1 -> Information object address
-   ==================================================================== */
+/******************************************************************************************************/
+/* Information object address (Identifier) ASDU -> Inform Object #1 -> Information object address     */
+/******************************************************************************************************/
 static proto_item* get_InfoObjectAddress(guint32 *asdu_info_obj_addr, tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree, guint ioa_len)
 {
 	proto_item* ti = NULL;
@@ -954,9 +977,9 @@ static proto_item* get_InfoObjectAddress(guint32 *asdu_info_obj_addr, tvbuff_t *
 	return ti;
 }
 
-/* ====================================================================
-   TypeId length
-   ==================================================================== */
+/******************************************************************************************************/
+/* TypeId length                                                                                      */
+/******************************************************************************************************/
 static guint8 get_TypeIdLength(guint8 TypeId)
 {
 	guint8 ret = 0;
@@ -976,9 +999,9 @@ static guint8 get_TypeIdLength(guint8 TypeId)
 	return ret;
 }
 
-/* ====================================================================
-   SIQ: Single-point information (IEV 371-02-07) w quality descriptor
-   ==================================================================== */
+/******************************************************************************************************/
+/*   SIQ: Single-point information (IEV 371-02-07) w quality descriptor                               */
+/******************************************************************************************************/
 static void get_SIQ(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	proto_item* ti;
@@ -996,9 +1019,9 @@ static void get_SIQ(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 	(*offset)++;
 }
 
-/* ====================================================================
-   DIQ: Double-point information (IEV 371-02-08) w quality descriptor
-   ==================================================================== */
+/******************************************************************************************************/
+/*   DIQ: Double-point information (IEV 371-02-08) w quality descriptor                               */
+/******************************************************************************************************/
 static void get_DIQ(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	proto_item* ti;
@@ -1016,9 +1039,9 @@ static void get_DIQ(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 	(*offset)++;
 }
 
-/* ====================================================================
-   QDS: Quality descriptor (separate octet)
-   ==================================================================== */
+/******************************************************************************************************/
+/*   QDS: Quality descriptor (separate octet)                                                         */
+/******************************************************************************************************/
 static void get_QDS(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	proto_item* ti;
@@ -1036,10 +1059,9 @@ static void get_QDS(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 	(*offset)++;
 }
 
-/* ====================================================================
-   QDP: Quality descriptor for events of protection equipment
-   (separate octet)
-   ==================================================================== */
+/******************************************************************************************************/
+/*   QDP: Quality descriptor for events of protection equipment (separate octet)                      */
+/******************************************************************************************************/
 #if 0
 static void get_QDP(tvbuff_t *tvb _U_, guint8 *offset _U_, proto_tree *iec104_header_tree _U_)
 {
@@ -1048,9 +1070,9 @@ static void get_QDP(tvbuff_t *tvb _U_, guint8 *offset _U_, proto_tree *iec104_he
 }
 #endif
 
-/* ====================================================================
-   VTI: Value with transient state indication
-   ==================================================================== */
+/******************************************************************************************************/
+/*   VTI: Value with transient state indication                                                       */
+/******************************************************************************************************/
 static void get_VTI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	proto_item* ti;
@@ -1065,9 +1087,9 @@ static void get_VTI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 	(*offset)++;
 }
 
-/* ====================================================================
-   NVA: Normalized value
-   ==================================================================== */
+/******************************************************************************************************/
+/*   NVA: Normalized value                                                                            */
+/******************************************************************************************************/
 static void get_NVA(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	gint16 value;
@@ -1082,6 +1104,9 @@ static void get_NVA(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 	(*offset) += 2;
 }
 
+/******************************************************************************************************/
+/*   NVAspt: Normalized value Set point                                                               */
+/******************************************************************************************************/
 static void get_NVAspt(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	gint16 value;
@@ -1096,9 +1121,9 @@ static void get_NVAspt(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_
 	(*offset) += 2;
 }
 
-/* ====================================================================
-   SVA: Scaled value
-   ==================================================================== */
+/******************************************************************************************************/
+/*   SVA: Scaled value                                                                                */
+/******************************************************************************************************/
 static void get_SVA(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	/* Scaled value I16[1..16]<-2^15..+2^15-1> */
@@ -1115,9 +1140,9 @@ static void get_SVAspt(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_
 	(*offset) += 2;
 }
 
-/* ====================================================================
-   "FLT": Short floating point number
-   ==================================================================== */
+/******************************************************************************************************/
+/*   "FLT": Short floating point number                                                               */
+/******************************************************************************************************/
 static void get_FLT(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	/* --------  IEEE 754 float value */
@@ -1134,9 +1159,9 @@ static void get_FLTspt(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_
 	(*offset) += 4;
 }
 
-/* ====================================================================
-   "BSI": Binary state information, 32 bit
-   ==================================================================== */
+/******************************************************************************************************/
+/*   "BSI": Binary state information, 32 bit                                                          */
+/******************************************************************************************************/
 static void get_BSI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	proto_tree_add_bits_item(iec104_header_tree, hf_asdu_bitstring, tvb, *offset*8, 32, ENC_BIG_ENDIAN);
@@ -1151,9 +1176,9 @@ static void get_BSIspt(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_
 	(*offset) += 4;
 }
 
-/* ====================================================================
-    BCR: Binary counter reading
-   ==================================================================== */
+/******************************************************************************************************/
+/*    BCR: Binary counter reading                                                                     */
+/******************************************************************************************************/
 static void get_BCR(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	proto_tree_add_item(iec104_header_tree, hf_bcr_count, tvb, *offset, 4, ENC_LITTLE_ENDIAN);
@@ -1166,9 +1191,9 @@ static void get_BCR(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 	*offset += 1;
 }
 
-/* ====================================================================
-    todo -- SEP: Single event of protection equipment
-   ==================================================================== */
+/******************************************************************************************************/
+/*    todo -- SEP: Single event of protection equipment                                               */
+/******************************************************************************************************/
 #if 0
 static void get_SEP(tvbuff_t *tvb _U_, guint8 *offset _U_, proto_tree *iec104_header_tree _U_)
 {
@@ -1177,9 +1202,9 @@ static void get_SEP(tvbuff_t *tvb _U_, guint8 *offset _U_, proto_tree *iec104_he
 }
 #endif
 
-/* ====================================================================
-    QOS: Qualifier Of Set-point command
-   ==================================================================== */
+/******************************************************************************************************/
+/*    QOS: Qualifier Of Set-point command                                                             */
+/******************************************************************************************************/
 static void get_QOS(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	proto_item* ti;
@@ -1194,9 +1219,9 @@ static void get_QOS(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 	(*offset)++;
 }
 
-/* ====================================================================
-    SCO: Single Command (IEV 371-03-02)
-   ==================================================================== */
+/******************************************************************************************************/
+/*    SCO: Single Command (IEV 371-03-02)                                                             */
+/******************************************************************************************************/
 static void get_SCO(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	proto_item* ti;
@@ -1212,9 +1237,9 @@ static void get_SCO(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 	(*offset)++;
 }
 
-/* ====================================================================
-    DCO: Double Command (IEV 371-03-03)
-   ==================================================================== */
+/******************************************************************************************************/
+/*    DCO: Double Command (IEV 371-03-03)                                                             */
+/******************************************************************************************************/
 static void get_DCO(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	proto_item* ti;
@@ -1230,9 +1255,9 @@ static void get_DCO(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 	(*offset)++;
 }
 
-/* ====================================================================
-    RCO: Regulating step command (IEV 371-03-13)
-   ==================================================================== */
+/******************************************************************************************************/
+/*    RCO: Regulating step command (IEV 371-03-13)                                                    */
+/******************************************************************************************************/
 static void get_RCO(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	proto_item* ti;
@@ -1248,9 +1273,9 @@ static void get_RCO(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 	(*offset)++;
 }
 
-/* ====================================================================
-    QPM: Qualifier of parameter of measured value
-   ==================================================================== */
+/******************************************************************************************************/
+/*    QPM: Qualifier of parameter of measured value                                                   */
+/******************************************************************************************************/
 static void get_QPM(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
 {
 	proto_item* ti;
@@ -1266,9 +1291,9 @@ static void get_QPM(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 	(*offset)++;
 }
 
-/* ====================================================================
-    COI: Cause of initialisation
-   ==================================================================== */
+/******************************************************************************************************/
+/*    COI: Cause of initialisation                                                                    */
+/******************************************************************************************************/
 static void get_COI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	proto_item* ti;
@@ -1283,9 +1308,9 @@ static void get_COI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 	(*offset)++;
 }
 
-/* ====================================================================
-    QOI: Qualifier of interrogation
-   ==================================================================== */
+/******************************************************************************************************/
+/*    QOI: Qualifier of interrogation                                                                 */
+/******************************************************************************************************/
 static void get_QOI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	proto_tree_add_item(iec104_header_tree, hf_qoi, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
@@ -1293,9 +1318,9 @@ static void get_QOI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 	(*offset)++;
 }
 
-/* ====================================================================
-    QRP: Qualifier of reset process command
-   ==================================================================== */
+/******************************************************************************************************/
+/*    QRP: Qualifier of reset process command                                                         */
+/******************************************************************************************************/
 static void get_QRP(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
 {
 	proto_tree_add_item(iec104_header_tree, hf_qrp, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
@@ -1304,9 +1329,10 @@ static void get_QRP(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 }
 /* .... end Misc. functions for dissection of signal values */
 
-
-/* Find the IEC60870-5-104 APDU (APDU=APCI+ASDU) length.
-Includes possible tvb_length-1 bytes that don't form an APDU */
+/******************************************************************************************************/
+/* Find the IEC60870-5-104 APDU (APDU=APCI+ASDU) length.                                              */
+/* Includes possible tvb_length-1 bytes that don't form an APDU                                       */
+/******************************************************************************************************/
 static guint get_iec104apdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
                                 int offset, void *data _U_)
 {
@@ -1323,9 +1349,10 @@ static guint get_iec104apdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
 	return (guint)(tvb_reported_length(tvb));
 }
 
-
-/* Is is called twice: For 'Packet List' and for 'Packet Details' */
-/* This dissection is shared by the IEC '101 and '104 dissectors */
+/******************************************************************************************************/
+/* Is is called twice: For 'Packet List' and for 'Packet Details'                                     */
+/* This dissection is shared by the IEC '101 and '104 dissectors                                      */
+/******************************************************************************************************/
 static int dissect_iec60870_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
 	guint Len = tvb_reported_length(tvb);
@@ -1482,10 +1509,10 @@ static int dissect_iec60870_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
 				/* create subtree for the signal values ... */
 				if (i == 0 || !asduh.SQ)
 					trSignal = proto_tree_add_subtree(it104tree, tvb, offset, asduh.DataLength + parms->ioa_len,
-														ett_asdu_objects, &itSignal, "IOA:s");
+									  ett_asdu_objects, &itSignal, "IOA:s");
 				else
 					trSignal = proto_tree_add_subtree(it104tree, tvb, offset, asduh.DataLength,
-														ett_asdu_objects, &itSignal, "IOA:s");
+									  ett_asdu_objects, &itSignal, "IOA:s");
 
 				/* --------  First Information object address */
 				if (i == 0)
@@ -1735,9 +1762,9 @@ static int dissect_iec60870_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
 	return tvb_captured_length(tvb);
 }
 
-
-
-/* Is is called twice: For 'Packet List' and for 'Packet Details' */
+/******************************************************************************************************/
+/* Is is called twice: For 'Packet List' and for 'Packet Details'                                     */
+/******************************************************************************************************/
 static int dissect_iec60870_104(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 {
 	guint TcpLen = tvb_reported_length(tvb);
@@ -1800,7 +1827,8 @@ static int dissect_iec60870_104(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
 			}
 
 			switch(type) {
-			case I_TYPE:
+
+			case I_TYPE:				
 				apci_txid = tvb_get_letohs(tvb, Off + 2) >> 1;
 				apci_rxid = tvb_get_letohs(tvb, Off + 4) >> 1;
 				wmem_strbuf_append_printf(res, "(%d,%d) ", apci_txid, apci_rxid);
@@ -1846,7 +1874,7 @@ static int dissect_iec60870_104(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
 }
 
 /******************************************************************************************************/
-/* Code to dissect IEC 101 Protocol packets */
+/* Code to dissect IEC 101 Protocol packets                                                           */
 /******************************************************************************************************/
 static int
 dissect_iec60870_101(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
@@ -1930,6 +1958,9 @@ dissect_iec60870_101(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
 
 }
 
+/******************************************************************************************************/
+/*                                                                                                    */
+/******************************************************************************************************/
 static int dissect_iec60870_104_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 {
 	/* 5th parameter = 6 = minimum bytes received to calculate the length.
@@ -1940,7 +1971,9 @@ static int dissect_iec60870_104_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tre
 	return tvb_captured_length(tvb);
 }
 
-/* The protocol has two subprotocols: Register APCI */
+/******************************************************************************************************/
+/* The protocol has two subprotocols: Register APCI                                                   */
+/******************************************************************************************************/
 void
 proto_register_iec60870_104(void)
 {
@@ -1986,7 +2019,9 @@ proto_register_iec60870_104(void)
 	prefs_register_protocol(proto_iec60870_104, NULL);
 }
 
-/* Register ASDU dissection, shared by the '101 and '104 dissectors */
+/******************************************************************************************************/
+/* Register ASDU dissection, shared by the '101 and '104 dissectors                                   */
+/******************************************************************************************************/
 void
 proto_register_iec60870_asdu(void)
 {
@@ -2347,7 +2382,9 @@ proto_register_iec60870_asdu(void)
 
 }
 
-/* The registration hand-off routine */
+/******************************************************************************************************/
+/* The registration hand-off routine                                                                  */
+/******************************************************************************************************/
 void
 proto_reg_handoff_iec60870_104(void)
 {
@@ -2358,6 +2395,9 @@ proto_reg_handoff_iec60870_104(void)
 	dissector_add_uint_with_preference("tcp.port", IEC104_PORT, iec60870_104_handle);
 }
 
+/******************************************************************************************************/
+/*                                                                                                    */
+/******************************************************************************************************/
 static void
 apply_iec60870_101_prefs(void)
 {
@@ -2367,9 +2407,8 @@ apply_iec60870_101_prefs(void)
   global_iec60870_ioa_len       = prefs_get_uint_value("iec60870_101", "asdu_ioa_len");
 }
 
-
 /******************************************************************************************************/
-/* Return length of IEC 101 Protocol over TCP message (used for re-assembly)						 */
+/* Return length of IEC 101 Protocol over TCP message (used for re-assembly)			      */
 /******************************************************************************************************/
 static guint
 get_iec101_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset _U_, void *data _U_)
@@ -2394,7 +2433,7 @@ get_iec101_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset _U_, void *data
 }
 
 /******************************************************************************************************/
-/* Dissect (and possibly Re-assemble) IEC 101 protocol payload data */
+/* Dissect (and possibly Re-assemble) IEC 101 protocol payload data                                   */
 /******************************************************************************************************/
 static int
 dissect_iec60870_101_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
@@ -2416,7 +2455,9 @@ dissect_iec60870_101_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
 	return tvb_captured_length(tvb);
 }
 
-/* The registration hand-off routine */
+/******************************************************************************************************/
+/* The registration hand-off routine                                                                  */
+/******************************************************************************************************/
 void
 proto_register_iec60870_101(void)
 {
@@ -2504,6 +2545,9 @@ proto_register_iec60870_101(void)
 
 }
 
+/******************************************************************************************************/
+/* The registration hand-off routine                                                                  */
+/******************************************************************************************************/
 void
 proto_reg_handoff_iec60870_101(void)
 {
