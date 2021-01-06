@@ -210,6 +210,6 @@ SIP Statistics window shows captured SIP transactions. It is divided into SIP Re
 
 === WAP-WSP Packet Counter
 
-In the WAP-WSP Packet Counter menu the user can check the Packet Counter window. It shows the total packets and they are divided into different Status Codes and PDU Types. The user can filter, copy or save the data into a file.
+The WAP-WSP Packet Counter menu displays the number of packets for each Status Code and PDU Type in Wireless Session Protocol traffic. The user can filter, copy or save the data into a file.
 
 // End of WSUG Chapter Telephony
