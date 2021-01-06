@@ -1821,7 +1821,7 @@ uninstall_libtiff() {
 install_spandsp() {
     if [ "$SPANDSP_VERSION" -a ! -f spandsp-$SPANDSP_VERSION-done ] ; then
         echo "Downloading, building, and installing SpanDSP:"
-        [ -f spandsp-$SPANDSP_VERSION.tar.gz ] || curl -L -O https://www.soft-switch.org/downloads/spandsp/spandsp-$SPANDSP_VERSION.tar.gz || exit 1
+        [ -f spandsp-$SPANDSP_VERSION.tar.gz ] || curl -L -O https://web.archive.org/web/20180626203108/https://www.soft-switch.org/downloads/spandsp/spandsp-$SPANDSP_VERSION.tar.gz || exit 1
         $no_build && echo "Skipping installation" && return
         gzcat spandsp-$SPANDSP_VERSION.tar.gz | tar xf - || exit 1
         cd spandsp-$SPANDSP_VERSION
