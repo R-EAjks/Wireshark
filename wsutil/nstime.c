@@ -11,6 +11,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 #include <glib.h>
 #include "nstime.h"
 #include "epochs.h"
