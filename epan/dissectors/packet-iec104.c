@@ -18,7 +18,6 @@
 #include "config.h"
 
 #include <math.h> /* floor */
-#include <stdio.h>
 
 #include <epan/packet.h>
 #include <epan/prefs.h>
@@ -1827,8 +1826,7 @@ static int dissect_iec60870_104(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
 			}
 
 			switch(type) {
-
-			case I_TYPE:				
+			case I_TYPE:
 				apci_txid = tvb_get_letohs(tvb, Off + 2) >> 1;
 				apci_rxid = tvb_get_letohs(tvb, Off + 4) >> 1;
 				wmem_strbuf_append_printf(res, "(%d,%d) ", apci_txid, apci_rxid);
