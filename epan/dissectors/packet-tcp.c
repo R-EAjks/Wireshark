@@ -41,7 +41,6 @@
 
 void proto_register_tcp(void);
 void proto_reg_handoff_tcp(void);
-void conversation_completeness_fill(gchar*, guint32);
 
 static int tcp_tap = -1;
 static int tcp_follow_tap = -1;
@@ -653,14 +652,14 @@ static int * const tcp_option_mptcp_dss_flags[] = {
 static const unit_name_string units_64bit_version = { " (64bits version)", NULL };
 
 
-static char *
+static const char *
 tcp_flags_to_str(wmem_allocator_t *scope, const struct tcpheader *tcph)
 {
     static const char flags[][4] = { "FIN", "SYN", "RST", "PSH", "ACK", "URG", "ECN", "CWR", "NS" };
     const int maxlength = 64; /* upper bounds, max 53B: 8 * 3 + 2 + strlen("Reserved") + 9 * 2 + 1 */
 
     char *pbuf;
-    char *buf;
+    const char *buf;
 
     int i;
 
@@ -686,7 +685,7 @@ tcp_flags_to_str(wmem_allocator_t *scope, const struct tcpheader *tcph)
 
     return buf;
 }
-static char *
+static const char *
 tcp_flags_to_str_first_letter(const struct tcpheader *tcph)
 {
     wmem_strbuf_t *buf = wmem_strbuf_new(wmem_packet_scope(), "");
@@ -902,7 +901,7 @@ tcp_seq_analysis_packet( void *ptr, packet_info *pinfo, epan_dissect_t *edt _U_,
 {
     seq_analysis_info_t *sainfo = (seq_analysis_info_t *) ptr;
     const struct tcpheader *tcph = (const struct tcpheader *)tcp_info;
-    char* flags;
+    const char* flags;
     seq_analysis_item_t *sai = sequence_analysis_create_sai_with_addresses(pinfo, sainfo);
 
     if (!sai)
@@ -922,7 +921,7 @@ tcp_seq_analysis_packet( void *ptr, packet_info *pinfo, epan_dissect_t *edt _U_,
         sai->frame_label = g_strdup(flags);
     }
 
-    wmem_free(NULL, flags);
+    wmem_free(NULL, (void*)flags);
 
     if (tcph->th_flags & TH_ACK)
         sai->comment = g_strdup_printf("Seq = %u Ack = %u",tcph->th_seq, tcph->th_ack);
@@ -1095,7 +1094,7 @@ check_follow_fragments(follow_info_t *follow_info, gboolean is_server, guint32 a
         follow_record = g_new0(follow_record_t,1);
 
         follow_record->data = g_byte_array_append(g_byte_array_new(),
-                                                  (guchar*)dummy_str,
+                                                  dummy_str,
                                                   (guint)strlen(dummy_str)+1);
         g_free(dummy_str);
         follow_record->is_server = is_server;
@@ -1353,7 +1352,7 @@ handle_export_pdu_conversation(packet_info *pinfo, tvbuff_t *tvb, int src_port, 
  * we of course pay much attention on complete conversations but also incomplete ones which
  * have a regular start, as in practice we are often looking for such thing
  */
-void conversation_completeness_fill(gchar *buf, guint32 value)
+void conversation_completeness_fill (gchar *buf, guint32 value)
 {
     switch(value) {
         case TCP_COMPLETENESS_SYNSENT:
@@ -4159,7 +4158,7 @@ dissect_tcpopt_exp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
     proto_item *item;
     proto_tree *exp_tree;
     guint16 magic;
-    gint offset = 0, optlen = tvb_reported_length(tvb);
+    int offset = 0, optlen = tvb_reported_length(tvb);
 
     item = proto_tree_add_item(tree, proto_tcp_option_exp, tvb, offset, -1, ENC_NA);
     exp_tree = proto_item_add_subtree(item, ett_tcp_option_exp);
@@ -6296,7 +6295,7 @@ dissect_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
     proto_item *options_item, *hide_seqack_abs_item;
     proto_tree *options_tree;
     int        offset = 0;
-    char       *flags_str, *flags_str_first_letter;
+    const char *flags_str, *flags_str_first_letter;
     guint      optlen;
     guint32    nxtseq = 0;
     guint      reported_len;
@@ -6309,8 +6308,7 @@ dissect_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
     struct tcpinfo tcpinfo;
     struct tcpheader *tcph;
     proto_item *tf_syn = NULL, *tf_fin = NULL, *tf_rst = NULL, *scaled_pi;
-    conversation_t *conv=NULL, *other_conv;
-    guint32 save_last_frame = 0;
+    conversation_t *conv=NULL;
     struct tcp_analysis *tcpd=NULL;
     struct tcp_per_packet_data_t *tcppd=NULL;
     proto_item *item;
@@ -6318,6 +6316,7 @@ dissect_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
     gboolean    icmp_ip = FALSE;
     guint8     conversation_completeness = 0;
     gboolean   conversation_is_new = FALSE;
+    gboolean   isSYN = FALSE;
 
     tcph = wmem_new0(wmem_packet_scope(), struct tcpheader);
     tcph->th_sport = tvb_get_ntohs(tvb, offset);
@@ -6393,14 +6392,8 @@ dissect_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
      * in case a new conversation is found and the previous conversation needs
      * to be adjusted,
      */
-    if((conv = find_conversation_pinfo(pinfo, 0)) != NULL) {
-        /* Update how far the conversation reaches */
-        if (pinfo->num > conv->last_frame) {
-            save_last_frame = conv->last_frame;
-            conv->last_frame = pinfo->num;
-        }
-    }
-    else {
+    conv = find_conversation_pinfo(pinfo, 0);
+    if(!conv) {
         conv = conversation_new(pinfo->num, &pinfo->src,
                      &pinfo->dst, ENDPOINT_TCP,
                      pinfo->srcport, pinfo->destport, 0);
@@ -6408,6 +6401,10 @@ dissect_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
         conversation_is_new = TRUE;
     }
     tcpd=get_tcp_conversation_data(conv,pinfo);
+
+    /* temp debug
+    printf("in frame:%u conversation:%u (last_frame:%u) stream:%u\n", pinfo->num, conv->conv_index, conv->last_frame, tcpd->stream);
+    */
 
     /* If this is a SYN packet, then check if its seq-nr is different
      * from the base_seq of the retrieved conversation. If this is the
@@ -6421,16 +6418,17 @@ dissect_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
        (tcpd->fwd->static_flags & TCP_S_BASE_SEQ_SET) &&
        (tcph->th_seq!=tcpd->fwd->base_seq) ) {
         if (!(pinfo->fd->visited)) {
-            /* Reset the last frame seen in the conversation */
-            if (save_last_frame > 0)
-                conv->last_frame = save_last_frame;
-
             conv=conversation_new(pinfo->num, &pinfo->src, &pinfo->dst, ENDPOINT_TCP, pinfo->srcport, pinfo->destport, 0);
             tcpd=get_tcp_conversation_data(conv,pinfo);
 
             /* As above, a new conversation starting with a SYN implies conversation completeness value 1 */
             tcpd->conversation_completeness = 1;
+
+            isSYN = TRUE;
+            /* extend the conversation end */
+            conv->last_frame = pinfo->num;
         }
+
         if(!tcpd->ta)
             tcp_analyze_get_acked_struct(pinfo->num, tcph->th_seq, tcph->th_ack, TRUE, tcpd);
         tcpd->ta->flags|=TCP_A_REUSED_PORTS;
@@ -6447,24 +6445,21 @@ dissect_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
        (tcpd->fwd->static_flags & TCP_S_BASE_SEQ_SET) &&
        (tcph->th_seq!=tcpd->fwd->base_seq) ) {
         if (!(pinfo->fd->visited)) {
-            /* Reset the last frame seen in the conversation */
-            if (save_last_frame > 0)
-                conv->last_frame = save_last_frame;
+            /* extend the conversation end */
+            conv->last_frame = pinfo->num;
         }
 
-        other_conv = find_conversation(pinfo->num, &pinfo->dst, &pinfo->src, ENDPOINT_TCP, pinfo->destport, pinfo->srcport, 0);
-        if (other_conv != NULL)
-        {
-            conv = other_conv;
-            tcpd=get_tcp_conversation_data(conv,pinfo);
-
-            /* the retrieved conversation might have a different base_seq (issue 16944) */
-            tcpd->fwd->base_seq = tcph->th_seq;
-        }
+        /* the retrieved conversation might have a different base_seq (issue 16944) */
+        tcpd->fwd->base_seq = tcph->th_seq;
 
         if(!tcpd->ta)
             tcp_analyze_get_acked_struct(pinfo->num, tcph->th_seq, tcph->th_ack, TRUE, tcpd);
         tcpd->ta->flags|=TCP_A_REUSED_PORTS;
+    }
+
+    if (!isSYN && (!(pinfo->fd->visited)) ) {
+        /* extend the conversation end */
+        conv->last_frame = pinfo->num;
     }
 
     if (tcpd) {
@@ -7191,6 +7186,9 @@ dissect_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
             }
         }
     }
+    /* temp debug
+    printf("end frame:%u conversation:%u (last_frame:%u) stream:%u\n", pinfo->num, conv->conv_index, conv->last_frame, tcpd->stream);
+    */
     return tvb_captured_length(tvb);
 }
 

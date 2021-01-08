@@ -1442,44 +1442,55 @@ try_conversation_dissector_by_id(const endpoint_type etype, const guint32 id, tv
 conversation_t *
 find_conversation_pinfo(packet_info *pinfo, const guint options)
 {
-	conversation_t *conv=NULL;
+        conversation_t *conv=NULL, *other_conv=NULL;
 
-	DINSTR(gchar *src_str = address_to_str(NULL, &pinfo->src));
-	DINSTR(gchar *dst_str = address_to_str(NULL, &pinfo->dst));
-	DPRINT(("called for frame #%u: %s:%d -> %s:%d (ptype=%d)",
-		pinfo->num, src_str, pinfo->srcport,
-		dst_str, pinfo->destport, pinfo->ptype));
-	DINDENT();
-	DINSTR(wmem_free(NULL, src_str));
-	DINSTR(wmem_free(NULL, dst_str));
+        DINSTR(gchar *src_str = address_to_str(NULL, &pinfo->src));
+        DINSTR(gchar *dst_str = address_to_str(NULL, &pinfo->dst));
+        DPRINT(("called for frame #%u: %s:%d -> %s:%d (ptype=%d)",
+                pinfo->num, src_str, pinfo->srcport,
+                dst_str, pinfo->destport, pinfo->ptype));
+        DINDENT();
+        DINSTR(wmem_free(NULL, src_str));
+        DINSTR(wmem_free(NULL, dst_str));
 
-	/* Have we seen this conversation before? */
-	if (pinfo->use_endpoint) {
-		DISSECTOR_ASSERT(pinfo->conv_endpoint);
-		if ((conv = find_conversation(pinfo->num, &pinfo->conv_endpoint->addr1, &pinfo->conv_endpoint->addr2,
-					      pinfo->conv_endpoint->etype, pinfo->conv_endpoint->port1,
-					      pinfo->conv_endpoint->port2, pinfo->conv_endpoint->options)) != NULL) {
-			DPRINT(("found previous conversation for frame #%u (last_frame=%d)",
-					pinfo->num, conv->last_frame));
-			if (pinfo->num > conv->last_frame) {
-				conv->last_frame = pinfo->num;
-			}
-		}
-	} else {
-		if ((conv = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst,
-					      conversation_pt_to_endpoint_type(pinfo->ptype), pinfo->srcport,
-					      pinfo->destport, options)) != NULL) {
-			DPRINT(("found previous conversation for frame #%u (last_frame=%d)",
-					pinfo->num, conv->last_frame));
-			if (pinfo->num > conv->last_frame) {
-				conv->last_frame = pinfo->num;
-			}
-		}
-	}
+        /* Have we seen this conversation before? */
+        if (pinfo->use_endpoint) {
+                DISSECTOR_ASSERT(pinfo->conv_endpoint);
+                if ((conv = find_conversation(pinfo->num, &pinfo->conv_endpoint->addr1, &pinfo->conv_endpoint->addr2,
+                                              pinfo->conv_endpoint->etype, pinfo->conv_endpoint->port1,
+                                              pinfo->conv_endpoint->port2, pinfo->conv_endpoint->options)) != NULL) {
+                        DPRINT(("found previous conversation for frame #%u (last_frame=%d)",
+                                        pinfo->num, conv->last_frame));
+                        /* is other_conv necessary here ? */
+                }
+        } else {
+                if ((conv = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst,
+                                              conversation_pt_to_endpoint_type(pinfo->ptype), pinfo->srcport,
+                                              pinfo->destport, options)) != NULL) {
+                        DPRINT(("found previous conversation for frame #%u (last_frame=%d)",
+                                        pinfo->num, conv->last_frame));
 
-	DENDENT();
+                        /*
+                         * When conversations reuse the same ports, we might not identify the correct conversation
+                         * and it's necessary to check if there's already a newer conversation in the other direction
+                         * A similar check was first performed in packet-tcp, and was moved here
+                         */
+                        other_conv = find_conversation(pinfo->num, &pinfo->dst, &pinfo->src, ENDPOINT_TCP,
+                                                       pinfo->destport, pinfo->srcport, 0);
+                        if (other_conv != NULL) {
+                            /* switch conversation if it is newer */
+                            if(other_conv->conv_index > conv->conv_index) {
+                                conv = other_conv;
+                            }
+                        }
+                }
 
-	return conv;
+
+        }
+
+        DENDENT();
+
+        return conv;
 }
 
 /*  A helper function that calls find_conversation() and, if a conversation is
