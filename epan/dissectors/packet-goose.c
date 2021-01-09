@@ -75,6 +75,8 @@ static int hf_goose_length = -1;
 static int hf_goose_reserve1 = -1;
 static int hf_goose_reserve1_s_bit = -1;
 static int hf_goose_reserve2 = -1;
+static int hf_goose_float_value = -1;
+
 
 /* Bit fields in the Reserved fields */
 #define F_RESERVE1_S_BIT  0x8000
@@ -88,6 +90,11 @@ typedef struct _goose_chk_data{
 static expert_field ei_goose_mal_utctime = EI_INIT;
 static expert_field ei_goose_zero_pdu = EI_INIT;
 static expert_field ei_goose_invalid_sim = EI_INIT;
+
+static gboolean goose_display_float_values = FALSE;
+
+#define SINGLE_FLOAT_EXP_BITS	8
+#define FLOAT_ENC_LENGHT		5
 
 
 /*--- Included file: packet-goose-hf.c ---*/
@@ -153,7 +160,7 @@ static int hf_goose_mMSString = -1;               /* MMSString */
 static int hf_goose_utc_time = -1;                /* UtcTime */
 
 /*--- End of included file: packet-goose-hf.c ---*/
-#line 85 "./asn1/goose/packet-goose-template.c"
+#line 92 "./asn1/goose/packet-goose-template.c"
 
 /* Initialize the subtree pointers */
 static int ett_r_goose = -1;
@@ -188,7 +195,7 @@ static gint ett_goose_SEQUENCE_OF_Data = -1;
 static gint ett_goose_Data = -1;
 
 /*--- End of included file: packet-goose-ett.c ---*/
-#line 98 "./asn1/goose/packet-goose-template.c"
+#line 105 "./asn1/goose/packet-goose-template.c"
 
 
 /*--- Included file: packet-goose-fn.c ---*/
@@ -550,10 +557,6 @@ dissect_goose_UtcTime(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _
 		proto_tree_add_string(tree, hf_index, tvb, offset, len, ptime);
 	}
 
-	return offset;
-
-
-
 
 
   return offset;
@@ -621,8 +624,19 @@ dissect_goose_BIT_STRING(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offse
 
 static int
 dissect_goose_FloatingPoint(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+#line 68 "./asn1/goose/goose.cnf"
+	tvbuff_t *value;
+	int len = tvb_reported_length_remaining(tvb, offset);
   offset = dissect_ber_octet_string(implicit_tag, actx, tree, tvb, offset, hf_index,
-                                       NULL);
+                                       &value);
+
+	if (goose_display_float_values){
+		if ( (value) && (len == FLOAT_ENC_LENGHT) && (tvb_get_guint8(value,0) == SINGLE_FLOAT_EXP_BITS) ){
+			/* IEEE 754 single precision floating point */
+			proto_tree_add_item(tree, hf_goose_float_value, value, 1, (FLOAT_ENC_LENGHT-1), ENC_BIG_ENDIAN);
+		}
+	}
+
 
   return offset;
 }
@@ -770,7 +784,7 @@ dissect_goose_GOOSEpdu(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset 
 
 
 /*--- End of included file: packet-goose-fn.c ---*/
-#line 100 "./asn1/goose/packet-goose-template.c"
+#line 107 "./asn1/goose/packet-goose-template.c"
 
 static dissector_handle_t goose_handle = NULL;
 static dissector_handle_t ositp_handle = NULL;
@@ -1221,11 +1235,15 @@ void proto_register_goose(void) {
 
 		{ &hf_goose_reserve1_s_bit,
 		{ "Simulated",	"goose.reserve1.s_bit",
-		  FT_BOOLEAN, 16, NULL, F_RESERVE1_S_BIT, "BOOLEAN", HFILL } },
+		  FT_BOOLEAN, 16, NULL, F_RESERVE1_S_BIT, NULL, HFILL } },
 
 		{ &hf_goose_reserve2,
 		{ "Reserved 2", "goose.reserve2",
 		  FT_UINT16, BASE_HEX_DEC, NULL, 0x0, NULL, HFILL }},
+
+		{ &hf_goose_float_value,
+		{ "float value", "goose.float_value",
+		  FT_FLOAT, BASE_NONE, NULL, 0x0, NULL, HFILL }},
 
 
 /*--- Included file: packet-goose-hfarr.c ---*/
@@ -1377,7 +1395,7 @@ void proto_register_goose(void) {
     { &hf_goose_simulation,
       { "simulation", "goose.simulation",
         FT_BOOLEAN, BASE_NONE, NULL, 0,
-        NULL, HFILL }},
+        "BOOLEAN", HFILL }},
     { &hf_goose_ndsCom,
       { "ndsCom", "goose.ndsCom",
         FT_BOOLEAN, BASE_NONE, NULL, 0,
@@ -1468,7 +1486,7 @@ void proto_register_goose(void) {
         "UtcTime", HFILL }},
 
 /*--- End of included file: packet-goose-hfarr.c ---*/
-#line 557 "./asn1/goose/packet-goose-template.c"
+#line 568 "./asn1/goose/packet-goose-template.c"
 	};
 
 	/* List of subtrees */
@@ -1504,7 +1522,7 @@ void proto_register_goose(void) {
     &ett_goose_Data,
 
 /*--- End of included file: packet-goose-ettarr.c ---*/
-#line 571 "./asn1/goose/packet-goose-template.c"
+#line 582 "./asn1/goose/packet-goose-template.c"
 	};
 
 	static ei_register_info ei[] = {
@@ -1520,6 +1538,7 @@ void proto_register_goose(void) {
 	};
 
 	expert_module_t* expert_goose;
+	module_t *goose_module;
 
 	/* Register protocol */
 	proto_goose = proto_register_protocol(GOOSE_PNAME, GOOSE_PSNAME, GOOSE_PFNAME);
@@ -1532,6 +1551,11 @@ void proto_register_goose(void) {
 	proto_register_subtree_array(ett, array_length(ett));
 	expert_goose = expert_register_protocol(proto_goose);
 	expert_register_field_array(expert_goose, ei, array_length(ei));
+
+	goose_module = prefs_register_protocol(proto_goose, NULL);
+	prefs_register_bool_preference(goose_module, "display_float_values",
+		"Display decimal representation of float values",
+		NULL, &goose_display_float_values);
 }
 
 /*--- proto_reg_handoff_goose --- */
