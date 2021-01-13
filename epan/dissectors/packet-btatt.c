@@ -22,6 +22,7 @@
 #include <epan/tap.h>
 #include <epan/proto_data.h>
 #include <epan/unit_strings.h>
+#include <epan/reassemble.h>
 
 #include "packet-bluetooth.h"
 #include "packet-btatt.h"
@@ -32,6 +33,12 @@
 #include "packet-btmesh.h"
 
 #define HANDLE_TVB -1
+
+#define PINFO_FD_VISITED(pinfo)   ((pinfo)->fd->visited)
+
+/* packet reassembly */
+static reassembly_table msg_reassembly_table;
+/* end packet reassebly */
 
 /* Initialize the protocol and registered fields */
 static int proto_btatt = -1;
@@ -2107,6 +2114,8 @@ static gint ett_btgatt_microbit_magnetometer = -1;
 static gint ett_btgatt_microbit_pin_data = -1;
 static gint ett_btgatt_microbit_pin_ad_config = -1;
 static gint ett_btgatt_microbit_pin_io_config = -1;
+static gint ett_msg_fragment = -1;
+static gint ett_msg_fragments = -1;
 
 static expert_field ei_btatt_uuid_format_unknown = EI_INIT;
 static expert_field ei_btatt_handle_too_few = EI_INIT;
@@ -2136,6 +2145,40 @@ static dissector_handle_t usb_hid_boot_mouse_input_report_handle;
 static dissector_handle_t btmesh_proxy_handle;
 
 static dissector_table_t att_handle_dissector_table;
+
+static int hf_msg_fragments = -1;
+static int hf_msg_fragment = -1;
+static int hf_msg_fragment_overlap = -1;
+static int hf_msg_fragment_overlap_conflicts = -1;
+static int hf_msg_fragment_multiple_tails = -1;
+static int hf_msg_fragment_too_long_fragment = -1;
+static int hf_msg_fragment_error = -1;
+static int hf_msg_fragment_count = -1;
+static int hf_msg_reassembled_in = -1;
+static int hf_msg_reassembled_length = -1;
+static int hf_msg_reassembled_data = -1;
+
+static const fragment_items msg_frag_items = {
+    /* Fragment subtrees */
+    &ett_msg_fragment,
+    &ett_msg_fragments,
+    /* Fragment fields */
+    &hf_msg_fragments,
+    &hf_msg_fragment,
+    &hf_msg_fragment_overlap,
+    &hf_msg_fragment_overlap_conflicts,
+    &hf_msg_fragment_multiple_tails,
+    &hf_msg_fragment_too_long_fragment,
+    &hf_msg_fragment_error,
+    &hf_msg_fragment_count,
+    /* Reassembled in field */
+    &hf_msg_reassembled_in,
+    /* Reassembled length field */
+    &hf_msg_reassembled_length,
+    &hf_msg_reassembled_data,
+    /* Tag */
+    "Message fragments"
+};
 
 extern value_string_ext ext_usb_vendors_vals;
 
@@ -10735,7 +10778,9 @@ dissect_btatt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
     guint16            handle;
     bluetooth_uuid_t   uuid;
     guint              mtu;
-
+/* desegmentation stuff */
+    int deseg_offset = 0;
+/*end desgementation stuff */
     memset(&uuid, 0, sizeof uuid);
 
     bluetooth_data = (bluetooth_data_t *) data;
@@ -10770,11 +10815,8 @@ dissect_btatt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
     opcode = tvb_get_guint8(tvb, 0);
     att_data.opcode = opcode;
     offset++;
-
     request_data = get_request(tvb, offset, pinfo, opcode, bluetooth_data);
-
     col_append_str(pinfo->cinfo, COL_INFO, val_to_str_const(opcode, opcode_vals, "<unknown>"));
-
     switch (opcode) {
     case 0x01: /* Error Response */
         {
@@ -11331,12 +11373,15 @@ dissect_btatt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
     case 0x1d: /* Handle Value Indication */
     case 0x52: /* Write Command */
     case 0x1b: /* Handle Value Notification */
+        again:
         offset = dissect_handle(main_tree, pinfo, hf_btatt_handle, tvb, offset, bluetooth_data, &uuid, HANDLE_TVB);
         handle = tvb_get_letohs(tvb, offset - 2);
-
         col_append_info_by_handle(pinfo, handle, bluetooth_data);
 
+        printf("martin: start dissect value\n");
+        //adds opcode & handel, then returns bc. 0x2700 not BTLE defined
         offset = dissect_attribute_value(main_tree, NULL, pinfo, tvb, offset, tvb_captured_length_remaining(tvb, offset), tvb_get_guint16(tvb, offset - 2, ENC_LITTLE_ENDIAN), uuid, &att_data);
+        printf("martin: finish dissect value\n");
 
         if (!pinfo->fd->visited && bluetooth_data && (opcode == 0x12 || opcode == 0x1d)) {
             union request_parameters_union  request_parameters;
@@ -11345,6 +11390,68 @@ dissect_btatt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
             request_parameters.read_write.offset = 0;
 
             save_request(pinfo, opcode, request_parameters, bluetooth_data);
+        }
+
+        /* Did the subdissector ask us to desegment some more data
+         * before it could handle the packet?
+         * If so we have to create some structures in our table but
+         * this is something we only do the first time we see this
+         * packet.
+         */
+        printf("martin: start desegemtn pkt:%i\n",pinfo->num);
+        printf("martin: desgement_len:%i desegment_off: %i\n",pinfo->desegment_len,pinfo->desegment_offset);
+
+        if(pinfo->desegment_len) {
+            if (!PINFO_FD_VISITED(pinfo))
+
+            /*
+             * Set "deseg_offset" to the offset in "tvb"
+             * of the first byte of data that the
+             * subdissector didn't process.
+             */
+            deseg_offset = offset + pinfo->desegment_offset;
+
+            tvbuff_t *new_tvb = NULL;
+            fragment_item *frag_msg = NULL;
+            pinfo->fragmented = TRUE;
+            guint32 msg_seqid = handle << sizeof(opcode) | opcode;
+            pinfo->srcport = handle;
+            pinfo->destport = opcode;
+            frag_msg = fragment_add_seq_check(&msg_reassembly_table,
+                                              tvb, deseg_offset, pinfo,
+                                              msg_seqid, NULL,                                  /* ID for fragments belonging together */
+                                              pinfo->num,                                     /* fragment sequence number */
+                                              tvb_captured_length_remaining(tvb, deseg_offset), /* fragment length - to the end */
+                                              TRUE);                                            /* More fragments? */
+            new_tvb = process_reassembled_data(tvb, offset, pinfo,
+                                               "Reassembled Message", frag_msg, &msg_frag_items,
+                                               NULL, main_tree);
+
+            if (frag_msg)
+            { /* Reassembled */
+                col_append_str(pinfo->cinfo, COL_INFO,
+                               "Last Pckt (Message Reassembled)");
+            }
+            else
+            { /* Not last packet of reassembled Short Message */
+                col_append_fstr(pinfo->cinfo, COL_INFO,
+                                "(Message fragment %u)", pinfo->num);
+            }
+
+            printf("martin: new tvb assigned for dissect: %s\n", (new_tvb) ? "true" : "false");
+            if (new_tvb)
+            { /* take it all */
+                tvb = new_tvb;
+            }
+            else
+            { /* make a new subset */
+                tvb = tvb_new_subset_remaining(tvb, offset);
+            }
+            goto again;
+        }
+        else
+        { /* Not fragmented */
+            tvb = tvb_new_subset_remaining(tvb, offset);
         }
         break;
 
@@ -11469,15 +11576,16 @@ dissect_btatt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
             sub_item = proto_tree_add_uint(main_tree, hf_request_in_frame, tvb, 0, 0, request_data->request_in_frame);
             proto_item_set_generated(sub_item);
         }
-
+printf("martin after lua?8\n");
         if (!pinfo->fd->visited && request_data->response_in_frame == 0 &&
                 pinfo->num > request_data->request_in_frame)
             request_data->response_in_frame = pinfo->num;
-
+printf("martin before lua?9\n");
         if (request_data->response_in_frame > 0 && request_data->response_in_frame != pinfo->num) {
             sub_item = proto_tree_add_uint(main_tree, hf_response_in_frame, tvb, 0, 0, request_data->response_in_frame);
             proto_item_set_generated(sub_item);
         }
+        printf("martin before lua?10\n");
     }
 
     return offset;
@@ -11945,12 +12053,19 @@ dissect_btgatt_microbit_temperature_period(tvbuff_t *tvb, packet_info *pinfo _U_
     return offset;
 }
 
+
+
+
 void
 proto_register_btatt(void)
 {
     module_t         *module;
     expert_module_t  *expert_btatt;
 
+    //src_port will be filled wiht handle
+    //dst_port will be filled with opcode
+    reassembly_table_register(&msg_reassembly_table,
+        &addresses_ports_reassembly_table_functions);
 
     static hf_register_info hf[] = {
         {&hf_btatt_opcode,
