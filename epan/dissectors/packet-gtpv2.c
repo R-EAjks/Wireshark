@@ -9367,7 +9367,6 @@ void proto_register_gtpv2(void)
          {"ETHPDN (Ethernet PDN Support Indication)", "gtpv2.ethpdn",
           FT_BOOLEAN, 8, TFS(&tfs_supported_not_supported), 0x01, NULL, HFILL}
         },
-        
         { &hf_gtpv2_sissme,
          {"SISSME (Same IWK-SCEF Selected for Monitoring Event Indication)", "gtpv2.sissme",
           FT_BOOLEAN, 8, NULL, 0x08, NULL, HFILL}
