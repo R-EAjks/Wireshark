@@ -39,10 +39,14 @@ struct asduheader {
 	guint8 TypeId;
 	guint8 TNCause;
 	guint32 IOA;
+
 	guint8 SegmentationControl;
 	guint8 asn;
 	guint8 fir;
 	guint8 fin;
+
+	guint32 USR;
+	
 	guint8 NumIx;
 	guint8 SQ;
 	guint8 DataLength;
@@ -247,6 +251,7 @@ static const value_string u_types[] = {
 #define S_KS_NA_1  85    /* session key status									*/
 #define S_KC_NA_1  86    /* session key change									*/
 #define S_ER_NA_1  87    /* authentication error								*/
+#define S_CU_NA_1  88    /* user certificate      								*/
 #define S_US_NA_1  90    /* user status change									*/
 #define S_UQ_NA_1  91    /* update key change request								*/
 #define S_UR_NA_1  92    /* update key change reply								*/
@@ -736,6 +741,8 @@ static int hf_ioa    = -1;
 static int hf_asn  = -1;
 static int hf_fir  = -1;
 static int hf_fin  = -1;
+
+static int hf_usr  = -1;
 
 static int hf_cp24time  = -1;
 static int hf_cp24time_ms  = -1;
@@ -1490,14 +1497,13 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 			/* (packet details window) info to show for result_text */
 			/* 'ASDU Details': ROOT ITEM */
 			proto_item_append_text(it104, ": %s '%s'", wmem_strbuf_get_str(result_text),
-					       Len >= offset + parms->ioa_len ? val_to_str_const(asduh.TypeId, asdu_lngtypes, "<Unknown TypeId>") : "");	
+					       Len >= offset + parms->ioa_len ? val_to_str_const(asduh.TypeId, asdu_lngtypes, "<Unknown TypeId>") : "");
 			
 			break;
 
 		case S_CH_NA_1:
 		case S_RP_NA_1:
 		case S_AR_NA_1:
-		case S_KR_NA_1:
 		case S_KS_NA_1:
 		case S_KC_NA_1:
 		case S_ER_NA_1:
@@ -1509,7 +1515,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 		case S_UC_NA_1:
 		       
 			/* 60870-5-7 par 7.2.6 Segmentation Control */
-			asduh.SegmentationControl = tvb_get_guint8(tvb, offset);
+			asduh.IOA = tvb_get_letohs(tvb, offset);
 
 			asduh.asn = asduh.SegmentationControl & F_ASN;
 			asduh.fir = asduh.SegmentationControl & F_FIR;
@@ -1534,7 +1540,38 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 			proto_item_append_text(it104, ": %s '%s'", wmem_strbuf_get_str(result_text),
 					       Len >= offset + parms->ioa_len ? val_to_str_const(asduh.TypeId, asdu_lngtypes, "<Unknown TypeId>") : "");	
 			
-			break;			
+			break;
+
+		case S_KR_NA_1:
+
+
+			/* IEC/TS 62351-5:2013 psr 7.2.4.4 USR User Number */
+			asduh.USR = tvb_get_guint8(tvb, offset);
+
+			proto_tree_add_item_ret_uint(it104tree, hf_usr, tvb, offset, 2, ENC_LITTLE_ENDIAN, &asduh.USR);
+			offset += 2;
+						
+			/* add to result_text Segmentation Control */
+			if (asduh.NumIx == 1) {
+				wmem_strbuf_append_printf(result_text, " USR=%d", asduh.USR);
+			}
+
+			/* (packet list window) info to show for result_text */
+			col_append_str(pinfo->cinfo, COL_INFO, wmem_strbuf_get_str(result_text));
+			col_set_fence(pinfo->cinfo, COL_INFO);
+
+			/* (packet details window) info to show for result_text */
+			/* 'ASDU Details': ROOT ITEM */
+			proto_item_append_text(it104, ": %s '%s'", wmem_strbuf_get_str(result_text),
+					       Len >= offset ? val_to_str_const(asduh.TypeId, asdu_lngtypes, "<Unknown TypeId>") : "");
+#if 0
+			printf("Len = %d\n", Len);
+			printf("offset = %d\n", offset);
+			printf("parms->ioa_len = %d\n", parms->ioa_len);
+#endif
+			
+			break;
+			
 		default:
 			break;
 
@@ -1837,6 +1874,12 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 				} /* end 'switch (asduh.TypeId)' */
 			} /* end 'for(i = 0; i < dui.asdu_vsq_no_of_obj; i++)' */
 			break;
+
+		case S_KR_NA_1:
+			
+			offset = Len;
+
+			break;
 		default:
 			proto_tree_add_item(it104tree, hf_ioa, tvb, offset, 3, ENC_LITTLE_ENDIAN);
 			offset += 3;
@@ -2115,6 +2158,10 @@ proto_register_iec60870_asdu_sec(void)
 		{ &hf_fin,
 		  { "Final", "iec60870_asdu.fin", FT_BOOLEAN, 8, NULL, F_FIN,
 		    NULL, HFILL }},
+
+		{ &hf_usr,
+		  { "USR", "iec60870_asdu.usr", FT_UINT16, BASE_DEC, NULL, 0x0,
+		    "User Number", HFILL }},
 		
 		{ &hf_ioa,
 		  { "IOA", "iec60870_asdu.ioa", FT_UINT24, BASE_DEC, NULL, 0x0,
