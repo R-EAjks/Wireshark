@@ -4,7 +4,7 @@
  * Security extensions to IEC 60870-5-101 and IEC 60870-5-104 protocols (applying IEC 62351)
  *
  * Copyright (c) 2020 by Maurizio Greci <greci.maurizio@gmail.com>
- * Module based on packet-iec104-sec.c
+ * Module based on packet-iec104.c
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -711,6 +711,33 @@ static const value_string qrp_r_types[] = {
 	{ 0, NULL }
 };
 
+static const value_string kwa_r_types[] = {
+	{ 0,		"Not used" },
+	{ 1,		"AES-128 Key Wrap Algorithm" },
+	{ 2,		"AES-256 Key Wrap Algorithm" },
+	{ 0, NULL }
+};
+
+static const value_string kst_r_types[] = {
+	{ 0,		"Not used" },
+	{ 1,		"OK. There have been no communications failures or restarts since the last time the controlled station received an authentic Key Change message. The Session Keys are valid." },
+	{ 2,		"NOT INIT. The controlled station has not received an authentic Key Change message since it last started up. The Session Keys are not valid." },
+	{ 3,		"COMM FAIL. The controlled station has detected a communications failure in either the control or monitoring direction. The Session Keys are not valid." },
+	{ 4,		"AUTH FAIL. The controlled station has received a non-authentic Challenge or Aggressive." },
+	{ 0, NULL }
+};
+
+static const value_string hal_r_types[] = {
+	{ 0, 		"reserved" },
+	{ 1, 		"reserved" },
+	{ 2, 		"reserved" },
+	{ 3, 		"HMAC-SHA-256 truncated to 8 octets (serial)" },
+	{ 4, 		"HMAC-SHA-256 truncated to 16 octets (networked)" },
+	{ 5, 		"reserved" },
+	{ 6, 		"AES-GMAC (output is 12 octets)" },
+	{ 0, NULL }
+};
+
 static const true_false_string tfs_blocked_not_blocked = { "Blocked", "Not blocked" };
 static const true_false_string tfs_substituted_not_substituted = { "Substituted", "Not Substituted" };
 static const true_false_string tfs_not_topical_topical = { "Not Topical", "Topical" };
@@ -1392,7 +1419,13 @@ static void get_KST(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*    HAL = MAC algorithm (Enumerated value) defined in 7.2.6.6 of IEC/TS 62351-5:2013                */
+/*    HAL = MAC algorithm (Enumerated value) defined in 7.2.6.6 of IEC/TS 62351-5:2013 
+
+      Using this value, the controlled station shall specify the algorithm that the controlling station
+      shall use to calculate the MAC Value in this message, as described in 7.2.6.9, and shall also
+      specify the resulting length of the MAC Value.
+      The enumerated values used to specify the MAC algorithm are defined in 7.2.2.4, except for the following:
+      <0> := No MAC Value in this message. */
 /******************************************************************************************************/
 static void get_HAL(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
 {
@@ -2304,15 +2337,15 @@ proto_register_iec60870_asdu_sec(void)
 		    "User Number", HFILL }},
 
 		{ &hf_secure_kwa,
-		  { "KWA", "iec60870_asdu.kwa", FT_UINT8, BASE_DEC, NULL, 0x0,
+		  { "KWA", "iec60870_asdu.kwa", FT_UINT8, BASE_DEC, VALS(kwa_r_types), 0x0,
 		    "Key wrap algorithm", HFILL }},
 
 		{ &hf_secure_kst,
-		  { "KST", "iec60870_asdu.kst", FT_UINT8, BASE_DEC, NULL, 0x0,
+		  { "KST", "iec60870_asdu.kst", FT_UINT8, BASE_DEC, VALS(kst_r_types), 0x0,
 		    "Key status", HFILL }},
 
 		{ &hf_secure_hal,
-		  { "HAL", "iec60870_asdu.hal", FT_UINT8, BASE_DEC, NULL, 0x0,
+		  { "HAL", "iec60870_asdu.hal", FT_UINT8, BASE_DEC, VALS(hal_r_types), 0x0,
 		    "MAC algorithm", HFILL }},
 
 		{ &hf_secure_cln,
