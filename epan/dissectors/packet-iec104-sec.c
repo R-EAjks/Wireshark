@@ -1,12 +1,10 @@
-/* packet-iec104.c
- * Routines for IEC-60870-5-101 & 104 Protocol disassembly
+/* packet-iec104-sec.c
  *
- * Copyright (c) 2008 by Joan Ramio <joan@ramio.cat>
- * Joan is a masculine catalan name. Search the Internet for Joan Pujol (alias Garbo).
+ * Routines for IEC-60870-5-7
+ * Security extensions to IEC 60870-5-101 and IEC 60870-5-104 protocols (applying IEC 62351)
  *
- * Copyright (c) 2009 by Kjell Hultman <kjell.hultman@gmail.com>
- * Added dissection of signal (ASDU) information.
- * Kjell is also a masculine name, but a Scandinavian one.
+ * Copyright (c) 2020 by Maurizio Greci <greci.maurizio@gmail.com>
+ * Module based on packet-iec104-sec.c
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -167,12 +165,12 @@ static const value_string apci_types [] = {
 
 /* Constants relative to the filed, independent of the field position in the byte */
 /* U (Unnumbered) constants */
-#define U_STARTDT_ACT 		0x01
-#define U_STARTDT_CON	 	0x02
-#define U_STOPDT_ACT 		0x04
-#define U_STOPDT_CON	 	0x08
-#define U_TESTFR_ACT 		0x10
-#define U_TESTFR_CON	 	0x20
+#define U_STARTDT_ACT 	0x01
+#define U_STARTDT_CON	0x02
+#define U_STOPDT_ACT 	0x04
+#define U_STOPDT_CON	0x08
+#define U_TESTFR_ACT 	0x10
+#define U_TESTFR_CON	0x20
 
 static const value_string u_types[] = {
 	{ U_STARTDT_ACT,		"STARTDT act" },
@@ -339,6 +337,7 @@ static const value_string asdu_types [] = {
 	{  S_KS_NA_1,	"S_KS_NA_1" },
 	{  S_KC_NA_1,	"S_KC_NA_1" },
 	{  S_ER_NA_1,	"S_ER_NA_1" },
+	{  S_CU_NA_1,	"S_CU_NA_1" },
 	{  S_US_NA_1,	"S_US_NA_1" },
 	{  S_UQ_NA_1,	"S_UQ_NA_1" },
 	{  S_UR_NA_1,	"S_UR_NA_1" },
@@ -419,6 +418,7 @@ static const value_string asdu_lngtypes [] = {
 	{  S_KS_NA_1,	"session key status" },
 	{  S_KC_NA_1,	"session key change" },
 	{  S_ER_NA_1,	"authentication error" },
+	{  S_CU_NA_1,	"user certificate" },
 	{  S_US_NA_1,	"user status change" },
 	{  S_UQ_NA_1,	"update key change request" },
 	{  S_UR_NA_1,	"update key change reply" },
@@ -504,6 +504,7 @@ static const td_asdu_length asdu_length [] = {
 	{  S_KS_NA_1,    0 },
 	{  S_KC_NA_1,    0 },
 	{  S_ER_NA_1,    0 },
+	{  S_CU_NA_1,    0 },
 	{  S_US_NA_1,    0 },
 	{  S_UQ_NA_1,    0 },
 	{  S_UR_NA_1,    0 },
@@ -738,11 +739,16 @@ static int hf_oa     = -1;
 static int hf_addr   = -1;
 static int hf_ioa    = -1;
 
-static int hf_asn  = -1;
-static int hf_fir  = -1;
-static int hf_fin  = -1;
+static int hf_secure_asn  = -1;
+static int hf_secure_fir  = -1;
+static int hf_secure_fin  = -1;
 
-static int hf_usr  = -1;
+static int hf_secure_ksq  = -1;
+static int hf_secure_usr  = -1;
+static int hf_secure_kwa  = -1;
+static int hf_secure_kst  = -1;
+static int hf_secure_hal  = -1;
+static int hf_secure_cln  = -1;
 
 static int hf_cp24time  = -1;
 static int hf_cp24time_ms  = -1;
@@ -803,6 +809,9 @@ static int hf_coi_r  = -1;
 static int hf_coi_i  = -1;
 static int hf_qoi  = -1;
 static int hf_qrp  = -1;
+
+static int hf_tsc  = -1;
+
 static int hf_bcr_count = -1;
 static int hf_bcr_sq = -1;
 static int hf_bcr_cy = -1;
@@ -1126,6 +1135,9 @@ static void get_SVA(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 	(*offset) += 2;
 }
 
+/******************************************************************************************************/
+/*                                                                                                    */
+/******************************************************************************************************/
 static void get_SVAspt(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	/* Scaled value I16[1..16]<-2^15..+2^15-1> */
@@ -1145,6 +1157,9 @@ static void get_FLT(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 	(*offset) += 4;
 }
 
+/******************************************************************************************************/
+/*                                                                                                    */
+/******************************************************************************************************/
 static void get_FLTspt(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	/* --------  IEEE 754 float value */
@@ -1163,6 +1178,9 @@ static void get_BSI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 	(*offset) += 4;
 }
 
+/******************************************************************************************************/
+/*                                                                                                    */
+/******************************************************************************************************/
 static void get_BSIspt(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	proto_tree_add_bits_item(iec104_header_tree, hf_asdu_bitstring, tvb, *offset*8, 32, ENC_BIG_ENDIAN);
@@ -1321,7 +1339,79 @@ static void get_QRP(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 
 	(*offset)++;
 }
-/* .... end Misc. functions for dissection of signal values */
+
+/******************************************************************************************************/
+/*    TSC: Test Sequence Counter                                                                      */
+/******************************************************************************************************/
+static void get_TSC(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
+{
+	proto_tree_add_item(iec104_header_tree, hf_tsc, tvb, *offset, 2, ENC_LITTLE_ENDIAN);
+
+	(*offset) += 2;
+}
+
+/******************************************************************************************************/
+/*    KSQ = Key change sequence number defined in 7.2.6.2 of IEC/TS 62351-5:2013                      */
+/******************************************************************************************************/
+static void get_KSQ(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_ksq, tvb, *offset, 4, ENC_LITTLE_ENDIAN);
+
+	(*offset) += 4;
+}
+
+/******************************************************************************************************/
+/*    USR = User number defined in 7.2.4.4 of IEC/TS 62351-5:2013                                     */
+/*                      defined in 7.2.6.3 of IEC/TS 62351-5:2013                                     */
+/******************************************************************************************************/
+static void get_USR(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_usr, tvb, *offset, 2, ENC_LITTLE_ENDIAN);
+
+	(*offset) += 2;
+}
+
+/******************************************************************************************************/
+/*    KWA = Key wrap algorithm (Enumerated value) defined in 7.2.6.4 of IEC/TS 62351-5:2013           */
+/******************************************************************************************************/
+static void get_KWA(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_kwa, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
+
+	(*offset) += 1;
+}
+
+/******************************************************************************************************/
+/*    KST = Key status (Enumerated value) defined in 7.2.6.5 of IEC/TS 62351-5:2013                   */
+/******************************************************************************************************/
+static void get_KST(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_kst, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
+
+	(*offset) += 1;
+}
+
+/******************************************************************************************************/
+/*    HAL = MAC algorithm (Enumerated value) defined in 7.2.6.6 of IEC/TS 62351-5:2013                */
+/******************************************************************************************************/
+static void get_HAL(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_hal, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
+
+	(*offset) += 1;
+}
+
+/******************************************************************************************************/
+/*    CLN = Challenge data length defined in 7.2.6.7 of IEC/TS 62351-5:2013                           */
+/******************************************************************************************************/
+static void get_CLN(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_cln, tvb, *offset, 2, ENC_LITTLE_ENDIAN);
+
+	(*offset) += 2;
+}
+
+/* ... end Misc. functions for dissection of signal values */
 
 /******************************************************************************************************/
 /* Find the IEC60870-5-104 APDU (APDU = APCI + ASDU) length.                                          */
@@ -1403,7 +1493,6 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 	proto_tree_add_item_ret_uint(it104tree, hf_addr, tvb, offset, parms->asdu_addr_len, ENC_LITTLE_ENDIAN, &asduh.Addr);
 	offset += parms->asdu_addr_len;
 
-
 	cause_str = val_to_str(asduh.TNCause & F_CAUSE, causetx_types, " <CauseTx=%u>");
 
 	/* print packet info to show on result_text 
@@ -1454,6 +1543,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 		case C_IC_NA_1:
 		case C_CS_NA_1:
 		case C_RP_NA_1:
+		case C_TS_TA_1:
 		case P_ME_NA_1:
 		case P_ME_NB_1:
 		case P_ME_NC_1:
@@ -1507,6 +1597,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 		case S_KS_NA_1:
 		case S_KC_NA_1:
 		case S_ER_NA_1:
+		case S_CU_NA_1:
 		case S_US_NA_1:
 		case S_UQ_NA_1:
 		case S_UR_NA_1:
@@ -1521,9 +1612,9 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 			asduh.fir = asduh.SegmentationControl & F_FIR;
 			asduh.fin = asduh.SegmentationControl & F_FIN;
 			
-			proto_tree_add_item(it104tree, hf_asn, tvb, offset, 1, ENC_LITTLE_ENDIAN); 
-			proto_tree_add_item(it104tree, hf_fir, tvb, offset, 1, ENC_LITTLE_ENDIAN); 
-			proto_tree_add_item(it104tree, hf_fin, tvb, offset, 1, ENC_LITTLE_ENDIAN); 
+			proto_tree_add_item(it104tree, hf_secure_asn, tvb, offset, 1, ENC_LITTLE_ENDIAN); 
+			proto_tree_add_item(it104tree, hf_secure_fir, tvb, offset, 1, ENC_LITTLE_ENDIAN); 
+			proto_tree_add_item(it104tree, hf_secure_fin, tvb, offset, 1, ENC_LITTLE_ENDIAN); 
 			offset += 1;
 						
 			/* add to result_text Segmentation Control */
@@ -1544,11 +1635,10 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 
 		case S_KR_NA_1:
 
-
 			/* IEC/TS 62351-5:2013 psr 7.2.4.4 USR User Number */
 			asduh.USR = tvb_get_guint8(tvb, offset);
 
-			proto_tree_add_item_ret_uint(it104tree, hf_usr, tvb, offset, 2, ENC_LITTLE_ENDIAN, &asduh.USR);
+			proto_tree_add_item_ret_uint(it104tree, hf_secure_usr, tvb, offset, 2, ENC_LITTLE_ENDIAN, &asduh.USR);
 			offset += 2;
 						
 			/* add to result_text Segmentation Control */
@@ -1625,10 +1715,11 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 		case C_IC_NA_1:
 		case C_CS_NA_1:
 		case C_RP_NA_1:
+		case C_TS_TA_1:
 		case P_ME_NA_1:
 		case P_ME_NB_1:
 		case P_ME_NC_1:
-
+			
 			/* -- object values */
 			for(i = 0; i < asduh.NumIx; i++)
 			{
@@ -1756,7 +1847,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 				case M_SP_TB_1: /* 30	Single-point information with time tag CP56Time2a */
 					get_SIQ(tvb, &offset, trSignal);
 					get_CP56Time(tvb, &offset, trSignal);
-					break;
+					break;					
 				case M_DP_TB_1: /* 31	Double-point information with time tag CP56Time2a */
 					get_DIQ(tvb, &offset, trSignal);
 					get_CP56Time(tvb, &offset, trSignal);
@@ -1857,6 +1948,10 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 				case C_RP_NA_1: /* 105   reset process command  */
 					get_QRP(tvb, &offset, trSignal);
 					break;
+				case C_TS_TA_1: /* 107   test command with time tag CP56Time2a */
+					get_TSC(tvb, &offset, trSignal);
+					get_CP56Time(tvb, &offset, trSignal);
+					break;					
 				case P_ME_NA_1: /* 110   Parameter of measured value, normalized value */
 					get_NVA(tvb, &offset, trSignal);
 					get_QPM(tvb, &offset, trSignal);
@@ -1875,11 +1970,52 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 			} /* end 'for(i = 0; i < dui.asdu_vsq_no_of_obj; i++)' */
 			break;
 
+		case S_CH_NA_1:
+		case S_RP_NA_1:
+		case S_AR_NA_1:
 		case S_KR_NA_1:
+
+		case S_KC_NA_1:
+		case S_ER_NA_1:
+		case S_CU_NA_1:
+		case S_US_NA_1:
+		case S_UQ_NA_1:
+		case S_UR_NA_1:
+		case S_UK_NA_1:
+		case S_UA_NA_1:
+		case S_UC_NA_1:
 			
 			offset = Len;
 
 			break;
+			
+		case S_KS_NA_1:		      			
+
+			/* KSQ = Key change sequence number            defined in 7.2.6.2 of IEC/TS 62351-5:2013 */
+			get_KSQ(tvb, &offset, it104tree);
+
+			/* USR = User Number                           defined in 7.2.6.3 of IEC/TS 62351-5:2013 */
+			get_USR(tvb, &offset, it104tree);
+
+			/* KWA = Key wrap algorithm (Enumerated value) defined in 7.2.6.4 of IEC/TS 62351-5:2013 */
+			get_KWA(tvb, &offset, it104tree);
+
+			/* KST = Key status (Enumerated value)         defined in 7.2.6.5 of IEC/TS 62351-5:2013 */
+			get_KST(tvb, &offset, it104tree);
+
+			/* HAL = MAC algorithm (Enumerated value)      defined in 7.2.6.6 of IEC/TS 62351-5:2013 */
+			get_HAL(tvb, &offset, it104tree);
+			
+			/* CLN = Challenge data length,                defined in 7.2.6.7 of IEC/TS 62351-5:2013 Zero if KST does not equal <0> OK */
+			get_CLN(tvb, &offset, it104tree);
+
+			/* Number of octets specified in CLN Pseudo-random challenge data, defined in 7.2.6.8 of IEC/TS 62351-5:2013 */
+			/* Number of octets specified in HAL MAC value,                    defined in 7.2.6.9 of IEC/TS 62351-5:2013 Only included if KST = <0> OK */
+			
+			offset = Len;
+			
+			break;
+			
 		default:
 			proto_tree_add_item(it104tree, hf_ioa, tvb, offset, 3, ENC_LITTLE_ENDIAN);
 			offset += 3;
@@ -2147,21 +2283,41 @@ proto_register_iec60870_asdu_sec(void)
 		  { "Addr", "iec60870_asdu.addr", FT_UINT16, BASE_DEC, NULL, 0x0,
 		    "Common Address of Asdu", HFILL }},
 
-		{ &hf_asn,
+		{ &hf_secure_asn,
 		  { "ASN", "iec60870_asdu.asn", FT_UINT8, BASE_DEC, NULL, F_ASN,
 		    "ASDU Sequence Number", HFILL }},
 
-		{ &hf_fir,
+		{ &hf_secure_fir,
 		  { "First", "iec60870_asdu.fir", FT_BOOLEAN, 8, NULL, F_FIR,
 		    NULL, HFILL }},
 
-		{ &hf_fin,
+		{ &hf_secure_fin,
 		  { "Final", "iec60870_asdu.fin", FT_BOOLEAN, 8, NULL, F_FIN,
 		    NULL, HFILL }},
 
-		{ &hf_usr,
+		{ &hf_secure_ksq,
+		  { "KSQ", "iec60870_asdu.ksq", FT_UINT32, BASE_DEC, NULL, 0x0,
+		    "Key Change Sequence Number", HFILL }},
+
+		{ &hf_secure_usr,
 		  { "USR", "iec60870_asdu.usr", FT_UINT16, BASE_DEC, NULL, 0x0,
 		    "User Number", HFILL }},
+
+		{ &hf_secure_kwa,
+		  { "KWA", "iec60870_asdu.kwa", FT_UINT8, BASE_DEC, NULL, 0x0,
+		    "Key wrap algorithm", HFILL }},
+
+		{ &hf_secure_kst,
+		  { "KST", "iec60870_asdu.kst", FT_UINT8, BASE_DEC, NULL, 0x0,
+		    "Key status", HFILL }},
+
+		{ &hf_secure_hal,
+		  { "HAL", "iec60870_asdu.hal", FT_UINT8, BASE_DEC, NULL, 0x0,
+		    "MAC algorithm", HFILL }},
+
+		{ &hf_secure_cln,
+		  { "CLN", "iec60870_asdu.cln", FT_UINT16, BASE_DEC, NULL, 0x0,
+		    "Challenge data length", HFILL }},
 		
 		{ &hf_ioa,
 		  { "IOA", "iec60870_asdu.ioa", FT_UINT24, BASE_DEC, NULL, 0x0,
@@ -2403,6 +2559,10 @@ proto_register_iec60870_asdu_sec(void)
 		  { "QRP", "iec60870_asdu.qrp", FT_UINT8, BASE_DEC, VALS(qrp_r_types), 0,
 		    NULL, HFILL }},
 
+		{ &hf_tsc,
+		  { "TSC", "iec60870_asdu.tsc", FT_UINT16, BASE_DEC, NULL, 0,
+		    "Test Sequence Counter", HFILL }},
+				
 		{ &hf_bcr_count,
 		  { "Binary Counter", "iec60870_asdu.bcr.count", FT_INT32, BASE_DEC, NULL, 0x0,
 		    NULL, HFILL }},
