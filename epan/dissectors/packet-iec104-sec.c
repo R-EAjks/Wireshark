@@ -37,17 +37,25 @@ struct asduheader {
 	guint8 TypeId;
 	guint8 TNCause;
 	guint32 IOA;
+	
+	guint8 NumIx;
+	guint8 SQ;
+	guint8 DataLength;
+};
 
+/* the asdu secure structure */
+struct asdu_secure {
 	guint8 SegmentationControl;
 	guint8 asn;
 	guint8 fir;
 	guint8 fin;
 
 	guint32 USR;
-	
-	guint8 NumIx;
-	guint8 SQ;
-	guint8 DataLength;
+	guint32 KST;
+	guint32 MAL;
+	guint32 CLN;
+	guint32 HLN;
+	guint32 WKL;
 };
 
 struct asdu_parms {
@@ -720,14 +728,14 @@ static const value_string kwa_r_types[] = {
 
 static const value_string kst_r_types[] = {
 	{ 0,		"Not used" },
-	{ 1,		"OK. There have been no communications failures or restarts since the last time the controlled station received an authentic Key Change message. The Session Keys are valid." },
-	{ 2,		"NOT INIT. The controlled station has not received an authentic Key Change message since it last started up. The Session Keys are not valid." },
-	{ 3,		"COMM FAIL. The controlled station has detected a communications failure in either the control or monitoring direction. The Session Keys are not valid." },
-	{ 4,		"AUTH FAIL. The controlled station has received a non-authentic Challenge or Aggressive." },
+	{ 1,		"OK" },         /* There have been no communications failures or restarts since the last time the controlled station received an authentic Key Change message. The Session Keys are valid */
+	{ 2,		"NOT INIT" },   /* The controlled station has not received an authentic Key Change message since it last started up. The Session Keys are not valid */
+	{ 3,		"COMM FAIL" },  /* The controlled station has detected a communications failure in either the control or monitoring direction. The Session Keys are not valid */
+	{ 4,		"AUTH FAIL" },  /* The controlled station has received a non-authentic Challenge or Aggressive */
 	{ 0, NULL }
 };
 
-static const value_string hal_r_types[] = {
+static const value_string mal_r_types[] = {
 	{ 0, 		"reserved" },
 	{ 1, 		"reserved" },
 	{ 2, 		"reserved" },
@@ -735,6 +743,12 @@ static const value_string hal_r_types[] = {
 	{ 4, 		"HMAC-SHA-256 truncated to 16 octets (networked)" },
 	{ 5, 		"reserved" },
 	{ 6, 		"AES-GMAC (output is 12 octets)" },
+	{ 0, NULL }
+};
+
+static const value_string rsc_r_types[] = {
+	{ 0, 		"Not used" },
+	{ 1, 		"CRITICAL" },
 	{ 0, NULL }
 };
 
@@ -771,11 +785,23 @@ static int hf_secure_fir  = -1;
 static int hf_secure_fin  = -1;
 
 static int hf_secure_ksq  = -1;
+static int hf_secure_csq  = -1;
+
 static int hf_secure_usr  = -1;
 static int hf_secure_kwa  = -1;
 static int hf_secure_kst  = -1;
-static int hf_secure_hal  = -1;
+static int hf_secure_mal  = -1;
+static int hf_secure_hln  = -1;
+static int hf_secure_rsc  = -1;
+
 static int hf_secure_cln  = -1;
+static int hf_secure_kcd  = -1;
+static int hf_secure_chd  = -1;
+
+static int hf_secure_wkl  = -1;
+static int hf_secure_wkd  = -1;
+
+static int hf_secure_mac  = -1;
 
 static int hf_cp24time  = -1;
 static int hf_cp24time_ms  = -1;
@@ -1056,7 +1082,7 @@ static void get_DIQ(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 {
 	proto_item* ti;
 	proto_tree* diq_tree;
-
+	
 	ti = proto_tree_add_item(iec104_header_tree, hf_diq, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
 	diq_tree = proto_item_add_subtree(ti, ett_diq);
 
@@ -1378,7 +1404,17 @@ static void get_TSC(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*    KSQ = Key change sequence number defined in 7.2.6.2 of IEC/TS 62351-5:2013                      */
+/*    KSQ = Key change sequence number defined in 7.2.6.2 of IEC/TS 62351-5:2013         
+
+      Each controlled station shall maintain a Key change sequence number, which it shall use to
+      match Key Status messages with subsequent Key Change messages. This value shall be
+      initialised to zero on start-up of the controlled station (unless the MAC algorithm is
+      AES-GMAC; refer to 8.3.2.1). The controlled station shall increment the KSQ each time it
+      receives a Key Change or Key Status Request message. (The first KSQ transmitted shall
+      therefore always be 1). If the value reaches 4294967295 (32 bit), the next KSQ the controlled station
+      transmits shall be zero.
+      The controlling station shall not process the KSQ except to include it in subsequent Key Change messages.
+*/
 /******************************************************************************************************/
 static void get_KSQ(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
 {
@@ -1388,12 +1424,29 @@ static void get_KSQ(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*    USR = User number defined in 7.2.4.4 of IEC/TS 62351-5:2013                                     */
-/*                      defined in 7.2.6.3 of IEC/TS 62351-5:2013                                     */
+/*    CSQ = Challeng sequence number defined in 7.2.2.2 of IEC/TS 62351-5:2013         
+
+      Stations shall use this value to match replies with challenges as described in 7.3.3.3.
+*/
 /******************************************************************************************************/
-static void get_USR(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
+static void get_CSQ(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
 {
-	proto_tree_add_item(iec104_header_tree, hf_secure_usr, tvb, *offset, 2, ENC_LITTLE_ENDIAN);
+	proto_tree_add_item(iec104_header_tree, hf_secure_csq, tvb, *offset, 4, ENC_LITTLE_ENDIAN);
+
+	(*offset) += 4;
+}
+
+/******************************************************************************************************/
+/*    USR = User number defined in 7.2.4.4 of IEC/TS 62351-5:2013 defined in 7.2.6.3 of IEC/TS 62351-5:2013  
+      
+      The controlled station shall use this value to identify the set of Session Keys for which it is
+      reporting the current status. This value shall match the value supplied in the previous 
+      Key Status Request message, as described in 7.2.5.2. 
+ */
+/******************************************************************************************************/
+static void get_USR(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 *USR)
+{
+	proto_tree_add_item_ret_uint(iec104_header_tree, hf_secure_usr, tvb, *offset, 2, ENC_LITTLE_ENDIAN, USR);
 
 	(*offset) += 2;
 }
@@ -1411,37 +1464,149 @@ static void get_KWA(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 /******************************************************************************************************/
 /*    KST = Key status (Enumerated value) defined in 7.2.6.5 of IEC/TS 62351-5:2013                   */
 /******************************************************************************************************/
-static void get_KST(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
+static void get_KST(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 *KST)
 {
-	proto_tree_add_item(iec104_header_tree, hf_secure_kst, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
+	proto_tree_add_item_ret_uint(iec104_header_tree, hf_secure_kst, tvb, *offset, 1, ENC_LITTLE_ENDIAN, KST);
 
 	(*offset) += 1;
 }
 
 /******************************************************************************************************/
-/*    HAL = MAC algorithm (Enumerated value) defined in 7.2.6.6 of IEC/TS 62351-5:2013 
+/*    MAL = MAC algorithm (Enumerated value) defined in 7.2.6.6 of IEC/TS 62351-5:2013 
 
       Using this value, the controlled station shall specify the algorithm that the controlling station
       shall use to calculate the MAC Value in this message, as described in 7.2.6.9, and shall also
       specify the resulting length of the MAC Value.
       The enumerated values used to specify the MAC algorithm are defined in 7.2.2.4, except for the following:
-      <0> := No MAC Value in this message. */
+      <0> := No MAC Value in this message. 
+*/
 /******************************************************************************************************/
-static void get_HAL(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
+static void get_MAL(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 *MAL)
 {
-	proto_tree_add_item(iec104_header_tree, hf_secure_hal, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
+	proto_tree_add_item_ret_uint(iec104_header_tree, hf_secure_mal, tvb, *offset, 1, ENC_LITTLE_ENDIAN, MAL);
 
 	(*offset) += 1;
 }
 
 /******************************************************************************************************/
-/*    CLN = Challenge data length defined in 7.2.6.7 of IEC/TS 62351-5:2013                           */
+/*    HLN = MAC Length defined in 7.2.3.4 of IEC/TS 62351-5:2013 
+
+      The MAC Length shall specify the length of the MAC Value in octets. The MAC Length shall
+      be correct for the MAC algorithm specified by the Challenger, as described in 7.2.2.4.
+*/
 /******************************************************************************************************/
-static void get_CLN(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
+static void get_HLN(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 *HLN)
 {
-	proto_tree_add_item(iec104_header_tree, hf_secure_cln, tvb, *offset, 2, ENC_LITTLE_ENDIAN);
+	proto_tree_add_item_ret_uint(iec104_header_tree, hf_secure_hln, tvb, *offset, 2, ENC_LITTLE_ENDIAN, HLN);
 
 	(*offset) += 2;
+}
+
+/******************************************************************************************************/
+/*    CLN = Challenge data length defined in 7.2.6.7 of IEC/TS 62351-5:2013                          
+                                                                                                    
+      This value shall specify the length in octets of the challenge data that follows.               
+      The minimum length of the challenge data shall be eight octets.                                 
+*/
+/******************************************************************************************************/
+static void get_CLN(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 *CLN)
+{
+	proto_tree_add_item_ret_uint(iec104_header_tree, hf_secure_cln, tvb, *offset, 2, ENC_LITTLE_ENDIAN, CLN);
+
+	(*offset) += 2;
+}
+
+/******************************************************************************************************/
+/*    KCD = Key Status pseudo-random challenge data defined in 7.2.6.8 of IEC/TS 62351-5:2013         
+                                                                                                    
+      The controlled station shall include this pseudo-random data in the Key Status message to       
+      ensure that the contents of the Key Status message are not predictable. The pseudo-random       
+      data shall be generated using the algorithm specified in the FIPS 186-2 Digital Signature St    
+*/
+/******************************************************************************************************/
+static void get_KCD(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 CLN)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_kcd, tvb, *offset, CLN, ENC_LITTLE_ENDIAN);
+
+	(*offset) += CLN;
+}
+
+/******************************************************************************************************/
+/*    CHD = Pseudo-random challenge data defined in 7.2.2.7 of IEC/TS 62351-5:2013         
+
+      Stations shall include pseudo-random data in the Challenge message to ensure that the
+      contents of the Challenge message are not predictable. The pseudo-random data shall be
+      generated using the algorithm 3.1 specified in the FIPS 186-2 Digital Signature Standard.
+*/
+/******************************************************************************************************/
+static void get_CHD(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 CLN)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_chd, tvb, *offset, CLN, ENC_LITTLE_ENDIAN);
+
+	(*offset) += CLN;
+}
+
+/******************************************************************************************************/
+/*    WKL = Wrapped key data length, defined in 7.2.7.4 of IEC/TS 62351-5:2013
+
+      This value shall be the length of the data produced by the Key Wrap algorithm, as described
+      in 7.2.7.5.
+*/
+/******************************************************************************************************/
+static void get_WKL(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 *WKL)
+{
+	proto_tree_add_item_ret_uint(iec104_header_tree, hf_secure_wkl, tvb, *offset, 2, ENC_LITTLE_ENDIAN, WKL);
+
+	(*offset) += 2;
+}
+
+/******************************************************************************************************/
+/*    WKD = Wrapper key data defined in 7.2.7.5 of IEC/TS 62351-5:2013         
+
+      This value shall be the result of passing the Session Keys and the most recent Key Status
+      message through the Key Wrap Algorithm defined in the Key Status message.
+*/
+/******************************************************************************************************/
+static void get_WKD(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 WKL)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_wkd, tvb, *offset, WKL, ENC_LITTLE_ENDIAN);
+
+	(*offset) += WKL;
+}
+
+/******************************************************************************************************/
+/*    MAC = Message Authentication Code (Number of octets specified in MAL) defined in 7.2.6.9 of IEC/TS 62351-5:2013 
+      Only included if KST = <1> OK
+
+      The controlled station shall calculate the MAC Value according to the MAC algorithm MAL, as
+      described in 7.2.6.6. The controlled station shall include in the MAC Value calculation the
+      data listed in Table 12, in the order listed. It shall use the Monitoring Direction Session Key
+      from the Key Change message most recently received from the controlling station.
+      Note that this MAC is calculated regardless of whether the Session Keys are currently
+      considered valid. If they are not valid, the outstation shall use the last Monitoring Direction
+      Session Key that was considered valid. If there were no previous Session Keys, the MAL shall
+      be <0> and there shall be no MAC Value included in this message.
+*/
+/******************************************************************************************************/
+static void get_MAC(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 LENGHT_MAC)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_mac, tvb, *offset, LENGHT_MAC, ENC_LITTLE_ENDIAN);
+
+	(*offset) += LENGHT_MAC;
+}
+
+/******************************************************************************************************/
+/*    RSC = Reason for Challenge (Enumerated value) defined in 7.2.2.5 of IEC/TS 62351-5:2013 
+
+      This value explains the Challenger’s reason for making the challenge. The Responder shall
+      use this value to determine what extra data to include when calculating the MAC Value.
+*/
+/******************************************************************************************************/
+static void get_RSC(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_rsc, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
+
+	(*offset) += 1;
 }
 
 /* ... end Misc. functions for dissection of signal values */
@@ -1477,6 +1642,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 	const char *cause_str;
 	size_t Ind;
 	struct asduheader asduh = { .OA = 0, .Addr = 0, .IOA = 0};
+	struct asdu_secure asdu_secure;
 	struct asdu_parms* parms = (struct asdu_parms*)data;
 	proto_item *it104;
 	proto_tree *it104tree;
@@ -1488,6 +1654,8 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 	proto_item * itSignal = NULL;
 	proto_tree * trSignal;
 
+	memset(&asdu_secure, 0, sizeof(asdu_secure));
+	
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "IEC 60870-5-104 ASDU SEC");
 
 	it104 = proto_tree_add_item(tree, proto_iec60870_asdu, tvb, offset, -1, ENC_NA);
@@ -1641,9 +1809,9 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 			/* 60870-5-7 par 7.2.6 Segmentation Control */
 			asduh.IOA = tvb_get_letohs(tvb, offset);
 
-			asduh.asn = asduh.SegmentationControl & F_ASN;
-			asduh.fir = asduh.SegmentationControl & F_FIR;
-			asduh.fin = asduh.SegmentationControl & F_FIN;
+			asdu_secure.asn = asdu_secure.SegmentationControl & F_ASN;
+			asdu_secure.fir = asdu_secure.SegmentationControl & F_FIR;
+			asdu_secure.fin = asdu_secure.SegmentationControl & F_FIN;
 			
 			proto_tree_add_item(it104tree, hf_secure_asn, tvb, offset, 1, ENC_LITTLE_ENDIAN); 
 			proto_tree_add_item(it104tree, hf_secure_fir, tvb, offset, 1, ENC_LITTLE_ENDIAN); 
@@ -1652,7 +1820,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 						
 			/* add to result_text Segmentation Control */
 			if (asduh.NumIx == 1) {
-				wmem_strbuf_append_printf(result_text, " ASN=%d", asduh.asn);
+				wmem_strbuf_append_printf(result_text, " ASN=%d", asdu_secure.asn);
 			}
 
 			/* (packet list window) info to show for result_text */
@@ -1669,14 +1837,11 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 		case S_KR_NA_1:
 
 			/* IEC/TS 62351-5:2013 psr 7.2.4.4 USR User Number */
-			asduh.USR = tvb_get_guint8(tvb, offset);
-
-			proto_tree_add_item_ret_uint(it104tree, hf_secure_usr, tvb, offset, 2, ENC_LITTLE_ENDIAN, &asduh.USR);
-			offset += 2;
+			get_USR(tvb, &offset, it104tree, &asdu_secure.USR);
 						
 			/* add to result_text Segmentation Control */
 			if (asduh.NumIx == 1) {
-				wmem_strbuf_append_printf(result_text, " USR=%d", asduh.USR);
+				wmem_strbuf_append_printf(result_text, " USR=%d", asdu_secure.USR);
 			}
 
 			/* (packet list window) info to show for result_text */
@@ -2003,12 +2168,8 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 			} /* end 'for(i = 0; i < dui.asdu_vsq_no_of_obj; i++)' */
 			break;
 
-		case S_CH_NA_1:
-		case S_RP_NA_1:
-		case S_AR_NA_1:
 		case S_KR_NA_1:
-
-		case S_KC_NA_1:
+		case S_AR_NA_1:
 		case S_ER_NA_1:
 		case S_CU_NA_1:
 		case S_US_NA_1:
@@ -2021,33 +2182,63 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 			offset = Len;
 
 			break;
-			
-		case S_KS_NA_1:		      			
 
-			/* KSQ = Key change sequence number            defined in 7.2.6.2 of IEC/TS 62351-5:2013 */
+		case S_KC_NA_1: /* 86 session key change */
+
 			get_KSQ(tvb, &offset, it104tree);
+			get_USR(tvb, &offset, it104tree, NULL);
+			get_WKL(tvb, &offset, it104tree, &asdu_secure.WKL);
+			if (asdu_secure.WKL > 0)
+				get_WKD(tvb, &offset, it104tree, asdu_secure.WKL);
+			break;			
+		       			
+		case S_KS_NA_1: /* 85 session key status */		      			
 
-			/* USR = User Number                           defined in 7.2.6.3 of IEC/TS 62351-5:2013 */
-			get_USR(tvb, &offset, it104tree);
-
-			/* KWA = Key wrap algorithm (Enumerated value) defined in 7.2.6.4 of IEC/TS 62351-5:2013 */
+			get_KSQ(tvb, &offset, it104tree);
+			get_USR(tvb, &offset, it104tree, NULL);
 			get_KWA(tvb, &offset, it104tree);
-
-			/* KST = Key status (Enumerated value)         defined in 7.2.6.5 of IEC/TS 62351-5:2013 */
-			get_KST(tvb, &offset, it104tree);
-
-			/* HAL = MAC algorithm (Enumerated value)      defined in 7.2.6.6 of IEC/TS 62351-5:2013 */
-			get_HAL(tvb, &offset, it104tree);
-			
-			/* CLN = Challenge data length,                defined in 7.2.6.7 of IEC/TS 62351-5:2013 Zero if KST does not equal <0> OK */
-			get_CLN(tvb, &offset, it104tree);
-
-			/* Number of octets specified in CLN Pseudo-random challenge data, defined in 7.2.6.8 of IEC/TS 62351-5:2013 */
-			/* Number of octets specified in HAL MAC value,                    defined in 7.2.6.9 of IEC/TS 62351-5:2013 Only included if KST = <0> OK */
-			
-			offset = Len;
+			get_KST(tvb, &offset, it104tree, &asdu_secure.KST);
+			get_MAL(tvb, &offset, it104tree, &asdu_secure.MAL);
+			get_CLN(tvb, &offset, it104tree, &asdu_secure.CLN);
+			if (asdu_secure.CLN > 0)
+				get_KCD(tvb, &offset, it104tree, asdu_secure.CLN);
+			if (asdu_secure.KST == 1)
+			{
+				/* look at mal_r_types */
+				guint32 lenght_MAC = 0;
+				if (asdu_secure.MAL == 3)
+					lenght_MAC = 8;
+				else if (asdu_secure.MAL == 4)
+					lenght_MAC = 16;
+				else if (asdu_secure.MAL == 6)
+					lenght_MAC = 12;
+				
+				get_MAC(tvb, &offset, it104tree, lenght_MAC);
+			}
 			
 			break;
+
+		case S_CH_NA_1:	/* 81 authentication challenge */
+			
+			get_CSQ(tvb, &offset, it104tree);
+			get_USR(tvb, &offset, it104tree, NULL);
+			get_MAL(tvb, &offset, it104tree, &asdu_secure.MAL);
+			get_RSC(tvb, &offset, it104tree);
+			get_CLN(tvb, &offset, it104tree, &asdu_secure.CLN);
+			if (asdu_secure.CLN > 0)
+				get_CHD(tvb, &offset, it104tree, asdu_secure.CLN);
+		       			
+			break;
+
+		case S_RP_NA_1: /* 82 authentication reply */
+			
+			get_CSQ(tvb, &offset, it104tree);
+			get_USR(tvb, &offset, it104tree, NULL);
+			get_HLN(tvb, &offset, it104tree, &asdu_secure.HLN);
+			if (asdu_secure.HLN > 0)
+				get_MAC(tvb, &offset, it104tree, asdu_secure.HLN);
+			
+			break;			
 			
 		default:
 			proto_tree_add_item(it104tree, hf_ioa, tvb, offset, 3, ENC_LITTLE_ENDIAN);
@@ -2055,6 +2246,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 
 			if (Len - offset > 0)
 				proto_tree_add_item(it104tree, hf_asdu_raw_data, tvb, offset, Len - offset, ENC_NA);
+
 			offset = Len;
 
 			break;
@@ -2332,6 +2524,10 @@ proto_register_iec60870_asdu_sec(void)
 		  { "KSQ", "iec60870_asdu.ksq", FT_UINT32, BASE_DEC, NULL, 0x0,
 		    "Key Change Sequence Number", HFILL }},
 
+		{ &hf_secure_csq,
+		  { "CSQ", "iec60870_asdu.csq", FT_UINT32, BASE_DEC, NULL, 0x0,
+		    "Challenge Sequence Number", HFILL }},
+
 		{ &hf_secure_usr,
 		  { "USR", "iec60870_asdu.usr", FT_UINT16, BASE_DEC, NULL, 0x0,
 		    "User Number", HFILL }},
@@ -2344,14 +2540,42 @@ proto_register_iec60870_asdu_sec(void)
 		  { "KST", "iec60870_asdu.kst", FT_UINT8, BASE_DEC, VALS(kst_r_types), 0x0,
 		    "Key status", HFILL }},
 
-		{ &hf_secure_hal,
-		  { "HAL", "iec60870_asdu.hal", FT_UINT8, BASE_DEC, VALS(hal_r_types), 0x0,
+		{ &hf_secure_mal,
+		  { "MAL", "iec60870_asdu.mal", FT_UINT8, BASE_DEC, VALS(mal_r_types), 0x0,
 		    "MAC algorithm", HFILL }},
 
+		{ &hf_secure_hln,
+		  { "HLN", "iec60870_asdu.hln", FT_UINT16, BASE_DEC, NULL, 0x0,
+		    "MAC lenght", HFILL }},
+		
+		{ &hf_secure_rsc,
+		  { "RSC", "iec60870_asdu.rsc", FT_UINT8, BASE_DEC, VALS(rsc_r_types), 0x0,
+		    "Reason for challenge", HFILL }},
+		
 		{ &hf_secure_cln,
 		  { "CLN", "iec60870_asdu.cln", FT_UINT16, BASE_DEC, NULL, 0x0,
 		    "Challenge data length", HFILL }},
+
+		{ &hf_secure_kcd,
+	       	  { "KCD", "iec60870_asdu.kcd", FT_NONE, BASE_NONE, NULL, 0x0,
+		    "Challenge data", HFILL }},
+
+		{ &hf_secure_chd,
+	       	  { "CHD", "iec60870_asdu.chd", FT_NONE, BASE_NONE, NULL, 0x0,
+		    "Challenge data", HFILL }},
 		
+		{ &hf_secure_wkl,
+		  { "WKL", "iec60870_asdu.wkl", FT_UINT16, BASE_DEC, NULL, 0x0,
+		    "Wrapped key data length", HFILL }},
+
+		{ &hf_secure_wkd,
+	       	  { "WKD", "iec60870_asdu.wkd", FT_NONE, BASE_NONE, NULL, 0x0,
+		    "Wrapper key data", HFILL }},
+		
+		{ &hf_secure_mac,
+	       	  { "MAC", "iec60870_asdu.mac", FT_NONE, BASE_NONE, NULL, 0x0,
+		    "Message Authentication Code", HFILL }},
+
 		{ &hf_ioa,
 		  { "IOA", "iec60870_asdu.ioa", FT_UINT24, BASE_DEC, NULL, 0x0,
 		    "Information Object Address", HFILL }},
