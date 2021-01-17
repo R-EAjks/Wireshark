@@ -4205,6 +4205,9 @@ static int hf_ieee80211_rnr_tbtt_information_length = -1;
 static int hf_ieee80211_rnr_operating_class = -1;
 static int hf_ieee80211_rnr_channel_number = -1;
 static int hf_ieee80211_rnr_neighbor_ap_tbtt_offset = -1;
+static int hf_ieee80211_rnr_bssid = -1;
+static int hf_ieee80211_rnr_short_ssid = -1;
+static int hf_ieee80211_rnr_bss_parameters = -1;
 
 static int hf_ieee80211_ampduparam = -1;
 static int hf_ieee80211_ampduparam_vs = -1;
@@ -17139,7 +17142,7 @@ static int
 dissect_reduced_neighbor_report(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void* data _U_)
 {
   int offset = 0;
-  guint8 tbbt_length, i;
+  guint8 tbbt_length;
   static int * const ieee80211_rnr_tbtt_information_header[] = {
     &hf_ieee80211_rnr_tbtt_information_field_type,
     &hf_ieee80211_rnr_tbtt_information_filtered_neighbor_ap,
@@ -17162,8 +17165,24 @@ dissect_reduced_neighbor_report(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tre
   proto_tree_add_item(tree, hf_ieee80211_rnr_channel_number, tvb, offset, 1, ENC_LITTLE_ENDIAN);
   offset += 1;
 
-  for (i=1; i <= tbbt_length; i++) {
-    proto_tree_add_item(tree, hf_ieee80211_rnr_neighbor_ap_tbtt_offset, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+  proto_tree_add_item(tree, hf_ieee80211_rnr_neighbor_ap_tbtt_offset, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+  offset += 1;
+
+  /* BSSID */
+  if(tbbt_length == 7 || tbbt_length == 8 || tbbt_length >= 11){
+    proto_tree_add_item(tree, hf_ieee80211_rnr_bssid, tvb, offset, 6, ENC_LITTLE_ENDIAN);
+    offset += 6;
+  }
+
+  /* Short SSID */
+  if(tbbt_length == 5 || tbbt_length == 6 || tbbt_length >= 11){
+    proto_tree_add_item(tree, hf_ieee80211_rnr_short_ssid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+  }
+
+  /* BSS Parameters */
+  if(tbbt_length == 2 || tbbt_length == 6 || tbbt_length == 8 || tbbt_length >= 12){
+    proto_tree_add_item(tree, hf_ieee80211_rnr_bss_parameters, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
   }
 
@@ -33535,6 +33554,21 @@ proto_register_ieee80211(void)
 
     {&hf_ieee80211_rnr_neighbor_ap_tbtt_offset,
      {"Neighbor AP TTBT Offset", "wlan.rnr.neighbor_ap_tbtt_offset",
+      FT_UINT8, BASE_HEX, NULL, 0x0,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_rnr_bssid,
+     {"BSSID", "wlan.rnr.bssid",
+      FT_ETHER, BASE_NONE, NULL, 0x0,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_rnr_short_ssid,
+     {"Short SSID", "wlan.rnr.short_ssid",
+      FT_BYTES, BASE_NONE, NULL, 0x0,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_rnr_bss_parameters,
+     {"BSS Parameters", "wlan.rnr.bss_parameters",
       FT_UINT8, BASE_HEX, NULL, 0x0,
       NULL, HFILL }},
 
