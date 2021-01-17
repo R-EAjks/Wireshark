@@ -1056,7 +1056,7 @@ static guint8 get_TypeIdLength(guint8 TypeId)
 }
 
 /******************************************************************************************************/
-/*   SIQ: Single-point information (IEV 371-02-07) w quality descriptor                               */
+/*   SIQ = Single-point information (IEV 371-02-07) w quality descriptor                               */
 /******************************************************************************************************/
 static void get_SIQ(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
@@ -1076,7 +1076,7 @@ static void get_SIQ(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*   DIQ: Double-point information (IEV 371-02-08) w quality descriptor                               */
+/*   DIQ = Double-point information (IEV 371-02-08) w quality descriptor                               */
 /******************************************************************************************************/
 static void get_DIQ(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
@@ -1096,7 +1096,7 @@ static void get_DIQ(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*   QDS: Quality descriptor (separate octet)                                                         */
+/*   QDS = Quality descriptor (separate octet)                                                         */
 /******************************************************************************************************/
 static void get_QDS(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
@@ -1116,7 +1116,7 @@ static void get_QDS(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*   QDP: Quality descriptor for events of protection equipment (separate octet)                      */
+/*   QDP = Quality descriptor for events of protection equipment (separate octet)                      */
 /******************************************************************************************************/
 #if 0
 static void get_QDP(tvbuff_t *tvb _U_, guint8 *offset _U_, proto_tree *iec104_header_tree _U_)
@@ -1127,7 +1127,7 @@ static void get_QDP(tvbuff_t *tvb _U_, guint8 *offset _U_, proto_tree *iec104_he
 #endif
 
 /******************************************************************************************************/
-/*   VTI: Value with transient state indication                                                       */
+/*   VTI = Value with transient state indication                                                       */
 /******************************************************************************************************/
 static void get_VTI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
@@ -1144,7 +1144,7 @@ static void get_VTI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*   NVA: Normalized value                                                                            */
+/*   NVA = Normalized value                                                                            */
 /******************************************************************************************************/
 static void get_NVA(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
@@ -1161,7 +1161,7 @@ static void get_NVA(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*   NVAspt: Normalized value Set point                                                               */
+/*   NVAspt = Normalized value Set point                                                               */
 /******************************************************************************************************/
 static void get_NVAspt(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
@@ -1178,7 +1178,7 @@ static void get_NVAspt(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_
 }
 
 /******************************************************************************************************/
-/*   SVA: Scaled value                                                                                */
+/*   SVA = Scaled value                                                                                */
 /******************************************************************************************************/
 static void get_SVA(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
@@ -1200,7 +1200,7 @@ static void get_SVAspt(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_
 }
 
 /******************************************************************************************************/
-/*   "FLT": Short floating point number                                                               */
+/*   "FLT" = Short floating point number                                                               */
 /******************************************************************************************************/
 static void get_FLT(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
@@ -1222,7 +1222,7 @@ static void get_FLTspt(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_
 }
 
 /******************************************************************************************************/
-/*   "BSI": Binary state information, 32 bit                                                          */
+/*   "BSI" = Binary state information, 32 bit                                                          */
 /******************************************************************************************************/
 static void get_BSI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
@@ -1242,7 +1242,7 @@ static void get_BSIspt(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_
 }
 
 /******************************************************************************************************/
-/*    BCR: Binary counter reading                                                                     */
+/*    BCR = Binary counter reading                                                                     */
 /******************************************************************************************************/
 static void get_BCR(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
@@ -1257,7 +1257,7 @@ static void get_BCR(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*    todo -- SEP: Single event of protection equipment                                               */
+/*    todo -- SEP = Single event of protection equipment                                               */
 /******************************************************************************************************/
 #if 0
 static void get_SEP(tvbuff_t *tvb _U_, guint8 *offset _U_, proto_tree *iec104_header_tree _U_)
@@ -1268,7 +1268,7 @@ static void get_SEP(tvbuff_t *tvb _U_, guint8 *offset _U_, proto_tree *iec104_he
 #endif
 
 /******************************************************************************************************/
-/*    QOS: Qualifier Of Set-point command                                                             */
+/*    QOS = Qualifier Of Set-point command                                                             */
 /******************************************************************************************************/
 static void get_QOS(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
@@ -1285,7 +1285,7 @@ static void get_QOS(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*    SCO: Single Command (IEV 371-03-02)                                                             */
+/*    SCO = Single Command (IEV 371-03-02)                                                             */
 /******************************************************************************************************/
 static void get_SCO(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
@@ -1303,7 +1303,7 @@ static void get_SCO(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*    DCO: Double Command (IEV 371-03-03)                                                             */
+/*    DCO = Double Command (IEV 371-03-03)                                                             */
 /******************************************************************************************************/
 static void get_DCO(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
@@ -1321,7 +1321,7 @@ static void get_DCO(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*    RCO: Regulating step command (IEV 371-03-13)                                                    */
+/*    RCO = Regulating step command (IEV 371-03-13)                                                    */
 /******************************************************************************************************/
 static void get_RCO(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
@@ -1339,7 +1339,7 @@ static void get_RCO(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*    QPM: Qualifier of parameter of measured value                                                   */
+/*    QPM = Qualifier of parameter of measured value                                                   */
 /******************************************************************************************************/
 static void get_QPM(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
 {
@@ -1357,7 +1357,7 @@ static void get_QPM(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*    COI: Cause of initialisation                                                                    */
+/*    COI = Cause of initialisation                                                                    */
 /******************************************************************************************************/
 static void get_COI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
@@ -1374,7 +1374,7 @@ static void get_COI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*    QOI: Qualifier of interrogation                                                                 */
+/*    QOI = Qualifier of interrogation                                                                 */
 /******************************************************************************************************/
 static void get_QOI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
@@ -1384,7 +1384,7 @@ static void get_QOI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*    QRP: Qualifier of reset process command                                                         */
+/*    QRP = Qualifier of reset process command                                                         */
 /******************************************************************************************************/
 static void get_QRP(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
 {
@@ -1394,7 +1394,11 @@ static void get_QRP(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*    TSC: Test Sequence Counter                                                                      */
+/*    TSC = Test Sequence Counter 
+
+      The requesting station may choose any value of TSC. The TSC in the response shall match
+      the request, and the time in the response shall also exactly match the time in the request.
+*/
 /******************************************************************************************************/
 static void get_TSC(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
 {
