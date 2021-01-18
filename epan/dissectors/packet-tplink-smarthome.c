@@ -2,7 +2,7 @@
  *
  * Routines for TP-Link Smart Home Protocol dissection
  *
- * Copyright 2020, Fulko Hew <fulko.hew@gmail.com>
+ * Copyright 2020-2021, Fulko Hew <fulko.hew@gmail.com>
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -33,8 +33,10 @@
 #include <epan/packet.h>
 #include <epan/address.h>
 #include <epan/wmem/wmem.h>
+#include "packet-tcp.h"
 
-#define TPLINK_SMARTHOME_PORT 9999			/* TP-Link Smart Home devices use this port on both TCP and UDP */
+#define TPLINK_SMARTHOME_PORT	9999			/* TP-Link Smart Home devices use this port on both TCP and UDP */
+#define FRAME_HEADER_LEN	4			/* 4 bytes of TCP frame length header info */
 
 	/* Prototypes */
 	/* (Required to prevent [-Wmissing-prototypes] warnings */
@@ -51,19 +53,13 @@ static int	hf_tplink_smarthome_Len	= -1;
 static int	hf_tplink_smarthome_Msg	= -1;
 
 static int
-dissect_tplink_smarthome(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
+dissect_tplink_smarthome_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		void *data _U_)
 {
 	proto_item	*ti;
 	proto_tree	*tplink_smarthome_tree;
 	gint8		start;
 	gint32		len = tvb_captured_length(tvb);
-
-	col_set_str(pinfo->cinfo, COL_PROTOCOL, "TPLINK-SMARTHOME");				/* show the protocol name of what we're dissecting */
-	col_clear(pinfo->cinfo, COL_INFO);							/* and clear anything that might be in the Info field on the UI */
-
-	ti = proto_tree_add_item(tree, proto_tplink_smarthome, tvb, 0, -1, ENC_NA);		/* create display subtree for this protocol */
-	tplink_smarthome_tree = proto_item_add_subtree(ti, ett_tplink_smarthome);		/* and add it to the display tree */
 
 	switch (pinfo->ptype) {									/* look at the IP port type */
 		case PT_UDP:									/* UDP */
@@ -72,26 +68,34 @@ dissect_tplink_smarthome(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 			break;
 		case PT_TCP:									/* TCP */
 			if (len < (4 + 2)) return 0;						/* don't dissect unless it has the msg length plus minimal JSON */
-			proto_tree_add_item(tplink_smarthome_tree,
-					hf_tplink_smarthome_Len, tvb, 0, 4, ENC_BIG_ENDIAN);	/* decode the the 4 byte message length field pre-pended in a TCP message, */
 			start = 4;								/* and the JSON message starts after that */
 			break;
 		default:
 			return 0;
 	}
 
+	col_set_str(pinfo->cinfo, COL_PROTOCOL, "TPLINK-SMARTHOME");				/* show the protocol name of what we're dissecting */
+	col_clear(pinfo->cinfo, COL_INFO);							/* and clear anything that might be in the Info field on the UI */
+
+	ti = proto_tree_add_item(tree, proto_tplink_smarthome, tvb, 0, -1, ENC_NA);		/* create display subtree for this protocol */
+	tplink_smarthome_tree = proto_item_add_subtree(ti, ett_tplink_smarthome);		/* and add it to the display tree */
+
+	if (pinfo->ptype == PT_TCP) {
+		proto_tree_add_item(tplink_smarthome_tree, hf_tplink_smarthome_Len,
+					tvb, 0, FRAME_HEADER_LEN, ENC_BIG_ENDIAN);		/* decode the the 4 byte message length field pre-pended in a TCP message, */
+	}
 	guint8	c, d;
 	guint8	key		= 171;
 	gint	i_offset	= start;
 	gint	o_offset	= 0;
 	gint	decode_len	= len - start;
-	char	*ascii_buffer	= (char *)wmem_alloc( wmem_epan_scope(), 1 + len - start);	/* create a buffer for the decoded (JSON) message */
+	char	*ascii_buffer	= (char *)wmem_alloc(pinfo->pool, 1 + len - start);		/* create a buffer for the decoded (JSON) message */
 
 	for (; o_offset < decode_len; i_offset++, o_offset++) {					/* decrypt 'Autokey XOR' message (into ASCII) */
 		c	= tvb_get_guint8(tvb, i_offset);
 		d	= c ^ key;								/* XOR the byte with the key to get the decoded byte */
 		key	= c;									/* then use that decoded byte as the value for the next key */
-		*(ascii_buffer + o_offset) = (d >= 0x20 && d <= 0x7E) ? d : '.';		/* buffer a printable version (for display and JSON decoding) */
+		*(ascii_buffer + o_offset) = g__ascii_isprint(d) ? d : '.';			/* buffer a printable version (for display and JSON decoding) */
 	}
 	*(ascii_buffer + o_offset) = '\0';
 
@@ -108,10 +112,28 @@ dissect_tplink_smarthome(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 	call_dissector(find_dissector("json"), next_tvb, pinfo, ti);					/* and decode/dissect it as JSON so you can drill down into it as well */
 
 	col_add_fstr(pinfo->cinfo, COL_INFO, "%s %s: %s",
-		(pinfo->ptype == 3) ? "UDP" : "TCP",
+		(pinfo->ptype == PT_UDP) ? "UDP" : "TCP",
 		mtype, ascii_buffer);									/* add the decoded string to the INFO column for a quick and easy read */
 
 	return tvb_captured_length(tvb);								/* finally return the amount of data this dissector was able to dissect */
+}
+
+static guint
+get_tplink_smarthome_message_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+{													/* the PDU size is... the value in the length field */
+    return (guint)tvb_get_ntohl(tvb, offset) + FRAME_HEADER_LEN;					/* plus the 'size of' the length field itself */
+}
+
+static int
+dissect_tplink_smarthome(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
+{
+	if (pinfo->ptype == PT_UDP) {
+		dissect_tplink_smarthome_message(tvb, pinfo, tree, data);
+	} else {
+		tcp_dissect_pdus(tvb, pinfo, tree, TRUE, FRAME_HEADER_LEN,
+			get_tplink_smarthome_message_len, dissect_tplink_smarthome_message, data);
+	}
+	return tvb_captured_length(tvb);
 }
 
 	/* Register the protocol with Wireshark. */
