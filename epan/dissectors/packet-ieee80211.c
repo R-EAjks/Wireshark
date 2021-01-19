@@ -1190,6 +1190,7 @@ static value_string_ext aruba_mgt_typevals_ext = VALUE_STRING_EXT_INIT(aruba_mgt
 #define PA_WHITE_SPACE_MAP_ANNOUNCEMENT    31
 #define PA_FTM_REQUEST                     32
 #define PA_FTM_RESPONSE                    33
+#define PA_FILS_DISCOVERY                  34
 
 /* Keep in sync with PA_* defines */
 #define PPA_DSE_ENABLEMENT                   1
@@ -2060,6 +2061,7 @@ static const value_string ff_pa_action_codes[] = {
   {PA_WHITE_SPACE_MAP_ANNOUNCEMENT,    "White Space Map Announcement"},
   {PA_FTM_REQUEST,                     "FTM Request"},
   {PA_FTM_RESPONSE,                    "FTM Response"},
+  {PA_FILS_DISCOVERY,                  "FILS Discovery"},
   {0x00, NULL}
 };
 value_string_ext ff_pa_action_codes_ext = VALUE_STRING_EXT_INIT(ff_pa_action_codes);
@@ -3244,6 +3246,19 @@ static const value_string wfa_mbo_transition_rej_reason_vals[] = {
     "which are available at its serving AP will not be available if it transitions"},
   { 0, NULL }
 };
+
+/* 802.11ai FILS Discovery */
+#define PA_FILS_FC_SSID_LENGTH  0x001F
+#define PA_FILS_FC_CAPABILITY   0x0020
+#define PA_FILS_FC_SHORT_SSID   0x0040
+#define PA_FILS_FC_AP_CSN       0x0080
+#define PA_FILS_FC_ANO          0x0100
+#define PA_FILS_FC_CCFS1        0x0200
+#define PA_FILS_FC_PC           0x0400
+#define PA_FILS_FC_RSN_INFO     0x0800
+#define PA_FILS_FC_LENGTH       0x1000
+#define PA_FILS_FC_MD           0x2000
+#define PA_FILS_FC_RESERVED     0xC000
 
 static int proto_wlan = -1;
 static int proto_centrino = -1;
@@ -5473,6 +5488,31 @@ static int hf_ieee80211_hs20_reauth_delay = -1;
 static int hf_ieee80211_hs20_deauth_reason_url_len = -1;
 static int hf_ieee80211_hs20_deauth_imminent_reason_url = -1;
 
+/* IEEE Std 802.11ai : FILS Discovery */
+static int hf_ieee80211_ff_fils_discovery_frame_control = -1;
+static int hf_ieee80211_ff_fils_discovery_frame_control_ssid_length = -1;
+static int hf_ieee80211_ff_fils_discovery_frame_control_capability = -1;
+static int hf_ieee80211_ff_fils_discovery_frame_control_short_ssid = -1;
+static int hf_ieee80211_ff_fils_discovery_frame_control_ap_csn = -1;
+static int hf_ieee80211_ff_fils_discovery_frame_control_ano = -1;
+static int hf_ieee80211_ff_fils_discovery_frame_control_channel_center_frequency = -1;
+static int hf_ieee80211_ff_fils_discovery_frame_control_primary_channel = -1;
+static int hf_ieee80211_ff_fils_discovery_frame_control_rsn_info = -1;
+static int hf_ieee80211_ff_fils_discovery_frame_control_length = -1;
+static int hf_ieee80211_ff_fils_discovery_frame_control_md = -1;
+static int hf_ieee80211_ff_fils_discovery_frame_control_reserved = -1;
+static int hf_ieee80211_ff_fils_discovery_ssid = -1;
+static int hf_ieee80211_ff_fils_discovery_capability = -1;
+static int hf_ieee80211_ff_fils_discovery_short_ssid = -1;
+static int hf_ieee80211_ff_fils_discovery_ap_csn = -1;
+static int hf_ieee80211_ff_fils_discovery_ano = -1;
+static int hf_ieee80211_ff_fils_discovery_ccfs1 = -1;
+static int hf_ieee80211_ff_fils_discovery_operating_class = -1;
+static int hf_ieee80211_ff_fils_discovery_primary_channel = -1;
+static int hf_ieee80211_ff_fils_discovery_rsn_info = -1;
+static int hf_ieee80211_ff_fils_discovery_length = -1;
+static int hf_ieee80211_ff_fils_discovery_md = -1;
+
 /* IEEE Std 802.11ad */
 static int hf_ieee80211_block_ack_RBUFCAP = -1;
 static int hf_ieee80211_cf_response_offset = -1;
@@ -6487,6 +6527,7 @@ static gint ett_he_ndp_annc_sta_info = -1;
 /* 802.11ai trees */
 static gint ett_fils_indication_realm_list = -1;
 static gint ett_fils_indication_public_key_list = -1;
+static gint ett_ff_fils_discovery_frame_control = -1;
 
 static gint ett_rnr_tbtt_information_tree = -1;
 static gint ett_rnr_bss_parameters = -1;
@@ -10351,6 +10392,99 @@ add_ff_bss_termination_delay(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo
 }
 
 static guint
+add_ff_fils_discovery(proto_tree *tree, tvbuff_t *tvb,
+                                            packet_info *pinfo _U_, int offset)
+{
+
+  guint16 fc, ssid_length;
+  static int * const ieee80211_ff_fils_discovery_frame_control[] = {
+    &hf_ieee80211_ff_fils_discovery_frame_control_ssid_length,
+    &hf_ieee80211_ff_fils_discovery_frame_control_capability,
+    &hf_ieee80211_ff_fils_discovery_frame_control_short_ssid,
+    &hf_ieee80211_ff_fils_discovery_frame_control_ap_csn,
+    &hf_ieee80211_ff_fils_discovery_frame_control_ano,
+    &hf_ieee80211_ff_fils_discovery_frame_control_channel_center_frequency,
+    &hf_ieee80211_ff_fils_discovery_frame_control_primary_channel,
+    &hf_ieee80211_ff_fils_discovery_frame_control_rsn_info,
+    &hf_ieee80211_ff_fils_discovery_frame_control_length,
+    &hf_ieee80211_ff_fils_discovery_frame_control_md,
+    &hf_ieee80211_ff_fils_discovery_frame_control_reserved,
+    NULL
+  };
+
+  proto_tree_add_bitmask(tree, tvb, offset,
+                         hf_ieee80211_ff_fils_discovery_frame_control,
+                         ett_ff_fils_discovery_frame_control,
+                         ieee80211_ff_fils_discovery_frame_control,
+                         ENC_LITTLE_ENDIAN);
+  fc = tvb_get_letohs(tvb, offset);
+  offset += 2;
+
+  offset += add_ff_timestamp(tree, tvb, pinfo, offset);
+
+  offset += add_ff_beacon_interval(tree, tvb, pinfo, offset);
+
+  if(fc & PA_FILS_FC_SHORT_SSID) {
+     /* Always 4 bytes for Short SSID */
+     /* TODO add check of SSID Length */
+    proto_tree_add_item(tree, hf_ieee80211_ff_fils_discovery_short_ssid, tvb, offset, 4, ENC_NA);
+    offset += 4;
+  } else {
+    ssid_length = (fc & PA_FILS_FC_SSID_LENGTH) + 1;
+    proto_tree_add_item(tree, hf_ieee80211_ff_fils_discovery_ssid, tvb, offset, ssid_length, ENC_ASCII|ENC_NA);
+    offset += ssid_length;
+  }
+
+  if(fc & PA_FILS_FC_LENGTH){
+    proto_tree_add_item(tree, hf_ieee80211_ff_fils_discovery_length, tvb, offset, 1, ENC_NA);
+    offset += 1;
+  }
+
+  if(fc & PA_FILS_FC_CAPABILITY) {
+    /*TODO Dissect Capability */
+    proto_tree_add_item(tree, hf_ieee80211_ff_fils_discovery_capability, tvb, offset, 2, ENC_NA);
+    offset += 2;
+  }
+
+  if(fc & PA_FILS_FC_PC) {
+    proto_tree_add_item(tree, hf_ieee80211_ff_fils_discovery_operating_class, tvb, offset, 1, ENC_NA);
+    offset += 1;
+    proto_tree_add_item(tree, hf_ieee80211_ff_fils_discovery_primary_channel, tvb, offset, 1, ENC_NA);
+    offset += 1;
+  }
+
+  if(fc & PA_FILS_FC_AP_CSN) {
+    proto_tree_add_item(tree, hf_ieee80211_ff_fils_discovery_ap_csn, tvb, offset, 1, ENC_NA);
+    offset += 1;
+  }
+
+  if(fc & PA_FILS_FC_ANO) {
+    proto_tree_add_item(tree, hf_ieee80211_ff_fils_discovery_ano, tvb, offset, 1, ENC_NA);
+    offset += 1;
+  }
+
+  if(fc & PA_FILS_FC_RSN_INFO) {
+    /*TODO Dissect RSN info */
+    proto_tree_add_item(tree, hf_ieee80211_ff_fils_discovery_rsn_info, tvb, offset, 5, ENC_NA);
+    offset += 5;
+  }
+
+  if(fc & PA_FILS_FC_CCFS1){
+    proto_tree_add_item(tree, hf_ieee80211_ff_fils_discovery_ccfs1, tvb, offset, 1, ENC_NA);
+    offset += 1;
+  }
+
+  if(fc & PA_FILS_FC_MD) {
+    /*TODO Dissect Mobility Domain */
+    proto_tree_add_item(tree, hf_ieee80211_ff_fils_discovery_md, tvb, offset, 3, ENC_NA);
+    offset += 3;
+  }
+
+  return offset;
+}
+
+
+static guint
 add_ff_action_spectrum_mgmt(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, int offset)
 {
     switch (tvb_get_guint8(tvb, offset + 1)) {
@@ -10566,6 +10700,9 @@ add_ff_action_public_fields(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
     offset += add_ff_ftm_toa(tree, tvb, pinfo, offset);
     offset += add_ff_ftm_tod_err(tree, tvb, pinfo, offset);
     offset += add_ff_ftm_toa_err(tree, tvb, pinfo, offset);
+    break;
+  case PA_FILS_DISCOVERY:
+    offset += add_ff_fils_discovery(tree, tvb, pinfo, offset);
     break;
   }
 
@@ -29102,6 +29239,123 @@ proto_register_ieee80211(void)
       FT_BYTES, BASE_NONE, NULL, 0,
       NULL, HFILL }},
 
+/* 802.11ai */
+
+    {&hf_ieee80211_ff_fils_discovery_frame_control,
+     {"Frame Control", "wlan.fils_discovery.frame_control",
+      FT_UINT16, BASE_HEX, NULL, 0,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_frame_control_ssid_length,
+     {"SSID Length", "wlan.fils_discovery.frame_control.ssid_length",
+      FT_UINT16, BASE_HEX, NULL, PA_FILS_FC_SSID_LENGTH,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_frame_control_capability,
+     {"Capability", "wlan.fils_discovery.frame_control.capability",
+      FT_BOOLEAN, 16, TFS(&tfs_present_not_present), PA_FILS_FC_CAPABILITY,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_frame_control_short_ssid,
+     {"Short SSID", "wlan.fils_discovery.frame_control.short_ssid",
+      FT_BOOLEAN, 16, TFS(&tfs_present_not_present), PA_FILS_FC_SHORT_SSID,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_frame_control_ap_csn,
+     {"AP-CSN", "wlan.fils_discovery.frame_control.ap_csn",
+      FT_BOOLEAN, 16, TFS(&tfs_present_not_present), PA_FILS_FC_AP_CSN,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_frame_control_ano,
+     {"ANO", "wlan.fils_discovery.frame_control.ano",
+      FT_BOOLEAN, 16, TFS(&tfs_present_not_present), PA_FILS_FC_ANO,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_frame_control_channel_center_frequency,
+     {"Channel Center Frequency Segment 1", "wlan.fils_discovery.frame_control.channel_center_frequency",
+      FT_BOOLEAN, 16, TFS(&tfs_present_not_present), PA_FILS_FC_CCFS1,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_frame_control_primary_channel,
+     {"Primary Channel", "wlan.fils_discovery.frame_control.primary_channel",
+      FT_BOOLEAN, 16, TFS(&tfs_present_not_present), PA_FILS_FC_PC,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_frame_control_rsn_info,
+     {"RSN Info", "wlan.fils_discovery.frame_control.rsn_info",
+      FT_BOOLEAN, 16, TFS(&tfs_present_not_present), PA_FILS_FC_RSN_INFO,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_frame_control_length,
+     {"Length", "wlan.fils_discovery.frame_control.length",
+      FT_BOOLEAN, 16, TFS(&tfs_present_not_present), PA_FILS_FC_LENGTH,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_frame_control_md,
+     {"MD", "wlan.fils_discovery.frame_control.md",
+      FT_BOOLEAN, 16, TFS(&tfs_present_not_present), PA_FILS_FC_MD,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_frame_control_reserved,
+     {"Reserved", "wlan.fils_discovery.frame_control.reserved",
+      FT_BOOLEAN, 16, TFS(&tfs_present_not_present), PA_FILS_FC_RESERVED,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_ssid,
+     {"SSID", "wlan.fils_discovery.ssid_length",
+      FT_STRING, BASE_NONE, NULL, 0x0,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_capability,
+     {"Capability", "wlan.fils_discovery.capability",
+      FT_UINT16, BASE_HEX, NULL, 0x0,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_short_ssid,
+     {"Short SSID", "wlan.fils_discovery.short_ssid",
+      FT_UINT32, BASE_HEX, NULL, 0x0,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_ap_csn,
+     {"AP Configuration Sequence Number", "wlan.fils_discovery.ap_csn",
+      FT_UINT8, BASE_DEC, NULL, 0x0,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_ano,
+     {"Access Network Options", "wlan.fils_discovery.ano",
+      FT_UINT8, BASE_HEX, NULL, 0x0,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_ccfs1,
+     {"Channel Center Frequency Segment 1", "wlan.fils_discovery.channel_center_frequency",
+      FT_UINT8, BASE_HEX, NULL, 0x0,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_operating_class,
+     {"Operating Class", "wlan.fils_discovery.operating_class",
+      FT_UINT8, BASE_DEC, NULL, 0x0,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_primary_channel,
+     {"Primary Channel", "wlan.fils_discovery.primary_channel",
+      FT_UINT8, BASE_DEC, NULL, 0x0,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_rsn_info,
+     {"RSN Info", "wlan.fils_discovery.rsn_info",
+      FT_BYTES, BASE_NONE, NULL, 0x0,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_length,
+     {"Length", "wlan.fils_discovery.length",
+      FT_UINT8, BASE_DEC, NULL, 0x0,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_md,
+     {"MD", "wlan.fils_discovery.md",
+      FT_UINT24, BASE_HEX, NULL, 0x0,
+      NULL, HFILL }},
+
 /* 802.11ad */
     {&hf_ieee80211_cf_response_offset,
      {"Response Offset", "wlan.res_offset",
@@ -40382,6 +40636,8 @@ proto_register_ieee80211(void)
 
     &ett_rnr_tbtt_information_tree,
     &ett_rnr_bss_parameters,
+
+    &ett_ff_fils_discovery_frame_control,
   };
 
   static ei_register_info ei[] = {
