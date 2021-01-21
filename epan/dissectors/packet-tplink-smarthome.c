@@ -95,7 +95,7 @@ dissect_tplink_smarthome_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
 		c	= tvb_get_guint8(tvb, i_offset);
 		d	= c ^ key;								/* XOR the byte with the key to get the decoded byte */
 		key	= c;									/* then use that decoded byte as the value for the next key */
-		*(ascii_buffer + o_offset) = g__ascii_isprint(d) ? d : '.';			/* buffer a printable version (for display and JSON decoding) */
+		*(ascii_buffer + o_offset) = g_ascii_isprint(d) ? d : '.';			/* buffer a printable version (for display and JSON decoding) */
 	}
 	*(ascii_buffer + o_offset) = '\0';
 
