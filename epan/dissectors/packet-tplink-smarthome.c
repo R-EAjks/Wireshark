@@ -105,11 +105,11 @@ dissect_tplink_smarthome_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
 	else							{ mtype = "Msg"; }		/* impossible... because we're registered on this port so src or dest must have matched */
 
 	proto_tree_add_string_format(tplink_smarthome_tree, hf_tplink_smarthome_Msg, tvb,
-					start, -1, ascii_buffer, "%s: %s", mtype, ascii_buffer);	/* add the decrypted data to the subtree so you can 'expand' on it */
+					start, -1, ascii_buffer, "%s: %s", mtype, ascii_buffer);	    /* add the decrypted data to the subtree so you can 'expand' on it */
 
-	tvbuff_t *next_tvb = tvb_new_child_real_data(tvb, ascii_buffer, decode_len, decode_len);	/* create a new TVB and insert the decrypted ASCII string, and */
-	add_new_data_source(pinfo, next_tvb, "JSON Message");						/* add it so you can click on this JSON entry and see the decoded buffer */
-	call_dissector(find_dissector("json"), next_tvb, pinfo, ti);					/* and decode/dissect it as JSON so you can drill down into it as well */
+	tvbuff_t *next_tvb = tvb_new_child_real_data(tvb, (guint8 *)ascii_buffer, decode_len, decode_len);	/* create a new TVB and insert the decrypted ASCII string, and */
+	add_new_data_source(pinfo, next_tvb, "JSON Message");					    	/* add it so you can click on this JSON entry and see the decoded buffer */
+	call_dissector(find_dissector("json"), next_tvb, pinfo, ti);			    		/* and decode/dissect it as JSON so you can drill down into it as well */
 
 	col_add_fstr(pinfo->cinfo, COL_INFO, "%s %s: %s",
 		(pinfo->ptype == PT_UDP) ? "UDP" : "TCP",
