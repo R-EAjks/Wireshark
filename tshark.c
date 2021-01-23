@@ -138,6 +138,7 @@
 #define LONGOPT_COLOR                   LONGOPT_BASE_APPLICATION+2
 #define LONGOPT_NO_DUPLICATE_KEYS       LONGOPT_BASE_APPLICATION+3
 #define LONGOPT_ELASTIC_MAPPING_FILTER  LONGOPT_BASE_APPLICATION+4
+#define LONGOPT_HEXDUMP                 LONGOPT_BASE_APPLICATION+5
 
 #if 0
 #define tshark_debug(...) g_warning(__VA_ARGS__)
@@ -175,12 +176,14 @@ static gboolean do_dissection;     /* TRUE if we have to dissect each packet */
 static gboolean print_packet_info; /* TRUE if we're to print packet information */
 static gboolean print_summary;     /* TRUE if we're to print packet summary information */
 static gboolean print_details;     /* TRUE if we're to print packet details information */
-static gboolean print_hex;         /* TRUE if we're to print hex/ascci information */
+static gboolean print_hex;         /* TRUE if we're to print hex/ascii information */
 static gboolean line_buffered;
 static gboolean quiet = FALSE;
 static gboolean really_quiet = FALSE;
 static gchar* delimiter_char = " ";
 static gboolean dissect_color = FALSE;
+static guint hexdump_source_option = HEXDUMP_SOURCE_MULTI; /* Default - Enable legacy multi-source mode */
+static guint hexdump_ascii_option = HEXDUMP_ASCII_INCLUDE; /* Default - Enable legacy undelimited ASCII dump */
 
 static print_format_e print_format = PR_FMT_TEXT;
 static print_stream_t *print_stream = NULL;
@@ -430,6 +433,13 @@ print_usage(FILE *output)
   fprintf(output, "  -P, --print              print packet summary even when writing to a file\n");
   fprintf(output, "  -S <separator>           the line separator to print between packets\n");
   fprintf(output, "  -x                       add output of hex and ASCII dump (Packet Bytes)\n");
+  fprintf(output, "  --hexdump <hexoption>    enable hexdump, set options for data source and ASCII dump\n");
+  fprintf(output, "     all                   dump all data sources (-x default)\n");
+  fprintf(output, "     frames                dump only frame data\n");
+  fprintf(output, "     ascii                 include ASCII dump text (-x default)\n");
+  fprintf(output, "     delimit               delimit ASCII dump text with '|' characters\n");
+  fprintf(output, "     noascii               exclude ASCII dump text\n");
+  fprintf(output, "     help                  display help for --hexdump and exit\n");
   fprintf(output, "  -T pdml|ps|psml|json|jsonraw|ek|tabs|text|fields|?\n");
   fprintf(output, "                           format of text output (def: text)\n");
   fprintf(output, "  -j <protocolfilter>      protocols layers filter if -T ek|pdml|json selected\n");
@@ -521,6 +531,32 @@ glossary_option_help(void)
   fprintf(output, "  -G currentprefs          dump current preferences and exit\n");
   fprintf(output, "  -G defaultprefs          dump default preferences and exit\n");
   fprintf(output, "  -G folders               dump about:folders\n");
+  fprintf(output, "\n");
+}
+
+static void
+hexdump_option_help(FILE *output)
+{
+  fprintf(output, "%s\n", get_appname_and_version());
+
+  fprintf(output, "\n");
+  fprintf(output, "tshark: Valid --hexdump <hexoption> values include:\n");
+  fprintf(output, "\n");
+  fprintf(output, "Data source options:\n");
+  fprintf(output, "  all                      enable hexdump, dump all data sources (-x default)\n");
+  fprintf(output, "  frames                   enable hexdump, dump only frame data\n");
+  fprintf(output, "\n");
+  fprintf(output, "ASCII options:\n");
+  fprintf(output, "  ascii                    enable hexdump, include ASCII dump text (-x default)\n");
+  fprintf(output, "  delimit                  enable hexdump, delimit ASCII dump text with '|' characters\n");
+  fprintf(output, "  noascii                  enable hexdump, exclude ASCII dump text\n");
+  fprintf(output, "\n");
+  fprintf(output, "Miscellaneous:\n");
+  fprintf(output, "  help                     display this help and exit\n");
+  fprintf(output, "\n");
+  fprintf(output, "Example:\n");
+  fprintf(output, "\n");
+  fprintf(output, "    $ tshark ... --hexdump frames --hexdump delimit ...\n");
   fprintf(output, "\n");
 }
 
@@ -709,6 +745,7 @@ main(int argc, char *argv[])
     {"color", no_argument, NULL, LONGOPT_COLOR},
     {"no-duplicate-keys", no_argument, NULL, LONGOPT_NO_DUPLICATE_KEYS},
     {"elastic-mapping-filter", required_argument, NULL, LONGOPT_ELASTIC_MAPPING_FILTER},
+    {"hexdump", required_argument, NULL, LONGOPT_HEXDUMP},
     {0, 0, 0, 0 }
   };
   gboolean             arg_error = FALSE;
@@ -1381,7 +1418,7 @@ main(int argc, char *argv[])
                         "\t          This is the default.\n"
                         "\t\"tabs\"    Similar to the text report except that each column of the\n"
                         "\t          human-readable one-line summary is delimited with an ASCII\n"
-                        "\t          horizontal tab character.");
+                        "\t          horizontal tab character.\n");
         exit_status = INVALID_OPTION;
         goto clean_exit;
       }
@@ -1479,6 +1516,29 @@ main(int argc, char *argv[])
     case LONGOPT_NO_DUPLICATE_KEYS:
       no_duplicate_keys = TRUE;
       node_children_grouper = proto_node_group_children_by_json_key;
+      break;
+    case LONGOPT_HEXDUMP:
+      print_hex = TRUE;
+      if (strcmp(optarg, "all") == 0)
+        hexdump_source_option = HEXDUMP_SOURCE_MULTI;
+      else if (strcmp(optarg, "frames") == 0)
+        hexdump_source_option = HEXDUMP_SOURCE_PRIMARY;
+      else if (strcmp(optarg, "ascii") == 0)
+        hexdump_ascii_option = HEXDUMP_ASCII_INCLUDE;
+      else if (strcmp(optarg, "delimit") == 0)
+        hexdump_ascii_option = HEXDUMP_ASCII_DELIMIT;
+      else if (strcmp(optarg, "noascii") == 0)
+        hexdump_ascii_option = HEXDUMP_ASCII_EXCLUDE;
+      else if (strcmp("help", optarg) == 0) {
+        hexdump_option_help(stdout);
+        exit_status = EXIT_SUCCESS;
+        goto clean_exit;
+      } else {
+        fprintf(stderr, "tshark: \"%s\" is an invalid value for --hexdump <hexoption>\n", optarg);
+        fprintf(stderr, "For valid <hexoption> values enter: tshark --hexdump help\n");
+        exit_status = INVALID_OPTION;
+        goto clean_exit;
+      }
       break;
     default:
     case '?':        /* Bad flag - print usage message */
@@ -4268,7 +4328,7 @@ print_packet(capture_file *cf, epan_dissect_t *edt)
       if (!print_line(print_stream, 0, ""))
         return FALSE;
     }
-    if (!print_hex_data(print_stream, edt))
+    if (!print_hex_data(print_stream, edt, hexdump_source_option | hexdump_ascii_option))
       return FALSE;
     if (!print_line(print_stream, 0, separator))
       return FALSE;
