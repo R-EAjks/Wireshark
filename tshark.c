@@ -1418,7 +1418,7 @@ main(int argc, char *argv[])
                         "\t          This is the default.\n"
                         "\t\"tabs\"    Similar to the text report except that each column of the\n"
                         "\t          human-readable one-line summary is delimited with an ASCII\n"
-                        "\t          horizontal tab character.\n");
+                        "\t          horizontal tab character.");
         exit_status = INVALID_OPTION;
         goto clean_exit;
       }
