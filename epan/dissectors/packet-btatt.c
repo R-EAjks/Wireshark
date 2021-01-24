@@ -2146,36 +2146,36 @@ static dissector_handle_t btmesh_proxy_handle;
 
 static dissector_table_t att_handle_dissector_table;
 
-static int hf_msg_fragments = -1;
-static int hf_msg_fragment = -1;
-static int hf_msg_fragment_overlap = -1;
-static int hf_msg_fragment_overlap_conflicts = -1;
-static int hf_msg_fragment_multiple_tails = -1;
-static int hf_msg_fragment_too_long_fragment = -1;
-static int hf_msg_fragment_error = -1;
-static int hf_msg_fragment_count = -1;
-static int hf_msg_reassembled_in = -1;
-static int hf_msg_reassembled_length = -1;
-static int hf_msg_reassembled_data = -1;
+static gint hf_msg_fragments = -1;
+static gint hf_msg_fragment = -1;
+static gint hf_msg_fragment_overlap = -1;
+static gint hf_msg_fragment_overlap_conflicts = -1;
+static gint hf_msg_fragment_multiple_tails = -1;
+static gint hf_msg_fragment_too_long_fragment = -1;
+static gint hf_msg_fragment_error = -1;
+static gint hf_msg_fragment_count = -1;
+static gint hf_msg_reassembled_in = -1;
+static gint hf_msg_reassembled_length = -1;
+static gint hf_msg_reassembled_data = -1;
 
 static const fragment_items msg_frag_items = {
     /* Fragment subtrees */
-    &ett_msg_fragment,
+    &ett_msg_fragment,      
     &ett_msg_fragments,
-    /* Fragment fields */
-    &hf_msg_fragments,
-    &hf_msg_fragment,
-    &hf_msg_fragment_overlap,
-    &hf_msg_fragment_overlap_conflicts,
-    &hf_msg_fragment_multiple_tails,
-    &hf_msg_fragment_too_long_fragment,
-    &hf_msg_fragment_error,
-    &hf_msg_fragment_count,
-    /* Reassembled in field */
-    &hf_msg_reassembled_in,
-    /* Reassembled length field */
-    &hf_msg_reassembled_length,
-    &hf_msg_reassembled_data,
+    /* Fragment fields */       
+    &hf_msg_fragments,                        /* FT_NONE     */   
+    &hf_msg_fragment,                           /* FT_FRAMENUM */
+    &hf_msg_fragment_overlap,                  /* FT_BOOLEAN  */ 
+    &hf_msg_fragment_overlap_conflicts,        /* FT_BOOLEAN  */         
+    &hf_msg_fragment_multiple_tails,           /* FT_BOOLEAN  */         
+    &hf_msg_fragment_too_long_fragment,        /* FT_BOOLEAN  */         
+    &hf_msg_fragment_error,                 
+    &hf_msg_fragment_count,         
+    /* Reassembled in field */                  
+    &hf_msg_reassembled_in,         
+    /* Reassembled length field */                  
+    &hf_msg_reassembled_length,         
+    &hf_msg_reassembled_data,                   
     /* Tag */
     "Message fragments"
 };
@@ -4690,9 +4690,82 @@ dissect_attribute_value(proto_tree *tree, proto_item *patron_item, packet_info *
 
         p_add_proto_data(pinfo->pool, pinfo, proto_btatt, PROTO_DATA_BTATT_HANDLE, value_data);
     }
+    /* hier wird subddisector aufgerufen */
+    /*handle muss vorbereitet / aufgehoben werden, bei merheren aufraufen muss da immer die 0x2700hin*/
+    /* dann geht es*/
+    /*
+     * Fälle
+     * 1) einzelnes Paket: deseg_len=0 deseg_offset=pktlen oder 0??
+     * 2) start stream: deseg_len=MORE_BYTE   deseg_offset>0<pktlen
+     * 3) cont stream:  deseg_len=MORE_BYTE           deseg_offset=0 weil header nicht passt
+     * 4) end stream: deseg_len=0              deseg_offset=pktlen
+     * */
+    guint consumed;
+    gboolean more_fragments=FALSE;
+    again:
+    pinfo->desegment_offset=-1;
+    consumed = btatt_dissect_attribute_handle(handle, tvb, pinfo, tree, att_data);
+    
+    if ((guint)pinfo->desegment_offset == tvb_captured_length(tvb))
+        more_fragments=FALSE;
+    if (pinfo->desegment_offset >0 && (guint)pinfo->desegment_offset < tvb_captured_length(tvb)) 
+        more_fragments=TRUE;
+    if (pinfo->desegment_offset ==0 ) 
+        more_fragments=FALSE;
+    if ((guint)pinfo->desegment_offset ==tvb_captured_length(tvb) && consumed ) 
+        more_fragments=FALSE;
+    
+/******** reassemble */
+    if ((guint)pinfo->desegment_offset < tvb_captured_length(tvb) ) {
 
-    if (btatt_dissect_attribute_handle(handle, tvb, pinfo, tree, att_data))
-        return old_offset + length;
+        //again:
+        offset = pinfo->desegment_offset;
+        opcode = att_data->opcode;
+        tvbuff_t *new_tvb = NULL;
+        fragment_item *frag_msg = NULL;
+        pinfo->fragmented = TRUE;
+        guint32 msg_seqid = handle << sizeof(opcode) | opcode;
+        pinfo->srcport = handle;
+        pinfo->destport = opcode;
+        frag_msg = fragment_add_seq_next(&msg_reassembly_table,
+                                         tvb, offset, pinfo,
+                                         msg_seqid, NULL,                              /* ID for fragments belonging together */
+                                         tvb_captured_length_remaining(tvb, offset), /* fragment length - to the end martin:THROWS!!offest 28, tvb->len 23 */
+                                         more_fragments);                                        /* More fragments? */
+        if (frag_msg)
+            frag_msg->flags ^=FD_BLOCKSEQUENCE; 
+        new_tvb = process_reassembled_data(tvb, offset, pinfo, /*martin: muss hier statt offset auch deseg_offset hi*/
+                                           "Reassembled Message", frag_msg, &msg_frag_items,
+                                           NULL, tree);
+
+        if (frag_msg)
+        { /* Reassembled */
+            col_append_str(pinfo->cinfo, COL_INFO,
+                           "Last Pckt (Message Reassembled)");
+        }
+        else
+        { /* Not last packet of reassembled Short Message */
+            col_append_fstr(pinfo->cinfo, COL_INFO,
+                            "(Message fragment %u)", pinfo->num);
+        }
+
+        if (new_tvb)
+        { /* take it all */
+            tvb = new_tvb;
+            goto again;
+        }
+        else
+        { /* make a new subset */
+            tvb = tvb_new_subset_remaining(tvb, offset);
+            offset = 0;
+        }
+        return old_offset + offset;  
+        // if (tvb_captured_length(tvb) > 0){
+        //     consumed = btatt_dissect_attribute_handle(handle, tvb, pinfo, tree, att_data);
+        //     goto again; //martin: das ist irgendwie flash. nächst eRunde
+        // }
+    }
+    /*************reassemble */
 
     if (p_get_proto_data(pinfo->pool, pinfo, proto_bluetooth, PROTO_DATA_BLUETOOTH_SERVICE_UUID) == NULL) {
         guint8 *value_data;
@@ -4701,7 +4774,8 @@ dissect_attribute_value(proto_tree *tree, proto_item *patron_item, packet_info *
 
         p_add_proto_data(pinfo->pool, pinfo, proto_bluetooth, PROTO_DATA_BLUETOOTH_SERVICE_UUID, value_data);
     }
-
+    /* hier wird subddisector aufgerufen */
+    /* dort wird auch von einem neuen PAket ausgegangen, was es natürlich nicht ist, darum fehelern und kein subddisector aufgerufen*/
     if (dissector_try_string(bluetooth_uuid_table, print_numeric_uuid(&uuid), tvb, pinfo, tree, att_data))
         return old_offset + length;
     else if (!uuid.bt_uuid) {
@@ -4736,7 +4810,9 @@ dissect_attribute_value(proto_tree *tree, proto_item *patron_item, packet_info *
             col_append_fstr(pinfo->cinfo, COL_INFO, ", %s", print_uuid(&sub_uuid));
 
             save_handle(pinfo, sub_uuid, handle, ATTRIBUTE_TYPE_SERVICE, bluetooth_data);
-        } else if (tvb_reported_length_remaining(tvb, offset) == 16) {
+        }
+        else if (tvb_reported_length_remaining(tvb, offset) == 16)
+        {
             proto_tree_add_item(tree, hf_btatt_uuid128, tvb, offset, 16, ENC_NA);
             sub_uuid = get_uuid(tvb, offset, 16);
             proto_item_append_text(patron_item, ", UUID128: %s", print_uuid(&sub_uuid));
@@ -4745,7 +4821,9 @@ dissect_attribute_value(proto_tree *tree, proto_item *patron_item, packet_info *
             col_append_fstr(pinfo->cinfo, COL_INFO, ", %s", print_uuid(&sub_uuid));
 
             save_handle(pinfo, sub_uuid, handle, ATTRIBUTE_TYPE_SERVICE, bluetooth_data);
-        } else {
+        }
+        else
+        {
             sub_item = proto_tree_add_item(tree, hf_btatt_value, tvb, offset, -1, ENC_NA);
             expert_add_info(pinfo, sub_item, &ei_btatt_bad_data);
             offset = tvb_captured_length(tvb);
@@ -4803,7 +4881,9 @@ dissect_attribute_value(proto_tree *tree, proto_item *patron_item, packet_info *
             col_append_fstr(pinfo->cinfo, COL_INFO, ", %s", print_uuid(&sub_uuid));
 
             save_handle(pinfo, sub_uuid, sub_handle, ATTRIBUTE_TYPE_CHARACTERISTIC, bluetooth_data);
-        } else if (tvb_reported_length_remaining(tvb, offset) == 2) {
+        }
+        else if (tvb_reported_length_remaining(tvb, offset) == 2)
+        {
             proto_tree_add_item(tree, hf_btatt_uuid16, tvb, offset, 2, ENC_LITTLE_ENDIAN);
             sub_uuid = get_uuid(tvb, offset, 2);
             proto_item_append_text(patron_item, ", Characteristic Handle: 0x%04x, UUID: %s", sub_handle, print_uuid(&sub_uuid));
@@ -10565,6 +10645,7 @@ btatt_dissect_attribute_handle(guint16 handle, tvbuff_t *tvb, packet_info *pinfo
      * It will implicitly call dissect_btgatt() which retrieves the BT UUID
      * from its protocol name and then calls dissect_attribute_value().
      */
+
     return dissector_try_uint_new(att_handle_dissector_table, handle, tvb, pinfo, tree, TRUE, att_data);
 }
 
@@ -10779,7 +10860,7 @@ dissect_btatt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
     bluetooth_uuid_t   uuid;
     guint              mtu;
 /* desegmentation stuff */
-    int deseg_offset = 0;
+//    int deseg_offset = 0;
 /*end desgementation stuff */
     memset(&uuid, 0, sizeof uuid);
 
@@ -11373,16 +11454,17 @@ dissect_btatt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
     case 0x1d: /* Handle Value Indication */
     case 0x52: /* Write Command */
     case 0x1b: /* Handle Value Notification */
-        again:
+        
         offset = dissect_handle(main_tree, pinfo, hf_btatt_handle, tvb, offset, bluetooth_data, &uuid, HANDLE_TVB);
         handle = tvb_get_letohs(tvb, offset - 2);
         col_append_info_by_handle(pinfo, handle, bluetooth_data);
-
+        
+        //again: /*martin: muss vor dissect_attribute_value. dort wird subddisector aufgerufen*/
         printf("martin: start dissect value\n");
         //adds opcode & handel, then returns bc. 0x2700 not BTLE defined
         offset = dissect_attribute_value(main_tree, NULL, pinfo, tvb, offset, tvb_captured_length_remaining(tvb, offset), tvb_get_guint16(tvb, offset - 2, ENC_LITTLE_ENDIAN), uuid, &att_data);
         printf("martin: finish dissect value\n");
-
+        
         if (!pinfo->fd->visited && bluetooth_data && (opcode == 0x12 || opcode == 0x1d)) {
             union request_parameters_union  request_parameters;
 
@@ -11400,59 +11482,62 @@ dissect_btatt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
          */
         printf("martin: start desegemtn pkt:%i\n",pinfo->num);
         printf("martin: desgement_len:%i desegment_off: %i\n",pinfo->desegment_len,pinfo->desegment_offset);
-
-        if(pinfo->desegment_len) {
-            if (!PINFO_FD_VISITED(pinfo))
+        
+        //if(pinfo->desegment_len) {
+        //    if (!PINFO_FD_VISITED(pinfo))
 
             /*
              * Set "deseg_offset" to the offset in "tvb"
              * of the first byte of data that the
              * subdissector didn't process.
              */
-            deseg_offset = offset + pinfo->desegment_offset;
+            //martin : offset is bogus, parsing started at beginngin, i.e. 0x2700
+            //deseg_offset = offset + pinfo->desegment_offset;
+            // deseg_offset = pinfo->desegment_offset;
 
-            tvbuff_t *new_tvb = NULL;
-            fragment_item *frag_msg = NULL;
-            pinfo->fragmented = TRUE;
-            guint32 msg_seqid = handle << sizeof(opcode) | opcode;
-            pinfo->srcport = handle;
-            pinfo->destport = opcode;
-            frag_msg = fragment_add_seq_check(&msg_reassembly_table,
-                                              tvb, deseg_offset, pinfo,
-                                              msg_seqid, NULL,                                  /* ID for fragments belonging together */
-                                              pinfo->num,                                     /* fragment sequence number */
-                                              tvb_captured_length_remaining(tvb, deseg_offset), /* fragment length - to the end */
-                                              TRUE);                                            /* More fragments? */
-            new_tvb = process_reassembled_data(tvb, offset, pinfo,
-                                               "Reassembled Message", frag_msg, &msg_frag_items,
-                                               NULL, main_tree);
+            // tvbuff_t *new_tvb = NULL;
+            // fragment_item *frag_msg = NULL;
+            // pinfo->fragmented = TRUE;
+            // guint32 msg_seqid = handle << sizeof(opcode) | opcode;
+            // pinfo->srcport = handle;
+            // pinfo->destport = opcode;
+            // frag_msg = fragment_add_seq_next(&msg_reassembly_table,
+            //                                   tvb, deseg_offset, pinfo,
+            //                                   msg_seqid, NULL,                                  /* ID for fragments belonging together */
+            //                                   tvb_captured_length_remaining(tvb, deseg_offset), /* fragment length - to the end martin:THROWS!!offest 28, tvb->len 23 */
+            //                                   TRUE);                                            /* More fragments? */
+            // new_tvb = process_reassembled_data(tvb, offset, pinfo,/*martin: muss hier statt offset auch deseg_offset hi*/
+            //                                    "Reassembled Message", frag_msg, &msg_frag_items,
+            //                                    NULL, main_tree);
 
-            if (frag_msg)
-            { /* Reassembled */
-                col_append_str(pinfo->cinfo, COL_INFO,
-                               "Last Pckt (Message Reassembled)");
-            }
-            else
-            { /* Not last packet of reassembled Short Message */
-                col_append_fstr(pinfo->cinfo, COL_INFO,
-                                "(Message fragment %u)", pinfo->num);
-            }
+            // if (frag_msg)
+            // { /* Reassembled */
+            //     col_append_str(pinfo->cinfo, COL_INFO,
+            //                    "Last Pckt (Message Reassembled)");
+            // }
+            // else
+            // { /* Not last packet of reassembled Short Message */
+            //     col_append_fstr(pinfo->cinfo, COL_INFO,
+            //                     "(Message fragment %u)", pinfo->num);
+            // }
 
-            printf("martin: new tvb assigned for dissect: %s\n", (new_tvb) ? "true" : "false");
-            if (new_tvb)
-            { /* take it all */
-                tvb = new_tvb;
-            }
-            else
-            { /* make a new subset */
-                tvb = tvb_new_subset_remaining(tvb, offset);
-            }
-            goto again;
-        }
-        else
-        { /* Not fragmented */
-            tvb = tvb_new_subset_remaining(tvb, offset);
-        }
+            // printf("martin: new tvb assigned for dissect: %s\n", (new_tvb) ? "true" : "false");
+            // if (new_tvb)
+            // { /* take it all */
+            //     tvb = new_tvb;
+            // }
+            // else
+            // { /* make a new subset */
+            //     tvb = tvb_new_subset_remaining(tvb, deseg_offset);
+            //     offset -= deseg_offset;
+            // }
+            // if (tvb_captured_length(tvb) > 0)
+            //     goto again;//martin: das ist irgendwie flash. nächst eRunde ist dann offset 28 und len 23
+        // }
+        // else
+        // { /* Not fragmented */
+        //     tvb = tvb_new_subset_remaining(tvb, offset);
+        // }
         break;
 
     case 0x13: /* Write Response */
@@ -17401,6 +17486,40 @@ proto_register_btatt(void)
             FT_FRAMENUM, BASE_NONE, FRAMENUM_TYPE(FT_FRAMENUM_RESPONSE), 0x0,
             NULL, HFILL}
         },
+        /* Reassembly fields. */
+        { &hf_msg_fragments,
+          { "Message fragments",              "btatt.fragments",
+            FT_NONE, BASE_NONE, NULL, 0x00, NULL, HFILL }},
+        { &hf_msg_fragment,
+          { "Message fragment",               "btatt.fragment",
+            FT_FRAMENUM, BASE_NONE, NULL, 0x00, NULL, HFILL }},
+        { &hf_msg_fragment_overlap,
+          { "Message fragment overlap",       "msg.fragment.overlap",
+            FT_BOOLEAN, BASE_NONE, NULL, 0x00, NULL, HFILL }},
+        { &hf_msg_fragment_overlap_conflicts,
+          { "Message fragment overlapping with conflicting data", "msg.fragment.overlap.conflicts",
+            FT_BOOLEAN, BASE_NONE, NULL, 0x00, NULL, HFILL }},
+        { &hf_msg_fragment_multiple_tails,
+          { "Message has multiple tail fragments", "msg.fragment.multiple_tails",
+            FT_BOOLEAN, BASE_NONE, NULL, 0x00, NULL, HFILL }},
+        { &hf_msg_fragment_too_long_fragment,
+          { "Message fragment too long",      "msg.fragment.too_long_fragment",
+            FT_BOOLEAN, BASE_NONE, NULL, 0x00, NULL, HFILL }},
+        { &hf_msg_fragment_error,
+          { "Message defragmentation error",  "msg.fragment.error",
+            FT_FRAMENUM, BASE_NONE, NULL, 0x00, NULL, HFILL }},
+        { &hf_msg_fragment_count,
+          { "Message fragment count",         "msg.fragment.count",
+            FT_UINT32, BASE_DEC, NULL, 0x00, NULL, HFILL }},
+        { &hf_msg_reassembled_in,
+          { "Reassembled in",                 "msg.reassembled.in",
+            FT_FRAMENUM, BASE_NONE, NULL, 0x00, NULL, HFILL }},
+        { &hf_msg_reassembled_length,
+          { "Reassembled msg length",     "msg.reassembled.length",
+            FT_UINT32, BASE_DEC, NULL, 0x00, NULL, HFILL }},
+        { &hf_msg_reassembled_data,
+          { "Reassembled msg ata",     "msg.reassembled.data",
+            FT_BYTES, SEP_SPACE, NULL, 0x00, NULL, HFILL }},
     };
 
     /* Setup protocol subtree array */
@@ -17410,7 +17529,10 @@ proto_register_btatt(void)
         &ett_btatt_value,
         &ett_btatt_opcode,
         &ett_btatt_handle,
-        &ett_btatt_characteristic_properties
+        &ett_btatt_characteristic_properties,
+        /* reassembly subtree */
+        &ett_msg_fragment,
+        &ett_msg_fragments,
     };
 
     static ei_register_info ei[] = {
