@@ -908,6 +908,76 @@ B<n> write network address resolution information (pcapng only)
 Cause B<TShark> to print a hex and ASCII dump of the packet data
 after printing the summary and/or details, if either are also being displayed.
 
+=item --hexdump E<lt>hexoptionE<gt>
+
+Cause B<TShark> to print a hex and ASCII dump of the packet data
+with the ability to select which data sources to dump and how to
+format the ASCII dump text.
+
+This option can be used multiple times on the command line where
+E<lt>hexoptionE<gt> is one of B<all>, B<frames>, B<ascii>,
+B<delimit>, B<noascii>, or B<help>.
+
+Example:  tshark ... --hexdump frames --hexdump noascii ...
+
+=over 4
+
+=item B<all>
+
+Enable hexdump, generate hexdump blocks for all data sources associated
+with each frame. Used to negate earlier use of B<--hexdump frames>.
+Legacy B<-x> option displays all data sources by default.
+
+=item B<frames>
+
+Enable hexdump, generate hexdump blocks only for the frame data. Use
+this option to exclude, from hexdump output, any hexdump blocks for
+secondary data sources such as 'Bitstring tvb', 'Reassembled TCP',
+'De-chunked entity body', etc.
+
+=item B<ascii>
+
+Enable hexdump, with undelimited ASCII dump text. Used to negate earlier
+use of B<--hexdump delimit> or B<--hexdump noascii>. Legacy B<-x> option
+displays undelimited ASCII dump text by default.
+
+=item B<delimit>
+
+Enable hexdump with the ASCII dump text delimited with '|' characters.
+This is useful to unambigiously determine the last of the hex byte text
+and start of the ASCII dump text.
+
+=item B<noascii>
+
+Enable hexdump without printing any ASCII dump text.
+
+=item B<help>
+
+Display --hexdump specific help then exit.
+
+=back
+
+The B<--hexdump> option is particularly useful for helping to generate
+output that can be used to generate a pcap or pcapng file from a capture
+file type such as Microsoft NetMon 2.x which tshark and Wireshark can
+read but can not directly do a "Save as" nor export packets from.
+
+Examples:
+
+Generate hexdump output with delimited ASCII dump text and human
+readable timestamps that is directly usable by the text2pcap utility:
+
+  tshark ... --hexdump frames --hexdump delimit \
+      -P -t ad -o gui.column.format:"Time","%t" \
+      | text2pcap -t '%F %T.' - MYNEWPCAP
+
+Generate hexdump output without any ASCII dump text using epoch
+timestamps that is directly usable by the text2pcap utility:
+
+  tshark ... --hexdump frames --hexdump noascii \
+      -P -t e -o gui.column.format:"Time","%t" \
+      | text2pcap -t %s. - MYNEWPCAP
+
 =item -X E<lt>eXtension optionsE<gt>
 
 Specify an option to be passed to a B<TShark> module.  The eXtension option
