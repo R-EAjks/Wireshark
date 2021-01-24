@@ -311,6 +311,12 @@ typedef struct tcp_analyze_seq_flow_info_t {
 				 * distinguish between retransmission,
 				 * fast retransmissions and outoforder
 				 */
+	/* Taken from tcpheader */
+	/* This is the absolute maximum we could find in TCP options (RFC2018, section 3) */
+	#define MAX_TCP_SACK_RANGES 4
+	guint8  num_sack_ranges;
+	guint32 sack_left_edge[MAX_TCP_SACK_RANGES];
+	guint32 sack_right_edge[MAX_TCP_SACK_RANGES];
 
 } tcp_analyze_seq_flow_info_t;
 
