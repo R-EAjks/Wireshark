@@ -4712,11 +4712,11 @@ dissect_attribute_value(proto_tree *tree, proto_item *patron_item, packet_info *
         more_fragments=TRUE;
     if (pinfo->desegment_offset ==0 ) 
         more_fragments=FALSE;
-    if ((guint)pinfo->desegment_offset ==tvb_captured_length(tvb) && consumed ) 
+    if (pinfo->desegment_offset == -1 && consumed == tvb_captured_length(tvb) ) 
         more_fragments=FALSE;
     
 /******** reassemble */
-    if ((guint)pinfo->desegment_offset < tvb_captured_length(tvb) ) {
+    if (consumed < tvb_captured_length(tvb) ) {
 
         //again:
         offset = pinfo->desegment_offset;
@@ -4738,7 +4738,7 @@ dissect_attribute_value(proto_tree *tree, proto_item *patron_item, packet_info *
                                            "Reassembled Message", frag_msg, &msg_frag_items,
                                            NULL, tree);
 
-        if (frag_msg)
+        if (!more_fragments)
         { /* Reassembled */
             col_append_str(pinfo->cinfo, COL_INFO,
                            "Last Pckt (Message Reassembled)");
