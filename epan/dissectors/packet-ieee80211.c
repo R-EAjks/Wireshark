@@ -5503,6 +5503,15 @@ static int hf_ieee80211_ff_fils_discovery_frame_control_md = -1;
 static int hf_ieee80211_ff_fils_discovery_frame_control_reserved = -1;
 static int hf_ieee80211_ff_fils_discovery_ssid = -1;
 static int hf_ieee80211_ff_fils_discovery_capability = -1;
+static int hf_ieee80211_ff_fils_discovery_capability_ess = -1;
+static int hf_ieee80211_ff_fils_discovery_capability_privacy = -1;
+static int hf_ieee80211_ff_fils_discovery_capability_bss_operating_channel_width = -1;
+static int hf_ieee80211_ff_fils_discovery_capability_max_number_of_spatial_streams = -1;
+static int hf_ieee80211_ff_fils_discovery_capability_reserved = -1;
+static int hf_ieee80211_ff_fils_discovery_capability_multiple_bssid = -1;
+static int hf_ieee80211_ff_fils_discovery_capability_phy_index = -1;
+static int hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate = -1;
+
 static int hf_ieee80211_ff_fils_discovery_short_ssid = -1;
 static int hf_ieee80211_ff_fils_discovery_ap_csn = -1;
 static int hf_ieee80211_ff_fils_discovery_ano = -1;
@@ -6528,7 +6537,7 @@ static gint ett_he_ndp_annc_sta_info = -1;
 static gint ett_fils_indication_realm_list = -1;
 static gint ett_fils_indication_public_key_list = -1;
 static gint ett_ff_fils_discovery_frame_control = -1;
-
+static gint ett_ff_fils_discovery_capability = -1;
 static gint ett_rnr_tbtt_information_tree = -1;
 static gint ett_rnr_bss_parameters = -1;
 
@@ -10412,6 +10421,18 @@ add_ff_fils_discovery(proto_tree *tree, tvbuff_t *tvb,
     NULL
   };
 
+  static int * const ieee80211_ff_fils_discovery_capability[] = {
+    &hf_ieee80211_ff_fils_discovery_capability_ess,
+    &hf_ieee80211_ff_fils_discovery_capability_privacy,
+    &hf_ieee80211_ff_fils_discovery_capability_bss_operating_channel_width,
+    &hf_ieee80211_ff_fils_discovery_capability_max_number_of_spatial_streams,
+    &hf_ieee80211_ff_fils_discovery_capability_reserved,
+    &hf_ieee80211_ff_fils_discovery_capability_multiple_bssid,
+    &hf_ieee80211_ff_fils_discovery_capability_phy_index,
+    &hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate,
+    NULL
+  };
+
   proto_tree_add_bitmask(tree, tvb, offset,
                          hf_ieee80211_ff_fils_discovery_frame_control,
                          ett_ff_fils_discovery_frame_control,
@@ -10441,8 +10462,11 @@ add_ff_fils_discovery(proto_tree *tree, tvbuff_t *tvb,
   }
 
   if(fc & PA_FILS_FC_CAPABILITY) {
-    /*TODO Dissect Capability */
-    proto_tree_add_item(tree, hf_ieee80211_ff_fils_discovery_capability, tvb, offset, 2, ENC_NA);
+    proto_tree_add_bitmask(tree, tvb, offset,
+                         hf_ieee80211_ff_fils_discovery_capability,
+                         ett_ff_fils_discovery_capability,
+                         ieee80211_ff_fils_discovery_capability,
+                         ENC_LITTLE_ENDIAN);
     offset += 2;
   }
 
@@ -29311,6 +29335,46 @@ proto_register_ieee80211(void)
       FT_UINT16, BASE_HEX, NULL, 0x0,
       NULL, HFILL }},
 
+    {&hf_ieee80211_ff_fils_discovery_capability_ess,
+     {"ESS", "wlan.fils_discovery.capability.ess",
+      FT_UINT16, BASE_HEX, NULL, 0x0001,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_capability_privacy,
+     {"Privacy", "wlan.fils_discovery.capability.privacy",
+      FT_UINT16, BASE_HEX, NULL, 0x0002,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_capability_bss_operating_channel_width,
+     {"BSS Operating Channel width", "wlan.fils_discovery.capability.bss_operating_channel_width",
+      FT_UINT16, BASE_HEX, NULL, 0x001C,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_capability_max_number_of_spatial_streams,
+     {"Maximum Number of Spatial Streams", "wlan.fils_discovery.maximum_number_of_spatial_streams",
+      FT_UINT16, BASE_HEX, NULL, 0x00E0,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_capability_reserved,
+     {"Reserved", "wlan.fils_discovery.capability.reserved",
+      FT_UINT16, BASE_HEX, NULL, 0x0100,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_capability_multiple_bssid,
+     {"Multiple BSSID", "wlan.fils_discovery.capability.multiple_bssid",
+      FT_UINT16, BASE_HEX, NULL, 0x0200,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_capability_phy_index,
+     {"PHY Index", "wlan.fils_discovery.capability.phy_index",
+      FT_UINT16, BASE_HEX, NULL, 0x1C00,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate,
+     {"FILS Minimum Rate", "wlan.fils_discovery.capability.minimum_rate",
+      FT_UINT16, BASE_HEX, NULL, 0xE000,
+      NULL, HFILL }},
+
     {&hf_ieee80211_ff_fils_discovery_short_ssid,
      {"Short SSID", "wlan.fils_discovery.short_ssid",
       FT_UINT32, BASE_HEX, NULL, 0x0,
@@ -40638,6 +40702,7 @@ proto_register_ieee80211(void)
     &ett_rnr_bss_parameters,
 
     &ett_ff_fils_discovery_frame_control,
+    &ett_ff_fils_discovery_capability,
   };
 
   static ei_register_info ei[] = {
