@@ -10582,7 +10582,7 @@ static void ansi_a_dtap_stat_init(stat_tap_table_ui* new_stat)
 
     stat_tap_add_table(new_stat, table);
 
-    /* Add a fow for each value type */
+    /* Add a row for each value type */
     while (ansi_a_dtap_strings[i].strptr)
     {
         items[IEI_COLUMN].type = TABLE_ITEM_UINT;
