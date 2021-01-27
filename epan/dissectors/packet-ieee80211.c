@@ -3285,6 +3285,32 @@ static const value_string fils_discovery_capability_phy_index[] = {
   {0x00, NULL}
 };
 
+static const value_string fils_discovery_capability_fils_minimum_rate_dsss[] = {
+  {0, "1 Mbps"},
+  {1, "2 Mbps"},
+  {2, "5.5 Mbps"},
+  {3, "11 Mbps"},
+  {0x00, NULL}
+};
+
+static const value_string fils_discovery_capability_fils_minimum_rate_ofdm[] = {
+  {0, "6 Mbps"},
+  {1, "9 Mbps"},
+  {2, "12 Mbps"},
+  {3, "18 Mbps"},
+  {4, "24 Mbps"},
+  {0x00, NULL}
+};
+
+static const value_string fils_discovery_capability_fils_minimum_rate_ht_vht_tvht[] = {
+  {0, "MCS 0"},
+  {1, "MCS 1"},
+  {2, "MCS 2"},
+  {3, "MCS 3"},
+  {4, "MCS 4"},
+  {0x00, NULL}
+};
+
 static int proto_wlan = -1;
 static int proto_centrino = -1;
 static int proto_aggregate = -1;
@@ -5535,6 +5561,9 @@ static int hf_ieee80211_ff_fils_discovery_capability_max_number_of_spatial_strea
 static int hf_ieee80211_ff_fils_discovery_capability_reserved = -1;
 static int hf_ieee80211_ff_fils_discovery_capability_multiple_bssid = -1;
 static int hf_ieee80211_ff_fils_discovery_capability_phy_index = -1;
+static int hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate_dsss = -1;
+static int hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate_ofdm = -1;
+static int hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate_ht_vht_tvht = -1;
 static int hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate = -1;
 
 static int hf_ieee80211_ff_fils_discovery_short_ssid = -1;
@@ -10446,18 +10475,6 @@ add_ff_fils_discovery(proto_tree *tree, tvbuff_t *tvb,
     NULL
   };
 
-  static int * const ieee80211_ff_fils_discovery_capability[] = {
-    &hf_ieee80211_ff_fils_discovery_capability_ess,
-    &hf_ieee80211_ff_fils_discovery_capability_privacy,
-    &hf_ieee80211_ff_fils_discovery_capability_bss_operating_channel_width,
-    &hf_ieee80211_ff_fils_discovery_capability_max_number_of_spatial_streams,
-    &hf_ieee80211_ff_fils_discovery_capability_reserved,
-    &hf_ieee80211_ff_fils_discovery_capability_multiple_bssid,
-    &hf_ieee80211_ff_fils_discovery_capability_phy_index,
-    &hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate,
-    NULL
-  };
-
   proto_tree_add_bitmask(tree, tvb, offset,
                          hf_ieee80211_ff_fils_discovery_frame_control,
                          ett_ff_fils_discovery_frame_control,
@@ -10487,11 +10504,33 @@ add_ff_fils_discovery(proto_tree *tree, tvbuff_t *tvb,
   }
 
   if(fc & PA_FILS_FC_CAPABILITY) {
-    proto_tree_add_bitmask(tree, tvb, offset,
-                         hf_ieee80211_ff_fils_discovery_capability,
-                         ett_ff_fils_discovery_capability,
-                         ieee80211_ff_fils_discovery_capability,
-                         ENC_LITTLE_ENDIAN);
+    proto_tree *fdc_tree;
+    proto_item *fdc_item;
+    guint32 fdc;
+    fdc_item = proto_tree_add_item_ret_uint(tree, hf_ieee80211_ff_fils_discovery_capability, tvb, offset, 2, ENC_LITTLE_ENDIAN, &fdc);
+    fdc_tree = proto_item_add_subtree(fdc_item, ett_ff_fils_discovery_capability);
+    proto_tree_add_item(fdc_tree, hf_ieee80211_ff_fils_discovery_capability_ess, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(fdc_tree, hf_ieee80211_ff_fils_discovery_capability_privacy, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(fdc_tree, hf_ieee80211_ff_fils_discovery_capability_bss_operating_channel_width, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(fdc_tree, hf_ieee80211_ff_fils_discovery_capability_max_number_of_spatial_streams, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(fdc_tree, hf_ieee80211_ff_fils_discovery_capability_reserved, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(fdc_tree, hf_ieee80211_ff_fils_discovery_capability_multiple_bssid, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(fdc_tree, hf_ieee80211_ff_fils_discovery_capability_phy_index, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    switch((fdc & 0x1C00) >> 10){
+      case 0:
+        proto_tree_add_item(fdc_tree, hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate_dsss, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+      break;
+      case 1:
+        proto_tree_add_item(fdc_tree, hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate_ofdm, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+      break;
+      case 2:
+      case 3:
+        proto_tree_add_item(fdc_tree, hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate_ht_vht_tvht, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+      break;
+      default:
+        proto_tree_add_item(fdc_tree, hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+      break;
+    }
     offset += 2;
   }
 
@@ -29393,6 +29432,21 @@ proto_register_ieee80211(void)
     {&hf_ieee80211_ff_fils_discovery_capability_phy_index,
      {"PHY Index", "wlan.fils_discovery.capability.phy_index",
       FT_UINT16, BASE_HEX, VALS(fils_discovery_capability_phy_index), 0x1C00,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate_dsss,
+     {"FILS Minimum Rate", "wlan.fils_discovery.capability.minimum_rate",
+      FT_UINT16, BASE_HEX, VALS(fils_discovery_capability_fils_minimum_rate_dsss), 0xE000,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate_ofdm,
+     {"FILS Minimum Rate", "wlan.fils_discovery.capability.minimum_rate",
+      FT_UINT16, BASE_HEX, VALS(fils_discovery_capability_fils_minimum_rate_ofdm), 0xE000,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate_ht_vht_tvht,
+     {"FILS Minimum Rate", "wlan.fils_discovery.capability.minimum_rate",
+      FT_UINT16, BASE_HEX, VALS(fils_discovery_capability_fils_minimum_rate_ht_vht_tvht), 0xE000,
       NULL, HFILL }},
 
     {&hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate,
