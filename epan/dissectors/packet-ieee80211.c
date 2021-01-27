@@ -3260,6 +3260,31 @@ static const value_string wfa_mbo_transition_rej_reason_vals[] = {
 #define PA_FILS_FC_MD           0x2000
 #define PA_FILS_FC_RESERVED     0xC000
 
+static const value_string fils_discovery_capability_bss_operating_channel_width[] = {
+  {0, "20MHz (or 22Mhz) / TVHT_W"},
+  {1, "40MHZ / TVHT_W+W"},
+  {2, "80MHz / TVHT_2W"},
+  {3, "160MHz or 80MHz+80MHz / TVHT_4W or TVHT_2W+2W"},
+  {0, NULL}
+};
+
+static const value_string fils_discovery_capability_max_number_of_spatial_streams[] = {
+  {0, "1 spatial stream"},
+  {1, "2 spatial streams"},
+  {2, "3 spatial streams"},
+  {3, "4 spatial streams"},
+  {4, "5-8 spatial streams"},
+  {0, NULL}
+};
+
+static const value_string fils_discovery_capability_phy_index[] = {
+  {0, "HR/DSSS"},
+  {1, "ERP-OFDM"},
+  {2, "HT"},
+  {3, "VHT or TVHT"},
+  {0x00, NULL}
+};
+
 static int proto_wlan = -1;
 static int proto_centrino = -1;
 static int proto_aggregate = -1;
@@ -29347,12 +29372,12 @@ proto_register_ieee80211(void)
 
     {&hf_ieee80211_ff_fils_discovery_capability_bss_operating_channel_width,
      {"BSS Operating Channel width", "wlan.fils_discovery.capability.bss_operating_channel_width",
-      FT_UINT16, BASE_HEX, NULL, 0x001C,
+      FT_UINT16, BASE_HEX, VALS(fils_discovery_capability_bss_operating_channel_width), 0x001C,
       NULL, HFILL }},
 
     {&hf_ieee80211_ff_fils_discovery_capability_max_number_of_spatial_streams,
      {"Maximum Number of Spatial Streams", "wlan.fils_discovery.maximum_number_of_spatial_streams",
-      FT_UINT16, BASE_HEX, NULL, 0x00E0,
+      FT_UINT16, BASE_HEX, VALS(fils_discovery_capability_max_number_of_spatial_streams), 0x00E0,
       NULL, HFILL }},
 
     {&hf_ieee80211_ff_fils_discovery_capability_reserved,
@@ -29367,7 +29392,7 @@ proto_register_ieee80211(void)
 
     {&hf_ieee80211_ff_fils_discovery_capability_phy_index,
      {"PHY Index", "wlan.fils_discovery.capability.phy_index",
-      FT_UINT16, BASE_HEX, NULL, 0x1C00,
+      FT_UINT16, BASE_HEX, VALS(fils_discovery_capability_phy_index), 0x1C00,
       NULL, HFILL }},
 
     {&hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate,
