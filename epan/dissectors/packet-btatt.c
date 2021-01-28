@@ -4694,40 +4694,87 @@ dissect_attribute_value(proto_tree *tree, proto_item *patron_item, packet_info *
     /*handle muss vorbereitet / aufgehoben werden, bei merheren aufraufen muss da immer die 0x2700hin*/
     /* dann geht es*/
     /*
-     * Fälle
-     * 1) einzelnes Paket: deseg_len=0 deseg_offset=pktlen oder 0??
-     * 2) start stream: deseg_len=MORE_BYTE   deseg_offset>0<pktlen
-     * 3) cont stream:  deseg_len=MORE_BYTE           deseg_offset=0 weil header nicht passt
-     * 4) end stream: deseg_len=0              deseg_offset=pktlen
+     * Cases
+     * 1) single paket: deseg_len=0 deseg_offset=pktlen oder 0??
+     * 2) start stream: deseg_len=MORE_BYTE   deseg_offset>0<pktlen -> partially consumed, store fragment, finish
+     * 3) cont stream:  deseg_len=MORE_BYTE   deseg_offset=0 (due to header mismatch) -> not consumed, add previous fragment, run again
+     * 4) end stream: deseg_len=0              deseg_offset=pktlen -> completely consumed, return pktlen
+     * 
+     * case 3 can lead to case 2 -> stop fragment stream, create new fragment stream
      * */
     guint consumed;
+    gboolean save_fragmented;
     gboolean more_fragments=FALSE;
+    guint state = 0;
+    static guint16 seq_id=0;
+    state = state;
+    // do not test for (PINFO_FD_VISITED(pinfo)) otherwise the lua dissector is not added
+
     again:
     pinfo->desegment_offset=-1;
     consumed = btatt_dissect_attribute_handle(handle, tvb, pinfo, tree, att_data);
-    
-    if ((guint)pinfo->desegment_offset == tvb_captured_length(tvb))
+//einzige offene Änderung ist dieses hier. und es bricht die endlo schleife leider nicht. alle anderen Ändeurngen waren fehler im lua
+if ( ! (consumed == 0 && (pinfo->desegment_offset==-1)) ){ //consumed == 0: paket was rejected by subdissector, do not test for fragmentation
+    if ((guint)pinfo->desegment_offset == tvb_captured_length(tvb)){
+        state=1;
+        seq_id++;
         more_fragments=FALSE;
-    if (pinfo->desegment_offset >0 && (guint)pinfo->desegment_offset < tvb_captured_length(tvb)) 
+    }
+    if (pinfo->desegment_offset >0 && (guint)pinfo->desegment_offset < tvb_captured_length(tvb)) {
+        if (state == 3) {
+         guint32 msg_seqid = handle << 24 |(opcode <<16) | (seq_id & 0xffff);
+         fragment_end_seq_next(&msg_reassembly_table,pinfo,msg_seqid,NULL);
+         fragment_add_seq_offset(&msg_reassembly_table,pinfo,msg_seqid,NULL,0);
+         
+         state=5; //case 5: first bytes were reassembled, then dissection left some that go into a new fragment stream
+         
+          //  seq_id++;
+        /* state5 ist eventuell quatsch. ganz wichtig test case wechseln. im 
+         * Grund wird alles richtig paket3 braucht den vorherigen HEader nicht, sondern mehr bytes hinten raus
+         * */
+        } else
+          state = 2;
+    
         more_fragments=TRUE;
-    if (pinfo->desegment_offset ==0 ) 
+    }
+    if (pinfo->desegment_offset ==0 ) {
+        state = 3;
         more_fragments=FALSE;
-    if (pinfo->desegment_offset == -1 && consumed == tvb_captured_length(tvb) ) 
+    }
+    if (pinfo->desegment_offset == -1 && consumed == tvb_captured_length(tvb) ) {
+        state = 4;
         more_fragments=FALSE;
-    
+    }
+    save_fragmented = pinfo->fragmented;
+    /********* add
+     * fragment_end_seq_next  Mark end of reassembly and returns the reassembled fragment (if completed).
+     * fragment_add_seq_offset To specify the offset for the fragment numbering
+     *      *
+     * next steps:
+     * one_set looks awful, check if artefacts are reassembly leftovers like p2/p3
+     * either age off after case 2/4?? o
+     * or ??
+     * 
+     */
 /******** reassemble */
     if (consumed < tvb_captured_length(tvb) ) {
-
-        //again:
+        
         offset = pinfo->desegment_offset;
         opcode = att_data->opcode;
         tvbuff_t *new_tvb = NULL;
         fragment_item *frag_msg = NULL;
         pinfo->fragmented = TRUE;
-        guint32 msg_seqid = handle << sizeof(opcode) | opcode;
+        guint32 msg_seqid = handle << 24 |(opcode <<16) | (seq_id & 0xffff);
         pinfo->srcport = handle;
         pinfo->destport = opcode;
-        frag_msg = fragment_add_seq_next(&msg_reassembly_table,
+//        if (state==5) 
+//            frag_msg=fragment_add_multiple_ok(&msg_reassembly_table,
+//                                         tvb, offset, pinfo,
+//                                         msg_seqid, NULL,                              /* ID for fragments belonging together */
+//                                         offset,tvb_captured_length_remaining(tvb, offset), /* fragment length - to the end martin:THROWS!!offest 28, tvb->len 23 */
+//                                         more_fragments);                                        /* More fragments? */
+//        else
+            frag_msg = fragment_add_seq_next(&msg_reassembly_table,
                                          tvb, offset, pinfo,
                                          msg_seqid, NULL,                              /* ID for fragments belonging together */
                                          tvb_captured_length_remaining(tvb, offset), /* fragment length - to the end martin:THROWS!!offest 28, tvb->len 23 */
@@ -4740,6 +4787,7 @@ dissect_attribute_value(proto_tree *tree, proto_item *patron_item, packet_info *
 
         if (!more_fragments)
         { /* Reassembled */
+            printf("reassemble\n");
             col_append_str(pinfo->cinfo, COL_INFO,
                            "Last Pckt (Message Reassembled)");
         }
@@ -4749,6 +4797,10 @@ dissect_attribute_value(proto_tree *tree, proto_item *patron_item, packet_info *
                             "(Message fragment %u)", pinfo->num);
         }
 
+        pinfo->fragmented = save_fragmented;
+        //Reassembly buffer is empty but reassembly requested. break the loop
+        if (new_tvb && (tvb_captured_length(tvb) == tvb_captured_length(new_tvb)))
+            return 0;//tvb_captured_length(tvb);
         if (new_tvb)
         { /* take it all */
             tvb = new_tvb;
@@ -4757,7 +4809,7 @@ dissect_attribute_value(proto_tree *tree, proto_item *patron_item, packet_info *
         else
         { /* make a new subset */
             tvb = tvb_new_subset_remaining(tvb, offset);
-            offset = 0;
+            //offset = 0;
         }
         return old_offset + offset;  
         // if (tvb_captured_length(tvb) > 0){
@@ -4765,8 +4817,9 @@ dissect_attribute_value(proto_tree *tree, proto_item *patron_item, packet_info *
         //     goto again; //martin: das ist irgendwie flash. nächst eRunde
         // }
     }
+    
     /*************reassemble */
-
+}
     if (p_get_proto_data(pinfo->pool, pinfo, proto_bluetooth, PROTO_DATA_BLUETOOTH_SERVICE_UUID) == NULL) {
         guint8 *value_data;
 
@@ -11480,9 +11533,9 @@ dissect_btatt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
          * this is something we only do the first time we see this
          * packet.
          */
-        printf("martin: start desegemtn pkt:%i\n",pinfo->num);
-        printf("martin: desgement_len:%i desegment_off: %i\n",pinfo->desegment_len,pinfo->desegment_offset);
-        
+//        printf("martin: start desegemtn pkt:%i\n",pinfo->num);
+//        printf("martin: desgement_len:%i desegment_off: %i\n",pinfo->desegment_len,pinfo->desegment_offset);
+//        
         //if(pinfo->desegment_len) {
         //    if (!PINFO_FD_VISITED(pinfo))
 
