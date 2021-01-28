@@ -3282,6 +3282,7 @@ static const value_string fils_discovery_capability_phy_index[] = {
   {1, "ERP-OFDM"},
   {2, "HT"},
   {3, "VHT or TVHT"},
+  {4, "HE"},
   {0x00, NULL}
 };
 
@@ -3308,6 +3309,15 @@ static const value_string fils_discovery_capability_fils_minimum_rate_ht_vht_tvh
   {2, "MCS 2"},
   {3, "MCS 3"},
   {4, "MCS 4"},
+  {0x00, NULL}
+};
+
+static const value_string fils_discovery_capability_fils_minimum_rate_he[] = {
+  {0, "HE-MCS 0"},
+  {1, "HE-MCS 1"},
+  {2, "HE-MCS 2"},
+  {3, "HE-MCS 3"},
+  {4, "HE-MCS 4"},
   {0x00, NULL}
 };
 
@@ -5564,6 +5574,7 @@ static int hf_ieee80211_ff_fils_discovery_capability_phy_index = -1;
 static int hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate_dsss = -1;
 static int hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate_ofdm = -1;
 static int hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate_ht_vht_tvht = -1;
+static int hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate_he = -1;
 static int hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate = -1;
 
 static int hf_ieee80211_ff_fils_discovery_short_ssid = -1;
@@ -10526,6 +10537,9 @@ add_ff_fils_discovery(proto_tree *tree, tvbuff_t *tvb,
       case 2:
       case 3:
         proto_tree_add_item(fdc_tree, hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate_ht_vht_tvht, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+      break;
+      case 4:
+        proto_tree_add_item(fdc_tree, hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate_he, tvb, offset, 2, ENC_LITTLE_ENDIAN);
       break;
       default:
         proto_tree_add_item(fdc_tree, hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate, tvb, offset, 2, ENC_LITTLE_ENDIAN);
@@ -29447,6 +29461,11 @@ proto_register_ieee80211(void)
     {&hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate_ht_vht_tvht,
      {"FILS Minimum Rate", "wlan.fils_discovery.capability.minimum_rate",
       FT_UINT16, BASE_HEX, VALS(fils_discovery_capability_fils_minimum_rate_ht_vht_tvht), 0xE000,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate_he,
+     {"FILS Minimum Rate", "wlan.fils_discovery.capability.minimum_rate",
+      FT_UINT16, BASE_HEX, VALS(fils_discovery_capability_fils_minimum_rate_he), 0xE000,
       NULL, HFILL }},
 
     {&hf_ieee80211_ff_fils_discovery_capability_fils_minimum_rate,
