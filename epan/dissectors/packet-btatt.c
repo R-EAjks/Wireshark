@@ -12204,7 +12204,8 @@ proto_register_btatt(void)
     //dst_port will be filled with opcode
     reassembly_table_register(&msg_reassembly_table,
         &addresses_ports_reassembly_table_functions);
-
+    reassembly_table_init(&msg_reassembly_table,
+        &addresses_ports_reassembly_table_functions);
     static hf_register_info hf[] = {
         {&hf_btatt_opcode,
             {"Opcode", "btatt.opcode",
