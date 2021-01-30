@@ -4794,10 +4794,6 @@ if ( ! (consumed == 0 && (pinfo->desegment_offset==-1)) ){ //consumed == 0: pake
             //offset = 0;
         }
         return old_offset + offset;  
-        // if (tvb_captured_length(tvb) > 0){
-        //     consumed = btatt_dissect_attribute_handle(handle, tvb, pinfo, tree, att_data);
-        //     goto again; //martin: das ist irgendwie flash. nächst eRunde
-        // }
     }
     
     /*************reassemble */
