@@ -4706,7 +4706,6 @@ dissect_attribute_value(proto_tree *tree, proto_item *patron_item, packet_info *
     gboolean save_fragmented;
     gboolean more_fragments=FALSE;
     guint state = 0;
-    static guint16 seq_id=0;
     state = state;
     // do not test for (PINFO_FD_VISITED(pinfo)) otherwise the lua dissector is not added
 
@@ -4714,15 +4713,14 @@ dissect_attribute_value(proto_tree *tree, proto_item *patron_item, packet_info *
     pinfo->desegment_offset=-1;
     consumed = btatt_dissect_attribute_handle(handle, tvb, pinfo, tree, att_data);
 //einzige offene Änderung ist dieses hier. und es bricht die endlo schleife leider nicht. alle anderen Ändeurngen waren fehler im lua
+        guint32 msg_seqid = handle << 16 |(opcode & 0xffff) ;
 if ( ! (consumed == 0 && (pinfo->desegment_offset==-1)) ){ //consumed == 0: paket was rejected by subdissector, do not test for fragmentation
     if ((guint)pinfo->desegment_offset == tvb_captured_length(tvb)){
         state=1;
-        seq_id++;
         more_fragments=FALSE;
     }
     if (pinfo->desegment_offset >0 && (guint)pinfo->desegment_offset < tvb_captured_length(tvb)) {
         if (state == 3) {
-         guint32 msg_seqid = handle << 24 |(opcode <<16) | (seq_id & 0xffff);
          fragment_end_seq_next(&msg_reassembly_table,pinfo,msg_seqid,NULL);
          fragment_add_seq_offset(&msg_reassembly_table,pinfo,msg_seqid,NULL,0);
          
@@ -4758,7 +4756,6 @@ if ( ! (consumed == 0 && (pinfo->desegment_offset==-1)) ){ //consumed == 0: pake
         tvbuff_t *new_tvb = NULL;
         fragment_item *frag_msg = NULL;
         pinfo->fragmented = TRUE;
-        guint32 msg_seqid = handle << 24 |(opcode <<16) | (seq_id & 0xffff);
         pinfo->srcport = handle;
         pinfo->destport = opcode;
 
