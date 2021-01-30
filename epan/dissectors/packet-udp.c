@@ -252,7 +252,7 @@ init_udp_conversation_data(packet_info *pinfo)
   return udpd;
 }
 
-struct udp_analysis *
+static struct udp_analysis *
 get_udp_conversation_data(conversation_t *conv, packet_info *pinfo)
 {
   int direction;

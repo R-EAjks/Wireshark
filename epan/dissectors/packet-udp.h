@@ -106,8 +106,6 @@ WS_DLL_PUBLIC guint32 get_udp_stream_count(void);
 WS_DLL_PUBLIC void decode_udp_ports(tvbuff_t *, int, packet_info *,
 	proto_tree *, int, int, int);
 
-WS_DLL_PUBLIC struct udp_analysis *get_udp_conversation_data(conversation_t *,
-	packet_info *);
 
 /*
  * Loop for dissecting PDUs within a UDP packet; Similar to tcp_dissect_pdus,

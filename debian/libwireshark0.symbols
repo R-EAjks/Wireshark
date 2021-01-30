@@ -854,7 +854,6 @@ libwireshark.so.0 libwireshark0 #MINVER#
  get_ts_23_038_7bits_string_unpacked@Base 3.3.1
  get_ucs_2_string@Base 1.12.0~rc1
  get_ucs_4_string@Base 1.12.0~rc1
- get_udp_conversation_data@Base 1.99.2
  get_udp_stream_count@Base 1.12.0~rc1
  get_unichar2_string@Base 1.12.0~rc1
  get_utf_16_string@Base 1.12.0~rc1
