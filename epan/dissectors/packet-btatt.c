@@ -4708,12 +4708,14 @@ dissect_attribute_value(proto_tree *tree, proto_item *patron_item, packet_info *
 again:
     pinfo->desegment_offset = -1;
     consumed = btatt_dissect_attribute_handle(handle, tvb, pinfo, tree, att_data);
-    opcode = att_data->opcode;
-    guint32 msg_seqid = handle << 16 | (opcode & 0xffff);
-    pinfo->srcport = handle;
-    pinfo->destport = opcode;
+
+    //consumed == 0: paket was rejected by subdissector, do not test for fragmentation
     if (!(consumed == 0 && (pinfo->desegment_offset == -1)))
-    { //consumed == 0: paket was rejected by subdissector, do not test for fragmentation
+    { 
+        opcode = att_data->opcode;
+        guint32 msg_seqid = handle << 16 | (opcode & 0xffff);
+        pinfo->srcport = handle;
+        pinfo->destport = opcode;
         if ((guint)pinfo->desegment_offset == tvb_captured_length(tvb))
         {
             // case 1
