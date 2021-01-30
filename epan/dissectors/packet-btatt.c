@@ -4727,12 +4727,6 @@ if ( ! (consumed == 0 && (pinfo->desegment_offset==-1)) ){ //consumed == 0: pake
          fragment_add_seq_offset(&msg_reassembly_table,pinfo,msg_seqid,NULL,0);
          
          state=5; //case 5: first bytes were reassembled, then dissection left some that go into a new fragment stream
-         
-          //  seq_id++;
-        /* state5 ist eventuell quatsch. ganz wichtig test case wechseln. im 
-         * Grund wird alles richtig paket3 braucht den vorherigen HEader nicht, sondern mehr bytes hinten raus
-         * */
-        } else
           state = 2;
     
         more_fragments=TRUE;
@@ -4767,12 +4761,7 @@ if ( ! (consumed == 0 && (pinfo->desegment_offset==-1)) ){ //consumed == 0: pake
         guint32 msg_seqid = handle << 24 |(opcode <<16) | (seq_id & 0xffff);
         pinfo->srcport = handle;
         pinfo->destport = opcode;
-//        if (state==5) 
-//            frag_msg=fragment_add_multiple_ok(&msg_reassembly_table,
-//                                         tvb, offset, pinfo,
-//                                         msg_seqid, NULL,                              /* ID for fragments belonging together */
-//                                         offset,tvb_captured_length_remaining(tvb, offset), /* fragment length - to the end martin:THROWS!!offest 28, tvb->len 23 */
-//                                         more_fragments);                                        /* More fragments? */
+
         frag_msg = fragment_add_seq_next(&msg_reassembly_table,
                                          tvb, offset, pinfo,
                                          msg_seqid, NULL,                              /* ID for fragments belonging together */
