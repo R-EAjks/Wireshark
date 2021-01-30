@@ -83,10 +83,8 @@ static expert_field ei_goose_mal_utctime = EI_INIT;
 static expert_field ei_goose_zero_pdu = EI_INIT;
 static expert_field ei_goose_invalid_sim = EI_INIT;
 
-static gboolean goose_display_float_values = FALSE;
-
 #define SINGLE_FLOAT_EXP_BITS	8
-#define FLOAT_ENC_LENGHT		5
+#define FLOAT_ENC_LENGTH		5
 
 #include "packet-goose-hf.c"
 
@@ -594,7 +592,6 @@ void proto_register_goose(void) {
 	};
 
 	expert_module_t* expert_goose;
-	module_t *goose_module;
 
 	/* Register protocol */
 	proto_goose = proto_register_protocol(GOOSE_PNAME, GOOSE_PSNAME, GOOSE_PFNAME);
@@ -608,10 +605,6 @@ void proto_register_goose(void) {
 	expert_goose = expert_register_protocol(proto_goose);
 	expert_register_field_array(expert_goose, ei, array_length(ei));
 
-	goose_module = prefs_register_protocol(proto_goose, NULL);
-	prefs_register_bool_preference(goose_module, "display_float_values",
-		"Display decimal representation of float values",
-		NULL, &goose_display_float_values);
 }
 
 /*--- proto_reg_handoff_goose --- */

@@ -64,16 +64,19 @@ GOOSEpdu
 
 #.END
 
-#.FN_BODY FloatingPoint VAL_PTR= &value
-	tvbuff_t *value;
+#.FN_BODY FloatingPoint
+
 	int len = tvb_reported_length_remaining(tvb, offset);
-%(DEFAULT_BODY)s
-	if (goose_display_float_values){
-		if ( (value) && (len == FLOAT_ENC_LENGHT) && (tvb_get_guint8(value,0) == SINGLE_FLOAT_EXP_BITS) ){
-			/* IEEE 754 single precision floating point */
-			proto_tree_add_item(tree, hf_goose_float_value, value, 1, (FLOAT_ENC_LENGHT-1), ENC_BIG_ENDIAN);
-		}
+
+	if ((len == FLOAT_ENC_LENGTH) && (tvb_get_guint8(tvb,0) == SINGLE_FLOAT_EXP_BITS) ){
+		/* IEEE 754 single precision floating point */
+		proto_tree_add_item(tree, hf_goose_float_value, tvb, 1, (FLOAT_ENC_LENGTH-1), ENC_BIG_ENDIAN);
+		offset = len;
+	}else{
+		offset = dissect_ber_octet_string(implicit_tag, actx, tree, tvb, offset, hf_index,
+								   NULL);
 	}
+
 #.END
 
 #.TYPE_ATTR
