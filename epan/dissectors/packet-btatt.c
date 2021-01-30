@@ -4722,12 +4722,7 @@ again:
         if (pinfo->desegment_offset > 0 && (guint)pinfo->desegment_offset < tvb_captured_length(tvb))
         {
             // case 2
-            // possibilites instead of fragment_delete:
-            // * fragment_end_seq_next  Mark end of reassembly and returns the reassembled fragment (if completed).
-            // * fragment_add_seq_offset To specify the offset for the fragment numbering
-            // fragment_end_seq_next(&msg_reassembly_table,pinfo,msg_seqid,NULL);
-            // fragment_add_seq_offset(&msg_reassembly_table,pinfo,msg_seqid,NULL,0);
-
+            //drop leftoveres before a fresh fragment ist started
             tvbuff_t *old_tvb_data = fragment_delete(&msg_reassembly_table, pinfo, msg_seqid, NULL);
             if (old_tvb_data)
                 tvb_free(old_tvb_data);
