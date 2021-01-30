@@ -4773,19 +4773,17 @@ if ( ! (consumed == 0 && (pinfo->desegment_offset==-1)) ){ //consumed == 0: pake
 //                                         msg_seqid, NULL,                              /* ID for fragments belonging together */
 //                                         offset,tvb_captured_length_remaining(tvb, offset), /* fragment length - to the end martin:THROWS!!offest 28, tvb->len 23 */
 //                                         more_fragments);                                        /* More fragments? */
-//        else
-            frag_msg = fragment_add_seq_next(&msg_reassembly_table,
+        frag_msg = fragment_add_seq_next(&msg_reassembly_table,
                                          tvb, offset, pinfo,
                                          msg_seqid, NULL,                              /* ID for fragments belonging together */
                                          tvb_captured_length_remaining(tvb, offset), /* fragment length - to the end martin:THROWS!!offest 28, tvb->len 23 */
                                          more_fragments);                                        /* More fragments? */
-        if (frag_msg)
-            frag_msg->flags ^=FD_BLOCKSEQUENCE; 
+
         new_tvb = process_reassembled_data(tvb, offset, pinfo, /*martin: muss hier statt offset auch deseg_offset hi*/
                                            "Reassembled Message", frag_msg, &msg_frag_items,
                                            NULL, tree);
 
-        if (!more_fragments)
+        if (frag_msg)
         { /* Reassembled */
             printf("reassemble\n");
             col_append_str(pinfo->cinfo, COL_INFO,
