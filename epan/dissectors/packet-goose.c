@@ -631,8 +631,9 @@ dissect_goose_FloatingPoint(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int of
 		proto_tree_add_item(tree, hf_goose_float_value, tvb, 1, (FLOAT_ENC_LENGTH-1), ENC_BIG_ENDIAN);
 		offset = len;
 	}else{
-		offset = dissect_ber_octet_string(implicit_tag, actx, tree, tvb, offset, hf_index,
-								   NULL);
+		  offset = dissect_ber_octet_string(implicit_tag, actx, tree, tvb, offset, hf_index,
+                                       NULL);
+
 	}
 
 
