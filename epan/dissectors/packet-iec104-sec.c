@@ -22,6 +22,8 @@
 #include <epan/prefs.h>
 #include <epan/expert.h>
 #include "packet-tcp.h"
+#include "packet-tls.h"
+#include "packet-tls-utils.h"
 
 void proto_register_iec60870_104_sec(void);
 void proto_reg_handoff_iec60870_104_sec(void);
@@ -29,6 +31,7 @@ void proto_reg_handoff_iec60870_104_sec(void);
 void proto_register_iec60870_asdu_sec(void);
 
 static dissector_handle_t iec60870_asdu_handle;
+static dissector_handle_t tls_handle;
 
 /* the asdu header structure */
 struct asduheader {
@@ -82,6 +85,7 @@ typedef struct {
 } td_CmdInfo;
 
 #define IEC60870_104_PORT 19998
+#define USE_SSL_DISSECTOR 1
 
 /* Define the iec101/104 protos */
 static int proto_iec60870_104  = -1;
@@ -2463,12 +2467,24 @@ void
 proto_reg_handoff_iec60870_104_sec(void)
 {
 	/* create a dissector handle, which is a handle associated with the protocol
+	   and the function called to do the actual dissecting */
+	tls_handle = find_dissector("tls");
+	
+	/* create a dissector handle, which is a handle associated with the protocol
 	   and the function called to do the actual dissecting */	
 	dissector_handle_t iec60870_104_handle;
-	iec60870_104_handle = create_dissector_handle(dissect_iec60870_104_tcp, proto_iec60870_104);
 
+#if USE_SSL_DISSECTOR
+	iec60870_104_handle = register_dissector("IEC104_TCP", dissect_iec60870_104_tcp, proto_iec60870_104);	
+#else
+	iec60870_104_handle = create_dissector_handle(dissect_iec60870_104_tcp, proto_iec60870_104);
+#endif
 	/* register the dissectorhandle so that traffic associated with the protocol calls the dissector */
 	dissector_add_uint_with_preference("tcp.port", IEC60870_104_PORT, iec60870_104_handle);
+
+#if USE_SSL_DISSECTOR
+	ssl_dissector_add(IEC60870_104_PORT, iec60870_104_handle);
+#endif
 }
 
 /******************************************************************************************************/
