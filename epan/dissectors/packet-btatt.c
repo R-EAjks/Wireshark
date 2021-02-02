@@ -2114,8 +2114,8 @@ static gint ett_btgatt_microbit_magnetometer = -1;
 static gint ett_btgatt_microbit_pin_data = -1;
 static gint ett_btgatt_microbit_pin_ad_config = -1;
 static gint ett_btgatt_microbit_pin_io_config = -1;
-static gint ett_msg_fragment = -1;
-static gint ett_msg_fragments = -1;
+static gint ett_btatt_fragment = -1;
+static gint ett_btatt_fragments = -1;
 
 static expert_field ei_btatt_uuid_format_unknown = EI_INIT;
 static expert_field ei_btatt_handle_too_few = EI_INIT;
@@ -2146,39 +2146,38 @@ static dissector_handle_t btmesh_proxy_handle;
 
 static dissector_table_t att_handle_dissector_table;
 
-static gint hf_msg_fragments = -1;
-static gint hf_msg_fragment = -1;
-static gint hf_msg_fragment_overlap = -1;
-static gint hf_msg_fragment_overlap_conflicts = -1;
-static gint hf_msg_fragment_multiple_tails = -1;
-static gint hf_msg_fragment_too_long_fragment = -1;
-static gint hf_msg_fragment_error = -1;
-static gint hf_msg_fragment_count = -1;
-static gint hf_msg_reassembled_in = -1;
-static gint hf_msg_reassembled_length = -1;
-static gint hf_msg_reassembled_data = -1;
+static gint hf_btatt_fragments = -1;
+static gint hf_btatt_fragment = -1;
+static gint hf_btatt_fragment_overlap = -1;
+static gint hf_btatt_fragment_overlap_conflicts = -1;
+static gint hf_btatt_fragment_multiple_tails = -1;
+static gint hf_btatt_fragment_too_long_fragment = -1;
+static gint hf_btatt_fragment_error = -1;
+static gint hf_btatt_fragment_count = -1;
+static gint hf_btatt_reassembled_in = -1;
+static gint hf_btatt_reassembled_length = -1;
+static gint hf_btatt_reassembled_data = -1;
 
 static const fragment_items msg_frag_items = {
     /* Fragment subtrees */
-    &ett_msg_fragment,      
-    &ett_msg_fragments,
-    /* Fragment fields */       
-    &hf_msg_fragments,                        /* FT_NONE     */   
-    &hf_msg_fragment,                           /* FT_FRAMENUM */
-    &hf_msg_fragment_overlap,                  /* FT_BOOLEAN  */ 
-    &hf_msg_fragment_overlap_conflicts,        /* FT_BOOLEAN  */         
-    &hf_msg_fragment_multiple_tails,           /* FT_BOOLEAN  */         
-    &hf_msg_fragment_too_long_fragment,        /* FT_BOOLEAN  */         
-    &hf_msg_fragment_error,                 
-    &hf_msg_fragment_count,         
-    /* Reassembled in field */                  
-    &hf_msg_reassembled_in,         
-    /* Reassembled length field */                  
-    &hf_msg_reassembled_length,         
-    &hf_msg_reassembled_data,                   
+    &ett_btatt_fragment,
+    &ett_btatt_fragments,
+    /* Fragment fields */
+    &hf_btatt_fragments,                  /* FT_NONE     */
+    &hf_btatt_fragment,                   /* FT_FRAMENUM */
+    &hf_btatt_fragment_overlap,           /* FT_BOOLEAN  */
+    &hf_btatt_fragment_overlap_conflicts, /* FT_BOOLEAN  */
+    &hf_btatt_fragment_multiple_tails,    /* FT_BOOLEAN  */
+    &hf_btatt_fragment_too_long_fragment, /* FT_BOOLEAN  */
+    &hf_btatt_fragment_error,
+    &hf_btatt_fragment_count,
+    /* Reassembled in field */
+    &hf_btatt_reassembled_in,
+    /* Reassembled length field */
+    &hf_btatt_reassembled_length,
+    &hf_btatt_reassembled_data,
     /* Tag */
-    "Message fragments"
-};
+    "Message fragments"};
 
 extern value_string_ext ext_usb_vendors_vals;
 
@@ -4761,7 +4760,6 @@ again:
 
             if (frag_msg)
             { /* Reassembled */
-                printf("reassemble\n");
                 col_append_str(pinfo->cinfo, COL_INFO,
                                "Last Pckt (Message Reassembled)");
             }
@@ -11481,11 +11479,7 @@ dissect_btatt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
         handle = tvb_get_letohs(tvb, offset - 2);
         col_append_info_by_handle(pinfo, handle, bluetooth_data);
         
-        //again: /*martin: muss vor dissect_attribute_value. dort wird subddisector aufgerufen*/
-        printf("martin: start dissect value\n");
-        //adds opcode & handel, then returns bc. 0x2700 not BTLE defined
         offset = dissect_attribute_value(main_tree, NULL, pinfo, tvb, offset, tvb_captured_length_remaining(tvb, offset), tvb_get_guint16(tvb, offset - 2, ENC_LITTLE_ENDIAN), uuid, &att_data);
-        printf("martin: finish dissect value\n");
         
         if (!pinfo->fd->visited && bluetooth_data && (opcode == 0x12 || opcode == 0x1d)) {
             union request_parameters_union  request_parameters;
@@ -17510,38 +17504,38 @@ proto_register_btatt(void)
             NULL, HFILL}
         },
         /* Reassembly fields. */
-        { &hf_msg_fragments,
+        { &hf_btatt_fragments,
           { "Message fragments",              "btatt.fragments",
             FT_NONE, BASE_NONE, NULL, 0x00, NULL, HFILL }},
-        { &hf_msg_fragment,
+        { &hf_btatt_fragment,
           { "Message fragment",               "btatt.fragment",
             FT_FRAMENUM, BASE_NONE, NULL, 0x00, NULL, HFILL }},
-        { &hf_msg_fragment_overlap,
-          { "Message fragment overlap",       "msg.fragment.overlap",
+        { &hf_btatt_fragment_overlap,
+          { "Message fragment overlap",       "btatt.fragmet.overlap",
             FT_BOOLEAN, BASE_NONE, NULL, 0x00, NULL, HFILL }},
-        { &hf_msg_fragment_overlap_conflicts,
-          { "Message fragment overlapping with conflicting data", "msg.fragment.overlap.conflicts",
+        { &hf_btatt_fragment_overlap_conflicts,
+          { "Message fragment overlapping with conflicting data", "btatt.fragmet.overlap.conflicts",
             FT_BOOLEAN, BASE_NONE, NULL, 0x00, NULL, HFILL }},
-        { &hf_msg_fragment_multiple_tails,
-          { "Message has multiple tail fragments", "msg.fragment.multiple_tails",
+        { &hf_btatt_fragment_multiple_tails,
+          { "Message has multiple tail fragments", "btatt.fragmet.multiple_tails",
             FT_BOOLEAN, BASE_NONE, NULL, 0x00, NULL, HFILL }},
-        { &hf_msg_fragment_too_long_fragment,
-          { "Message fragment too long",      "msg.fragment.too_long_fragment",
+        { &hf_btatt_fragment_too_long_fragment,
+          { "Message fragment too long",      "btatt.fragmet.too_long_fragment",
             FT_BOOLEAN, BASE_NONE, NULL, 0x00, NULL, HFILL }},
-        { &hf_msg_fragment_error,
-          { "Message defragmentation error",  "msg.fragment.error",
+        { &hf_btatt_fragment_error,
+          { "Message defragmentation error",  "btatt.fragmet.error",
             FT_FRAMENUM, BASE_NONE, NULL, 0x00, NULL, HFILL }},
-        { &hf_msg_fragment_count,
-          { "Message fragment count",         "msg.fragment.count",
+        { &hf_btatt_fragment_count,
+          { "Message fragment count",         "btatt.fragmet.count",
             FT_UINT32, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-        { &hf_msg_reassembled_in,
-          { "Reassembled in",                 "msg.reassembled.in",
+        { &hf_btatt_reassembled_in,
+          { "Reassembled in",                 "btatt.reassembled.in",
             FT_FRAMENUM, BASE_NONE, NULL, 0x00, NULL, HFILL }},
-        { &hf_msg_reassembled_length,
-          { "Reassembled msg length",     "msg.reassembled.length",
+        { &hf_btatt_reassembled_length,
+          { "Reassembled msg length",     "btatt.reassembled.length",
             FT_UINT32, BASE_DEC, NULL, 0x00, NULL, HFILL }},
-        { &hf_msg_reassembled_data,
-          { "Reassembled msg ata",     "msg.reassembled.data",
+        { &hf_btatt_reassembled_data,
+          { "Reassembled msg ata",     "btatt.reassembled.data",
             FT_BYTES, SEP_SPACE, NULL, 0x00, NULL, HFILL }},
     };
 
@@ -17554,8 +17548,8 @@ proto_register_btatt(void)
         &ett_btatt_handle,
         &ett_btatt_characteristic_properties,
         /* reassembly subtree */
-        &ett_msg_fragment,
-        &ett_msg_fragments,
+        &ett_btatt_fragment,
+        &ett_btatt_fragments,
     };
 
     static ei_register_info ei[] = {
