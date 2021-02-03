@@ -2614,7 +2614,7 @@ process_reassembled_data(tvbuff_t *tvb, const int offset, packet_info *pinfo,
 		} else {
 			/*
 			 * No.
-			 * Return a tvbuff with the payload. next_tvb ist form offset until end 
+			 * Return a tvbuff with the payload. next_tvb ist from offset until end
 			 */
 			next_tvb = tvb_new_subset_remaining(tvb, offset);
 			pinfo->fragmented = FALSE;	/* one-fragment packet */
