@@ -12140,6 +12140,7 @@ static const value_string valstr_240_048_RES[] = {
     { 4, "High Resolution - 8 bit" },
     { 5, "Very High Resolution - 16 bit" },
     { 6, "Ultra High Resolution - 32 bit" },
+    { 0, NULL }
 };
 
 static const FieldPart I240_048_C = { 1, 1.0, FIELD_PART_UINT, &hf_240_048_C, NULL};
