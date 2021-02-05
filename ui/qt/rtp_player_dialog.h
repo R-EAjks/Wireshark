@@ -20,18 +20,29 @@
 
 #include <QMap>
 #include <QTreeWidgetItem>
+#include <QMetaType>
+#include <ui/qt/widgets/qcustomplot.h>
 
 namespace Ui {
 class RtpPlayerDialog;
 }
 
 typedef enum {
-    channel_none,         // Mute
+    channel_any,          // Used just for changes of mute
     channel_mono,         // Play
     channel_stereo_left,  // L
     channel_stereo_right, // R
     channel_stereo_both   // L+R
+} channel_mode_audio_t;
+
+typedef struct {
+    bool muted;
+    channel_mode_audio_t channel;
 } channel_mode_t;
+Q_DECLARE_METATYPE(channel_mode_t)
+
+#define AUDIO_MUTED true
+#define AUDIO_UNMUTED false
 
 class QCPItemStraightLine;
 class QDialogButtonBox;
@@ -94,6 +105,7 @@ private slots:
     void updateWidgets();
     void graphClicked(QMouseEvent *event);
     void graphDoubleClicked(QMouseEvent *event);
+    void plotClicked(QCPAbstractPlottable *plottable, int dataIndex, QMouseEvent *event);
     void updateHintLabel();
     void resetXAxis();
 

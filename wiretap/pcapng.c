@@ -344,18 +344,42 @@ register_pcapng_block_type_handler(guint block_type, block_reader reader,
  * Tables for plugins to handle particular options for particular block
  * types.
  *
- * An option has a handler routine, which is passed an indication of
- * whether this section of the file is byte-swapped, the length of the
- * option, the data of the option, a pointer to an error code, and a
- * pointer to a pointer variable for an error string.
+ * An option has three handler routines:
  *
- * It checks whether the length and option are valid, and, if they aren't,
- * returns FALSE, setting the error code to the appropriate error (normally
- * WTAP_ERR_BAD_FILE) and the error string to an appropriate string
- * indicating the problem.
+ *   An option parser, used when reading an option from a file:
  *
- * Otherwise, if this section of the file is byte-swapped, it byte-swaps
- * multi-byte numerical values, so that it's in the host byte order.
+ *     The option parser is passed an indication of whether this section
+ *     of the file is byte-swapped, the length of the option, the data of
+ *     the option, a pointer to an error code, and a pointer to a pointer
+ *     variable for an error string.
+ *
+ *     It checks whether the length and option are valid, and, if they
+ *     aren't, returns FALSE, setting the error code to the appropriate
+ *     error (normally WTAP_ERR_BAD_FILE) and the error string to an
+ *     appropriate string indicating the problem.
+ *
+ *     Otherwise, if this section of the file is byte-swapped, it byte-swaps
+ *     multi-byte numerical values, so that it's in the host byte order.
+ *
+ *   An option sizer, used when writing an option to a file:
+ *
+ *     The option sizer is passed the option identifier for the option
+ *     and a wtap_optval_t * that points to the data for the option.
+ *
+ *     It calculates how many bytes the option's data requires, not
+ *     including any padding bytes, and returns that value.
+ *
+ *   An option writer, used when writing an option to a file:
+ *
+ *     The option writer is passed a wtap_dumper * to which the
+ *     option data should be written, the option identifier for
+ *     the option, a wtap_optval_t * that points to the data for
+ *     the option, and an int * into which an error code should
+ *     be stored if an error occurs when writing the option.
+ *
+ *     It returns a gboolean value of TRUE if the attempt to
+ *     write the option succeeds and FALSE if the attempt to
+ *     write the option gets an error.
  */
 
 /*
@@ -376,7 +400,9 @@ register_pcapng_block_type_handler(guint block_type, block_reader reader,
 #define NUM_BT_INDICES      7
 
 typedef struct {
-    option_handler_fn hfunc;
+    option_parser parser;
+    option_sizer sizer;
+    option_writer writer;
 } option_handler;
 
 static GHashTable *option_handlers[NUM_BT_INDICES];
@@ -436,7 +462,9 @@ get_block_type_index(guint block_type, guint *bt_index)
 
 void
 register_pcapng_option_handler(guint block_type, guint option_code,
-                               option_handler_fn hfunc)
+                               option_parser parser,
+                               option_sizer sizer,
+                               option_writer writer)
 {
     guint bt_index;
     option_handler *handler;
@@ -456,9 +484,11 @@ register_pcapng_option_handler(guint block_type, guint option_code,
                                                           NULL, g_free);
     }
     handler = g_new(option_handler, 1);
-    handler->hfunc = hfunc;
+    handler->parser = parser;
+    handler->sizer = sizer;
+    handler->writer = writer;
     g_hash_table_insert(option_handlers[bt_index],
-                              GUINT_TO_POINTER(option_code), handler);
+                        GUINT_TO_POINTER(option_code), handler);
 }
 #endif /* HAVE_PLUGINS */
 
@@ -604,6 +634,44 @@ pcapng_process_uint64_option(wtapng_block_t *wblock,
         wtap_block_add_uint64_option(wblock->block, ohp->option_code, uint64);
     }
 }
+
+#ifdef HAVE_PLUGINS
+static gboolean
+pcap_process_unhandled_option(wtapng_block_t *wblock,
+                              guint bt_index,
+                              const section_info_t *section_info,
+                              pcapng_option_header_t *ohp,
+                              guint8 *option_content,
+                              int *err, gchar **err_info)
+{
+    option_handler *handler;
+
+    /*
+     * Do we have a handler for this packet block option code?
+     */
+    if (option_handlers[bt_index] != NULL &&
+        (handler = (option_handler *)g_hash_table_lookup(option_handlers[bt_index],
+                                                         GUINT_TO_POINTER((guint)ohp->option_code))) != NULL) {
+        /* Yes - call the handler. */
+        if (!handler->parser(wblock->block, section_info->byte_swapped,
+                             ohp->option_length, option_content, err, err_info))
+            /* XXX - free anything? */
+            return FALSE;
+    }
+    return TRUE;
+}
+#else
+static gboolean
+pcap_process_unhandled_option(wtapng_block_t *wblock _U_,
+                              guint bt_index _U_,
+                              const section_info_t *section_info _U_,
+                              pcapng_option_header_t *ohp _U_,
+                              guint8 *option_content _U_,
+                              int *err _U_, gchar **err_info _U_)
+{
+    return TRUE;
+}
+#endif
 
 static block_return_val
 pcapng_read_section_header_block(FILE_T fh, pcapng_block_header_t *bh,
@@ -771,8 +839,9 @@ pcapng_read_section_header_block(FILE_T fh, pcapng_block_header_t *bh,
                 pcapng_process_string_option(wblock, &oh, option_content, opt_cont_buf_len);
                 break;
             default:
-                pcapng_debug("pcapng_read_section_header_block: unknown option %u - ignoring %u bytes",
-                              oh.option_code, oh.option_length);
+                if (!pcap_process_unhandled_option(wblock, BT_INDEX_SHB, section_info, &oh, option_content, err, err_info))
+                    return PCAPNG_BLOCK_ERROR;
+                break;
         }
     }
     g_free(option_content);
@@ -1064,8 +1133,9 @@ pcapng_read_if_descr_block(wtap *wth, FILE_T fh, pcapng_block_header_t *bh,
                  * be useful for highly synchronized capture systems? 1234
                  */
             default:
-                pcapng_debug("pcapng_read_if_descr_block: unknown option %u - ignoring %u bytes",
-                              oh.option_code, oh.option_length);
+                if (!pcap_process_unhandled_option(wblock, BT_INDEX_IDB, section_info, &oh, option_content, err, err_info))
+                    return FALSE;
+                break;
         }
     }
 
@@ -1183,9 +1253,6 @@ pcapng_read_packet_block(FILE_T fh, pcapng_block_header_t *bh,
     gpointer option_content_copy;
     int pseudo_header_len;
     int fcslen;
-#ifdef HAVE_PLUGINS
-    option_handler *handler;
-#endif
 
     /* "(Enhanced) Packet Block" read fixed part */
     if (enhanced) {
@@ -1577,25 +1644,9 @@ pcapng_read_packet_block(FILE_T fh, pcapng_block_header_t *bh,
                              option_content[0], oh->option_length - 1);
                 break;
             default:
-#ifdef HAVE_PLUGINS
-                /*
-                 * Do we have a handler for this packet block option code?
-                 */
-                if (option_handlers[BT_INDEX_PBS] != NULL &&
-                    (handler = (option_handler *)g_hash_table_lookup(option_handlers[BT_INDEX_PBS],
-                                                                   GUINT_TO_POINTER((guint)oh->option_code))) != NULL) {
-                    /* Yes - call the handler. */
-                    if (!handler->hfunc(section_info->byte_swapped,
-                                        oh->option_length, option_content,
-                                        err, err_info))
-                        /* XXX - free anything? */
-                        return FALSE;
-                } else
-#endif
-                {
-                    pcapng_debug("pcapng_read_packet_block: unknown option %u - ignoring %u bytes",
-                                  oh->option_code, oh->option_length);
-                }
+                pcapng_debug("pcapng_read_packet_block: unknown option %u - ignoring %u bytes",
+                              oh->option_code, oh->option_length);
+                break;
         }
     }
 
@@ -1834,9 +1885,6 @@ pcapng_read_name_resolution_block(FILE_T fh, pcapng_block_header_t *bh,
     int bytes_read;
     pcapng_option_header_t oh;
     guint8 *option_content;
-#ifdef HAVE_PLUGINS
-    option_handler *handler;
-#endif
 
     /*
      * Is this block long enough to be an NRB?
@@ -2084,28 +2132,9 @@ read_options:
                 pcapng_process_string_option(wblock, &oh, option_content, opt_cont_buf_len);
                 break;
             default:
-#ifdef HAVE_PLUGINS
-                /*
-                 * Do we have a handler for this network resolution block option code?
-                 */
-                if (option_handlers[BT_INDEX_NRB] != NULL &&
-                    (handler = (option_handler *)g_hash_table_lookup(option_handlers[BT_INDEX_NRB],
-                                                                   GUINT_TO_POINTER((guint)oh.option_code))) != NULL) {
-                    /* Yes - call the handler. */
-                    if (!handler->hfunc(section_info->byte_swapped,
-                                        oh.option_length, option_content,
-                                        err, err_info)) {
-
-                        g_free(option_content);
-                        ws_buffer_free(&nrb_rec);
-                        return FALSE;
-                    }
-                } else
-#endif
-                {
-                    pcapng_debug("pcapng_read_name_resolution_block: unknown option %u - ignoring %u bytes",
-                                  oh.option_code, oh.option_length);
-                }
+                if (!pcap_process_unhandled_option(wblock, BT_INDEX_NRB, section_info, &oh, option_content, err, err_info))
+                    return FALSE;
+                break;
         }
     }
 
@@ -2221,8 +2250,9 @@ pcapng_read_interface_statistics_block(FILE_T fh, pcapng_block_header_t *bh,
                 pcapng_process_uint64_option(wblock, section_info, &oh, option_content, opt_cont_buf_len);
                 break;
             default:
-                pcapng_debug("pcapng_read_interface_statistics_block: unknown option %u - ignoring %u bytes",
-                              oh.option_code, oh.option_length);
+                if (!pcap_process_unhandled_option(wblock, BT_INDEX_ISB, section_info, &oh, option_content, err, err_info))
+                    return FALSE;
+                break;
         }
     }
 
