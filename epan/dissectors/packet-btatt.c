@@ -4665,8 +4665,8 @@ btatt_dissect_with_reassmbly(guint16 handle, tvbuff_t *tvb, packet_info *pinfo, 
     /*
      * Cases
      * 1) single paket: deseg_len=0 deseg_offset=pktlen oder 0??
-     * 2) start stream: deseg_len=MORE_BYTE   deseg_offset>0<pktlen -> partially consumed, store fragment, finish
-     * 3) cont stream:  deseg_len=MORE_BYTE   deseg_offset=0 (due to header mismatch) -> not consumed, add previous fragment, run again
+     * 2) start stream: deseg_len=MORE_BYTE   deseg_offset>-1<pktlen -> partially consumed, store fragment, finish
+     * 3) cont stream:  deseg_len=MORE_BYTE   deseg_offset=-1 (due to header mismatch) -> not consumed, add previous fragment, run again
      * 4) end stream: deseg_len=0              deseg_offset=pktlen -> completely consumed, return pktlen
      *
      * case 3 can lead to case 2 -> stop fragment stream, create new fragment stream
@@ -4679,10 +4679,11 @@ btatt_dissect_with_reassmbly(guint16 handle, tvbuff_t *tvb, packet_info *pinfo, 
 
 again:
     pinfo->desegment_offset = -1;
+    pinfo->desegment_len = 0;
     consumed = btatt_dissect_attribute_handle(handle, tvb, pinfo, tree, att_data);
 
     //consumed == 0: paket was rejected by subdissector, do not test for fragmentation
-    if (!(consumed == 0 && (pinfo->desegment_offset == -1)))
+    if (!(consumed == 0 && pinfo->desegment_len == 0))
     {
         guint32 msg_seqid = handle << 16 | ( att_data->opcode & 0xffff);
         pinfo->srcport = handle;
@@ -4692,7 +4693,7 @@ again:
             // case 1
             more_fragments = FALSE;
         }
-        if (pinfo->desegment_offset > 0 && (guint)pinfo->desegment_offset < tvb_captured_length(tvb))
+        if (pinfo->desegment_offset > -1 && (guint)pinfo->desegment_offset < tvb_captured_length(tvb))
         {
             // case 2
             //drop leftovers before a fresh fragment ist started
@@ -4701,7 +4702,7 @@ again:
                 tvb_free(old_tvb_data);
             more_fragments = TRUE;
         }
-        if (pinfo->desegment_offset == 0)
+        if (pinfo->desegment_offset == -1)
         {
             // case 3
             more_fragments = FALSE;
@@ -4715,7 +4716,7 @@ again:
         save_fragmented = pinfo->fragmented;
         if (consumed < tvb_captured_length(tvb))
         {
-            offset = pinfo->desegment_offset;
+            offset = (pinfo->desegment_offset==-1?0:pinfo->desegment_offset);
             tvbuff_t *new_tvb = NULL;
             fragment_item *frag_msg = NULL;
             pinfo->fragmented = TRUE;
