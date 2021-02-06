@@ -382,6 +382,7 @@ register_pcapng_block_type_handler(guint block_type, block_reader reader,
  *     write the option gets an error.
  */
 
+#endif
 /*
  * Block types indices in the table of tables of option handlers.
  *
@@ -399,6 +400,7 @@ register_pcapng_block_type_handler(guint block_type, block_reader reader,
 
 #define NUM_BT_INDICES      7
 
+#ifdef HAVE_PLUGINS
 typedef struct {
     option_parser parser;
     option_sizer sizer;
