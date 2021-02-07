@@ -59,6 +59,7 @@ struct asdu_secure {
 	guint32 CLN;
 	guint32 HLN;
 	guint32 WKL;
+	guint32 ELN;
 };
 
 struct asdu_parms {
@@ -85,7 +86,7 @@ typedef struct {
 } td_CmdInfo;
 
 #define IEC60870_104_PORT 19998
-#define USE_SSL_DISSECTOR 1
+#define USE_SSL_DISSECTOR 0
 
 /* Define the iec101/104 protos */
 static int proto_iec60870_104  = -1;
@@ -730,6 +731,22 @@ static const value_string kwa_r_types[] = {
 	{ 0, NULL }
 };
 
+static const value_string err_r_types[] = {
+	{ 0,           "Not used" },
+	{ 1,           "Authentication failed" },
+	{ 2,           "Unexpected reply" },
+	{ 3,           "No reply" },
+	{ 4,           "Aggressive Mode not permitted" },
+	{ 5,           "MAC algorithm not permitted" },
+	{ 6,           "Key Wrap algorithm not permitted" },
+	{ 7,           "Authorization failed" },
+	{ 8,           "Update Key Change Method not permitted" },
+	{ 9,           "Invalid Signature" },
+	{10,           "Invalid Certification Data" },
+	{11,           "Unknown User" },
+	{ 0,           NULL }
+};
+
 static const value_string kst_r_types[] = {
 	{ 0,		"Not used" },
 	{ 1,		"OK" },         /* There have been no communications failures or restarts since the last time the controlled station received an authentic Key Change message. The Session Keys are valid */
@@ -792,10 +809,14 @@ static int hf_secure_ksq  = -1;
 static int hf_secure_csq  = -1;
 
 static int hf_secure_usr  = -1;
+static int hf_secure_aid  = -1;
 static int hf_secure_kwa  = -1;
+static int hf_secure_err  = -1;
+static int hf_secure_etm  = -1;
 static int hf_secure_kst  = -1;
 static int hf_secure_mal  = -1;
 static int hf_secure_hln  = -1;
+static int hf_secure_eln  = -1;
 static int hf_secure_rsc  = -1;
 
 static int hf_secure_cln  = -1;
@@ -806,6 +827,7 @@ static int hf_secure_wkl  = -1;
 static int hf_secure_wkd  = -1;
 
 static int hf_secure_mac  = -1;
+static int hf_secure_etext  = -1;
 
 static int hf_cp24time  = -1;
 static int hf_cp24time_ms  = -1;
@@ -1460,6 +1482,22 @@ static void get_USR(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 }
 
 /******************************************************************************************************/
+/*    AID = Association ID defined in 7.2.8.4 of IEC/TS 62351-5:2013
+
+      This value shall uniquely identify the association between controlled and controlling station on
+      which the error occurred, in case the USR is not unique within the controlled station. The
+      combination of USR and AID shall be unique within the controlled station. An Association ID
+      of 0 shall indicate the statistic is being reported on the same association it is measuring.
+ */
+/******************************************************************************************************/
+static void get_AID(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 *AID)
+{
+	proto_tree_add_item_ret_uint(iec104_header_tree, hf_secure_aid, tvb, *offset, 2, ENC_LITTLE_ENDIAN, AID);
+
+	(*offset) += 2;
+}
+
+/******************************************************************************************************/
 /*    KWA = Key wrap algorithm (Enumerated value) defined in 7.2.6.4 of IEC/TS 62351-5:2013           */
 /******************************************************************************************************/
 static void get_KWA(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
@@ -1467,6 +1505,24 @@ static void get_KWA(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 	proto_tree_add_item(iec104_header_tree, hf_secure_kwa, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
 
 	(*offset) += 1;
+}
+
+/******************************************************************************************************/
+/*    ERR = Error code (Enumerated value) defined in 7.2.8.5 of IEC/TS 62351-5:2013                   */
+/******************************************************************************************************/
+static void get_ERR(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_err, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
+
+	(*offset) += 1;
+}
+
+/******************************************************************************************************/
+/*    ETM = Error time stamp, 7-octet binary time Defined in 7.2.6.18 of IEC 60870-5-101              */
+/******************************************************************************************************/
+static void get_ETM(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
+{
+	get_CP56Time(tvb, offset, iec104_header_tree);
 }
 
 /******************************************************************************************************/
@@ -1510,6 +1566,20 @@ static void get_HLN(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 	(*offset) += 2;
 }
 
+/******************************************************************************************************/
+/*    ELN = Error length, defined in 7.2.8.6 of IEC/TS 62351-5:2013                                   
+
+      This value shall specify the length of the Error Text that follows.
+*/
+/******************************************************************************************************/
+#if 1
+static void get_ELN(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 *ELN)
+{
+	proto_tree_add_item_ret_uint(iec104_header_tree, hf_secure_eln, tvb, *offset, 2, ENC_LITTLE_ENDIAN, ELN);
+
+	(*offset) += 2;
+}
+#endif 
 /******************************************************************************************************/
 /*    CLN = Challenge data length defined in 7.2.6.7 of IEC/TS 62351-5:2013                          
                                                                                                     
@@ -1604,6 +1674,25 @@ static void get_MAC(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 }
 
 /******************************************************************************************************/
+/*    ETEXT = Error text, defined in 7.2.8.7 of IEC/TS 62351-5:2013
+
+      This value shall be a string of text suitable for display on a user interface or in a security log,
+      encoded in unicode UTF-8 as described in RFC 3629 (note that all characters encoded in 7-
+      bit ASCII comply with UTF-8) . The Error Text shall explain the Error Code. For standardized
+      Error Codes, the Error Text is optional and ELN may be zero. For private range Error Codes,
+      the Error Text shall be mandatory. It is recommended that the error text contain a unique
+      description of the user represented by the USR.
+*/
+/******************************************************************************************************/
+#if 1
+static void get_ETEXT(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 LENGHT_ETEXT)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_etext, tvb, *offset, LENGHT_ETEXT, ENC_LITTLE_ENDIAN);
+
+	(*offset) += LENGHT_ETEXT;
+}
+#endif
+/******************************************************************************************************/
 /*    RSC = Reason for Challenge (Enumerated value) defined in 7.2.2.5 of IEC/TS 62351-5:2013 
 
       This value explains the Challenger’s reason for making the challenge. The Responder shall
@@ -1685,7 +1774,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 	proto_tree_add_item(it104tree, hf_numix, tvb, offset, 1, ENC_LITTLE_ENDIAN); /* number of information objects or elements */
 	offset += 1;
 
-	/* 60870-5-101 par 7.2.3 Cause of transmission */
+	/* 60870-5-101 par 7.2.3 Cause of transmission (lenght 2) */
 	asduh.TNCause = tvb_get_guint8(tvb, offset);
 	proto_tree_add_item(it104tree, hf_causetx, tvb, offset, 1, ENC_LITTLE_ENDIAN); /* cause */
 	proto_tree_add_item(it104tree, hf_nega, tvb, offset, 1, ENC_LITTLE_ENDIAN); /* negative */
@@ -1698,7 +1787,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 		offset += 1;
 	}
 
-	/* 60870-5-101 par 7.2.4 Common address of ASDU */
+	/* 60870-5-101 par 7.2.4 Common address of ASDU (lenght 2) */
 	proto_tree_add_item_ret_uint(it104tree, hf_addr, tvb, offset, parms->asdu_addr_len, ENC_LITTLE_ENDIAN, &asduh.Addr);
 	offset += parms->asdu_addr_len;
 
@@ -2177,8 +2266,6 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 			break;
 
 		case S_KR_NA_1:
-		case S_AR_NA_1:
-		case S_ER_NA_1:
 		case S_CU_NA_1:
 		case S_US_NA_1:
 		case S_UQ_NA_1:
@@ -2246,7 +2333,35 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 			if (asdu_secure.HLN > 0)
 				get_MAC(tvb, &offset, it104tree, asdu_secure.HLN);
 			
-			break;			
+			break;
+
+		case S_AR_NA_1: /* 83 aggressive mode authentication request session key status request */
+
+			offset += 18;
+			get_CSQ(tvb, &offset, it104tree);
+			get_USR(tvb, &offset, it104tree, NULL);
+			get_MAC(tvb, &offset, it104tree, 16);
+			
+			break;
+
+		case S_ER_NA_1: /* 87 authentication error */
+
+#if 1			
+			get_CSQ(tvb, &offset, it104tree);
+#else
+			get_KSQ(tvb, &offset, it104tree);
+#endif			
+			get_USR(tvb, &offset, it104tree, NULL);
+			get_AID(tvb, &offset, it104tree, NULL);
+			get_ERR(tvb, &offset, it104tree);
+			get_ETM(tvb, &offset, it104tree);
+			get_ELN(tvb, &offset, it104tree, &asdu_secure.ELN);
+			if (asdu_secure.ELN > 0)
+				get_ETEXT(tvb, &offset, it104tree, asdu_secure.ELN);			
+			
+			offset = Len;
+			
+			break;
 			
 		default:
 			proto_tree_add_item(it104tree, hf_ioa, tvb, offset, 3, ENC_LITTLE_ENDIAN);
@@ -2552,9 +2667,21 @@ proto_register_iec60870_asdu_sec(void)
 		  { "USR", "iec60870_asdu.usr", FT_UINT16, BASE_DEC, NULL, 0x0,
 		    "User Number", HFILL }},
 
+		{ &hf_secure_aid,
+		  { "AID", "iec60870_asdu.aid", FT_UINT16, BASE_DEC, NULL, 0x0,
+		    "Association ID", HFILL }},
+
 		{ &hf_secure_kwa,
 		  { "KWA", "iec60870_asdu.kwa", FT_UINT8, BASE_DEC, VALS(kwa_r_types), 0x0,
 		    "Key wrap algorithm", HFILL }},
+		
+		{ &hf_secure_err,
+		  { "ERR", "iec60870_asdu.err", FT_UINT8, BASE_DEC, VALS(err_r_types), 0x0,
+		    "Key wrap algorithm", HFILL }},
+
+		{ &hf_secure_etm,
+		  { "ETM", "iec60870_asdu.etm", FT_ABSOLUTE_TIME, ABSOLUTE_TIME_LOCAL, NULL, 0x0,
+		    "Error Timestamp", HFILL }},
 
 		{ &hf_secure_kst,
 		  { "KST", "iec60870_asdu.kst", FT_UINT8, BASE_DEC, VALS(kst_r_types), 0x0,
@@ -2567,7 +2694,11 @@ proto_register_iec60870_asdu_sec(void)
 		{ &hf_secure_hln,
 		  { "HLN", "iec60870_asdu.hln", FT_UINT16, BASE_DEC, NULL, 0x0,
 		    "MAC lenght", HFILL }},
-		
+
+		{ &hf_secure_eln,
+		  { "ELN", "iec60870_asdu.eln", FT_UINT16, BASE_DEC, NULL, 0x0,
+		    "ERROR lenght", HFILL }},
+
 		{ &hf_secure_rsc,
 		  { "RSC", "iec60870_asdu.rsc", FT_UINT8, BASE_DEC, VALS(rsc_r_types), 0x0,
 		    "Reason for challenge", HFILL }},
@@ -2596,6 +2727,10 @@ proto_register_iec60870_asdu_sec(void)
 	       	  { "MAC", "iec60870_asdu.mac", FT_NONE, BASE_NONE, NULL, 0x0,
 		    "Message Authentication Code", HFILL }},
 
+		{ &hf_secure_etext,
+	       	  { "ETEXT", "iec60870_asdu.etext", FT_NONE, BASE_NONE, NULL, 0x0,
+		    "Error Text", HFILL }},
+		
 		{ &hf_ioa,
 		  { "IOA", "iec60870_asdu.ioa", FT_UINT24, BASE_DEC, NULL, 0x0,
 		    "Information Object Address", HFILL }},
