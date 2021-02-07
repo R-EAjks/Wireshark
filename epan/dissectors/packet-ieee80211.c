@@ -674,8 +674,14 @@ static value_string_ext tag_num_vals_ext = VALUE_STRING_EXT_INIT(ie_tag_num_vals
 #define ETAG_NDP_FEEDBACK_REPORT_PARAMETER_SET 41
 #define ETAG_BSS_COLOR_CHANGE_ANNOUNCEMENT     42
 #define ETAG_QUIET_TIME_PERIOD_SETUP           43
-#define ETAG_ESS_REPORT                        44
+#define ETAG_ESS_REPORT                        45
+#define ETAG_OPS                               46
+#define ETAG_HE_BSS_LOAD                       47
+#define ETAG_MULTIPLE_BSSID_CONFIGURATION      55
+#define ETAG_KNOWN_BSSID                       57
+#define ETAG_SHORT_SSID                        58
 #define ETAG_HE_6GHZ_BAND_CAPABILITIES         59
+#define ETAG_UL_MU_POWER_CAPABILITIES          60
 #define ETAG_REJECTED_GROUPS                   92
 #define ETAG_ANTI_CLOGGING_TOKEN               93
 
@@ -705,7 +711,13 @@ static const value_string tag_num_vals_eid_ext[] = {
   { ETAG_BSS_COLOR_CHANGE_ANNOUNCEMENT,       "BSS Color Change Announcement" },
   { ETAG_QUIET_TIME_PERIOD_SETUP,             "Quiet Time Period Setup" },
   { ETAG_ESS_REPORT,                          "ESS Report" },
+  { ETAG_OPS,                                 "OPS" },
+  { ETAG_HE_BSS_LOAD,                         "HE BSS Load" },
+  { ETAG_MULTIPLE_BSSID_CONFIGURATION,        "Multiple BSSID Configuration" },
+  { ETAG_KNOWN_BSSID,                         "Known BSSID" },
+  { ETAG_SHORT_SSID,                          "Short SSID" },
   { ETAG_HE_6GHZ_BAND_CAPABILITIES,           "HE 6Ghz Band Capabilities" },
+  { ETAG_UL_MU_POWER_CAPABILITIES,            "UL MU Power Capabilities" },
   { ETAG_REJECTED_GROUPS,                     "Rejected Groups" },
   { ETAG_ANTI_CLOGGING_TOKEN,                 "Anti-Clogging Token Container" },
   { 0, NULL }
@@ -863,6 +875,7 @@ static const value_string ieee80211_reason_code[] = {
   { 64, "The Deauthentication frame was sent because the MAC address of the STA already exists in the mesh BSS. See 11.3.3 (Additional mechanisms for an AP collocated with a mesh STA)" },
   { 65, "The mesh STA performs channel switch to meet regulatory requirements" },
   { 66, "The mesh STA performs channel switch with unspecified reason" },
+  { 71, "Disassociated due to poor RSSI." },
   { 0,    NULL}
 };
 value_string_ext ieee80211_reason_code_ext = VALUE_STRING_EXT_INIT(ieee80211_reason_code);
@@ -2975,6 +2988,7 @@ static const value_string band_id[] = {
   {0x4, "4.9 and 5 GHz"},
   {0x5, "60 GHz"},
   {0x6, "45 GHz"},
+  {0x7, "6 Ghz"},
   {0,   NULL}
 };
 
@@ -5105,7 +5119,8 @@ static int hf_ieee80211_tag_extended_capabilities_b82 = -1;
 static int hf_ieee80211_tag_extended_capabilities_b83 = -1;
 static int hf_ieee80211_tag_extended_capabilities_b84 = -1;
 static int hf_ieee80211_tag_extended_capabilities_b85 = -1;
-static int hf_ieee80211_tag_extended_capabilities_reserved = -1;
+static int hf_ieee80211_tag_extended_capabilities_b86 = -1;
+static int hf_ieee80211_tag_extended_capabilities_b87 = -1;
 
 static int hf_ieee80211_tag_extended_capabilities_b88 = -1;
 static int hf_ieee80211_tag_extended_capabilities_b89 = -1;
@@ -6382,6 +6397,8 @@ static int hf_ieee80211_tag_fils_indication_public_key_indicator = -1;
 static int hf_ieee80211_ext_tag = -1;
 static int hf_ieee80211_ext_tag_number = -1;
 static int hf_ieee80211_ext_tag_length = -1;
+static int hf_ieee80211_ext_tag_data = -1;
+
 static int hf_ieee80211_fils_session = -1;
 static int hf_ieee80211_fils_encrypted_data = -1;
 static int hf_ieee80211_fils_wrapped_data = -1;
@@ -6634,6 +6651,11 @@ static int hf_ieee80211_he_uora_field = -1;
 static int hf_ieee80211_he_uora_eocwmin = -1;
 static int hf_ieee80211_he_uora_owcwmax = -1;
 static int hf_ieee80211_he_uora_reserved = -1;
+
+static int hf_ieee80211_multiple_bssid_configuration_bssid_count = -1;
+static int hf_ieee80211_multiple_bssid_configuration_full_set_rx_periodicity = -1;
+static int hf_ieee80211_known_bssid_bitmap = -1;
+static int hf_ieee80211_short_ssid = -1;
 
 static int hf_ieee80211_rejected_groups_group = -1;
 
@@ -17134,7 +17156,8 @@ dissect_extended_capabilities_ie(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
     &hf_ieee80211_tag_extended_capabilities_b83,
     &hf_ieee80211_tag_extended_capabilities_b84,
     &hf_ieee80211_tag_extended_capabilities_b85,
-    &hf_ieee80211_tag_extended_capabilities_reserved,
+    &hf_ieee80211_tag_extended_capabilities_b86,
+    &hf_ieee80211_tag_extended_capabilities_b87,
     NULL
   };
 
@@ -22844,11 +22867,11 @@ add_tagged_field(packet_info *pinfo, proto_tree *tree, tvbuff_t *tvb, int offset
   if (tree) {
     if (tag_no == TAG_ELEMENT_ID_EXTENSION) {
       ext_tag_no  = tvb_get_guint8(tvb, offset + 2);
-      ti = proto_tree_add_item(orig_tree, hf_ieee80211_ext_tag, tvb, offset + 2, tag_len , ENC_NA);
-      proto_item_append_text(ti, ": %s", val_to_str_ext(ext_tag_no, &tag_num_vals_eid_ext_ext, "Reserved (%d)"));
+      ti = proto_tree_add_item(orig_tree, hf_ieee80211_ext_tag, tvb, offset, 2 + tag_len, ENC_NA);
+      proto_item_append_text(ti, ": %s", val_to_str_ext(ext_tag_no, &tag_num_vals_eid_ext_ext, "Unknown (%d)"));
     } else {
       ti = proto_tree_add_item(orig_tree, hf_ieee80211_tag, tvb, offset, 2 + tag_len , ENC_NA);
-      proto_item_append_text(ti, ": %s", val_to_str_ext(tag_no, &tag_num_vals_ext, "Reserved (%d)"));
+      proto_item_append_text(ti, ": %s", val_to_str_ext(tag_no, &tag_num_vals_ext, "Unknown (%d)"));
     }
 
     tree = proto_item_add_subtree(ti, ett_80211_mgt_ie);
@@ -25246,6 +25269,41 @@ dissect_ess_report(tvbuff_t *tvb, packet_info *pinfo _U_,
                         bss_trans_thresh, -100 + bss_trans_thresh);
 }
 
+static void
+dissect_multiple_bssid_configuration(tvbuff_t *tvb, packet_info *pinfo _U_,
+  proto_tree *tree, int offset, int len _U_)
+{
+
+  proto_tree_add_item(tree, hf_ieee80211_multiple_bssid_configuration_bssid_count, tvb, offset, 1, ENC_NA);
+  offset += 1;
+
+  proto_tree_add_item(tree, hf_ieee80211_multiple_bssid_configuration_full_set_rx_periodicity, tvb, offset, 1, ENC_NA);
+  /*offset += 1;*/
+
+}
+
+static void
+dissect_known_bssid(tvbuff_t *tvb, packet_info *pinfo _U_,
+  proto_tree *tree, int offset, int len)
+{
+
+  proto_tree_add_item(tree, hf_ieee80211_known_bssid_bitmap, tvb, offset, len, ENC_NA);
+
+}
+
+static void
+dissect_short_ssid(tvbuff_t *tvb, packet_info *pinfo _U_,
+  proto_tree *tree, int offset, int len _U_)
+{
+
+  while(len > 0){
+
+    proto_tree_add_item(tree, hf_ieee80211_short_ssid, tvb, offset, 4, ENC_NA);
+    offset += 4;
+    len -=4;
+  }
+}
+
 static int
 dissect_password_identifier(tvbuff_t *tvb, packet_info *pinfo _U_,
   proto_tree *tree, int offset, int len _U_)
@@ -25723,6 +25781,15 @@ ieee80211_tag_element_id_extension(tvbuff_t *tvb, packet_info *pinfo, proto_tree
     case ETAG_ESS_REPORT:
       dissect_ess_report(tvb, pinfo, tree, offset, ext_tag_len);
       break;
+    case ETAG_MULTIPLE_BSSID_CONFIGURATION:
+      dissect_multiple_bssid_configuration(tvb, pinfo, tree, offset, ext_tag_len);
+      break;
+    case ETAG_KNOWN_BSSID:
+      dissect_known_bssid(tvb, pinfo, tree, offset, ext_tag_len);
+      break;
+    case ETAG_SHORT_SSID:
+      dissect_short_ssid(tvb, pinfo, tree, offset, ext_tag_len);
+      break;
     case ETAG_REJECTED_GROUPS:
       dissect_rejected_groups(tvb, pinfo, tree, offset, ext_tag_len);
       break;
@@ -25736,6 +25803,13 @@ ieee80211_tag_element_id_extension(tvbuff_t *tvb, packet_info *pinfo, proto_tree
       dissect_he_6ghz_band_capabilities(tvb, pinfo, tree, offset, ext_tag_len);
       break;
     default:
+      proto_tree_add_item(tree, hf_ieee80211_ext_tag_data, tvb, offset, ext_tag_len, ENC_NA);
+      expert_add_info_format(pinfo, field_data->item_tag, &ei_ieee80211_tag_data,
+                             "Dissector for 802.11 Extension Tag"
+                             " (%s) code not implemented, Contact"
+                             " Wireshark developers if you want this supported", val_to_str_ext(ext_tag_no,
+                                            &tag_num_vals_eid_ext_ext, "%d"));
+      proto_item_append_text(field_data->item_tag, ": Undecoded");
       break;
   }
 
@@ -41030,7 +41104,7 @@ proto_register_ieee80211(void)
       NULL, HFILL }},
 
     {&hf_ieee80211_tag_extended_capabilities_b83,
-     {"Reserved", "wlan.extcap.b83",
+     {"Enhanced Multi-BSSID Advertisement Support", "wlan.extcap.b83",
       FT_BOOLEAN, 8, NULL, 0x08,
       NULL, HFILL }},
 
@@ -41044,9 +41118,14 @@ proto_register_ieee80211(void)
       FT_BOOLEAN, 8, NULL, 0x20,
       NULL, HFILL }},
 
-    {&hf_ieee80211_tag_extended_capabilities_reserved,
-     {"Reserved", "wlan.extcap.reserved",
-      FT_UINT8, BASE_HEX, NULL, 0xC0,
+    {&hf_ieee80211_tag_extended_capabilities_b86,
+     {"OCT", "wlan.extcap.b86",
+      FT_BOOLEAN, 8, NULL, 0x40,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_tag_extended_capabilities_b87,
+     {"Reserved", "wlan.extcap.b87",
+      FT_UINT8, BASE_HEX, NULL, 0x80,
       NULL, HFILL }},
 
     {&hf_ieee80211_tag_extended_capabilities_b88,
@@ -41055,7 +41134,7 @@ proto_register_ieee80211(void)
       NULL, HFILL }},
 
     {&hf_ieee80211_tag_extended_capabilities_b89,
-     {"Reserved", "wlan.extcap.b89",
+     {"TWT Parameters Range Support", "wlan.extcap.b89",
       FT_UINT8, BASE_HEX, NULL, 0x02, NULL, HFILL }},
 
     {&hf_ieee80211_tag_extended_capabilities_b90,
@@ -44075,6 +44154,11 @@ proto_register_ieee80211(void)
       FT_UINT32, BASE_DEC, NULL, 0,
       "Length of tag", HFILL }},
 
+    {&hf_ieee80211_ext_tag_data,
+     {"Ext Tag Data", "wlan.ext_tag.data",
+      FT_BYTES, BASE_NONE, 0x0, 0,
+      NULL, HFILL }},
+
     {&hf_ieee80211_fils_session,
      {"FILS Session", "wlan.ext_tag.fils.session",
       FT_BYTES, BASE_NONE, NULL, 0x0,
@@ -45079,6 +45163,22 @@ proto_register_ieee80211(void)
      {"Reserved", "wlan.ext_tag.uora_parameter_set.reserved",
       FT_UINT8, BASE_DEC, NULL, 0xC0, NULL, HFILL }},
 
+    {&hf_ieee80211_multiple_bssid_configuration_bssid_count,
+     {"BSSID Count", "wlan.ext_tag.multiple_bssid_configuration.bssid_count",
+     FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+
+    {&hf_ieee80211_multiple_bssid_configuration_full_set_rx_periodicity,
+     {"Full Set Rx Periodicity", "wlan.ext_tag.multiple_bssid_configuration.full_set_rx_periodicity",
+     FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+
+    {&hf_ieee80211_known_bssid_bitmap,
+     {"Bitmap", "wlan.ext_tag.known_bssid.bitmap",
+     FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
+
+    {&hf_ieee80211_short_ssid,
+     {"Short BSSID", "wlan.ext_tag.short_bssid",
+     FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
     {&hf_ieee80211_rejected_groups_group,
      {"Rejected Finite Cyclic Group", "wlan.ext_tag.rejected_groups.group",
       FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
@@ -45146,15 +45246,15 @@ proto_register_ieee80211(void)
       FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
 
     {&hf_ieee80211_s1g_twt_next_twt_32,
-     {"Next TWT", "wlan.s1g.twt_information.next_twt",
+     {"Next TWT", "wlan.s1g.twt_information.next_twt32",
       FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL }},
 
     {&hf_ieee80211_s1g_twt_next_twt_48,
-     {"Next TWT", "wlan.s1g.twt_information.next_twt",
+     {"Next TWT", "wlan.s1g.twt_information.next_twt48",
       FT_UINT48, BASE_HEX, NULL, 0x0, NULL, HFILL }},
 
     {&hf_ieee80211_s1g_twt_next_twt_64,
-     {"Next TWT", "wlan.s1g.twt_information.next_twt",
+     {"Next TWT", "wlan.s1g.twt_information.next_twt64",
       FT_UINT64, BASE_HEX, NULL, 0x0, NULL, HFILL }},
 
     {&hf_ieee80211_s1g_twt_flow_identifier,
