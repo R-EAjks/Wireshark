@@ -39,6 +39,13 @@ include( FindWSWinLibs )
 # Zlib is included with GLib2
 FindWSWinLibs( "vcpkg-export-*" "ZLIB_HINTS" )
 
+# Homebrew forces pkg-config to return the prefix
+# /Library/Developer/CommandLineTools/SDKs/<sdk>/usr
+# https://github.com/Homebrew/homebrew-core/blob/e2c833d326c45d9aaf4e26af6dd8b2f31564dc04/Formula/pkg-config.rb#L49
+if (DEFINED CMAKE_OSX_SYSROOT AND EXISTS "${CMAKE_OSX_SYSROOT}/usr")
+    set (ZLIB_HINTS "${CMAKE_OSX_SYSROOT}/usr")
+endif()
+
 if (NOT ZLIB_INCLUDE_DIR OR NOT ZLIB_LIBRARY)
     find_package(PkgConfig)
     pkg_search_module(ZLIB zlib)
@@ -47,9 +54,9 @@ if (NOT ZLIB_INCLUDE_DIR OR NOT ZLIB_LIBRARY)
         NAMES
             zlib.h
         HINTS
-            "${ZLIB_INCLUDEDIR}"
             ${ZLIB_HINTS}/include
             ${ZLIB_HINTS}
+            "${ZLIB_INCLUDEDIR}"
         PATHS
             "[HKEY_LOCAL_MACHINE\\SOFTWARE\\GnuWin32\\Zlib;InstallPath]/include"
     )
@@ -59,9 +66,9 @@ if (NOT ZLIB_INCLUDE_DIR OR NOT ZLIB_LIBRARY)
         NAMES
             ${ZLIB_NAMES}
         HINTS
-            "${ZLIB_LIBDIR}"
-            ${ZLIB_HINTS}/lib
             ${ZLIB_HINTS}
+            ${ZLIB_HINTS}/lib
+            "${ZLIB_LIBDIR}"
         PATHS
             "[HKEY_LOCAL_MACHINE\\SOFTWARE\\GnuWin32\\Zlib;InstallPath]/lib"
     )
