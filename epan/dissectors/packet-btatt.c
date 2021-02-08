@@ -16,6 +16,7 @@
 
 #include <glib/gprintf.h>
 
+#include <epan/frame_data.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/decode_as.h>
@@ -33,8 +34,6 @@
 #include "packet-btmesh.h"
 
 #define HANDLE_TVB -1
-
-#define PINFO_FD_VISITED(pinfo)   ((pinfo)->fd->visited)
 
 /* packet reassembly */
 static reassembly_table msg_reassembly_table;
