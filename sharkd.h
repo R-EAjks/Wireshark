@@ -41,7 +41,7 @@ const char *sharkd_version(void);
 
 /* sharkd_daemon.c */
 int sharkd_init(int argc, char **argv);
-int sharkd_loop(int argc, char* argv[]);
+int sharkd_loop(int argc _U_, char* argv[] _U_);
 
 /* sharkd_session.c */
 int sharkd_session_main(int mode_setting);

@@ -19,16 +19,12 @@
 #include <stdlib.h>
 #include <signal.h>
 
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-
 #ifdef _WIN32
 #include <wsutil/unicode-utils.h>
-#include <wsutil/filesystem.h>
 #include <wsutil/win32-utils.h>
 #endif
 
+#include <wsutil/filesystem.h>
 #include <wsutil/socket.h>
 #include <wsutil/inet_addr.h>
 #include <wsutil/please_report_bug.h>
@@ -358,7 +354,7 @@ sharkd_init(int argc, char **argv)
 }
 
 int
-sharkd_loop(int argc, char* argv[])
+sharkd_loop(int argc _U_, char* argv[])
 {
 	if (mode == SHARKD_MODE_CLASSIC_CONSOLE || mode == SHARKD_MODE_GOLD_CONSOLE)
 	{
