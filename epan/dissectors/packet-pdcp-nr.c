@@ -1684,6 +1684,8 @@ static guint32 calculate_digest(pdu_security_settings_t *pdu_security_settings, 
 #endif
 
         default:
+            (void)header_length; /* Mark unused for all macros in switch
+                                    statement are undefined*/
             /* Can't calculate */
             *calculated = FALSE;
             return 0;
