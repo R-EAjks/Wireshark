@@ -50,6 +50,13 @@ The following cache variables may also be set:
 include(FindWSWinLibs)
 FindWSWinLibs("vcpkg-export-.*" LIBXML2_HINTS)
 
+# Homebrew forces pkg-config to return the prefix
+# /Library/Developer/CommandLineTools/SDKs/<sdk>/usr
+# https://github.com/Homebrew/homebrew-core/blob/e2c833d326c45d9aaf4e26af6dd8b2f31564dc04/Formula/pkg-config.rb#L49
+if (DEFINED CMAKE_OSX_SYSROOT AND EXISTS "${CMAKE_OSX_SYSROOT}/usr")
+    set (LIBXML2_HINTS "${CMAKE_OSX_SYSROOT}/usr")
+endif()
+
 # use pkg-config to get the directories and then use these values
 # in the find_path() and find_library() calls
 find_package(PkgConfig QUIET)
@@ -58,9 +65,9 @@ set(LIBXML2_DEFINITIONS ${PC_LIBXML_CFLAGS_OTHER})
 
 find_path(LIBXML2_INCLUDE_DIR NAMES libxml/xpath.h
    HINTS
+   ${LIBXML2_HINTS}/include
    ${PC_LIBXML_INCLUDEDIR}
    ${PC_LIBXML_INCLUDE_DIRS}
-   ${LIBXML2_HINTS}/include
    PATH_SUFFIXES libxml2
    )
 
@@ -73,9 +80,9 @@ endif()
 
 find_library(LIBXML2_LIBRARY NAMES xml2 libxml2 libxml2-2
    HINTS
+   ${LIBXML2_HINTS}/lib
    ${PC_LIBXML_LIBDIR}
    ${PC_LIBXML_LIBRARY_DIRS}
-   ${LIBXML2_HINTS}/lib
    )
 
 find_program(LIBXML2_XMLLINT_EXECUTABLE xmllint
