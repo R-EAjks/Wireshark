@@ -348,6 +348,40 @@ struct prop_nssrc_ctx hf_nvme_rdma_cmd_gprop_nssr = {
     .nssrc = -1,
     .rsvd = -1,
 };
+/* Shared between Property Get and Property Set*/
+static void dissect_nvme_rdma_prop_cc(proto_tree *cqe_tree, tvbuff_t *cqe_tvb, const struct prop_cc_ctx *cc_ctx, guint8 offset);
+static void dissect_nvme_rdma_prop_csts(proto_tree *cqe_tree, tvbuff_t *cqe_tvb, const struct prop_csts_ctx *csts_ctx, guint8 offset);
+static void dissect_nvme_rdma_prop_nssr(proto_tree *cqe_tree, tvbuff_t *cqe_tvb, const struct prop_nssrc_ctx *nssrc_ctx, guint8 offset);
+
+/* MVME Fabric Property Set commands */
+/* Controller Configuration */
+static struct prop_cc_ctx hf_nvme_rdma_cmd_sprop_cc = {
+    .en = -1,
+    .rsvd = -1,
+    .css = -1,
+    .mps = -1,
+    .ams = -1,
+    .shn = -1,
+    .iosqes = -1,
+    .iocqes = -1,
+    .rsvd1 = -1,
+    .rsvd2 = -1,
+};
+/* Controller Status */
+static struct prop_csts_ctx hf_nvme_rdma_cmd_sprop_csts = {
+    .rdy= -1,
+    .cfs= -1,
+    .shst= -1,
+    .nssro= -1,
+    .pp= -1,
+    .rsvd= -1,
+    .rsvd1= -1,
+};
+/* NVM Subsystem Reset */
+struct prop_nssrc_ctx hf_nvme_rdma_cmd_sprop_nssr = {
+    .nssrc = -1,
+    .rsvd = -1,
+};
 
 static int hf_nvme_rdma_to_host_unknown_data = -1;
 
@@ -627,16 +661,26 @@ static void dissect_nvme_fabric_prop_get_cmd(proto_tree *cmd_tree, tvbuff_t *cmd
 static void dissect_nvme_fabric_prop_set_cmd(proto_tree *cmd_tree, tvbuff_t *cmd_tvb)
 {
     guint8 attr;
+    guint32 offset;
 
     attr = dissect_nvme_fabric_prop_cmd_common(cmd_tree, cmd_tvb);
-    if (attr == 0) {
-        proto_tree_add_item(cmd_tree, hf_nvme_rdma_cmd_prop_attr_set_4B_value, cmd_tvb,
+    offset = tvb_get_guint32(cmd_tvb, 44, ENC_LITTLE_ENDIAN);
+    switch(offset) {
+        case 0x14: dissect_nvme_rdma_prop_cc(cmd_tree, cmd_tvb, &hf_nvme_rdma_cmd_sprop_cc, 48); break;
+        case 0x1c: dissect_nvme_rdma_prop_csts(cmd_tree, cmd_tvb, &hf_nvme_rdma_cmd_sprop_csts, 48); break;
+        case 0x20: dissect_nvme_rdma_prop_nssr(cmd_tree, cmd_tvb, &hf_nvme_rdma_cmd_sprop_nssr, 48);  break;
+        default:
+        {
+            if (attr == 0) {
+            proto_tree_add_item(cmd_tree, hf_nvme_rdma_cmd_prop_attr_set_4B_value, cmd_tvb,
                             48, 4, ENC_LITTLE_ENDIAN);
-        proto_tree_add_item(cmd_tree, hf_nvme_rdma_cmd_prop_attr_set_4B_value_rsvd, cmd_tvb,
+            proto_tree_add_item(cmd_tree, hf_nvme_rdma_cmd_prop_attr_set_4B_value_rsvd, cmd_tvb,
                             52, 4, ENC_LITTLE_ENDIAN);
-    } else {
-        proto_tree_add_item(cmd_tree, hf_nvme_rdma_cmd_prop_attr_set_8B_value, cmd_tvb,
+            } else {
+                proto_tree_add_item(cmd_tree, hf_nvme_rdma_cmd_prop_attr_set_8B_value, cmd_tvb,
                             48, 8, ENC_LITTLE_ENDIAN);
+            }
+        }
     }
     proto_tree_add_item(cmd_tree, hf_nvme_rdma_cmd_prop_attr_set_rsvd3, cmd_tvb,
                         56, 8, ENC_NA);
@@ -873,57 +917,57 @@ dissect_nvme_rdma_status_prop_get_vs(proto_tree *cqe_tree, tvbuff_t *cqe_tvb)
 }
 
 static void
-dissect_nvme_rdma_status_prop_get_cc(proto_tree *cqe_tree, tvbuff_t *cqe_tvb)
+dissect_nvme_rdma_prop_cc(proto_tree *tree, tvbuff_t *tvb, const struct prop_cc_ctx *cc_ctx, guint8 offset)
 {
     proto_item *ti;
     guint8 val;
 
-    proto_tree_add_item(cqe_tree, hf_nvme_rdma_cmd_gprop_cc.en, cqe_tvb, 0, 2, ENC_LITTLE_ENDIAN);
-    proto_tree_add_item(cqe_tree, hf_nvme_rdma_cmd_gprop_cc.rsvd, cqe_tvb, 0, 2, ENC_LITTLE_ENDIAN);
-    ti = proto_tree_add_item(cqe_tree, hf_nvme_rdma_cmd_gprop_cc.css, cqe_tvb, 0, 2, ENC_LITTLE_ENDIAN);
-    val = (tvb_get_guint16(cqe_tvb, 0, ENC_LITTLE_ENDIAN) & 0x70) >> 4;
+    proto_tree_add_item(tree, cc_ctx->en, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, cc_ctx->rsvd, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    ti = proto_tree_add_item(tree, cc_ctx->css, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    val = (tvb_get_guint16(tvb, offset, ENC_LITTLE_ENDIAN) & 0x70) >> 4;
     proto_item_append_text(ti, " (%s)", val_to_str(val, css_table, "Unknown"));
-    ti = proto_tree_add_item(cqe_tree, hf_nvme_rdma_cmd_gprop_cc.mps, cqe_tvb, 0, 2, ENC_LITTLE_ENDIAN);
-    val =  12 + ((tvb_get_guint16(cqe_tvb, 0, ENC_LITTLE_ENDIAN) & 0x780) >> 7);
+    ti = proto_tree_add_item(tree, cc_ctx->mps, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    val =  12 + ((tvb_get_guint16(tvb, offset, ENC_LITTLE_ENDIAN) & 0x780) >> 7);
     proto_item_append_text(ti, " (%lu bytes)", 1UL << val);
-    ti = proto_tree_add_item(cqe_tree, hf_nvme_rdma_cmd_gprop_cc.ams, cqe_tvb, 0, 2, ENC_LITTLE_ENDIAN);
-    val = (tvb_get_guint16(cqe_tvb, 0, ENC_LITTLE_ENDIAN) & 0x3800) >> 11;
+    ti = proto_tree_add_item(tree, cc_ctx->ams, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    val = (tvb_get_guint16(tvb, offset, ENC_LITTLE_ENDIAN) & 0x3800) >> 11;
     proto_item_append_text(ti, " (%s)", val_to_str(val, ams_table, "Unknown"));
-    ti = proto_tree_add_item(cqe_tree, hf_nvme_rdma_cmd_gprop_cc.shn, cqe_tvb, 0, 2, ENC_LITTLE_ENDIAN);
-    val = (tvb_get_guint16(cqe_tvb, 0, ENC_LITTLE_ENDIAN) & 0xC000) >> 14;
+    ti = proto_tree_add_item(tree, cc_ctx->shn, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    val = (tvb_get_guint16(tvb, offset, ENC_LITTLE_ENDIAN) & 0xC000) >> 14;
     proto_item_append_text(ti, " (%s)", val_to_str(val, sn_table, "Unknown"));
-    ti = proto_tree_add_item(cqe_tree, hf_nvme_rdma_cmd_gprop_cc.iosqes, cqe_tvb, 2, 1, ENC_LITTLE_ENDIAN);
-    val = tvb_get_guint8(cqe_tvb, 2) & 0xF;
+    ti = proto_tree_add_item(tree, cc_ctx->iosqes, tvb, offset+2, 1, ENC_LITTLE_ENDIAN);
+    val = tvb_get_guint8(tvb, offset+2) & 0xF;
     proto_item_append_text(ti, " (%lu bytes)", 1UL << val);
-    ti = proto_tree_add_item(cqe_tree, hf_nvme_rdma_cmd_gprop_cc.iocqes, cqe_tvb, 2, 1, ENC_LITTLE_ENDIAN);
-    val = tvb_get_guint8(cqe_tvb, 2) >> 4;
+    ti = proto_tree_add_item(tree, cc_ctx->iocqes, tvb, offset+2, 1, ENC_LITTLE_ENDIAN);
+    val = tvb_get_guint8(tvb, offset+2) >> 4;
     proto_item_append_text(ti, " (%lu bytes)", 1UL << val);
-    proto_tree_add_item(cqe_tree, hf_nvme_rdma_cmd_gprop_cc.rsvd1, cqe_tvb, 3, 1, ENC_LITTLE_ENDIAN);
-    proto_tree_add_item(cqe_tree, hf_nvme_rdma_cmd_gprop_cc.rsvd2, cqe_tvb, 4, 4, ENC_NA);
+    proto_tree_add_item(tree, cc_ctx->rsvd1, tvb, offset+3, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, cc_ctx->rsvd2, tvb, offset+4, 4, ENC_NA);
 }
 
 static void
-dissect_nvme_rdma_status_prop_get_csts(proto_tree *cqe_tree, tvbuff_t *cqe_tvb)
+dissect_nvme_rdma_prop_csts(proto_tree *tree, tvbuff_t *tvb, const struct prop_csts_ctx *csts_ctx, guint8 offset)
 {
     proto_item *ti;
     guint8 val;
 
-    proto_tree_add_item(cqe_tree, hf_nvme_rdma_cmd_gprop_csts.rdy, cqe_tvb, 0, 1, ENC_LITTLE_ENDIAN);
-    proto_tree_add_item(cqe_tree, hf_nvme_rdma_cmd_gprop_csts.cfs, cqe_tvb, 0, 1, ENC_LITTLE_ENDIAN);
-    ti = proto_tree_add_item(cqe_tree, hf_nvme_rdma_cmd_gprop_csts.shst, cqe_tvb, 0, 1, ENC_LITTLE_ENDIAN);
-    val = (tvb_get_guint8(cqe_tvb, 0) & 0xC) >> 2;
+    proto_tree_add_item(tree, csts_ctx->rdy, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, csts_ctx->cfs, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    ti = proto_tree_add_item(tree, csts_ctx->shst, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    val = (tvb_get_guint8(tvb, offset) & 0xC) >> 2;
     proto_item_append_text(ti, " (%s)", val_to_str(val, shst_table, "Unknown"));
-    proto_tree_add_item(cqe_tree, hf_nvme_rdma_cmd_gprop_csts.nssro, cqe_tvb, 0, 1, ENC_LITTLE_ENDIAN);
-    proto_tree_add_item(cqe_tree, hf_nvme_rdma_cmd_gprop_csts.pp, cqe_tvb, 0, 1, ENC_LITTLE_ENDIAN);
-    proto_tree_add_item(cqe_tree, hf_nvme_rdma_cmd_gprop_csts.rsvd, cqe_tvb, 0, 1, ENC_LITTLE_ENDIAN);
-    proto_tree_add_item(cqe_tree, hf_nvme_rdma_cmd_gprop_csts.rsvd1, cqe_tvb, 1, 7, ENC_NA);
+    proto_tree_add_item(tree, csts_ctx->nssro, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, csts_ctx->pp, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, csts_ctx->rsvd, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, csts_ctx->rsvd1, tvb, offset+1, 7, ENC_NA);
 }
 
 static void
-dissect_nvme_rdma_status_prop_get_nssr(proto_tree *cqe_tree _U_, tvbuff_t *cqe_tvb _U_)
+dissect_nvme_rdma_prop_nssr(proto_tree *tree, tvbuff_t *tvb, const struct prop_nssrc_ctx *nssrc_ctx, guint8 offset)
 {
-    proto_tree_add_item(cqe_tree, hf_nvme_rdma_cmd_gprop_nssr.nssrc, cqe_tvb, 0, 4, ENC_LITTLE_ENDIAN);
-    proto_tree_add_item(cqe_tree, hf_nvme_rdma_cmd_gprop_nssr.rsvd, cqe_tvb, 4, 4, ENC_NA);
+    proto_tree_add_item(tree, nssrc_ctx->nssrc, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, nssrc_ctx->rsvd, tvb, offset+4, 4, ENC_NA);
 }
 
 static void
@@ -934,9 +978,9 @@ dissect_nvme_rdma_status_prop_get(proto_tree *cqe_tree, tvbuff_t *cqe_tvb, struc
     switch (cmd_ctx->fabric_cmd.prop_get.offset) {
         case 0: dissect_nvme_rdma_status_prop_get_cap(cqe_tree, cqe_tvb); break;
         case 8: dissect_nvme_rdma_status_prop_get_vs(cqe_tree, cqe_tvb); break;
-        case 0x14: dissect_nvme_rdma_status_prop_get_cc(cqe_tree, cqe_tvb); break;
-        case 0x1c: dissect_nvme_rdma_status_prop_get_csts(cqe_tree, cqe_tvb); break;
-        case 0x20: dissect_nvme_rdma_status_prop_get_nssr(cqe_tree, cqe_tvb); break;
+        case 0x14: dissect_nvme_rdma_prop_cc(cqe_tree, cqe_tvb, &hf_nvme_rdma_cmd_gprop_cc, 0); break;
+        case 0x1c: dissect_nvme_rdma_prop_csts(cqe_tree, cqe_tvb, &hf_nvme_rdma_cmd_gprop_csts, 0); break;
+        case 0x20: dissect_nvme_rdma_prop_nssr(cqe_tree, cqe_tvb, &hf_nvme_rdma_cmd_gprop_nssr, 0); break;
     }
 };
 
@@ -1297,6 +1341,82 @@ proto_register_nvme_rdma(void)
         { &hf_nvme_rdma_cmd_prop_attr_set_8B_value,
             { "Value", "nvme-rdma.cmd.prop_attr.set.value.8B",
                FT_UINT64, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_rdma_cmd_sprop_cc.en,
+            { "Enable", "nvme-rdma.cmd.prop_attr.set.cc.en",
+               FT_UINT16, BASE_HEX, NULL, 0x1, NULL, HFILL}
+        },
+        { &hf_nvme_rdma_cmd_sprop_cc.rsvd,
+            { "Reserved", "nvme-rdma.cmd.prop_attr.set.cc.rsvd",
+               FT_UINT16, BASE_HEX, NULL, 0xE, NULL, HFILL}
+        },
+        { &hf_nvme_rdma_cmd_sprop_cc.css,
+            { "IO Command Set Selected", "nvme-rdma.cmd.prop_attr.set.cc.css",
+               FT_UINT16, BASE_HEX, NULL, 0x70, NULL, HFILL}
+        },
+        { &hf_nvme_rdma_cmd_sprop_cc.mps,
+            { "Memory Page Size", "nvme-rdma.cmd.prop_attr.set.cc.mps",
+               FT_UINT16, BASE_HEX, NULL, 0x780, NULL, HFILL}
+        },
+        { &hf_nvme_rdma_cmd_sprop_cc.ams,
+            { "Arbitration Mechanism Selected", "nvme-rdma.cmd.prop_attr.set.cc.ams",
+               FT_UINT16, BASE_HEX, NULL, 0x3800, NULL, HFILL}
+        },
+        { &hf_nvme_rdma_cmd_sprop_cc.shn,
+            { "Shutdown Notification", "nvme-rdma.cmd.prop_attr.set.cc.shn",
+               FT_UINT16, BASE_HEX, NULL, 0xc000, NULL, HFILL}
+        },
+        { &hf_nvme_rdma_cmd_sprop_cc.iosqes,
+            { "IO Submission Queue Entry Size", "nvme-rdma.cmd.prop_attr.set.cc.iosqes",
+               FT_UINT8, BASE_HEX, NULL, 0xF, NULL, HFILL}
+        },
+        { &hf_nvme_rdma_cmd_sprop_cc.iocqes,
+            { "IO Completion Queue Entry Size", "nvme-rdma.cmd.prop_attr.set.cc.iocqes",
+               FT_UINT8, BASE_HEX, NULL, 0xF0, NULL, HFILL}
+        },
+        { &hf_nvme_rdma_cmd_sprop_cc.rsvd1,
+            { "Reserved", "nvme-rdma.cmd.prop_attr.set.cc.rsvd1",
+               FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL}
+        },
+        { &hf_nvme_rdma_cmd_sprop_cc.rsvd2,
+            { "Reserved", "nvme-rdma.cmd.prop_attr.set.cc.rsvd2",
+               FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL}
+        },
+        { &hf_nvme_rdma_cmd_sprop_csts.rdy,
+            { "Ready", "nvme-rdma.cmd.prop_attr.set.csts.rdy",
+               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+        },
+        { &hf_nvme_rdma_cmd_sprop_csts.cfs,
+            { "Controller Fatal Status", "nvme-rdma.cmd.prop_attr.set.csts.cfs",
+               FT_UINT8, BASE_HEX, NULL, 0x2, NULL, HFILL}
+        },
+        { &hf_nvme_rdma_cmd_sprop_csts.shst,
+            { "Shutdown Status", "nvme-rdma.cmd.prop_attr.set.csts.shst",
+               FT_UINT8, BASE_HEX, NULL, 0xC, NULL, HFILL}
+        },
+        { &hf_nvme_rdma_cmd_sprop_csts.nssro,
+            { "NVM Subsystem Reset Occurred", "nvme-rdma.cmd.prop_attr.set.csts.nssro",
+               FT_UINT8, BASE_HEX, NULL, 0x10, NULL, HFILL}
+        },
+        { &hf_nvme_rdma_cmd_sprop_csts.pp,
+            { "Processing Paused", "nvme-rdma.cmd.prop_attr.set.csts.pp",
+               FT_UINT8, BASE_HEX, NULL, 0x20, NULL, HFILL}
+        },
+        { &hf_nvme_rdma_cmd_sprop_csts.rsvd,
+            { "Reserved", "nvme-rdma.cmd.prop_attr.set.csts.rsvd",
+               FT_UINT8, BASE_HEX, NULL, 0xC0, NULL, HFILL}
+        },
+        { &hf_nvme_rdma_cmd_sprop_csts.rsvd1,
+            { "Reserved", "nvme-rdma.cmd.prop_attr.set.csts.rsvd",
+               FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL}
+        },
+        { &hf_nvme_rdma_cmd_sprop_nssr.nssrc,
+            { "NVM Subsystem Reset Control", "nvme-rdma.cmd.prop_attr.set.nssr.nssrc",
+               FT_UINT32, BASE_HEX, NULL, 0, NULL, HFILL}
+        },
+        { &hf_nvme_rdma_cmd_sprop_nssr.rsvd,
+            { "Reserved", "nvme-rdma.cmd.prop_attr.set.nssr.rsvd",
+               FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL}
         },
         { &hf_nvme_rdma_cmd_prop_attr_set_rsvd3,
             { "Reserved", "nvme-rdma.cmd.prop_attr.set.rsvd3",
