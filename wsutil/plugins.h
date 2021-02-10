@@ -11,11 +11,12 @@
 #ifndef __PLUGINS_H__
 #define __PLUGINS_H__
 
+#include <glib.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
 
-#include <glib.h>
 #include <gmodule.h>
 
 #include "ws_symbol_export.h"
