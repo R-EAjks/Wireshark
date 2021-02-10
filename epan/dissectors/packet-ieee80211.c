@@ -5400,6 +5400,11 @@ static int hf_ieee80211_tag_mmie_keyid = -1;
 static int hf_ieee80211_tag_mmie_ipn = -1;
 static int hf_ieee80211_tag_mmie_mic = -1;
 
+/* IEEE Std 802.11-2016: 9.4.2.72 */
+static int hf_ieee80211_tag_no_bssid_capability_dmg_bss_control = -1;
+static int hf_ieee80211_tag_no_bssid_capability_dmg_bss_control_type = -1;
+static int hf_ieee80211_tag_no_bssid_capability_dmg_bss_control_reserved = -1;
+
 /* IEEE Std 802.11-2012: 8.4.2.61 */
 static int hf_ieee80211_tag_obss_spd = -1;
 static int hf_ieee80211_tag_obss_sad = -1;
@@ -7190,6 +7195,7 @@ static gint ett_osen_group_management_cipher_suite = -1;
 
 static gint ett_hs20_cc_proto_port_tuple = -1;
 
+static gint ett_tag_no_bssid_capability_dmg_bss_control_tree = -1; 
 static gint ett_ssid_list = -1;
 
 static gint ett_sgdsn = -1;
@@ -18138,6 +18144,34 @@ dissect_mmie(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
                       ENC_NA);
   proto_tree_add_item(tree, hf_ieee80211_tag_mmie_mic, tvb, offset + 8, 8,
                       ENC_NA);
+  return tvb_captured_length(tvb);
+}
+
+static int
+ieee80211_tag_dmg_capabilities(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data);
+
+static int
+dissect_no_bssid_capability(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void* data)
+{
+  int offset = 0;
+
+  static int * const ieee80211_tag_no_bssid_capability_dmg_bss_control[] = {
+    &hf_ieee80211_tag_no_bssid_capability_dmg_bss_control_type,
+    &hf_ieee80211_tag_no_bssid_capability_dmg_bss_control_reserved,
+    NULL
+  };
+
+  add_ff_cap_info(tree, tvb, pinfo, offset);
+  offset += 2;
+
+  proto_tree_add_bitmask_with_flags(tree, tvb, offset, hf_ieee80211_tag_no_bssid_capability_dmg_bss_control,
+                                    ett_tag_no_bssid_capability_dmg_bss_control_tree,
+                                    ieee80211_tag_no_bssid_capability_dmg_bss_control,
+                                    ENC_LITTLE_ENDIAN, BMT_NO_APPEND);
+  offset += 1;
+
+  ieee80211_tag_dmg_capabilities(tvb, pinfo, tree, data);
+
   return tvb_captured_length(tvb);
 }
 
@@ -45251,6 +45285,19 @@ proto_register_ieee80211(void)
      {"MIC", "wlan.mmie.mic",
       FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL }},
 
+    /* Non Transmitted BSSID Capability */
+    {&hf_ieee80211_tag_no_bssid_capability_dmg_bss_control,
+     {"DMG BSS Control", "wlan.no_bssid_capability.dmg_bss_control",
+      FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL }},
+
+    {&hf_ieee80211_tag_no_bssid_capability_dmg_bss_control_type,
+     {"Type", "wlan.no_bssid_capability.dmg_bss_control.type",
+      FT_UINT8, BASE_DEC, NULL, 0x03, NULL, HFILL }},
+
+    {&hf_ieee80211_tag_no_bssid_capability_dmg_bss_control_reserved,
+     {"Reserved", "wlan.no_bssid_capability.dmg_bss_control.reserved",
+      FT_UINT8, BASE_DEC, NULL, 0xFC, NULL, HFILL }},
+
     /* WAPI Parameter Set*/
     {&hf_ieee80211_tag_wapi_param_set_version,
      {"Version", "wlan.wapi.version",
@@ -47606,6 +47653,7 @@ proto_register_ieee80211(void)
 
     &ett_hs20_cc_proto_port_tuple,
 
+    &ett_tag_no_bssid_capability_dmg_bss_control_tree,
     &ett_ssid_list,
 
     &ett_sgdsn,
@@ -48361,6 +48409,7 @@ proto_reg_handoff_ieee80211(void)
   dissector_add_uint("wlan.tag.number", TAG_MOBILITY_DOMAIN, create_dissector_handle(dissect_mobility_domain, -1));
   dissector_add_uint("wlan.tag.number", TAG_FAST_BSS_TRANSITION, create_dissector_handle(dissect_fast_bss_transition, -1));
   dissector_add_uint("wlan.tag.number", TAG_MMIE, create_dissector_handle(dissect_mmie, -1));
+  dissector_add_uint("wlan.tag.number", TAG_NO_BSSID_CAPABILITY, create_dissector_handle(dissect_no_bssid_capability, -1));
   dissector_add_uint("wlan.tag.number", TAG_SSID_LIST, create_dissector_handle(dissect_ssid_list, -1));
   dissector_add_uint("wlan.tag.number", TAG_TIME_ZONE, create_dissector_handle(dissect_time_zone, -1));
   dissector_add_uint("wlan.tag.number", TAG_TIMEOUT_INTERVAL, create_dissector_handle(dissect_timeout_interval, -1));
