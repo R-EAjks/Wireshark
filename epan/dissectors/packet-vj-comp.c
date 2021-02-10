@@ -293,7 +293,7 @@ dissect_vjc_uncomp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
             conversation_add_proto_data(conv, proto_vjc, (void *)pkt_data);
         }
         pdata = // shorthand
-            pkt_data->frame_headers = tvb_memdup(wmem_file_scope(), tcpip_tvb, 0, -1);
+            pkt_data->frame_headers = (guint8 *)tvb_memdup(wmem_file_scope(), tcpip_tvb, 0, -1);
         ip_len = (pdata[0] & 0x0F) << 2;
 
         pkt_data->last_frame = pinfo->num;
