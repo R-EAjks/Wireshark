@@ -7388,6 +7388,8 @@ static const enum_val_t wlan_ignore_prot_options[] = {
 static int wlan_address_type = -1;
 static int wlan_bssid_address_type = -1;
 
+static int beacon_padding = 0; /* beacon padding bug */
+
 /*
  * Check if we have an S1G STA
  */
@@ -21081,6 +21083,8 @@ dissect_multiple_bssid_ie(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
   const gchar *sub_tag_name;
   proto_tree *sub_tag_tree;
   const guint8 ids[] = { TAG_VENDOR_SPECIFIC_IE };
+  const guint8 ids2[] = { TAG_SSID, TAG_MULTIPLE_BSSID_INDEX, TAG_NO_BSSID_CAPABILITY, TAG_VENDOR_SPECIFIC_IE };
+  guint32 s_offset, s_end;
 
   if (tag_len < 1)
   {
@@ -21115,6 +21119,17 @@ dissect_multiple_bssid_ie(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
     {
     case MULTIPLE_BSSID_SUBELEM_NO_BSSID_PROFILE:
       proto_tree_add_item(sub_tag_tree, hf_ieee80211_tag_multiple_bssid_subelem_nontrans_profile, tvb, offset, sub_tag_len, ENC_NA);
+
+      s_offset = offset;
+      s_end = offset + sub_tag_len;
+      beacon_padding = 0; /* this is for the beacon padding confused with ssid fix */
+      while (s_offset < s_end) {
+        int tlen = add_tagged_field(pinfo, sub_tag_tree, tvb, s_offset, 0, ids2, G_N_ELEMENTS(ids2), NULL);
+        if (tlen==0)
+          break;
+        s_offset += tlen;
+      }
+
       break;
 
     case MULTIPLE_BSSID_SUBELEM_VENDOR_SPECIFIC:
@@ -21132,6 +21147,7 @@ dissect_multiple_bssid_ie(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
     }
 
     offset += sub_tag_len;
+
   }
 
   if (offset < tag_len) {
@@ -22241,8 +22257,6 @@ dissect_he_6ghz_band_capabilities(tvbuff_t *tvb, packet_info *pinfo, proto_tree 
 /* ************************************************************************* */
 /*           Dissect and add tagged (optional) fields to proto tree          */
 /* ************************************************************************* */
-
-static int beacon_padding = 0; /* beacon padding bug */
 
 static int
 ieee80211_tag_ssid(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
