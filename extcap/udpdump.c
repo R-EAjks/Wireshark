@@ -67,6 +67,8 @@
 
 static gboolean run_loop = TRUE;
 
+static socket_handle_t sock;
+
 enum {
 	EXTCAP_BASE_OPTIONS_ENUM,
 	OPT_HELP,
@@ -153,10 +155,72 @@ cleanup_setup_listener:
 
 }
 
+#ifdef _WIN32
+/* Setup a dummy window and message loop to receive WM_CLOSE messages
+ * to allow graceful termination of the extcap process on win32.
+ */
+
+static HWND xHwnd;
+
+static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+	switch( uMsg ) {
+	case WM_QUIT:
+	case WM_CLOSE:
+		DestroyWindow(hwnd);
+		break;
+	case WM_DESTROY:
+		PostQuitMessage(0);
+		break;
+	case WM_COMMAND:
+	case WM_PAINT:
+		break;
+	default:
+		return DefWindowProc( hwnd, uMsg, wParam, lParam );
+	}
+	return 0;
+}
+
+static DWORD WINAPI msg_thread(void* data)
+{
+	(void)data;
+	MSG message;
+	HINSTANCE hinst = GetModuleHandle( NULL );
+	const wchar_t class_name[] = L"WindowClass";
+	WNDCLASSEX swc = { sizeof( WNDCLASSEX ), 0, WndProc, 0, 0, hinst, NULL, NULL, NULL, NULL, class_name, NULL };
+
+	if (!RegisterClassEx( &swc )) {
+		g_warning("Error registering window" );
+		goto exit_main_loop;
+	}
+
+	xHwnd = CreateWindowEx( WS_EX_CLIENTEDGE, class_name, L"udpdump", WS_OVERLAPPEDWINDOW,
+				CW_USEDEFAULT, CW_USEDEFAULT, 100, 100, NULL, NULL, hinst, NULL );
+	if (xHwnd == NULL) {
+		g_warning("Error creating window" );
+		goto exit_main_loop;
+	}
+
+	while (GetMessage( &message, NULL, 0, 0 ) > 0) {
+		TranslateMessage( &message );
+		DispatchMessage( &message );
+	}
+
+exit_main_loop:
+	run_loop = FALSE;
+	closesocket(sock);
+	return 0;
+}
+#endif
+
 static void exit_from_loop(int signo _U_)
 {
-	g_warning("Exiting from main loop");
+#ifdef _WIN32
+	PostMessage(xHwnd, WM_CLOSE, 0, 0);
+#else
 	run_loop = FALSE;
+	closesocket(sock);
+#endif
 }
 
 static int setup_dumpfile(const char* fifo, FILE** fp)
@@ -293,15 +357,9 @@ static void run_listener(const char* fifo, const guint16 port, const char* proto
 {
 	struct sockaddr_in clientaddr;
 	socklen_t clientlen = sizeof(clientaddr);
-	socket_handle_t sock;
 	char* buf;
 	ssize_t buflen;
 	FILE* fp = NULL;
-
-	if (signal(SIGINT, exit_from_loop) == SIG_ERR) {
-		g_warning("Can't set signal handler");
-		return;
-	}
 
 	if (setup_dumpfile(fifo, &fp) == EXIT_FAILURE) {
 		if (fp)
@@ -311,6 +369,15 @@ static void run_listener(const char* fifo, const guint16 port, const char* proto
 
 	if (setup_listener(port, &sock) == EXIT_FAILURE)
 		return;
+
+#ifdef _WIN32
+	CreateThread(NULL, 0, msg_thread, NULL, 0, NULL);
+#endif
+
+	if (signal(SIGINT, exit_from_loop) == SIG_ERR) {
+		g_warning("Can't set signal handler");
+		return;
+	}
 
 	g_debug("Listener running on port %u", port);
 
@@ -329,12 +396,15 @@ static void run_listener(const char* fifo, const guint16 port, const char* proto
 					{
 						wchar_t *errmsg = NULL;
 						int err = WSAGetLastError();
-						FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-							NULL, err,
-							MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-							(LPWSTR)&errmsg, 0, NULL);
-						g_warning("Error in recvfrom: %S (err=%d)", errmsg, err);
-						LocalFree(errmsg);
+						if( err != WSAEINTR )
+						{
+							FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+								NULL, err,
+								MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+								(LPWSTR)&errmsg, 0, NULL);
+							g_warning("Error in recvfrom: %S (err=%d)", errmsg, err);
+							LocalFree(errmsg);
+						}
 					}
 #else
 					g_warning("Error in recvfrom: %s (errno=%d)", strerror(errno), errno);

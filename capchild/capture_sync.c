@@ -2002,14 +2002,66 @@ signal_pipe_capquit_to_child(capture_session *cap_session)
 #endif
 
 
+#ifdef _WIN32
+typedef struct {
+    DWORD process_id;
+    BOOL wmclose_sent;
+} handle_data;
+
+BOOL CALLBACK enum_windows_callback(HWND handle, LPARAM lParam)
+{
+    handle_data* data = (handle_data*)lParam;
+    DWORD process_id = 0;
+    GetWindowThreadProcessId(handle, &process_id);
+    if (data->process_id == process_id ) {
+        data->wmclose_sent = data->wmclose_sent || PostMessage( handle, WM_CLOSE, 0, 0 );
+    }
+    return TRUE;
+}
+#endif
+
+
 /* user wants to stop the capture run */
 void
 sync_pipe_stop(capture_session *cap_session)
 {
 #ifdef _WIN32
     int count;
+    guint icnt;
     DWORD childstatus;
     gboolean terminate = TRUE;
+    interface_options *interface_opts;
+#define STOP_SLEEP_TIME 500 /* ms */
+#define STOP_CHECK_TIME 50
+
+    /* Send WM_CLOSE message to any extcap processes to allow them a chance to
+     * send any final blocks, such as Interface Statistics, on extcap_pipe_h and close gracefully.
+     * Extcap processes which don't accept WM_CLOSE will be terminated forcefully by ws_pipe_close later on.
+     */
+
+    for (icnt = 0; icnt < cap_session->capture_opts->ifaces->len; icnt++) {
+        interface_opts = &g_array_index(cap_session->capture_opts->ifaces, interface_options, icnt);
+        if (interface_opts->if_type == IF_EXTCAP && interface_opts->extcap_pid != WS_INVALID_PID) {
+            handle_data data;
+            data.process_id = GetProcessId(interface_opts->extcap_pid);
+            data.wmclose_sent = FALSE;
+            EnumWindows(enum_windows_callback, (LPARAM)&data);
+            if( data.wmclose_sent ) {
+                /* Give the process some time to send any final blocks on the pcapng pipe and exit gracefully */
+                for (count = 0; count < STOP_SLEEP_TIME / STOP_CHECK_TIME; count++) {
+                    if (GetExitCodeProcess((HANDLE) interface_opts->extcap_pid, &childstatus) &&
+                        childstatus != STILL_ACTIVE ) {
+                        if (interface_opts->extcap_pipe_h != INVALID_HANDLE_VALUE)
+                        {
+                           FlushFileBuffers(interface_opts->extcap_pipe_h);
+                        }
+                        break;
+                    }
+                    Sleep(STOP_CHECK_TIME);
+                }
+            }
+        }
+    }
 #endif
     if (cap_session->fork_child != WS_INVALID_PID) {
 #ifndef _WIN32
@@ -2020,8 +2072,6 @@ sync_pipe_stop(capture_session *cap_session)
                   "Sending SIGINT to child failed: %s\n", g_strerror(errno));
         }
 #else
-#define STOP_SLEEP_TIME 500 /* ms */
-#define STOP_CHECK_TIME 50
         /* First, use the special signal pipe to try to close the capture child
          * gracefully.
          */
