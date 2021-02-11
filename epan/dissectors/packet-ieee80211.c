@@ -18155,6 +18155,7 @@ ieee80211_tag_dmg_capabilities(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tr
 static int
 dissect_no_bssid_capability(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void* data)
 {
+  int tag_len = tvb_reported_length(tvb);
   int offset = 0;
 
   static int * const ieee80211_tag_no_bssid_capability_dmg_bss_control[] = {
@@ -18165,14 +18166,18 @@ dissect_no_bssid_capability(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *t
 
   add_ff_cap_info(tree, tvb, pinfo, offset);
   offset += 2;
+  tag_len -= 2;
 
-  proto_tree_add_bitmask_with_flags(tree, tvb, offset, hf_ieee80211_tag_no_bssid_capability_dmg_bss_control,
-                                    ett_tag_no_bssid_capability_dmg_bss_control_tree,
-                                    ieee80211_tag_no_bssid_capability_dmg_bss_control,
-                                    ENC_LITTLE_ENDIAN, BMT_NO_APPEND);
-  offset += 1;
+  /* On nontransmitted BSSID, there is only DMG Capability Info */
+  if (tag_len) {
+    proto_tree_add_bitmask_with_flags(tree, tvb, offset, hf_ieee80211_tag_no_bssid_capability_dmg_bss_control,
+                                      ett_tag_no_bssid_capability_dmg_bss_control_tree,
+                                      ieee80211_tag_no_bssid_capability_dmg_bss_control,
+                                      ENC_LITTLE_ENDIAN, BMT_NO_APPEND);
+    offset += 1;
 
-  ieee80211_tag_dmg_capabilities(tvb, pinfo, tree, data);
+    ieee80211_tag_dmg_capabilities(tvb, pinfo, tree, data);
+  }
 
   return tvb_captured_length(tvb);
 }
