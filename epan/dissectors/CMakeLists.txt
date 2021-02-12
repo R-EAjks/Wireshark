@@ -1929,6 +1929,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-wow.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-wps.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-wreth.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-wsdiscovery.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-wsmp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-wsp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-wtls.c
