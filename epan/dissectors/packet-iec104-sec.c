@@ -2336,12 +2336,247 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 			break;
 
 		case S_AR_NA_1: /* 83 aggressive mode authentication request session key status request */
-
-			offset += 18;
-			get_CSQ(tvb, &offset, it104tree);
-			get_USR(tvb, &offset, it104tree, NULL);
-			get_MAC(tvb, &offset, it104tree, 16);
 			
+			/* 60870-5-101 7.2.1 Type identification */
+			asduh.TypeId = tvb_get_guint8(tvb, offset);
+			proto_tree_add_item(it104tree, hf_typeid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+			asduh.DataLength = get_TypeIdLength(asduh.TypeId);
+			offset += 1;
+
+			/* 60870-5-101 par 7.2.2 Variable structure qualifier */
+			Bytex = tvb_get_guint8(tvb, 1);
+			asduh.SQ = Bytex & F_SQ; 
+			asduh.NumIx = Bytex & F_NUMIX; 
+			proto_tree_add_item(it104tree, hf_sq, tvb, offset, 1, ENC_LITTLE_ENDIAN); /* single (0) or sequence (1) */
+			proto_tree_add_item(it104tree, hf_numix, tvb, offset, 1, ENC_LITTLE_ENDIAN); /* number of information objects or elements */
+			offset += 1;
+
+			/* 60870-5-101 par 7.2.3 Cause of transmission (lenght 2) */
+			asduh.TNCause = tvb_get_guint8(tvb, offset);
+			proto_tree_add_item(it104tree, hf_causetx, tvb, offset, 1, ENC_LITTLE_ENDIAN); /* cause */
+			proto_tree_add_item(it104tree, hf_nega, tvb, offset, 1, ENC_LITTLE_ENDIAN); /* negative */
+			proto_tree_add_item(it104tree, hf_test, tvb, offset, 1, ENC_LITTLE_ENDIAN); /* test */
+			offset += 1;			
+
+			if (parms->cot_len == 2) {
+				asduh.OA = tvb_get_guint8(tvb, offset); /* originator address */
+				proto_tree_add_item(it104tree, hf_oa, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+				offset += 1;
+			}
+
+			/* 60870-5-101 par 7.2.4 Common address of ASDU (lenght 2) */
+			proto_tree_add_item_ret_uint(it104tree, hf_addr, tvb, offset, parms->asdu_addr_len, ENC_LITTLE_ENDIAN, &asduh.Addr);
+			offset += parms->asdu_addr_len;
+
+			/* 60870-5-101 par 7.2.5 Information object address */
+			/* Support both 16 and 24-bit IOA addresses */
+			/* Don't increment offset, as we'll want to be at this position later */
+			if (parms->ioa_len == 3) {
+				asduh.IOA = tvb_get_letoh24(tvb, offset);
+			}
+			else if (parms->ioa_len == 2) {
+				asduh.IOA = tvb_get_letohs(tvb, offset);
+			}
+			offset += parms->ioa_len;
+
+			switch (asduh.TypeId) {
+				case M_SP_NA_1: /* 1	Single-point information */
+					get_SIQ(tvb, &offset, it104tree);
+					break;
+				case M_SP_TA_1: /* 2	Single-point information with time tag */
+					get_SIQ(tvb, &offset, it104tree);
+					get_CP24Time(tvb, &offset, it104tree);
+					break;
+				case M_DP_NA_1: /* 3	Double-point information */
+					get_DIQ(tvb, &offset, it104tree);
+					break;
+				case M_DP_TA_1: /* 4	Double-point information with time tag */
+					get_DIQ(tvb, &offset, it104tree);
+					get_CP24Time(tvb, &offset, it104tree);
+					break;
+				case M_ST_NA_1: /* 5	Step position information */
+					get_VTI(tvb, &offset, it104tree);
+					get_QDS(tvb, &offset, it104tree);
+					break;
+				case M_ST_TA_1: /* 6	Step position information with time tag */
+					get_VTI(tvb, &offset, it104tree);
+					get_QDS(tvb, &offset, it104tree);
+					get_CP24Time(tvb, &offset, it104tree);
+					break;
+				case M_BO_NA_1: /* 7	Bitstring of 32 bits */
+					get_BSI(tvb, &offset, it104tree);
+					get_QDS(tvb, &offset, it104tree);
+					break;
+				case M_BO_TA_1: /* 8	Bitstring of 32 bits with time tag */
+					get_BSI(tvb, &offset, it104tree);
+					get_QDS(tvb, &offset, it104tree);
+					get_CP24Time(tvb, &offset, it104tree);
+					break;
+				case M_ME_NA_1: /* 9	Measured value, normalized value */
+					get_NVA(tvb, &offset, it104tree);
+					get_QDS(tvb, &offset, it104tree);
+					break;
+				case M_ME_TA_1: /* 10	Measured value, normalized value with time tag */
+					get_NVA(tvb, &offset, it104tree);
+					get_QDS(tvb, &offset, it104tree);
+					get_CP24Time(tvb, &offset, it104tree);
+					break;
+				case M_ME_NB_1: /* 11     Measured value, scaled value */
+					get_SVA(tvb, &offset, it104tree);
+					get_QDS(tvb, &offset, it104tree);
+					break;
+				case M_ME_TB_1: /* 12     Measured value, scaled value with time tag */
+					get_SVA(tvb, &offset, it104tree);
+					get_QDS(tvb, &offset, it104tree);
+					get_CP24Time(tvb, &offset, it104tree);
+					break;
+				case M_ME_NC_1: /* 13	Measured value, short floating point value */
+					get_FLT(tvb, &offset, it104tree);
+					get_QDS(tvb, &offset, it104tree);
+					break;
+				case M_ME_TC_1: /* 14	Measured value, short floating point value with time tag */
+					get_FLT(tvb, &offset, it104tree);
+					get_QDS(tvb, &offset, it104tree);
+					get_CP24Time(tvb, &offset, it104tree);
+					break;
+				case M_IT_NA_1: /* 15	Integrated totals */
+					get_BCR(tvb, &offset, it104tree);
+					break;
+				case M_IT_TA_1: /* 16	Integrated totals with time tag */
+					get_BCR(tvb, &offset, it104tree);
+					get_CP24Time(tvb, &offset, it104tree);
+					break;
+				case M_ME_ND_1: /* 21    Measured value, normalized value without quality descriptor */
+					get_NVA(tvb, &offset, it104tree);
+					break;
+				case M_SP_TB_1: /* 30	Single-point information with time tag CP56Time2a */
+					get_SIQ(tvb, &offset, it104tree);
+					get_CP56Time(tvb, &offset, it104tree);
+					break;					
+				case M_DP_TB_1: /* 31	Double-point information with time tag CP56Time2a */
+					get_DIQ(tvb, &offset, it104tree);
+					get_CP56Time(tvb, &offset, it104tree);
+					break;
+				case M_ST_TB_1: /* 32	Step position information with time tag CP56Time2a */
+					get_VTI(tvb, &offset, it104tree);
+					get_QDS(tvb, &offset, it104tree);
+					get_CP56Time(tvb, &offset, it104tree);
+					break;
+				case M_BO_TB_1: /* 33	Bitstring of 32 bit with time tag CP56Time2a */
+					get_BSI(tvb, &offset, it104tree);
+					get_QDS(tvb, &offset, it104tree);
+					get_CP56Time(tvb, &offset, it104tree);
+					break;
+				case M_ME_TD_1: /* 34    Measured value, normalized value with time tag CP56Time2a */
+					get_NVA(tvb, &offset, it104tree);
+					get_QDS(tvb, &offset, it104tree);
+					get_CP56Time(tvb, &offset, it104tree);
+					break;
+				case M_ME_TE_1: /* 35    Measured value, scaled value with time tag CP56Time2a */
+					get_SVA(tvb, &offset, it104tree);
+					get_QDS(tvb, &offset, it104tree);
+					get_CP56Time(tvb, &offset, it104tree);
+					break;
+				case M_ME_TF_1: /* 36    Measured value, short floating point value with time tag CP56Time2a */
+					get_FLT(tvb, &offset, it104tree);
+					get_QDS(tvb, &offset, it104tree);
+					get_CP56Time(tvb, &offset, it104tree);
+					break;
+				case M_IT_TB_1: /* 37	Integrated totals with time tag CP56Time2a */
+					get_BCR(tvb, &offset, it104tree);
+					get_CP56Time(tvb, &offset, it104tree);
+					break;
+				case C_SC_NA_1: /* 45	Single command */
+					get_SCO(tvb, &offset, it104tree);
+					break;
+				case C_DC_NA_1: /* 46	Double command */
+					get_DCO(tvb, &offset, it104tree);
+					break;
+				case C_RC_NA_1: /* 47	Regulating step command */
+					get_RCO(tvb, &offset, it104tree);
+					break;
+				case C_SE_NA_1: /* 48    Set point command, normalized value */
+					get_NVAspt(tvb, &offset, it104tree);
+					get_QOS(tvb, &offset, it104tree);
+					break;
+				case C_SE_NB_1: /* 49    Set point command, scaled value */
+					get_SVAspt(tvb, &offset, it104tree);
+					get_QOS(tvb, &offset, it104tree);
+					break;
+				case C_SE_NC_1: /* 50    Set point command, short floating point value */
+					get_FLTspt(tvb, &offset, it104tree);
+					get_QOS(tvb, &offset, it104tree);
+					break;
+				case C_BO_NA_1: /* 51    Bitstring of 32 bits */
+					get_BSIspt(tvb, &offset, it104tree);
+					break;
+				case C_SC_TA_1: /* 58    Single command with time tag CP56Time2a */
+					get_SCO(tvb, &offset, it104tree);
+					get_CP56Time(tvb, &offset, it104tree);
+					break;
+				case C_DC_TA_1: /* 59    Double command with time tag CP56Time2a */
+					get_DCO(tvb, &offset, it104tree);
+					get_CP56Time(tvb, &offset, it104tree);
+					break;
+				case C_RC_TA_1: /* 60    Regulating step command with time tag CP56Time2a */
+					get_RCO(tvb, &offset, it104tree);
+					get_CP56Time(tvb, &offset, it104tree);
+					break;
+				case C_SE_TA_1: /* 61    Set point command, normalized value with time tag CP56Time2a */
+					get_NVAspt(tvb, &offset, it104tree);
+					get_QOS(tvb, &offset, it104tree);
+					get_CP56Time(tvb, &offset, it104tree);
+					break;
+				case C_SE_TB_1: /* 62    Set point command, scaled value with time tag CP56Time2a */
+					get_SVAspt(tvb, &offset, it104tree);
+					get_QOS(tvb, &offset, it104tree);
+					get_CP56Time(tvb, &offset, it104tree);
+					break;
+				case C_SE_TC_1: /* 63    Set point command, short floating point value with time tag CP56Time2a */
+					get_FLTspt(tvb, &offset, it104tree);
+					get_QOS(tvb, &offset, it104tree);
+					get_CP56Time(tvb, &offset, it104tree);
+					break;
+				case C_BO_TA_1: /* 64    Bitstring of 32 bits with time tag CP56Time2a */
+					get_BSIspt(tvb, &offset, it104tree);
+					get_CP56Time(tvb, &offset, it104tree);
+					break;
+				case M_EI_NA_1: /* 70    End of initialization  */
+					get_COI(tvb, &offset, it104tree);
+					break;
+				case C_IC_NA_1: /* 100   Interrogation command  */
+					get_QOI(tvb, &offset, it104tree);
+					break;
+				case C_CS_NA_1: /* 103   Clock synchronization command  */
+					get_CP56Time(tvb, &offset, it104tree);
+					break;
+				case C_RP_NA_1: /* 105   reset process command  */
+					get_QRP(tvb, &offset, it104tree);
+					break;
+				case C_TS_TA_1: /* 107   test command with time tag CP56Time2a */
+					get_TSC(tvb, &offset, it104tree);
+					get_CP56Time(tvb, &offset, it104tree);
+					break;					
+				case P_ME_NA_1: /* 110   Parameter of measured value, normalized value */
+					get_NVA(tvb, &offset, it104tree);
+					get_QPM(tvb, &offset, it104tree);
+					break;
+				case P_ME_NB_1: /* 111   Parameter of measured value, scaled value */
+					get_SVA(tvb, &offset, it104tree);
+					get_QPM(tvb, &offset, it104tree);
+					break;
+				case P_ME_NC_1: /* 112   Parameter of measured value, short floating-point number */
+					get_FLT(tvb, &offset, it104tree);
+					get_QPM(tvb, &offset, it104tree);
+					break;
+				default:
+					break;
+			} /* end 'switch (asduh.TypeId)' */
+
+			get_CSQ(tvb, &offset, it104tree);        //  4 byte
+			get_USR(tvb, &offset, it104tree, NULL);  //  2 byte 
+			get_MAC(tvb, &offset, it104tree, 16);    // 16 byte 
+
 			break;
 
 		case S_ER_NA_1: /* 87 authentication error */
@@ -2358,8 +2593,6 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 			get_ELN(tvb, &offset, it104tree, &asdu_secure.ELN);
 			if (asdu_secure.ELN > 0)
 				get_ETEXT(tvb, &offset, it104tree, asdu_secure.ELN);			
-			
-			offset = Len;
 			
 			break;
 			
