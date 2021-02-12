@@ -5405,6 +5405,11 @@ static int hf_ieee80211_tag_no_bssid_capability_dmg_bss_control = -1;
 static int hf_ieee80211_tag_no_bssid_capability_dmg_bss_control_type = -1;
 static int hf_ieee80211_tag_no_bssid_capability_dmg_bss_control_reserved = -1;
 
+/* IEEE Std 802.11-2016: 9.4.2.74 */
+static int hf_ieee80211_tag_multiple_bssid_index_bssid_index = -1;
+static int hf_ieee80211_tag_multiple_bssid_index_dtim_period = -1;
+static int hf_ieee80211_tag_multiple_bssid_index_dtim_count = -1;
+
 /* IEEE Std 802.11-2012: 8.4.2.61 */
 static int hf_ieee80211_tag_obss_spd = -1;
 static int hf_ieee80211_tag_obss_sad = -1;
@@ -18209,6 +18214,27 @@ dissect_ssid_list(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void*
     proto_tree_add_item(entry, hf_ieee80211_tag_ssid, tvb, offset, len,
                         ENC_ASCII|ENC_NA);
     offset += len;
+  }
+
+  return tvb_captured_length(tvb);
+}
+
+static int
+dissect_multiple_bssid_index(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void* data _U_)
+{
+  int tag_len = tvb_reported_length(tvb);
+  int offset = 0;
+
+  proto_tree_add_item(tree, hf_ieee80211_tag_multiple_bssid_index_bssid_index, tvb, offset, 1, ENC_NA);
+  offset += 1;
+  tag_len -= 1;
+
+  if (tag_len) {
+    proto_tree_add_item(tree, hf_ieee80211_tag_multiple_bssid_index_dtim_period, tvb, offset, 1, ENC_NA);
+    offset += 1;
+
+    proto_tree_add_item(tree, hf_ieee80211_tag_multiple_bssid_index_dtim_count, tvb, offset, 1, ENC_NA);
+    offset += 1;
   }
 
   return tvb_captured_length(tvb);
@@ -45317,6 +45343,19 @@ proto_register_ieee80211(void)
      {"Reserved", "wlan.no_bssid_capability.dmg_bss_control.reserved",
       FT_UINT8, BASE_DEC, NULL, 0xFC, NULL, HFILL }},
 
+    /* Multiple BSSID Index */
+    {&hf_ieee80211_tag_multiple_bssid_index_bssid_index,
+     {"BSSID Index", "wlan.multiple_bssid_index.bssid_index",
+      FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
+
+    {&hf_ieee80211_tag_multiple_bssid_index_dtim_period,
+     {"DTIM Period", "wlan.multiple_bssid_index.dtim_period",
+      FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
+
+    {&hf_ieee80211_tag_multiple_bssid_index_dtim_count,
+     {"DTIM Count", "wlan.multiple_bssid_index.dtim_count",
+      FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }},
+
     /* WAPI Parameter Set*/
     {&hf_ieee80211_tag_wapi_param_set_version,
      {"Version", "wlan.wapi.version",
@@ -48430,6 +48469,7 @@ proto_reg_handoff_ieee80211(void)
   dissector_add_uint("wlan.tag.number", TAG_MMIE, create_dissector_handle(dissect_mmie, -1));
   dissector_add_uint("wlan.tag.number", TAG_NO_BSSID_CAPABILITY, create_dissector_handle(dissect_no_bssid_capability, -1));
   dissector_add_uint("wlan.tag.number", TAG_SSID_LIST, create_dissector_handle(dissect_ssid_list, -1));
+  dissector_add_uint("wlan.tag.number", TAG_MULTIPLE_BSSID_INDEX, create_dissector_handle(dissect_multiple_bssid_index, -1));
   dissector_add_uint("wlan.tag.number", TAG_TIME_ZONE, create_dissector_handle(dissect_time_zone, -1));
   dissector_add_uint("wlan.tag.number", TAG_TIMEOUT_INTERVAL, create_dissector_handle(dissect_timeout_interval, -1));
   dissector_add_uint("wlan.tag.number", TAG_RIC_DATA, create_dissector_handle(dissect_ric_data, -1));
