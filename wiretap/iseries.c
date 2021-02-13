@@ -194,6 +194,10 @@ static int iseries_UNICODE_to_ASCII (guint8 * buf, guint bytes);
 static gboolean iseries_parse_hex_string (const char * ascii, guint8 * buf,
                                           size_t len);
 
+static int iseries_file_type_subtype = -1;
+
+void register_iseries(void);
+
 /*
  * XXX - it would probably be cleaner to use a UCS-2 flavor of file_gets(),
  * rather than file_gets(), if we're reading a UCS-2 file.
@@ -240,7 +244,7 @@ iseries_open (wtap * wth, int *err, gchar ** err_info)
           }
 
         wth->file_encap        = WTAP_ENCAP_ETHERNET;
-        wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_ISERIES;
+        wth->file_type_subtype = iseries_file_type_subtype;
         wth->snapshot_length   = 0;
         wth->subtype_read      = iseries_read;
         wth->subtype_seek_read = iseries_seek_read;
@@ -289,7 +293,7 @@ iseries_open (wtap * wth, int *err, gchar ** err_info)
               }
 
             wth->file_encap        = WTAP_ENCAP_ETHERNET;
-            wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_ISERIES;
+            wth->file_type_subtype = iseries_file_type_subtype;
             wth->snapshot_length   = 0;
             wth->subtype_read      = iseries_read;
             wth->subtype_seek_read = iseries_seek_read;
@@ -1045,6 +1049,18 @@ iseries_parse_hex_string (const char * ascii, guint8 * buf, size_t len)
       byte++;
     }
   return TRUE;
+}
+
+static const struct file_type_subtype_info iseries_info = {
+  "IBM iSeries comm. trace", "iseries", "txt", NULL,
+  FALSE, FALSE, 0,
+  NULL, NULL, NULL
+};
+
+void register_iseries(void)
+{
+  iseries_file_type_subtype = wtap_register_file_type_subtypes(&iseries_info,
+                                                               WTAP_FILE_TYPE_SUBTYPE_UNKNOWN);
 }
 
 /*
