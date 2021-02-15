@@ -70,6 +70,7 @@ Kerberos SPAKE
 O-RAN fronthaul UC-plane (O-RAN)
 PDU Transport Protocol
 State Synchronization Protocol (SSyncP)
+WS-Discovery
 --
 
 === Updated Protocol Support
