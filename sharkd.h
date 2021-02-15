@@ -25,6 +25,8 @@
 #define SHARKD_MODE_GOLD_CONSOLE       3
 #define SHARKD_MODE_GOLD_DAEMON        4
 
+#define SHARKD_API_VERSION             1
+
 typedef void (*sharkd_dissect_func_t)(epan_dissect_t *edt, proto_tree *tree, struct epan_column_info *cinfo, const GSList *data_src, void *data);
 
 /* sharkd.c */

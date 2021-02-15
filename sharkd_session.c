@@ -80,6 +80,9 @@ struct sharkd_filter_item
 
 static GHashTable *filter_table = NULL;
 
+static int session_version = 0;  // default to Classic
+static char session_userid[32];
+static char session_agent[128];
 static int mode;
 gboolean extended_log = FALSE;
 
@@ -172,13 +175,30 @@ sharkd_json_array_close(void)
 }
 
 static void
-sharkd_json_simple_reply(int err, const char *errmsg)
+sharkd_json_simple_reply(int err, const char* errmsg)
 {
 	json_dumper_begin_object(&dumper);
 	sharkd_json_value_anyf("err", "%d", err);
 	if (errmsg)
 		sharkd_json_value_string("errmsg", errmsg);
 
+	json_dumper_end_object(&dumper);
+	json_dumper_finish(&dumper);
+}
+
+static void
+sharkd_json_error_preamble(int rspcode, int subcode, const char* msg)
+{
+	json_dumper_begin_object(&dumper);
+	sharkd_json_value_anyf("rspcode", "%d", rspcode);
+	sharkd_json_value_anyf("subcode", "%d", subcode);
+	sharkd_json_value_string("msg", msg);
+}
+
+static void
+sharkd_json_error_only(int rspcode, int subcode, const char* msg)
+{
+	sharkd_json_error_preamble(rspcode, subcode, msg);
 	json_dumper_end_object(&dumper);
 	json_dumper_finish(&dumper);
 }
@@ -4139,6 +4159,79 @@ sharkd_session_process_download(char *buf, const jsmntok_t *tokens, int count)
 	}
 }
 
+/**
+ * sharkd_session_process_session()
+ *
+ * Process session request
+ *
+ * Input:
+ *   (m) version - api version
+ *   (o) userid  - user identifier
+ *   (o) agent   - client type
+ *
+ *   version 0 = Classic dialect (original behaviour defined by Jakub)
+ *
+ * Output object with attributes:
+ *   (m) rspcode - 200 - success
+ *   (m) subcode - 0 - success
+ *   (m) message - OK - success
+ */
+static void
+sharkd_session_process_session(char* buf, const jsmntok_t* tokens, int count)
+{
+	const char* tok_version = json_find_attr(buf, tokens, count, "version");
+	const char* tok_userid = json_find_attr(buf, tokens, count, "userid");
+	const char* tok_agent = json_find_attr(buf, tokens, count, "agent");
+
+	frame_data* fdata;
+
+	if (!tok_version || !ws_strtou32(tok_version, NULL, &session_version))
+	{
+		sharkd_json_error_only(400, 1001, "Session version format must be a positive integer");
+		return;
+	}
+
+	if (session_version > SHARKD_API_VERSION)
+	{
+		sharkd_json_error_only(422, 1002, "Session version unsupported");
+		return;
+	}
+
+	if (strlen(tok_userid) > sizeof(session_userid))
+	{
+		sharkd_json_error_only(413, 1003, "Session userid is too long");
+		return;
+	}
+	else
+	{
+		if (!g_ascii_isalpha(tok_userid[0]))
+		{
+			sharkd_json_error_only(400, 1005, "Session userid must start with an alphabetic character");
+			return;
+		}
+		else
+			strncpy(session_userid, tok_userid, sizeof(session_userid));
+	}
+
+	if (strlen(tok_agent) > sizeof(session_agent))
+	{
+		sharkd_json_error_only(413, 1004, "Session agent is too long");
+		return;
+	}
+	else
+	{
+		if (!g_ascii_isalpha(tok_agent[0]))
+		{
+			sharkd_json_error_only(400, 1006, "Session agent must start with an alphabetic character");
+			return;
+		}
+		else
+			strncpy(session_agent, tok_agent, sizeof(session_agent));
+	}
+
+	sharkd_json_error_only(200, 0, "OK");
+}
+
 static void
 sharkd_session_process(char *buf, const jsmntok_t *tokens, int count)
 {
@@ -4227,6 +4320,8 @@ sharkd_session_process(char *buf, const jsmntok_t *tokens, int count)
 			sharkd_session_process_dumpconf(buf, tokens, count);
 		else if (!strcmp(tok_req, "download"))
 			sharkd_session_process_download(buf, tokens, count);
+		else if (!strcmp(tok_req, "session"))
+			sharkd_session_process_session(buf, tokens, count);
 		else if (!strcmp(tok_req, "bye"))
 			exit(0);
 		else
