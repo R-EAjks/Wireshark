@@ -14,6 +14,8 @@
 
 #include <file.h>
 
+#define SHARKD_JSONRPC_VERSION         "2.0"
+
 #define SHARKD_DISSECT_FLAG_NULL       0x00u
 #define SHARKD_DISSECT_FLAG_BYTES      0x01u
 #define SHARKD_DISSECT_FLAG_COLUMNS    0x02u
