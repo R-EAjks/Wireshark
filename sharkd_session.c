@@ -80,12 +80,10 @@ struct sharkd_filter_item
 
 static GHashTable *filter_table = NULL;
 
-static char session_userid[33];
-static char session_agent[129];
 static int mode;
 gboolean extended_log = FALSE;
-int rpcid;
-char msgbuf[1024];
+guint32 rpcid;
+char msgbuf[1024];  // buffer used to construct the message that's carried in the error object of a response
 
 static json_dumper dumper = {0};
 
@@ -177,7 +175,7 @@ sharkd_json_array_close(void)
 }
 
 static void
-sharkd_json_result_prologue(int id)
+sharkd_json_result_prologue(guint32 id)
 {
 	json_dumper_begin_object(&dumper);  // start the message
 	sharkd_json_value_string("jsonrpc", SHARKD_JSONRPC_VERSION);
@@ -197,7 +195,7 @@ sharkd_json_result_epilogue()
 }
 
 static void
-sharkd_json_result_array_prologue(int id)
+sharkd_json_result_array_prologue(guint32 id)
 {
 	json_dumper_begin_object(&dumper);  // start the message
 	sharkd_json_value_string("jsonrpc", SHARKD_JSONRPC_VERSION);
@@ -216,7 +214,7 @@ sharkd_json_result_array_epilogue()
 }
 
 static void
-sharkd_json_simple_ok(int id)
+sharkd_json_simple_ok(guint32 id)
 {
 	sharkd_json_result_prologue(id);
 	sharkd_json_value_string("status", "OK");
@@ -224,7 +222,7 @@ sharkd_json_simple_ok(int id)
 }
 
 static void
-sharkd_json_warning(int id, char *warning)
+sharkd_json_warning(guint32 id, char *warning)
 {
 	sharkd_json_result_prologue(id);
 	sharkd_json_value_string("status", "Warning");
@@ -233,7 +231,7 @@ sharkd_json_warning(int id, char *warning)
 }
 
 static void
-sharkd_json_error(int code, const char* msg, int id, char* data)
+sharkd_json_error(int code, const char* msg, guint32 id, char* data)
 {
 	json_dumper_begin_object(&dumper);
 		sharkd_json_value_string("jsonrpc", SHARKD_JSONRPC_VERSION);
@@ -527,7 +525,7 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 					}
 					else if (name_array[j].type == JSMN_PRIMITIVE && name_array[j].value_type == SHARKD_JSON_UINTEGER)
 					{
-						int temp;
+						guint32 temp;
 						if (!ws_strtou32(&buf[tokens[i + 1].start], NULL, &temp) || temp <= 0)
 						{
 							g_snprintf(msgbuf, sizeof(msgbuf), "The value for %s must be a positive integer", name_array[j].name);
@@ -537,9 +535,9 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 					}
 					else if (name_array[j].type == JSMN_PRIMITIVE && name_array[j].value_type == SHARKD_JSON_BOOLEAN)
 					{
-						if (!strcmpi(&buf[tokens[i + 1].start], "true") && !strcmpi(&buf[tokens[i + 1].start], "false"))
+						if (!strcmp(&buf[tokens[i + 1].start], "true") && !strcmp(&buf[tokens[i + 1].start], "false"))
 						{
-							g_snprintf(msgbuf, sizeof(msgbuf), "The value for %s must be a boolean", name_array[j].name);
+							g_snprintf(msgbuf, sizeof(msgbuf), "The value for %s must be a boolean (true or false)", name_array[j].name);
 							sharkd_json_error(-32600, msgbuf, rpcid, NULL);
 							return FALSE;
 						}
@@ -2653,7 +2651,7 @@ sharkd_session_process_tap(char *buf, const jsmntok_t *tokens, int count)
 			{
 				g_snprintf(msgbuf, sizeof(msgbuf), "sharkd_session_process_tap() stat %s not found", tok_tap + 5);
 				sharkd_json_error(-11001, msgbuf, rpcid, NULL);
-				return -11001;
+				return;
 			}
 
 			st = stats_tree_new(cfg, NULL, tap_filter);
@@ -2691,7 +2689,7 @@ sharkd_session_process_tap(char *buf, const jsmntok_t *tokens, int count)
 			{
 				g_snprintf(msgbuf, sizeof(msgbuf), "sharkd_session_process_tap() seq analysis %s not found", tok_tap + 5);
 				sharkd_json_error(-11002, msgbuf, rpcid, NULL);
-				return -11002;
+				return;
 			}
 
 			graph_analysis = sequence_analysis_info_new();
@@ -2723,7 +2721,7 @@ sharkd_session_process_tap(char *buf, const jsmntok_t *tokens, int count)
 				{
 					g_snprintf(msgbuf, sizeof(msgbuf), "sharkd_session_process_tap() conv %s not found", tok_tap + 5);
 					sharkd_json_error(-11003, msgbuf, rpcid, NULL);
-					return -11003;
+					return;
 				}
 			}
 			else if (!strncmp(tok_tap, "endpt:", 6))
@@ -2734,14 +2732,14 @@ sharkd_session_process_tap(char *buf, const jsmntok_t *tokens, int count)
 				{
 					g_snprintf(msgbuf, sizeof(msgbuf), "sharkd_session_process_tap() endpt %s not found", tok_tap + 6);
 					sharkd_json_error(-11004, msgbuf, rpcid, NULL);
-					return -11004;
+					return;
 				}
 			}
 			else
 			{
 				g_snprintf(msgbuf, sizeof(msgbuf), "sharkd_session_process_tap() conv/endpt(?): %s not found", tok_tap);
 				sharkd_json_error(-11005, msgbuf, rpcid, NULL);
-				return -11005;
+				return;
 			}
 
 			ct_tapname = proto_get_protocol_filter_name(get_conversation_proto_id(ct));
@@ -2768,7 +2766,7 @@ sharkd_session_process_tap(char *buf, const jsmntok_t *tokens, int count)
 			{
 				g_snprintf(msgbuf, sizeof(msgbuf), "sharkd_session_process_tap() nstat=%s not found", tok_tap + 6);
 				sharkd_json_error(-11006, msgbuf, rpcid, NULL);
-				return -11006;
+				return;
 			}
 
 			stat_tap->stat_tap_init_cb(stat_tap);
@@ -2792,7 +2790,7 @@ sharkd_session_process_tap(char *buf, const jsmntok_t *tokens, int count)
 			{
 				g_snprintf(msgbuf, sizeof(msgbuf), "sharkd_session_process_tap() rtd=%s not found", tok_tap + 4);
 				sharkd_json_error(-11007, msgbuf, rpcid, NULL);
-				return -11007;
+				return;
 			}
 
 			rtd_table_get_filter(rtd, "", &tap_filter, &err);
@@ -2801,7 +2799,7 @@ sharkd_session_process_tap(char *buf, const jsmntok_t *tokens, int count)
 				g_snprintf(msgbuf, sizeof(msgbuf), "sharkd_session_process_tap() rtd=%s err=%s", tok_tap + 4, err);
 				sharkd_json_error(-11008, msgbuf, rpcid, NULL);
 				g_free(err);
-				return -11008;
+				return;
 			}
 
 			rtd_data = g_new0(rtd_data_t, 1);
@@ -2823,7 +2821,7 @@ sharkd_session_process_tap(char *buf, const jsmntok_t *tokens, int count)
 			{
 				g_snprintf(msgbuf, sizeof(msgbuf), "sharkd_session_process_tap() srt=%s not found", tok_tap + 4);
 				sharkd_json_error(-11009, msgbuf, rpcid, NULL);
-				return -11009;
+				return;
 			}
 
 			srt_table_get_filter(srt, "", &tap_filter, &err);
@@ -2832,7 +2830,7 @@ sharkd_session_process_tap(char *buf, const jsmntok_t *tokens, int count)
 				g_snprintf(msgbuf, sizeof(msgbuf), "sharkd_session_process_tap() srt=%s err=%s", tok_tap + 4, err);
 				sharkd_json_error(-11010, msgbuf, rpcid, NULL);
 				g_free(err);
-				return -11010;
+				return;
 			}
 
 			srt_data = g_new0(srt_data_t, 1);
@@ -2855,7 +2853,7 @@ sharkd_session_process_tap(char *buf, const jsmntok_t *tokens, int count)
 			{
 				g_snprintf(msgbuf, sizeof(msgbuf), "sharkd_session_process_tap() eo=%s not found", tok_tap + 3);
 				sharkd_json_error(-11011, msgbuf, rpcid, NULL);
-				return -11011;
+				return;
 			}
 
 			for (object_list = sharkd_eo_list; object_list; object_list = object_list->next)
@@ -2920,7 +2918,7 @@ sharkd_session_process_tap(char *buf, const jsmntok_t *tokens, int count)
 		{
 			g_snprintf(msgbuf, sizeof(msgbuf), "sharkd_session_process_tap() %s not recognized", tok_tap);
 			sharkd_json_error(-11012, msgbuf, rpcid, NULL);
-			return -11012;
+			return;
 		}
 
 		if (tap_error)
@@ -2930,7 +2928,7 @@ sharkd_session_process_tap(char *buf, const jsmntok_t *tokens, int count)
 			g_string_free(tap_error, TRUE);
 			if (tap_free)
 				tap_free(tap_data);
-			return -11013;
+			return;
 		}
 
 		taps_data[taps_count] = tap_data;
@@ -3005,7 +3003,7 @@ sharkd_session_process_follow(char *buf, const jsmntok_t *tokens, int count)
 	{
 		g_snprintf(msgbuf, sizeof(msgbuf), "sharkd_session_process_follow() follower=%s not found", tok_follow);
 		sharkd_json_error(-12001, msgbuf, rpcid, NULL);
-		return -12001;
+		return;
 	}
 
 	/* follow_reset_stream ? */
@@ -3019,7 +3017,7 @@ sharkd_session_process_follow(char *buf, const jsmntok_t *tokens, int count)
 		sharkd_json_error(-12001, msgbuf, rpcid, NULL);
 		g_string_free(tap_error, TRUE);
 		g_free(follow_info);
-		return -12001;
+		return;
 	}
 
 	sharkd_retap();
@@ -3517,7 +3515,7 @@ sharkd_session_process_iograph(char *buf, const jsmntok_t *tokens, int count)
 		{
 			sharkd_json_error(-6001, graph->error->str, rpcid, NULL);
 			g_string_free(graph->error, TRUE);
-			return -6001;
+			return;
 		}
 
 		if (graph->error == NULL)
@@ -3633,7 +3631,7 @@ sharkd_session_process_intervals(char *buf, const jsmntok_t *tokens, int count)
 		{
 			g_snprintf(msgbuf, sizeof(msgbuf), "Invalid filter parameter: %s", tok_filter);
 			sharkd_json_error(-7001, msgbuf, rpcid, NULL);
-			return -7001;
+			return;
 		}
 		filter_data = filter_item->filtered;
 	}
@@ -3765,7 +3763,7 @@ sharkd_session_process_frame(char *buf, const jsmntok_t *tokens, int count)
 		if (ref_frame_num > framenum)
 		{
 			sharkd_json_error(-8001, "Invalid ref_frame - The ref_frame occurs after the frame specified", rpcid, NULL);
-			return -8001;
+			return;
 		}
 	}
 
@@ -3776,7 +3774,7 @@ sharkd_session_process_frame(char *buf, const jsmntok_t *tokens, int count)
 		if (prev_dis_num >= framenum)
 		{
 			sharkd_json_error(-8002, "Invalid prev_frame - The prev_frame occurs on or after the frame specified", rpcid, NULL);
-			return -8002;
+			return;
 		}
 	}
 
@@ -3794,7 +3792,7 @@ sharkd_session_process_frame(char *buf, const jsmntok_t *tokens, int count)
 	if (sharkd_dissect_request(framenum, ref_frame_num, prev_dis_num, &sharkd_session_process_frame_cb, dissect_flags, &req_data))
 	{
 		sharkd_json_error(-8003, "Invalid frame - The frame number requested is out of range", rpcid, NULL);
-		return -8003;
+		return;
 	}
 }
 
@@ -3838,7 +3836,7 @@ sharkd_session_process_check(char *buf, const jsmntok_t *tokens, int count)
 		{
 			g_snprintf(msgbuf, sizeof(msgbuf), "Filter invalid - %s", err_msg);
 			sharkd_json_error(-5001, msgbuf, rpcid, NULL);
-			return -5001;
+			return;
 		}
 	}
 
@@ -3850,7 +3848,7 @@ sharkd_session_process_check(char *buf, const jsmntok_t *tokens, int count)
 		{
 			g_snprintf(msgbuf, sizeof(msgbuf), "Field %s not found", tok_field);
 			sharkd_json_error(-5002, msgbuf, rpcid, NULL);
-			return -5002;
+			return;
 		}
 		else
 		{
@@ -4327,7 +4325,7 @@ sharkd_session_process_dumpconf(char *buf, const jsmntok_t *tokens, int count)
 		{
 			g_snprintf(msgbuf, sizeof(msgbuf), "Invalid pref %s.", tok_pref);
 			sharkd_json_error(-9001, msgbuf, rpcid, NULL);
-			return -9001;
+			return;
 		}
 
 	}
@@ -4613,7 +4611,7 @@ sharkd_session_process_download(char *buf, const jsmntok_t *tokens, int count)
 		memset(&rtp_req, 0, sizeof(rtp_req));
 		if (!sharkd_rtp_match_init(&rtp_req.id, tok_token + 4))
 		{
-			sprintf(msgbuf, "sharkd_session_process_download() rtp tokenizing error %s", tok_token);
+			g_snprintf(msgbuf, sizeof(msgbuf), "sharkd_session_process_download() rtp tokenizing error %s", tok_token);
 			sharkd_json_error(-10001, msgbuf, rpcid, NULL);
 			return;
 		}
@@ -4621,7 +4619,7 @@ sharkd_session_process_download(char *buf, const jsmntok_t *tokens, int count)
 		tap_error = register_tap_listener("rtp", &rtp_req, NULL, 0, NULL, sharkd_session_packet_download_tap_rtp_cb, NULL, NULL);
 		if (tap_error)
 		{
-			sprintf(msgbuf, "sharkd_session_process_download() rtp error %s", tap_error->str);
+			g_snprintf(msgbuf, sizeof(msgbuf), "sharkd_session_process_download() rtp error %s", tap_error->str);
 			sharkd_json_error(-10002, msgbuf, rpcid, NULL);
 			g_string_free(tap_error, TRUE);
 			return;
