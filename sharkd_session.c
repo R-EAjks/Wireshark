@@ -4699,7 +4699,7 @@ sharkd_session_process(char *buf, const jsmntok_t *tokens, int count)
 		}
 		else
 		{
-			sprintf(msgbuf, "The method \"%s\" is unknown", tok_method);
+			g_snprintf(msgbuf, sizeof(msgbuf), "The method \"%s\" is unknown", tok_method);
 			sharkd_json_error(-32601, msgbuf, rpcid, NULL);
 		}
 	}
