@@ -6,6 +6,14 @@
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
+if(DEFINED ENV{FORCE_CMAKE_NINJA_NON_VERBOSE})
+	#
+	# Forcibly unset CMAKE_VERBOSE_MAKEFILE,
+	# to make *CERTAIN* that we don't do
+	# anything verbose here!
+	#
+	unset(CMAKE_VERBOSE_MAKEFILE CACHE)
+endif()
 
 if(WIN32)
 	# Needed for add_custom_command() WORKING_DIRECTORY generator expressions
@@ -435,6 +443,12 @@ if( CMAKE_C_COMPILER_ID MATCHES "MSVC")
 	set(WIRESHARK_COMMON_FLAGS /Qspectre)
 
 	if(ENABLE_CODE_ANALYSIS)
+		# We should probably add a code_analysis.props file and use it to set
+		# CAExcludePath, otherwise we trigger on Qt's headers:
+		# https://stackoverflow.com/questions/59669026/how-to-add-property-to-affect-code-analysis-in-cmake
+		# https://gitlab.kitware.com/cmake/cmake/-/issues/19682
+		# For now, we set CAExcludePath=C:\Qt;%include% in the Visual Studio
+		# Code Analys builder's environment.
 		list(APPEND LOCAL_CFLAGS /analyze:WX-)
 	endif()
 
@@ -3035,9 +3049,6 @@ if(RPMBUILD_EXECUTABLE)
 	endforeach()
 
 	set(_rpmbuild_with_args)
-	if(CMAKE_VERBOSE_MAKEFILE)
-		list(APPEND _rpmbuild_with_args -v)
-	endif()
 	#
 	# This is ugly.
 	#
@@ -3090,6 +3101,10 @@ if(RPMBUILD_EXECUTABLE)
 				NON_VERBOSE_CMAKE_BUILD_VALUE
 				${CMAKE_BUILD_VALUE})
 			list(APPEND _rpmbuild_with_args --define "cmake_build ${NON_VERBOSE_CMAKE_BUILD_VALUE}")
+		endif()
+	else()
+		if(CMAKE_VERBOSE_MAKEFILE)
+			list(APPEND _rpmbuild_with_args -v)
 		endif()
 	endif()
 	if(CMAKE_GENERATOR STREQUAL "Ninja")
