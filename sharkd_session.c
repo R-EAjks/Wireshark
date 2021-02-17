@@ -3836,7 +3836,7 @@ sharkd_session_process_check(char *buf, const jsmntok_t *tokens, int count)
 		{
 			g_snprintf(msgbuf, sizeof(msgbuf), "Filter invalid - %s", err_msg);
 			sharkd_json_error(-5001, msgbuf, rpcid, NULL);
-			return;
+			return -5001;
 		}
 	}
 
@@ -3848,7 +3848,7 @@ sharkd_session_process_check(char *buf, const jsmntok_t *tokens, int count)
 		{
 			g_snprintf(msgbuf, sizeof(msgbuf), "Field %s not found", tok_field);
 			sharkd_json_error(-5002, msgbuf, rpcid, NULL);
-			return;
+			return -5002;
 		}
 		else
 		{
