@@ -3246,6 +3246,15 @@ test_someip(packet_info *pinfo _U_, tvbuff_t *tvb, int offset _U_, void *data _U
     if (!try_val_to_str((tvb_get_guint8(tvb, 14) & ~SOMEIP_MSGTYPE_TP_MASK), someip_msg_type)) {
         return FALSE;
     }
+    /* Assume no frafments for UDP */
+    if (pinfo->ptype == PT_UDP) {
+        /* Get messge length */
+        guint32 len = tvb_get_ntohl(tvb, 4);
+        guint32 pkt_len = (guint32)tvb_reported_length(tvb);
+        if (len + SOMEIP_HDR_PART1_LEN > pkt_len) {
+            return FALSE;
+        }
+    }
 
     return TRUE;
 }
