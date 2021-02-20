@@ -12,6 +12,7 @@
 #include "config.h"
 
 #include <epan/packet.h>
+#include <epan/wmem/wmem.h>
 
 #include <wiretap/wtap.h>
 
@@ -87,6 +88,10 @@ dissect_netmon_802_11(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void 
   gint        calc_channel;
   gint32      rssi;
   guint8      rate;
+
+  if (NULL == phdr) {
+    phdr = wmem_new0(wmem_packet_scope(), struct ieee_802_11_phdr);
+  }
 
   col_set_str(pinfo->cinfo, COL_PROTOCOL, "WLAN");
   col_clear(pinfo->cinfo, COL_INFO);
