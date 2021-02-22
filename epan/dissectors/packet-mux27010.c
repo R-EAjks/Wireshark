@@ -566,9 +566,9 @@ getFrameLength(tvbuff_t *tvb, proto_tree *field_tree, int offset, guint16* lengt
         return 1;
     }
 
-    /*If E/A = 0 the length of the info field is >127*/
-    proto_tree_add_item(field_tree, hf_mux27010_lengthframesize_ea, tvb, offset, 2, ENC_BIG_ENDIAN);
-    *length_info = (tvb_get_ntohs(tvb, offset) & MUX27010_FRAMESIZE_LENGTH_FLAG_EA) >> 1; /*Shift because of EA bit*/
+    /*If E/A = 0 the length of the info field is >127; first octet stores LSB bits, second octet MSB -> LITTLE ENDIAN stuffing*/
+    proto_tree_add_item(field_tree, hf_mux27010_lengthframesize_ea, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    *length_info = (tvb_get_letohs(tvb, offset) & MUX27010_FRAMESIZE_LENGTH_FLAG_EA) >> 1; /*Shift because of EA bit*/
 
     return 2;
 }
