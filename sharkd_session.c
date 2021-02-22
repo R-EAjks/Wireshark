@@ -172,15 +172,51 @@ sharkd_json_array_close(void)
 }
 
 static void
-sharkd_json_simple_reply(int err, const char *errmsg)
+sharkd_json_response_close(void)
 {
+	json_dumper_finish(&dumper);
+
+	/*
+	 * We do an explicit fflush after every line, because
+	 * we want output to be written to the socket as soon
+	 * as the line is complete.
+	 *
+	 * The stream is fully-buffered by default, so it's
+	 * only flushed when the buffer fills or the FILE *
+	 * is closed.  On UN*X, we could set it to be line
+	 * buffered, but the MSVC standard I/O routines don't
+	 * support line buffering - they only support *byte*
+	 * buffering, doing a write for every byte written,
+	 * which is too inefficient, and full buffering,
+	 * which is what you get if you request line buffering.
+	 */
+	fflush(stdout);
+}
+
+static void
+sharkd_json_error(int err, char* format, ...)
+{
+	char msgbuf[512];
+
+	memset(msgbuf, 0, sizeof(msgbuf));
+
+	if (format)
+	{
+		// format the text message
+		va_list args;
+
+		va_start(args, format);
+		g_vsnprintf(msgbuf, sizeof(msgbuf), format, args);
+		va_end(args);
+	}
+
+	// now build the response
 	json_dumper_begin_object(&dumper);
 	sharkd_json_value_anyf("err", "%d", err);
-	if (errmsg)
-		sharkd_json_value_string("errmsg", errmsg);
+	if (format)
+		sharkd_json_value_string("errmsg", msgbuf);
 
 	json_dumper_end_object(&dumper);
-	json_dumper_finish(&dumper);
 }
 
 static void
@@ -551,7 +587,7 @@ sharkd_session_process_load(const char *buf, const jsmntok_t *tokens, int count)
 
 	if (sharkd_cf_open(tok_file, WTAP_TYPE_AUTO, FALSE, &err) != CF_OK)
 	{
-		sharkd_json_simple_reply(err, NULL);
+		sharkd_json_error(err, NULL);
 		return;
 	}
 
@@ -566,7 +602,7 @@ sharkd_session_process_load(const char *buf, const jsmntok_t *tokens, int count)
 	}
 	ENDTRY;
 
-	sharkd_json_simple_reply(err, NULL);
+	sharkd_json_error(err, NULL);
 }
 
 /**
@@ -3590,7 +3626,7 @@ sharkd_session_process_setcomment(char *buf, const jsmntok_t *tokens, int count)
 
 	ret = sharkd_set_user_comment(fdata, tok_comment);
 
-	sharkd_json_simple_reply(ret, NULL);
+	sharkd_json_error(ret, NULL);
 }
 
 /**
@@ -3622,7 +3658,7 @@ sharkd_session_process_setconf(char *buf, const jsmntok_t *tokens, int count)
 
 	ret = prefs_set_pref(pref, &errmsg);
 
-	sharkd_json_simple_reply(ret, errmsg);
+	sharkd_json_error(ret, errmsg);
 	g_free(errmsg);
 }
 
@@ -4230,26 +4266,11 @@ sharkd_session_process(char *buf, const jsmntok_t *tokens, int count)
 		else if (!strcmp(tok_req, "bye"))
 			exit(0);
 		else
+		{
 			fprintf(stderr, "::: req = %s\n", tok_req);
-
-		/* reply for every command are 0+ lines of JSON reply (outputed above), finished by empty new line */
-		json_dumper_finish(&dumper);
-
-		/*
-		 * We do an explicit fflush after every line, because
-		 * we want output to be written to the socket as soon
-		 * as the line is complete.
-		 *
-		 * The stream is fully-buffered by default, so it's
-		 * only flushed when the buffer fills or the FILE *
-		 * is closed.  On UN*X, we could set it to be line
-		 * buffered, but the MSVC standard I/O routines don't
-		 * support line buffering - they only support *byte*
-		 * buffering, doing a write for every byte written,
-		 * which is too inefficient, and full buffering,
-		 * which is what you get if you request line buffering.
-		 */
-		fflush(stdout);
+			sharkd_json_error(-32601, "The method %s is not supported", tok_req);
+		}
+		sharkd_json_response_close();
 	}
 }
 
