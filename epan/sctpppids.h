@@ -94,4 +94,6 @@
 #define E2_DU_PROTOCOL_ID                              72
 #define W1AP_PROTOCOL_ID                               73
 
+WS_DLL_PUBLIC value_string_ext sctpppid_val_ext;
+
 #endif /* sctpppids.h */
