@@ -494,7 +494,7 @@ static const td_asdu_length asdu_length [] = {
 	{  M_EP_TD_1,	10 },
 	{  M_EP_TE_1,	11 },
 	{  M_EP_TF_1,	11 },
-	{  S_IT_TC_1,    0 },
+	{  S_IT_TC_1,   13 },
 	{  C_SC_NA_1,	 1 },
 	{  C_DC_NA_1,	 1 },
 	{  C_RC_NA_1,	 1 },
@@ -887,6 +887,8 @@ static int hf_coi  = -1;
 static int hf_coi_r  = -1;
 static int hf_coi_i  = -1;
 static int hf_qoi  = -1;
+static int hf_qcc_rqt  = -1;
+static int hf_qcc_frz  = -1;
 static int hf_qrp  = -1;
 
 static int hf_tsc  = -1;
@@ -1400,11 +1402,22 @@ static void get_COI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*    QOI = Qualifier of interrogation                                                                 */
+/*    QOI = Qualifier of interrogation defined in 7.2.6.22                                            */
 /******************************************************************************************************/
 static void get_QOI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
 	proto_tree_add_item(iec104_header_tree, hf_qoi, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
+
+	(*offset)++;
+}
+
+/******************************************************************************************************/
+/*    QCC = Qualifier of counter interrogation defined in 7.2.6.23                                    */
+/******************************************************************************************************/
+static void get_QCC(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
+{
+	proto_tree_add_item(iec104_header_tree, hf_qcc_rqt, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
+	proto_tree_add_item(iec104_header_tree, hf_qcc_frz, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
 
 	(*offset)++;
 }
@@ -1823,6 +1836,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 		case M_IT_NA_1:
 		case M_IT_TA_1:
 		case M_IT_TB_1:
+		case S_IT_TC_1:
 		case C_SC_NA_1:
 		case C_DC_NA_1:
 		case C_RC_NA_1:
@@ -1839,6 +1853,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 		case C_BO_TA_1:
 		case M_EI_NA_1:
 		case C_IC_NA_1:
+		case C_CI_NA_1:
 		case C_CS_NA_1:
 		case C_RP_NA_1:
 		case C_TS_TA_1:
@@ -1992,6 +2007,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 		case M_IT_NA_1:
 		case M_IT_TA_1:
 		case M_IT_TB_1:
+		case S_IT_TC_1:
 		case C_SC_NA_1:
 		case C_DC_NA_1:
 		case C_RC_NA_1:
@@ -2008,6 +2024,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 		case C_BO_TA_1:
 		case M_EI_NA_1:
 		case C_IC_NA_1:
+		case C_CI_NA_1:
 		case C_CS_NA_1:
 		case C_RP_NA_1:
 		case C_TS_TA_1:
@@ -2176,6 +2193,11 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 					get_BCR(tvb, &offset, trSignal);
 					get_CP56Time(tvb, &offset, trSignal);
 					break;
+				case S_IT_TC_1: /* 41	Integrated totals containing time tagged security statistics */
+					get_AID(tvb, &offset, trSignal, NULL);
+					get_BCR(tvb, &offset, trSignal);
+					get_CP56Time(tvb, &offset, trSignal);
+					break;					
 				case C_SC_NA_1: /* 45	Single command */
 					get_SCO(tvb, &offset, trSignal);
 					break;
@@ -2236,6 +2258,9 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 					break;
 				case C_IC_NA_1: /* 100   Interrogation command  */
 					get_QOI(tvb, &offset, trSignal);
+					break;
+				case C_CI_NA_1: /* 101   Counter interrogation command  */
+					get_QCC(tvb, &offset, trSignal);
 					break;
 				case C_CS_NA_1: /* 103   Clock synchronization command  */
 					get_CP56Time(tvb, &offset, trSignal);
@@ -2486,6 +2511,11 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 					get_BCR(tvb, &offset, it104tree);
 					get_CP56Time(tvb, &offset, it104tree);
 					break;
+				case S_IT_TC_1: /* 41	Integrated totals containing time tagged security statistics */
+					get_AID(tvb, &offset, it104tree, NULL);
+					get_BCR(tvb, &offset, it104tree);
+					get_CP56Time(tvb, &offset, it104tree);
+					break;
 				case C_SC_NA_1: /* 45	Single command */
 					get_SCO(tvb, &offset, it104tree);
 					break;
@@ -2546,6 +2576,9 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 					break;
 				case C_IC_NA_1: /* 100   Interrogation command  */
 					get_QOI(tvb, &offset, it104tree);
+					break;
+				case C_CI_NA_1: /* 101   Counter interrogation command  */
+					get_QCC(tvb, &offset, it104tree);
 					break;
 				case C_CS_NA_1: /* 103   Clock synchronization command  */
 					get_CP56Time(tvb, &offset, it104tree);
@@ -3198,6 +3231,14 @@ proto_register_iec60870_asdu_sec(void)
 
 		{ &hf_qoi,
 		  { "QOI", "iec60870_asdu.qoi", FT_UINT8, BASE_DEC, VALS(qoi_r_types), 0,
+		    NULL, HFILL }},
+
+		{ &hf_qcc_rqt,
+		  { "QCC RQT", "iec60870_asdu.qcc.rqt", FT_UINT8, BASE_DEC, NULL, 0x3F,
+		    NULL, HFILL }},
+
+		{ &hf_qcc_frz,
+		  { "QCC FRZ", "iec60870_asdu.qcc.frz", FT_UINT8, BASE_DEC, NULL, 0xC0,
 		    NULL, HFILL }},
 
 		{ &hf_qrp,
