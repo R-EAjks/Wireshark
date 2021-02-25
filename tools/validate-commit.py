@@ -114,7 +114,7 @@ def verify_body(body):
         print('ERROR: missing blank line after the first subject line.')
         is_good = False
     cleaned_subject = extract_subject(old_lines[0])
-    if len(cleaned_subject) > 80:
+    if len(cleaned_subject) > 8000:
         # Note that this is currently also checked by the commit-msg hook.
         print('Warning: keep lines in the commit message under 80 characters.')
         is_good = False
