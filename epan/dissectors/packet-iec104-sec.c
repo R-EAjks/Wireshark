@@ -195,7 +195,7 @@ static const value_string u_types[] = {
 	{ 0, NULL }
 };
 
-/* ASDU types (TypeId) defined in 60870-5-101 7.2.1.1 Definition of the semantics of the values of the TYPE IDENTIFICATION field */
+/* ASDU types (TypeId) defined in 7.2.1.1 of 60870-5-101 Definition of the semantics of the values of the TYPE IDENTIFICATION field */
 
 #define M_SP_NA_1  1     /* single-point information 								*/
 #define M_SP_TA_1  2     /* single-point information with time tag 	 					*/
@@ -545,7 +545,7 @@ static const td_asdu_length asdu_length [] = {
 	{ 0, 0 }
 };
 
-/* Cause of transmission (CauseTx) defined in 60870-5-101 7.2.3 */
+/* Cause of transmission (CauseTx) defined in 7.2.3 of of IEC 60870-5-101:2003 */
 #define Per_Cyc         1
 #define Back            2
 #define Spont           3
@@ -585,7 +585,7 @@ static const td_asdu_length asdu_length [] = {
 #define Reqco3          40
 #define Reqco4          41
 
-/* Causes of transmission (CauseTx) defined in 60870-5-7 7.2.1  */
+/* Causes of transmission (CauseTx) defined in 7.2.1 of IEC 60870-5-7  */
 #define UkTypeId        44
 #define UkCauseTx       45
 #define UkComAdrASDU    46
@@ -773,6 +773,24 @@ static const value_string rsc_r_types[] = {
 	{ 0, NULL }
 };
 
+static const value_string qcc_rqt_types[] = {
+	{ 0,		"no counter requested (not used)" },
+	{ 1,		"request counter group 1" },
+	{ 2,		"request counter group 2" },
+	{ 3,		"request counter group 3" },
+	{ 4,		"request counter group 4" },
+	{ 5,		"general request counter" },
+	{ 0, NULL }
+};
+
+static const value_string qcc_frz_types[] = {
+	{ 0,		"read (no freeze or reset)" },
+	{ 1,		"counter freeze without reset (value frozen represents integrated total)" },
+	{ 2,		"counter freeze with reset (value frozen represents incremental information)" },
+	{ 3,		"counter reset" },
+	{ 0, NULL }
+};
+
 static const true_false_string tfs_blocked_not_blocked = { "Blocked", "Not blocked" };
 static const true_false_string tfs_substituted_not_substituted = { "Substituted", "Not Substituted" };
 static const true_false_string tfs_not_topical_topical = { "Not Topical", "Topical" };
@@ -887,6 +905,7 @@ static int hf_coi  = -1;
 static int hf_coi_r  = -1;
 static int hf_coi_i  = -1;
 static int hf_qoi  = -1;
+static int hf_qcc  = -1;
 static int hf_qcc_rqt  = -1;
 static int hf_qcc_frz  = -1;
 static int hf_qrp  = -1;
@@ -921,6 +940,7 @@ static gint ett_dco = -1;
 static gint ett_rco = -1;
 static gint ett_qpm = -1;
 static gint ett_coi = -1;
+static gint ett_qcc = -1;
 static gint ett_cp24time = -1;
 static gint ett_cp56time = -1;
 
@@ -1270,7 +1290,7 @@ static void get_BSIspt(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_
 }
 
 /******************************************************************************************************/
-/*    BCR = Binary counter reading                                                                     */
+/*    BCR = Binary counter reading defined in 7.2.6.9 of IEC 60870-5-101:2003                         */
 /******************************************************************************************************/
 static void get_BCR(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
@@ -1402,7 +1422,7 @@ static void get_COI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*    QOI = Qualifier of interrogation defined in 7.2.6.22                                            */
+/*    QOI = Qualifier of interrogation defined in 7.2.6.22 of IEC 60870-5-101:2003                    */
 /******************************************************************************************************/
 static void get_QOI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
@@ -1412,12 +1432,18 @@ static void get_QOI(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*    QCC = Qualifier of counter interrogation defined in 7.2.6.23                                    */
+/*    QCC = Qualifier of counter interrogation defined in 7.2.6.23 of IEC 60870-5-101:2003            */
 /******************************************************************************************************/
 static void get_QCC(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
-	proto_tree_add_item(iec104_header_tree, hf_qcc_rqt, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
-	proto_tree_add_item(iec104_header_tree, hf_qcc_frz, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
+	proto_item* ti;
+	proto_tree* qcc_tree;
+
+	ti = proto_tree_add_item(iec104_header_tree, hf_qcc, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
+	qcc_tree = proto_item_add_subtree(ti, ett_qcc);
+	
+	proto_tree_add_item(qcc_tree, hf_qcc_rqt, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
+	proto_tree_add_item(qcc_tree, hf_qcc_frz, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
 
 	(*offset)++;
 }
@@ -1467,7 +1493,7 @@ static void get_KSQ(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*    CSQ = Challeng sequence number defined in 7.2.2.2 of IEC/TS 62351-5:2013         
+/*    CSQ = Challeng sequence number defined in 7.2.2.2 of IEC/TS 62351-5:2013
 
       Stations shall use this value to match replies with challenges as described in 7.3.3.3.
 */
@@ -3233,13 +3259,17 @@ proto_register_iec60870_asdu_sec(void)
 		  { "QOI", "iec60870_asdu.qoi", FT_UINT8, BASE_DEC, VALS(qoi_r_types), 0,
 		    NULL, HFILL }},
 
-		{ &hf_qcc_rqt,
-		  { "QCC RQT", "iec60870_asdu.qcc.rqt", FT_UINT8, BASE_DEC, NULL, 0x3F,
+		{ &hf_qcc,
+		  { "QCC", "iec60870_asdu.qcc", FT_UINT8, BASE_HEX, NULL, 0,
 		    NULL, HFILL }},
+		
+		{ &hf_qcc_rqt,
+		  { "RQT", "iec60870_asdu.qcc.rqt", FT_UINT8, BASE_DEC, VALS(qcc_rqt_types), 0x3F,
+		    "QCC Request", HFILL }},
 
 		{ &hf_qcc_frz,
-		  { "QCC FRZ", "iec60870_asdu.qcc.frz", FT_UINT8, BASE_DEC, NULL, 0xC0,
-		    NULL, HFILL }},
+		  { "FRZ", "iec60870_asdu.qcc.frz", FT_UINT8, BASE_DEC, VALS(qcc_frz_types), 0xC0,
+		    "QCC Freeze", HFILL }},
 
 		{ &hf_qrp,
 		  { "QRP", "iec60870_asdu.qrp", FT_UINT8, BASE_DEC, VALS(qrp_r_types), 0,
@@ -3308,6 +3338,7 @@ proto_register_iec60870_asdu_sec(void)
 		&ett_rco,
 		&ett_qpm,
 		&ett_coi,
+		&ett_qcc,
 		&ett_cp24time,
 		&ett_cp56time
 	};
