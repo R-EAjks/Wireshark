@@ -50,7 +50,7 @@ static const value_string sctp_payload_proto_id_values[] = {
   { FORCES_LP_PAYLOAD_PROTOCOL_ID,                  "ForCES-LP" },
   { SBC_AP_PAYLOAD_PROTOCOL_ID,                     "SBc-AP" },
   { NBAP_PAYLOAD_PROTOCOL_ID,                       "NBAP" },
-  /* Unassigned 26 */
+  { 26,                                             "Unassigned" },     /* Unassigned 26 */
   { X2AP_PAYLOAD_PROTOCOL_ID,                       "X2AP" },
   { IRCP_PAYLOAD_PROTOCOL_ID,                       "IRCP" },
   { LCS_AP_PAYLOAD_PROTOCOL_ID,                     "LCS-AP" },
@@ -74,6 +74,7 @@ static const value_string sctp_payload_proto_id_values[] = {
   { DIAMETER_DTLS_PROTOCOL_ID,                      "DIAMETER over DTLS" },
   { R14P_BER_PROTOCOL_ID,                           "R14P" },
   { WEBRTC_DCEP_PROTOCOL_ID,                        "WebRTC Control" },
+  { 49,                                             "Unassigned" },     /* Unassigned 49 */
   { WEBRTC_STRING_PAYLOAD_PROTOCOL_ID,              "WebRTC String" },
   { WEBRTC_BINARY_PARTIAL_PAYLOAD_PROTOCOL_ID,      "WebRTC Binary Partial (Deprecated)" },
   { WEBRTC_BINARY_PAYLOAD_PROTOCOL_ID,              "WebRTC Binary" },
