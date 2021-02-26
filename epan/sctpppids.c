@@ -1,11 +1,11 @@
 /* sctpppids.h
  * Declarations of SCTP payload protocol IDs.
  *
+ * Copyright 2011-2021 by Thomas Dreibholz <dreibh [AT] iem.uni-due.de>
+ *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
  * Copyright 1998 Gerald Combs
- *
- * Copyright 2011-2021 by Thomas Dreibholz <dreibh [AT] iem.uni-due.de>
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
