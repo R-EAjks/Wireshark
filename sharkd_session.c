@@ -81,9 +81,7 @@ struct sharkd_filter_item
 static GHashTable *filter_table = NULL;
 
 static int mode;
-gboolean extended_log = FALSE;
-guint32 rpcid;
-char msgbuf[1024];  // buffer used to construct the message that's carried in the error object of a response
+static guint32 rpcid;
 
 static json_dumper dumper = {0};
 
@@ -250,17 +248,9 @@ sharkd_json_warning(guint32 id, char *warning)
 	sharkd_json_result_epilogue();
 }
 
-static void
+static void G_GNUC_PRINTF(4, 5)
 sharkd_json_error(guint32 id, int code, char* data, char* format, ...)
 {
-	// fomat the text message
-	va_list args;
-
-	va_start(args, format);
-	g_vsnprintf(msgbuf, sizeof(msgbuf), format, args);
-	va_end(args);
-
-	// now build the response
 	json_dumper_begin_object(&dumper);
 	sharkd_json_value_string("jsonrpc", SHARKD_JSONRPC_VERSION);
 	sharkd_json_value_anyf("id", "%d", id);
@@ -268,7 +258,21 @@ sharkd_json_error(guint32 id, int code, char* data, char* format, ...)
 	sharkd_json_value_anyf("error", NULL);
 	json_dumper_begin_object(&dumper);
 	sharkd_json_value_anyf("code", "%d", code);
-	sharkd_json_value_string("message", msgbuf);
+
+	if (format)
+	{
+		// format the text message
+		va_list args;
+
+		va_start(args, format);
+		char *error_msg = g_strdup_vprintf(format, args);
+		va_end(args);
+
+		sharkd_json_value_string("message", error_msg);
+
+		g_free(error_msg);
+	}
+
 	json_dumper_end_object(&dumper);
 
 	if (data)
@@ -312,6 +316,8 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 {
 	int i;
 	char* method = NULL;
+	char* attr_name = NULL;
+	char* attr_value = NULL;
 
 #define SHARKD_JSON_ANY      0
 #define SHARKD_JSON_STRING   1
@@ -454,7 +460,7 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 			rpcid, -32600, NULL,
 			"The request must an object"
 		);
-		return FALSE;
+		goto fail;
 	}
 
 	/* don't need [0] token */
@@ -467,7 +473,7 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 			rpcid, -32600, NULL,
 			"The request must contain name/value pairs"
 		);
-		return FALSE;
+		goto fail;
 	}
 
 	for (i = 0; i < count; i += 2)
@@ -478,27 +484,29 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 				rpcid, -32600, NULL,
 				"Member names must be a string - member %d is not string", (i / 2) + 1
 			);
-			return FALSE;
+			goto fail;
 		}
 
 		buf[tokens[i + 0].end] = '\0';
 		buf[tokens[i + 1].end] = '\0';
 
+		attr_name = &buf[tokens[i + 0].start];
+		attr_value = &buf[tokens[i + 1].start];
 
 		// we must get the id as soon as possible so that it's available in all future error messages
-		if (!strcmp(&buf[tokens[i + 0].start], "id"))
+		if (!strcmp(attr_name, "id"))
 		{
-			if (!ws_strtou32(&buf[tokens[i + 1].start], NULL, &rpcid))
+			if (!ws_strtou32(attr_value, NULL, &rpcid))
 			{
 				sharkd_json_error(
 					rpcid, -32600, NULL,
 					"The id value must be a positive integer"
 				);
-				return FALSE;
+				goto fail;
 			}
 		}
 
-		if (!strcmp(&buf[tokens[i + 0].start], "jsonrpc"))
+		if (!strcmp(attr_name, "jsonrpc"))
 		{
 			if (strcmp(&buf[tokens[i + 1].start], SHARKD_JSONRPC_VERSION))
 			{
@@ -506,18 +514,18 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 					rpcid, -32600, NULL,
 					"Only JSON %s is supported", SHARKD_JSONRPC_VERSION
 				);
-				return FALSE;
+				goto fail;
 			}
 		}
 
 		/* unescape only value, as keys are simple strings */
-		if (tokens[i + 1].type == JSMN_STRING && !json_decode_string_inplace(&buf[tokens[i + 1].start]))
+		if (tokens[i + 1].type == JSMN_STRING && !json_decode_string_inplace(attr_value))
 		{
 			sharkd_json_error(
 				rpcid, -32600, NULL,
 				"Cannot unescape the value string of member %d", (i / 2) + 1
 			);
-			return FALSE;
+			goto fail;
 		}
 
 		/* Confirm that the member is valid */
@@ -531,7 +539,7 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 
 			while (name_array[j].value_type != SHARKD_ARRAY_END)  // iterate through the array until we hit the end
 			{
-				if (is_param_match(&buf[tokens[i + 0].start], name_array[j].name) && name_array[j].level == level)
+				if (is_param_match(attr_name, name_array[j].name) && name_array[j].level == level)
 				{
 					// We need to be sure the match is in the correct context
 					// i.e. is this a match for a root member (level 1) or for a parameter (level 2).
@@ -578,31 +586,31 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 					{
 						sharkd_json_error(
 							rpcid, -32600, NULL,
-							"The data type for member %s is not a valid", &buf[tokens[i + 0].start]
+							"The data type for member %s is not a valid", attr_name
 						);
-						return FALSE;
+						goto fail;
 					}
 					else if (name_array[j].type == JSMN_PRIMITIVE && name_array[j].value_type == SHARKD_JSON_UINTEGER)
 					{
 						guint32 temp;
-						if (!ws_strtou32(&buf[tokens[i + 1].start], NULL, &temp) || temp <= 0)
+						if (!ws_strtou32(attr_value, NULL, &temp) || temp <= 0)
 						{
 							sharkd_json_error(
 								rpcid, -32600, NULL,
 								"The value for %s must be a positive integer", name_array[j].name
 							);
-							return FALSE;
+							goto fail;
 						}
 					}
 					else if (name_array[j].type == JSMN_PRIMITIVE && name_array[j].value_type == SHARKD_JSON_BOOLEAN)
 					{
-						if (!strcmp(&buf[tokens[i + 1].start], "true") && !strcmp(&buf[tokens[i + 1].start], "false"))
+						if (!strcmp(attr_value, "true") && !strcmp(attr_value, "false"))
 						{
 							sharkd_json_error(
 								rpcid, -32600, NULL,
 								"The value for %s must be a boolean (true or false)", name_array[j].name
 							);
-							return FALSE;
+							goto fail;
 						}
 
 					}
@@ -611,7 +619,7 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 				j++;
 			}
 
-			if (!strcmp(&buf[tokens[i + 0].start], "method"))
+			if (!strcmp(attr_name, "method"))
 			{
 				int k = 0;  // name array index
 				// check that the request method is good
@@ -619,8 +627,8 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 				{
 					if (name_array[k].parent_ctx)
 					{
-						if (!strcmp(&buf[tokens[i + 1].start], name_array[k].name) && !strcmp(name_array[k].parent_ctx, "method"))
-							method = &buf[tokens[i + 1].start];  // the method is valid
+						if (!strcmp(attr_value, name_array[k].name) && !strcmp(name_array[k].parent_ctx, "method"))
+							method = attr_value;  // the method is valid
 					}
 
 					k++;
@@ -630,9 +638,9 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 				{
 					sharkd_json_error(
 						rpcid, -32601, NULL,
-						"The method %s is not supported", &buf[tokens[i + 1].start]
+						"The method %s is not supported", attr_value
 					);
-					return FALSE;
+					goto fail;
 				}
 			}
 		}
@@ -641,9 +649,9 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 		{
 			sharkd_json_error(
 				rpcid, -32600, NULL,
-				"%s is not a valid member name", &buf[tokens[i + 0].start]
+				"%s is not a valid member name", attr_name
 			);
-			return FALSE;
+			goto fail;
 		}
 	}
 
@@ -660,7 +668,7 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 					rpcid, -32600, NULL,
 					"Mandatory member %s is missing", name_array[j].name
 				);
-				return FALSE;
+				goto fail;
 			}
 		}
 		j++;
@@ -679,7 +687,7 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 					rpcid, -32600, NULL,
 					"Mandatory parameter %s is missing", name_array[j].name
 				);
-				return FALSE;
+				goto fail;
 			}
 		}
 		j++;
@@ -689,6 +697,9 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 	// check that the parameters for the current request are valid for the method and that the data type for the value is valid
 
 	return TRUE;
+
+fail:
+	return FALSE;
 }
 
 static void
@@ -4505,6 +4516,13 @@ sharkd_session_process_dumpconf(char *buf, const jsmntok_t *tokens, int count)
 		json_dumper_end_object(&dumper);
 
 		sharkd_json_result_epilogue();
+	}
+	else
+	{
+		sharkd_json_error(
+			rpcid, -9002, NULL,
+			"Invalid pref %s.", tok_pref
+		);
 	}
 }
 
