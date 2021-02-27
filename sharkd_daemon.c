@@ -354,7 +354,7 @@ sharkd_init(int argc, char **argv)
 }
 
 int
-sharkd_loop(int argc _U_, char* argv[])
+sharkd_loop(int argc _U_, char* argv[] _U_)
 {
 	if (mode == SHARKD_MODE_CLASSIC_CONSOLE || mode == SHARKD_MODE_GOLD_CONSOLE)
 	{
