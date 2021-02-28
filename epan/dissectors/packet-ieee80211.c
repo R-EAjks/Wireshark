@@ -11602,7 +11602,8 @@ add_ff_action_public_fields(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
     offset += add_ff_ftm_toa_err(tree, tvb, pinfo, offset);
     break;
   case PA_FILS_DISCOVERY:
-    offset += add_ff_fils_discovery(tree, tvb, pinfo, offset);
+    col_set_str(pinfo->cinfo, COL_INFO, "FILS Discovery");
+    offset = add_ff_fils_discovery(tree, tvb, pinfo, offset);
     break;
   }
 
@@ -18193,7 +18194,7 @@ dissect_no_bssid_capability(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *t
                                       ett_tag_no_bssid_capability_dmg_bss_control_tree,
                                       ieee80211_tag_no_bssid_capability_dmg_bss_control,
                                       ENC_LITTLE_ENDIAN, BMT_NO_APPEND);
-    offset += 1;
+    /* offset += 1; */
 
     ieee80211_tag_dmg_capabilities(tvb, pinfo, tree, data);
   }
@@ -18251,7 +18252,7 @@ dissect_multiple_bssid_index(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *
     offset += 1;
   }
 
-  return tvb_captured_length(tvb);
+  return offset;
 }
 
 static int
