@@ -173,7 +173,15 @@ sharkd_json_array_close(void)
 }
 
 static void
-sharkd_json_result_close(void)
+sharkd_json_response_open(guint32 id)
+{
+	json_dumper_begin_object(&dumper);  // start the message
+	sharkd_json_value_string("jsonrpc", "2.0");
+	sharkd_json_value_anyf("id", "%d", id);
+}
+
+static void
+sharkd_json_response_close(void)
 {
 	json_dumper_finish(&dumper);
 
@@ -197,10 +205,7 @@ sharkd_json_result_close(void)
 static void
 sharkd_json_result_prologue(guint32 id)
 {
-	json_dumper_begin_object(&dumper);  // start the message
-	sharkd_json_value_string("jsonrpc", SHARKD_JSONRPC_VERSION);
-	sharkd_json_value_anyf("id", "%d", id);
-
+	sharkd_json_response_open(id);
 	sharkd_json_value_anyf("result", NULL);
 	json_dumper_begin_object(&dumper);  // start the result object
 }
@@ -210,16 +215,13 @@ sharkd_json_result_epilogue()
 {
 	json_dumper_end_object(&dumper);  // end the result object
 	json_dumper_end_object(&dumper);  // end the message
-	sharkd_json_result_close();
+	sharkd_json_response_close();
 }
 
 static void
 sharkd_json_result_array_prologue(guint32 id)
 {
-	json_dumper_begin_object(&dumper);  // start the message
-	sharkd_json_value_string("jsonrpc", SHARKD_JSONRPC_VERSION);
-	sharkd_json_value_anyf("id", "%d", id);
-
+	sharkd_json_response_open(id);
 	sharkd_json_array_open("result");   // start the result array
 }
 
@@ -228,7 +230,7 @@ sharkd_json_result_array_epilogue()
 {
 	sharkd_json_array_close();        // end of result array
 	json_dumper_end_object(&dumper);  // end the message
-	sharkd_json_result_close();
+	sharkd_json_response_close();
 }
 
 static void
@@ -251,10 +253,7 @@ sharkd_json_warning(guint32 id, char *warning)
 static void G_GNUC_PRINTF(4, 5)
 sharkd_json_error(guint32 id, int code, char* data, char* format, ...)
 {
-	json_dumper_begin_object(&dumper);
-	sharkd_json_value_string("jsonrpc", SHARKD_JSONRPC_VERSION);
-	sharkd_json_value_anyf("id", "%d", id);
-
+	sharkd_json_response_open(id);
 	sharkd_json_value_anyf("error", NULL);
 	json_dumper_begin_object(&dumper);
 	sharkd_json_value_anyf("code", "%d", code);
@@ -279,7 +278,7 @@ sharkd_json_error(guint32 id, int code, char* data, char* format, ...)
 		sharkd_json_value_string("data", data);
 
 	json_dumper_end_object(&dumper);
-	sharkd_json_result_close();
+	sharkd_json_response_close();
 }
 
 static gboolean
@@ -508,11 +507,11 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 
 		if (!strcmp(attr_name, "jsonrpc"))
 		{
-			if (strcmp(&buf[tokens[i + 1].start], SHARKD_JSONRPC_VERSION))
+			if (strcmp(&buf[tokens[i + 1].start], "2.0"))
 			{
 				sharkd_json_error(
 					rpcid, -32600, NULL,
-					"Only JSON %s is supported", SHARKD_JSONRPC_VERSION
+					"Only JSON %s is supported", "2.0"
 				);
 				goto fail;
 			}
