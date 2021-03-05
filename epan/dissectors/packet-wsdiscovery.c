@@ -52,10 +52,10 @@ void
 proto_register_wsdiscovery(void)
 {
     proto_wsdiscovery = proto_register_protocol (
-        "WS-Discovery",  /* name        */
-        "WSDISCOVERY",  /* short_name  */
-        "wsdiscovery"   /* filter_name */
-        );
+        "Web Services Dynamic Discovery",  /* name        */
+        "WS-Discovery",                    /* short_name  */
+        "wsdiscovery"                      /* filter_name */
+    );
 
     /* Add data partition for expand/unexpand 'wsdiscovery' tree */
     proto_register_subtree_array(ett, array_length(ett));
