@@ -22,9 +22,14 @@
 void proto_register_npm(void);
 void proto_reg_handoff_npm(void);
 
-static int  proto_npm       = -1;
-static gint ett_npm         = -1;
-static gint ett_onoffarray  = -1;
+static int proto_npm              = -1;
+static int ett_npm                = -1;
+static int ett_addflow_flags      = -1;
+static int ett_identifyflow_flags = -1;
+static int ett_start_flags        = -1;
+static int ett_data_flags         = -1;
+static int ett_results_flags      = -1;
+static int ett_onoffarray         = -1;
 
 
 #define PPID_NETPERFMETER_CONTROL_LEGACY   0x29097605
@@ -69,9 +74,11 @@ INIT_FIELD(message_length, 2, 2)
 INIT_FIELD(acknowledge_flowid,          4,  4)
 INIT_FIELD(acknowledge_measurementid,   8,  8)
 INIT_FIELD(acknowledge_streamid,       16,  2)
-/* INIT_FIELD(acknowledge_padding,        18,  2) */
 INIT_FIELD(acknowledge_status,         20,  4)
 
+static int hf_addflow_flag_debug       = -1;
+static int hf_addflow_flag_nodelay     = -1;
+static int hf_addflow_flag_repeatonoff = -1;
 INIT_FIELD(addflow_flowid,              4,  4)
 INIT_FIELD(addflow_measurementid,       8,  8)
 INIT_FIELD(addflow_streamid,           16,  2)
@@ -103,6 +110,8 @@ INIT_FIELD(removeflow_flowid,           4,  4)
 INIT_FIELD(removeflow_measurementid,    8,  8)
 INIT_FIELD(removeflow_streamid,        16,  2)
 
+static int hf_identifyflow_flag_compress_vectors = -1;
+static int hf_identifyflow_flag_no_vectors       = -1;
 INIT_FIELD(identifyflow_flowid,         4,  4)
 INIT_FIELD(identifyflow_magicnumber,    8,  8)
 INIT_FIELD(identifyflow_measurementid, 16,  8)
@@ -110,6 +119,8 @@ INIT_FIELD(identifyflow_streamid,      24,  2)
 
 #define NETPERFMETER_IDENTIFY_FLOW_MAGIC_NUMBER 0x4bcdf3aa303c6774ULL
 
+static int hf_data_flag_frame_begin = -1;
+static int hf_data_flag_frame_end   = -1;
 INIT_FIELD(data_flowid,           4,  4)
 INIT_FIELD(data_measurementid,    8,  8)
 INIT_FIELD(data_streamid,        16,  2)
@@ -118,15 +129,20 @@ INIT_FIELD(data_frameid,         20,  4)
 INIT_FIELD(data_packetseqnumber, 24,  8)
 INIT_FIELD(data_byteseqnumber,   32,  8)
 INIT_FIELD(data_timestamp,       40,  8)
-INIT_FIELD_WITHOUT_LEN(data_payload,         48)
+INIT_FIELD_WITHOUT_LEN(data_payload, 48)
 
-/* INIT_FIELD(start_padding,         4,  4) */
+
+static int hf_start_flag_compress_vectors = -1;
+static int hf_start_flag_compress_scalars = -1;
+static int hf_start_flag_no_vectors = -1;
+static int hf_start_flag_no_scalars = -1;
 INIT_FIELD(start_measurementid,   8,  8)
 
-/* INIT_FIELD(stop_padding,          4,  4) */
+
 INIT_FIELD(stop_measurementid,    8,  8)
 
-INIT_FIELD_WITHOUT_LEN(results_data,          4)
+static int hf_results_flag_eof = -1;
+INIT_FIELD_WITHOUT_LEN(results_data, 4)
 
 
 /* Setup list of Transport Layer protocol types */
@@ -156,6 +172,25 @@ static const value_string rng_type_values[] = {
   { 2,              "Neg. Exponential" },
   { 0,              NULL }
 };
+
+/* Message flags */
+#define NPMAFF_DEBUG           (1 << 0)
+#define NPMAFF_NODELAY         (1 << 1)
+#define NPMAFF_REPEATONOFF     (1 << 2)
+
+#define NPMIF_COMPRESS_VECTORS (1 << 0)
+#define NPMIF_NO_VECTORS       (1 << 1)
+
+#define NPMSF_COMPRESS_VECTORS (1 << 0)
+#define NPMSF_COMPRESS_SCALARS (1 << 1)
+#define NPMSF_NO_VECTORS       (1 << 2)
+#define NPMSF_NO_SCALARS       (1 << 3)
+
+#define NPMDF_FRAME_BEGIN      (1 << 0)
+#define NPMDF_FRAME_END        (1 << 1)
+
+#define NPMRF_EOF              (1 << 0)
+
 
 /* Setup list of header fields */
 static hf_register_info hf[] = {
@@ -197,6 +232,9 @@ static hf_register_info hf[] = {
    { &hf_addflow_ccid,               { "CCID",                  "netperfmeter.addflow_ccid",               FT_UINT8,   BASE_HEX,  NULL,                      0x0, NULL, HFILL } },
    { &hf_addflow_onoffevents,        { "On/Off Events",         "netperfmeter.addflow_onoffevents",        FT_UINT16,  BASE_DEC,  NULL,                      0x0, NULL, HFILL } },
    { &hf_addflow_onoffeventarray,    { "On/Off Event",          "netperfmeter.addflow_onoffeventarray",    FT_UINT32,  BASE_DEC,  NULL,                      0x0, NULL, HFILL } },
+   { &hf_addflow_flag_debug,         { "Debug",                 "netperfmeter.addflow_flags.debug",        FT_BOOLEAN, 8, TFS(&tfs_set_notset), NPMAFF_DEBUG,       NULL, HFILL } },
+   { &hf_addflow_flag_nodelay,       { "No Delay",              "netperfmeter.addflow_flags.nodelay",      FT_BOOLEAN, 8, TFS(&tfs_set_notset), NPMAFF_NODELAY,     NULL, HFILL } },
+   { &hf_addflow_flag_repeatonoff,   { "Repeat On/Off",         "netperfmeter.addflow_flags.repeatonoff",  FT_BOOLEAN, 8, TFS(&tfs_set_notset), NPMAFF_REPEATONOFF, NULL, HFILL } },
 
    { &hf_removeflow_flowid,          { "Flow ID",               "netperfmeter.removeflow_flowid",          FT_UINT32,  BASE_HEX,  NULL,                      0x0, NULL, HFILL } },
    { &hf_removeflow_measurementid,   { "Measurement ID",        "netperfmeter.removeflow_measurementid",   FT_UINT64,  BASE_HEX,  NULL,                      0x0, NULL, HFILL } },
@@ -206,6 +244,8 @@ static hf_register_info hf[] = {
    { &hf_identifyflow_magicnumber,   { "Magic Number",          "netperfmeter.identifyflow_magicnumber",   FT_UINT64,  BASE_HEX,  NULL,                      0x0, NULL, HFILL } },
    { &hf_identifyflow_measurementid, { "Measurement ID",        "netperfmeter.identifyflow_measurementid", FT_UINT64,  BASE_HEX,  NULL,                      0x0, NULL, HFILL } },
    { &hf_identifyflow_streamid,      { "Stream ID",             "netperfmeter.identifyflow_streamid",      FT_UINT16,  BASE_DEC,  NULL,                      0x0, NULL, HFILL } },
+   { &hf_identifyflow_flag_compress_vectors, { "Compress Vectors", "netperfmeter.dentifyflow_flags.compress_vectors", FT_BOOLEAN, 8, TFS(&tfs_set_notset), NPMIF_COMPRESS_VECTORS, NULL, HFILL } },
+   { &hf_identifyflow_flag_no_vectors,       { "No Vectors", "netperfmeter.dentifyflow_flags.no_vectors",             FT_BOOLEAN, 8, TFS(&tfs_set_notset), NPMIF_NO_VECTORS,       NULL, HFILL } },
 
    { &hf_data_flowid,                { "Flow ID",               "netperfmeter.data_flowid",                FT_UINT32,  BASE_HEX,  NULL,                      0x0, NULL, HFILL } },
    { &hf_data_measurementid,         { "Measurement ID",        "netperfmeter.data_measurementid",         FT_UINT64,  BASE_HEX,  NULL,                      0x0, NULL, HFILL } },
@@ -216,11 +256,17 @@ static hf_register_info hf[] = {
    { &hf_data_byteseqnumber,         { "Byte Seq Number",       "netperfmeter.data_byteseqnumber",         FT_UINT64,  BASE_DEC,  NULL,                      0x0, NULL, HFILL } },
    { &hf_data_timestamp,             { "Time Stamp",            "netperfmeter.data_timestamp",             FT_ABSOLUTE_TIME, ABSOLUTE_TIME_UTC, NULL,        0x0, NULL, HFILL } },
    { &hf_data_payload,               { "Payload",               "netperfmeter.data_payload",               FT_BYTES,   BASE_NONE, NULL,                      0x0, NULL, HFILL } },
+   { &hf_data_flag_frame_begin,      { "Begin of Frame",        "netperfmeter.data_flags.frame_begin",     FT_BOOLEAN, 8, TFS(&tfs_set_notset), NPMDF_FRAME_BEGIN, NULL, HFILL } },
+   { &hf_data_flag_frame_end,        { "End of Frame",          "netperfmeter.data_flags.frame_end",       FT_BOOLEAN, 8, TFS(&tfs_set_notset), NPMDF_FRAME_END,   NULL, HFILL } },
 
 #if 0
    { &hf_start_padding,              { "Padding",               "netperfmeter.start_padding",              FT_UINT32,  BASE_HEX,  NULL,                      0x0, NULL, HFILL } },
 #endif
    { &hf_start_measurementid,        { "Measurement ID",        "netperfmeter.start_measurementid",        FT_UINT64,  BASE_HEX,  NULL,                      0x0, NULL, HFILL } },
+   { &hf_start_flag_compress_vectors,{ "Compress Vectors",      "netperfmeter.start_flags.compress_vectors", FT_BOOLEAN, 8, TFS(&tfs_set_notset), NPMSF_COMPRESS_VECTORS, NULL, HFILL } },
+   { &hf_start_flag_compress_scalars,{ "Compress Scalars",      "netperfmeter.start_flags.compress_scalars", FT_BOOLEAN, 8, TFS(&tfs_set_notset), NPMSF_COMPRESS_SCALARS, NULL, HFILL } },
+   { &hf_start_flag_no_vectors,      { "No Vectors",            "netperfmeter.start_flags.no_vectors",       FT_BOOLEAN, 8, TFS(&tfs_set_notset), NPMSF_NO_VECTORS,       NULL, HFILL } },
+   { &hf_start_flag_no_scalars,      { "No Scalars",            "netperfmeter.start_flags.no_scalars",       FT_BOOLEAN, 8, TFS(&tfs_set_notset), NPMSF_NO_SCALARS,       NULL, HFILL } },
 
 #if 0
    { &hf_stop_padding,               { "Padding",               "netperfmeter.stop_padding",               FT_UINT32,  BASE_HEX,  NULL,                      0x0, NULL, HFILL } },
@@ -228,11 +274,13 @@ static hf_register_info hf[] = {
    { &hf_stop_measurementid,         { "Measurement ID",        "netperfmeter.stop_measurementid",         FT_UINT64,  BASE_HEX,  NULL,                      0x0, NULL, HFILL } },
 
    { &hf_results_data,               { "Data",                  "netperfmeter.results_data",               FT_BYTES,   BASE_NONE, NULL,                      0x0, NULL, HFILL } },
+   { &hf_results_flag_eof,           { "End of File",           "netperfmeter.results_flags.eof",          FT_BOOLEAN, 8, TFS(&tfs_set_notset), NPMRF_EOF, NULL, HFILL } }
 };
 
 
-#define ADD_FIELD_UINT(tree, field) proto_tree_add_item(tree, hf_##field, message_tvb, offset_##field, length_##field, ENC_BIG_ENDIAN)
-#define ADD_FIELD_STRING(tree, field) proto_tree_add_item(tree, hf_##field, message_tvb, offset_##field, length_##field, ENC_ASCII|ENC_NA)
+#define ADD_FIELD_MSGFLAG(tree, field) proto_tree_add_item(tree, hf_##field, message_tvb, offset_message_flags, length_message_flags, ENC_BIG_ENDIAN)
+#define ADD_FIELD_UINT(tree, field)    proto_tree_add_item(tree, hf_##field, message_tvb, offset_##field, length_##field, ENC_BIG_ENDIAN)
+#define ADD_FIELD_STRING(tree, field)  proto_tree_add_item(tree, hf_##field, message_tvb, offset_##field, length_##field, ENC_UTF_8|ENC_NA)
 
 
 static void
@@ -246,14 +294,20 @@ dissect_npm_acknowledge_message(tvbuff_t *message_tvb, proto_tree *message_tree)
 
 
 static void
-dissect_npm_add_flow_message(tvbuff_t *message_tvb, proto_tree *message_tree)
+dissect_npm_add_flow_message(tvbuff_t *message_tvb, proto_tree *message_tree, proto_item *flags_item)
 {
   guint32      retranstrials;
   proto_item*  onoffitem;
   proto_tree*  onofftree;
+  proto_tree*  flags_tree;
   guint16      onoffevents;
   guint32      onoffvalue;
   unsigned int i;
+
+  flags_tree = proto_item_add_subtree(flags_item, ett_addflow_flags);
+  ADD_FIELD_MSGFLAG(flags_tree, addflow_flag_debug);
+  ADD_FIELD_MSGFLAG(flags_tree, addflow_flag_nodelay);
+  ADD_FIELD_MSGFLAG(flags_tree, addflow_flag_repeatonoff);
 
   ADD_FIELD_UINT(message_tree, addflow_flowid);
   ADD_FIELD_UINT(message_tree, addflow_measurementid);
@@ -315,8 +369,14 @@ dissect_npm_remove_flow_message(tvbuff_t *message_tvb, proto_tree *message_tree)
 
 
 static void
-dissect_npm_identify_flow_message(tvbuff_t *message_tvb, proto_tree *message_tree)
+dissect_npm_identify_flow_message(tvbuff_t *message_tvb, proto_tree *message_tree, proto_item *flags_item)
 {
+  proto_tree* flags_tree;
+
+  flags_tree = proto_item_add_subtree(flags_item, ett_identifyflow_flags);
+  ADD_FIELD_MSGFLAG(flags_tree, identifyflow_flag_compress_vectors);
+  ADD_FIELD_MSGFLAG(flags_tree, identifyflow_flag_no_vectors);
+
   ADD_FIELD_UINT(message_tree, identifyflow_magicnumber);
   ADD_FIELD_UINT(message_tree, identifyflow_flowid);
   ADD_FIELD_UINT(message_tree, identifyflow_measurementid);
@@ -325,11 +385,16 @@ dissect_npm_identify_flow_message(tvbuff_t *message_tvb, proto_tree *message_tre
 
 
 static void
-dissect_npm_data_message(tvbuff_t *message_tvb, proto_tree *message_tree)
+dissect_npm_data_message(tvbuff_t *message_tvb, proto_tree *message_tree, proto_item *flags_item)
 {
+  proto_tree*   flags_tree;
   const guint16 message_length = tvb_get_ntohs(message_tvb, offset_message_length);
   guint64       timestamp;
   nstime_t      t;
+
+  flags_tree = proto_item_add_subtree(flags_item, ett_data_flags);
+  ADD_FIELD_MSGFLAG(flags_tree, data_flag_frame_begin);
+  ADD_FIELD_MSGFLAG(flags_tree, data_flag_frame_end);
 
   ADD_FIELD_UINT(message_tree, data_flowid);
   ADD_FIELD_UINT(message_tree, data_measurementid);
@@ -352,8 +417,16 @@ dissect_npm_data_message(tvbuff_t *message_tvb, proto_tree *message_tree)
 
 
 static void
-dissect_npm_start_message(tvbuff_t *message_tvb, proto_tree *message_tree)
+dissect_npm_start_message(tvbuff_t *message_tvb, proto_tree *message_tree, proto_item *flags_item)
 {
+  proto_tree* flags_tree;
+
+  flags_tree = proto_item_add_subtree(flags_item, ett_start_flags);
+  ADD_FIELD_MSGFLAG(flags_tree, start_flag_compress_vectors);
+  ADD_FIELD_MSGFLAG(flags_tree, start_flag_compress_scalars);
+  ADD_FIELD_MSGFLAG(flags_tree, start_flag_no_vectors);
+  ADD_FIELD_MSGFLAG(flags_tree, start_flag_no_scalars);
+
   ADD_FIELD_UINT(message_tree, start_measurementid);
 }
 
@@ -366,8 +439,13 @@ dissect_npm_stop_message(tvbuff_t *message_tvb, proto_tree *message_tree)
 
 
 static void
-dissect_npm_results_message(tvbuff_t *message_tvb, proto_tree *message_tree)
+dissect_npm_results_message(tvbuff_t *message_tvb, proto_tree *message_tree, proto_item *flags_item)
 {
+  proto_tree* flags_tree;
+
+  flags_tree = proto_item_add_subtree(flags_item, ett_data_flags);
+  ADD_FIELD_MSGFLAG(flags_tree, results_flag_eof);
+
   const guint16 message_length = tvb_get_ntohs(message_tvb, offset_message_length);
   if (message_length > offset_results_data) {
     proto_tree_add_item(message_tree, hf_results_data, message_tvb, offset_results_data, message_length - offset_results_data, ENC_NA);
@@ -378,13 +456,14 @@ dissect_npm_results_message(tvbuff_t *message_tvb, proto_tree *message_tree)
 static void
 dissect_npm_message(tvbuff_t *message_tvb, packet_info *pinfo, proto_tree *npm_tree)
 {
-  guint8 type;
+  proto_tree* flags_tree;
+  guint8      type;
 
   type = tvb_get_guint8(message_tvb, offset_message_type);
   col_add_fstr(pinfo->cinfo, COL_INFO, "%s ", val_to_str_const(type, message_type_values, "Unknown NetPerfMeter message type"));
 
   ADD_FIELD_UINT(npm_tree, message_type);
-  ADD_FIELD_UINT(npm_tree, message_flags);
+  flags_tree = ADD_FIELD_UINT(npm_tree, message_flags);
   ADD_FIELD_UINT(npm_tree, message_length);
 
   switch (type) {
@@ -392,25 +471,25 @@ dissect_npm_message(tvbuff_t *message_tvb, packet_info *pinfo, proto_tree *npm_t
       dissect_npm_acknowledge_message(message_tvb, npm_tree);
      break;
     case NETPERFMETER_ADD_FLOW:
-      dissect_npm_add_flow_message(message_tvb, npm_tree);
+      dissect_npm_add_flow_message(message_tvb, npm_tree, flags_tree);
      break;
     case NETPERFMETER_REMOVE_FLOW:
       dissect_npm_remove_flow_message(message_tvb, npm_tree);
      break;
     case NETPERFMETER_IDENTIFY_FLOW:
-      dissect_npm_identify_flow_message(message_tvb, npm_tree);
+      dissect_npm_identify_flow_message(message_tvb, npm_tree, flags_tree);
      break;
     case NETPERFMETER_DATA:
-      dissect_npm_data_message(message_tvb, npm_tree);
+      dissect_npm_data_message(message_tvb, npm_tree, flags_tree);
      break;
     case NETPERFMETER_START:
-      dissect_npm_start_message(message_tvb, npm_tree);
+      dissect_npm_start_message(message_tvb, npm_tree, flags_tree);
      break;
     case NETPERFMETER_STOP:
       dissect_npm_stop_message(message_tvb, npm_tree);
      break;
     case NETPERFMETER_RESULTS:
-      dissect_npm_results_message(message_tvb, npm_tree);
+      dissect_npm_results_message(message_tvb, npm_tree, flags_tree);
      break;
   }
 }
@@ -485,6 +564,11 @@ proto_register_npm(void)
   /* Setup protocol subtree array */
   static gint *ett[] = {
     &ett_npm,
+    &ett_addflow_flags,
+    &ett_identifyflow_flags,
+    &ett_start_flags,
+    &ett_data_flags,
+    &ett_results_flags,
     &ett_onoffarray
   };
 
