@@ -1596,6 +1596,7 @@ static void get_MAL(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 
       The MAC Length shall specify the length of the MAC Value in octets. The MAC Length shall
       be correct for the MAC algorithm specified by the Challenger, as described in 7.2.2.4.
+      The maximum lenght is 64 octets.
 */
 /******************************************************************************************************/
 static void get_HLN(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 *HLN)
@@ -1609,21 +1610,22 @@ static void get_HLN(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 /*    ELN = Error length, defined in 7.2.8.6 of IEC/TS 62351-5:2013                                   
 
       This value shall specify the length of the Error Text that follows.
+      The maximum lenght is 128 octets.
 */
 /******************************************************************************************************/
-#if 1
 static void get_ELN(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 *ELN)
 {
 	proto_tree_add_item_ret_uint(iec104_header_tree, hf_secure_eln, tvb, *offset, 2, ENC_LITTLE_ENDIAN, ELN);
 
 	(*offset) += 2;
 }
-#endif 
+
 /******************************************************************************************************/
 /*    CLN = Challenge data length defined in 7.2.6.7 of IEC/TS 62351-5:2013                          
                                                                                                     
       This value shall specify the length in octets of the challenge data that follows.               
-      The minimum length of the challenge data shall be eight octets.                                 
+      The minimum length of the challenge data shall be eight octets.
+      The maximum lenght is 64 octets.
 */
 /******************************************************************************************************/
 static void get_CLN(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 *CLN)
@@ -1668,6 +1670,7 @@ static void get_CHD(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 
       This value shall be the length of the data produced by the Key Wrap algorithm, as described
       in 7.2.7.5.
+      The maximum lenght is 1024 octets.
 */
 /******************************************************************************************************/
 static void get_WKL(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 *WKL)
@@ -1723,14 +1726,13 @@ static void get_MAC(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
       description of the user represented by the USR.
 */
 /******************************************************************************************************/
-#if 1
 static void get_ETEXT(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 LENGHT_ETEXT)
 {
 	proto_tree_add_item(iec104_header_tree, hf_secure_etext, tvb, *offset, LENGHT_ETEXT, ENC_LITTLE_ENDIAN);
 
 	(*offset) += LENGHT_ETEXT;
 }
-#endif
+
 /******************************************************************************************************/
 /*    RSC = Reason for Challenge (Enumerated value) defined in 7.2.2.5 of IEC/TS 62351-5:2013 
 
