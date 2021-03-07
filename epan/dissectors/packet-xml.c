@@ -76,6 +76,7 @@ static gboolean pref_heuristic_unicode    = FALSE;
 #define XML_CDATA       -1000
 #define XML_SCOPED_NAME -1001
 
+#define DEFAULT_XML_PORT_RANGE "3702"
 
 static wmem_array_t *hf_arr;
 static GArray *ett_arr;
@@ -1548,6 +1549,7 @@ proto_reg_handoff_xml(void)
 {
     wmem_map_foreach(media_types, add_dissector_media, NULL);
     dissector_add_uint_range_with_preference("tcp.port", "", xml_handle);
+    dissector_add_uint_range_with_preference("udp.port", DEFAULT_XML_PORT_RANGE, xml_handle);
 
     heur_dissector_add("http",  dissect_xml_heur, "XML in HTTP", "xml_http", xml_ns.hf_tag, HEURISTIC_DISABLE);
     heur_dissector_add("sip",   dissect_xml_heur, "XML in SIP", "xml_sip", xml_ns.hf_tag, HEURISTIC_DISABLE);
