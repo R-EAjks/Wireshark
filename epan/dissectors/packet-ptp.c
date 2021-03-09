@@ -3312,7 +3312,6 @@ dissect_ptp_v2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean ptp
 
                     /* There are TLV's to be processed */
                     tlv_length = tvb_get_ntohs (tvb, PTP_AS_SIG_TLV_MESSAGEINTERVALREQUEST_OFFSET + PTP_AS_SIG_TLV_LENGTHFIELD_OFFSET);
-   
                     tlv_type = tvb_get_ntohs(tvb, PTP_AS_SIG_TLV_MESSAGEINTERVALREQUEST_OFFSET + PTP_V2_SIG_TLV_TYPE_OFFSET);
 
                     switch (tlv_type)
