@@ -164,6 +164,9 @@ static int hf_nvme_identify_ctrl_dsto[3] = { NEG_LST_3 };
 static int hf_nvme_identify_ctrl_fwug = -1;
 static int hf_nvme_identify_ctrl_kas = -1;
 static int hf_nvme_identify_ctrl_hctma[3] = { NEG_LST_3 };
+static int hf_nvme_identify_ctrl_mntmt = -1;
+static int hf_nvme_identify_ctrl_mxtmt = -1;
+static int hf_nvme_identify_ctrl_sanicap[7] = { NEG_LST_7 };
 static int hf_nvme_identify_ctrl_sqes = -1;
 static int hf_nvme_identify_ctrl_cqes = -1;
 static int hf_nvme_identify_ctrl_maxcmd = -1;
@@ -874,6 +877,33 @@ static void dissect_nvme_identify_ctrl_resp_mi(tvbuff_t *cmd_tvb, proto_tree *cm
     add_group_mask_entry(cmd_tvb, grp, 255, 1, ASPEC(hf_nvme_identify_ctrl_mi_mec));
 }
 
+static void post_add_tmt(proto_item *ti, guint val)
+{
+    if (!val)
+        proto_item_append_text(ti, " (not supported)");
+    else
+        proto_item_append_text(ti, " (%u degrees K)", val);
+}
+
+static void dissect_nvme_identify_ctrl_resp_sanicap(tvbuff_t *cmd_tvb, proto_tree *cmd_tree)
+{
+    guint array_len = array_length(hf_nvme_identify_ctrl_sanicap);
+    proto_item *ti, *grp;
+    guint i, val;
+    const value_string mmas_type_tbl[] = {
+        { 0,  "modification not defined" },
+        { 1,  "no modification after sanitize completion" },
+        { 2,  "additional modification after sanitize completion" },
+        { 0, NULL}
+    };
+    ti = proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_sanicap[0], cmd_tvb, 328, 4, ENC_LITTLE_ENDIAN);
+    grp =  proto_item_add_subtree(ti, ett_data);
+
+    for (i = 1; i < array_len; i++)
+        ti = proto_tree_add_item_ret_uint(grp, hf_nvme_identify_ctrl_sanicap[i], cmd_tvb, 328, 4, ENC_LITTLE_ENDIAN, &val);
+    proto_item_append_text(ti, " (%s)", val_to_str(val, mmas_type_tbl, "reserved value"));
+}
+
 static void dissect_nvme_identify_ctrl_resp(tvbuff_t *cmd_tvb,
                                             proto_tree *cmd_tree)
 {
@@ -967,6 +997,13 @@ static void dissect_nvme_identify_ctrl_resp(tvbuff_t *cmd_tvb,
     post_add_ms(ti, val);
 
     add_group_mask_entry(cmd_tvb, cmd_tree, 320, 2, ASPEC(hf_nvme_identify_ctrl_hctma));
+
+    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_mntmt, cmd_tvb, 324, 2, ENC_LITTLE_ENDIAN, &val);
+    post_add_tmt(ti, val);
+    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_mxtmt, cmd_tvb, 326, 2, ENC_LITTLE_ENDIAN, &val);
+    post_add_tmt(ti, val);
+    dissect_nvme_identify_ctrl_resp_sanicap(cmd_tvb, cmd_tree);
+
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_sqes, cmd_tvb, 512, 1, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_cqes, cmd_tvb, 513, 1, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_maxcmd, cmd_tvb, 514, 2, ENC_LITTLE_ENDIAN);
@@ -1997,6 +2034,42 @@ proto_register_nvme(void)
         { &hf_nvme_identify_ctrl_hctma[2],
             { "Reserevd", "nvme.cmd.identify.ctrl.hctma.rsvd",
                FT_UINT16, BASE_HEX, NULL, 0xfffe, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_mntmt,
+            { "Minimum Thermal Management Temperature (MNTMT)", "nvme.cmd.identify.ctrl.mntmt",
+               FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_mxtmt,
+            { "Maximum Thermal Management Temperature (MXTMT)", "nvme.cmd.identify.ctrl.mxtmt",
+               FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_sanicap[0],
+            { "Sanitize Capabilities (SANICAP)", "nvme.cmd.identify.ctrl.sanicap",
+               FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_sanicap[1],
+            { "Crypto Erase Support (CES)", "nvme.cmd.identify.ctrl.sanicap.ces",
+               FT_UINT32, BASE_HEX, NULL, 0x1, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_sanicap[2],
+            { "Block Erase Support (BES)", "nvme.cmd.identify.ctrl.sanicap.bes",
+               FT_UINT32, BASE_HEX, NULL, 0x2, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_sanicap[3],
+            { "Overwrite Support (OWS)", "nvme.cmd.identify.ctrl.sanicap.ows",
+               FT_UINT32, BASE_HEX, NULL, 0x4, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_sanicap[4],
+            { "Reserevd", "nvme.cmd.identify.ctrl.sanicap.rsvd",
+               FT_UINT32, BASE_HEX, NULL, 0x1ffffff8, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_sanicap[5],
+            { "No-Deallocate Inhibited (NDI)", "nvme.cmd.identify.ctrl.sanicap.ndi",
+               FT_UINT32, BASE_HEX, NULL, 0x20000000, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_sanicap[6],
+            { "No-Deallocate Modifies Media After Sanitize (NODMMAS)", "nvme.cmd.identify.ctrl.sanicap.nodmmas",
+               FT_UINT32, BASE_HEX, NULL, 0xc0000000, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_sqes,
             { "Submission Queue Entry Size (SQES)", "nvme.cmd.identify.ctrl.sqes",
