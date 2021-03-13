@@ -159,7 +159,11 @@ static int hf_nvme_identify_ctrl_hmmin = -1;
 static int hf_nvme_identify_ctrl_tnvmcap = -1;
 static int  hf_nvme_identify_ctrl_unvmcap = -1;
 static int hf_nvme_identify_ctrl_rpmbs[6] = { NEG_LST_5 };
+static int hf_nvme_identify_ctrl_edstt = -1;
+static int hf_nvme_identify_ctrl_dsto[3] = { NEG_LST_3 };
+static int hf_nvme_identify_ctrl_fwug = -1;
 static int hf_nvme_identify_ctrl_kas = -1;
+static int hf_nvme_identify_ctrl_hctma[3] = { NEG_LST_3 };
 static int hf_nvme_identify_ctrl_sqes = -1;
 static int hf_nvme_identify_ctrl_cqes = -1;
 static int hf_nvme_identify_ctrl_maxcmd = -1;
@@ -955,7 +959,14 @@ static void dissect_nvme_identify_ctrl_resp(tvbuff_t *cmd_tvb,
     post_add_cap(ti, cmd_tvb, 296);
 
     add_group_mask_entry(cmd_tvb, cmd_tree, 312, 4, ASPEC(hf_nvme_identify_ctrl_rpmbs));
-    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_kas, cmd_tvb, 320, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_edstt, cmd_tvb, 316, 2, ENC_LITTLE_ENDIAN);
+    add_group_mask_entry(cmd_tvb, cmd_tree, 318, 1, ASPEC(hf_nvme_identify_ctrl_dsto));
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_fwug, cmd_tvb, 319, 1, ENC_LITTLE_ENDIAN);
+
+    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_kas, cmd_tvb, 320, 2, ENC_LITTLE_ENDIAN, &val);
+    post_add_ms(ti, val);
+
+    add_group_mask_entry(cmd_tvb, cmd_tree, 320, 2, ASPEC(hf_nvme_identify_ctrl_hctma));
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_sqes, cmd_tvb, 512, 1, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_cqes, cmd_tvb, 513, 1, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_maxcmd, cmd_tvb, 514, 2, ENC_LITTLE_ENDIAN);
@@ -1951,9 +1962,41 @@ proto_register_nvme(void)
             { "Access Size (512-byte blocks, zero based)", "nvme.cmd.identify.ctrl.rpmbs.as",
                FT_UINT32, BASE_HEX, NULL, 0xff000000, NULL, HFILL}
         },
+            { &hf_nvme_identify_ctrl_edstt,
+            { "Extended Device Self-test Time (EDSTT) (in minutes)", "nvme.cmd.identify.ctrl.edstt",
+               FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_dsto[0],
+            { "Device Self-test Options (DSTO)", "nvme.cmd.identify.ctrl.dsto",
+               FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_dsto[1],
+            { "Concurrent Self-Tests for Multiple Devices Support", "nvme.cmd.identify.ctrl.dsto.mds",
+               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_dsto[2],
+            { "Reserved", "nvme.cmd.identify.ctrl.dsto.rsvd",
+               FT_UINT8, BASE_HEX, NULL, 0xfe, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_fwug,
+            { "Firmware Update Granularity in 4 KiB Units (FWUG)", "nvme.cmd.identify.ctrl.fwug",
+               FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
         { &hf_nvme_identify_ctrl_kas,
-            { "Keep Alive Support (KAS)", "nvme.cmd.identify.ctrl.kas",
+            { "Keep Alive Support - Timer Value (KAS)", "nvme.cmd.identify.ctrl.kas",
+               FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_hctma[0],
+            { "Host Controlled Thermal Management Attributes (HCTMA)", "nvme.cmd.identify.ctrl.hctma",
                FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_hctma[1],
+            { "Controller Supports Thermal Management", "nvme.cmd.identify.ctrl.hctma.sup",
+               FT_UINT16, BASE_HEX, NULL, 0x1, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_hctma[2],
+            { "Reserevd", "nvme.cmd.identify.ctrl.hctma.rsvd",
+               FT_UINT16, BASE_HEX, NULL, 0xfffe, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_sqes,
             { "Submission Queue Entry Size (SQES)", "nvme.cmd.identify.ctrl.sqes",
