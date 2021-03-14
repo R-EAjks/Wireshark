@@ -183,6 +183,10 @@ static int hf_nvme_identify_ctrl_maxcmd = -1;
 static int hf_nvme_identify_ctrl_nn = -1;
 static int hf_nvme_identify_ctrl_oncs[10] = { NEG_LST_10 };
 static int hf_nvme_identify_ctrl_fuses[3] = { NEG_LST_3 };
+static int hf_nvme_identify_ctrl_fna[5] = { NEG_LST_5 };
+static int hf_nvme_identify_ctrl_vwc[4] = { NEG_LST_4 };
+static int hf_nvme_identify_ctrl_awun = -1;
+static int hf_nvme_identify_ctrl_awupf = -1;
 static int hf_nvme_identify_ctrl_sgls = -1;
 static int hf_nvme_identify_ctrl_subnqn = -1;
 static int hf_nvme_identify_ctrl_ioccsz = -1;
@@ -773,7 +777,6 @@ static void dissect_nvme_identify_nslist_resp(tvbuff_t *cmd_tvb,
     }
 }
 
-
 static void add_group_mask_entry(tvbuff_t *tvb, proto_tree *tree, guint offset, guint bytes, int *array, guint array_len)
 {
     proto_item *ti, *grp;
@@ -786,6 +789,21 @@ static void add_group_mask_entry(tvbuff_t *tvb, proto_tree *tree, guint offset, 
         proto_tree_add_item(grp, array[i], tvb, offset, bytes, ENC_LITTLE_ENDIAN);
 }
 
+static void add_group_mask_entry_post_cb(tvbuff_t *tvb, proto_tree *tree, guint offset, guint bytes, int *array, guint array_len, void (*post_cb)(proto_item *ti, guint array_idx, guint value))
+{
+    proto_item *ti, *grp;
+    guint i;
+    guint val;
+
+    ti = proto_tree_add_item_ret_uint(tree, array[0], tvb, offset, bytes, ENC_LITTLE_ENDIAN, &val);
+    post_cb(ti, 0, val);
+    grp =  proto_item_add_subtree(ti, ett_data);
+
+    for (i = 1; i < array_len; i++) {
+        ti = proto_tree_add_item_ret_uint(grp, array[i], tvb, offset, bytes, ENC_LITTLE_ENDIAN, &val);
+        post_cb(ti, i, val);
+    }
+}
 
 static void post_add_mdts(proto_item *ti, guint val)
 {
@@ -805,7 +823,7 @@ static void post_add_rtd3(proto_item *ti, guint val)
 
 static void post_add_cntrltype(proto_item *ti, guint val)
 {
-    const value_string ctrl_type_tbl[] = {
+    static const value_string ctrl_type_tbl[] = {
         { 0,  "Reserved (not reported)" },
         { 1,  "I/O Controller" },
         { 2,  "Discovery Controller" },
@@ -896,38 +914,40 @@ static void post_add_tmt(proto_item *ti, guint val)
         proto_item_append_text(ti, " (%u degrees K)", val);
 }
 
-static void dissect_nvme_identify_ctrl_resp_sanicap(tvbuff_t *cmd_tvb, proto_tree *cmd_tree)
+static void post_add_sanicap(proto_item *ti, guint idx, guint val)
 {
-    guint array_len = array_length(hf_nvme_identify_ctrl_sanicap);
-    proto_item *ti, *grp;
-    guint i, val;
-    const value_string mmas_type_tbl[] = {
+    static const value_string mmas_type_tbl[] = {
         { 0,  "modification not defined" },
         { 1,  "no modification after sanitize completion" },
         { 2,  "additional modification after sanitize completion" },
         { 0, NULL}
     };
-    ti = proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_sanicap[0], cmd_tvb, 328, 4, ENC_LITTLE_ENDIAN);
-    grp =  proto_item_add_subtree(ti, ett_data);
-
-    for (i = 1; i < array_len; i++)
-        ti = proto_tree_add_item_ret_uint(grp, hf_nvme_identify_ctrl_sanicap[i], cmd_tvb, 328, 4, ENC_LITTLE_ENDIAN, &val);
-    proto_item_append_text(ti, " (%s)", val_to_str(val, mmas_type_tbl, "reserved value"));
+    if (idx == 6)
+        proto_item_append_text(ti, " (%s)", val_to_str(val, mmas_type_tbl, "reserved value"));
 }
 
-static void dissect_nvme_identify_ctrl_resp_qes(tvbuff_t *cmd_tvb, proto_tree *cmd_tree, guint off)
+static void post_add_lblocks(proto_item *ti, guint val)
 {
-    int *array = (off == 512) ? hf_nvme_identify_ctrl_sqes : hf_nvme_identify_ctrl_cqes;
-    guint val;
-    proto_item *ti, *grp;
-    guint i;
+    proto_item_append_text(ti, " (%u logical block%s)", val + 1, val ? "%s" : "");
+}
 
-    ti = proto_tree_add_item(cmd_tree, array[0], cmd_tvb, off, 1, ENC_LITTLE_ENDIAN);
-    grp =  proto_item_add_subtree(ti, ett_data);
-    for (i = 1; i < 3; i++) {
-        ti = proto_tree_add_item_ret_uint(grp, array[i], cmd_tvb, off, 1, ENC_LITTLE_ENDIAN, &val);
+static void post_add_qes(proto_item *ti, guint idx, guint val)
+{
+    if (idx)
         proto_item_append_text(ti, " (%u bytes)", 2 << val);
-    }
+}
+
+static void post_add_vwc(proto_item *ti, guint idx, guint val)
+{
+    static const value_string fcb_type_tbl[] = {
+        { 0,  "support for the NSID field set to FFFFFFFFh is not indicated" },
+        { 1, "reserved value" },
+        { 2,  "Flush command does not support the NSID field set to FFFFFFFFh" },
+        { 3,  "Flush command supports the NSID field set to FFFFFFFFh" },
+        { 0, NULL}
+    };
+    if (idx == 2)
+        proto_item_append_text(ti, " (%s)", val_to_str(val, fcb_type_tbl, "reserved value"));
 }
 
 static void dissect_nvme_identify_ctrl_resp(tvbuff_t *cmd_tvb,
@@ -1028,7 +1048,7 @@ static void dissect_nvme_identify_ctrl_resp(tvbuff_t *cmd_tvb,
     post_add_tmt(ti, val);
     ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_mxtmt, cmd_tvb, 326, 2, ENC_LITTLE_ENDIAN, &val);
     post_add_tmt(ti, val);
-    dissect_nvme_identify_ctrl_resp_sanicap(cmd_tvb, cmd_tree);
+    add_group_mask_entry_post_cb(cmd_tvb, cmd_tree, 328, 2, ASPEC(hf_nvme_identify_ctrl_sanicap), post_add_sanicap);
 
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_hmmminds, cmd_tvb, 332, 4, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_hmmaxd, cmd_tvb, 336, 2, ENC_LITTLE_ENDIAN);
@@ -1041,12 +1061,18 @@ static void dissect_nvme_identify_ctrl_resp(tvbuff_t *cmd_tvb,
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_pels, cmd_tvb, 352, 4, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_rsvd2, cmd_tvb, 356, 156, ENC_NA);
 
-    dissect_nvme_identify_ctrl_resp_qes(cmd_tvb, cmd_tree, 512);
-    dissect_nvme_identify_ctrl_resp_qes(cmd_tvb, cmd_tree, 513);
+    add_group_mask_entry_post_cb(cmd_tvb, cmd_tree, 512, 1, ASPEC(hf_nvme_identify_ctrl_sqes), post_add_qes);
+    add_group_mask_entry_post_cb(cmd_tvb, cmd_tree, 513, 1, ASPEC(hf_nvme_identify_ctrl_cqes), post_add_qes);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_maxcmd, cmd_tvb, 514, 2, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_nn, cmd_tvb, 516, 4, ENC_LITTLE_ENDIAN);
     add_group_mask_entry(cmd_tvb, cmd_tree, 520, 2, ASPEC(hf_nvme_identify_ctrl_oncs));
     add_group_mask_entry(cmd_tvb, cmd_tree, 522, 2, ASPEC(hf_nvme_identify_ctrl_fuses));
+    add_group_mask_entry(cmd_tvb, cmd_tree, 524, 1, ASPEC(hf_nvme_identify_ctrl_fna));
+    add_group_mask_entry_post_cb(cmd_tvb, cmd_tree, 525, 1, ASPEC(hf_nvme_identify_ctrl_vwc), post_add_vwc);
+    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_awun, cmd_tvb, 526, 2, ENC_LITTLE_ENDIAN, &val);
+    post_add_lblocks(ti, val);
+    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_awupf, cmd_tvb, 528, 2, ENC_LITTLE_ENDIAN, &val);
+    post_add_lblocks(ti, val);
 
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_sgls, cmd_tvb, 536, 4, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_subnqn, cmd_tvb, 768, 256, ENC_ASCII|ENC_NA);
@@ -2265,6 +2291,50 @@ proto_register_nvme(void)
         { &hf_nvme_identify_ctrl_fuses[2],
             { "Reserved", "nvme.cmd.identify.ctrl.fuses.rsvd",
                FT_UINT16, BASE_HEX, NULL, 0xfffe, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_fna[0],
+            { "Format NVM Attributes (FNA)", "nvme.cmd.identify.ctrl.fna",
+               FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_fna[1],
+            { "Format Operation Applies to all Namespaces", "nvme.cmd.identify.ctrl.fna.fall",
+               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_fna[2],
+            { "Secure Erase Operation Applies to all Namespaces", "nvme.cmd.identify.ctrl.fna.seall",
+               FT_UINT8, BASE_HEX, NULL, 0x2, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_fna[3],
+            { "Cryptographic Erase Supportred", "nvme.cmd.identify.ctrl.fna.ces",
+               FT_UINT8, BASE_HEX, NULL, 0x4, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_fna[4],
+            { "Reserved", "nvme.cmd.identify.ctrl.fna.rsvd",
+               FT_UINT8, BASE_HEX, NULL, 0xf8, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_vwc[0],
+            { "Volatile Write Cache (VWC)", "nvme.cmd.identify.ctrl.vwc",
+               FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_vwc[1],
+            { "Volatile Write Cache Present", "nvme.cmd.identify.ctrl.vwc.cp",
+               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_vwc[2],
+            { "Flush Command Behavior", "nvme.cmd.identify.ctrl.vwc.cfb",
+               FT_UINT8, BASE_HEX, NULL, 0x6, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_vwc[3],
+            { "Reserved", "nvme.cmd.identify.ctrl.vwc.rsvd",
+               FT_UINT8, BASE_HEX, NULL, 0xf8, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_awun,
+            { "Atomic Write Unit Normal (AWUN)", "nvme.cmd.identify.ctrl.awun",
+               FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_awupf,
+            { "Atomic Write Unit Power Fail (AWUPF)", "nvme.cmd.identify.ctrl.awupf",
+               FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_sgls,
             { "SGL Support (SGLS)", "nvme.cmd.identify.ctrl.sgls",
