@@ -167,6 +167,11 @@ static int hf_nvme_identify_ctrl_hctma[3] = { NEG_LST_3 };
 static int hf_nvme_identify_ctrl_mntmt = -1;
 static int hf_nvme_identify_ctrl_mxtmt = -1;
 static int hf_nvme_identify_ctrl_sanicap[7] = { NEG_LST_7 };
+static int hf_nvme_identify_ctrl_hmmminds = -1;
+static int hf_nvme_identify_ctrl_hmmaxd = -1;
+static int hf_nvme_identify_ctrl_nsetidmax = -1;
+static int hf_nvme_identify_ctrl_endgidmax = -1;
+static int hf_nvme_identify_ctrl_anatt = -1;
 static int hf_nvme_identify_ctrl_sqes = -1;
 static int hf_nvme_identify_ctrl_cqes = -1;
 static int hf_nvme_identify_ctrl_maxcmd = -1;
@@ -1004,6 +1009,11 @@ static void dissect_nvme_identify_ctrl_resp(tvbuff_t *cmd_tvb,
     post_add_tmt(ti, val);
     dissect_nvme_identify_ctrl_resp_sanicap(cmd_tvb, cmd_tree);
 
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_hmmminds, cmd_tvb, 332, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_hmmaxd, cmd_tvb, 336, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_nsetidmax, cmd_tvb, 338, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_endgidmax, cmd_tvb, 340, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_anatt, cmd_tvb, 342, 1, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_sqes, cmd_tvb, 512, 1, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_cqes, cmd_tvb, 513, 1, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_maxcmd, cmd_tvb, 514, 2, ENC_LITTLE_ENDIAN);
@@ -2070,6 +2080,26 @@ proto_register_nvme(void)
         { &hf_nvme_identify_ctrl_sanicap[6],
             { "No-Deallocate Modifies Media After Sanitize (NODMMAS)", "nvme.cmd.identify.ctrl.sanicap.nodmmas",
                FT_UINT32, BASE_HEX, NULL, 0xc0000000, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_hmmminds,
+            { "Host Memory Buffer Minimum Descriptor Entry Size in 4 KiB Units (HMMINDS)", "nvme.cmd.identify.ctrl.hmmminds",
+               FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_hmmaxd,
+            { "Host Memory Maximum Descriptors Entries (HMMAXD)", "nvme.cmd.identify.ctrl.hmmaxd",
+               FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_nsetidmax,
+            { "NVM Set Identifier Maximum (NSETIDMAX)", "nvme.cmd.identify.ctrl.nsetidmax",
+               FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_endgidmax,
+            { "Endurance Group Identifier Maximum (ENDGIDMAX)", "nvme.cmd.identify.ctrl.endgidmax",
+               FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_anatt,
+            { "ANA Transition Time in Seconds (ANATT)", "nvme.cmd.identify.ctrl.anatt",
+               FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_sqes,
             { "Submission Queue Entry Size (SQES)", "nvme.cmd.identify.ctrl.sqes",
