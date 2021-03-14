@@ -187,7 +187,13 @@ static int hf_nvme_identify_ctrl_fna[5] = { NEG_LST_5 };
 static int hf_nvme_identify_ctrl_vwc[4] = { NEG_LST_4 };
 static int hf_nvme_identify_ctrl_awun = -1;
 static int hf_nvme_identify_ctrl_awupf = -1;
-static int hf_nvme_identify_ctrl_sgls = -1;
+static int hf_nvme_identify_ctrl_nvscc[3] = { NEG_LST_3 };
+static int hf_nvme_identify_ctrl_nwpc[5] = { NEG_LST_5 };
+static int hf_nvme_identify_ctrl_acwu = -1;
+static int hf_nvme_identify_ctrl_rsvd3 = -1;
+static int hf_nvme_identify_ctrl_sgls[11] = { NEG_LST_11 };
+static int hf_nvme_identify_ctrl_mnan = -1;
+static int hf_nvme_identify_ctrl_rsvd4 = -1;
 static int hf_nvme_identify_ctrl_subnqn = -1;
 static int hf_nvme_identify_ctrl_ioccsz = -1;
 static int hf_nvme_identify_ctrl_iorcsz = -1;
@@ -940,16 +946,28 @@ static void post_add_qes(proto_item *ti, guint idx, guint val)
 static void post_add_vwc(proto_item *ti, guint idx, guint val)
 {
     static const value_string fcb_type_tbl[] = {
-        { 0,  "support for the NSID field set to FFFFFFFFh is not indicated" },
+        { 0, "support for the NSID field set to FFFFFFFFh is not indicated" },
         { 1, "reserved value" },
-        { 2,  "Flush command does not support the NSID field set to FFFFFFFFh" },
-        { 3,  "Flush command supports the NSID field set to FFFFFFFFh" },
+        { 2, "Flush command does not support the NSID field set to FFFFFFFFh" },
+        { 3, "Flush command supports the NSID field set to FFFFFFFFh" },
         { 0, NULL}
     };
     if (idx == 2)
         proto_item_append_text(ti, " (%s)", val_to_str(val, fcb_type_tbl, "reserved value"));
 }
 
+static void post_add_sgls(proto_item *ti, guint idx, guint val)
+{
+    static const value_string sgls_type_tbl[] = {
+        { 0,  "SGLs are not supported." },
+        { 1, "SGLs are supported without alignment or granularity limitations" },
+        { 2, "SGLs are supported with DWORD alignment and granularity limitation" },
+        { 3,  "reserved value" },
+        { 0, NULL}
+    };
+    if (idx == 1)
+        proto_item_append_text(ti, " (%s)", val_to_str(val, sgls_type_tbl, "reserved value"));
+}
 static void dissect_nvme_identify_ctrl_resp(tvbuff_t *cmd_tvb,
                                             proto_tree *cmd_tree)
 {
@@ -1074,7 +1092,14 @@ static void dissect_nvme_identify_ctrl_resp(tvbuff_t *cmd_tvb,
     ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_awupf, cmd_tvb, 528, 2, ENC_LITTLE_ENDIAN, &val);
     post_add_lblocks(ti, val);
 
-    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_sgls, cmd_tvb, 536, 4, ENC_LITTLE_ENDIAN);
+    add_group_mask_entry(cmd_tvb, cmd_tree, 530, 1, ASPEC(hf_nvme_identify_ctrl_nvscc));
+    add_group_mask_entry(cmd_tvb, cmd_tree, 531, 1, ASPEC(hf_nvme_identify_ctrl_nwpc));
+    ti =  proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_acwu, cmd_tvb, 532, 2, ENC_LITTLE_ENDIAN, &val);
+    post_add_lblocks(ti, val);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_rsvd3, cmd_tvb, 534, 2, ENC_NA);
+    add_group_mask_entry_post_cb(cmd_tvb, cmd_tree, 536, 4, ASPEC(hf_nvme_identify_ctrl_sgls), post_add_sgls);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_mnan, cmd_tvb, 540, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_rsvd4, cmd_tvb, 544, 224, ENC_NA);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_subnqn, cmd_tvb, 768, 256, ENC_ASCII|ENC_NA);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_ioccsz, cmd_tvb, 1792, 4, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_iorcsz, cmd_tvb, 1796, 4, ENC_LITTLE_ENDIAN);
@@ -2336,9 +2361,97 @@ proto_register_nvme(void)
             { "Atomic Write Unit Power Fail (AWUPF)", "nvme.cmd.identify.ctrl.awupf",
                FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}
         },
-        { &hf_nvme_identify_ctrl_sgls,
+        { &hf_nvme_identify_ctrl_nvscc[0],
+            { "NVM Vendor Specific Command Configuration (NVSCC)", "nvme.cmd.identify.ctrl.nvscc",
+               FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_nvscc[1],
+            { "Standard Format Used for Vendor Specific Commands", "nvme.cmd.identify.ctrl.nvscc.std",
+               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_nvscc[2],
+            { "Reserved", "nvme.cmd.identify.ctrl.nvscc.rsvd",
+               FT_UINT8, BASE_HEX, NULL, 0xfe, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_nwpc[0],
+            { "Namespace Write Protection Capabilities (NWPC)", "nvme.cmd.identify.ctrl.nwpc",
+               FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_nwpc[1],
+            { "No Write Protect and Write Protect namespace write protection states Support", "nvme.cmd.identify.ctrl.nwpc.wpss",
+               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_nwpc[2],
+            { "Write Protect Until Power Cycle state Support", "nvme.cmd.identify.ctrl.nwpc.wppcs",
+               FT_UINT8, BASE_HEX, NULL, 0x2, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_nwpc[3],
+            { "Permanent Write Protect state Support", "nvme.cmd.identify.ctrl.nwpc.pwpss",
+               FT_UINT8, BASE_HEX, NULL, 0x4, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_nwpc[4],
+            { "Reserved", "nvme.cmd.identify.ctrl.nwpc.rsvd",
+               FT_UINT8, BASE_HEX, NULL, 0xf8, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_acwu,
+            { "Atomic Compare & Write Unit (ACWU)", "nvme.cmd.identify.ctrl.acwu",
+               FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_rsvd3,
+            { "Reserved", "nvme.cmd.identify.ctrl.rsvd3",
+               FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_sgls[0],
             { "SGL Support (SGLS)", "nvme.cmd.identify.ctrl.sgls",
                FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_sgls[1],
+            { "SGL Supported", "nvme.cmd.identify.ctrl.sgls.sgls",
+               FT_UINT32, BASE_HEX, NULL, 0x3, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_sgls[2],
+            { "Supports Keyed SGL Data Block Descriptor", "nvme.cmd.identify.ctrl.sgls.kdbs",
+               FT_UINT32, BASE_HEX, NULL, 0x4, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_sgls[3],
+            { "Reserved", "nvme.cmd.identify.ctrl.sgls.rsvd0",
+               FT_UINT32, BASE_HEX, NULL, 0xfff8, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_sgls[4],
+            { "Supports SGL Bit Bucket Descriptor", "nvme.cmd.identify.ctrl.sgls.bbd",
+               FT_UINT32, BASE_HEX, NULL, 0x10000, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_sgls[5],
+            { "Supports byte aligned contiguous buffer in MPTR Field", "nvme.cmd.identify.ctrl.sgls.bufmptr",
+               FT_UINT32, BASE_HEX, NULL, 0x20000, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_sgls[6],
+            { "Supports Larger SGL List than Command Requires", "nvme.cmd.identify.ctrl.sgls.lsgl",
+               FT_UINT32, BASE_HEX, NULL, 0x40000, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_sgls[7],
+            { "Supports SGL Segment in MPTR Field", "nvme.cmd.identify.ctrl.sgls.kmptr",
+               FT_UINT32, BASE_HEX, NULL, 0x80000, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_sgls[8],
+            { "Supports Address Field as offset in Data Block, Segment and Last Segment SGLs", "nvme.cmd.identify.ctrl.sgls.offs",
+               FT_UINT32, BASE_HEX, NULL, 0x100000, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_sgls[9],
+            { "Supports Transport SGL Data Block Descriptor", "nvme.cmd.identify.ctrl.sgls.tdbd",
+               FT_UINT32, BASE_HEX, NULL, 0x200000, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_sgls[10],
+            { "Reserved", "nvme.cmd.identify.ctrl.sgls.rsvd1",
+               FT_UINT32, BASE_HEX, NULL, 0xffc00000, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_mnan,
+            { "Maximum Number of Allowed Namespaces (MNAN)", "nvme.cmd.identify.ctrl.mnan",
+               FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_rsvd4,
+            { "Reserved", "nvme.cmd.identify.ctrl.rsvd4",
+               FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_subnqn,
             { "NVM Subsystem NVMe Qualified Name (SUBNQN)", "nvme.cmd.identify.ctrl.subnqn",
