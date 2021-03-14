@@ -114,6 +114,7 @@ static int hf_nvme_identify_ctrl_ieee = -1;
 #define NEG_LST_18 NEG_LST_9, NEG_LST_9
 #define NEG_LST_19 NEG_LST_10, NEG_LST_9
 #define NEG_LST_20 NEG_LST_10, NEG_LST_10
+#define NEG_LST_32 NEG_LST_16, NEG_LST_16
 
 static int hf_nvme_identify_ctrl_cmic[6] = { NEG_LST_6 };
 static int hf_nvme_identify_ctrl_mdts = -1;
@@ -204,6 +205,34 @@ static int hf_nvme_identify_ctrl_nvmeof_fcatt[3] = { NEG_LST_3 };
 static int hf_nvme_identify_ctrl_nvmeof_msdbd = -1;
 static int hf_nvme_identify_ctrl_nvmeof_ofcs[3] = { NEG_LST_3 };
 static int hf_nvme_identify_ctrl_nvmeof_rsvd = -1;
+static int hf_nvme_identify_ctrl_psds = -1;
+static int hf_nvme_identify_ctrl_psd = -1;
+static int hf_nvme_identify_ctrl_psd_mp = -1;
+static int hf_nvme_identify_ctrl_psd_rsvd0 = -1;
+static int hf_nvme_identify_ctrl_psd_mxps = -1;
+static int hf_nvme_identify_ctrl_psd_nops = -1;
+static int hf_nvme_identify_ctrl_psd_rsvd1 = -1;
+static int hf_nvme_identify_ctrl_psd_enlat = -1;
+static int hf_nvme_identify_ctrl_psd_exlat = -1;
+static int hf_nvme_identify_ctrl_psd_rrt = -1;
+static int hf_nvme_identify_ctrl_psd_rsvd2 = -1;
+static int hf_nvme_identify_ctrl_psd_rrl = -1;
+static int hf_nvme_identify_ctrl_psd_rsvd3 = -1;
+static int hf_nvme_identify_ctrl_psd_rwt = -1;
+static int hf_nvme_identify_ctrl_psd_rsvd4 = -1;
+static int hf_nvme_identify_ctrl_psd_rwl = -1;
+static int hf_nvme_identify_ctrl_psd_rsvd5 = -1;
+static int hf_nvme_identify_ctrl_psd_idlp = -1;
+static int hf_nvme_identify_ctrl_psd_rsvd6 = -1;
+static int hf_nvme_identify_ctrl_psd_ips = -1;
+static int hf_nvme_identify_ctrl_psd_rsvd7 = -1;
+static int hf_nvme_identify_ctrl_psd_actp = -1;
+static int hf_nvme_identify_ctrl_psd_apw = -1;
+static int hf_nvme_identify_ctrl_psd_rsvd8 = -1;
+static int hf_nvme_identify_ctrl_psd_aps = -1;
+static int hf_nvme_identify_ctrl_psd_rsvd9 = -1;
+static int hf_nvme_identify_ctrl_vs = - 1;
+
 static int hf_nvme_identify_nslist_nsid = -1;
 
 /* NVMe CQE fields */
@@ -998,6 +1027,80 @@ static void dissect_nvme_identify_ctrl_resp_nvmeof(tvbuff_t *cmd_tvb, proto_tree
     proto_tree_add_item(grp, hf_nvme_identify_ctrl_nvmeof_rsvd, cmd_tvb, 1806, 242, ENC_NA);
 }
 
+static void dissect_nvme_identify_ctrl_resp_power_state_descriptor(tvbuff_t *cmd_tvb, proto_tree *tree, guint8 idx)
+{
+    proto_item *ti;
+    proto_tree *grp;
+    guint val;
+    guint off;
+
+    static const value_string power_scale_tbl[] = {
+        { 0, "not reported for this power state" },
+        { 1, "0.0001 Watt units" },
+        { 2, "0.01 Watt units" },
+        { 3,  "reserved value" },
+        { 0, NULL}
+    };
+
+
+    off = 2048 + idx *32;
+    ti = proto_tree_add_bytes_format(tree, hf_nvme_identify_ctrl_psd, cmd_tvb, off, 32, NULL,
+                                           "Power State %u Descriptor (PSD%u)", idx, idx);
+    grp =  proto_item_add_subtree(ti, ett_data);
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_mp, cmd_tvb, off, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd0, cmd_tvb, off+2, 1, ENC_LITTLE_ENDIAN);
+
+    ti = proto_tree_add_item_ret_uint(grp, hf_nvme_identify_ctrl_psd_mxps, cmd_tvb, off+3, 1, ENC_LITTLE_ENDIAN, &val);
+    proto_item_append_text(ti, " (%s Watt units)", val ? "0.0001" : "0.001");
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_nops, cmd_tvb, off+3, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd1, cmd_tvb, off+3, 1, ENC_LITTLE_ENDIAN);
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_enlat, cmd_tvb, off+4, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_exlat, cmd_tvb, off+8, 4, ENC_LITTLE_ENDIAN);
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rrt, cmd_tvb, off+12, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd2, cmd_tvb, off+12, 1, ENC_LITTLE_ENDIAN);
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rrl, cmd_tvb, off+13, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd3, cmd_tvb, off+13, 1, ENC_LITTLE_ENDIAN);
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rwt, cmd_tvb, off+14, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd4, cmd_tvb, off+14, 1, ENC_LITTLE_ENDIAN);
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rwl, cmd_tvb, off+15, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd5, cmd_tvb, off+15, 1, ENC_LITTLE_ENDIAN);
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_idlp, cmd_tvb, off+16, 2, ENC_LITTLE_ENDIAN);
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd6, cmd_tvb, off+18, 1, ENC_LITTLE_ENDIAN);
+    ti = proto_tree_add_item_ret_uint(grp, hf_nvme_identify_ctrl_psd_ips, cmd_tvb, off+18, 1, ENC_LITTLE_ENDIAN, &val);
+    proto_item_append_text(ti, " (%s)", val_to_str(val, power_scale_tbl, "reserved value"));
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd7, cmd_tvb, off+19, 1, ENC_LITTLE_ENDIAN);
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_actp, cmd_tvb, off+20, 2, ENC_LITTLE_ENDIAN);
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_apw, cmd_tvb, off+22, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd8, cmd_tvb, off+22, 1, ENC_LITTLE_ENDIAN);
+    ti = proto_tree_add_item_ret_uint(grp, hf_nvme_identify_ctrl_psd_aps, cmd_tvb, off+22, 1, ENC_LITTLE_ENDIAN, &val);
+    proto_item_append_text(ti, " (%s)", val_to_str(val, power_scale_tbl, "reserved value"));
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd9, cmd_tvb, off+23, 9, ENC_NA);
+}
+
+static void dissect_nvme_identify_ctrl_resp_power_state_descriptors(tvbuff_t *cmd_tvb, proto_tree *cmd_tree)
+{
+    proto_item *ti;
+    proto_tree *grp;
+    guint i;
+
+    ti = proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_psds, cmd_tvb, 2048, 1024, ENC_NA);
+    grp =  proto_item_add_subtree(ti, ett_data);
+    for (i = 0; i < 32; i++)
+        dissect_nvme_identify_ctrl_resp_power_state_descriptor(cmd_tvb, grp, i);
+}
+
 static void dissect_nvme_identify_ctrl_resp(tvbuff_t *cmd_tvb,
                                             proto_tree *cmd_tree)
 {
@@ -1134,7 +1237,9 @@ static void dissect_nvme_identify_ctrl_resp(tvbuff_t *cmd_tvb,
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_rsvd5, cmd_tvb, 1024, 68, ENC_NA);
 
     dissect_nvme_identify_ctrl_resp_nvmeof(cmd_tvb, cmd_tree);
-
+    dissect_nvme_identify_ctrl_resp_power_state_descriptors(cmd_tvb, cmd_tree);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_vs, cmd_tvb, 3072, 1024, ENC_NA);
+}
 
 static void dissect_nvme_identify_resp(tvbuff_t *cmd_tvb, proto_tree *cmd_tree,
                                        struct nvme_cmd_ctx *cmd_ctx)
@@ -2538,6 +2643,114 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_nvmeof_rsvd,
             { "Reserved", "nvme.cmd.identify.ctrl.nvmeof.rsvd",
+               FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psds,
+            { "Power State Attributes", "nvme.cmd.identify.ctrl.psds",
+               FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd,
+            { "Power State 0 Descriptor (PSD0)", "nvme.cmd.identify.ctrl.psds.psd",
+               FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_mp,
+            { "Maximum Power (MP)", "nvme.cmd.identify.ctrl.psds.psd.mp",
+               FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_rsvd0,
+            { "Reserved", "nvme.cmd.identify.ctrl.psds.psd.rsvd0",
+               FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_mxps,
+            { "Max Power Scale (MXPS)", "nvme.cmd.identify.ctrl.psds.psd.mxps",
+               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_nops,
+            { "Non-Operational State (NOPS)", "nvme.cmd.identify.ctrl.psds.psd.nops",
+               FT_UINT8, BASE_HEX, NULL, 0x2, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_rsvd1,
+            { "Reserved", "nvme.cmd.identify.ctrl.psds.psd.rsvd1",
+               FT_UINT8, BASE_HEX, NULL, 0xfc, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_enlat,
+            { "Entry Latency (ENLAT)", "nvme.cmd.identify.ctrl.psds.psd.enlat",
+               FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_exlat,
+            { "Exit Latency (EXLAT)", "nvme.cmd.identify.ctrl.psds.psd.exlat",
+               FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_rrt,
+            { "Relative Read Throughput (RRT)", "nvme.cmd.identify.ctrl.psds.psd.rrt",
+               FT_UINT8, BASE_DEC, NULL, 0x1f, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_rsvd2,
+            { "Reserved", "nvme.cmd.identify.ctrl.psds.psd.rsvd2",
+               FT_UINT8, BASE_HEX, NULL, 0xe0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_rrl,
+            { "Relative Read Latency (RRL)", "nvme.cmd.identify.ctrl.psds.psd.rrl",
+               FT_UINT8, BASE_DEC, NULL, 0x1f, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_rsvd3,
+            { "Reserved", "nvme.cmd.identify.ctrl.psds.psd.rsvd3",
+               FT_UINT8, BASE_HEX, NULL, 0xe0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_rwt,
+            { "Relative Write Throughput (RWT)", "nvme.cmd.identify.ctrl.psds.psd.rwt",
+               FT_UINT8, BASE_DEC, NULL, 0x1f, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_rsvd4,
+            { "Reserved", "nvme.cmd.identify.ctrl.psds.psd.rsvd4",
+               FT_UINT8, BASE_HEX, NULL, 0xe0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_rwl,
+            { "Relative Write Latency (RWL)", "nvme.cmd.identify.ctrl.psds.psd.rwl",
+               FT_UINT8, BASE_DEC, NULL, 0x1f, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_rsvd5,
+            { "Reserved", "nvme.cmd.identify.ctrl.psds.psd.rsvd5",
+               FT_UINT8, BASE_HEX, NULL, 0xe0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_idlp,
+            { "Idle Power (IDLP)", "nvme.cmd.identify.ctrl.psds.psd.idlp",
+               FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_rsvd6,
+            { "Reserved", "nvme.cmd.identify.ctrl.psds.psd.rsvd6",
+               FT_UINT8, BASE_HEX, NULL, 0x3f, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_ips,
+            { "Idle Power Scale (IPS)", "nvme.cmd.identify.ctrl.psds.psd.ips",
+               FT_UINT8, BASE_HEX, NULL, 0xc0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_rsvd7,
+            { "Reserved", "nvme.cmd.identify.ctrl.psds.psd.rsvd7",
+               FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_actp,
+            { "Active Power (ACTP)", "nvme.cmd.identify.ctrl.psds.psd.actp",
+               FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_apw,
+            { "Active Power Workload (APW)", "nvme.cmd.identify.ctrl.psds.psd.apw",
+               FT_UINT8, BASE_HEX, NULL, 0x7, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_rsvd8,
+            { "Reserved", "nvme.cmd.identify.ctrl.psds.psd.rsvd8",
+               FT_UINT8, BASE_HEX, NULL, 0x38, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_aps,
+            { "Active Power Scale (APS)", "nvme.cmd.identify.ctrl.psds.psd.aps",
+               FT_UINT8, BASE_HEX, NULL, 0xc0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_psd_rsvd9,
+            { "Reserved", "nvme.cmd.identify.ctrl.psds.psd.rsvd9",
+               FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_vs,
+            { "Vendor Specific", "nvme.cmd.identify.ctrl.vs",
                FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}
         },
 
