@@ -172,6 +172,11 @@ static int hf_nvme_identify_ctrl_hmmaxd = -1;
 static int hf_nvme_identify_ctrl_nsetidmax = -1;
 static int hf_nvme_identify_ctrl_endgidmax = -1;
 static int hf_nvme_identify_ctrl_anatt = -1;
+static int hf_nvme_identify_ctrl_anacap[9] = { NEG_LST_9 };
+static int hf_nvme_identify_ctrl_anagrpmax = -1;
+static int hf_nvme_identify_ctrl_nanagrpid = -1;
+static int hf_nvme_identify_ctrl_pels = -1;
+static int hf_nvme_identify_ctrl_rsvd2 = -1;
 static int hf_nvme_identify_ctrl_sqes = -1;
 static int hf_nvme_identify_ctrl_cqes = -1;
 static int hf_nvme_identify_ctrl_maxcmd = -1;
@@ -1014,6 +1019,11 @@ static void dissect_nvme_identify_ctrl_resp(tvbuff_t *cmd_tvb,
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_nsetidmax, cmd_tvb, 338, 2, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_endgidmax, cmd_tvb, 340, 2, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_anatt, cmd_tvb, 342, 1, ENC_LITTLE_ENDIAN);
+    add_group_mask_entry(cmd_tvb, cmd_tree, 343, 1, ASPEC(hf_nvme_identify_ctrl_anacap));
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_anagrpmax, cmd_tvb, 344, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_nanagrpid, cmd_tvb, 348, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_pels, cmd_tvb, 352, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_rsvd2, cmd_tvb, 356, 156, ENC_NA);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_sqes, cmd_tvb, 512, 1, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_cqes, cmd_tvb, 513, 1, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_maxcmd, cmd_tvb, 514, 2, ENC_LITTLE_ENDIAN);
@@ -2100,6 +2110,58 @@ proto_register_nvme(void)
         { &hf_nvme_identify_ctrl_anatt,
             { "ANA Transition Time in Seconds (ANATT)", "nvme.cmd.identify.ctrl.anatt",
                FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_anacap[0],
+            { "Asymmetric Namespace Access Capabilities (ANACAP)", "nvme.cmd.identify.ctrl.anacap",
+               FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_anacap[1],
+            { "Reports ANA Optimized State", "nvme.cmd.identify.ctrl.anacap.osr",
+               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_anacap[2],
+            { "Reports ANA Non-Optimized State", "nvme.cmd.identify.ctrl.anacap.nosr",
+               FT_UINT8, BASE_HEX, NULL, 0x2, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_anacap[3],
+            { "Reports Innaccessible State", "nvme.cmd.identify.ctrl.anacap.isr",
+               FT_UINT8, BASE_HEX, NULL, 0x4, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_anacap[4],
+            { "Reports ANA Persistent Loss State", "nvme.cmd.identify.ctrl.anacap.plsr",
+               FT_UINT8, BASE_HEX, NULL, 0x8, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_anacap[5],
+            { "Reports ANA Change Sate", "nvme.cmd.identify.ctrl.anacap.csr",
+               FT_UINT8, BASE_HEX, NULL, 0x10, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_anacap[6],
+            { "Reserved", "nvme.cmd.identify.ctrl.anacap.rsvd",
+               FT_UINT8, BASE_HEX, NULL, 0x20, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_anacap[7],
+            { "ANAGRPID field in the Identify Namespace does not change", "nvme.cmd.identify.ctrl.anacap.panagrpid",
+               FT_UINT8, BASE_HEX, NULL, 0x40, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_anacap[8],
+            { "Supports non-zero value in the ANAGRPID field", "nvme.cmd.identify.ctrl.anacap.nzpanagrpid",
+               FT_UINT8, BASE_HEX, NULL, 0x80, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_anagrpmax,
+            { "ANA Group Identifier Maximum (ANAGRPMAX)", "nvme.cmd.identify.ctrl.anagrpmax",
+               FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_nanagrpid,
+            { "Number of ANA Group Identifiers (NANAGRPID)", "nvme.cmd.identify.ctrl.nanagrpid",
+               FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_pels,
+            { "Persistent Event Log Size in 64 KiB Units (PELS)", "nvme.cmd.identify.ctrl.pels",
+               FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_identify_ctrl_rsvd2,
+            { "Reserved", "nvme.cmd.identify.ctrl.rsvd2",
+               FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_sqes,
             { "Submission Queue Entry Size (SQES)", "nvme.cmd.identify.ctrl.sqes",
