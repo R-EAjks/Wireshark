@@ -597,6 +597,7 @@ const value_string ie_tag_num_vals[] = {
   { TAG_QUIET_PERIOD_RES,                     "Quiet Period Response" },
   { TAG_ECAPC_POLICY,                         "ECAPC Policy" },
   { TAG_CLUSTER_TIME_OFFSET,                  "Cluster Time Offset" },
+  { TAG_INTRA_ACCESS_CAT_PRIO,                "Intra-Access Category Priority" },
   { TAG_SCS_DESCRIPTOR,                       "SCS Descriptor" },
   { TAG_ANTENNA_SECTOR_ID,                    "Antenna Sector ID" },
   { TAG_VHT_CAPABILITY,                       "VHT Capabilities" },
@@ -24425,7 +24426,7 @@ ieee80211_frame_classifier(tvbuff_t *tvb, packet_info *pinfo _U_,
                         offset, 1, ENC_NA);
     offset += 1;
 
-    filter_field_len = (tag_len - 5) / 2;
+    filter_field_len = (tag_len - 4) / 2;
 
     proto_tree_add_item(tree, hf_ieee80211_tclas_filter_value, tvb, offset,
                         filter_field_len, ENC_NA);
