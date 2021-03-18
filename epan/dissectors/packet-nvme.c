@@ -422,6 +422,7 @@ static const value_string dsm_acc_lat_tbl[] = {
     { 0, NULL}
 };
 
+
 void
 nvme_publish_qid(proto_tree *tree, int field_index, guint16 qid)
 {
@@ -831,82 +832,131 @@ static void add_group_mask_entry(tvbuff_t *tvb, proto_tree *tree, guint offset, 
         proto_tree_add_item(grp, array[i], tvb, offset, bytes, ENC_LITTLE_ENDIAN);
 }
 
-static void add_group_mask_entry_post_cb(tvbuff_t *tvb, proto_tree *tree, guint offset, guint bytes, int *array, guint array_len, void (*post_cb)(proto_item *ti, guint array_idx, guint value))
-{
-    proto_item *ti, *grp;
-    guint i;
-    guint val;
 
-    ti = proto_tree_add_item_ret_uint(tree, array[0], tvb, offset, bytes, ENC_LITTLE_ENDIAN, &val);
-    post_cb(ti, 0, val);
+#define ASPEC(_x_) _x_, array_length(_x_)
+
+static void add_ctrl_x16_bytes( gchar *result, guint32 val)
+{
+    g_snprintf(result, ITEM_LABEL_LENGTH, "%x (%u bytes)", val, val * 16);
+}
+
+static void dissect_nvme_identify_ctrl_resp_nvmeof(tvbuff_t *cmd_tvb, proto_tree *cmd_tree)
+{
+    proto_item *ti;
+    proto_tree *grp;
+
+    ti = proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_nvmeof, cmd_tvb, 1792, 256, ENC_NA);
     grp =  proto_item_add_subtree(ti, ett_data);
 
-    for (i = 1; i < array_len; i++) {
-        ti = proto_tree_add_item_ret_uint(grp, array[i], tvb, offset, bytes, ENC_LITTLE_ENDIAN, &val);
-        post_cb(ti, i, val);
-    }
+    ti = proto_tree_add_item(grp, hf_nvme_identify_ctrl_nvmeof_ioccsz, cmd_tvb, 1792, 4, ENC_LITTLE_ENDIAN);
+    ti = proto_tree_add_item(grp, hf_nvme_identify_ctrl_nvmeof_iorcsz, cmd_tvb, 1796, 4, ENC_LITTLE_ENDIAN);
+    ti = proto_tree_add_item(grp, hf_nvme_identify_ctrl_nvmeof_icdoff, cmd_tvb, 1800, 2, ENC_LITTLE_ENDIAN);
+
+    add_group_mask_entry(cmd_tvb, grp, 1802, 1, ASPEC(hf_nvme_identify_ctrl_nvmeof_fcatt));
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_nvmeof_msdbd, cmd_tvb, 1803, 1, ENC_LITTLE_ENDIAN);
+    add_group_mask_entry(cmd_tvb, grp, 1804, 2, ASPEC(hf_nvme_identify_ctrl_nvmeof_ofcs));
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_nvmeof_rsvd, cmd_tvb, 1806, 242, ENC_NA);
 }
 
-static void post_add_mdts(proto_item *ti, guint val)
+const unit_name_string units_watts = { " (0.0001 Watt units)", " (0.001 Watt units)" };
+
+static const value_string power_scale_tbl[] = {
+    { 0, "not reported for this power state" },
+    { 1, "0.0001 Watt units" },
+    { 2, "0.01 Watt units" },
+    { 3,  "reserved value" },
+    { 0, NULL}
+};
+
+static void dissect_nvme_identify_ctrl_resp_power_state_descriptor(tvbuff_t *cmd_tvb, proto_tree *tree, guint8 idx)
+{
+    proto_item *ti;
+    proto_tree *grp;
+    guint off;
+
+    off = 2048 + idx *32;
+    ti = proto_tree_add_bytes_format(tree, hf_nvme_identify_ctrl_psd, cmd_tvb, off, 32, NULL,
+                                           "Power State %u Descriptor (PSD%u)", idx, idx);
+    grp =  proto_item_add_subtree(ti, ett_data);
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_mp, cmd_tvb, off, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd0, cmd_tvb, off+2, 1, ENC_LITTLE_ENDIAN);
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_mxps, cmd_tvb, off+3, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_nops, cmd_tvb, off+3, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd1, cmd_tvb, off+3, 1, ENC_LITTLE_ENDIAN);
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_enlat, cmd_tvb, off+4, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_exlat, cmd_tvb, off+8, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rrt, cmd_tvb, off+12, 1, ENC_LITTLE_ENDIAN);
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd2, cmd_tvb, off+12, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rrl, cmd_tvb, off+13, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd3, cmd_tvb, off+13, 1, ENC_LITTLE_ENDIAN);
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rwt, cmd_tvb, off+14, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd4, cmd_tvb, off+14, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rwl, cmd_tvb, off+15, 1, ENC_LITTLE_ENDIAN);
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd5, cmd_tvb, off+15, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_idlp, cmd_tvb, off+16, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd6, cmd_tvb, off+18, 1, ENC_LITTLE_ENDIAN);
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_ips, cmd_tvb, off+18, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd7, cmd_tvb, off+19, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_actp, cmd_tvb, off+20, 2, ENC_LITTLE_ENDIAN);
+
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_apw, cmd_tvb, off+22, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd8, cmd_tvb, off+22, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_aps, cmd_tvb, off+22, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd9, cmd_tvb, off+23, 9, ENC_NA);
+}
+
+static void dissect_nvme_identify_ctrl_resp_power_state_descriptors(tvbuff_t *cmd_tvb, proto_tree *cmd_tree)
+{
+    proto_item *ti;
+    proto_tree *grp;
+    guint i;
+
+    ti = proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_psds, cmd_tvb, 2048, 1024, ENC_NA);
+    grp =  proto_item_add_subtree(ti, ett_data);
+    for (i = 0; i < 32; i++)
+        dissect_nvme_identify_ctrl_resp_power_state_descriptor(cmd_tvb, grp, i);
+}
+
+
+static void add_ctrl_rab(gchar *result, guint32 val)
+{
+    g_snprintf(result, ITEM_LABEL_LENGTH, "0x%x (%"G_GUINT64_FORMAT" command%s)", val, ((guint64)1) << val, val ? "s" : "");
+}
+
+static void add_ctrl_mdts(gchar *result, guint32 val)
 {
     if (val)
-        proto_item_append_text(ti, " (%lu pages)", 1UL << val);
+        g_snprintf(result, ITEM_LABEL_LENGTH, "0x%x (%"G_GUINT64_FORMAT" pages)", val, ((guint64)1) << val);
     else
-        proto_item_append_text(ti, " (unlimited)");
+        g_snprintf(result, ITEM_LABEL_LENGTH, "0x%x (unlimited)", val);
 }
 
-static void post_add_rtd3(proto_item *ti, guint val)
+static void add_ctrl_rtd3(gchar *result, guint32 val)
 {
     if (!val)
-        proto_item_append_text(ti, " (not reported)");
+        g_snprintf(result, ITEM_LABEL_LENGTH, "0 (not reported)");
     else
-        proto_item_append_text(ti, " (%u microseconds)", val);
+        g_snprintf(result, ITEM_LABEL_LENGTH, "%u (%u microsecond%s)", val, val, (val > 1) ? "%s" : "");
 }
 
-static void post_add_cntrltype(proto_item *ti, guint val)
-{
-    static const value_string ctrl_type_tbl[] = {
-        { 0,  "Reserved (not reported)" },
-        { 1,  "I/O Controller" },
-        { 2,  "Discovery Controller" },
-        { 3,  "Administrative Controller" },
-        { 0, NULL}
-    };
-    proto_item_append_text(ti, " (%s)", val_to_str(val, ctrl_type_tbl, "Reserved"));
-}
+static const value_string ctrl_type_tbl[] = {
+    { 0,  "Reserved (not reported)" },
+    { 1,  "I/O Controller" },
+    { 2,  "Discovery Controller" },
+    { 3,  "Administrative Controller" },
+    { 0, NULL}
+};
 
-static void post_add_ms(proto_item *ti, guint val)
+static void add_ctrl_ms(gchar *result, guint32 val)
 {
-    proto_item_append_text(ti, " (%u ms)", val * 100);
-}
-
-static void post_add_hmpre(proto_item *ti, guint val)
-{
-    proto_item_append_text(ti, " (%lu bytes)", ((unsigned long)(val)) * 4096);
-}
-
-static void post_add_cap(proto_item *ti, tvbuff_t *tvb, guint off)
-{
-    guint64 lo = tvb_get_guint64(tvb, off, 0);
-    guint64 hi = tvb_get_guint64(tvb, off, 8);
-    if (hi) {
-        if (!(hi >> 10))
-            proto_item_append_text(ti, " (%" G_GUINT64_FORMAT " KiB)", (hi << 54) | (lo >> 10));
-        else if (!(hi >> 20))
-            proto_item_append_text(ti, " (%" G_GUINT64_FORMAT " MiB)", (hi << 44) | (lo >> 20));
-        else if (!(hi >> 30))
-            proto_item_append_text(ti, " (%" G_GUINT64_FORMAT " GiB)", (hi << 34) | (lo >> 30));
-        else if (!(hi >> 40))
-            proto_item_append_text(ti, " (%" G_GUINT64_FORMAT " TiB)", (hi << 24) | (lo >> 40));
-        else if (!(hi >> 50))
-            proto_item_append_text(ti, " (%" G_GUINT64_FORMAT " PiB)", (hi << 14) | (lo >> 50));
-        else if (!(hi >> 60))
-            proto_item_append_text(ti, " (%" G_GUINT64_FORMAT " EiB)", (hi << 4) | (lo >> 60));
-        else
-            proto_item_append_text(ti, " (%" G_GUINT64_FORMAT " ZiB)", hi >> 6);
-    } else {
-        proto_item_append_text(ti, " (%" G_GUINT64_FORMAT " bytes)", lo);
-    }
+    g_snprintf(result, ITEM_LABEL_LENGTH, "%u (%u ms)", val, val * 100);
 }
 
 static void dissect_nvme_identify_ctrl_resp_ver(tvbuff_t *cmd_tvb, proto_tree *cmd_tree)
@@ -934,7 +984,6 @@ static void dissect_nvme_identify_ctrl_resp_fguid(tvbuff_t *cmd_tvb, proto_tree 
     proto_tree_add_item(grp, hf_nvme_identify_ctrl_fguid_ei, cmd_tvb, 123, 5, ENC_LITTLE_ENDIAN);
 }
 
-#define ASPEC(_x_) _x_, array_length(_x_)
 static void dissect_nvme_identify_ctrl_resp_mi(tvbuff_t *cmd_tvb, proto_tree *cmd_tree)
 {
     proto_item *ti;
@@ -948,237 +997,151 @@ static void dissect_nvme_identify_ctrl_resp_mi(tvbuff_t *cmd_tvb, proto_tree *cm
     add_group_mask_entry(cmd_tvb, grp, 255, 1, ASPEC(hf_nvme_identify_ctrl_mi_mec));
 }
 
-static void post_add_tmt(proto_item *ti, guint val)
+static void add_ctrl_commands(gchar *result, guint32 val)
+{
+    g_snprintf(result, ITEM_LABEL_LENGTH, "0x%x: (%u command%s)", val, val+1, val ? "s" : "");
+}
+
+static void add_ctrl_events(gchar *result, guint32 val)
+{
+    g_snprintf(result, ITEM_LABEL_LENGTH, "0x%x: (%u event%s)", val, val+1, val ? "s" : "");
+}
+
+static void add_ctrl_entries(gchar *result, guint32 val)
+{
+    g_snprintf(result, ITEM_LABEL_LENGTH, "0x%x: (%u entr%s)", val, val+1, val ? "ies" : "y");
+}
+
+static void add_ctrl_states(gchar *result, guint32 val)
+{
+    g_snprintf(result, ITEM_LABEL_LENGTH, "0x%x: (%u state%s)", val, val+1, val ? "s" : "");
+}
+
+static void add_ctrl_hmpre(gchar *result, guint32 val)
+{
+    g_snprintf(result, ITEM_LABEL_LENGTH, "0x%x (%"G_GUINT64_FORMAT" bytes)", val, ((guint64)(val)) * 4096);
+}
+
+static void post_add_cap(proto_item *ti, tvbuff_t *tvb, guint off)
+{
+    guint64 lo = tvb_get_guint64(tvb, off, 0);
+    guint64 hi = tvb_get_guint64(tvb, off, 8);
+    if (hi) {
+        if (!(hi >> 10))
+            proto_item_append_text(ti, " (%" G_GUINT64_FORMAT " KiB)", (hi << 54) | (lo >> 10));
+        else if (!(hi >> 20))
+            proto_item_append_text(ti, " (%" G_GUINT64_FORMAT " MiB)", (hi << 44) | (lo >> 20));
+        else if (!(hi >> 30))
+            proto_item_append_text(ti, " (%" G_GUINT64_FORMAT " GiB)", (hi << 34) | (lo >> 30));
+        else if (!(hi >> 40))
+            proto_item_append_text(ti, " (%" G_GUINT64_FORMAT " TiB)", (hi << 24) | (lo >> 40));
+        else if (!(hi >> 50))
+            proto_item_append_text(ti, " (%" G_GUINT64_FORMAT " PiB)", (hi << 14) | (lo >> 50));
+        else if (!(hi >> 60))
+            proto_item_append_text(ti, " (%" G_GUINT64_FORMAT " EiB)", (hi << 4) | (lo >> 60));
+        else
+            proto_item_append_text(ti, " (%" G_GUINT64_FORMAT " ZiB)", hi >> 6);
+    } else {
+        proto_item_append_text(ti, " (%" G_GUINT64_FORMAT " bytes)", lo);
+    }
+}
+
+static void add_ctrl_tmt(gchar *result, guint32 val)
 {
     if (!val)
-        proto_item_append_text(ti, " (not supported)");
+        g_snprintf(result, ITEM_LABEL_LENGTH, "0 (not supported)");
     else
-        proto_item_append_text(ti, " (%u degrees K)", val);
+        g_snprintf(result, ITEM_LABEL_LENGTH, "%u degrees K", val);
 }
 
-static void post_add_sanicap(proto_item *ti, guint idx, guint val)
+static const value_string mmas_type_tbl[] = {
+    { 0,  "modification not defined" },
+    { 1,  "no modification after sanitize completion" },
+    { 2,  "additional modification after sanitize completion" },
+    { 0, NULL}
+};
+
+static void add_ctrl_pow2_bytes(gchar *result, guint32 val)
 {
-    static const value_string mmas_type_tbl[] = {
-        { 0,  "modification not defined" },
-        { 1,  "no modification after sanitize completion" },
-        { 2,  "additional modification after sanitize completion" },
-        { 0, NULL}
-    };
-    if (idx == 6)
-        proto_item_append_text(ti, " (%s)", val_to_str(val, mmas_type_tbl, "reserved value"));
+    g_snprintf(result, ITEM_LABEL_LENGTH, "0x%x (%" G_GUINT64_FORMAT" bytes)", val, ((guint64)1) << val);
 }
 
-static void post_add_lblocks(proto_item *ti, guint val)
+static const value_string fcb_type_tbl[] = {
+    { 0, "support for the NSID field set to FFFFFFFFh is not indicated" },
+    { 1, "reserved value" },
+    { 2, "Flush command does not support the NSID field set to FFFFFFFFh" },
+    { 3, "Flush command supports the NSID field set to FFFFFFFFh" },
+    { 0, NULL}
+};
+
+
+static void add_ctrl_lblocks(gchar *result, guint32 val)
 {
-    proto_item_append_text(ti, " (%u logical block%s)", val + 1, val ? "%s" : "");
+    g_snprintf(result, ITEM_LABEL_LENGTH, "%u logical block%s", val + 1, val ? "%s" : "");
 }
 
-static void post_add_qes(proto_item *ti, guint idx, guint val)
-{
-    if (idx)
-        proto_item_append_text(ti, " (%u bytes)", 2 << val);
-}
-
-static void post_add_vwc(proto_item *ti, guint idx, guint val)
-{
-    static const value_string fcb_type_tbl[] = {
-        { 0, "support for the NSID field set to FFFFFFFFh is not indicated" },
-        { 1, "reserved value" },
-        { 2, "Flush command does not support the NSID field set to FFFFFFFFh" },
-        { 3, "Flush command supports the NSID field set to FFFFFFFFh" },
-        { 0, NULL}
-    };
-    if (idx == 2)
-        proto_item_append_text(ti, " (%s)", val_to_str(val, fcb_type_tbl, "reserved value"));
-}
-
-static void post_add_sgls(proto_item *ti, guint idx, guint val)
-{
-    static const value_string sgls_type_tbl[] = {
-        { 0,  "SGLs are not supported." },
-        { 1, "SGLs are supported without alignment or granularity limitations" },
-        { 2, "SGLs are supported with DWORD alignment and granularity limitation" },
-        { 3,  "reserved value" },
-        { 0, NULL}
-    };
-    if (idx == 1)
-        proto_item_append_text(ti, " (%s)", val_to_str(val, sgls_type_tbl, "reserved value"));
-}
-
-static void dissect_nvme_identify_ctrl_resp_nvmeof(tvbuff_t *cmd_tvb, proto_tree *cmd_tree)
-{
-    proto_item *ti;
-    proto_tree *grp;
-    guint val;
-
-    ti = proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_nvmeof, cmd_tvb, 1792, 256, ENC_NA);
-    grp =  proto_item_add_subtree(ti, ett_data);
-
-    ti = proto_tree_add_item_ret_uint(grp, hf_nvme_identify_ctrl_nvmeof_ioccsz, cmd_tvb, 1792, 4, ENC_LITTLE_ENDIAN, &val);
-    proto_item_append_text(ti, " (%u bytes)", val * 16);
-    ti = proto_tree_add_item_ret_uint(grp, hf_nvme_identify_ctrl_nvmeof_iorcsz, cmd_tvb, 1796, 4, ENC_LITTLE_ENDIAN, &val);
-    proto_item_append_text(ti, " (%u bytes)", val * 16);
-    ti = proto_tree_add_item_ret_uint(grp, hf_nvme_identify_ctrl_nvmeof_icdoff, cmd_tvb, 1800, 2, ENC_LITTLE_ENDIAN, &val);
-    proto_item_append_text(ti, " (%u bytes)", val * 16);
-
-    add_group_mask_entry(cmd_tvb, grp, 1802, 1, ASPEC(hf_nvme_identify_ctrl_nvmeof_fcatt));
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_nvmeof_msdbd, cmd_tvb, 1803, 1, ENC_LITTLE_ENDIAN);
-    add_group_mask_entry(cmd_tvb, grp, 1804, 2, ASPEC(hf_nvme_identify_ctrl_nvmeof_ofcs));
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_nvmeof_rsvd, cmd_tvb, 1806, 242, ENC_NA);
-}
-
-static void dissect_nvme_identify_ctrl_resp_power_state_descriptor(tvbuff_t *cmd_tvb, proto_tree *tree, guint8 idx)
-{
-    proto_item *ti;
-    proto_tree *grp;
-    guint val;
-    guint off;
-
-    static const value_string power_scale_tbl[] = {
-        { 0, "not reported for this power state" },
-        { 1, "0.0001 Watt units" },
-        { 2, "0.01 Watt units" },
-        { 3,  "reserved value" },
-        { 0, NULL}
-    };
-
-
-    off = 2048 + idx *32;
-    ti = proto_tree_add_bytes_format(tree, hf_nvme_identify_ctrl_psd, cmd_tvb, off, 32, NULL,
-                                           "Power State %u Descriptor (PSD%u)", idx, idx);
-    grp =  proto_item_add_subtree(ti, ett_data);
-
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_mp, cmd_tvb, off, 2, ENC_LITTLE_ENDIAN);
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd0, cmd_tvb, off+2, 1, ENC_LITTLE_ENDIAN);
-
-    ti = proto_tree_add_item_ret_uint(grp, hf_nvme_identify_ctrl_psd_mxps, cmd_tvb, off+3, 1, ENC_LITTLE_ENDIAN, &val);
-    proto_item_append_text(ti, " (%s Watt units)", val ? "0.0001" : "0.001");
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_nops, cmd_tvb, off+3, 1, ENC_LITTLE_ENDIAN);
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd1, cmd_tvb, off+3, 1, ENC_LITTLE_ENDIAN);
-
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_enlat, cmd_tvb, off+4, 4, ENC_LITTLE_ENDIAN);
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_exlat, cmd_tvb, off+8, 4, ENC_LITTLE_ENDIAN);
-
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rrt, cmd_tvb, off+12, 1, ENC_LITTLE_ENDIAN);
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd2, cmd_tvb, off+12, 1, ENC_LITTLE_ENDIAN);
-
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rrl, cmd_tvb, off+13, 1, ENC_LITTLE_ENDIAN);
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd3, cmd_tvb, off+13, 1, ENC_LITTLE_ENDIAN);
-
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rwt, cmd_tvb, off+14, 1, ENC_LITTLE_ENDIAN);
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd4, cmd_tvb, off+14, 1, ENC_LITTLE_ENDIAN);
-
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rwl, cmd_tvb, off+15, 1, ENC_LITTLE_ENDIAN);
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd5, cmd_tvb, off+15, 1, ENC_LITTLE_ENDIAN);
-
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_idlp, cmd_tvb, off+16, 2, ENC_LITTLE_ENDIAN);
-
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd6, cmd_tvb, off+18, 1, ENC_LITTLE_ENDIAN);
-    ti = proto_tree_add_item_ret_uint(grp, hf_nvme_identify_ctrl_psd_ips, cmd_tvb, off+18, 1, ENC_LITTLE_ENDIAN, &val);
-    proto_item_append_text(ti, " (%s)", val_to_str(val, power_scale_tbl, "reserved value"));
-
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd7, cmd_tvb, off+19, 1, ENC_LITTLE_ENDIAN);
-
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_actp, cmd_tvb, off+20, 2, ENC_LITTLE_ENDIAN);
-
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_apw, cmd_tvb, off+22, 1, ENC_LITTLE_ENDIAN);
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd8, cmd_tvb, off+22, 1, ENC_LITTLE_ENDIAN);
-    ti = proto_tree_add_item_ret_uint(grp, hf_nvme_identify_ctrl_psd_aps, cmd_tvb, off+22, 1, ENC_LITTLE_ENDIAN, &val);
-    proto_item_append_text(ti, " (%s)", val_to_str(val, power_scale_tbl, "reserved value"));
-
-    proto_tree_add_item(grp, hf_nvme_identify_ctrl_psd_rsvd9, cmd_tvb, off+23, 9, ENC_NA);
-}
-
-static void dissect_nvme_identify_ctrl_resp_power_state_descriptors(tvbuff_t *cmd_tvb, proto_tree *cmd_tree)
-{
-    proto_item *ti;
-    proto_tree *grp;
-    guint i;
-
-    ti = proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_psds, cmd_tvb, 2048, 1024, ENC_NA);
-    grp =  proto_item_add_subtree(ti, ett_data);
-    for (i = 0; i < 32; i++)
-        dissect_nvme_identify_ctrl_resp_power_state_descriptor(cmd_tvb, grp, i);
-}
+static const value_string sgls_ify_type_tbl[] = {
+    { 0,  "SGLs are not supported." },
+    { 1, "SGLs are supported without alignment or granularity limitations" },
+    { 2, "SGLs are supported with DWORD alignment and granularity limitation" },
+    { 3,  "reserved value" },
+    { 0, NULL}
+};
 
 static void dissect_nvme_identify_ctrl_resp(tvbuff_t *cmd_tvb,
                                             proto_tree *cmd_tree)
 {
     proto_item *ti;
-    guint val;
 
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_vid, cmd_tvb, 0, 2, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_ssvid, cmd_tvb, 2, 2, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_sn, cmd_tvb, 4, 20, ENC_ASCII|ENC_NA);
+
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_mn, cmd_tvb, 24, 40, ENC_ASCII|ENC_NA);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_fr, cmd_tvb, 64, 8, ENC_NA);
-
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_rab, cmd_tvb, 72, 1, ENC_LITTLE_ENDIAN, &val);
-    proto_item_append_text(ti, " (%lu command%s)", 1UL << val, val ? "s" : "");
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_rab, cmd_tvb, 72, 1, ENC_LITTLE_ENDIAN);
 
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_ieee, cmd_tvb, 73, 3, ENC_LITTLE_ENDIAN);
     add_group_mask_entry(cmd_tvb, cmd_tree, 76, 1, ASPEC(hf_nvme_identify_ctrl_cmic));
-
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_mdts, cmd_tvb, 77, 1, ENC_LITTLE_ENDIAN, &val);
-    post_add_mdts(ti, val);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_mdts, cmd_tvb, 77, 1, ENC_LITTLE_ENDIAN);
 
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_cntlid, cmd_tvb, 78, 2, ENC_LITTLE_ENDIAN);
-
     dissect_nvme_identify_ctrl_resp_ver(cmd_tvb, cmd_tree);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_rtd3r, cmd_tvb, 84, 4, ENC_LITTLE_ENDIAN);
 
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_rtd3r, cmd_tvb, 84, 4, ENC_LITTLE_ENDIAN, &val);
-    post_add_rtd3(ti, val);
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_rtd3e, cmd_tvb, 88, 4, ENC_LITTLE_ENDIAN, &val);
-    post_add_rtd3(ti, val);
-
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_rtd3e, cmd_tvb, 88, 4, ENC_LITTLE_ENDIAN);
     add_group_mask_entry(cmd_tvb, cmd_tree, 92, 4, ASPEC(hf_nvme_identify_ctrl_oaes));
     add_group_mask_entry(cmd_tvb, cmd_tree, 96, 4, ASPEC(hf_nvme_identify_ctrl_ctratt));
+
     add_group_mask_entry(cmd_tvb, cmd_tree, 100, 2, ASPEC(hf_nvme_identify_ctrl_rrls));
-
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_rsvd0, cmd_tvb, 102, 9, ENC_NA);
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_cntrltype, cmd_tvb, 111, 1, ENC_LITTLE_ENDIAN, &val);
-    post_add_cntrltype(ti, val);
-
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_cntrltype, cmd_tvb, 111, 1, ENC_LITTLE_ENDIAN);
     dissect_nvme_identify_ctrl_resp_fguid(cmd_tvb, cmd_tree);
 
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_crdt1, cmd_tvb, 128, 2, ENC_LITTLE_ENDIAN, &val);
-    post_add_ms(ti, val);
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_crdt2, cmd_tvb, 130, 2, ENC_LITTLE_ENDIAN, &val);
-    post_add_ms(ti, val);
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_crdt3, cmd_tvb, 132, 2, ENC_LITTLE_ENDIAN, &val);
-    post_add_ms(ti, val);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_crdt1, cmd_tvb, 128, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_crdt2, cmd_tvb, 130, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_crdt3, cmd_tvb, 132, 2, ENC_LITTLE_ENDIAN);
 
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_rsvd1, cmd_tvb, 134, 106, ENC_NA);
-
     dissect_nvme_identify_ctrl_resp_mi(cmd_tvb, cmd_tree);
-
     add_group_mask_entry(cmd_tvb, cmd_tree, 256, 2, ASPEC(hf_nvme_identify_ctrl_oacs));
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_acl, cmd_tvb,  258, 1, ENC_LITTLE_ENDIAN, &val);
-    proto_item_append_text(ti, " (%u command%s)", val+1, val ? "s" : "");
 
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_aerl, cmd_tvb, 259, 1, ENC_LITTLE_ENDIAN, &val);
-    proto_item_append_text(ti, " (%u event%s)", val+1, val ? "s" : "");
-
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_acl, cmd_tvb,  258, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_aerl, cmd_tvb, 259, 1, ENC_LITTLE_ENDIAN);
     add_group_mask_entry(cmd_tvb, cmd_tree, 260, 1, ASPEC(hf_nvme_identify_ctrl_frmw));
-    add_group_mask_entry(cmd_tvb, cmd_tree, 261, 1, ASPEC(hf_nvme_identify_ctrl_lpa));
 
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_elpe, cmd_tvb, 262, 1, ENC_LITTLE_ENDIAN, &val);
-    proto_item_append_text(ti, " (%u entr%s)", val+1, val ? "ies" : "y");
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_npss, cmd_tvb, 263, 1, ENC_LITTLE_ENDIAN, &val);
-    proto_item_append_text(ti, " (%u state%s)", val+1, val ? "s" : "");
+    add_group_mask_entry(cmd_tvb, cmd_tree, 261, 1, ASPEC(hf_nvme_identify_ctrl_lpa));
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_elpe, cmd_tvb, 262, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_npss, cmd_tvb, 263, 1, ENC_LITTLE_ENDIAN);
 
     add_group_mask_entry(cmd_tvb, cmd_tree, 264, 1, ASPEC(hf_nvme_identify_ctrl_avscc));
     add_group_mask_entry(cmd_tvb, cmd_tree, 265, 1, ASPEC(hf_nvme_identify_ctrl_apsta));
-
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_wctemp, cmd_tvb, 266, 2, ENC_LITTLE_ENDIAN);
-    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_cctemp, cmd_tvb, 268, 2, ENC_LITTLE_ENDIAN);
 
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_mtfa, cmd_tvb, 270, 2, ENC_LITTLE_ENDIAN, &val);
-    post_add_ms(ti, val);
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_hmpre, cmd_tvb, 272, 4, ENC_LITTLE_ENDIAN, &val);
-    post_add_hmpre(ti, val);
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_hmmin, cmd_tvb, 276, 4, ENC_LITTLE_ENDIAN, &val);
-    post_add_hmpre(ti, val);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_cctemp, cmd_tvb, 268, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_mtfa, cmd_tvb, 270, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_hmpre, cmd_tvb, 272, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_hmmin, cmd_tvb, 276, 4, ENC_LITTLE_ENDIAN);
 
     ti = proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_tnvmcap, cmd_tvb, 280, 16, ENC_NA);
     post_add_cap(ti, cmd_tvb, 280);
@@ -1188,55 +1151,55 @@ static void dissect_nvme_identify_ctrl_resp(tvbuff_t *cmd_tvb,
     add_group_mask_entry(cmd_tvb, cmd_tree, 312, 4, ASPEC(hf_nvme_identify_ctrl_rpmbs));
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_edstt, cmd_tvb, 316, 2, ENC_LITTLE_ENDIAN);
     add_group_mask_entry(cmd_tvb, cmd_tree, 318, 1, ASPEC(hf_nvme_identify_ctrl_dsto));
+
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_fwug, cmd_tvb, 319, 1, ENC_LITTLE_ENDIAN);
-
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_kas, cmd_tvb, 320, 2, ENC_LITTLE_ENDIAN, &val);
-    post_add_ms(ti, val);
-
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_kas, cmd_tvb, 320, 2, ENC_LITTLE_ENDIAN);
     add_group_mask_entry(cmd_tvb, cmd_tree, 320, 2, ASPEC(hf_nvme_identify_ctrl_hctma));
 
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_mntmt, cmd_tvb, 324, 2, ENC_LITTLE_ENDIAN, &val);
-    post_add_tmt(ti, val);
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_mxtmt, cmd_tvb, 326, 2, ENC_LITTLE_ENDIAN, &val);
-    post_add_tmt(ti, val);
-    add_group_mask_entry_post_cb(cmd_tvb, cmd_tree, 328, 2, ASPEC(hf_nvme_identify_ctrl_sanicap), post_add_sanicap);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_mntmt, cmd_tvb, 324, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_mxtmt, cmd_tvb, 326, 2, ENC_LITTLE_ENDIAN);
+    add_group_mask_entry(cmd_tvb, cmd_tree, 328, 2, ASPEC(hf_nvme_identify_ctrl_sanicap));
 
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_hmmminds, cmd_tvb, 332, 4, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_hmmaxd, cmd_tvb, 336, 2, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_nsetidmax, cmd_tvb, 338, 2, ENC_LITTLE_ENDIAN);
+
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_endgidmax, cmd_tvb, 340, 2, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_anatt, cmd_tvb, 342, 1, ENC_LITTLE_ENDIAN);
     add_group_mask_entry(cmd_tvb, cmd_tree, 343, 1, ASPEC(hf_nvme_identify_ctrl_anacap));
+
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_anagrpmax, cmd_tvb, 344, 4, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_nanagrpid, cmd_tvb, 348, 4, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_pels, cmd_tvb, 352, 4, ENC_LITTLE_ENDIAN);
-    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_rsvd2, cmd_tvb, 356, 156, ENC_NA);
 
-    add_group_mask_entry_post_cb(cmd_tvb, cmd_tree, 512, 1, ASPEC(hf_nvme_identify_ctrl_sqes), post_add_qes);
-    add_group_mask_entry_post_cb(cmd_tvb, cmd_tree, 513, 1, ASPEC(hf_nvme_identify_ctrl_cqes), post_add_qes);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_rsvd2, cmd_tvb, 356, 156, ENC_NA);
+    add_group_mask_entry(cmd_tvb, cmd_tree, 512, 1, ASPEC(hf_nvme_identify_ctrl_sqes));
+    add_group_mask_entry(cmd_tvb, cmd_tree, 513, 1, ASPEC(hf_nvme_identify_ctrl_cqes));
+
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_maxcmd, cmd_tvb, 514, 2, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_nn, cmd_tvb, 516, 4, ENC_LITTLE_ENDIAN);
     add_group_mask_entry(cmd_tvb, cmd_tree, 520, 2, ASPEC(hf_nvme_identify_ctrl_oncs));
+
     add_group_mask_entry(cmd_tvb, cmd_tree, 522, 2, ASPEC(hf_nvme_identify_ctrl_fuses));
     add_group_mask_entry(cmd_tvb, cmd_tree, 524, 1, ASPEC(hf_nvme_identify_ctrl_fna));
-    add_group_mask_entry_post_cb(cmd_tvb, cmd_tree, 525, 1, ASPEC(hf_nvme_identify_ctrl_vwc), post_add_vwc);
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_awun, cmd_tvb, 526, 2, ENC_LITTLE_ENDIAN, &val);
-    post_add_lblocks(ti, val);
-    ti = proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_awupf, cmd_tvb, 528, 2, ENC_LITTLE_ENDIAN, &val);
-    post_add_lblocks(ti, val);
+    add_group_mask_entry(cmd_tvb, cmd_tree, 525, 1, ASPEC(hf_nvme_identify_ctrl_vwc));
 
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_awun, cmd_tvb, 526, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_awupf, cmd_tvb, 528, 2, ENC_LITTLE_ENDIAN);
     add_group_mask_entry(cmd_tvb, cmd_tree, 530, 1, ASPEC(hf_nvme_identify_ctrl_nvscc));
+
     add_group_mask_entry(cmd_tvb, cmd_tree, 531, 1, ASPEC(hf_nvme_identify_ctrl_nwpc));
-    ti =  proto_tree_add_item_ret_uint(cmd_tree, hf_nvme_identify_ctrl_acwu, cmd_tvb, 532, 2, ENC_LITTLE_ENDIAN, &val);
-    post_add_lblocks(ti, val);
+    proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_acwu, cmd_tvb, 532, 2, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_rsvd3, cmd_tvb, 534, 2, ENC_NA);
-    add_group_mask_entry_post_cb(cmd_tvb, cmd_tree, 536, 4, ASPEC(hf_nvme_identify_ctrl_sgls), post_add_sgls);
+
+    add_group_mask_entry(cmd_tvb, cmd_tree, 536, 4, ASPEC(hf_nvme_identify_ctrl_sgls));
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_mnan, cmd_tvb, 540, 4, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_rsvd4, cmd_tvb, 544, 224, ENC_NA);
+
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_subnqn, cmd_tvb, 768, 256, ENC_ASCII|ENC_NA);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_rsvd5, cmd_tvb, 1024, 68, ENC_NA);
-
     dissect_nvme_identify_ctrl_resp_nvmeof(cmd_tvb, cmd_tree);
+
     dissect_nvme_identify_ctrl_resp_power_state_descriptors(cmd_tvb, cmd_tree);
     proto_tree_add_item(cmd_tree, hf_nvme_identify_ctrl_vs, cmd_tvb, 3072, 1024, ENC_NA);
 }
@@ -1727,7 +1690,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_rab,
             { "Recommended Arbitration Burst (RAB)", "nvme.cmd.identify.ctrl.rab",
-               FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}
+               FT_UINT16, BASE_CUSTOM, CF_FUNC(add_ctrl_rab), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_ieee,
             { "IEEE OUI Identifier (IEEE)", "nvme.cmd.identify.ctrl.ieee",
@@ -1759,7 +1722,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_mdts,
             { "Maximum Data Transfer Size (MDTS)", "nvme.cmd.identify.ctrl.mdts",
-               FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL}
+               FT_UINT8, BASE_CUSTOM, CF_FUNC(add_ctrl_mdts), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_cntlid,
             { "Controller ID (CNTLID)", "nvme.cmd.identify.ctrl.cntlid",
@@ -1783,11 +1746,11 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_rtd3r,
             { "RTD3 Resume Latency (RTD3R)", "nvme.cmd.identify.ctrl.rtd3r",
-               FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL}
+               FT_UINT32, BASE_CUSTOM, CF_FUNC(add_ctrl_rtd3), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rtd3e,
             { "RTD3 Entry Latency (RTD3E)", "nvme.cmd.identify.ctrl.rtd3e",
-               FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL}
+               FT_UINT32, BASE_CUSTOM, CF_FUNC(add_ctrl_rtd3), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oaes[0],
             { "Optional Asynchronous Events Supported (OAES)", "nvme.cmd.identify.ctrl.oaes",
@@ -1951,7 +1914,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_cntrltype,
             { "Controller Type (CNTRLTYPE)", "nvme.cmd.identify.ctrl.cntrltype",
-               FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL}
+               FT_UINT8, BASE_HEX, VALS(ctrl_type_tbl), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_fguid,
             { "FRU Globally Unique Identifier (FGUID)", "nvme.cmd.identify.ctrl.fguid",
@@ -1971,15 +1934,15 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_crdt1,
             { "Command Retry Delay Time 1", "nvme.cmd.identify.ctrl.crdt1",
-               FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}
+               FT_UINT16, BASE_CUSTOM, CF_FUNC(add_ctrl_ms), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_crdt2,
             { "Command Retry Delay Time 2", "nvme.cmd.identify.ctrl.crdt2",
-               FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}
+               FT_UINT16, BASE_CUSTOM, CF_FUNC(add_ctrl_ms), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_crdt3,
             { "Command Retry Delay Time 3", "nvme.cmd.identify.ctrl.crdt3",
-               FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}
+               FT_UINT16, BASE_CUSTOM, CF_FUNC(add_ctrl_ms), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rsvd1,
             { "Reserved", "nvme.cmd.identify.ctrl.rsvd1",
@@ -2087,11 +2050,11 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_acl,
             { "Abort Command Limit (ACL)", "nvme.cmd.identify.ctrl.acl",
-               FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL}
+               FT_UINT8, BASE_CUSTOM, CF_FUNC(add_ctrl_commands), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_aerl,
             { "Asynchronous Event Request Limit (AERL)", "nvme.cmd.identify.ctrl.aerl",
-               FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL}
+               FT_UINT8, BASE_CUSTOM, CF_FUNC(add_ctrl_events), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_frmw[0],
             { "Firmware Updates (FRMW)", "nvme.cmd.identify.ctrl.frmw",
@@ -2143,11 +2106,11 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_elpe,
             { "Error Log Page Entries (ELPE)", "nvme.cmd.identify.ctrl.elpe",
-               FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL}
+               FT_UINT8, BASE_CUSTOM, CF_FUNC(add_ctrl_entries), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_npss,
             { "Number of Power States Supported (NPSS)", "nvme.cmd.identify.ctrl.npss",
-               FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL}
+               FT_UINT8, BASE_CUSTOM, CF_FUNC(add_ctrl_states), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_avscc[0],
             { "Admin Vendor Specific Command Configuration (AVSCC)", "nvme.cmd.identify.ctrl.avscc",
@@ -2183,23 +2146,23 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_mtfa,
             { "Maximum Time for Firmware Activation (MTFA)", "nvme.cmd.identify.ctrl.mtfa",
-               FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}
+               FT_UINT16, BASE_CUSTOM, CF_FUNC(add_ctrl_ms), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_hmpre,
             { "Host Memory Buffer Preferred Size (HMPRE)", "nvme.cmd.identify.ctrl.hmpre",
-               FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL}
+               FT_UINT32, BASE_CUSTOM, CF_FUNC(add_ctrl_hmpre), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_hmmin,
             { "Host Memory Buffer Minimum Size (HMMIN)", "nvme.cmd.identify.ctrl.hmmin",
-               FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL}
+               FT_UINT32, BASE_CUSTOM, CF_FUNC(add_ctrl_hmpre), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_tnvmcap,
             { "Total NVM Capacity (TNVMCAP)", "nvme.cmd.identify.ctrl.tnvmcap",
-               FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}
+               FT_BYTES, BASE_NO_DISPLAY_VALUE, NULL, 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_unvmcap,
             { "Unallocated NVM Capacity (UNVMCAP)", "nvme.cmd.identify.ctrl.unvmcap",
-               FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}
+               FT_BYTES, BASE_NO_DISPLAY_VALUE, NULL, 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rpmbs[0],
             { "Replay Protected Memory Block Support (RPMBS)", "nvme.cmd.identify.ctrl.rpmbs",
@@ -2247,7 +2210,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_kas,
             { "Keep Alive Support - Timer Value (KAS)", "nvme.cmd.identify.ctrl.kas",
-               FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}
+               FT_UINT16, BASE_CUSTOM, CF_FUNC(add_ctrl_ms), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_hctma[0],
             { "Host Controlled Thermal Management Attributes (HCTMA)", "nvme.cmd.identify.ctrl.hctma",
@@ -2263,11 +2226,11 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_mntmt,
             { "Minimum Thermal Management Temperature (MNTMT)", "nvme.cmd.identify.ctrl.mntmt",
-               FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}
+               FT_UINT16, BASE_CUSTOM, CF_FUNC(add_ctrl_tmt), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_mxtmt,
             { "Maximum Thermal Management Temperature (MXTMT)", "nvme.cmd.identify.ctrl.mxtmt",
-               FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}
+               FT_UINT16, BASE_CUSTOM, CF_FUNC(add_ctrl_tmt), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_sanicap[0],
             { "Sanitize Capabilities (SANICAP)", "nvme.cmd.identify.ctrl.sanicap",
@@ -2295,7 +2258,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_sanicap[6],
             { "No-Deallocate Modifies Media After Sanitize (NODMMAS)", "nvme.cmd.identify.ctrl.sanicap.nodmmas",
-               FT_UINT32, BASE_HEX, NULL, 0xc0000000, NULL, HFILL}
+               FT_UINT32, BASE_HEX, VALS(mmas_type_tbl), 0xc0000000, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_hmmminds,
             { "Host Memory Buffer Minimum Descriptor Entry Size in 4 KiB Units (HMMINDS)", "nvme.cmd.identify.ctrl.hmmminds",
@@ -2375,11 +2338,11 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_sqes[1],
             { "Minimum (required) Size", "nvme.cmd.identify.ctrl.sqes.mins",
-               FT_UINT8, BASE_DEC, NULL, 0xf, NULL, HFILL}
+               FT_UINT8, BASE_CUSTOM, CF_FUNC(add_ctrl_pow2_bytes), 0xf, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_sqes[2],
             { "Maximum (allowed) Size", "nvme.cmd.identify.ctrl.sqes.maxs",
-               FT_UINT8, BASE_DEC, NULL, 0xf0, NULL, HFILL}
+               FT_UINT8, BASE_CUSTOM, CF_FUNC(add_ctrl_pow2_bytes), 0xf0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_cqes[0],
             { "Completion Queue Entry Size (CQES)", "nvme.cmd.identify.ctrl.cqes",
@@ -2387,11 +2350,11 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_cqes[1],
             { "Minimum (required) Size", "nvme.cmd.identify.ctrl.cqes.mins",
-               FT_UINT8, BASE_DEC, NULL, 0xf, NULL, HFILL}
+               FT_UINT8, BASE_CUSTOM, CF_FUNC(add_ctrl_pow2_bytes), 0xf, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_cqes[2],
             { "Maximum (allowed) Size", "nvme.cmd.identify.ctrl.cqes.maxs",
-               FT_UINT8, BASE_DEC, NULL, 0xf0, NULL, HFILL}
+               FT_UINT8, BASE_CUSTOM, CF_FUNC(add_ctrl_pow2_bytes), 0xf0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_maxcmd,
             { "Maximum Outstanding Commands (MAXCMD)", "nvme.cmd.identify.ctrl.maxcmd",
@@ -2483,7 +2446,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_vwc[2],
             { "Flush Command Behavior", "nvme.cmd.identify.ctrl.vwc.cfb",
-               FT_UINT8, BASE_HEX, NULL, 0x6, NULL, HFILL}
+               FT_UINT8, BASE_HEX, VALS(fcb_type_tbl), 0x6, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_vwc[3],
             { "Reserved", "nvme.cmd.identify.ctrl.vwc.rsvd",
@@ -2491,11 +2454,11 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_awun,
             { "Atomic Write Unit Normal (AWUN)", "nvme.cmd.identify.ctrl.awun",
-               FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}
+               FT_UINT16, BASE_CUSTOM, CF_FUNC(add_ctrl_lblocks), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_awupf,
             { "Atomic Write Unit Power Fail (AWUPF)", "nvme.cmd.identify.ctrl.awupf",
-               FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}
+               FT_UINT16, BASE_CUSTOM, CF_FUNC(add_ctrl_lblocks), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_nvscc[0],
             { "NVM Vendor Specific Command Configuration (NVSCC)", "nvme.cmd.identify.ctrl.nvscc",
@@ -2531,7 +2494,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_acwu,
             { "Atomic Compare & Write Unit (ACWU)", "nvme.cmd.identify.ctrl.acwu",
-               FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}
+               FT_UINT16, BASE_CUSTOM, CF_FUNC(add_ctrl_hmpre), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rsvd3,
             { "Reserved", "nvme.cmd.identify.ctrl.rsvd3",
@@ -2543,7 +2506,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_sgls[1],
             { "SGL Supported", "nvme.cmd.identify.ctrl.sgls.sgls",
-               FT_UINT32, BASE_HEX, NULL, 0x3, NULL, HFILL}
+               FT_UINT32, BASE_HEX, VALS(sgls_ify_type_tbl), 0x3, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_sgls[2],
             { "Supports Keyed SGL Data Block Descriptor", "nvme.cmd.identify.ctrl.sgls.kdbs",
@@ -2603,15 +2566,15 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_nvmeof_ioccsz,
             { "I/O Queue Command Capsule Supported Size (IOCCSZ)", "nvme.cmd.identify.ctrl.nvmeof.ioccsz",
-               FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL}
+               FT_UINT32, BASE_CUSTOM, CF_FUNC(add_ctrl_x16_bytes), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_nvmeof_iorcsz,
             { "I/O Queue Response Capsule Supported Size (IORCSZ)", "nvme.cmd.identify.ctrl.nvmeof.iorcsz",
-               FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL}
+               FT_UINT32, BASE_CUSTOM, CF_FUNC(add_ctrl_x16_bytes), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_nvmeof_icdoff,
             { "In Capsule Data Offset (ICDOFF)", "nvme.cmd.identify.ctrl.nvmeof.icdoff",
-               FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}
+               FT_UINT16, BASE_CUSTOM, CF_FUNC(add_ctrl_x16_bytes), 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_nvmeof_fcatt[0],
             { "Fabrics Controller Attributes (FCATT)", "nvme.cmd.identify.ctrl.nvmeof.fcatt",
@@ -2663,7 +2626,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_psd_mxps,
             { "Max Power Scale (MXPS)", "nvme.cmd.identify.ctrl.psds.psd.mxps",
-               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_UINT8, BASE_HEX | BASE_UNIT_STRING, &units_watts, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_psd_nops,
             { "Non-Operational State (NOPS)", "nvme.cmd.identify.ctrl.psds.psd.nops",
@@ -2723,7 +2686,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_psd_ips,
             { "Idle Power Scale (IPS)", "nvme.cmd.identify.ctrl.psds.psd.ips",
-               FT_UINT8, BASE_HEX, NULL, 0xc0, NULL, HFILL}
+               FT_UINT8, BASE_HEX, VALS(power_scale_tbl), 0xc0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_psd_rsvd7,
             { "Reserved", "nvme.cmd.identify.ctrl.psds.psd.rsvd7",
@@ -2743,7 +2706,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_psd_aps,
             { "Active Power Scale (APS)", "nvme.cmd.identify.ctrl.psds.psd.aps",
-               FT_UINT8, BASE_HEX, NULL, 0xc0, NULL, HFILL}
+               FT_UINT8, BASE_HEX, VALS(power_scale_tbl), 0xc0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_psd_rsvd9,
             { "Reserved", "nvme.cmd.identify.ctrl.psds.psd.rsvd9",
