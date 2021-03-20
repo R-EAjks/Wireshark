@@ -2587,6 +2587,12 @@ Enable dissection of heuristic protocol.
 Disable dissection of heuristic protocol.
 --
 
+--columns::
++
+--
+Fill in packet list column data for internal use (such as pinfo.columns in Lua).
+--
+
 include::diagnostic-options.adoc[]
 
 == CAPTURE FILTER SYNTAX
