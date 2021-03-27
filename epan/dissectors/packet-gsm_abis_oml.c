@@ -713,6 +713,13 @@ static int hf_attr_ipa_nsei = -1;
 static int hf_attr_ipa_nsvci = -1;
 static int hf_attr_ipa_bvci = -1;
 static int hf_attr_ipa_rac = -1;
+static int hf_attr_ipa_ns_cfg_unblock_timer = -1;
+static int hf_attr_ipa_ns_cfg_unblock_retries = -1;
+static int hf_attr_ipa_ns_cfg_reset_timer = -1;
+static int hf_attr_ipa_ns_cfg_reset_retries = -1;
+static int hf_attr_ipa_ns_cfg_test_timer = -1;
+static int hf_attr_ipa_ns_cfg_alive_timer = -1;
+static int hf_attr_ipa_ns_cfg_alive_retries = -1;
 
 /* initialize the subtree pointers */
 static int ett_oml = -1;
@@ -1522,6 +1529,7 @@ dissect_oml_attrs(tvbuff_t *tvb, int base_offs, int length,
 		proto_item *ti;
 		proto_tree *att_tree;
 		tvbuff_t *sub_tvb;
+		int ie_offset;
 
 		tag = tvb_get_guint8(tvb, offset);
 		ti = proto_tree_add_item(tree, hf_oml_fom_attr_tag, tvb,
@@ -1575,6 +1583,7 @@ dissect_oml_attrs(tvbuff_t *tvb, int base_offs, int length,
 		/* Empty IE => nothing to dissect */
 		if (len == 0)
 			continue;
+		ie_offset = offset;
 
 		sub_tvb = tvb_new_subset_length(tvb, offset, len);
 
@@ -1777,6 +1786,25 @@ dissect_oml_attrs(tvbuff_t *tvb, int base_offs, int length,
 					   tvb, offset+2, 4, ENC_NA);
 			proto_tree_add_item(att_tree, hf_attr_ipa_nsl_dport,
 					    tvb, offset+6, 2, ENC_BIG_ENDIAN);
+			break;
+		case NM_ATT_IPACC_NS_CFG:
+			/* (Un)Blocking Timer and Retries */
+			proto_tree_add_item(att_tree, hf_attr_ipa_ns_cfg_unblock_timer,
+					    tvb, ie_offset++, 1, ENC_NA);
+			proto_tree_add_item(att_tree, hf_attr_ipa_ns_cfg_unblock_retries,
+					    tvb, ie_offset++, 1, ENC_NA);
+			/* Reset Timer and Retries */
+			proto_tree_add_item(att_tree, hf_attr_ipa_ns_cfg_reset_timer,
+					    tvb, ie_offset++, 1, ENC_NA);
+			proto_tree_add_item(att_tree, hf_attr_ipa_ns_cfg_reset_retries,
+					    tvb, ie_offset++, 1, ENC_NA);
+			/* Test Timer, Alive Timer and Retries */
+			proto_tree_add_item(att_tree, hf_attr_ipa_ns_cfg_test_timer,
+					    tvb, ie_offset++, 1, ENC_NA);
+			proto_tree_add_item(att_tree, hf_attr_ipa_ns_cfg_alive_timer,
+					    tvb, ie_offset++, 1, ENC_NA);
+			proto_tree_add_item(att_tree, hf_attr_ipa_ns_cfg_alive_retries,
+					    tvb, ie_offset++, 1, ENC_NA);
 			break;
 		}
 		offset += len;
@@ -2233,6 +2261,41 @@ proto_register_abis_oml(void)
 			{ "RAC", "gsm_abis_oml.fom.attr.ipa.rac",
 			  FT_UINT8, BASE_HEX, NULL, 0,
 			  "Routing Area Code", HFILL }
+		},
+		{ &hf_attr_ipa_ns_cfg_unblock_timer,
+			{ "NS Unblock Timer",
+			  "gsm_abis_oml.fom.attr.ipa.ns_cfg_unblock_timer",
+			  FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }
+		},
+		{ &hf_attr_ipa_ns_cfg_unblock_retries,
+			{ "NS Unblock Retries",
+			  "gsm_abis_oml.fom.attr.ipa.ns_cfg_unblock_retries",
+			  FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }
+		},
+		{ &hf_attr_ipa_ns_cfg_reset_timer,
+			{ "NS Reset Timer",
+			  "gsm_abis_oml.fom.attr.ipa.ns_cfg_reset_timer",
+			  FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }
+		},
+		{ &hf_attr_ipa_ns_cfg_reset_retries,
+			{ "NS Reset Retries",
+			  "gsm_abis_oml.fom.attr.ipa.ns_cfg_reset_retries",
+			  FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }
+		},
+		{ &hf_attr_ipa_ns_cfg_test_timer,
+			{ "NS Test Timer",
+			  "gsm_abis_oml.fom.attr.ipa.ns_cfg_test_timer",
+			  FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }
+		},
+		{ &hf_attr_ipa_ns_cfg_alive_timer,
+			{ "NS Alive Timer",
+			  "gsm_abis_oml.fom.attr.ipa.ns_cfg_alive_timer",
+			  FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }
+		},
+		{ &hf_attr_ipa_ns_cfg_alive_retries,
+			{ "NS Alive Retries",
+			  "gsm_abis_oml.fom.attr.ipa.ns_cfg_alive_retries",
+			  FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }
 		},
 	};
 	static gint *ett[] = {
