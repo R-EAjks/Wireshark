@@ -678,6 +678,7 @@ static int hf_attr_maio = -1;
 static int hf_attr_list_req_attr = -1;
 static int hf_attr_ari_not_reported_cnt = -1;
 static int hf_attr_ari_not_reported_attr = -1;
+static int hf_attr_rf_max_pwr_red = -1;
 /* Ipaccess */
 static int hf_oml_ipa_tres_attr_tag = -1;
 static int hf_oml_ipa_tres_attr_len = -1;
@@ -1602,6 +1603,11 @@ dissect_oml_attrs(tvbuff_t *tvb, int base_offs, int length,
 						    ENC_BIG_ENDIAN);
 			}
 			break;
+		case NM_ATT_RF_MAXPOWR_R:
+			val8 = tvb_get_guint8(tvb, offset); /* 2 dB steps */
+			proto_tree_add_uint(att_tree, hf_attr_rf_max_pwr_red,
+					    tvb, offset, 1, val8 * 2);
+			break;
 		case NM_ATT_AVAIL_STATUS:
 			/* Availability status can have length 0 */
 			if (len) {
@@ -2064,6 +2070,11 @@ proto_register_abis_oml(void)
 		{ &hf_attr_ari_not_reported_attr,
 			{ "Not-reported attribute", "gsm_abis_oml.fom.attr.ari.not_reported",
 			  FT_UINT8, BASE_DEC, VALS(oml_fom_attr_vals), 0,
+			  NULL, HFILL }
+		},
+		{ &hf_attr_rf_max_pwr_red,
+			{ "Max RF Power Reduction", "gsm_abis_oml.fom.attr.ari.max_rf_pwr_red",
+			  FT_UINT8, BASE_DEC | BASE_UNIT_STRING, &units_decibels, 0,
 			  NULL, HFILL }
 		},
 
