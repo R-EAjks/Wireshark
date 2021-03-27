@@ -85,6 +85,7 @@ The following features are new (or have been significantly updated) since versio
   turn on the "Enable stricter conversation tracking heuristics" top level protocol preference.
 
 * tshark can now export TLS session keys with the --export-tls-session-keys option.
+* Wireshark now supports dissecting TCP payload as GRPC directly by "Decode as" feature. (Similar to perform "decode as" HTTP2 in previous versions)
 
 // === Removed Features and Support
 
