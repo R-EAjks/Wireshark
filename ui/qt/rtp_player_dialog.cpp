@@ -1447,7 +1447,7 @@ const QString RtpPlayerDialog::getFormatedHoveredTime()
     QTreeWidgetItem *ti = findItemByCoords(pos);
     if (!ti) return tr("Unknown");
 
-    double ts = ui->audioPlot->xAxis->pixelToCoord(ui->audioPlot->mapFromGlobal(pos).x());
+    double ts = ui->audioPlot->xAxis->pixelToCoord(pos.x());
 
     return getFormatedTime(ts);
 }
@@ -1460,7 +1460,7 @@ int RtpPlayerDialog::getHoveredPacket()
 
     RtpAudioStream *audio_stream = ti->data(stream_data_col_, Qt::UserRole).value<RtpAudioStream*>();
 
-    double ts = ui->audioPlot->xAxis->pixelToCoord(ui->audioPlot->mapFromGlobal(pos).x());
+    double ts = ui->audioPlot->xAxis->pixelToCoord(pos.x());
 
     return audio_stream->nearestPacket(ts, !ui->todCheckBox->isChecked());
 }
