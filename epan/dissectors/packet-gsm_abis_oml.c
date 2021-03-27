@@ -735,6 +735,8 @@ static int hf_attr_ipa_rlc_cfg2_t_dl_tbf_ext = -1;
 static int hf_attr_ipa_rlc_cfg2_t_ul_tbf_ext = -1;
 static int hf_attr_ipa_rlc_cfg2_init_cs = -1;
 static int hf_attr_ipa_rlc_cfg2_init_mcs = -1;
+static int hf_attr_ipa_cs[4] = { -1, -1, -1, -1 };
+static int hf_attr_ipa_mcs[9] = { -1, -1, -1, -1, -1, -1, -1, -1, -1 };
 
 /* initialize the subtree pointers */
 static int ett_oml = -1;
@@ -1887,6 +1889,14 @@ dissect_oml_attrs(tvbuff_t *tvb, int base_offs, int length,
 			proto_tree_add_item(att_tree, hf_attr_ipa_rlc_cfg2_init_mcs,
 					    tvb, ie_offset++, 1, ENC_NA);
 			break;
+		case NM_ATT_IPACC_CODING_SCHEMES:
+			for (i = 0; i < 4; i++) /* CS1 .. CS4 */
+				proto_tree_add_item(att_tree, hf_attr_ipa_cs[i],
+						    tvb, ie_offset, 2, ENC_LITTLE_ENDIAN);
+			for (i = 0; i < 9; i++) /* MCS1 .. MCS9 */
+				proto_tree_add_item(att_tree, hf_attr_ipa_mcs[i],
+						    tvb, ie_offset, 2, ENC_LITTLE_ENDIAN);
+			break;
 		}
 		offset += len;
 	}
@@ -2466,6 +2476,58 @@ proto_register_abis_oml(void)
 			  "gsm_abis_oml.fom.attr.ipa.rlc_cfg2_init_mcs",
 			  FT_UINT8, BASE_DEC, VALS(rlc_cfg2_init_mcs_vals), 0,
 			  NULL, HFILL }
+		},
+		{ &hf_attr_ipa_cs[0],
+			{ "CS1", "gsm_abis_oml.fom.attr.ipa.cs1",
+			  FT_UINT16, BASE_DEC, NULL, (1 << 0), NULL, HFILL }
+		},
+		{ &hf_attr_ipa_cs[1],
+			{ "CS2", "gsm_abis_oml.fom.attr.ipa.cs2",
+			  FT_UINT16, BASE_DEC, NULL, (1 << 1), NULL, HFILL }
+		},
+		{ &hf_attr_ipa_cs[2],
+			{ "CS3", "gsm_abis_oml.fom.attr.ipa.cs3",
+			  FT_UINT16, BASE_DEC, NULL, (1 << 2), NULL, HFILL }
+		},
+		{ &hf_attr_ipa_cs[3],
+			{ "CS4", "gsm_abis_oml.fom.attr.ipa.cs4",
+			  FT_UINT16, BASE_DEC, NULL, (1 << 3), NULL, HFILL }
+		},
+		{ &hf_attr_ipa_mcs[0],
+			{ "MCS1", "gsm_abis_oml.fom.attr.ipa.mcs1",
+			  FT_UINT16, BASE_DEC, NULL, (1 << 8), NULL, HFILL }
+		},
+		{ &hf_attr_ipa_mcs[1],
+			{ "MCS2", "gsm_abis_oml.fom.attr.ipa.mcs2",
+			  FT_UINT16, BASE_DEC, NULL, (1 << 9), NULL, HFILL }
+		},
+		{ &hf_attr_ipa_mcs[2],
+			{ "MCS3", "gsm_abis_oml.fom.attr.ipa.mcs3",
+			  FT_UINT16, BASE_DEC, NULL, (1 << 10), NULL, HFILL }
+		},
+		{ &hf_attr_ipa_mcs[3],
+			{ "MCS4", "gsm_abis_oml.fom.attr.ipa.mcs4",
+			  FT_UINT16, BASE_DEC, NULL, (1 << 11), NULL, HFILL }
+		},
+		{ &hf_attr_ipa_mcs[4],
+			{ "MCS5", "gsm_abis_oml.fom.attr.ipa.mcs5",
+			  FT_UINT16, BASE_DEC, NULL, (1 << 12), NULL, HFILL }
+		},
+		{ &hf_attr_ipa_mcs[5],
+			{ "MCS6", "gsm_abis_oml.fom.attr.ipa.mcs6",
+			  FT_UINT16, BASE_DEC, NULL, (1 << 13), NULL, HFILL }
+		},
+		{ &hf_attr_ipa_mcs[6],
+			{ "MCS7", "gsm_abis_oml.fom.attr.ipa.mcs7",
+			  FT_UINT16, BASE_DEC, NULL, (1 << 14), NULL, HFILL }
+		},
+		{ &hf_attr_ipa_mcs[7],
+			{ "MCS8", "gsm_abis_oml.fom.attr.ipa.mcs8",
+			  FT_UINT16, BASE_DEC, NULL, (1 << 15), NULL, HFILL }
+		},
+		{ &hf_attr_ipa_mcs[8],
+			{ "MCS9", "gsm_abis_oml.fom.attr.ipa.mcs9",
+			  FT_UINT16, BASE_DEC, NULL, (1 << 7), NULL, HFILL }
 		},
 	};
 	static gint *ett[] = {
