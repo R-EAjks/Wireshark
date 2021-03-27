@@ -720,6 +720,8 @@ static int hf_attr_ipa_ns_cfg_reset_retries = -1;
 static int hf_attr_ipa_ns_cfg_test_timer = -1;
 static int hf_attr_ipa_ns_cfg_alive_timer = -1;
 static int hf_attr_ipa_ns_cfg_alive_retries = -1;
+static int hf_attr_ipa_gprs_paging_rep_time = -1;
+static int hf_attr_ipa_gprs_paging_rep_count = -1;
 
 /* initialize the subtree pointers */
 static int ett_oml = -1;
@@ -1806,6 +1808,13 @@ dissect_oml_attrs(tvbuff_t *tvb, int base_offs, int length,
 			proto_tree_add_item(att_tree, hf_attr_ipa_ns_cfg_alive_retries,
 					    tvb, ie_offset++, 1, ENC_NA);
 			break;
+		case NM_ATT_IPACC_GPRS_PAGING_CFG:
+			val8 = tvb_get_guint8(tvb, ie_offset); /* units: 50 ms */
+			proto_tree_add_uint(att_tree, hf_attr_ipa_gprs_paging_rep_time,
+					    tvb, ie_offset++, 1, val8 * 50);
+			proto_tree_add_item(att_tree, hf_attr_ipa_gprs_paging_rep_count,
+					    tvb, ie_offset++, 1, ENC_NA);
+			break;
 		}
 		offset += len;
 	}
@@ -2295,6 +2304,17 @@ proto_register_abis_oml(void)
 		{ &hf_attr_ipa_ns_cfg_alive_retries,
 			{ "NS Alive Retries",
 			  "gsm_abis_oml.fom.attr.ipa.ns_cfg_alive_retries",
+			  FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }
+		},
+		{ &hf_attr_ipa_gprs_paging_rep_time,
+			{ "GPRS Paging Repeat Time",
+			  "gsm_abis_oml.fom.attr.ipa.gprs_paging_rep_time",
+			  FT_UINT8, BASE_DEC | BASE_UNIT_STRING, &units_milliseconds, 0,
+			  NULL, HFILL }
+		},
+		{ &hf_attr_ipa_gprs_paging_rep_count,
+			{ "GPRS Paging Repeat Count",
+			  "gsm_abis_oml.fom.attr.ipa.gprs_paging_rep_count",
 			  FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }
 		},
 	};
