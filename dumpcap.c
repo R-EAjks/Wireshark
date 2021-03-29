@@ -3068,20 +3068,13 @@ static gboolean
 capture_loop_init_pcapng_output(capture_options *capture_opts, loop_data *ld,
                                 int *err)
 {
-    g_rw_lock_reader_lock (&ld->saved_shb_idb_lock);
-
-    if (ld->pcapng_passthrough && !ld->saved_shb) {
-        /* We have a single pcapng capture interface and this is the first or only output file. */
-        g_log(LOG_DOMAIN_CAPTURE_CHILD, G_LOG_LEVEL_DEBUG, "%s: skipping dumpcap SHB and IDBs in favor of source", G_STRFUNC);
-        g_rw_lock_reader_unlock (&ld->saved_shb_idb_lock);
-        return TRUE;
-    }
-
     gboolean successful = TRUE;
     GString *os_info_str = g_string_new("");
 
     *err = 0;
     get_os_version_info(os_info_str);
+
+    g_rw_lock_reader_lock (&ld->saved_shb_idb_lock);
 
     if (ld->saved_shb) {
         /* We have a single pcapng capture interface and multiple output files. */
