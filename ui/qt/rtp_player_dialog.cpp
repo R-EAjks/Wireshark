@@ -1630,22 +1630,6 @@ void RtpPlayerDialog::on_outputAudioRate_currentIndexChanged(const QString & rat
     rescanPackets();
 }
 
-void RtpPlayerDialog::on_outputAudioRate_currentIndexChanged(const QString & rate_string)
-{
-    // Any unconvertable string is converted to 0 => used as Automatic rate
-    unsigned selected_rate = rate_string.toInt();
-
-    for (int row = 0; row < ui->streamTreeWidget->topLevelItemCount(); row++) {
-        QTreeWidgetItem *ti = ui->streamTreeWidget->topLevelItem(row);
-        RtpAudioStream *audio_stream = ti->data(stream_data_col_, Qt::UserRole).value<RtpAudioStream*>();
-        if (!audio_stream)
-            continue;
-
-        audio_stream->setRequestedPlayRate(selected_rate);
-    }
-    rescanPackets();
-}
-
 void RtpPlayerDialog::on_jitterSpinBox_valueChanged(double)
 {
     rescanPackets();
