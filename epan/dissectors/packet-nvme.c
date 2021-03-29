@@ -858,7 +858,12 @@ static void dissect_nvme_identify_ctrl_resp_nvmeof(tvbuff_t *cmd_tvb, proto_tree
     proto_tree_add_item(grp, hf_nvme_identify_ctrl_nvmeof_rsvd, cmd_tvb, 1806, 242, ENC_NA);
 }
 
-const unit_name_string units_watts = { " (0.0001 Watt units)", " (0.001 Watt units)" };
+
+static const true_false_string units_watts = {
+    "1 (0.0001 Watt units)",
+    "0 (0.01 Watt units)"
+};
+
 
 static const value_string power_scale_tbl[] = {
     { 0, "not reported for this power state" },
@@ -1702,19 +1707,19 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_cmic[1],
             { "Multiple Ports Support", "nvme.cmd.identify.ctrl.cmic.mp",
-               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_cmic[2],
             { "Multiple Controllers Support", "nvme.cmd.identify.ctrl.cmic.mc",
-               FT_UINT8, BASE_HEX, NULL, 0x2, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x2, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_cmic[3],
             { "SRIOV Association", "nvme.cmd.identify.ctrl.cmic.sriov",
-               FT_UINT8, BASE_HEX, NULL, 0x4, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x4, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_cmic[4],
             { "ANA Reporting Support", "nvme.cmd.identify.ctrl.cmic.ana",
-               FT_UINT8, BASE_HEX, NULL, 0x8, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x8, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_cmic[5],
             { "Reserved", "nvme.cmd.identify.ctrl.cmic.rsvd",
@@ -1762,11 +1767,11 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_oaes[2],
             { "Namespace Attribute Notices Supported", "nvme.cmd.identify.ctrl.oaes.nan",
-               FT_UINT32, BASE_HEX, NULL, 0x100, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x100, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oaes[3],
             { "Firmware Activation Supported", "nvme.cmd.identify.ctrl.oaes.fan",
-               FT_UINT32, BASE_HEX, NULL, 0x200, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x200, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oaes[4],
             { "Reserved", "nvme.cmd.identify.ctrl.oaes.rsvd1",
@@ -1774,19 +1779,19 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_oaes[5],
             { "Asymmetric Namespace Access Change Notices Supported", "nvme.cmd.identify.ctrl.oaes.ana",
-               FT_UINT32, BASE_HEX, NULL, 0x800, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x800, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oaes[6],
             { "Predictable Latency Event Aggregate Log Change Notices Supported", "nvme.cmd.identify.ctrl.oaes.ple",
-               FT_UINT32, BASE_HEX, NULL, 0x1000, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x1000, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oaes[7],
             { "LBA Status Information Notices Supported", "nvme.cmd.identify.ctrl.oaes.lba",
-               FT_UINT32, BASE_HEX, NULL, 0x2000, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x2000, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oaes[8],
             { "Endurance Group Event Aggregate Log Page Change Notices Supported", "nvme.cmd.identify.ctrl.oaes.ege",
-               FT_UINT32, BASE_HEX, NULL, 0x4000, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x4000, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oaes[9],
             { "Reserved", "nvme.cmd.identify.ctrl.oaes.rsvd2",
@@ -1798,43 +1803,43 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_ctratt[1],
             { "128-bit Host Identifier Support", "nvme.cmd.identify.ctrl.ctratt.hi_128",
-               FT_UINT32, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_ctratt[2],
             { "Non-Operational Power State Permissive Mode Supported", "nvme.cmd.identify.ctrl.ctratt.nopspm",
-               FT_UINT32, BASE_HEX, NULL, 0x2, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x2, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_ctratt[3],
             { "NVM Sets Supported", "nvme.cmd.identify.ctrl.ctratt.nvmset",
-               FT_UINT32, BASE_HEX, NULL, 0x4, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x4, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_ctratt[4],
             { "Read Recovery Levels Supported", "nvme.cmd.identify.ctrl.ctratt.rrl",
-               FT_UINT32, BASE_HEX, NULL, 0x8, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x8, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_ctratt[5],
             { "Endurance Groups Supported", "nvme.cmd.identify.ctrl.ctratt.eg",
-               FT_UINT32, BASE_HEX, NULL, 0x10, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x10, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_ctratt[6],
             { "Predictable Latency Mode Supported", "nvme.cmd.identify.ctrl.ctratt.plm",
-               FT_UINT32, BASE_HEX, NULL, 0x20, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x20, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_ctratt[7],
             { "Traffic Based Keep Alive Support (TBKAS)", "nvme.cmd.identify.ctrl.ctratt.tbkas",
-               FT_UINT32, BASE_HEX, NULL, 0x40, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x40, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_ctratt[8],
             { "Namespace Granularity", "nvme.cmd.identify.ctrl.ctratt.ng",
-               FT_UINT32, BASE_HEX, NULL, 0x80, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x80, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_ctratt[9],
             { "SQ Associations Support", "nvme.cmd.identify.ctrl.ctratt.sqa",
-               FT_UINT32, BASE_HEX, NULL, 0x100, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x100, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_ctratt[10],
             { "UUID List Support", "nvme.cmd.identify.ctrl.ctratt.uuidl",
-               FT_UINT32, BASE_HEX, NULL, 0x200, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x200, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_ctratt[11],
             { "Reserved", "nvme.cmd.identify.ctrl.ctratt.rsvd",
@@ -1846,67 +1851,67 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_rrls[1],
             { "Read Recovery Level 0 Support", "nvme.cmd.identify.ctrl.rrls.rrls0",
-               FT_UINT16, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rrls[2],
             { "Read Recovery Level 1 Support", "nvme.cmd.identify.ctrl.rrls.rrls1",
-               FT_UINT16, BASE_HEX, NULL, 0x2, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x2, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rrls[3],
             { "Read Recovery Level 2 Support", "nvme.cmd.identify.ctrl.rrls.rrls2",
-               FT_UINT16, BASE_HEX, NULL, 0x4, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x4, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rrls[4],
             { "Read Recovery Level 3 Support", "nvme.cmd.identify.ctrl.rrls.rrls3",
-               FT_UINT16, BASE_HEX, NULL, 0x8, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x8, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rrls[5],
             { "Read Recovery Level 4 (Default) Support", "nvme.cmd.identify.ctrl.rrls.rrls4",
-               FT_UINT16, BASE_HEX, NULL, 0x10, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x10, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rrls[6],
             { "Read Recovery Level 5 Support", "nvme.cmd.identify.ctrl.rrls.rrls5",
-               FT_UINT16, BASE_HEX, NULL, 0x20, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x20, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rrls[7],
             { "Read Recovery Level 6 Support", "nvme.cmd.identify.ctrl.rrls.rrls6",
-               FT_UINT16, BASE_HEX, NULL, 0x40, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x40, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rrls[8],
             { "Read Recovery Level 7 Support", "nvme.cmd.identify.ctrl.rrls.rrls7",
-               FT_UINT16, BASE_HEX, NULL, 0x80, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x80, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rrls[9],
             { "Read Recovery Level 8 Support", "nvme.cmd.identify.ctrl.rrls.rrls8",
-               FT_UINT16, BASE_HEX, NULL, 0x100, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x100, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rrls[10],
             { "Read Recovery Level 9 Support", "nvme.cmd.identify.ctrl.rrls.rrls9",
-               FT_UINT16, BASE_HEX, NULL, 0x200, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x200, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rrls[11],
             { "Read Recovery Level 10 Support", "nvme.cmd.identify.ctrl.rrls.rrls10",
-               FT_UINT16, BASE_HEX, NULL, 0x400, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x400, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rrls[12],
             { "Read Recovery Level 11 Support", "nvme.cmd.identify.ctrl.rrls.rrls11",
-               FT_UINT16, BASE_HEX, NULL, 0x800, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x800, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rrls[13],
             { "Read Recovery Level 12 Support", "nvme.cmd.identify.ctrl.rrls.rrls12",
-               FT_UINT16, BASE_HEX, NULL, 0x1000, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x1000, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rrls[14],
             { "Read Recovery Level 13 Support", "nvme.cmd.identify.ctrl.rrls.rrls13",
-               FT_UINT16, BASE_HEX, NULL, 0x2000, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x2000, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rrls[15],
             { "Read Recovery Level 14 Support", "nvme.cmd.identify.ctrl.rrls.rrls14",
-               FT_UINT16, BASE_HEX, NULL, 0x4000, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x4000, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rrls[16],
             { "Read Recovery Level 15 (Fast Fail) Support", "nvme.cmd.identify.ctrl.rrls.rrls15",
-               FT_UINT16, BASE_HEX, NULL, 0x8000, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x8000, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_rsvd0,
             { "Reserved", "nvme.cmd.identify.ctrl.rsvd0",
@@ -1962,11 +1967,11 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_mi_nvmsr[1],
             { "NVMe Storage Device (NVMESD)", "nvme.cmd.identify.ctrl.mi.nvmsr.nvmesd",
-               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_mi_nvmsr[2],
             { "NVMe Enclosure (NVMEE)", "nvme.cmd.identify.ctrl.mi.nvmsr.nvmee",
-               FT_UINT8, BASE_HEX, NULL, 0x2, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x2, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_mi_nvmsr[3],
             { "Reserved", "nvme.cmd.identify.ctrl.mi.nvmsr.rsvd",
@@ -1982,7 +1987,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_mi_vwci[2],
             { "VPD Write Cycle Remaining Valid (VWCRV)", "nvme.cmd.identify.ctrl.mi.vwci.vwcrv",
-               FT_UINT8, BASE_HEX, NULL, 0x80, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x80, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_mi_mec[0],
             { "Management Endpoint Capabilities (MEC)", "nvme.cmd.identify.ctrl.mi.mec",
@@ -1990,11 +1995,11 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_mi_mec[1],
             { "SMBus/I2C Port Management Endpoint (SMBUSME)", "nvme.cmd.identify.ctrl.mi.mec.smbusme",
-               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_mi_mec[2],
             { "PCIe Port Management Endpoint (PCIEME)", "nvme.cmd.identify.ctrl.mi.mec.pcieme",
-               FT_UINT8, BASE_HEX, NULL, 0x2, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x2, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_mi_mec[3],
             { "Reserved", "nvme.cmd.identify.ctrl.mi.mec.rsvd",
@@ -2006,43 +2011,43 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_oacs[1],
             { "Security Send and Security Receive Support", "nvme.cmd.identify.ctrl.oacs.sec",
-               FT_UINT16, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oacs[2],
             { "Format NVM Support", "nvme.cmd.identify.ctrl.oacs.fmt",
-               FT_UINT16, BASE_HEX, NULL, 0x2, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x2, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oacs[3],
             { "Firmware Download and Commit Support", "nvme.cmd.identify.ctrl.oacs.fw",
-               FT_UINT16, BASE_HEX, NULL, 0x4, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x4, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oacs[4],
             { "Namespace Management Support", "nvme.cmd.identify.ctrl.oacs.nsmgmt",
-               FT_UINT16, BASE_HEX, NULL, 0x8, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x8, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oacs[5],
             { "Device Self-Test Support", "nvme.cmd.identify.ctrl.oacs.stst",
-               FT_UINT16, BASE_HEX, NULL, 0x10, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x10, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oacs[6],
             { "Directive Send and Directive Receive Support", "nvme.cmd.identify.ctrl.oacs.dtv",
-               FT_UINT16, BASE_HEX, NULL, 0x20, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x20, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oacs[7],
             { "NVMe-MI Send and NVMe Receive Support", "nvme.cmd.identify.ctrl.oacs.mi",
-               FT_UINT16, BASE_HEX, NULL, 0x40, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x40, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oacs[8],
             { "Virtualization Management Support", "nvme.cmd.identify.ctrl.oacs.vm",
-               FT_UINT16, BASE_HEX, NULL, 0x80, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x80, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oacs[9],
             { "Dorbell Buffer Config Support", "nvme.cmd.identify.ctrl.oacs.db",
-               FT_UINT16, BASE_HEX, NULL, 0x100, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x100, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oacs[10],
             { "Get LBA Status Support", "nvme.cmd.identify.ctrl.oacs.sec.lba",
-               FT_UINT16, BASE_HEX, NULL, 0x200, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x200, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oacs[11],
             { "Reserved", "nvme.cmd.identify.ctrl.oacs.sec.rsvd",
@@ -2062,7 +2067,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_frmw[1],
             { "First Firmware Slot Read-Only", "nvme.cmd.identify.ctrl.frmw.fro",
-               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_frmw[2],
             { "Number of Firmware Slots", "nvme.cmd.identify.ctrl.frmw.fsn",
@@ -2070,7 +2075,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_frmw[3],
             { "Supports Activation Without Reset", "nvme.cmd.identify.ctrl.frmw.anr",
-               FT_UINT8, BASE_HEX, NULL, 0x10, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x10, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_frmw[4],
             { "Reserved", "nvme.cmd.identify.ctrl.frmw.rsvd",
@@ -2078,27 +2083,27 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_lpa[0],
             { "Log Page Attributes (LPA)", "nvme.cmd.identify.ctrl.lpa",
-               FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x0, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_lpa[1],
             { "Smart Log Page per Namespace Support", "nvme.cmd.identify.ctrl.lpa.smrt",
-               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_lpa[2],
             { "Commands Supported and Effects Log Page Support", "nvme.cmd.identify.ctrl.lpa.cmds",
-               FT_UINT8, BASE_HEX, NULL, 0x2, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x2, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_lpa[3],
             { "Extended Data Get Log Page Support", "nvme.cmd.identify.ctrl.lpa.elp.elp",
-               FT_UINT8, BASE_HEX, NULL, 0x4, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x4, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_lpa[4],
             { "Telemetry Log Page and Notices Support", "nvme.cmd.identify.ctrl.lpa.tel",
-               FT_UINT8, BASE_HEX, NULL, 0x8, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x8, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_lpa[5],
             { "Persistent Event Log Support", "nvme.cmd.identify.ctrl.lpa.ple",
-               FT_UINT8, BASE_HEX, NULL, 0x10, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x10, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_lpa[6],
             { "Reserved", "nvme.cmd.identify.ctrl.lpa",
@@ -2118,7 +2123,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_avscc[1],
             { "Standard Command Format", "nvme.cmd.identify.ctrl.avscc.std",
-               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_avscc[2],
             { "Reserved", "nvme.cmd.identify.ctrl.avscc.rsvd",
@@ -2130,7 +2135,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_apsta[1],
             { "Autonomous Power State Transitions Supported", "nvme.cmd.identify.ctrl.apsta.aut",
-               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_apsta[2],
             { "Reserved", "nvme.cmd.identify.ctrl.apsta.rsvd",
@@ -2198,7 +2203,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_dsto[1],
             { "Concurrent Self-Tests for Multiple Devices Support", "nvme.cmd.identify.ctrl.dsto.mds",
-               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_dsto[2],
             { "Reserved", "nvme.cmd.identify.ctrl.dsto.rsvd",
@@ -2218,7 +2223,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_hctma[1],
             { "Controller Supports Thermal Management", "nvme.cmd.identify.ctrl.hctma.sup",
-               FT_UINT16, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_hctma[2],
             { "Reserved", "nvme.cmd.identify.ctrl.hctma.rsvd",
@@ -2238,15 +2243,15 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_sanicap[1],
             { "Crypto Erase Support (CES)", "nvme.cmd.identify.ctrl.sanicap.ces",
-               FT_UINT32, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_sanicap[2],
             { "Block Erase Support (BES)", "nvme.cmd.identify.ctrl.sanicap.bes",
-               FT_UINT32, BASE_HEX, NULL, 0x2, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x2, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_sanicap[3],
             { "Overwrite Support (OWS)", "nvme.cmd.identify.ctrl.sanicap.ows",
-               FT_UINT32, BASE_HEX, NULL, 0x4, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x4, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_sanicap[4],
             { "Reserved", "nvme.cmd.identify.ctrl.sanicap.rsvd",
@@ -2254,7 +2259,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_sanicap[5],
             { "No-Deallocate Inhibited (NDI)", "nvme.cmd.identify.ctrl.sanicap.ndi",
-               FT_UINT32, BASE_HEX, NULL, 0x20000000, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x20000000, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_sanicap[6],
             { "No-Deallocate Modifies Media After Sanitize (NODMMAS)", "nvme.cmd.identify.ctrl.sanicap.nodmmas",
@@ -2286,35 +2291,35 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_anacap[1],
             { "Reports ANA Optimized State", "nvme.cmd.identify.ctrl.anacap.osr",
-               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_anacap[2],
             { "Reports ANA Non-Optimized State", "nvme.cmd.identify.ctrl.anacap.nosr",
-               FT_UINT8, BASE_HEX, NULL, 0x2, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x2, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_anacap[3],
             { "Reports Innaccessible State", "nvme.cmd.identify.ctrl.anacap.isr",
-               FT_UINT8, BASE_HEX, NULL, 0x4, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x4, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_anacap[4],
             { "Reports ANA Persistent Loss State", "nvme.cmd.identify.ctrl.anacap.plsr",
-               FT_UINT8, BASE_HEX, NULL, 0x8, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x8, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_anacap[5],
             { "Reports ANA Change Sate", "nvme.cmd.identify.ctrl.anacap.csr",
-               FT_UINT8, BASE_HEX, NULL, 0x10, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x10, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_anacap[6],
             { "Reserved", "nvme.cmd.identify.ctrl.anacap.rsvd",
-               FT_UINT8, BASE_HEX, NULL, 0x20, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x20, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_anacap[7],
             { "ANAGRPID field in the Identify Namespace does not change", "nvme.cmd.identify.ctrl.anacap.panagrpid",
-               FT_UINT8, BASE_HEX, NULL, 0x40, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x40, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_anacap[8],
             { "Supports non-zero value in the ANAGRPID field", "nvme.cmd.identify.ctrl.anacap.nzpanagrpid",
-               FT_UINT8, BASE_HEX, NULL, 0x80, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x80, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_anagrpmax,
             { "ANA Group Identifier Maximum (ANAGRPMAX)", "nvme.cmd.identify.ctrl.anagrpmax",
@@ -2370,35 +2375,35 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_oncs[1],
             { "Supports Compare Command", "nvme.cmd.identify.ctrl.oncs.ccs",
-               FT_UINT16, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oncs[2],
             { "Supports Write Uncorrectable Command", "nvme.cmd.identify.ctrl.oncs.wus",
-               FT_UINT16, BASE_HEX, NULL, 0x2, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x2, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oncs[3],
             { "Supports Dataset Management Command", "nvme.cmd.identify.ctrl.oncs.dsms",
-               FT_UINT16, BASE_HEX, NULL, 0x4, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x4, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oncs[4],
             { "Support Write Zeroes Command", "nvme.cmd.identify.ctrl.oncs.wzs",
-               FT_UINT16, BASE_HEX, NULL, 0x8, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x8, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oncs[5],
             { "Supports non-zero Save Filed in Set/Get Features", "nvme.cmd.identify.ctrl.oncs.nzfs",
-               FT_UINT16, BASE_HEX, NULL, 0x10, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x10, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oncs[6],
             { "Supports Reservations", "nvme.cmd.identify.ctrl.oncs.ress",
-               FT_UINT16, BASE_HEX, NULL, 0x20, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x20, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oncs[7],
             { "Supports Timestamps", "nvme.cmd.identify.ctrl.oncs.tstmps",
-               FT_UINT16, BASE_HEX, NULL, 0x40, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x40, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oncs[8],
             { "Supports Verify Command", "nvme.cmd.identify.ctrl.oncs.vers",
-               FT_UINT16, BASE_HEX, NULL, 0x80, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x80, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_oncs[9],
             { "Reserved", "nvme.cmd.identify.ctrl.oncs.rsvd",
@@ -2410,7 +2415,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_fuses[1],
             { "Compare and Write Fused Operation Support", "nvme.cmd.identify.ctrl.fuses.cws",
-               FT_UINT16, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_fuses[2],
             { "Reserved", "nvme.cmd.identify.ctrl.fuses.rsvd",
@@ -2422,15 +2427,15 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_fna[1],
             { "Format Operation Applies to all Namespaces", "nvme.cmd.identify.ctrl.fna.fall",
-               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_fna[2],
             { "Secure Erase Operation Applies to all Namespaces", "nvme.cmd.identify.ctrl.fna.seall",
-               FT_UINT8, BASE_HEX, NULL, 0x2, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x2, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_fna[3],
             { "Cryptographic Erase Supportred", "nvme.cmd.identify.ctrl.fna.ces",
-               FT_UINT8, BASE_HEX, NULL, 0x4, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x4, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_fna[4],
             { "Reserved", "nvme.cmd.identify.ctrl.fna.rsvd",
@@ -2442,7 +2447,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_vwc[1],
             { "Volatile Write Cache Present", "nvme.cmd.identify.ctrl.vwc.cp",
-               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_vwc[2],
             { "Flush Command Behavior", "nvme.cmd.identify.ctrl.vwc.cfb",
@@ -2466,7 +2471,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_nvscc[1],
             { "Standard Format Used for Vendor Specific Commands", "nvme.cmd.identify.ctrl.nvscc.std",
-               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_nvscc[2],
             { "Reserved", "nvme.cmd.identify.ctrl.nvscc.rsvd",
@@ -2478,15 +2483,15 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_nwpc[1],
             { "No Write Protect and Write Protect namespace write protection states Support", "nvme.cmd.identify.ctrl.nwpc.wpss",
-               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_nwpc[2],
             { "Write Protect Until Power Cycle state Support", "nvme.cmd.identify.ctrl.nwpc.wppcs",
-               FT_UINT8, BASE_HEX, NULL, 0x2, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x2, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_nwpc[3],
             { "Permanent Write Protect state Support", "nvme.cmd.identify.ctrl.nwpc.pwpss",
-               FT_UINT8, BASE_HEX, NULL, 0x4, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x4, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_nwpc[4],
             { "Reserved", "nvme.cmd.identify.ctrl.nwpc.rsvd",
@@ -2510,7 +2515,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_sgls[2],
             { "Supports Keyed SGL Data Block Descriptor", "nvme.cmd.identify.ctrl.sgls.kdbs",
-               FT_UINT32, BASE_HEX, NULL, 0x4, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x4, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_sgls[3],
             { "Reserved", "nvme.cmd.identify.ctrl.sgls.rsvd0",
@@ -2518,27 +2523,27 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_sgls[4],
             { "Supports SGL Bit Bucket Descriptor", "nvme.cmd.identify.ctrl.sgls.bbd",
-               FT_UINT32, BASE_HEX, NULL, 0x10000, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x10000, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_sgls[5],
             { "Supports byte aligned contiguous buffer in MPTR Field", "nvme.cmd.identify.ctrl.sgls.bufmptr",
-               FT_UINT32, BASE_HEX, NULL, 0x20000, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x20000, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_sgls[6],
             { "Supports Larger SGL List than Command Requires", "nvme.cmd.identify.ctrl.sgls.lsgl",
-               FT_UINT32, BASE_HEX, NULL, 0x40000, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x40000, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_sgls[7],
             { "Supports SGL Segment in MPTR Field", "nvme.cmd.identify.ctrl.sgls.kmptr",
-               FT_UINT32, BASE_HEX, NULL, 0x80000, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x80000, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_sgls[8],
             { "Supports Address Field as offset in Data Block, Segment and Last Segment SGLs", "nvme.cmd.identify.ctrl.sgls.offs",
-               FT_UINT32, BASE_HEX, NULL, 0x100000, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x100000, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_sgls[9],
             { "Supports Transport SGL Data Block Descriptor", "nvme.cmd.identify.ctrl.sgls.tdbd",
-               FT_UINT32, BASE_HEX, NULL, 0x200000, NULL, HFILL}
+               FT_BOOLEAN, 32, NULL, 0x200000, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_sgls[10],
             { "Reserved", "nvme.cmd.identify.ctrl.sgls.rsvd1",
@@ -2582,7 +2587,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_nvmeof_fcatt[1],
             { "Dynamic Controller Model", "nvme.cmd.identify.ctrl.nvmeof.fcatt.dcm",
-               FT_UINT8, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_nvmeof_fcatt[2],
             { "Reserved", "nvme.cmd.identify.ctrl.nvmeof.fcatt.rsvd",
@@ -2598,7 +2603,7 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_nvmeof_ofcs[1],
             { "Supports Disconnect Command", "nvme.cmd.identify.ctrl.nvmeof.ofcs.dcs",
-               FT_UINT16, BASE_HEX, NULL, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 16, NULL, 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_nvmeof_ofcs[2],
             { "Reserved", "nvme.cmd.identify.ctrl.nvmeof.ofcs.rsvd",
@@ -2626,11 +2631,11 @@ proto_register_nvme(void)
         },
         { &hf_nvme_identify_ctrl_psd_mxps,
             { "Max Power Scale (MXPS)", "nvme.cmd.identify.ctrl.psds.psd.mxps",
-               FT_UINT8, BASE_HEX | BASE_UNIT_STRING, &units_watts, 0x1, NULL, HFILL}
+               FT_BOOLEAN, 8, TFS(&units_watts), 0x1, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_psd_nops,
             { "Non-Operational State (NOPS)", "nvme.cmd.identify.ctrl.psds.psd.nops",
-               FT_UINT8, BASE_HEX, NULL, 0x2, NULL, HFILL}
+               FT_BOOLEAN, 8, NULL, 0x2, NULL, HFILL}
         },
         { &hf_nvme_identify_ctrl_psd_rsvd1,
             { "Reserved", "nvme.cmd.identify.ctrl.psds.psd.rsvd1",
