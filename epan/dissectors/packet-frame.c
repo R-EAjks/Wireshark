@@ -69,6 +69,7 @@ static int hf_frame_verdict_tc = -1;
 static int hf_frame_verdict_xdp = -1;
 static int hf_frame_verdict_unknown = -1;
 static int hf_frame_drop_count = -1;
+static int hf_frame_number_captured = -1;
 static int hf_frame_protocols = -1;
 static int hf_frame_color_filter_name = -1;
 static int hf_frame_color_filter_text = -1;
@@ -689,6 +690,10 @@ dissect_frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* 
 			proto_tree_add_uint64(fh_tree, hf_frame_drop_count, tvb, 0, 0,
 					    pinfo->rec->rec_header.packet_header.drop_count);
 
+		/* visualize number of actually captured frames (dropped frames are considered) */
+		proto_tree_add_uint64(fh_tree, hf_frame_number_captured, tvb, 0, 0,
+					pinfo->num_capt);
+
 		if (generate_md5_hash) {
 			const guint8 *cp;
 			guint8        digest[HASH_MD5_LENGTH];
@@ -1216,6 +1221,11 @@ proto_register_frame(void)
 		  { "Drop Count", "frame.drop_count",
 		    FT_UINT64, BASE_DEC, NULL, 0x0,
 		    "Number of frames lost between this frame and the preceding one on the same interface", HFILL }},
+
+		{ &hf_frame_number_captured,
+		  { "Frame Number Captured", "frame.number_captured",
+		    FT_UINT64, BASE_DEC, NULL, 0x0,
+		    "Number of actually captured frames by the selected interface (dropped frames are considered)", HFILL } },
 	};
 
 	static hf_register_info hf_encap =

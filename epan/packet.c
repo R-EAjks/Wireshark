@@ -524,6 +524,7 @@ dissect_record(epan_dissect_t *edt, int file_type_subtype,
 	edt->pi.cinfo = cinfo;
 	edt->pi.presence_flags = 0;
 	edt->pi.num = fd->num;
+	edt->pi.num_capt = fd->num_capt;
 	/*
 	 * XXX - this doesn't check the wtap_rec because, for
 	 * some capture files, time stamps are supplied only

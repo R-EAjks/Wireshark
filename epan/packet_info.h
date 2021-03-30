@@ -46,6 +46,7 @@ typedef struct _packet_info {
   struct epan_column_info *cinfo;   /**< Column formatting information */
   guint32 presence_flags;           /**< Presence flags for some items */
   guint32 num;                      /**< Frame number */
+  guint64 num_capt;                 /**< Frame number (captured frames - consideration of dropped frames) */
   nstime_t abs_ts;                  /**< Packet absolute time stamp */
   nstime_t rel_ts;                  /**< Relative timestamp (yes, it can be negative) */
   frame_data *fd;

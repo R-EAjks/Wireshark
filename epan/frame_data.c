@@ -43,6 +43,9 @@
 
 #define COMPARE_TS(ts) COMPARE_TS_REAL(fdata1->ts, fdata2->ts)
 
+/* sum of all dropped frames */
+static guint64 drop_count_sum = 0;
+
 void
 frame_delta_abs_time(const struct epan_session *epan, const frame_data *fdata, guint32 prev_num, nstime_t *delta)
 {
@@ -166,6 +169,11 @@ frame_data_init(frame_data *fdata, guint32 num, const wtap_rec *rec,
   fdata->ref_time = 0;
   fdata->ignored = 0;
   fdata->has_ts = (rec->presence_flags & WTAP_HAS_TS) ? 1 : 0;
+  /* sum up the number of dropped frames during the running capture */
+  drop_count_sum += rec->rec_header.packet_header.drop_count;
+  /* generate the number of captures frames (dropped frames are considered) */
+  fdata->num_capt = ((guint64)num) + drop_count_sum;
+
   switch (rec->rec_type) {
 
   case REC_TYPE_PACKET:
@@ -286,6 +294,9 @@ frame_data_destroy(frame_data *fdata)
     g_slist_free(fdata->pfd);
     fdata->pfd = NULL;
   }
+
+  /* reset sum of all dropped frames */
+  drop_count_sum = 0;
 }
 
 /*
