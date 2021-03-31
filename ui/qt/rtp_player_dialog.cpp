@@ -1914,14 +1914,14 @@ qint64 RtpPlayerDialog::saveAudioHeaderWAV(QFile *save_file, int channels, unsig
     }
 
     /* WAVE fmt header, BlockAlign */
-    data16 = channels * sizeof(SAMPLE);
+    data16 = channels * (gint16)sizeof(SAMPLE);
     nchars = save_file->write((const char *)&data16, 2);
     if (nchars != 2) {
         return -1;
     }
 
     /* WAVE fmt header, BitsPerSample */
-    data16 = sizeof(SAMPLE) * 8;
+    data16 = (gint16)sizeof(SAMPLE) * 8;
     nchars = save_file->write((const char *)&data16, 2);
     if (nchars != 2) {
         return -1;
