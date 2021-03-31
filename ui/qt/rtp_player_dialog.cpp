@@ -2038,7 +2038,7 @@ void RtpPlayerDialog::saveAudio(bool sync_to_stream)
     // Check whether all streams use same audio rate
     foreach(RtpAudioStream *audio_stream, streams) {
         if (save_audio_rate != audio_stream->playRate()) {
-            QMessageBox::warning(this, tr("Error"), tr("All selected streams must use same play rate"));
+            QMessageBox::warning(this, tr("Error"), tr("All selected streams must use same play rate. Manual set of Output Audio Rate might help."));
             return;
         }
     }
