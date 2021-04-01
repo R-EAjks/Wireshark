@@ -48,7 +48,7 @@ struct asduheader {
 
 /* the asdu secure structure */
 struct asdu_secure {
-	guint8 SegmentationControl;
+	guint8 segmentation_control;
 	guint8 asn;
 	guint8 fir;
 	guint8 fin;
@@ -834,9 +834,11 @@ static int hf_apcidata = -1;
 static int hf_typeid = -1;
 static int hf_sq  = -1;
 static int hf_numix  = -1;
+
 static int hf_causetx  = -1;
 static int hf_nega  = -1;
 static int hf_test  = -1;
+
 static int hf_oa     = -1;
 static int hf_addr   = -1;
 static int hf_ioa    = -1;
@@ -1991,9 +1993,11 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 
 	/* 60870-5-101 par 7.2.3 Cause of transmission (lenght 2) */
 	asduh.TNCause = tvb_get_guint8(tvb, offset);
+	
 	proto_tree_add_item(it104tree, hf_causetx, tvb, offset, 1, ENC_LITTLE_ENDIAN); /* cause */
 	proto_tree_add_item(it104tree, hf_nega, tvb, offset, 1, ENC_LITTLE_ENDIAN); /* negative */
 	proto_tree_add_item(it104tree, hf_test, tvb, offset, 1, ENC_LITTLE_ENDIAN); /* test */
+
 	offset += 1;
 
 	if (parms->cot_len == 2) {
@@ -2121,17 +2125,18 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 		case S_UF_NA_1:
 		       
 			/* 60870-5-7 par 7.2.6 Segmentation Control */
-			asduh.IOA = tvb_get_letohs(tvb, offset);
-
-			asdu_secure.asn = asdu_secure.SegmentationControl & F_ASN;
-			asdu_secure.fir = asdu_secure.SegmentationControl & F_FIR;
-			asdu_secure.fin = asdu_secure.SegmentationControl & F_FIN;
-						
+			asdu_secure.segmentation_control = tvb_get_guint8(tvb, offset);
+			
 			proto_tree_add_item(it104tree, hf_secure_asn, tvb, offset, 1, ENC_LITTLE_ENDIAN); 
 			proto_tree_add_item(it104tree, hf_secure_fir, tvb, offset, 1, ENC_LITTLE_ENDIAN); 
 			proto_tree_add_item(it104tree, hf_secure_fin, tvb, offset, 1, ENC_LITTLE_ENDIAN); 
+
 			offset += 1;
-						
+
+			asdu_secure.asn = asdu_secure.segmentation_control & F_ASN;
+			asdu_secure.fir = asdu_secure.segmentation_control & F_FIR;
+			asdu_secure.fin = asdu_secure.segmentation_control & F_FIN;
+			
 			/* add to result_text Segmentation Control */
 			if (asduh.NumIx == 1) {
 				wmem_strbuf_append_printf(result_text, " ASN=%d", asdu_secure.asn);
@@ -2531,13 +2536,22 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 		case S_UK_NA_1:
 		case S_UA_NA_1: /* 95 update key change asymmetric */
 
-			get_KSQ(tvb, &offset, it104tree);
-			get_USR(tvb, &offset, it104tree, NULL);
-			get_EUL(tvb, &offset, it104tree, &asdu_secure.EUL);			
-			if (asdu_secure.EUL > 0)
-				get_EUD(tvb, &offset, it104tree, asdu_secure.EUL);
-			
+			if(asdu_secure.fir == 0x40)
+			{
+				get_KSQ(tvb, &offset, it104tree);
+				get_USR(tvb, &offset, it104tree, NULL);
+				get_EUL(tvb, &offset, it104tree, &asdu_secure.EUL);			
+				if (asdu_secure.EUL > 0)
+					get_EUD(tvb, &offset, it104tree, asdu_secure.EUL);
+			}
+
 			offset = Len;
+
+#if 0
+			printf("asn=%d\n", asdu_secure.asn);
+			printf("fir=%d\n", asdu_secure.fir);
+			printf("fin=%d\n", asdu_secure.fin);
+#endif
 
 			break;
 
