@@ -60,6 +60,10 @@ struct asdu_secure {
 	guint32 HLN;
 	guint32 WKL;
 	guint32 ELN;
+	guint32 UNL;
+	guint32 CCL;
+	guint32 CDL;
+	guint32 EUL;
 };
 
 struct asdu_parms {
@@ -257,18 +261,18 @@ static const value_string u_types[] = {
 
 #define S_CH_NA_1  81    /* authentication challenge								*/
 #define S_RP_NA_1  82    /* authentication reply								*/
-#define S_AR_NA_1  83    /* aggressive mode authentication request session key status request			*/
+#define S_AR_NA_1  83    /* aggressive mode authentication request                       			*/
 #define S_KR_NA_1  84    /* session key status request								*/
 #define S_KS_NA_1  85    /* session key status									*/
 #define S_KC_NA_1  86    /* session key change									*/
 #define S_ER_NA_1  87    /* authentication error								*/
-#define S_CU_NA_1  88    /* user certificate      								*/
+#define S_UC_NA_1  88    /* user certificate      								*/
 #define S_US_NA_1  90    /* user status change									*/
 #define S_UQ_NA_1  91    /* update key change request								*/
 #define S_UR_NA_1  92    /* update key change reply								*/
 #define S_UK_NA_1  93    /* update key change symmetric								*/
 #define S_UA_NA_1  94    /* update key change asymmetric							*/
-#define S_UC_NA_1  95    /* update key change confirmation							*/
+#define S_UF_NA_1  95    /* update key change confirmation							*/
 
 #define C_IC_NA_1  100    /* interrogation command 								*/
 #define C_CI_NA_1  101    /* counter interrogation command 							*/
@@ -350,13 +354,13 @@ static const value_string asdu_types [] = {
 	{  S_KS_NA_1,	"S_KS_NA_1" },
 	{  S_KC_NA_1,	"S_KC_NA_1" },
 	{  S_ER_NA_1,	"S_ER_NA_1" },
-	{  S_CU_NA_1,	"S_CU_NA_1" },
+	{  S_UC_NA_1,	"S_UC_NA_1" },
 	{  S_US_NA_1,	"S_US_NA_1" },
 	{  S_UQ_NA_1,	"S_UQ_NA_1" },
 	{  S_UR_NA_1,	"S_UR_NA_1" },
 	{  S_UK_NA_1,	"S_UK_NA_1" },
 	{  S_UA_NA_1,	"S_UA_NA_1" },
-	{  S_UC_NA_1,	"S_UC_NA_1" },
+	{  S_UF_NA_1,	"S_UF_NA_1" },
 	{  C_IC_NA_1,	"C_IC_NA_1" },
 	{  C_CI_NA_1,	"C_CI_NA_1" },
 	{  C_RD_NA_1,	"C_RD_NA_1" },
@@ -426,18 +430,18 @@ static const value_string asdu_lngtypes [] = {
 	{  M_EI_NA_1,	"end of initialization" },
 	{  S_CH_NA_1,	"authentication challenge" },
 	{  S_RP_NA_1,	"authentication reply" },
-	{  S_AR_NA_1,	"aggressive mode authentication request session key status request" },
+	{  S_AR_NA_1,	"aggressive mode authentication request" },
 	{  S_KR_NA_1,	"session key status request" },
 	{  S_KS_NA_1,	"session key status" },
 	{  S_KC_NA_1,	"session key change" },
 	{  S_ER_NA_1,	"authentication error" },
-	{  S_CU_NA_1,	"user certificate" },
+	{  S_UC_NA_1,	"user certificate" },
 	{  S_US_NA_1,	"user status change" },
 	{  S_UQ_NA_1,	"update key change request" },
 	{  S_UR_NA_1,	"update key change reply" },
 	{  S_UK_NA_1,	"update key change symmetric" },
 	{  S_UA_NA_1,	"update key change asymmetric" },
-	{  S_UC_NA_1,	"update key change confirmation" },
+	{  S_UF_NA_1,	"update key change confirmation" },
 	{  C_IC_NA_1,	"interrogation command" },
 	{  C_CI_NA_1,	"counter interrogation command" },
 	{  C_RD_NA_1,	"read command" },
@@ -517,13 +521,13 @@ static const td_asdu_length asdu_length [] = {
 	{  S_KS_NA_1,    0 },
 	{  S_KC_NA_1,    0 },
 	{  S_ER_NA_1,    0 },
-	{  S_CU_NA_1,    0 },
+	{  S_UC_NA_1,    0 },
 	{  S_US_NA_1,    0 },
 	{  S_UQ_NA_1,    0 },
 	{  S_UR_NA_1,    0 },
 	{  S_UK_NA_1,    0 },
 	{  S_UA_NA_1,    0 },
-	{  S_UC_NA_1,    0 },
+	{  S_UF_NA_1,    0 },
 	{  C_IC_NA_1,	 1 },
 	{  C_CI_NA_1,	 1 },
 	{  C_RD_NA_1,	 0 },
@@ -731,6 +735,24 @@ static const value_string kwa_r_types[] = {
 	{ 0, NULL }
 };
 
+static const value_string kcm_r_types[] = {
+	{  0,           "reserved" },
+	{  1,           "reserved" },
+	{  2,           "reserved" },
+	{  3,           "Symmetric AES-128 / HMAC-SHA-1" },
+	{  4,           "Symmetric AES-256 / HMAC-SHA-256" },
+	{  5,           "Symmetric AES-256 / AES-GMAC" },
+	{ 64,           "reserved" },
+	{ 65,           "reserved" },
+	{ 66,           "reserved" },
+	{ 67,           "Asymmetric RSA-2048 / DSA SHA-1 / HMAC-SHA-1" },
+	{ 68,           "Asymmetric RSA-2048 / DSA SHA-256 / HMAC-SHA-256" },
+	{ 69,           "Asymmetric RSA-3072 / DSA SHA-256 / HMAC-SHA-256" },
+	{ 70,           "Asymmetric RS-2048 / DSA SHA-256 / AES-GMAC" },
+	{ 71,           "Asymmetric RSA-3072 / DSA SHA-256 / AES-GMAC" },
+	{ 0,  NULL }
+};
+
 static const value_string err_r_types[] = {
 	{ 0,           "Not used" },
 	{ 1,           "Authentication failed" },
@@ -829,6 +851,7 @@ static int hf_secure_csq  = -1;
 static int hf_secure_usr  = -1;
 static int hf_secure_aid  = -1;
 static int hf_secure_kwa  = -1;
+static int hf_secure_kcm  = -1;
 static int hf_secure_err  = -1;
 static int hf_secure_etm  = -1;
 static int hf_secure_kst  = -1;
@@ -846,6 +869,19 @@ static int hf_secure_wkd  = -1;
 
 static int hf_secure_mac  = -1;
 static int hf_secure_etext  = -1;
+
+static int hf_secure_unl  = -1;
+static int hf_secure_username  = -1;
+
+static int hf_secure_ccl  = -1;
+static int hf_secure_cgc  = -1;
+
+static int hf_secure_cdl  = -1;
+static int hf_secure_cdc  = -1;
+static int hf_secure_cert  = -1;
+
+static int hf_secure_eul  = -1;
+static int hf_secure_eud  = -1;
 
 static int hf_cp24time  = -1;
 static int hf_cp24time_ms  = -1;
@@ -1547,6 +1583,16 @@ static void get_KWA(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 }
 
 /******************************************************************************************************/
+/*    KCM = Key change method (Enumerated value) defined in 7.2.9.2 of IEC/TS 62351-5:2013           */
+/******************************************************************************************************/
+static void get_KCM(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_kcm, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
+
+	(*offset) += 1;
+}
+
+/******************************************************************************************************/
 /*    ERR = Error code (Enumerated value) defined in 7.2.8.5 of IEC/TS 62351-5:2013                   */
 /******************************************************************************************************/
 static void get_ERR(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
@@ -1734,6 +1780,121 @@ static void get_ETEXT(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_t
 }
 
 /******************************************************************************************************/
+/*    USERNAME = User Name, defined in 7.2.10.5 of IEC/TS 62351-5:2013
+
+      The controlling station shall use this value to specify which user’s key is to be changed. The
+      name shall be unique within the organization managed by the authority, with one exception:
+      the null-terminated UTF-8 string “Default” shall be used to identify the common Update Key
+      used between the controlling station and the controlled station. The format of the User Name
+      is otherwise outside the scope of this specification.
+*/
+/******************************************************************************************************/
+static void get_USERNAME(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 LENGHT_USERNAME)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_username, tvb, *offset, LENGHT_USERNAME, ENC_LITTLE_ENDIAN);
+
+	(*offset) += LENGHT_USERNAME;
+}
+
+/******************************************************************************************************/
+/*    CCL = Controlling Station Challenge Data Length, defined in 7.2.10.4 of IEC/TS 62351-5:2013
+
+      The controlling station shall use this value to specify the length of the challenge data that
+      follows. The minimum length shall be as specified in 8.2.5.9.
+*/
+/******************************************************************************************************/
+static void get_CCL(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 *CCL)
+{
+	proto_tree_add_item_ret_uint(iec104_header_tree, hf_secure_ccl, tvb, *offset, 2, ENC_LITTLE_ENDIAN, CCL);
+
+	(*offset) += 2;
+}
+
+/******************************************************************************************************/
+/*    CGC = Controlling Station Challenge Data, defined in 7.2.10.6 of IEC/TS 62351-5:2013
+
+      The controlling station shall send this data to avoid replay attacks on the changing of Update
+      Keys. This value shall be pseudo-random data generated using the algorithm 3.1 specified in
+      the FIPS 186-2 Digital Signature Standard.
+*/
+/******************************************************************************************************/
+static void get_CGC(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 LENGHT_CGC)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_cgc, tvb, *offset, LENGHT_CGC, ENC_LITTLE_ENDIAN);
+
+	(*offset) += LENGHT_CGC;
+}
+
+/******************************************************************************************************/
+/*    CDL = Controlled Station Challenge Data Length, defined in 7.2.11.4 of IEC/TS 62351-5:2013
+
+      This value defines the length of the challenge data that follows, in octets. The minimum value
+      shall be as specified in 8.2.5.9.
+*/
+/******************************************************************************************************/
+static void get_CDL(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 *CDL)
+{
+	proto_tree_add_item_ret_uint(iec104_header_tree, hf_secure_cdl, tvb, *offset, 2, ENC_LITTLE_ENDIAN, CDL);
+
+	(*offset) += 2;
+}
+
+/******************************************************************************************************/
+/*    CDC = Controlled Station Challenge Data, defined in 7.2.11.5 of IEC/TS 62351-5:2013
+
+      The controlled station shall provide this pseudo-random data to ensure mutual authentication
+      can take place between it and the controlling station. The pseudo-random data shall be
+      generated using the algorithm 3.1 specified in the FIPS 186-2 Digital Signature Standard.
+*/
+/******************************************************************************************************/
+static void get_CDC(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 LENGHT_CDC)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_cdc, tvb, *offset, LENGHT_CDC, ENC_LITTLE_ENDIAN);
+
+	(*offset) += LENGHT_CDC;
+}
+
+/******************************************************************************************************/
+/*    EUL = Encrypted update key data length, defined in 7.2.12.4 of IEC/TS 62351-5:2013
+*/
+/******************************************************************************************************/
+static void get_EUL(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 *EUL)
+{
+	proto_tree_add_item_ret_uint(iec104_header_tree, hf_secure_eul, tvb, *offset, 2, ENC_LITTLE_ENDIAN, EUL);
+
+	(*offset) += 2;
+}
+
+/******************************************************************************************************/
+/*    EUD = Encrypted update key data, defined in 7.2.12.5 of IEC/TS 62351-5:2013
+
+      This value contains the new Update Key for the user, plus the name of the user and the
+      Controlled station Challenge Data from the controlled station, in the order shown in Table 23.
+*/
+/******************************************************************************************************/
+static void get_EUD(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 LENGHT_EUD)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_eud, tvb, *offset, LENGHT_EUD, ENC_LITTLE_ENDIAN);
+
+	(*offset) += LENGHT_EUD;
+}
+
+/******************************************************************************************************/
+/*    CERT = Controlled Station Challenge Data, defined in 7.2.11.5 of IEC/TS 62351-5:2013
+
+      The controlled station shall provide this pseudo-random data to ensure mutual authentication
+      can take place between it and the controlling station. The pseudo-random data shall be
+      generated using the algorithm 3.1 specified in the FIPS 186-2 Digital Signature Standard.
+*/
+/******************************************************************************************************/
+static void get_CERT(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 LENGHT_CERT)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_cert, tvb, *offset, LENGHT_CERT, ENC_LITTLE_ENDIAN);
+
+	(*offset) += LENGHT_CERT;
+}
+
+/******************************************************************************************************/
 /*    RSC = Reason for Challenge (Enumerated value) defined in 7.2.2.5 of IEC/TS 62351-5:2013 
 
       This value explains the Challenger’s reason for making the challenge. The Responder shall
@@ -1745,6 +1906,19 @@ static void get_RSC(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 	proto_tree_add_item(iec104_header_tree, hf_secure_rsc, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
 
 	(*offset) += 1;
+}
+
+/******************************************************************************************************/
+/*    UNL = User Name Length, defined in 7.2.10.3 of IEC/TS 62351-5:2013
+
+      The controlling station shall use this value to specify the length of the User Name that follows.
+*/
+/******************************************************************************************************/
+static void get_UNL(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 *UNL)
+{
+	proto_tree_add_item_ret_uint(iec104_header_tree, hf_secure_unl, tvb, *offset, 2, ENC_LITTLE_ENDIAN, UNL);
+
+	(*offset) += 2;
 }
 
 /* ... end Misc. functions for dissection of signal values */
@@ -1938,13 +2112,13 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 		case S_KS_NA_1:
 		case S_KC_NA_1:
 		case S_ER_NA_1:
-		case S_CU_NA_1:
+		case S_UC_NA_1:
 		case S_US_NA_1:
 		case S_UQ_NA_1:
 		case S_UR_NA_1:
 		case S_UK_NA_1:
 		case S_UA_NA_1:
-		case S_UC_NA_1:
+		case S_UF_NA_1:
 		       
 			/* 60870-5-7 par 7.2.6 Segmentation Control */
 			asduh.IOA = tvb_get_letohs(tvb, offset);
@@ -1952,7 +2126,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 			asdu_secure.asn = asdu_secure.SegmentationControl & F_ASN;
 			asdu_secure.fir = asdu_secure.SegmentationControl & F_FIR;
 			asdu_secure.fin = asdu_secure.SegmentationControl & F_FIN;
-			
+						
 			proto_tree_add_item(it104tree, hf_secure_asn, tvb, offset, 1, ENC_LITTLE_ENDIAN); 
 			proto_tree_add_item(it104tree, hf_secure_fir, tvb, offset, 1, ENC_LITTLE_ENDIAN); 
 			proto_tree_add_item(it104tree, hf_secure_fin, tvb, offset, 1, ENC_LITTLE_ENDIAN); 
@@ -2319,13 +2493,55 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 			break;
 
 		case S_KR_NA_1:
-		case S_CU_NA_1:
+
+			break;
+			
+		case S_UC_NA_1: /* 88 user certificate */
+
+			get_KCM(tvb, &offset, it104tree);
+			get_CDL(tvb, &offset, it104tree, &asdu_secure.CDL);
+			if (asdu_secure.CDL > 0)
+				get_CERT(tvb, &offset, it104tree, asdu_secure.CDL);
+			
+			break;
+
 		case S_US_NA_1:
-		case S_UQ_NA_1:
-		case S_UR_NA_1:
+		case S_UQ_NA_1: /* 91 update key change request */
+
+			get_KCM(tvb, &offset, it104tree);
+			get_UNL(tvb, &offset, it104tree, &asdu_secure.UNL);
+			get_CCL(tvb, &offset, it104tree, &asdu_secure.CCL);
+			if (asdu_secure.UNL > 0)
+				get_USERNAME(tvb, &offset, it104tree, asdu_secure.UNL);
+			if (asdu_secure.CCL > 0)
+				get_CGC(tvb, &offset, it104tree, asdu_secure.CCL);
+
+			break;
+			
+		case S_UR_NA_1: /* 92 update key change reply */
+
+			get_KSQ(tvb, &offset, it104tree);
+			get_USR(tvb, &offset, it104tree, NULL);
+			get_CDL(tvb, &offset, it104tree, &asdu_secure.CDL);
+			if (asdu_secure.CDL > 0)
+				get_CDC(tvb, &offset, it104tree, asdu_secure.CDL);
+
+			break;
+			
 		case S_UK_NA_1:
-		case S_UA_NA_1:
-		case S_UC_NA_1:
+		case S_UA_NA_1: /* 95 update key change asymmetric */
+
+			get_KSQ(tvb, &offset, it104tree);
+			get_USR(tvb, &offset, it104tree, NULL);
+			get_EUL(tvb, &offset, it104tree, &asdu_secure.EUL);			
+			if (asdu_secure.EUL > 0)
+				get_EUD(tvb, &offset, it104tree, asdu_secure.EUL);
+			
+			offset = Len;
+
+			break;
+
+		case S_UF_NA_1:
 			
 			offset = Len;
 
@@ -2968,7 +3184,11 @@ proto_register_iec60870_asdu_sec(void)
 		{ &hf_secure_kwa,
 		  { "KWA", "iec60870_asdu.kwa", FT_UINT8, BASE_DEC, VALS(kwa_r_types), 0x0,
 		    "Key wrap algorithm", HFILL }},
-		
+
+		{ &hf_secure_kcm,
+		  { "KCM", "iec60870_asdu.kcm", FT_UINT8, BASE_DEC, VALS(kcm_r_types), 0x0,
+		    "Key change method", HFILL }},
+
 		{ &hf_secure_err,
 		  { "ERR", "iec60870_asdu.err", FT_UINT8, BASE_DEC, VALS(err_r_types), 0x0,
 		    "Key wrap algorithm", HFILL }},
@@ -3024,6 +3244,42 @@ proto_register_iec60870_asdu_sec(void)
 		{ &hf_secure_etext,
 	       	  { "ETEXT", "iec60870_asdu.etext", FT_NONE, BASE_NONE, NULL, 0x0,
 		    "Error Text", HFILL }},
+
+		{ &hf_secure_username,
+	       	  { "USERNAME", "iec60870_asdu.username", FT_NONE, BASE_NONE, NULL, 0x0,
+		    "User Name", HFILL }},
+				
+		{ &hf_secure_unl,
+		  { "UNL", "iec60870_asdu.unl", FT_UINT16, BASE_DEC, NULL, 0x0,
+		    "User Name length", HFILL }},				
+		
+		{ &hf_secure_ccl,
+		  { "CCL", "iec60870_asdu.ccl", FT_UINT16, BASE_DEC, NULL, 0x0,
+		    "Controlling station challenge data length", HFILL }},
+		
+		{ &hf_secure_cgc,
+		  { "CGC", "iec60870_asdu.cgc", FT_NONE, BASE_NONE, NULL, 0x0,
+		    "Controlling station challenge data", HFILL }},
+		
+		{ &hf_secure_cdl,
+		  { "CDL", "iec60870_asdu.cdl", FT_UINT16, BASE_DEC, NULL, 0x0,
+		    "Controlled station challenge data length", HFILL }},
+		
+		{ &hf_secure_cdc,
+	       	  { "CDC", "iec60870_asdu.cdc", FT_NONE, BASE_NONE, NULL, 0x0,
+		    "Controlled station challenge data", HFILL }},
+		
+		{ &hf_secure_cert,
+	       	  { "CERT", "iec60870_asdu.cert", FT_NONE, BASE_NONE, NULL, 0x0,
+		    "Controlled station challenge data", HFILL }},
+		
+		{ &hf_secure_eul,
+		  { "EUL", "iec60870_asdu.eul", FT_UINT16, BASE_DEC, NULL, 0x0,
+		    "Encrypted update key data length", HFILL }},
+
+		{ &hf_secure_eud,
+	       	  { "EUD", "iec60870_asdu.eud", FT_NONE, BASE_NONE, NULL, 0x0,
+		    "Encrypted update key data", HFILL }},
 		
 		{ &hf_ioa,
 		  { "IOA", "iec60870_asdu.ioa", FT_UINT24, BASE_DEC, NULL, 0x0,
