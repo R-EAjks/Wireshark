@@ -768,10 +768,15 @@ is_valid_requerest_body(tvbuff_t *tvb)
     if (!allowed_ch) return FALSE;
   }
 
-  offset += tvb_strsize(tvb, offset);
-  guint len = tvb_strsize(tvb, offset);
-  const gchar* mode = tvb_format_stringzpad(tvb, offset, len);
-  
+  gint len = tvb_strnlen(tvb, offset, -1);
+  if (len == -1) return FALSE;
+  offset += len + 1;
+  if (!tvb_captured_length_remaining(tvb, offset)) return FALSE;
+  len = tvb_strnlen(tvb, offset, -1);
+  if (len == -1) return FALSE;
+
+  const gchar* mode = tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &len, ENC_ASCII);
+
   const gchar* modes[] = {"netscii", "octet", "mail"};
   for(guint i = 0; i < array_length(modes); ++i) {
     if (g_ascii_strcasecmp(mode, modes[i]) == 0) return TRUE;
