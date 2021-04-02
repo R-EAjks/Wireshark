@@ -2555,9 +2555,9 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 
 			break;
 
-		case S_UF_NA_1:
-			
-			offset = Len;
+		case S_UF_NA_1: /* 95 update key change confirmation */
+
+			get_MAC(tvb, &offset, it104tree, 32);
 
 			break;
 
@@ -2572,27 +2572,32 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 		       			
 		case S_KS_NA_1: /* 85 session key status */		      			
 
-			get_KSQ(tvb, &offset, it104tree);
-			get_USR(tvb, &offset, it104tree, NULL);
-			get_KWA(tvb, &offset, it104tree);
-			get_KST(tvb, &offset, it104tree, &asdu_secure.KST);
-			get_MAL(tvb, &offset, it104tree, &asdu_secure.MAL);
-			get_CLN(tvb, &offset, it104tree, &asdu_secure.CLN);
-			if (asdu_secure.CLN > 0)
-				get_KCD(tvb, &offset, it104tree, asdu_secure.CLN);
-			if (asdu_secure.KST == 1)
+			if(asdu_secure.fir == 0x40)
 			{
-				/* look at mal_r_types */
-				guint32 lenght_MAC = 0;
-				if (asdu_secure.MAL == 3)
-					lenght_MAC = 8;
-				else if (asdu_secure.MAL == 4)
-					lenght_MAC = 16;
-				else if (asdu_secure.MAL == 6)
-					lenght_MAC = 12;
+				get_KSQ(tvb, &offset, it104tree);
+				get_USR(tvb, &offset, it104tree, NULL);
+				get_KWA(tvb, &offset, it104tree);
+				get_KST(tvb, &offset, it104tree, &asdu_secure.KST);
+				get_MAL(tvb, &offset, it104tree, &asdu_secure.MAL);
+				get_CLN(tvb, &offset, it104tree, &asdu_secure.CLN);
+				if (asdu_secure.CLN > 0)
+					get_KCD(tvb, &offset, it104tree, asdu_secure.CLN);
+				if (asdu_secure.KST == 1)
+				{
+					/* look at mal_r_types */
+					guint32 lenght_MAC = 0;
+					if (asdu_secure.MAL == 3)
+						lenght_MAC = 8;
+					else if (asdu_secure.MAL == 4)
+						lenght_MAC = 16;
+					else if (asdu_secure.MAL == 6)
+						lenght_MAC = 12;
 				
-				get_MAC(tvb, &offset, it104tree, lenght_MAC);
+					get_MAC(tvb, &offset, it104tree, lenght_MAC);
+				}
 			}
+
+			offset = Len;
 			
 			break;
 
