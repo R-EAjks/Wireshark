@@ -4702,6 +4702,7 @@ static int hf_ieee80211_rnr_bss_parameters_b4 = -1;
 static int hf_ieee80211_rnr_bss_parameters_b5 = -1;
 static int hf_ieee80211_rnr_bss_parameters_b6 = -1;
 static int hf_ieee80211_rnr_bss_parameters_b7 = -1;
+static int hf_ieee80211_rnr_20_mhz_psd = -1;
 
 static int hf_ieee80211_ampduparam = -1;
 static int hf_ieee80211_ampduparam_vs = -1;
@@ -7391,6 +7392,8 @@ static gint ett_tag_neighbor_report_bssid_info_tree = -1;
 static gint ett_tag_neighbor_report_bssid_info_capability_tree = -1;
 static gint ett_tag_neighbor_report_subelement_tree = -1;
 static gint ett_tag_neighbor_report_sub_tag_tree = -1;
+
+static gint ett_tag_rnr_tbtt_tree = -1;
 
 static gint ett_tag_wapi_param_set_akm_tree = -1;
 static gint ett_tag_wapi_param_set_ucast_tree = -1;
@@ -19313,8 +19316,8 @@ dissect_operating_mode_notification(tvbuff_t *tvb, packet_info *pinfo _U_, proto
 static int
 dissect_reduced_neighbor_report(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void* data _U_)
 {
-  int offset = 0;
-  guint8 tbbt_length;
+  int offset = 0, count;
+  guint8 tbbt_length, tbtt_count;
   static int * const ieee80211_rnr_tbtt_information_header[] = {
     &hf_ieee80211_rnr_tbtt_information_field_type,
     &hf_ieee80211_rnr_tbtt_information_filtered_neighbor_ap,
@@ -19335,11 +19338,13 @@ dissect_reduced_neighbor_report(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tre
     &hf_ieee80211_rnr_bss_parameters_b7,
     NULL
   };
+  proto_tree *tbtt_subtree;
 
   /* TBTT Information Header */
   proto_tree_add_bitmask_with_flags(tree, tvb, offset, hf_ieee80211_rnr_tbtt_information_field_header,
                                     ett_rnr_tbtt_information_tree, ieee80211_rnr_tbtt_information_header,
                                     ENC_LITTLE_ENDIAN, BMT_NO_APPEND);
+  tbtt_count = tvb_get_guint8(tvb, offset) >> 4;
   tbbt_length = tvb_get_guint8(tvb, offset+1);
   offset += 2;
 
@@ -19349,27 +19354,40 @@ dissect_reduced_neighbor_report(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tre
   proto_tree_add_item(tree, hf_ieee80211_rnr_channel_number, tvb, offset, 1, ENC_LITTLE_ENDIAN);
   offset += 1;
 
-  proto_tree_add_item(tree, hf_ieee80211_rnr_neighbor_ap_tbtt_offset, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-  offset += 1;
+  count = tbtt_count;
+  while (count >= 0) {
+    tbtt_subtree = proto_tree_add_subtree_format(tree, tvb, offset, tbbt_length, ett_tag_rnr_tbtt_tree, NULL, "TBTT %d:", tbtt_count - count);
 
-  /* BSSID */
-  if(tbbt_length == 7 || tbbt_length == 8 || tbbt_length >= 11){
-    proto_tree_add_item(tree, hf_ieee80211_rnr_bssid, tvb, offset, 6, ENC_NA);
-    offset += 6;
-  }
-
-  /* Short SSID */
-  if(tbbt_length == 5 || tbbt_length == 6 || tbbt_length >= 11){
-    proto_tree_add_item(tree, hf_ieee80211_rnr_short_ssid, tvb, offset, 4, ENC_NA);
-    offset += 4;
-  }
-
-  /* BSS Parameters */
-  if(tbbt_length == 2 || tbbt_length == 6 || tbbt_length == 8 || tbbt_length >= 12){
-    proto_tree_add_bitmask_with_flags(tree, tvb, offset, hf_ieee80211_rnr_bss_parameters,
-                                      ett_rnr_bss_parameters, ieee80211_rnr_bss_parameters,
-                                      ENC_LITTLE_ENDIAN, BMT_NO_APPEND);
+    proto_tree_add_item(tbtt_subtree, hf_ieee80211_rnr_neighbor_ap_tbtt_offset, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
+
+    /* BSSID */
+    if(tbbt_length == 7 || tbbt_length == 8 || tbbt_length >= 11){
+      proto_tree_add_item(tbtt_subtree, hf_ieee80211_rnr_bssid, tvb, offset, 6, ENC_NA);
+      offset += 6;
+    }
+
+    /* Short SSID */
+    if(tbbt_length == 5 || tbbt_length == 6 || tbbt_length >= 11){
+      proto_tree_add_item(tbtt_subtree, hf_ieee80211_rnr_short_ssid, tvb, offset, 4, ENC_NA);
+      offset += 4;
+    }
+
+    /* BSS Parameters */
+    if(tbbt_length == 2 || tbbt_length == 6 || tbbt_length == 8 || tbbt_length >= 12){
+      proto_tree_add_bitmask_with_flags(tbtt_subtree, tvb, offset, hf_ieee80211_rnr_bss_parameters,
+                                        ett_rnr_bss_parameters, ieee80211_rnr_bss_parameters,
+                                        ENC_LITTLE_ENDIAN, BMT_NO_APPEND);
+      offset += 1;
+    }
+
+    /* 20 MHz PSD */
+    if(tbbt_length == 9 || tbbt_length == 13){
+      proto_tree_add_item(tbtt_subtree, hf_ieee80211_rnr_20_mhz_psd, tvb, offset, 1, ENC_NA);
+      offset += 1;
+    }
+
+    count--;
   }
 
   return offset;
@@ -41109,6 +41127,10 @@ proto_register_ieee80211(void)
       FT_BOOLEAN, 8, NULL, 0x80,
       NULL, HFILL }},
 
+    {&hf_ieee80211_rnr_20_mhz_psd,
+     {"20 MHz PSD", "wlan.rnr.20_mhz_psd",
+      FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+
     {&hf_ieee80211_s1g_cap_byte1,
      {"S1G Capabilities Byte 1", "wlan.s1g.capabilities.byte1",
       FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
@@ -49551,6 +49573,8 @@ proto_register_ieee80211(void)
     &ett_tag_neighbor_report_bssid_info_capability_tree,
     &ett_tag_neighbor_report_subelement_tree,
     &ett_tag_neighbor_report_sub_tag_tree,
+
+    &ett_tag_rnr_tbtt_tree,
 
     &ett_tag_wapi_param_set_akm_tree,
     &ett_tag_wapi_param_set_ucast_tree,
