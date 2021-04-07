@@ -1,4 +1,4 @@
-g6208\/* packet-ptp.c
+/* packet-ptp.c
  * Routines for PTP (Precision Time Protocol) dissection
  * Copyright 2004, Auges Tchouante <tchouante2001@yahoo.fr>
  * Copyright 2004, Dominic Bechaz <bdo@zhwin.ch> , ZHW/InES
