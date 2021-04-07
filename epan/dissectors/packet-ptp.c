@@ -1,4 +1,4 @@
-/* packet-ptp.c
+g6208\/* packet-ptp.c
  * Routines for PTP (Precision Time Protocol) dissection
  * Copyright 2004, Auges Tchouante <tchouante2001@yahoo.fr>
  * Copyright 2004, Dominic Bechaz <bdo@zhwin.ch> , ZHW/InES
@@ -6205,7 +6205,7 @@ proto_register_ptp(void)
           { "numberBitsAfterTimestamp", "ptp.as.sig.tlv.numberBitsAfterTimestamp",
             FT_UINT16, BASE_DEC, NULL, 0x00,
             NULL, HFILL }
-        },		
+        },
         /* Fields for PTP_Management (=mm) messages */
         { &hf_ptp_v2_mm_targetportidentity,
           { "targetPortIdentity",           "ptp.v2.mm.targetportidentity",
