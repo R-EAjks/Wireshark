@@ -2502,11 +2502,17 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 			break;
 			
 		case S_UC_NA_1: /* 88 user certificate */
+			
+			if(asdu_secure.fir == 0x40)
+			{
+				
+				get_KCM(tvb, &offset, it104tree);
+				get_CDL(tvb, &offset, it104tree, &asdu_secure.CDL);
+				if (asdu_secure.CDL > 0)
+					get_CERT(tvb, &offset, it104tree, asdu_secure.CDL);
+			}
 
-			get_KCM(tvb, &offset, it104tree);
-			get_CDL(tvb, &offset, it104tree, &asdu_secure.CDL);
-			if (asdu_secure.CDL > 0)
-				get_CERT(tvb, &offset, it104tree, asdu_secure.CDL);
+			offset = Len;
 			
 			break;
 
