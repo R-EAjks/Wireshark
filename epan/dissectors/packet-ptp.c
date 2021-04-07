@@ -264,8 +264,8 @@ static int proto_ptp = -1;
 
 	/* Interface Rate Tlv field offsets */
 #define PTP_SIG_TLV_INTERFACE_BIT_PERIOD							 10
-#define PTP_SIG_TLV_NUMBERBITS_BEFORE_TIMESTAMP					 18
-#define PTP_SIG_TLV_NUMBERBITS_AFTER_TIMESTAMP					 20
+#define PTP_SIG_TLV_NUMBERBITS_BEFORE_TIMESTAMP					 	 18
+#define PTP_SIG_TLV_NUMBERBITS_AFTER_TIMESTAMP					 	 20
 	
 /* END Offsets of fields within a PTP packet. */
 
@@ -1360,8 +1360,8 @@ static const value_string ptp_v2_org_cern_subtype_vals[] = {
 };
 
 static const value_string ptp_v2_org_itut_subtype_vals[] = {
-    {PTP_V2_INTERFACE_RATE_TLV,  "Interface Rate Tlv"},
-    {0,                                  NULL}
+    {PTP_V2_INTERFACE_RATE_TLV,  "Interface Rate TLV"},
+    {0,                          NULL}
 };
 
 static const value_string ptp_v2_org_cern_wrMessageID_vals[] = {
@@ -6205,8 +6205,7 @@ proto_register_ptp(void)
           { "numberBitsAfterTimestamp", "ptp.as.sig.tlv.numberBitsAfterTimestamp",
             FT_UINT16, BASE_DEC, NULL, 0x00,
             NULL, HFILL }
-        },
-		
+        },		
         /* Fields for PTP_Management (=mm) messages */
         { &hf_ptp_v2_mm_targetportidentity,
           { "targetPortIdentity",           "ptp.v2.mm.targetportidentity",
