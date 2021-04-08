@@ -1,5 +1,5 @@
 /* packet-bt-mijia.c
- * Routines for Bluetooth Mijia Protocal
+ * Routines for Bluetooth Mijia Protocol
  *
  * Copyright 2021, Lingao Meng <menglingao@xiaomi.com>
  *
@@ -19,6 +19,7 @@
 
 #include <epan/packet.h>
 #include <epan/prefs.h>
+#include <glib.h>
 #include <wsutil/wsgcrypt.h>
 #include <epan/expert.h>
 #include <stdio.h>
@@ -384,18 +385,18 @@ compute_ascii_key(guchar **ascii_key, const gchar *key)
 		if ((raw_key_len > 2) && (key[0] == '0') && ((key[1] == 'x') || (key[1] == 'X')))
 		{
 			/*
-             		* Key begins with "0x" or "0X"; skip that and treat the rest
-             		* as a sequence of hex digits.
-             		*/
+			* Key begins with "0x" or "0X"; skip that and treat the rest
+			* as a sequence of hex digits.
+			*/
 			i = 2; /* first character after "0[Xx]" */
 			j = 0;
 			if (raw_key_len % 2 == 1)
 			{
 				/*
-                 		* Key has an odd number of characters; we act as if the
-                 		* first character had a 0 in front of it, making the
-                 		* number of characters even.
-                 		*/
+				* Key has an odd number of characters; we act as if the
+				* first character had a 0 in front of it, making the
+				* number of characters even.
+				*/
 				key_len = (raw_key_len - 2) / 2 + 1;
 				*ascii_key = (guchar *)g_malloc((key_len + 1) * sizeof(gchar));
 				hex_digit = g_ascii_xdigit_value(key[i]);
@@ -412,9 +413,9 @@ compute_ascii_key(guchar **ascii_key, const gchar *key)
 			else
 			{
 				/*
-                 		* Key has an even number of characters, so we treat each
-                 		* pair of hex digits as a single byte value.
-                 		*/
+				* Key has an even number of characters, so we treat each
+				* pair of hex digits as a single byte value.
+				*/
 				key_len = (raw_key_len - 2) / 2;
 				*ascii_key = (guchar *)g_malloc((key_len + 1) * sizeof(gchar));
 			}
