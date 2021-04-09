@@ -167,6 +167,7 @@ DIAG_ON(frame-larger-than=)
 #include <QToolBar>
 #include <QDesktopServices>
 #include <QUrl>
+#include <QMutex>
 
 // XXX You must uncomment QT_WINEXTRAS_LIB lines in CMakeList.txt and
 // cmakeconfig.h.in.
@@ -3304,22 +3305,28 @@ void MainWindow::on_actionStatisticsHTTP2_triggered()
 
 // Telephony Menu
 
+static QMutex telephony_dialog_mutex;
+
 void MainWindow::openTelephonyRtpPlayerDialog()
 {
+    telephony_dialog_mutex.lock();
     if (!rtp_player_dialog_) {
         rtp_player_dialog_ = new RtpPlayerDialog(*this, capture_file_);
 
         connect(rtp_player_dialog_, SIGNAL(goToPacket(int)),
                 packet_list_, SLOT(goToPacket(int)));
     }
+    telephony_dialog_mutex.unlock();
     rtp_player_dialog_->show();
 }
 
 void MainWindow::openTelephonyVoipCallsDialog(bool all_flows)
 {
     VoipCallsDialog *dlg;
-    bool set_signals = false;
+    bool set_signals;
 
+    telephony_dialog_mutex.lock();
+    set_signals = false;
     if (all_flows) {
         if (!sip_calls_dialog_) {
             sip_calls_dialog_ = new VoipCallsDialog(*this, capture_file_, true);
@@ -3347,11 +3354,13 @@ void MainWindow::openTelephonyVoipCallsDialog(bool all_flows)
         connect(dlg, SIGNAL(rtpPlayerDialogRemoveRtpStreams(QVector<rtpstream_info_t *>)),
                 this, SLOT(rtpPlayerDialogRemoveRtpStreams(QVector<rtpstream_info_t *>)));
     }
+    telephony_dialog_mutex.unlock();
     dlg->show();
 }
 
 void MainWindow::openTelephonyRtpAnalysisDialog()
 {
+    telephony_dialog_mutex.lock();
     if (!rtp_analysis_dialog_) {
         rtp_analysis_dialog_ = new RtpAnalysisDialog(*this, capture_file_);
 
@@ -3364,6 +3373,7 @@ void MainWindow::openTelephonyRtpAnalysisDialog()
         connect(rtp_analysis_dialog_, SIGNAL(rtpPlayerDialogRemoveRtpStreams(QVector<rtpstream_info_t *>)),
                 this, SLOT(rtpPlayerDialogRemoveRtpStreams(QVector<rtpstream_info_t *>)));
     }
+    telephony_dialog_mutex.unlock();
     rtp_analysis_dialog_->show();
 }
 
@@ -3456,6 +3466,7 @@ void MainWindow::on_actionTelephonyOsmuxPacketCounter_triggered()
 
 void MainWindow::openTelephonyRtpStreamsDialog()
 {
+    telephony_dialog_mutex.lock();
     if (!rtp_stream_dialog_) {
         rtp_stream_dialog_ = new RtpStreamDialog(*this, capture_file_);
         connect(rtp_stream_dialog_, SIGNAL(packetsMarked()),
@@ -3479,6 +3490,7 @@ void MainWindow::openTelephonyRtpStreamsDialog()
         connect(rtp_stream_dialog_, SIGNAL(rtpAnalysisDialogRemoveRtpStreams(QVector<rtpstream_info_t *>)),
                 this, SLOT(rtpAnalysisDialogRemoveRtpStreams(QVector<rtpstream_info_t *>)));
     }
+    telephony_dialog_mutex.unlock();
     rtp_stream_dialog_->show();
 }
 

@@ -38,6 +38,7 @@
 #include <QPushButton>
 #include <QWidget>
 #include <QCheckBox>
+#include <QMutex>
 
 #include <ui/qt/utils/color_utils.h>
 #include <ui/qt/utils/qt_ui_utils.h>
@@ -51,6 +52,8 @@
  *
  * Displays forward and reverse RTP streams and graphs each stream
  */
+
+static QMutex streams_mutex;
 
 // To do:
 // - Progress bar for tapping and saving.
@@ -1073,16 +1076,25 @@ void RtpAnalysisDialog::showStreamMenu(QPoint pos)
 
 void RtpAnalysisDialog::replaceRtpStreams(QVector<rtpstream_info_t *> stream_infos)
 {
+    streams_mutex.lock();
     // Delete existing tabs (from last to first)
     if (tabs_.count() > 0) {
         for(int i=tabs_.count(); i>0; i--) {
             closeTab(i-1);
         }
     }
-    addRtpStreams(stream_infos);
+    addRtpStreamsPrivate(stream_infos);
+    streams_mutex.unlock();
 }
 
 void RtpAnalysisDialog::addRtpStreams(QVector<rtpstream_info_t *> stream_infos)
+{
+    streams_mutex.lock();
+    addRtpStreamsPrivate(stream_infos);
+    streams_mutex.unlock();
+}
+
+void RtpAnalysisDialog::addRtpStreamsPrivate(QVector<rtpstream_info_t *> stream_infos)
 {
     int first_tab_no = -1;
 
@@ -1122,6 +1134,7 @@ void RtpAnalysisDialog::addRtpStreams(QVector<rtpstream_info_t *> stream_infos)
 
 void RtpAnalysisDialog::removeRtpStreams(QVector<rtpstream_info_t *> stream_infos _U_)
 {
+    streams_mutex.lock();
     foreach(rtpstream_info_t *rtpstream, stream_infos) {
         for(int i=0; i < tabs_.count(); i++) {
             if (rtpstream_id_equal(&(tabs_[i]->stream.id), &(rtpstream->id), RTPSTREAM_ID_EQUAL_SSRC)) {
@@ -1129,6 +1142,7 @@ void RtpAnalysisDialog::removeRtpStreams(QVector<rtpstream_info_t *> stream_info
             }
         }
     }
+    streams_mutex.unlock();
 
     updateGraph();
 }
