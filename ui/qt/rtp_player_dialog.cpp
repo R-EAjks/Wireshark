@@ -35,7 +35,6 @@
 #include <QMenu>
 #include <QVBoxLayout>
 #include <QTimer>
-#include <QMutex>
 
 #include <QAudioFormat>
 #include <QAudioOutput>
@@ -74,8 +73,6 @@
 // Bug 12166 - RTP audio player crashes
 
 // In some places we match by conv/call number, in others we match by first frame.
-
-static QMutex streams_mutex;
 
 enum {
     channel_col_,
@@ -684,7 +681,6 @@ void RtpPlayerDialog::addSingleRtpStream(rtpstream_info_t *rtpstream)
 
 void RtpPlayerDialog::replaceRtpStreams(QVector<rtpstream_info_t *> stream_infos)
 {
-    streams_mutex.lock();
     // Delete all existing rows
     on_actionSelectAll_triggered();
     on_actionRemoveStream_triggered();
@@ -693,7 +689,6 @@ void RtpPlayerDialog::replaceRtpStreams(QVector<rtpstream_info_t *> stream_infos
     for (int i=0; i < stream_infos.size(); i++) {
         addSingleRtpStream(stream_infos[i]);
     }
-    streams_mutex.unlock();
     setMarkers();
 
     QTimer::singleShot(0, this, SLOT(retapPackets()));
@@ -701,14 +696,12 @@ void RtpPlayerDialog::replaceRtpStreams(QVector<rtpstream_info_t *> stream_infos
 
 void RtpPlayerDialog::addRtpStreams(QVector<rtpstream_info_t *> stream_infos)
 {
-    streams_mutex.lock();
     int tli_count = ui->streamTreeWidget->topLevelItemCount();
 
     // Add new streams
     for (int i=0; i < stream_infos.size(); i++) {
         addSingleRtpStream(stream_infos[i]);
     }
-    streams_mutex.unlock();
 
     if (tli_count == 0) {
         setMarkers();
@@ -719,7 +712,6 @@ void RtpPlayerDialog::addRtpStreams(QVector<rtpstream_info_t *> stream_infos)
 
 void RtpPlayerDialog::removeRtpStreams(QVector<rtpstream_info_t *> stream_infos)
 {
-    streams_mutex.lock();
     int tli_count = ui->streamTreeWidget->topLevelItemCount();
 
     if (last_ti_) {
@@ -738,7 +730,6 @@ void RtpPlayerDialog::removeRtpStreams(QVector<rtpstream_info_t *> stream_infos)
             }
         }
     }
-    streams_mutex.unlock();
     updateGraphs();
 
     updateWidgets();
