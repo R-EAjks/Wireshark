@@ -264,7 +264,7 @@ static int hf_smb2_comp_alg_flags = -1;
 static int hf_smb2_comp_alg_flags_chained = -1;
 static int hf_smb2_comp_alg_flags_reserved = -1;
 static int hf_smb2_netname_neg_id = -1;
-static int hf_smb2_transport_reserved = -1;
+static int hf_smb2_transport_ctx_flags = -1;
 static int hf_smb2_rdma_transform_count = -1;
 static int hf_smb2_rdma_transform_reserved1 = -1;
 static int hf_smb2_rdma_transform_reserved2 = -1;
@@ -435,6 +435,7 @@ static int hf_smb2_share_flags_enable_hash_v1 = -1;
 static int hf_smb2_share_flags_enable_hash_v2 = -1;
 static int hf_smb2_share_flags_encrypt_data = -1;
 static int hf_smb2_share_flags_identity_remoting = -1;
+static int hf_smb2_share_flags_compress_data = -1;
 static int hf_smb2_share_caching = -1;
 static int hf_smb2_share_caps = -1;
 static int hf_smb2_share_caps_dfs = -1;
@@ -1025,6 +1026,12 @@ static const val64_string unique_unsolicited_response[] = {
 static const value_string smb2_error_id_vals[] = {
 	{ SMB2_ERROR_ID_DEFAULT, "ERROR_ID_DEFAULT" },
 	{ SMB2_ERROR_ID_SHARE_REDIRECT, "ERROR_ID_SHARE_REDIRECT" },
+	{ 0, NULL }
+};
+
+#define SMB2_ACCEPT_TRANSPORT_LEVEL_SECURITY 0x00000001
+static const value_string smb2_transport_ctx_flags_vals[] = {
+	{ SMB2_ACCEPT_TRANSPORT_LEVEL_SECURITY, "SMB2_ACCEPT_TRANSPORT_LEVEL_SECURITY" },
 	{ 0, NULL }
 };
 
@@ -3416,6 +3423,7 @@ static const value_string share_cache_vals[] = {
 #define SHARE_FLAGS_enable_hash_v2		0x00004000
 #define SHARE_FLAGS_encryption_required		0x00008000
 #define SHARE_FLAGS_identity_remoting		0x00040000
+#define SHARE_FLAGS_compress_data		0x00100000
 
 static int
 dissect_smb2_share_flags(proto_tree *tree, tvbuff_t *tvb, int offset)
@@ -3432,6 +3440,7 @@ dissect_smb2_share_flags(proto_tree *tree, tvbuff_t *tvb, int offset)
 		&hf_smb2_share_flags_enable_hash_v2,
 		&hf_smb2_share_flags_encrypt_data,
 		&hf_smb2_share_flags_identity_remoting,
+		&hf_smb2_share_flags_compress_data,
 		NULL
 	};
 	proto_item *item;
@@ -5162,7 +5171,7 @@ dissect_smb2_negotiate_context(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree
 			break;
 
 		case SMB2_TRANSPORT_CAPABILITIES:
-			proto_tree_add_item(sub_tree, hf_smb2_transport_reserved, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+			proto_tree_add_item(sub_tree, hf_smb2_transport_ctx_flags, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 			offset += 4;
 			break;
 
@@ -12069,9 +12078,9 @@ proto_register_smb2(void)
 			STR_UNICODE, NULL, 0x0, NULL, HFILL }
 		},
 
-		{ &hf_smb2_transport_reserved,
-			{ "Reserved", "smb2.negotiate_context.transport_reserved", FT_UINT32, BASE_HEX,
-			NULL, 0, NULL, HFILL }
+		{ &hf_smb2_transport_ctx_flags,
+			{ "Flags", "smb2.negotiate_context.transport_flags", FT_UINT32, BASE_HEX,
+			  VALS(smb2_transport_ctx_flags_vals), 0, NULL, HFILL }
 		},
 
 		{ &hf_smb2_rdma_transform_count,
@@ -12847,6 +12856,11 @@ proto_register_smb2(void)
 		{ &hf_smb2_share_flags_identity_remoting,
 			{ "Identity Remoting", "smb2.share_flags.identity_remoting", FT_BOOLEAN, 32,
 			NULL, SHARE_FLAGS_identity_remoting, "The specified share supports Identity Remoting", HFILL }
+		},
+
+		{ &hf_smb2_share_flags_compress_data,
+			{ "Compressed IO", "smb2.share_flags.compress_data", FT_BOOLEAN, 32,
+			NULL, SHARE_FLAGS_compress_data, "The share supports compression of read/write messages", HFILL }
 		},
 
 		{ &hf_smb2_share_caching,
