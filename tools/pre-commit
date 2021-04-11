@@ -55,6 +55,7 @@ fi
 
 exit_status=0
 
+ALL_MODIFIED_FILES=$( git diff-index --cached --name-status "${COMMIT_ID}" | grep -v "^D" | cut -f2 )
 COMMIT_FILES=$( git diff-index --cached --name-status "${COMMIT_ID}" | grep -v "^D" | cut -f2 | grep "\\.[ch]$" )
 DIAMETER_FILES=$( git diff-index --cached --name-status "${COMMIT_ID}" | grep -v "^D" | cut -f2 | grep diameter/ )
 
@@ -70,6 +71,9 @@ fi
 
 bad_alloc_patterns=${PWD}/tools/detect_bad_alloc_patterns.py
 echo "$COMMIT_FILES" | $PYBIN "$bad_alloc_patterns"
+
+broken_docbook_images=${PWD}/tools/detect_broken_docbook_images.py
+echo "$ALL_MODIFIED_FILES" | $PYBIN "$broken_docbook_images"
 
 # On windows python will output \r\n line endings - we don't want that.
 #
