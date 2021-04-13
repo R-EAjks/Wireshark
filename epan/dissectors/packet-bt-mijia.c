@@ -110,12 +110,50 @@ static int ett_mijia_beacon_mesh = -1;
 
 static expert_field ei_mijia_beacon_unknown_payload = EI_INIT;
 
+static int * const hfx_bt_mijia_sd_frame_control[] = {
+    &hf_bt_mijia_sd_frame_control_rfu,
+    &hf_bt_mijia_sd_frame_control_locate,
+    &hf_bt_mijia_sd_frame_control_encrypted,
+    &hf_bt_mijia_sd_frame_control_mac_include,
+    &hf_bt_mijia_sd_frame_control_capability_include,
+    &hf_bt_mijia_sd_frame_control_object_include,
+    &hf_bt_mijia_sd_frame_control_mesh_include,
+    &hf_bt_mijia_sd_frame_control_registered,
+    &hf_bt_mijia_sd_frame_control_solicited,
+    &hf_bt_mijia_sd_frame_control_auth_mode,
+    &hf_bt_mijia_sd_frame_control_version,
+    NULL
+};
+
+static int * const hfx_bt_mijia_sd_capability[] = {
+    &hf_bt_mijia_sd_capability_connectable,
+    &hf_bt_mijia_sd_capability_centralable,
+    &hf_bt_mijia_sd_capability_encryptable,
+    &hf_bt_mijia_sd_capability_bondtability,
+    &hf_bt_mijia_sd_capability_io_include,
+    &hf_bt_mijia_sd_capability_rfu,
+    NULL
+};
+
+static int * const hfx_bt_mijia_sd_io_capability[] = {
+    &hf_bt_mijia_sd_io_capability_input_6_number,
+    &hf_bt_mijia_sd_io_capability_input_6_char,
+    &hf_bt_mijia_sd_io_capability_read_nfc_tag,
+    &hf_bt_mijia_sd_io_capability_scan_qr_code,
+    &hf_bt_mijia_sd_io_capability_output_6_number,
+    &hf_bt_mijia_sd_io_capability_output_6_char,
+    &hf_bt_mijia_sd_io_capability_gene_nfc_tag,
+    &hf_bt_mijia_sd_io_capability_gene_qr_code,
+    &hf_bt_mijia_sd_io_capability_rfu,
+    NULL
+};
+
 static gint
 dissect_mijia_beacon_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
 
-	proto_item *item, *frame_item, *obj_item, *oob_item, *capa_item, *mesh_item;
-	proto_tree *sub_tree, *frame_tree, *obj_tree, *oob_tree, *capa_tree, *mesh_tree;
+	proto_item *item, *obj_item, *mesh_item;
+	proto_tree *sub_tree, *obj_tree, *mesh_tree;
 	guint offset = 0;
 	guint8 nonce[12];
 
@@ -125,19 +163,7 @@ dissect_mijia_beacon_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
 	item = proto_tree_add_item(tree, proto_bt_mijia_beacon, tvb, offset, -1, ENC_NA);
 	sub_tree = proto_item_add_subtree(item, ett_mijia_beacon);
 
-	frame_item = proto_tree_add_item(sub_tree, hf_bt_mijia_sd_frame_control, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-	frame_tree = proto_item_add_subtree(frame_item, hf_bt_mijia_sd_frame_control);
-	proto_tree_add_item(frame_tree, hf_bt_mijia_sd_frame_control_rfu, tvb, offset, 2, ENC_NA);
-	proto_tree_add_item(frame_tree, hf_bt_mijia_sd_frame_control_locate, tvb, offset, 2, ENC_NA);
-	proto_tree_add_item(frame_tree, hf_bt_mijia_sd_frame_control_encrypted, tvb, offset, 2, ENC_NA);
-	proto_tree_add_item(frame_tree, hf_bt_mijia_sd_frame_control_mac_include, tvb, offset, 2, ENC_NA);
-	proto_tree_add_item(frame_tree, hf_bt_mijia_sd_frame_control_capability_include, tvb, offset, 2, ENC_NA);
-	proto_tree_add_item(frame_tree, hf_bt_mijia_sd_frame_control_object_include, tvb, offset, 2, ENC_NA);
-	proto_tree_add_item(frame_tree, hf_bt_mijia_sd_frame_control_mesh_include, tvb, offset, 2, ENC_NA);
-	proto_tree_add_item(frame_tree, hf_bt_mijia_sd_frame_control_registered, tvb, offset, 2, ENC_NA);
-	proto_tree_add_item(frame_tree, hf_bt_mijia_sd_frame_control_solicited, tvb, offset, 2, ENC_NA);
-	proto_tree_add_item(frame_tree, hf_bt_mijia_sd_frame_control_auth_mode, tvb, offset, 2, ENC_NA);
-	proto_tree_add_item(frame_tree, hf_bt_mijia_sd_frame_control_version, tvb, offset, 2, ENC_NA);
+	proto_tree_add_bitmask(sub_tree, tvb, offset, hf_bt_mijia_sd_frame_control, ett_mijia_beacon,  hfx_bt_mijia_sd_frame_control, ENC_BIG_ENDIAN);
 	offset += 2;
 
 	memcpy(nonce + 6, tvb_get_ptr(tvb, offset, 2), 2);
@@ -159,14 +185,7 @@ dissect_mijia_beacon_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
 	{
 		guint8 capa = tvb_get_guint8(tvb, offset);
 
-		capa_item = proto_tree_add_item(sub_tree, hf_bt_mijia_sd_capability, tvb, offset, 1, ENC_NA);
-		capa_tree = proto_item_add_subtree(capa_item, hf_bt_mijia_sd_capability);
-		proto_tree_add_item(capa_tree, hf_bt_mijia_sd_capability_connectable, tvb, offset, 1, ENC_NA);
-		proto_tree_add_item(capa_tree, hf_bt_mijia_sd_capability_centralable, tvb, offset, 1, ENC_NA);
-		proto_tree_add_item(capa_tree, hf_bt_mijia_sd_capability_encryptable, tvb, offset, 1, ENC_NA);
-		proto_tree_add_item(capa_tree, hf_bt_mijia_sd_capability_bondtability, tvb, offset, 1, ENC_NA);
-		proto_tree_add_item(capa_tree, hf_bt_mijia_sd_capability_io_include, tvb, offset, 1, ENC_NA);
-		proto_tree_add_item(capa_tree, hf_bt_mijia_sd_capability_rfu, tvb, offset, 1, ENC_NA);
+		proto_tree_add_bitmask(sub_tree, tvb, offset, hf_bt_mijia_sd_capability, ett_mijia_beacon, hfx_bt_mijia_sd_capability, ENC_NA);
 		offset += 1;
 
 		if ((capa & 0x18) == 0x18)
@@ -177,17 +196,7 @@ dissect_mijia_beacon_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
 
 		if (capa & 0x20)
 		{
-			oob_item = proto_tree_add_item(sub_tree, hf_bt_mijia_sd_io_capability, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-			oob_tree = proto_item_add_subtree(oob_item, hf_bt_mijia_sd_io_capability);
-			proto_tree_add_item(oob_tree, hf_bt_mijia_sd_io_capability_input_6_number, tvb, offset, 1, ENC_NA);
-			proto_tree_add_item(oob_tree, hf_bt_mijia_sd_io_capability_input_6_char, tvb, offset, 1, ENC_NA);
-			proto_tree_add_item(oob_tree, hf_bt_mijia_sd_io_capability_read_nfc_tag, tvb, offset, 1, ENC_NA);
-			proto_tree_add_item(oob_tree, hf_bt_mijia_sd_io_capability_scan_qr_code, tvb, offset, 1, ENC_NA);
-			proto_tree_add_item(oob_tree, hf_bt_mijia_sd_io_capability_output_6_number, tvb, offset, 1, ENC_NA);
-			proto_tree_add_item(oob_tree, hf_bt_mijia_sd_io_capability_output_6_char, tvb, offset, 1, ENC_NA);
-			proto_tree_add_item(oob_tree, hf_bt_mijia_sd_io_capability_gene_nfc_tag, tvb, offset, 1, ENC_NA);
-			proto_tree_add_item(oob_tree, hf_bt_mijia_sd_io_capability_gene_qr_code, tvb, offset, 1, ENC_NA);
-			proto_tree_add_item(oob_tree, hf_bt_mijia_sd_io_capability_rfu, tvb, offset + 1, 1, ENC_NA);
+			proto_tree_add_bitmask(sub_tree, tvb, offset, hf_bt_mijia_sd_io_capability, ett_mijia_beacon,  hfx_bt_mijia_sd_io_capability, ENC_BIG_ENDIAN);
 			offset += 2;
 		}
 	}
@@ -598,7 +607,7 @@ void proto_register_bt_mijia_beacon(void)
 	      NULL, HFILL}},
 	    {&hf_bt_mijia_sd_capability_rfu,
 	     {"Reserved", "mibeacon.capability.rfu",
-	      FT_UINT8, BASE_HEX, NULL, 0x00,
+	      FT_UINT8, BASE_HEX, NULL, 0xc0,
 	      NULL, HFILL}},
 	    {&hf_bt_mijia_sd_wifi_mac_address,
 	     {"WIFI MAC Address", "mibeacon.wifi_mac_address",
@@ -642,7 +651,7 @@ void proto_register_bt_mijia_beacon(void)
 	      NULL, HFILL}},
 	    {&hf_bt_mijia_sd_io_capability_rfu,
 	     {"Reserved", "mibeacon.io.rfu",
-	      FT_UINT8, BASE_HEX, NULL, 0x00,
+	      FT_UINT8, BASE_HEX, NULL, 0xff,
 	      NULL, HFILL}},
 	    {&hf_bt_mijia_sd_object,
 	     {"Object", "mibeacon.object",
