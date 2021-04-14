@@ -61,6 +61,7 @@ struct asdu_secure {
 	guint32 WKL;
 	guint32 ELN;
 	guint32 UNL;
+	guint32 UKL;
 	guint32 CCL;
 	guint32 CDL;
 	guint32 EUL;
@@ -262,16 +263,22 @@ static const value_string u_types[] = {
 #define S_CH_NA_1  81    /* authentication challenge								*/
 #define S_RP_NA_1  82    /* authentication reply								*/
 #define S_AR_NA_1  83    /* aggressive mode authentication request                       			*/
+
 #define S_KR_NA_1  84    /* session key status request								*/
 #define S_KS_NA_1  85    /* session key status									*/
 #define S_KC_NA_1  86    /* session key change									*/
+
 #define S_ER_NA_1  87    /* authentication error								*/
+
 #define S_UC_NA_1  88    /* user certificate      								*/
 #define S_US_NA_1  90    /* user status change									*/
+
 #define S_UQ_NA_1  91    /* update key change request								*/
 #define S_UR_NA_1  92    /* update key change reply								*/
+
 #define S_UK_NA_1  93    /* update key change symmetric								*/
 #define S_UA_NA_1  94    /* update key change asymmetric							*/
+
 #define S_UF_NA_1  95    /* update key change confirmation							*/
 
 #define C_IC_NA_1  100    /* interrogation command 								*/
@@ -753,6 +760,14 @@ static const value_string kcm_r_types[] = {
 	{ 0,  NULL }
 };
 
+static const value_string opr_r_types[] = {
+	{ 0,           "Not used" },
+	{ 1,           "ADD" },
+	{ 2,           "DELETE" },
+	{ 3,           "CHANGE" },
+	{ 0,  NULL }
+};
+
 static const value_string err_r_types[] = {
 	{ 0,           "Not used" },
 	{ 1,           "Authentication failed" },
@@ -885,6 +900,13 @@ static int hf_secure_cert  = -1;
 static int hf_secure_eul  = -1;
 static int hf_secure_eud  = -1;
 
+static int hf_secure_opr  = -1;
+static int hf_secure_scs  = -1;
+static int hf_secure_url  = -1;
+static int hf_secure_uei  = -1;
+static int hf_secure_ukl  = -1;
+static int hf_secure_userpubkey = -1;
+
 static int hf_cp24time  = -1;
 static int hf_cp24time_ms  = -1;
 static int hf_cp24time_min  = -1;
@@ -991,6 +1013,7 @@ static expert_field ei_iec104_apdu_invalid_len = EI_INIT;
 #define IEC101_FIXED_LEN      0x10
 #define IEC101_SINGLE_CHAR    0xE5
 
+static gboolean use_tls = FALSE;
 
 /* Misc. functions for dissection of signal values */
 
@@ -1912,6 +1935,7 @@ static void get_RSC(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 
 /******************************************************************************************************/
 /*    UNL = User Name Length, defined in 7.2.10.3 of IEC/TS 62351-5:2013
+      UNL = User Name Length, defined in 7.2.9.7  of IEC/TS 62351-5:2013
 
       The controlling station shall use this value to specify the length of the User Name that follows.
 */
@@ -1922,6 +1946,67 @@ static void get_UNL(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 
 	(*offset) += 2;
 }
+
+/******************************************************************************************************/
+/*    OPR = Operation, defined in 7.2.9.3 of IEC/TS 62351-5:2013                                      */
+/******************************************************************************************************/
+static void get_OPR(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_opr, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
+
+	(*offset) += 1;
+}
+
+/******************************************************************************************************/
+/*    SCS = Status Change Sequence number, defined in 7.2.9.4 of IEC/TS 62351-5:2013                  */
+/******************************************************************************************************/
+static void get_SCS(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_scs, tvb, *offset, 4, ENC_LITTLE_ENDIAN);
+
+	(*offset) += 4;
+}
+
+/******************************************************************************************************/
+/*    URL = User Role, defined in 7.2.9.5 of IEC/TS 62351-5:2013                                      */
+/******************************************************************************************************/
+static void get_URL(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_url, tvb, *offset, 2, ENC_LITTLE_ENDIAN);
+
+	(*offset) += 2;
+}
+
+/******************************************************************************************************/
+/*    UEI = User Role Expiry Interval, defined in 7.2.9.6 of IEC/TS 62351-5:2013                      */
+/******************************************************************************************************/
+static void get_UEI(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_uei, tvb, *offset, 2, ENC_LITTLE_ENDIAN);
+
+	(*offset) += 2;
+}
+
+/******************************************************************************************************/
+/*    UKL = User Public Key Length, defined in 7.2.9.8 of IEC/TS 62351-5:2013                         */
+/******************************************************************************************************/
+static void get_UKL(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 *UKL)
+{
+	proto_tree_add_item_ret_uint(iec104_header_tree, hf_secure_ukl, tvb, *offset, 2, ENC_LITTLE_ENDIAN, UKL);
+
+	(*offset) += 2;
+}
+
+/******************************************************************************************************/
+/*    USERPUBKEY = User Public Key, defined in 7.2.9 of IEC/TS 62351-5:2013                           */
+/******************************************************************************************************/
+static void get_USERPUBKEY(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 LENGHT_USERPUBKEY)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_userpubkey, tvb, *offset, LENGHT_USERPUBKEY, ENC_LITTLE_ENDIAN);
+
+	(*offset) += LENGHT_USERPUBKEY;
+}
+
 
 /* ... end Misc. functions for dissection of signal values */
 
@@ -1951,6 +2036,9 @@ static guint get_iec104apdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
 /******************************************************************************************************/
 static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
+#if 0	
+	printf("use_tls_dissect_iec60870_104_asdu=%d\n", use_tls);
+#endif	
 	guint Len = tvb_reported_length(tvb);
 	guint8 Bytex;
 	const char *cause_str;
@@ -2012,11 +2100,13 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 
 	cause_str = val_to_str(asduh.TNCause & F_CAUSE, causetx_types, " <CauseTx=%u>");
 
+	
 	/* print packet info to show on result_text 
 	   ASDU=35252 M_ME_NA_1 Inrogen IOA[8]=100-107 'measured value, normalized value' */
 	wmem_strbuf_append_printf(result_text, "ASDU=%u %s %s", asduh.Addr, val_to_str(asduh.TypeId, asdu_types, "<TypeId=%u>"), cause_str);
 
-	switch (asduh.TypeId) {
+	switch (asduh.TypeId)
+	{
 		case M_SP_NA_1:
 		case M_SP_TA_1:
 		case M_DP_NA_1:
@@ -2184,11 +2274,11 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 
 	} /* end 'switch (asdu_typeid)' */
 
-
 	/* 'Signal Details': TREE */
 	/* -------- get signal value and status based on ASDU type id */
 
-	switch (asduh.TypeId) {
+	switch (asduh.TypeId)
+	{
 		case M_SP_NA_1:
 		case M_SP_TA_1:
 		case M_DP_NA_1:
@@ -2496,117 +2586,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 				} /* end 'switch (asduh.TypeId)' */
 			} /* end 'for(i = 0; i < dui.asdu_vsq_no_of_obj; i++)' */
 			break;
-
-		case S_KR_NA_1:
-
-			break;
-			
-		case S_UC_NA_1: /* 88 user certificate */
-			
-			if(asdu_secure.fir == 0x40)
-			{
-				
-				get_KCM(tvb, &offset, it104tree);
-				get_CDL(tvb, &offset, it104tree, &asdu_secure.CDL);
-				if (asdu_secure.CDL > 0)
-					get_CERT(tvb, &offset, it104tree, asdu_secure.CDL);
-			}
-
-			offset = Len;
-			
-			break;
-
-		case S_US_NA_1:
-		case S_UQ_NA_1: /* 91 update key change request */
-
-			get_KCM(tvb, &offset, it104tree);
-			get_UNL(tvb, &offset, it104tree, &asdu_secure.UNL);
-			get_CCL(tvb, &offset, it104tree, &asdu_secure.CCL);
-			if (asdu_secure.UNL > 0)
-				get_USERNAME(tvb, &offset, it104tree, asdu_secure.UNL);
-			if (asdu_secure.CCL > 0)
-				get_CGC(tvb, &offset, it104tree, asdu_secure.CCL);
-
-			break;
-			
-		case S_UR_NA_1: /* 92 update key change reply */
-
-			get_KSQ(tvb, &offset, it104tree);
-			get_USR(tvb, &offset, it104tree, NULL);
-			get_CDL(tvb, &offset, it104tree, &asdu_secure.CDL);
-			if (asdu_secure.CDL > 0)
-				get_CDC(tvb, &offset, it104tree, asdu_secure.CDL);
-
-			break;
-			
-		case S_UK_NA_1:
-		case S_UA_NA_1: /* 95 update key change asymmetric */
-
-			if(asdu_secure.fir == 0x40)
-			{
-				get_KSQ(tvb, &offset, it104tree);
-				get_USR(tvb, &offset, it104tree, NULL);
-				get_EUL(tvb, &offset, it104tree, &asdu_secure.EUL);			
-				if (asdu_secure.EUL > 0)
-					get_EUD(tvb, &offset, it104tree, asdu_secure.EUL);
-			}
-
-			offset = Len;
-
-#if 0
-			printf("asn=%d\n", asdu_secure.asn);
-			printf("fir=%d\n", asdu_secure.fir);
-			printf("fin=%d\n", asdu_secure.fin);
-#endif
-
-			break;
-
-		case S_UF_NA_1: /* 95 update key change confirmation */
-
-			get_MAC(tvb, &offset, it104tree, 32);
-
-			break;
-
-		case S_KC_NA_1: /* 86 session key change */
-
-			get_KSQ(tvb, &offset, it104tree);
-			get_USR(tvb, &offset, it104tree, NULL);
-			get_WKL(tvb, &offset, it104tree, &asdu_secure.WKL);
-			if (asdu_secure.WKL > 0)
-				get_WKD(tvb, &offset, it104tree, asdu_secure.WKL);
-			break;			
-		       			
-		case S_KS_NA_1: /* 85 session key status */		      			
-
-			if(asdu_secure.fir == 0x40)
-			{
-				get_KSQ(tvb, &offset, it104tree);
-				get_USR(tvb, &offset, it104tree, NULL);
-				get_KWA(tvb, &offset, it104tree);
-				get_KST(tvb, &offset, it104tree, &asdu_secure.KST);
-				get_MAL(tvb, &offset, it104tree, &asdu_secure.MAL);
-				get_CLN(tvb, &offset, it104tree, &asdu_secure.CLN);
-				if (asdu_secure.CLN > 0)
-					get_KCD(tvb, &offset, it104tree, asdu_secure.CLN);
-				if (asdu_secure.KST == 1)
-				{
-					/* look at mal_r_types */
-					guint32 lenght_MAC = 0;
-					if (asdu_secure.MAL == 3)
-						lenght_MAC = 8;
-					else if (asdu_secure.MAL == 4)
-						lenght_MAC = 16;
-					else if (asdu_secure.MAL == 6)
-						lenght_MAC = 12;
-				
-					get_MAC(tvb, &offset, it104tree, lenght_MAC);
-				}
-			}
-
-			offset = Len;
-			
-			break;
-
+						
 		case S_CH_NA_1:	/* 81 authentication challenge */
 			
 			get_CSQ(tvb, &offset, it104tree);
@@ -2881,6 +2861,50 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 
 			break;
 
+		case S_KR_NA_1: /* 84 session key status request */
+
+			break;
+
+		case S_KS_NA_1: /* 85 session key status */		      			
+
+			if(asdu_secure.fir == 0x40)
+			{
+				get_KSQ(tvb, &offset, it104tree);
+				get_USR(tvb, &offset, it104tree, NULL);
+				get_KWA(tvb, &offset, it104tree);
+				get_KST(tvb, &offset, it104tree, &asdu_secure.KST);
+				get_MAL(tvb, &offset, it104tree, &asdu_secure.MAL);
+				get_CLN(tvb, &offset, it104tree, &asdu_secure.CLN);
+				if (asdu_secure.CLN > 0)
+					get_KCD(tvb, &offset, it104tree, asdu_secure.CLN);
+				if (asdu_secure.KST == 1)
+				{
+					/* look at mal_r_types */
+					guint32 lenght_MAC = 0;
+					if (asdu_secure.MAL == 3)
+						lenght_MAC = 8;
+					else if (asdu_secure.MAL == 4)
+						lenght_MAC = 16;
+					else if (asdu_secure.MAL == 6)
+						lenght_MAC = 12;
+				
+					get_MAC(tvb, &offset, it104tree, lenght_MAC);
+				}
+			}
+
+			offset = Len;
+			
+			break;
+
+		case S_KC_NA_1: /* 86 session key change */
+
+			get_KSQ(tvb, &offset, it104tree);
+			get_USR(tvb, &offset, it104tree, NULL);
+			get_WKL(tvb, &offset, it104tree, &asdu_secure.WKL);
+			if (asdu_secure.WKL > 0)
+				get_WKD(tvb, &offset, it104tree, asdu_secure.WKL);
+			break;
+		       
 		case S_ER_NA_1: /* 87 authentication error */
 
 #if 1			
@@ -2896,6 +2920,115 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 			if (asdu_secure.ELN > 0)
 				get_ETEXT(tvb, &offset, it104tree, asdu_secure.ELN);			
 			
+			break;
+
+		case S_UC_NA_1: /* 88 user certificate */
+			
+			if(asdu_secure.fir == 0x40)
+			{				
+				get_KCM(tvb, &offset, it104tree);
+				get_CDL(tvb, &offset, it104tree, &asdu_secure.CDL);
+				if (asdu_secure.CDL > 0)
+					get_CERT(tvb, &offset, it104tree, asdu_secure.CDL);
+			}
+
+			offset = Len;
+			
+			break;
+
+		case S_US_NA_1: /* 90 user status change */
+
+			if(asdu_secure.fir == 0x40)
+			{				
+				get_KCM(tvb, &offset, it104tree);
+				get_OPR(tvb, &offset, it104tree);
+
+				get_SCS(tvb, &offset, it104tree);
+
+				get_URL(tvb, &offset, it104tree);
+				get_UEI(tvb, &offset, it104tree);
+			
+				get_UNL(tvb, &offset, it104tree, &asdu_secure.UNL);
+				get_UKL(tvb, &offset, it104tree, &asdu_secure.UKL);
+				get_CDL(tvb, &offset, it104tree, &asdu_secure.CDL);
+
+				if (asdu_secure.UNL > 0)
+					get_USERNAME(tvb, &offset, it104tree, asdu_secure.UNL);
+
+				if (asdu_secure.UKL > 0)
+					get_USERPUBKEY(tvb, &offset, it104tree, asdu_secure.UKL);
+
+				if (asdu_secure.CDL > 0)
+					get_CERT(tvb, &offset, it104tree, asdu_secure.CDL);
+			}
+
+			offset = Len;
+			
+			break;
+
+		case S_UQ_NA_1: /* 91 update key change request */
+
+			get_KCM(tvb, &offset, it104tree);
+			get_UNL(tvb, &offset, it104tree, &asdu_secure.UNL);
+			get_CCL(tvb, &offset, it104tree, &asdu_secure.CCL);
+			if (asdu_secure.UNL > 0)
+				get_USERNAME(tvb, &offset, it104tree, asdu_secure.UNL);
+			if (asdu_secure.CCL > 0)
+				get_CGC(tvb, &offset, it104tree, asdu_secure.CCL);
+
+			break;
+			
+		case S_UR_NA_1: /* 92 update key change reply */
+
+			get_KSQ(tvb, &offset, it104tree);
+			get_USR(tvb, &offset, it104tree, NULL);
+			get_CDL(tvb, &offset, it104tree, &asdu_secure.CDL);
+			if (asdu_secure.CDL > 0)
+				get_CDC(tvb, &offset, it104tree, asdu_secure.CDL);
+
+			break;
+
+		case S_UK_NA_1: /* 93 update key change symmetric */
+			
+			if(asdu_secure.fir == 0x40)
+			{
+				get_KSQ(tvb, &offset, it104tree);
+				get_USR(tvb, &offset, it104tree, NULL);
+				get_EUL(tvb, &offset, it104tree, &asdu_secure.EUL);			
+				if (asdu_secure.EUL > 0)
+					get_EUD(tvb, &offset, it104tree, asdu_secure.EUL);
+				get_MAC(tvb, &offset, it104tree, 32);
+			}
+
+			offset = Len;
+
+			break;
+
+		case S_UA_NA_1: /* 94 update key change asymmetric */
+
+			if(asdu_secure.fir == 0x40)
+			{
+				get_KSQ(tvb, &offset, it104tree);
+				get_USR(tvb, &offset, it104tree, NULL);
+				get_EUL(tvb, &offset, it104tree, &asdu_secure.EUL);			
+				if (asdu_secure.EUL > 0)
+					get_EUD(tvb, &offset, it104tree, asdu_secure.EUL);
+			}
+
+			offset = Len;
+
+#if 0
+			printf("asn=%d\n", asdu_secure.asn);
+			printf("fir=%d\n", asdu_secure.fir);
+			printf("fin=%d\n", asdu_secure.fin);
+#endif
+
+			break;
+
+		case S_UF_NA_1: /* 95 update key change confirmation */
+
+			get_MAC(tvb, &offset, it104tree, 32);
+
 			break;
 			
 		default:
@@ -2924,6 +3057,9 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 /******************************************************************************************************/
 static int dissect_iec60870_104_apci(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 {
+#if 0
+	printf("use_tls_dissect_iec60870_104_apci=%d\n", use_tls);
+#endif	
 	guint TcpLen = tvb_reported_length(tvb);
 	guint8 Start, len, type, temp8;
 	guint16 apci_txid, apci_rxid;
@@ -3050,6 +3186,10 @@ static int dissect_iec60870_104_apci(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 /******************************************************************************************************/
 static int dissect_iec60870_104_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 {
+
+#if 0
+	printf("use_tls_dissect_iec60870_104_tcp=%d\n", use_tls);
+#endif	
 	/* 5th parameter = 6 = minimum bytes received to calculate the length.
 	 * (Not 2 in order to find more APCIs in case of 'noisy' bytes between the APCIs)
 	 */
@@ -3096,7 +3236,7 @@ proto_register_iec60870_104_sec(void)
 	static gint *ett_ap_tree[] = {
 		&ett_apci,
 	};
-
+	
 	/* Register the protocol (name, short_name, filter_name) */
 	proto_iec60870_104 = proto_register_protocol("IEC 60870-5-104 APCI SEC", "IEC 60870-5-104 APCI SEC", "iec60870_104_sec");
 
@@ -3107,7 +3247,6 @@ proto_register_iec60870_104_sec(void)
 	proto_register_field_array(proto_iec60870_104, hf_ap, array_length(hf_ap));
 	proto_register_subtree_array(ett_ap_tree, array_length(ett_ap_tree));
 	
-	prefs_register_protocol(proto_iec60870_104, NULL);
 }
 
 /******************************************************************************************************/
@@ -3116,25 +3255,40 @@ proto_register_iec60870_104_sec(void)
 void
 proto_reg_handoff_iec60870_104_sec(void)
 {
-	/* create a dissector handle, which is a handle associated with the protocol
-	   and the function called to do the actual dissecting */
-	tls_handle = find_dissector("tls");
-	
+	/* 62351 Preference - Use TLS */
+	module_t *iec60870_104_module;
+	iec60870_104_module = prefs_register_protocol(proto_iec60870_104, NULL);
+
+	prefs_register_bool_preference(iec60870_104_module, "use_tls",
+				       "Use TLS (Transport Layer Security)",
+				       "Use TLS (Transport Layer Security)",
+				       &use_tls);
+#if 0
+	printf("use_tls_proto_reg_handoff_iec60870_104_sec=%d\n", use_tls);
+#endif		
 	/* create a dissector handle, which is a handle associated with the protocol
 	   and the function called to do the actual dissecting */	
 	dissector_handle_t iec60870_104_handle;
 
-#if USE_SSL_DISSECTOR
-	iec60870_104_handle = register_dissector("IEC104_TCP", dissect_iec60870_104_tcp, proto_iec60870_104);	
-#else
-	iec60870_104_handle = create_dissector_handle(dissect_iec60870_104_tcp, proto_iec60870_104);
-#endif
+	use_tls = FALSE;
+	
+	if(use_tls == TRUE)
+	{
+		iec60870_104_handle = register_dissector("IEC104_TCP", dissect_iec60870_104_tcp, proto_iec60870_104);	
+	}
+	else if(use_tls == FALSE)
+	{
+		iec60870_104_handle = create_dissector_handle(dissect_iec60870_104_tcp, proto_iec60870_104);
+	}
+
 	/* register the dissectorhandle so that traffic associated with the protocol calls the dissector */
 	dissector_add_uint_with_preference("tcp.port", IEC60870_104_PORT, iec60870_104_handle);
-
-#if USE_SSL_DISSECTOR
-	ssl_dissector_add(IEC60870_104_PORT, iec60870_104_handle);
-#endif
+	
+	if(use_tls == TRUE)
+	{
+		ssl_dissector_add(IEC60870_104_PORT, iec60870_104_handle);
+		tls_handle = find_dissector_add_dependency("tls", proto_iec60870_104);
+	}
 }
 
 /******************************************************************************************************/
@@ -3194,6 +3348,10 @@ proto_register_iec60870_asdu_sec(void)
 		  { "KSQ", "iec60870_asdu.ksq", FT_UINT32, BASE_DEC, NULL, 0x0,
 		    "Key Change Sequence Number", HFILL }},
 
+		{ &hf_secure_scs,
+		  { "SCS", "iec60870_asdu.scs", FT_UINT32, BASE_DEC, NULL, 0x0,
+		    "Status Change Sequence Number", HFILL }},
+
 		{ &hf_secure_csq,
 		  { "CSQ", "iec60870_asdu.csq", FT_UINT32, BASE_DEC, NULL, 0x0,
 		    "Challenge Sequence Number", HFILL }},
@@ -3214,6 +3372,10 @@ proto_register_iec60870_asdu_sec(void)
 		  { "KCM", "iec60870_asdu.kcm", FT_UINT8, BASE_DEC, VALS(kcm_r_types), 0x0,
 		    "Key change method", HFILL }},
 
+		{ &hf_secure_opr,
+		  { "OPR", "iec60870_asdu.opr", FT_UINT8, BASE_DEC, VALS(opr_r_types), 0x0,
+		    "Operation", HFILL }},
+		
 		{ &hf_secure_err,
 		  { "ERR", "iec60870_asdu.err", FT_UINT8, BASE_DEC, VALS(err_r_types), 0x0,
 		    "Key wrap algorithm", HFILL }},
@@ -3277,7 +3439,11 @@ proto_register_iec60870_asdu_sec(void)
 		{ &hf_secure_unl,
 		  { "UNL", "iec60870_asdu.unl", FT_UINT16, BASE_DEC, NULL, 0x0,
 		    "User Name length", HFILL }},				
-		
+
+		{ &hf_secure_ukl,
+		  { "UKL", "iec60870_asdu.ukl", FT_UINT16, BASE_DEC, NULL, 0x0,
+		    "User Public Key length", HFILL }},				
+
 		{ &hf_secure_ccl,
 		  { "CCL", "iec60870_asdu.ccl", FT_UINT16, BASE_DEC, NULL, 0x0,
 		    "Controlling station challenge data length", HFILL }},
@@ -3289,7 +3455,15 @@ proto_register_iec60870_asdu_sec(void)
 		{ &hf_secure_cdl,
 		  { "CDL", "iec60870_asdu.cdl", FT_UINT16, BASE_DEC, NULL, 0x0,
 		    "Controlled station challenge data length", HFILL }},
-		
+
+		{ &hf_secure_url,
+		  { "URL", "iec60870_asdu.url", FT_UINT16, BASE_DEC, NULL, 0x0,
+		    "User Role", HFILL }},
+
+		{ &hf_secure_uei,
+		  { "UEI", "iec60870_asdu.uei", FT_UINT16, BASE_DEC, NULL, 0x0,
+		    "User Role Expiry Interval", HFILL }},
+
 		{ &hf_secure_cdc,
 	       	  { "CDC", "iec60870_asdu.cdc", FT_NONE, BASE_NONE, NULL, 0x0,
 		    "Controlled station challenge data", HFILL }},
