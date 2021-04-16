@@ -221,6 +221,7 @@ static int hf_smb2_write_length = -1;
 static int hf_smb2_write_data = -1;
 static int hf_smb2_write_flags = -1;
 static int hf_smb2_write_flags_write_through = -1;
+static int hf_smb2_write_flags_write_unbuffered = -1;
 static int hf_smb2_write_count = -1;
 static int hf_smb2_write_remaining = -1;
 static int hf_smb2_read_length = -1;
@@ -1005,9 +1006,11 @@ static const value_string smb2_comp_transform_flags_vals[] = {
 
 #define SMB2_RDMA_TRANSFORM_NONE       0x0000
 #define SMB2_RDMA_TRANSFORM_ENCRYPTION 0x0001
+#define SMB2_RDMA_TRANSFORM_SIGNING    0x0002
 static const value_string smb2_rdma_transform_types[] = {
 	{ SMB2_RDMA_TRANSFORM_NONE, "None" },
 	{ SMB2_RDMA_TRANSFORM_ENCRYPTION, "Encryption" },
+	{ SMB2_RDMA_TRANSFORM_SIGNING, "Signing" },
 	{ 0, NULL }
 };
 
@@ -1093,6 +1096,8 @@ static const val64_string nfs_type_vals[] = {
 #define SMB2_DIALECT_202  0x0202
 #define SMB2_DIALECT_210  0x0210
 #define SMB2_DIALECT_2FF  0x02FF
+#define SMB2_DIALECT_222  0x0222
+#define SMB2_DIALECT_224  0x0224
 #define SMB2_DIALECT_300  0x0300
 #define SMB2_DIALECT_302  0x0302
 #define SMB2_DIALECT_310  0x0310
@@ -1102,6 +1107,8 @@ static const value_string smb2_dialect_vals[] = {
 	{ SMB2_DIALECT_202, "SMB 2.0.2" },
 	{ SMB2_DIALECT_210, "SMB 2.1" },
 	{ SMB2_DIALECT_2FF, "SMB2 wildcard" },
+	{ SMB2_DIALECT_222, "SMB 2.2.2 (deprecated; should be 3.0)" },
+	{ SMB2_DIALECT_224, "SMB 2.2.4 (deprecated; should be 3.0)" },
 	{ SMB2_DIALECT_300, "SMB 3.0" },
 	{ SMB2_DIALECT_302, "SMB 3.0.2" },
 	{ SMB2_DIALECT_310, "SMB 3.1.0 (deprecated; should be 3.1.1)" },
@@ -6422,11 +6429,13 @@ clean_up_and_exit:
 #define SMB2_CHANNEL_NONE		0x00000000
 #define SMB2_CHANNEL_RDMA_V1		0x00000001
 #define SMB2_CHANNEL_RDMA_V1_INVALIDATE	0x00000002
+#define SMB2_CHANNEL_RDMA_TRANSFORM	0x00000003
 
 static const value_string smb2_channel_vals[] = {
 	{ SMB2_CHANNEL_NONE,	"None" },
 	{ SMB2_CHANNEL_RDMA_V1,	"RDMA V1" },
 	{ SMB2_CHANNEL_RDMA_V1_INVALIDATE,	"RDMA V1_INVALIDATE" },
+	{ SMB2_CHANNEL_RDMA_TRANSFORM,	"RDMA TRANSFORM" },
 	{ 0, NULL }
 };
 
@@ -6466,6 +6475,17 @@ dissect_smb2_rdma_v1_blob(tvbuff_t *tvb, packet_info *pinfo _U_,
 }
 
 #define SMB2_WRITE_FLAG_WRITE_THROUGH		0x00000001
+#define SMB2_WRITE_FLAG_WRITE_UNBUFFERED	0x00000002
+
+static const true_false_string tfs_write_through = {
+	"Client is asking for WRITE_THROUGH",
+	"Client is NOT asking for WRITE_THROUGH"
+};
+
+static const true_false_string tfs_write_unbuffered = {
+	"Client is asking for UNBUFFERED write",
+	"Client is NOT asking for UNBUFFERED write"
+};
 
 static int
 dissect_smb2_write_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset, smb2_info_t *si)
@@ -6478,6 +6498,7 @@ dissect_smb2_write_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
 	guint64 off;
 	static int * const f_fields[] = {
 		&hf_smb2_write_flags_write_through,
+		&hf_smb2_write_flags_write_unbuffered,
 		NULL
 	};
 
@@ -11634,7 +11655,12 @@ proto_register_smb2(void)
 
 		{ &hf_smb2_write_flags_write_through,
 			{ "Write through", "smb2.write.flags.write_through", FT_BOOLEAN, 32,
-			NULL, SMB2_WRITE_FLAG_WRITE_THROUGH, NULL, HFILL }
+			TFS(&tfs_write_through), SMB2_WRITE_FLAG_WRITE_THROUGH, "If the client requests WRITE_THROUGH", HFILL }
+		},
+
+		{ &hf_smb2_write_flags_write_unbuffered,
+			{ "Unbuffered", "smb2.write.flags.unbuffered", FT_BOOLEAN, 32,
+			TFS(&tfs_write_unbuffered), SMB2_WRITE_FLAG_WRITE_UNBUFFERED, "If client requests UNBUFFERED read", HFILL }
 		},
 
 		{ &hf_smb2_write_count,
