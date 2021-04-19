@@ -25,13 +25,19 @@
 #include "packet-tls.h"
 #include "packet-tls-utils.h"
 
-void proto_register_iec60870_104_sec(void);
 void proto_reg_handoff_iec60870_104_sec(void);
 
+void proto_register_iec60870_104_sec(void);
 void proto_register_iec60870_asdu_sec(void);
 
-static dissector_handle_t iec60870_asdu_handle;
 static dissector_handle_t tls_handle;
+static dissector_handle_t iec60870_104_handle;
+static dissector_handle_t iec60870_apci_handle;
+static dissector_handle_t iec60870_asdu_handle;
+
+static int proto_iec60870_104  = -1;
+static int proto_iec60870_apci = -1;
+static int proto_iec60870_asdu = -1;
 
 /* the asdu header structure */
 struct asduheader {
@@ -90,12 +96,8 @@ typedef struct {
 	gboolean SE;      /* Select (1) / Execute (0) */
 } td_CmdInfo;
 
-#define IEC60870_104_PORT 19998
-#define USE_SSL_DISSECTOR 0
-
-/* Define the iec101/104 protos */
-static int proto_iec60870_104  = -1;
-static int proto_iec60870_asdu = -1;
+#define IEC60870_104_SECURE_PORT 19998
+#define DEBUG_MODULE 1
 
 /* Protocol constants */
 #define APCI_START	0x68
@@ -1014,6 +1016,7 @@ static expert_field ei_iec104_apdu_invalid_len = EI_INIT;
 #define IEC101_SINGLE_CHAR    0xE5
 
 static gboolean use_tls = FALSE;
+static gboolean initialized = FALSE;
 
 /* Misc. functions for dissection of signal values */
 
@@ -2036,8 +2039,8 @@ static guint get_iec104apdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
 /******************************************************************************************************/
 static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
-#if 0	
-	printf("use_tls_dissect_iec60870_104_asdu=%d\n", use_tls);
+#if DEBUG_MODULE
+	printf("dissect_iec60870_104_asdu=%d\n", use_tls);
 #endif	
 	guint Len = tvb_reported_length(tvb);
 	guint8 Bytex;
@@ -3057,8 +3060,8 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 /******************************************************************************************************/
 static int dissect_iec60870_104_apci(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 {
-#if 0
-	printf("use_tls_dissect_iec60870_104_apci=%d\n", use_tls);
+#if DEBUG_MODULE
+	printf("dissect_iec60870_104_apci=%d\n", use_tls);
 #endif	
 	guint TcpLen = tvb_reported_length(tvb);
 	guint8 Start, len, type, temp8;
@@ -3187,12 +3190,16 @@ static int dissect_iec60870_104_apci(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 static int dissect_iec60870_104_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 {
 
-#if 0
-	printf("use_tls_dissect_iec60870_104_tcp=%d\n", use_tls);
-#endif	
+#if DEBUG_MODULE
+	printf("dissect_iec60870_104_tcp=%d\n", use_tls);
+#endif
+	
+	if(use_tls == TRUE)
+	{
+	}	
+	
 	/* 5th parameter = 6 = minimum bytes received to calculate the length.
-	 * (Not 2 in order to find more APCIs in case of 'noisy' bytes between the APCIs)
-	 */
+	   (Not 2 in order to find more APCIs in case of 'noisy' bytes between the APCIs) */
 	tcp_dissect_pdus(tvb, pinfo, tree, TRUE, APCI_LEN, get_iec104apdu_len, dissect_iec60870_104_apci, data);
 
 	return tvb_captured_length(tvb);
@@ -3204,6 +3211,10 @@ static int dissect_iec60870_104_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tre
 void
 proto_register_iec60870_104_sec(void)
 {
+#if DEBUG_MODULE
+	printf("proto_register_iec60870_104_sec=%d\n", use_tls);
+#endif
+		
 	/* APCI Protocol header fields */
 	static hf_register_info hf_ap[] = {
 
@@ -3240,13 +3251,24 @@ proto_register_iec60870_104_sec(void)
 	/* Register the protocol (name, short_name, filter_name) */
 	proto_iec60870_104 = proto_register_protocol("IEC 60870-5-104 APCI SEC", "IEC 60870-5-104 APCI SEC", "iec60870_104_sec");
 
+	/* create a dissector handle, which is a handle associated with the protocol
+	   and the function called to do the actual dissecting */	
+	iec60870_apci_handle = create_dissector_handle(dissect_iec60870_104_apci, proto_iec60870_apci);
+	
 	/* Provide an alias to the previous name of this dissector */
 	proto_register_alias(proto_iec60870_104, "104apci");
 
 	/* Required function calls to register the header fields and subtrees used */
 	proto_register_field_array(proto_iec60870_104, hf_ap, array_length(hf_ap));
-	proto_register_subtree_array(ett_ap_tree, array_length(ett_ap_tree));
-	
+	proto_register_subtree_array(ett_ap_tree, array_length(ett_ap_tree));	
+
+	/* 62351 Preference - Use TLS */
+	module_t *iec60870_104_module;
+	iec60870_104_module = prefs_register_protocol(proto_iec60870_104, proto_reg_handoff_iec60870_104_sec);
+	prefs_register_bool_preference(iec60870_104_module, "use_tls",
+				       "Use TLS (Transport Layer Security)",
+				       "Use TLS (Transport Layer Security)",
+				       &use_tls);
 }
 
 /******************************************************************************************************/
@@ -3255,22 +3277,11 @@ proto_register_iec60870_104_sec(void)
 void
 proto_reg_handoff_iec60870_104_sec(void)
 {
-	/* 62351 Preference - Use TLS */
-	module_t *iec60870_104_module;
-	iec60870_104_module = prefs_register_protocol(proto_iec60870_104, NULL);
-
-	prefs_register_bool_preference(iec60870_104_module, "use_tls",
-				       "Use TLS (Transport Layer Security)",
-				       "Use TLS (Transport Layer Security)",
-				       &use_tls);
-#if 0
-	printf("use_tls_proto_reg_handoff_iec60870_104_sec=%d\n", use_tls);
-#endif		
-	/* create a dissector handle, which is a handle associated with the protocol
-	   and the function called to do the actual dissecting */	
-	dissector_handle_t iec60870_104_handle;
-
-	use_tls = FALSE;
+#if DEBUG_MODULE
+	printf("proto_reg_handoff_iec60870_104_sec=%d\n", use_tls);
+#endif	
+	/* create a dissector handle, which is a handle associated with the protocol and the function called to do the actual dissecting */
+	iec60870_104_handle = create_dissector_handle(dissect_iec60870_104_tcp, proto_iec60870_104);
 	
 	if(use_tls == TRUE)
 	{
@@ -3281,12 +3292,16 @@ proto_reg_handoff_iec60870_104_sec(void)
 		iec60870_104_handle = create_dissector_handle(dissect_iec60870_104_tcp, proto_iec60870_104);
 	}
 
-	/* register the dissectorhandle so that traffic associated with the protocol calls the dissector */
-	dissector_add_uint_with_preference("tcp.port", IEC60870_104_PORT, iec60870_104_handle);
+	/* register the dissector handler so that TCP traffic associated with the port IEC60870_104_SECURE_PORT calls the dissector */
+	if (initialized == FALSE)
+	{		
+		dissector_add_uint_with_preference("tcp.port", IEC60870_104_SECURE_PORT, iec60870_104_handle);
+		initialized = TRUE;
+	}
 	
 	if(use_tls == TRUE)
 	{
-		ssl_dissector_add(IEC60870_104_PORT, iec60870_104_handle);
+		ssl_dissector_add(IEC60870_104_SECURE_PORT, iec60870_104_handle);
 		tls_handle = find_dissector_add_dependency("tls", proto_iec60870_104);
 	}
 }
@@ -3297,6 +3312,10 @@ proto_reg_handoff_iec60870_104_sec(void)
 void
 proto_register_iec60870_asdu_sec(void)
 {
+#if DEBUG_MODULE
+	printf("proto_register_iec60870_asdu_sec=%d\n", use_tls);
+#endif
+	
 	/* ASDU Protocol header fields */
 	static hf_register_info hf_as[] = {
 
@@ -3824,7 +3843,6 @@ proto_register_iec60870_asdu_sec(void)
 
 	expert_iec60870 = expert_register_protocol(proto_iec60870_asdu);
 	expert_register_field_array(expert_iec60870, ei, array_length(ei));
-
 }
 
 /*
