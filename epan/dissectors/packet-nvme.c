@@ -378,7 +378,39 @@ static int hf_nvme_get_logpage_ana_grp_chcnt = -1;
 static int hf_nvme_get_logpage_ana_grp_anas[3] = { NEG_LST_3 };
 static int hf_nvme_get_logpage_ana_grp_rsvd = -1;
 static int hf_nvme_get_logpage_ana_grp_nsid = -1;
-
+static int hf_nvme_get_logpage_lba_status_lslplen = -1;
+static int hf_nvme_get_logpage_lba_status_nlslne = -1;
+static int hf_nvme_get_logpage_lba_status_estulb = -1;
+static int hf_nvme_get_logpage_lba_status_rsvd = -1;
+static int hf_nvme_get_logpage_lba_status_lsgc = -1;
+static int hf_nvme_get_logpage_lba_status_nel = -1;
+static int hf_nvme_get_logpage_lba_status_nel_ne = -1;
+static int hf_nvme_get_logpage_lba_status_nel_ne_neid = -1;
+static int hf_nvme_get_logpage_lba_status_nel_ne_nlrd = -1;
+static int hf_nvme_get_logpage_lba_status_nel_ne_ratype = -1;
+static int hf_nvme_get_logpage_lba_status_nel_ne_rsvd = -1;
+static int hf_nvme_get_logpage_lba_status_nel_ne_rd = -1;
+static int hf_nvme_get_logpage_lba_status_nel_ne_rd_rslba = -1;
+static int hf_nvme_get_logpage_lba_status_nel_ne_rd_rnlb = -1;
+static int hf_nvme_get_logpage_lba_status_nel_ne_rd_rsvd = -1;
+static int hf_nvme_get_logpage_egroup_aggreg_ne = -1;
+static int hf_nvme_get_logpage_egroup_aggreg_eg = -1;
+static int hf_nvme_get_logpage_reserv_notif_lpc = -1;
+static int hf_nvme_get_logpage_reserv_notif_lpt = -1;
+static int hf_nvme_get_logpage_reserv_notif_nalp = -1;
+static int hf_nvme_get_logpage_reserv_notif_rsvd0 = -1;
+static int hf_nvme_get_logpage_reserv_notif_nsid = -1;
+static int hf_nvme_get_logpage_reserv_notif_rsvd1 = -1;
+static int hf_nvme_get_logpage_sanitize_sprog = -1;
+static int hf_nvme_get_logpage_sanitize_sstat[5] = { NEG_LST_5 };
+static int hf_nvme_get_logpage_sanitize_scdw10 = -1;
+static int hf_nvme_get_logpage_sanitize_eto = -1;
+static int hf_nvme_get_logpage_sanitize_etbe = -1;
+static int hf_nvme_get_logpage_sanitize_etce = -1;
+static int hf_nvme_get_logpage_sanitize_etond = -1;
+static int hf_nvme_get_logpage_sanitize_etbend = -1;
+static int hf_nvme_get_logpage_sanitize_etcend = -1;
+static int hf_nvme_get_logpage_sanitize_rsvd = -1;
 
 /* NVMe CQE fields */
 static int hf_nvme_cqe_sts = -1;
@@ -2270,6 +2302,225 @@ static void dissect_nvme_get_logpage_ana_resp(proto_item *ti, tvbuff_t *cmd_tvb,
     }
 }
 
+static void dissect_nvme_get_logpage_lba_status_resp_header(proto_tree *grp, tvbuff_t *cmd_tvb, guint len, guint32 off)
+{
+    if (!off && len >= 4)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_lba_status_lslplen,  cmd_tvb, off, 4, ENC_LITTLE_ENDIAN);
+    if (off <= 4 && (8 - off) <= len)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_lba_status_nlslne,  cmd_tvb, 4-off, 4, ENC_LITTLE_ENDIAN);
+    if (off <= 8 && (12 - off) <= len)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_lba_status_estulb,  cmd_tvb, 8-off, 4, ENC_LITTLE_ENDIAN);
+    if (off <= 12 && (14 - off) <= len)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_lba_status_rsvd,  cmd_tvb, 12-off, 2, ENC_LITTLE_ENDIAN);
+    if (off <= 14 && (16 - off) <= len)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_lba_status_lsgc,  cmd_tvb, 14-off, 2, ENC_LITTLE_ENDIAN);
+    if (off <= 16 && (20 - off) <= len)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_lba_status_nel,  cmd_tvb, 16-off, len - (16-off), ENC_NA);
+}
+
+static guint dissect_nvme_get_logpage_lba_status_lba_range(proto_tree *grp, tvbuff_t *cmd_tvb, guint len, guint32 poff)
+{
+    guint32 slen;
+    proto_item *ti;
+    guint done;
+
+    if (len >= 16) {
+        slen = tvb_get_guint8(cmd_tvb, 4);
+        if (!slen || slen == 0xffffffff)
+            slen = 16;
+        else
+            slen = 16 * (slen + 1);
+        if (slen > len)
+            slen = len;
+    } else {
+        slen = len;
+    }
+    ti = proto_tree_add_item(grp, hf_nvme_get_logpage_lba_status_nel_ne,  cmd_tvb, poff, slen, ENC_NA);
+    grp =  proto_item_add_subtree(ti, ett_data);
+
+    if (len >= 4)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_lba_status_nel_ne_neid,  cmd_tvb, poff, 4, ENC_LITTLE_ENDIAN);
+    if (len >= 8)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_lba_status_nel_ne_nlrd,  cmd_tvb, poff+4, 4, ENC_LITTLE_ENDIAN);
+    if (len >= 9)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_lba_status_nel_ne_ratype,  cmd_tvb, poff+8, 1, ENC_LITTLE_ENDIAN);
+    if (len >= 16)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_lba_status_nel_ne_rsvd,  cmd_tvb, poff+9, 7, ENC_NA);
+
+    if (len <= 16)
+        return len;
+
+    len -= 16;
+    poff += 16;
+    done = 16;
+    while (len >= 8) {
+        ti = proto_tree_add_item(grp, hf_nvme_get_logpage_lba_status_nel_ne_rd,  cmd_tvb, poff, len >= 16 ? 16 : len, ENC_NA);
+        grp =  proto_item_add_subtree(ti, ett_data);
+        proto_tree_add_item(grp, hf_nvme_get_logpage_lba_status_nel_ne_rd_rslba, cmd_tvb, poff, 8, ENC_LITTLE_ENDIAN);
+        if (len >= 12)
+            proto_tree_add_item(grp, hf_nvme_get_logpage_lba_status_nel_ne_rd_rnlb, cmd_tvb, poff+8, 4, ENC_LITTLE_ENDIAN);
+        if (len >= 16)
+            proto_tree_add_item(grp, hf_nvme_get_logpage_lba_status_nel_ne_rd_rsvd, cmd_tvb, poff+12, 4, ENC_LITTLE_ENDIAN);
+        if (len >= 16) {
+            done += 16;
+            poff += 16;
+        } else {
+            done += len;
+            len = 0;
+        }
+    }
+    return done;
+}
+
+static void dissect_nvme_get_logpage_lba_status_resp(proto_item *ti, tvbuff_t *cmd_tvb, struct nvme_cmd_ctx *cmd_ctx, guint len)
+{
+    guint32 off = cmd_ctx->cmd_ctx.get_logpage.off & 0xffffffff; /* need guint type to silence clang-11 errors */
+    proto_tree *grp;
+    guint poff = 0;
+
+    if (cmd_ctx->cmd_ctx.get_logpage.off < 16) {
+        grp =  proto_item_add_subtree(ti, ett_data);
+        dissect_nvme_get_logpage_lba_status_resp_header(grp, cmd_tvb, len, off);
+        poff = 16 - off;
+    } else if (off & 15) {
+        poff = 16 - (off & 15);
+    }
+
+    if (len < (poff + 8))
+        return;
+
+    if (cmd_ctx->cmd_ctx.get_logpage.off >= 16)
+        grp =  proto_item_add_subtree(ti, ett_data);
+
+    len -= poff;
+    ti = proto_tree_add_item(grp, hf_nvme_get_logpage_lba_status_nel,  cmd_tvb, poff, len, ENC_NA);
+    grp =  proto_item_add_subtree(ti, ett_data);
+
+    while (len >= 8) {
+        guint done = dissect_nvme_get_logpage_lba_status_lba_range(grp, cmd_tvb, len, poff);
+        poff += done;
+        len -= done;
+    }
+}
+
+static void dissect_nvme_get_logpage_egroup_aggreg_resp(proto_item *ti, tvbuff_t *cmd_tvb, struct nvme_cmd_ctx *cmd_ctx, guint len)
+{
+    proto_tree *grp;
+    guint poff = 0;
+
+    if (cmd_ctx->cmd_ctx.get_logpage.off < 8) {
+        poff = 8 - (guint)cmd_ctx->cmd_ctx.get_logpage.off;
+        if (poff > len || (cmd_ctx->cmd_ctx.get_logpage.off && poff == len))
+            return;
+    } else if (len < 2) {
+        return;
+    }
+
+    len -= poff;
+    grp =  proto_item_add_subtree(ti, ett_data);
+    if (!cmd_ctx->cmd_ctx.get_logpage.off)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_egroup_aggreg_ne, cmd_tvb, 0, 8, ENC_LITTLE_ENDIAN);
+    while (len >= 2) {
+        proto_tree_add_item(grp, hf_nvme_get_logpage_egroup_aggreg_eg, cmd_tvb, poff, 2, ENC_LITTLE_ENDIAN);
+        len -= 2;
+        poff += 2;
+    }
+}
+
+static const value_string rnlpt_tbl[] = {
+    { 0,  "Empty Log Page" },
+    { 1,  "Registration Preempted" },
+    { 2,  "Reservation Released" },
+    { 3,  "Reservation Preempted" },
+    { 0, NULL}
+};
+
+static void dissect_nvme_get_logpage_reserv_notif_resp(proto_item *ti, tvbuff_t *cmd_tvb, struct nvme_cmd_ctx *cmd_ctx, guint len)
+{
+    guint32 off = cmd_ctx->cmd_ctx.get_logpage.off & 0xffffffff; /* need guint type to silence clang-11 errors */
+    proto_tree *grp;
+    guint poff = 0;
+
+    if (cmd_ctx->cmd_ctx.get_logpage.off > 60)
+        return; /* max allowed offset is < 60, so we do not loose bits by casting to guint type */
+
+    grp =  proto_item_add_subtree(ti, ett_data);
+    if (!off && len >= 8)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_reserv_notif_lpc,  cmd_tvb, 0, 8, ENC_LITTLE_ENDIAN);
+    if (off <= 8 && (9 - off) <= len)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_reserv_notif_lpt,  cmd_tvb, 8-off, 1, ENC_LITTLE_ENDIAN);
+    if (off <= 9 && (10 - off) <= len)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_reserv_notif_nalp,  cmd_tvb, 9-off, 1, ENC_LITTLE_ENDIAN);
+    if (off <= 10 && (12 - off) <= len)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_reserv_notif_rsvd0,  cmd_tvb, 10-off, 2, ENC_LITTLE_ENDIAN);
+    if (off <= 12 && (16 - off) <= len)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_reserv_notif_nsid,  cmd_tvb, 12-off, 4, ENC_LITTLE_ENDIAN);
+    if (off < 16) {
+        poff = 16 - off;
+        if (len <= poff)
+            return;
+        len -= poff;
+        if (len > 48)
+            len = 48; /* max padding size is 48 */
+    } else {
+        if (len > (64 - off))
+            len = 64 - off; /* max padding size is 48 */
+    }
+    proto_tree_add_item(grp, hf_nvme_get_logpage_reserv_notif_rsvd1, cmd_tvb, poff, len, ENC_NA);
+}
+
+
+static const value_string san_mrst_tbl[] = {
+    { 0, "The NVM subsystem has never been sanitized" },
+    { 1, "The most recent sanitize operation completed successfully" },
+    { 2, "A sanitize operation is currently in progress" },
+    { 3, "The most recent sanitize operation failed" },
+    { 4, "The most recent sanitize operation with No-Deallocate has completed successfully with deallocation of all logical blocks"},
+    { 0, NULL}
+};
+
+static void dissect_nvme_get_logpage_sanitize_resp(proto_item *ti, tvbuff_t *cmd_tvb, struct nvme_cmd_ctx *cmd_ctx, guint len)
+{
+    guint32 off = cmd_ctx->cmd_ctx.get_logpage.off & 0xffffffff; /* need guint type to silence clang-11 errors */
+    proto_tree *grp;
+    guint poff = 0;
+
+    if (cmd_ctx->cmd_ctx.get_logpage.off > 508)
+        return; /* max allowed offset is < 508, so we do not loose bits by casting to guint type */
+
+    grp =  proto_item_add_subtree(ti, ett_data);
+    if (!off && len >= 2)
+         proto_tree_add_item(grp, hf_nvme_get_logpage_sanitize_sprog,  cmd_tvb, 0, 2, ENC_LITTLE_ENDIAN);
+    if (off <= 2 && (4 - off) <= len)
+        add_group_mask_entry(cmd_tvb, grp, 2 - off, 2, ASPEC(hf_nvme_get_logpage_sanitize_sstat));
+    if (off <= 4 && (8 - off) <= len)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_sanitize_scdw10,  cmd_tvb, 4-off, 4, ENC_LITTLE_ENDIAN);
+    if (off <= 8 && (12 - off) <= len)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_sanitize_eto,  cmd_tvb, 8-off, 4, ENC_LITTLE_ENDIAN);
+    if (off <= 12 && (16 - off) <= len)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_sanitize_etbe,  cmd_tvb, 12-off, 4, ENC_LITTLE_ENDIAN);
+    if (off <= 16 && (20 - off) <= len)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_sanitize_etce,  cmd_tvb, 16-off, 4, ENC_LITTLE_ENDIAN);
+    if (off <= 20 && (24 - off) <= len)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_sanitize_etond,  cmd_tvb, 20-off, 4, ENC_LITTLE_ENDIAN);
+    if (off <= 24 && (28 - off) <= len)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_sanitize_etbend,  cmd_tvb, 24-off, 4, ENC_LITTLE_ENDIAN);
+    if (off <= 28 && (32 - off) <= len)
+        proto_tree_add_item(grp, hf_nvme_get_logpage_sanitize_etcend,  cmd_tvb, 28-off, 4, ENC_LITTLE_ENDIAN);
+    if (off < 32) {
+        poff = 32 - off;
+        if (poff <= len)
+            return;
+        len -= poff;
+        if (len > (512 - poff))
+            len = 512 - poff;
+    } else {
+        if (len > (512 - off))
+            len = 512 - off;
+    }
+    proto_tree_add_item(grp, hf_nvme_get_logpage_sanitize_rsvd,  cmd_tvb, poff, len, ENC_NA);
+}
+
 static void dissect_nvme_get_logpage_resp(tvbuff_t *cmd_tvb, proto_tree *cmd_tree, struct nvme_cmd_ctx *cmd_ctx, guint len)
 {
     proto_item *ti = proto_tree_add_bytes_format_value(cmd_tree, hf_nvme_gen_data, cmd_tvb, 0, len, NULL,
@@ -2300,6 +2551,14 @@ static void dissect_nvme_get_logpage_resp(tvbuff_t *cmd_tvb, proto_tree *cmd_tre
             dissect_nvme_get_logpage_pred_lat_aggreg_resp(ti, cmd_tvb, cmd_ctx, len); break;
         case 0xC:
             dissect_nvme_get_logpage_ana_resp(ti, cmd_tvb, cmd_ctx, len); break;
+        case 0xE:
+            dissect_nvme_get_logpage_lba_status_resp(ti, cmd_tvb, cmd_ctx, len); break;
+        case 0xF:
+            dissect_nvme_get_logpage_egroup_aggreg_resp(ti, cmd_tvb, cmd_ctx, len); break;
+        case 0x80:
+            dissect_nvme_get_logpage_reserv_notif_resp(ti, cmd_tvb, cmd_ctx, len); break;
+        case 0x81:
+            dissect_nvme_get_logpage_sanitize_resp(ti, cmd_tvb, cmd_ctx, len); break;
         default:
             return;
     }
@@ -4729,6 +4988,158 @@ proto_register_nvme(void)
         { &hf_nvme_get_logpage_ana_grp_nsid,
             { "Namespace Identifier", "nvme.cmd.get_logpage.ana.grp.nsid",
                FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        /* LBA Status Information Response */
+        { &hf_nvme_get_logpage_lba_status_lslplen,
+            { "LBA Status Log Page Length (LSLPLEN)", "nvme.cmd.get_logpage.lba_status.lslplen",
+               FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_lba_status_nlslne,
+            { "Number of LBA Status Log Namespace Elements (NLSLNE)", "nvme.cmd.get_logpage.lba_status.lslplen",
+               FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_lba_status_estulb,
+            { "Estimate of Unrecoverable Logical Blocks (ESTULB)", "nvme.cmd.get_logpage.lba_status.estulb",
+               FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_lba_status_rsvd,
+            { "Reserved", "nvme.cmd.get_logpage.lba_status.rsvd",
+               FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_lba_status_lsgc,
+            { "LBA Status Generation Counter (LSGC)", "nvme.cmd.get_logpage.lba_status.lsgc",
+               FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_lba_status_nel,
+            { "LBA Status Log Namespace Element List", "nvme.cmd.get_logpage.lba_status.nel",
+               FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_lba_status_nel_ne,
+            { "LBA Status Log Namespace Element", "nvme.cmd.get_logpage.lba_status.nel.ne",
+               FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_lba_status_nel_ne_neid,
+            { "Namespace Element Identifier (NEID)", "nvme.cmd.get_logpage.lba_status.nel.ne.neid",
+               FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_lba_status_nel_ne_nlrd,
+            { "Number of LBA Range Descriptors (NLRD)", "nvme.cmd.get_logpage.lba_status.nel.ne.nlrd",
+               FT_UINT32, BASE_DEC_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_lba_status_nel_ne_ratype,
+            { "Number of LBA Range Descriptors (NLRD)", "nvme.cmd.get_logpage.lba_status.nel.ne.ratype",
+               FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_lba_status_nel_ne_rsvd,
+            { "Reserved", "nvme.cmd.get_logpage.lba_status.nel.ne.rsvd",
+               FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_lba_status_nel_ne_rd,
+            { "LBA Range Descriptor", "nvme.cmd.get_logpage.lba_status.nel.ne.rd",
+               FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_lba_status_nel_ne_rd_rslba,
+            { "LBA Range Descriptor", "nvme.cmd.get_logpage.lba_status.nel.ne.rd.rslba",
+               FT_UINT64, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_lba_status_nel_ne_rd_rnlb,
+            { "Range Number of Logical Blocks (RNLB)", "nvme.cmd.get_logpage.lba_status.nel.ne.rd.rnlb",
+               FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_lba_status_nel_ne_rd_rsvd,
+            { "Reserved", "nvme.cmd.get_logpage.lba_status.nel.ne.rd.rsvd",
+               FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        /* Get LogPage Endurance Group Aggregate Response */
+        { &hf_nvme_get_logpage_egroup_aggreg_ne,
+            { "Number of Entries", "nvme.cmd.get_logpage.egroup_agreg.ne",
+               FT_UINT64, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_egroup_aggreg_eg,
+            { "Endurance Group", "nvme.cmd.get_logpage.egroup_agreg.eg",
+               FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        /* Get LogPage Reservation Notification Response */
+        { &hf_nvme_get_logpage_reserv_notif_lpc,
+            { "Log Page Count", "nvme.cmd.get_logpage.reserv_notif.lpc",
+               FT_UINT64, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_reserv_notif_lpt,
+            { "Reservation Notification Log Page Type", "nvme.cmd.get_logpage.reserv_notif.lpt",
+               FT_UINT8, BASE_HEX, VALS(rnlpt_tbl), 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_reserv_notif_nalp,
+            { "Number of Available Log Pages", "nvme.cmd.get_logpage.reserv_notif.nalp",
+               FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_reserv_notif_rsvd0,
+            { "Reserved", "nvme.cmd.get_logpage.reserv_notif.rsvd0",
+               FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_reserv_notif_nsid,
+            { "Namespace ID", "nvme.cmd.get_logpage.reserv_notif.nsid",
+               FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_reserv_notif_rsvd1,
+            { "Reserved", "nvme.cmd.get_logpage.reserv_notif.rsvd1",
+               FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}
+        },
+        /* Get LogPage Sanitize Response */
+        { &hf_nvme_get_logpage_sanitize_sprog,
+            { "Sanitize Progress (SPROG)", "nvme.cmd.get_logpage.sanitize.sprog",
+               FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_sanitize_sstat[0],
+            { "Sanitize Status (SSTAT)", "nvme.cmd.get_logpage.sanitize.sstat",
+               FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_sanitize_sstat[1],
+            { "Status of the most resent Sanitize Operation", "nvme.cmd.get_logpage.sanitize.sstat.mrst",
+               FT_UINT16, BASE_HEX, VALS(san_mrst_tbl), 0x7, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_sanitize_sstat[2],
+            { "Number of Completed Overwrite Passes", "nvme.cmd.get_logpage.sanitize.sstat.cop",
+               FT_UINT16, BASE_HEX, NULL, 0xf8, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_sanitize_sstat[3],
+            { "Global Data Erased", "nvme.cmd.get_logpage.sanitize.sstat.gde",
+               FT_BOOLEAN, 16, NULL, 0x100, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_sanitize_sstat[4],
+            { "Reserved", "nvme.cmd.get_logpage.sanitize.sstat.rsvd",
+               FT_UINT16, BASE_HEX, NULL, 0xfe00, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_sanitize_scdw10,
+            { "Sanitize Command Dword 10 Information (SCDW10)", "nvme.cmd.get_logpage.sanitize.scdw10",
+               FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_sanitize_eto,
+            { "Estimated Time For Overwrite (seconds)", "nvme.cmd.get_logpage.sanitize.eto",
+               FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_sanitize_etbe,
+            { "Estimated Time For Block Erase (seconds)", "nvme.cmd.get_logpage.sanitize.etbe",
+               FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_sanitize_etce,
+            { "Estimated Time For Crypto Erase (seconds)", "nvme.cmd.get_logpage.sanitize.etce",
+               FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_sanitize_etond,
+            { "Estimated Time For Overwrite (seconds) with No-Deallocate", "nvme.cmd.get_logpage.sanitize.etond",
+               FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_sanitize_etbend,
+            { "Estimated Time For Block Erase (seconds) with No-Deallocate", "nvme.cmd.get_logpage.sanitize.etbend",
+               FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_sanitize_etcend,
+            { "Estimated Time For Crypto Erase (seconds) with No-Deallocate", "nvme.cmd.get_logpage.sanitize.etcend",
+               FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL}
+        },
+        { &hf_nvme_get_logpage_sanitize_rsvd,
+            { "Reserved", "nvme.cmd.get_logpage.sanitize.rsvd",
+               FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}
         },
         /* NVMe Response fields */
         { &hf_nvme_cqe_sts,
