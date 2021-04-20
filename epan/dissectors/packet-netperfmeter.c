@@ -66,38 +66,38 @@ INIT_FIELD(message_type,   0, 1)
 INIT_FIELD(message_flags,  1, 1)
 INIT_FIELD(message_length, 2, 2)
 
-INIT_FIELD(acknowledge_flowid,          4,  4)
-INIT_FIELD(acknowledge_measurementid,   8,  8)
-INIT_FIELD(acknowledge_streamid,       16,  2)
-/* INIT_FIELD(acknowledge_padding,        18,  2) */
-INIT_FIELD(acknowledge_status,         20,  4)
+int hf_acknowledge_flowid        = -1;
+int hf_acknowledge_measurementid = -1;
+int hf_acknowledge_streamid      = -1;
+// int hf_acknowledge_padding    = -1;
+int hf_acknowledge_status        = -1;
 
-INIT_FIELD(addflow_flowid,              4,  4)
-INIT_FIELD(addflow_measurementid,       8,  8)
-INIT_FIELD(addflow_streamid,           16,  2)
-INIT_FIELD(addflow_protocol,           18,  1)
-INIT_FIELD(addflow_flags,              19,  1)
-INIT_FIELD(addflow_description,        20, 32)
-INIT_FIELD(addflow_ordered,            52,  4)
-INIT_FIELD(addflow_reliable,           56,  4)
-INIT_FIELD(addflow_retranstrials,      60,  4)
-INIT_FIELD(addflow_framerate1,         64,  8)
-INIT_FIELD(addflow_framerate2,         72,  8)
-INIT_FIELD(addflow_framerate3,         80,  8)
-INIT_FIELD(addflow_framerate4,         88,  8)
-INIT_FIELD(addflow_framesize1,         96,  8)
-INIT_FIELD(addflow_framesize2,        104,  8)
-INIT_FIELD(addflow_framesize3,        112,  8)
-INIT_FIELD(addflow_framesize4,        120,  8)
-INIT_FIELD(addflow_frameraterng,      128,  1)
-INIT_FIELD(addflow_framesizerng,      129,  1)
-INIT_FIELD(addflow_rcvbuffersize,     130,  4)
-INIT_FIELD(addflow_sndbuffersize,     134,  4)
-INIT_FIELD(addflow_maxmsgsize,        138,  2)
-INIT_FIELD(addflow_cmt,               140,  1)
-INIT_FIELD(addflow_ccid,              141,  1)
-INIT_FIELD(addflow_onoffevents,       142,  2)
-INIT_FIELD_WITHOUT_LEN(addflow_onoffeventarray,   144)
+int hf_addflow_flowid          = -1;
+int hf_addflow_measurementid   = -1;
+int hf_addflow_streamid        = -1;
+int hf_addflow_protocol        = -1;
+int hf_addflow_flags           = -1;
+int hf_addflow_description     = -1;
+int hf_addflow_ordered         = -1;
+int hf_addflow_reliable        = -1;
+int hf_addflow_retranstrials   = -1;
+int hf_addflow_framerate1      = -1;
+int hf_addflow_framerate2      = -1;
+int hf_addflow_framerate3      = -1;
+int hf_addflow_framerate4      = -1;
+int hf_addflow_framesize1      = -1;
+int hf_addflow_framesize2      = -1;
+int hf_addflow_framesize3      = -1;
+int hf_addflow_framesize4      = -1;
+int hf_addflow_frameraterng    = -1;
+int hf_addflow_framesizerng    = -1;
+int hf_addflow_rcvbuffersize   = -1;
+int hf_addflow_sndbuffersize   = -1;
+int hf_addflow_maxmsgsize      = -1;
+int hf_addflow_cmt             = -1;
+int hf_addflow_ccid            = -1;
+int hf_addflow_onoffevents     = -1;
+int hf_addflow_onoffeventarray = -1;
 
 INIT_FIELD(removeflow_flowid,           4,  4)
 INIT_FIELD(removeflow_measurementid,    8,  8)
@@ -238,10 +238,11 @@ static hf_register_info hf[] = {
 static void
 dissect_npm_acknowledge_message(tvbuff_t *message_tvb, proto_tree *message_tree)
 {
-  ADD_FIELD_UINT(message_tree, acknowledge_flowid);
-  ADD_FIELD_UINT(message_tree, acknowledge_measurementid);
-  ADD_FIELD_UINT(message_tree, acknowledge_streamid);
-  ADD_FIELD_UINT(message_tree, acknowledge_status);
+  proto_tree_add_item(message_tree, hf_acknowledge_flowid, message_tvb,         4, 4, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_acknowledge_measurementid, message_tvb,  8, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_acknowledge_streamid, message_tvb,      16, 2, ENC_BIG_ENDIAN);
+  /* proto_tree_add_item(message_tree, acknowledge_padding, message_tvb,       18, 2, ENC_BIG_ENDIAN); */
+  proto_tree_add_item(message_tree, hf_acknowledge_status, message_tvb,        20, 4, ENC_BIG_ENDIAN);
 }
 
 
@@ -255,50 +256,50 @@ dissect_npm_add_flow_message(tvbuff_t *message_tvb, proto_tree *message_tree)
   guint32      onoffvalue;
   unsigned int i;
 
-  ADD_FIELD_UINT(message_tree, addflow_flowid);
-  ADD_FIELD_UINT(message_tree, addflow_measurementid);
-  ADD_FIELD_UINT(message_tree, addflow_streamid);
-  ADD_FIELD_UINT(message_tree, addflow_protocol);
-  ADD_FIELD_UINT(message_tree, addflow_flags);
-  ADD_FIELD_STRING(message_tree, addflow_description);
+  proto_tree_add_item(message_tree, hf_addflow_flowid, message_tvb,         4,  4, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_measurementid, message_tvb,  8,  8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_streamid, message_tvb,      16,  2, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_protocol, message_tvb,      18,  1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_flags, message_tvb,         19,  1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_description, message_tvb,   20, 32, ENC_UTF_8|ENC_NA);
 
-  proto_tree_add_double_format_value(message_tree, hf_addflow_ordered, message_tvb, offset_addflow_ordered, length_addflow_ordered,
-                                     100.0 * tvb_get_ntohl(message_tvb, offset_addflow_ordered) / (double)0xffffffff, "%1.3f%%",
-                                     100.0 * tvb_get_ntohl(message_tvb, offset_addflow_ordered) / (double)0xffffffff);
-  proto_tree_add_double_format_value(message_tree, hf_addflow_reliable, message_tvb, offset_addflow_reliable, length_addflow_reliable,
-                                     100.0 * tvb_get_ntohl(message_tvb, offset_addflow_reliable) / (double)0xffffffff, "%1.3f%%",
-                                     100.0 * tvb_get_ntohl(message_tvb, offset_addflow_reliable) / (double)0xffffffff);
+  proto_tree_add_double_format_value(message_tree, hf_addflow_ordered, message_tvb, 52, 4,
+                                     100.0 * tvb_get_ntohl(message_tvb, 52) / (double)0xffffffff, "%1.3f%%",
+                                     100.0 * tvb_get_ntohl(message_tvb, 52) / (double)0xffffffff);
+  proto_tree_add_double_format_value(message_tree, hf_addflow_reliable, message_tvb, 56, 4,
+                                     100.0 * tvb_get_ntohl(message_tvb, 56) / (double)0xffffffff, "%1.3f%%",
+                                     100.0 * tvb_get_ntohl(message_tvb, 56) / (double)0xffffffff);
 
-  retranstrials = tvb_get_ntohl(message_tvb, offset_addflow_retranstrials);
-  proto_tree_add_uint_format_value(message_tree, hf_addflow_retranstrials, message_tvb, offset_addflow_retranstrials, length_addflow_retranstrials,
+  retranstrials = tvb_get_ntohl(message_tvb, 60);
+  proto_tree_add_uint_format_value(message_tree, hf_addflow_retranstrials, message_tvb, 60, 4,
                                    retranstrials, (retranstrials & (1U << 31)) ? "%u ms" : "%u trials",
                                    retranstrials &~ (1U << 31));
 
-  ADD_FIELD_UINT(message_tree, addflow_frameraterng);
-  ADD_FIELD_UINT(message_tree, addflow_framerate1);
-  ADD_FIELD_UINT(message_tree, addflow_framerate2);
-  ADD_FIELD_UINT(message_tree, addflow_framerate3);
-  ADD_FIELD_UINT(message_tree, addflow_framerate4);
-  ADD_FIELD_UINT(message_tree, addflow_framesizerng);
-  ADD_FIELD_UINT(message_tree, addflow_framesize1);
-  ADD_FIELD_UINT(message_tree, addflow_framesize2);
-  ADD_FIELD_UINT(message_tree, addflow_framesize3);
-  ADD_FIELD_UINT(message_tree, addflow_framesize4);
-  ADD_FIELD_UINT(message_tree, addflow_rcvbuffersize);
-  ADD_FIELD_UINT(message_tree, addflow_sndbuffersize);
-  ADD_FIELD_UINT(message_tree, addflow_maxmsgsize);
-  ADD_FIELD_UINT(message_tree, addflow_cmt);
-  ADD_FIELD_UINT(message_tree, addflow_ccid);
+  proto_tree_add_item(message_tree, hf_addflow_frameraterng,  message_tvb, 128, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_framerate1,    message_tvb,  64, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_framerate2,    message_tvb,  72, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_framerate3,    message_tvb,  80, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_framerate4,    message_tvb,  88, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_framesizerng,  message_tvb, 129, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_framesize1,    message_tvb,  96, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_framesize2,    message_tvb, 104, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_framesize3,    message_tvb, 112, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_framesize4,    message_tvb, 120, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_rcvbuffersize, message_tvb, 130, 4, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_sndbuffersize, message_tvb, 134, 4, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_maxmsgsize,    message_tvb, 138, 2, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_cmt,           message_tvb, 140, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_ccid,          message_tvb, 141, 1, ENC_BIG_ENDIAN);
 
-  onoffitem = ADD_FIELD_UINT(message_tree, addflow_onoffevents);
+  onoffitem = proto_tree_add_item(message_tree, hf_addflow_onoffevents, message_tvb, 142, 2, ENC_BIG_ENDIAN);
 
-  onoffevents = tvb_get_ntohs(message_tvb, offset_addflow_onoffevents);
+  onoffevents = tvb_get_ntohs(message_tvb, 142);
   if (onoffevents > 0) {
      onofftree = proto_item_add_subtree(onoffitem, ett_onoffarray);
     for(i = 0;i < onoffevents;i++) {
-      onoffvalue = tvb_get_ntohl(message_tvb, offset_addflow_onoffeventarray + (int)(sizeof(guint32) * i));
+      onoffvalue = tvb_get_ntohl(message_tvb, 144 + (int)(sizeof(guint32) * i));
       proto_tree_add_uint_format(onofftree, hf_addflow_onoffeventarray, message_tvb,
-                                 offset_addflow_onoffeventarray + (int)(sizeof(guint32) * i), (int)sizeof(guint32),
+                                 144 + (int)(sizeof(guint32) * i), (int)sizeof(guint32),
                                  onoffvalue, "%1.3f s: set to %s", onoffvalue / 1000.0, (i & 1) ? "OFF" : "ON");
     }
   }
