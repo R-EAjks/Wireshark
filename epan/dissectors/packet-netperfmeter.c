@@ -32,14 +32,6 @@ static gint ett_onoffarray  = -1;
 
 
 /* Initialize the protocol and registered fields */
-#define INIT_FIELD(variable, offset, length) \
-   static int hf_##variable           = -1;        \
-   static const unsigned int offset_##variable = offset;    \
-   static const int length_##variable = length;
-
-#define INIT_FIELD_WITHOUT_LEN(variable, offset) \
-   static int hf_##variable           = -1;        \
-   static const unsigned int offset_##variable = offset;
 
 #define NETPERFMETER_ACKNOWLEDGE    0x01
 #define NETPERFMETER_ADD_FLOW       0x02
@@ -62,99 +54,99 @@ static const value_string message_type_values[] = {
   { 0, NULL }
 };
 
-INIT_FIELD(message_type,   0, 1)
-INIT_FIELD(message_flags,  1, 1)
-INIT_FIELD(message_length, 2, 2)
+int hf_message_type               = -1;
+int hf_message_flags              = -1;
+int hf_message_length             = -1;
 
-int hf_acknowledge_flowid        = -1;
-int hf_acknowledge_measurementid = -1;
-int hf_acknowledge_streamid      = -1;
-// int hf_acknowledge_padding    = -1;
-int hf_acknowledge_status        = -1;
+int hf_acknowledge_flowid         = -1;
+int hf_acknowledge_measurementid  = -1;
+int hf_acknowledge_streamid       = -1;
+// int hf_acknowledge_padding     = -1;
+int hf_acknowledge_status         = -1;
 
-int hf_addflow_flowid          = -1;
-int hf_addflow_measurementid   = -1;
-int hf_addflow_streamid        = -1;
-int hf_addflow_protocol        = -1;
-int hf_addflow_flags           = -1;
-int hf_addflow_description     = -1;
-int hf_addflow_ordered         = -1;
-int hf_addflow_reliable        = -1;
-int hf_addflow_retranstrials   = -1;
-int hf_addflow_framerate1      = -1;
-int hf_addflow_framerate2      = -1;
-int hf_addflow_framerate3      = -1;
-int hf_addflow_framerate4      = -1;
-int hf_addflow_framesize1      = -1;
-int hf_addflow_framesize2      = -1;
-int hf_addflow_framesize3      = -1;
-int hf_addflow_framesize4      = -1;
-int hf_addflow_frameraterng    = -1;
-int hf_addflow_framesizerng    = -1;
-int hf_addflow_rcvbuffersize   = -1;
-int hf_addflow_sndbuffersize   = -1;
-int hf_addflow_maxmsgsize      = -1;
-int hf_addflow_cmt             = -1;
-int hf_addflow_ccid            = -1;
-int hf_addflow_onoffevents     = -1;
-int hf_addflow_onoffeventarray = -1;
+int hf_addflow_flowid             = -1;
+int hf_addflow_measurementid      = -1;
+int hf_addflow_streamid           = -1;
+int hf_addflow_protocol           = -1;
+int hf_addflow_flags              = -1;
+int hf_addflow_description        = -1;
+int hf_addflow_ordered            = -1;
+int hf_addflow_reliable           = -1;
+int hf_addflow_retranstrials      = -1;
+int hf_addflow_framerate1         = -1;
+int hf_addflow_framerate2         = -1;
+int hf_addflow_framerate3         = -1;
+int hf_addflow_framerate4         = -1;
+int hf_addflow_framesize1         = -1;
+int hf_addflow_framesize2         = -1;
+int hf_addflow_framesize3         = -1;
+int hf_addflow_framesize4         = -1;
+int hf_addflow_frameraterng       = -1;
+int hf_addflow_framesizerng       = -1;
+int hf_addflow_rcvbuffersize      = -1;
+int hf_addflow_sndbuffersize      = -1;
+int hf_addflow_maxmsgsize         = -1;
+int hf_addflow_cmt                = -1;
+int hf_addflow_ccid               = -1;
+int hf_addflow_onoffevents        = -1;
+int hf_addflow_onoffeventarray    = -1;
 
-INIT_FIELD(removeflow_flowid,           4,  4)
-INIT_FIELD(removeflow_measurementid,    8,  8)
-INIT_FIELD(removeflow_streamid,        16,  2)
+int hf_removeflow_flowid          = -1;
+int hf_removeflow_measurementid   = -1;
+int hf_removeflow_streamid        = -1;
 
-INIT_FIELD(identifyflow_flowid,         4,  4)
-INIT_FIELD(identifyflow_magicnumber,    8,  8)
-INIT_FIELD(identifyflow_measurementid, 16,  8)
-INIT_FIELD(identifyflow_streamid,      24,  2)
+int hf_identifyflow_flowid        = -1;
+int hf_identifyflow_magicnumber   = -1;
+int hf_identifyflow_measurementid = -1;
+int hf_identifyflow_streamid      = -1;
 
 #define NETPERFMETER_IDENTIFY_FLOW_MAGIC_NUMBER 0x4bcdf3aa303c6774ULL
 
-INIT_FIELD(data_flowid,           4,  4)
-INIT_FIELD(data_measurementid,    8,  8)
-INIT_FIELD(data_streamid,        16,  2)
-INIT_FIELD(data_padding,         18,  2)
-INIT_FIELD(data_frameid,         20,  4)
-INIT_FIELD(data_packetseqnumber, 24,  8)
-INIT_FIELD(data_byteseqnumber,   32,  8)
-INIT_FIELD(data_timestamp,       40,  8)
-INIT_FIELD_WITHOUT_LEN(data_payload,         48)
+int hf_data_flowid                = -1;
+int hf_data_measurementid         = -1;
+int hf_data_streamid              = -1;
+int hf_data_padding               = -1;
+int hf_data_frameid               = -1;
+int hf_data_packetseqnumber       = -1;
+int hf_data_byteseqnumber         = -1;
+int hf_data_timestamp             = -1;
+int hf_data_payload               = -1;
 
-/* INIT_FIELD(start_padding,         4,  4) */
-INIT_FIELD(start_measurementid,   8,  8)
+// int hf_start_padding           = -1;
+int hf_start_measurementid        = -1;
 
-/* INIT_FIELD(stop_padding,          4,  4) */
-INIT_FIELD(stop_measurementid,    8,  8)
+// int hf_stop_padding            = -1;
+int hf_stop_measurementid         = -1;
 
-INIT_FIELD_WITHOUT_LEN(results_data,          4)
+int hf_results_data               = -1;
 
 
 /* Setup list of Transport Layer protocol types */
 static const value_string proto_type_values[] = {
-  { 6,              "TCP" },
-  { 8,              "MPTCP" },
-  { 17,             "UDP" },
-  { 33,             "DCCP" },
-  { 132,            "SCTP" },
-  { 0,              NULL }
+  { 6,   "TCP" },
+  { 8,   "MPTCP" },
+  { 17,  "UDP" },
+  { 33,  "DCCP" },
+  { 132, "SCTP" },
+  { 0,   NULL }
 };
 
 /* Setup list of CMT values */
 static const value_string cmt_values[] = {
-  { 0,              "Off" },
-  { 1,              "CMT" },
-  { 2,              "CMT/RPv1" },
-  { 3,              "CMT/RPv2" },
-  { 4,              "MPTCP-Like" },
-  { 0,              NULL }
+  { 0, "Off" },
+  { 1, "CMT" },
+  { 2, "CMT/RPv1" },
+  { 3, "CMT/RPv2" },
+  { 4, "MPTCP-Like" },
+  { 0, NULL }
 };
 
 /* Setup list of random number generator types */
 static const value_string rng_type_values[] = {
-  { 0,              "Constant" },
-  { 1,              "Uniform" },
-  { 2,              "Neg. Exponential" },
-  { 0,              NULL }
+  { 0, "Constant" },
+  { 1, "Uniform" },
+  { 2, "Neg. Exponential" },
+  { 0, NULL }
 };
 
 /* Setup list of header fields */
@@ -231,10 +223,6 @@ static hf_register_info hf[] = {
 };
 
 
-#define ADD_FIELD_UINT(tree, field) proto_tree_add_item(tree, hf_##field, message_tvb, offset_##field, length_##field, ENC_BIG_ENDIAN)
-#define ADD_FIELD_STRING(tree, field) proto_tree_add_item(tree, hf_##field, message_tvb, offset_##field, length_##field, ENC_ASCII|ENC_NA)
-
-
 static void
 dissect_npm_acknowledge_message(tvbuff_t *message_tvb, proto_tree *message_tree)
 {
@@ -309,45 +297,45 @@ dissect_npm_add_flow_message(tvbuff_t *message_tvb, proto_tree *message_tree)
 static void
 dissect_npm_remove_flow_message(tvbuff_t *message_tvb, proto_tree *message_tree)
 {
-  ADD_FIELD_UINT(message_tree, removeflow_flowid);
-  ADD_FIELD_UINT(message_tree, removeflow_measurementid);
-  ADD_FIELD_UINT(message_tree, removeflow_streamid);
+  proto_tree_add_item(message_tree, hf_removeflow_flowid,        message_tvb,  4, 4, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_removeflow_measurementid, message_tvb,  8, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_removeflow_streamid,      message_tvb, 16, 2, ENC_BIG_ENDIAN);
 }
 
 
 static void
 dissect_npm_identify_flow_message(tvbuff_t *message_tvb, proto_tree *message_tree)
 {
-  ADD_FIELD_UINT(message_tree, identifyflow_magicnumber);
-  ADD_FIELD_UINT(message_tree, identifyflow_flowid);
-  ADD_FIELD_UINT(message_tree, identifyflow_measurementid);
-  ADD_FIELD_UINT(message_tree, identifyflow_streamid);
+  proto_tree_add_item(message_tree, hf_identifyflow_magicnumber,   message_tvb,   4,  4, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_identifyflow_flowid,        message_tvb,   8,  8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_identifyflow_measurementid, message_tvb,  16,  8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_identifyflow_streamid,      message_tvb,  24, 24, ENC_BIG_ENDIAN);
 }
 
 
 static void
 dissect_npm_data_message(tvbuff_t *message_tvb, proto_tree *message_tree)
 {
-  const guint16 message_length = tvb_get_ntohs(message_tvb, offset_message_length);
+  const guint16 message_length = tvb_get_ntohs(message_tvb, 2);
   guint64       timestamp;
   nstime_t      t;
 
-  ADD_FIELD_UINT(message_tree, data_flowid);
-  ADD_FIELD_UINT(message_tree, data_measurementid);
-  ADD_FIELD_UINT(message_tree, data_streamid);
-  ADD_FIELD_UINT(message_tree, data_padding);
-  ADD_FIELD_UINT(message_tree, data_frameid);
-  ADD_FIELD_UINT(message_tree, data_packetseqnumber);
-  ADD_FIELD_UINT(message_tree, data_byteseqnumber);
+  proto_tree_add_item(message_tree, hf_data_flowid,          message_tvb,   4,  4, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_data_measurementid,   message_tvb,   8,  8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_data_streamid,        message_tvb,  16,  2, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_data_padding,         message_tvb,  18,  2, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_data_frameid,         message_tvb,  20,  4, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_data_packetseqnumber, message_tvb,  24,  8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_data_byteseqnumber,   message_tvb,  32,  8, ENC_BIG_ENDIAN);
 
-  timestamp = tvb_get_ntoh64(message_tvb, offset_data_timestamp);
+  timestamp = tvb_get_ntoh64(message_tvb, 40);
   t.secs  = (time_t)(timestamp / 1000000);
   t.nsecs = (int)((timestamp - 1000000 * t.secs) * 1000);
 
-  proto_tree_add_time(message_tree, hf_data_timestamp, message_tvb, offset_data_timestamp, length_data_timestamp, &t);
+  proto_tree_add_time(message_tree, hf_data_timestamp, message_tvb, 40, 8, &t);
 
-  if (message_length > offset_data_payload) {
-    proto_tree_add_item(message_tree, hf_data_payload, message_tvb, offset_data_payload, message_length - offset_data_payload, ENC_NA);
+  if (message_length > 4) {
+    proto_tree_add_item(message_tree, hf_data_payload, message_tvb, 4, message_length - 48, ENC_NA);
   }
 }
 
@@ -355,23 +343,23 @@ dissect_npm_data_message(tvbuff_t *message_tvb, proto_tree *message_tree)
 static void
 dissect_npm_start_message(tvbuff_t *message_tvb, proto_tree *message_tree)
 {
-  ADD_FIELD_UINT(message_tree, start_measurementid);
+  proto_tree_add_item(message_tree, hf_start_measurementid, message_tvb, 8, 8, ENC_BIG_ENDIAN);
 }
 
 
 static void
 dissect_npm_stop_message(tvbuff_t *message_tvb, proto_tree *message_tree)
 {
-  ADD_FIELD_UINT(message_tree, stop_measurementid);
+  proto_tree_add_item(message_tree, hf_stop_measurementid, message_tvb, 8, 8, ENC_BIG_ENDIAN);
 }
 
 
 static void
 dissect_npm_results_message(tvbuff_t *message_tvb, proto_tree *message_tree)
 {
-  const guint16 message_length = tvb_get_ntohs(message_tvb, offset_message_length);
-  if (message_length > offset_results_data) {
-    proto_tree_add_item(message_tree, hf_results_data, message_tvb, offset_results_data, message_length - offset_results_data, ENC_NA);
+  const guint16 message_length = tvb_get_ntohs(message_tvb, 2);
+  if (message_length > 4) {
+    proto_tree_add_item(message_tree, hf_results_data, message_tvb, 4, message_length - 4, ENC_NA);
   }
 }
 
@@ -381,12 +369,12 @@ dissect_npm_message(tvbuff_t *message_tvb, packet_info *pinfo, proto_tree *npm_t
 {
   guint8 type;
 
-  type = tvb_get_guint8(message_tvb, offset_message_type);
+  type = tvb_get_guint8(message_tvb, 0);
   col_add_fstr(pinfo->cinfo, COL_INFO, "%s ", val_to_str_const(type, message_type_values, "Unknown NetPerfMeter message type"));
 
-  ADD_FIELD_UINT(npm_tree, message_type);
-  ADD_FIELD_UINT(npm_tree, message_flags);
-  ADD_FIELD_UINT(npm_tree, message_length);
+  proto_tree_add_item(npm_tree, hf_message_type,   message_tvb, 0, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(npm_tree, hf_message_flags,  message_tvb, 1, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(npm_tree, hf_message_length, message_tvb, 2, 2, ENC_BIG_ENDIAN);
 
   switch (type) {
     case NETPERFMETER_ACKNOWLEDGE:
@@ -449,22 +437,22 @@ heur_dissect_npm(tvbuff_t *message_tvb, packet_info *pinfo, proto_tree *tree, vo
 
   /* For TCP, UDP or DCCP:
       Type must either be NETPERFMETER_DATA or NETPERFMETER_IDENTIFY_FLOW */
-  const guint8 type = tvb_get_guint8(message_tvb, offset_message_type);
+  const guint8 type = tvb_get_guint8(message_tvb, 0);
   switch(type) {
     case NETPERFMETER_DATA:
-      if (length < offset_data_payload + 8)
+      if (length < 48 + 8)
         return FALSE;
       /* Identify NetPerfMeter flow by payload pattern */
       for(int i = 0; i < 8; i++) {
-        guint8 d = tvb_get_guint8(message_tvb, offset_data_payload + i);
+        guint8 d = tvb_get_guint8(message_tvb, 48 + i);
         if( (d != 30 + i) && (d != 127 - i) )
           return FALSE;
       }
       break;
     case NETPERFMETER_IDENTIFY_FLOW:
-      if (length < offset_identifyflow_streamid + length_identifyflow_streamid)
+      if (length < 24 + 2)
         return FALSE;
-      if (tvb_get_ntoh64(message_tvb, offset_identifyflow_magicnumber) != NETPERFMETER_IDENTIFY_FLOW_MAGIC_NUMBER) {
+      if (tvb_get_ntoh64(message_tvb, 8) != NETPERFMETER_IDENTIFY_FLOW_MAGIC_NUMBER) {
         /* Identify NetPerfMeter flow by NETPERFMETER_IDENTIFY_FLOW_MAGIC_NUMBER */
         return FALSE;
       }
