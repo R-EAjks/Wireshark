@@ -37,14 +37,6 @@ static int ett_onoffarray         = -1;
 
 
 /* Initialize the protocol and registered fields */
-#define INIT_FIELD(variable, offset, length) \
-   static int hf_##variable           = -1;        \
-   static const unsigned int offset_##variable = offset;    \
-   static const int length_##variable = length;
-
-#define INIT_FIELD_WITHOUT_LEN(variable, offset) \
-   static int hf_##variable           = -1;        \
-   static const unsigned int offset_##variable = offset;
 
 #define NETPERFMETER_ACKNOWLEDGE    0x01
 #define NETPERFMETER_ADD_FLOW       0x02
@@ -67,110 +59,111 @@ static const value_string message_type_values[] = {
   { 0, NULL }
 };
 
-INIT_FIELD(message_type,   0, 1)
-INIT_FIELD(message_flags,  1, 1)
-INIT_FIELD(message_length, 2, 2)
+static int hf_message_type               = -1;
+static int hf_message_flags              = -1;
+static int hf_message_length             = -1;
 
-INIT_FIELD(acknowledge_flowid,          4,  4)
-INIT_FIELD(acknowledge_measurementid,   8,  8)
-INIT_FIELD(acknowledge_streamid,       16,  2)
-INIT_FIELD(acknowledge_status,         20,  4)
+static int hf_acknowledge_flowid         = -1;
+static int hf_acknowledge_measurementid  = -1;
+static int hf_acknowledge_streamid       = -1;
+// static int hf_acknowledge_padding     = -1;
+static int hf_acknowledge_status         = -1;
 
-static int hf_addflow_flag_debug       = -1;
-static int hf_addflow_flag_nodelay     = -1;
-static int hf_addflow_flag_repeatonoff = -1;
-INIT_FIELD(addflow_flowid,              4,  4)
-INIT_FIELD(addflow_measurementid,       8,  8)
-INIT_FIELD(addflow_streamid,           16,  2)
-INIT_FIELD(addflow_protocol,           18,  1)
-INIT_FIELD(addflow_flags,              19,  1)
-INIT_FIELD(addflow_description,        20, 32)
-INIT_FIELD(addflow_ordered,            52,  4)
-INIT_FIELD(addflow_reliable,           56,  4)
-INIT_FIELD(addflow_retranstrials,      60,  4)
-INIT_FIELD(addflow_framerate1,         64,  8)
-INIT_FIELD(addflow_framerate2,         72,  8)
-INIT_FIELD(addflow_framerate3,         80,  8)
-INIT_FIELD(addflow_framerate4,         88,  8)
-INIT_FIELD(addflow_framesize1,         96,  8)
-INIT_FIELD(addflow_framesize2,        104,  8)
-INIT_FIELD(addflow_framesize3,        112,  8)
-INIT_FIELD(addflow_framesize4,        120,  8)
-INIT_FIELD(addflow_frameraterng,      128,  1)
-INIT_FIELD(addflow_framesizerng,      129,  1)
-INIT_FIELD(addflow_rcvbuffersize,     130,  4)
-INIT_FIELD(addflow_sndbuffersize,     134,  4)
-INIT_FIELD(addflow_maxmsgsize,        138,  2)
-INIT_FIELD(addflow_cmt,               140,  1)
-INIT_FIELD(addflow_ccid,              141,  1)
-INIT_FIELD(addflow_onoffevents,       142,  2)
-INIT_FIELD_WITHOUT_LEN(addflow_onoffeventarray,   144)
+static int hf_addflow_flag_debug         = -1;
+static int hf_addflow_flag_nodelay       = -1;
+static int hf_addflow_flag_repeatonoff   = -1;
+static int hf_addflow_flowid             = -1;
+static int hf_addflow_measurementid      = -1;
+static int hf_addflow_streamid           = -1;
+static int hf_addflow_protocol           = -1;
+static int hf_addflow_flags              = -1;
+static int hf_addflow_description        = -1;
+static int hf_addflow_ordered            = -1;
+static int hf_addflow_reliable           = -1;
+static int hf_addflow_retranstrials      = -1;
+static int hf_addflow_framerate1         = -1;
+static int hf_addflow_framerate2         = -1;
+static int hf_addflow_framerate3         = -1;
+static int hf_addflow_framerate4         = -1;
+static int hf_addflow_framesize1         = -1;
+static int hf_addflow_framesize2         = -1;
+static int hf_addflow_framesize3         = -1;
+static int hf_addflow_framesize4         = -1;
+static int hf_addflow_frameraterng       = -1;
+static int hf_addflow_framesizerng       = -1;
+static int hf_addflow_rcvbuffersize      = -1;
+static int hf_addflow_sndbuffersize      = -1;
+static int hf_addflow_maxmsgsize         = -1;
+static int hf_addflow_cmt                = -1;
+static int hf_addflow_ccid               = -1;
+static int hf_addflow_onoffevents        = -1;
+static int hf_addflow_onoffeventarray    = -1;
 
-INIT_FIELD(removeflow_flowid,           4,  4)
-INIT_FIELD(removeflow_measurementid,    8,  8)
-INIT_FIELD(removeflow_streamid,        16,  2)
+static int hf_removeflow_flowid          = -1;
+static int hf_removeflow_measurementid   = -1;
+static int hf_removeflow_streamid        = -1;
 
 static int hf_identifyflow_flag_compress_vectors = -1;
 static int hf_identifyflow_flag_no_vectors       = -1;
-INIT_FIELD(identifyflow_flowid,         4,  4)
-INIT_FIELD(identifyflow_magicnumber,    8,  8)
-INIT_FIELD(identifyflow_measurementid, 16,  8)
-INIT_FIELD(identifyflow_streamid,      24,  2)
+static int hf_identifyflow_flowid        = -1;
+static int hf_identifyflow_magicnumber   = -1;
+static int hf_identifyflow_measurementid = -1;
+static int hf_identifyflow_streamid      = -1;
 
 #define NETPERFMETER_IDENTIFY_FLOW_MAGIC_NUMBER 0x4bcdf3aa303c6774ULL
 
-static int hf_data_flag_frame_begin = -1;
-static int hf_data_flag_frame_end   = -1;
-INIT_FIELD(data_flowid,           4,  4)
-INIT_FIELD(data_measurementid,    8,  8)
-INIT_FIELD(data_streamid,        16,  2)
-INIT_FIELD(data_padding,         18,  2)
-INIT_FIELD(data_frameid,         20,  4)
-INIT_FIELD(data_packetseqnumber, 24,  8)
-INIT_FIELD(data_byteseqnumber,   32,  8)
-INIT_FIELD(data_timestamp,       40,  8)
-INIT_FIELD_WITHOUT_LEN(data_payload, 48)
-
+static int hf_data_flag_frame_begin       = -1;
+static int hf_data_flag_frame_end         = -1;
+static int hf_data_flowid                 = -1;
+static int hf_data_measurementid          = -1;
+static int hf_data_streamid               = -1;
+static int hf_data_padding                = -1;
+static int hf_data_frameid                = -1;
+static int hf_data_packetseqnumber        = -1;
+static int hf_data_byteseqnumber          = -1;
+static int hf_data_timestamp              = -1;
+static int hf_data_payload                = -1;
 
 static int hf_start_flag_compress_vectors = -1;
 static int hf_start_flag_compress_scalars = -1;
-static int hf_start_flag_no_vectors = -1;
-static int hf_start_flag_no_scalars = -1;
-INIT_FIELD(start_measurementid,   8,  8)
+static int hf_start_flag_no_vectors       = -1;
+static int hf_start_flag_no_scalars       = -1;
+// static int hf_start_padding            = -1;
+static int hf_start_measurementid         = -1;
 
+// static int hf_stop_padding             = -1;
+static int hf_stop_measurementid          = -1;
 
-INIT_FIELD(stop_measurementid,    8,  8)
-
-static int hf_results_flag_eof = -1;
-INIT_FIELD_WITHOUT_LEN(results_data, 4)
+static int hf_results_flag_eof            = -1;
+static int hf_results_data                = -1;
 
 
 /* Setup list of Transport Layer protocol types */
 static const value_string proto_type_values[] = {
-  { 6,              "TCP" },
-  { 8,              "MPTCP" },
-  { 17,             "UDP" },
-  { 33,             "DCCP" },
-  { 132,            "SCTP" },
-  { 0,              NULL }
+  { 6,   "TCP" },
+  { 8,   "MPTCP" },
+  { 17,  "UDP" },
+  { 33,  "DCCP" },
+  { 132, "SCTP" },
+  { 0,   NULL }
 };
 
 /* Setup list of CMT values */
 static const value_string cmt_values[] = {
-  { 0,              "Off" },
-  { 1,              "CMT" },
-  { 2,              "CMT/RPv1" },
-  { 3,              "CMT/RPv2" },
-  { 4,              "MPTCP-Like" },
-  { 0,              NULL }
+  { 0, "Off" },
+  { 1, "CMT" },
+  { 2, "CMT/RPv1" },
+  { 3, "CMT/RPv2" },
+  { 4, "MPTCP-Like" },
+  { 0, NULL }
 };
 
 /* Setup list of random number generator types */
 static const value_string rng_type_values[] = {
-  { 0,              "Constant" },
-  { 1,              "Uniform" },
-  { 2,              "Neg. Exponential" },
-  { 0,              NULL }
+  { 0, "Constant" },
+  { 1, "Uniform" },
+  { 2, "Neg. Exponential" },
+  { 0, NULL }
 };
 
 /* Message flags */
@@ -278,18 +271,14 @@ static hf_register_info hf[] = {
 };
 
 
-#define ADD_FIELD_MSGFLAG(tree, field) proto_tree_add_item(tree, hf_##field, message_tvb, offset_message_flags, length_message_flags, ENC_BIG_ENDIAN)
-#define ADD_FIELD_UINT(tree, field)    proto_tree_add_item(tree, hf_##field, message_tvb, offset_##field, length_##field, ENC_BIG_ENDIAN)
-#define ADD_FIELD_STRING(tree, field)  proto_tree_add_item(tree, hf_##field, message_tvb, offset_##field, length_##field, ENC_UTF_8|ENC_NA)
-
-
 static void
 dissect_npm_acknowledge_message(tvbuff_t *message_tvb, proto_tree *message_tree)
 {
-  ADD_FIELD_UINT(message_tree, acknowledge_flowid);
-  ADD_FIELD_UINT(message_tree, acknowledge_measurementid);
-  ADD_FIELD_UINT(message_tree, acknowledge_streamid);
-  ADD_FIELD_UINT(message_tree, acknowledge_status);
+  proto_tree_add_item(message_tree, hf_acknowledge_flowid, message_tvb,         4, 4, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_acknowledge_measurementid, message_tvb,  8, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_acknowledge_streamid, message_tvb,      16, 2, ENC_BIG_ENDIAN);
+  /* proto_tree_add_item(message_tree, acknowledge_padding, message_tvb,       18, 2, ENC_BIG_ENDIAN); */
+  proto_tree_add_item(message_tree, hf_acknowledge_status, message_tvb,        20, 4, ENC_BIG_ENDIAN);
 }
 
 
@@ -305,54 +294,54 @@ dissect_npm_add_flow_message(tvbuff_t *message_tvb, proto_tree *message_tree, pr
   unsigned int i;
 
   flags_tree = proto_item_add_subtree(flags_item, ett_addflow_flags);
-  ADD_FIELD_MSGFLAG(flags_tree, addflow_flag_debug);
-  ADD_FIELD_MSGFLAG(flags_tree, addflow_flag_nodelay);
-  ADD_FIELD_MSGFLAG(flags_tree, addflow_flag_repeatonoff);
+  proto_tree_add_item(flags_tree, hf_addflow_flag_debug,       message_tvb, 1, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(flags_tree, hf_addflow_flag_nodelay,     message_tvb, 1, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(flags_tree, hf_addflow_flag_repeatonoff, message_tvb, 1, 1, ENC_BIG_ENDIAN);
 
-  ADD_FIELD_UINT(message_tree, addflow_flowid);
-  ADD_FIELD_UINT(message_tree, addflow_measurementid);
-  ADD_FIELD_UINT(message_tree, addflow_streamid);
-  ADD_FIELD_UINT(message_tree, addflow_protocol);
-  ADD_FIELD_UINT(message_tree, addflow_flags);
-  ADD_FIELD_STRING(message_tree, addflow_description);
+  proto_tree_add_item(message_tree, hf_addflow_flowid, message_tvb,         4,  4, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_measurementid, message_tvb,  8,  8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_streamid, message_tvb,      16,  2, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_protocol, message_tvb,      18,  1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_flags, message_tvb,         19,  1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_description, message_tvb,   20, 32, ENC_UTF_8|ENC_NA);
 
-  proto_tree_add_double_format_value(message_tree, hf_addflow_ordered, message_tvb, offset_addflow_ordered, length_addflow_ordered,
-                                     100.0 * tvb_get_ntohl(message_tvb, offset_addflow_ordered) / (double)0xffffffff, "%1.3f%%",
-                                     100.0 * tvb_get_ntohl(message_tvb, offset_addflow_ordered) / (double)0xffffffff);
-  proto_tree_add_double_format_value(message_tree, hf_addflow_reliable, message_tvb, offset_addflow_reliable, length_addflow_reliable,
-                                     100.0 * tvb_get_ntohl(message_tvb, offset_addflow_reliable) / (double)0xffffffff, "%1.3f%%",
-                                     100.0 * tvb_get_ntohl(message_tvb, offset_addflow_reliable) / (double)0xffffffff);
+  proto_tree_add_double_format_value(message_tree, hf_addflow_ordered, message_tvb, 52, 4,
+                                     100.0 * tvb_get_ntohl(message_tvb, 52) / (double)0xffffffff, "%1.3f%%",
+                                     100.0 * tvb_get_ntohl(message_tvb, 52) / (double)0xffffffff);
+  proto_tree_add_double_format_value(message_tree, hf_addflow_reliable, message_tvb, 56, 4,
+                                     100.0 * tvb_get_ntohl(message_tvb, 56) / (double)0xffffffff, "%1.3f%%",
+                                     100.0 * tvb_get_ntohl(message_tvb, 56) / (double)0xffffffff);
 
-  retranstrials = tvb_get_ntohl(message_tvb, offset_addflow_retranstrials);
-  proto_tree_add_uint_format_value(message_tree, hf_addflow_retranstrials, message_tvb, offset_addflow_retranstrials, length_addflow_retranstrials,
+  retranstrials = tvb_get_ntohl(message_tvb, 60);
+  proto_tree_add_uint_format_value(message_tree, hf_addflow_retranstrials, message_tvb, 60, 4,
                                    retranstrials, (retranstrials & (1U << 31)) ? "%u ms" : "%u trials",
                                    retranstrials &~ (1U << 31));
 
-  ADD_FIELD_UINT(message_tree, addflow_frameraterng);
-  ADD_FIELD_UINT(message_tree, addflow_framerate1);
-  ADD_FIELD_UINT(message_tree, addflow_framerate2);
-  ADD_FIELD_UINT(message_tree, addflow_framerate3);
-  ADD_FIELD_UINT(message_tree, addflow_framerate4);
-  ADD_FIELD_UINT(message_tree, addflow_framesizerng);
-  ADD_FIELD_UINT(message_tree, addflow_framesize1);
-  ADD_FIELD_UINT(message_tree, addflow_framesize2);
-  ADD_FIELD_UINT(message_tree, addflow_framesize3);
-  ADD_FIELD_UINT(message_tree, addflow_framesize4);
-  ADD_FIELD_UINT(message_tree, addflow_rcvbuffersize);
-  ADD_FIELD_UINT(message_tree, addflow_sndbuffersize);
-  ADD_FIELD_UINT(message_tree, addflow_maxmsgsize);
-  ADD_FIELD_UINT(message_tree, addflow_cmt);
-  ADD_FIELD_UINT(message_tree, addflow_ccid);
+  proto_tree_add_item(message_tree, hf_addflow_frameraterng,  message_tvb, 128, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_framerate1,    message_tvb,  64, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_framerate2,    message_tvb,  72, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_framerate3,    message_tvb,  80, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_framerate4,    message_tvb,  88, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_framesizerng,  message_tvb, 129, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_framesize1,    message_tvb,  96, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_framesize2,    message_tvb, 104, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_framesize3,    message_tvb, 112, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_framesize4,    message_tvb, 120, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_rcvbuffersize, message_tvb, 130, 4, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_sndbuffersize, message_tvb, 134, 4, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_maxmsgsize,    message_tvb, 138, 2, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_cmt,           message_tvb, 140, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_addflow_ccid,          message_tvb, 141, 1, ENC_BIG_ENDIAN);
 
-  onoffitem = ADD_FIELD_UINT(message_tree, addflow_onoffevents);
+  onoffitem = proto_tree_add_item(message_tree, hf_addflow_onoffevents, message_tvb, 142, 2, ENC_BIG_ENDIAN);
 
-  onoffevents = tvb_get_ntohs(message_tvb, offset_addflow_onoffevents);
+  onoffevents = tvb_get_ntohs(message_tvb, 142);
   if (onoffevents > 0) {
      onofftree = proto_item_add_subtree(onoffitem, ett_onoffarray);
     for(i = 0;i < onoffevents;i++) {
-      onoffvalue = tvb_get_ntohl(message_tvb, offset_addflow_onoffeventarray + (int)(sizeof(guint32) * i));
+      onoffvalue = tvb_get_ntohl(message_tvb, 144 + (int)(sizeof(guint32) * i));
       proto_tree_add_uint_format(onofftree, hf_addflow_onoffeventarray, message_tvb,
-                                 offset_addflow_onoffeventarray + (int)(sizeof(guint32) * i), (int)sizeof(guint32),
+                                 144 + (int)(sizeof(guint32) * i), (int)sizeof(guint32),
                                  onoffvalue, "%1.3f s: set to %s", onoffvalue / 1000.0, (i & 1) ? "OFF" : "ON");
     }
   }
@@ -362,9 +351,9 @@ dissect_npm_add_flow_message(tvbuff_t *message_tvb, proto_tree *message_tree, pr
 static void
 dissect_npm_remove_flow_message(tvbuff_t *message_tvb, proto_tree *message_tree)
 {
-  ADD_FIELD_UINT(message_tree, removeflow_flowid);
-  ADD_FIELD_UINT(message_tree, removeflow_measurementid);
-  ADD_FIELD_UINT(message_tree, removeflow_streamid);
+  proto_tree_add_item(message_tree, hf_removeflow_flowid,        message_tvb,  4, 4, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_removeflow_measurementid, message_tvb,  8, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_removeflow_streamid,      message_tvb, 16, 2, ENC_BIG_ENDIAN);
 }
 
 
@@ -374,13 +363,13 @@ dissect_npm_identify_flow_message(tvbuff_t *message_tvb, proto_tree *message_tre
   proto_tree* flags_tree;
 
   flags_tree = proto_item_add_subtree(flags_item, ett_identifyflow_flags);
-  ADD_FIELD_MSGFLAG(flags_tree, identifyflow_flag_compress_vectors);
-  ADD_FIELD_MSGFLAG(flags_tree, identifyflow_flag_no_vectors);
+  proto_tree_add_item(flags_tree, hf_identifyflow_flag_compress_vectors, message_tvb, 1, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(flags_tree, hf_identifyflow_flag_no_vectors,       message_tvb, 1, 1, ENC_BIG_ENDIAN);
 
-  ADD_FIELD_UINT(message_tree, identifyflow_magicnumber);
-  ADD_FIELD_UINT(message_tree, identifyflow_flowid);
-  ADD_FIELD_UINT(message_tree, identifyflow_measurementid);
-  ADD_FIELD_UINT(message_tree, identifyflow_streamid);
+  proto_tree_add_item(message_tree, hf_identifyflow_flowid,        message_tvb,  4, 4, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_identifyflow_magicnumber,   message_tvb,  8, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_identifyflow_measurementid, message_tvb, 16, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_identifyflow_streamid,      message_tvb, 24, 2, ENC_BIG_ENDIAN);
 }
 
 
@@ -388,30 +377,30 @@ static void
 dissect_npm_data_message(tvbuff_t *message_tvb, proto_tree *message_tree, proto_item *flags_item)
 {
   proto_tree*   flags_tree;
-  const guint16 message_length = tvb_get_ntohs(message_tvb, offset_message_length);
+  const guint16 message_length = tvb_get_ntohs(message_tvb, 2);
   guint64       timestamp;
   nstime_t      t;
 
   flags_tree = proto_item_add_subtree(flags_item, ett_data_flags);
-  ADD_FIELD_MSGFLAG(flags_tree, data_flag_frame_begin);
-  ADD_FIELD_MSGFLAG(flags_tree, data_flag_frame_end);
+  proto_tree_add_item(flags_tree, hf_data_flag_frame_begin, message_tvb, 1, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(flags_tree, hf_data_flag_frame_end,   message_tvb, 1, 1, ENC_BIG_ENDIAN);
 
-  ADD_FIELD_UINT(message_tree, data_flowid);
-  ADD_FIELD_UINT(message_tree, data_measurementid);
-  ADD_FIELD_UINT(message_tree, data_streamid);
-  ADD_FIELD_UINT(message_tree, data_padding);
-  ADD_FIELD_UINT(message_tree, data_frameid);
-  ADD_FIELD_UINT(message_tree, data_packetseqnumber);
-  ADD_FIELD_UINT(message_tree, data_byteseqnumber);
+  proto_tree_add_item(message_tree, hf_data_flowid,          message_tvb,  4, 4, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_data_measurementid,   message_tvb,  8, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_data_streamid,        message_tvb, 16, 2, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_data_padding,         message_tvb, 18, 2, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_data_frameid,         message_tvb, 20, 4, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_data_packetseqnumber, message_tvb, 24, 8, ENC_BIG_ENDIAN);
+  proto_tree_add_item(message_tree, hf_data_byteseqnumber,   message_tvb, 32, 8, ENC_BIG_ENDIAN);
 
-  timestamp = tvb_get_ntoh64(message_tvb, offset_data_timestamp);
+  timestamp = tvb_get_ntoh64(message_tvb, 40);
   t.secs  = (time_t)(timestamp / 1000000);
   t.nsecs = (int)((timestamp - 1000000 * t.secs) * 1000);
 
-  proto_tree_add_time(message_tree, hf_data_timestamp, message_tvb, offset_data_timestamp, length_data_timestamp, &t);
+  proto_tree_add_time(message_tree, hf_data_timestamp, message_tvb, 40, 8, &t);
 
-  if (message_length > offset_data_payload) {
-    proto_tree_add_item(message_tree, hf_data_payload, message_tvb, offset_data_payload, message_length - offset_data_payload, ENC_NA);
+  if (message_length > 4) {
+    proto_tree_add_item(message_tree, hf_data_payload, message_tvb, 48, message_length - 48, ENC_NA);
   }
 }
 
@@ -422,19 +411,19 @@ dissect_npm_start_message(tvbuff_t *message_tvb, proto_tree *message_tree, proto
   proto_tree* flags_tree;
 
   flags_tree = proto_item_add_subtree(flags_item, ett_start_flags);
-  ADD_FIELD_MSGFLAG(flags_tree, start_flag_compress_vectors);
-  ADD_FIELD_MSGFLAG(flags_tree, start_flag_compress_scalars);
-  ADD_FIELD_MSGFLAG(flags_tree, start_flag_no_vectors);
-  ADD_FIELD_MSGFLAG(flags_tree, start_flag_no_scalars);
+  proto_tree_add_item(flags_tree, hf_start_flag_compress_vectors, message_tvb, 1, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(flags_tree, hf_start_flag_compress_scalars, message_tvb, 1, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(flags_tree, hf_start_flag_no_vectors,       message_tvb, 1, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(flags_tree, hf_start_flag_no_scalars,       message_tvb, 1, 1, ENC_BIG_ENDIAN);
 
-  ADD_FIELD_UINT(message_tree, start_measurementid);
+  proto_tree_add_item(message_tree, hf_start_measurementid, message_tvb, 8, 8, ENC_BIG_ENDIAN);
 }
 
 
 static void
 dissect_npm_stop_message(tvbuff_t *message_tvb, proto_tree *message_tree)
 {
-  ADD_FIELD_UINT(message_tree, stop_measurementid);
+  proto_tree_add_item(message_tree, hf_stop_measurementid, message_tvb, 8, 8, ENC_BIG_ENDIAN);
 }
 
 
@@ -444,11 +433,11 @@ dissect_npm_results_message(tvbuff_t *message_tvb, proto_tree *message_tree, pro
   proto_tree* flags_tree;
 
   flags_tree = proto_item_add_subtree(flags_item, ett_data_flags);
-  ADD_FIELD_MSGFLAG(flags_tree, results_flag_eof);
+  proto_tree_add_item(flags_tree, hf_results_flag_eof, message_tvb, 1, 1, ENC_BIG_ENDIAN);
 
-  const guint16 message_length = tvb_get_ntohs(message_tvb, offset_message_length);
-  if (message_length > offset_results_data) {
-    proto_tree_add_item(message_tree, hf_results_data, message_tvb, offset_results_data, message_length - offset_results_data, ENC_NA);
+  const guint16 message_length = tvb_get_ntohs(message_tvb, 2);
+  if (message_length > 4) {
+    proto_tree_add_item(message_tree, hf_results_data, message_tvb, 4, message_length - 4, ENC_NA);
   }
 }
 
@@ -459,12 +448,12 @@ dissect_npm_message(tvbuff_t *message_tvb, packet_info *pinfo, proto_tree *npm_t
   proto_tree* flags_tree;
   guint8      type;
 
-  type = tvb_get_guint8(message_tvb, offset_message_type);
+  type = tvb_get_guint8(message_tvb, 0);
   col_add_fstr(pinfo->cinfo, COL_INFO, "%s ", val_to_str_const(type, message_type_values, "Unknown NetPerfMeter message type"));
 
-  ADD_FIELD_UINT(npm_tree, message_type);
-  flags_tree = ADD_FIELD_UINT(npm_tree, message_flags);
-  ADD_FIELD_UINT(npm_tree, message_length);
+  proto_tree_add_item(npm_tree, hf_message_type,   message_tvb, 0, 1, ENC_BIG_ENDIAN);
+  flags_tree = proto_tree_add_item(npm_tree, hf_message_flags,  message_tvb, 1, 1, ENC_BIG_ENDIAN);
+  proto_tree_add_item(npm_tree, hf_message_length, message_tvb, 2, 2, ENC_BIG_ENDIAN);
 
   switch (type) {
     case NETPERFMETER_ACKNOWLEDGE:
@@ -527,22 +516,22 @@ heur_dissect_npm(tvbuff_t *message_tvb, packet_info *pinfo, proto_tree *tree, vo
 
   /* For TCP, UDP or DCCP:
       Type must either be NETPERFMETER_DATA or NETPERFMETER_IDENTIFY_FLOW */
-  const guint8 type = tvb_get_guint8(message_tvb, offset_message_type);
+  const guint8 type = tvb_get_guint8(message_tvb, 0);
   switch(type) {
     case NETPERFMETER_DATA:
-      if (length < offset_data_payload + 8)
+      if (length < 48 + 8)
         return FALSE;
       /* Identify NetPerfMeter flow by payload pattern */
       for(int i = 0; i < 8; i++) {
-        guint8 d = tvb_get_guint8(message_tvb, offset_data_payload + i);
+        guint8 d = tvb_get_guint8(message_tvb, 48 + i);
         if( (d != 30 + i) && (d != 127 - i) )
           return FALSE;
       }
       break;
     case NETPERFMETER_IDENTIFY_FLOW:
-      if (length < offset_identifyflow_streamid + length_identifyflow_streamid)
+      if (length < 24 + 2)
         return FALSE;
-      if (tvb_get_ntoh64(message_tvb, offset_identifyflow_magicnumber) != NETPERFMETER_IDENTIFY_FLOW_MAGIC_NUMBER) {
+      if (tvb_get_ntoh64(message_tvb, 8) != NETPERFMETER_IDENTIFY_FLOW_MAGIC_NUMBER) {
         /* Identify NetPerfMeter flow by NETPERFMETER_IDENTIFY_FLOW_MAGIC_NUMBER */
         return FALSE;
       }
