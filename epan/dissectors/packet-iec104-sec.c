@@ -572,9 +572,11 @@ static const td_asdu_length asdu_length [] = {
 #define Retrem          11
 #define Retloc          12
 #define File            13
+
 #define Auth            14
 #define Seskey          15
 #define Usrkey          16
+
 #define Inrogen         20
 #define Inro1           21
 #define Inro2           22
@@ -618,9 +620,9 @@ static const value_string causetx_types [] = {
 	{ Retrem          ,"Retrem" },
 	{ Retloc          ,"Retloc" },
 	{ File            ,"File" },
-	{ Auth            ,"Auth" },
-	{ Seskey          ,"Seskey" },
-	{ Usrkey          ,"Usrkey" },
+	{ Auth            ,"Authentication" },
+	{ Seskey          ,"Maintenance of authentication session key" },
+	{ Usrkey          ,"Maintenance of user role and update key" },
 	{ Inrogen         ,"Inrogen" },
 	{ Inro1           ,"Inro1" },
 	{ Inro2           ,"Inro2" },
@@ -1016,7 +1018,7 @@ static expert_field ei_iec104_apdu_invalid_len = EI_INIT;
 #define IEC101_SINGLE_CHAR    0xE5
 
 static gboolean use_tls = FALSE;
-static gboolean initialized = FALSE;
+static gboolean prefs_initialized = FALSE;
 
 /* Misc. functions for dissection of signal values */
 
@@ -3000,7 +3002,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 				get_EUL(tvb, &offset, it104tree, &asdu_secure.EUL);			
 				if (asdu_secure.EUL > 0)
 					get_EUD(tvb, &offset, it104tree, asdu_secure.EUL);
-				get_MAC(tvb, &offset, it104tree, 32);
+				get_MAC(tvb, &offset, it104tree, 16);
 			}
 
 			offset = Len;
@@ -3030,7 +3032,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 
 		case S_UF_NA_1: /* 95 update key change confirmation */
 
-			get_MAC(tvb, &offset, it104tree, 32);
+			get_MAC(tvb, &offset, it104tree, 16);
 
 			break;
 			
@@ -3280,9 +3282,8 @@ proto_reg_handoff_iec60870_104_sec(void)
 #if DEBUG_MODULE
 	printf("proto_reg_handoff_iec60870_104_sec=%d\n", use_tls);
 #endif	
-	/* create a dissector handle, which is a handle associated with the protocol and the function called to do the actual dissecting */
-	iec60870_104_handle = create_dissector_handle(dissect_iec60870_104_tcp, proto_iec60870_104);
 	
+	/* create a dissector handle, which is a handle associated with the protocol and the function called to do the actual dissecting */	
 	if(use_tls == TRUE)
 	{
 		iec60870_104_handle = register_dissector("IEC104_TCP", dissect_iec60870_104_tcp, proto_iec60870_104);	
@@ -3291,16 +3292,19 @@ proto_reg_handoff_iec60870_104_sec(void)
 	{
 		iec60870_104_handle = create_dissector_handle(dissect_iec60870_104_tcp, proto_iec60870_104);
 	}
-
+	
 	/* register the dissector handler so that TCP traffic associated with the port IEC60870_104_SECURE_PORT calls the dissector */
-	if (initialized == FALSE)
+	if(prefs_initialized == FALSE)
 	{		
 		dissector_add_uint_with_preference("tcp.port", IEC60870_104_SECURE_PORT, iec60870_104_handle);
-		initialized = TRUE;
+		prefs_initialized = TRUE;
 	}
 	
 	if(use_tls == TRUE)
 	{
+#if DEBUG_MODULE
+		printf("ssl_dissector_add=%d\n", use_tls);
+#endif
 		ssl_dissector_add(IEC60870_104_SECURE_PORT, iec60870_104_handle);
 		tls_handle = find_dissector_add_dependency("tls", proto_iec60870_104);
 	}
