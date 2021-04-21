@@ -900,6 +900,7 @@ static int hf_secure_cgc  = -1;
 static int hf_secure_cdl  = -1;
 static int hf_secure_cdc  = -1;
 static int hf_secure_cert  = -1;
+static int hf_secure_segment  = -1;
 
 static int hf_secure_eul  = -1;
 static int hf_secure_eud  = -1;
@@ -1910,11 +1911,10 @@ static void get_EUD(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*    CERT = Controlled Station Challenge Data, defined in 7.2.11.5 of IEC/TS 62351-5:2013
+/*    CERT = Controlled Station Challenge Data, defined in 7.2.9.12 of IEC/TS 62351-5:2013
 
-      The controlled station shall provide this pseudo-random data to ensure mutual authentication
-      can take place between it and the controlling station. The pseudo-random data shall be
-      generated using the algorithm 3.1 specified in the FIPS 186-2 Digital Signature Standard.
+      Certification Data. A standard X.509 certificate as described in RFC 5280 and refined for role-based 
+      access control of power system data communications as described in IEC/TS 62351-8.
 */
 /******************************************************************************************************/
 static void get_CERT(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 LENGHT_CERT)
@@ -1922,6 +1922,21 @@ static void get_CERT(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tr
 	proto_tree_add_item(iec104_header_tree, hf_secure_cert, tvb, *offset, LENGHT_CERT, ENC_LITTLE_ENDIAN);
 
 	(*offset) += LENGHT_CERT;
+}
+
+/******************************************************************************************************/
+/*    SEGMENT = Controlled Station Challenge Data, defined in 7.2.11.5 of IEC/TS 62351-5:2013
+
+      The controlled station shall provide this pseudo-random data to ensure mutual authentication
+      can take place between it and the controlling station. The pseudo-random data shall be
+      generated using the algorithm 3.1 specified in the FIPS 186-2 Digital Signature Standard.
+*/
+/******************************************************************************************************/
+static void get_SEGMENT(tvbuff_t* tvb, guint8* offset, proto_tree* iec104_header_tree, guint32 LENGHT_SEGMENT)
+{
+	proto_tree_add_item(iec104_header_tree, hf_secure_segment, tvb, *offset, LENGHT_SEGMENT, ENC_LITTLE_ENDIAN);
+
+	(*offset) += LENGHT_SEGMENT;
 }
 
 /******************************************************************************************************/
@@ -2231,10 +2246,16 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 			asdu_secure.asn = asdu_secure.segmentation_control & F_ASN;
 			asdu_secure.fir = asdu_secure.segmentation_control & F_FIR;
 			asdu_secure.fin = asdu_secure.segmentation_control & F_FIN;
+
+#if 0
+			printf("asn=%d\n", asdu_secure.asn);
+			printf("fir=%d\n", asdu_secure.fir);
+			printf("fin=%d\n", asdu_secure.fin);
+#endif
 			
 			/* add to result_text Segmentation Control */
 			if (asduh.NumIx == 1) {
-				wmem_strbuf_append_printf(result_text, " ASN=%d", asdu_secure.asn);
+				wmem_strbuf_append_printf(result_text, " ASN=%d fir=%d fin=%d", asdu_secure.asn, (asdu_secure.fir == F_FIR) ? (1) : (0), (asdu_secure.fin == F_FIN) ? (1) : (0));
 			}
 
 			/* (packet list window) info to show for result_text */
@@ -2872,7 +2893,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 
 		case S_KS_NA_1: /* 85 session key status */		      			
 
-			if(asdu_secure.fir == 0x40)
+			if(asdu_secure.fir == F_FIR)
 			{
 				get_KSQ(tvb, &offset, it104tree);
 				get_USR(tvb, &offset, it104tree, NULL);
@@ -2929,12 +2950,18 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 
 		case S_UC_NA_1: /* 88 user certificate */
 			
-			if(asdu_secure.fir == 0x40)
+			if(asdu_secure.fir == F_FIR)
 			{				
 				get_KCM(tvb, &offset, it104tree);
 				get_CDL(tvb, &offset, it104tree, &asdu_secure.CDL);
 				if (asdu_secure.CDL > 0)
 					get_CERT(tvb, &offset, it104tree, asdu_secure.CDL);
+			}
+			else
+			{
+				asdu_secure.CDL = Len - offset;
+				if (asdu_secure.CDL > 0)
+					get_SEGMENT(tvb, &offset, it104tree, asdu_secure.CDL);
 			}
 
 			offset = Len;
@@ -2966,7 +2993,13 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 				if (asdu_secure.CDL > 0)
 					get_CERT(tvb, &offset, it104tree, asdu_secure.CDL);
 			}
-
+			else
+			{
+				asdu_secure.CDL = Len - offset;
+				if (asdu_secure.CDL > 0)
+					get_SEGMENT(tvb, &offset, it104tree, asdu_secure.CDL);
+			}
+			
 			offset = Len;
 			
 			break;
@@ -2995,7 +3028,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 
 		case S_UK_NA_1: /* 93 update key change symmetric */
 			
-			if(asdu_secure.fir == 0x40)
+			if(asdu_secure.fir == F_FIR)
 			{
 				get_KSQ(tvb, &offset, it104tree);
 				get_USR(tvb, &offset, it104tree, NULL);
@@ -3011,7 +3044,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 
 		case S_UA_NA_1: /* 94 update key change asymmetric */
 
-			if(asdu_secure.fir == 0x40)
+			if(asdu_secure.fir == F_FIR)
 			{
 				get_KSQ(tvb, &offset, it104tree);
 				get_USR(tvb, &offset, it104tree, NULL);
@@ -3019,14 +3052,14 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 				if (asdu_secure.EUL > 0)
 					get_EUD(tvb, &offset, it104tree, asdu_secure.EUL);
 			}
-
+			else
+			{
+				asdu_secure.EUL = Len - offset;
+				if (asdu_secure.EUL > 0)
+					get_SEGMENT(tvb, &offset, it104tree, asdu_secure.EUL);
+			}
+		       
 			offset = Len;
-
-#if 0
-			printf("asn=%d\n", asdu_secure.asn);
-			printf("fir=%d\n", asdu_secure.fir);
-			printf("fin=%d\n", asdu_secure.fin);
-#endif
 
 			break;
 
@@ -3282,11 +3315,6 @@ proto_reg_handoff_iec60870_104_sec(void)
 #if DEBUG_MODULE
 	printf("proto_reg_handoff_iec60870_104_sec=%d\n", use_tls);
 #endif	
-<<<<<<< HEAD
-=======
-	/* create dissector handle, which is a handle associated with the protocol and the function called to do the actual dissecting */
-	iec60870_104_handle = create_dissector_handle(dissect_iec60870_104_tcp, proto_iec60870_104);
->>>>>>> f121a8d25a90c5cb79717d54e5da865e6eacea68
 	
 	/* create a dissector handle, which is a handle associated with the protocol and the function called to do the actual dissecting */	
 	if(use_tls == TRUE)
@@ -3498,7 +3526,11 @@ proto_register_iec60870_asdu_sec(void)
 		
 		{ &hf_secure_cert,
 	       	  { "CERT", "iec60870_asdu.cert", FT_NONE, BASE_NONE, NULL, 0x0,
-		    "Controlled station challenge data", HFILL }},
+		    "Certification data", HFILL }},
+
+		{ &hf_secure_segment,
+	       	  { "SEGMENT", "iec60870_asdu.segment", FT_NONE, BASE_NONE, NULL, 0x0,
+		    "Segmentation data", HFILL }},
 		
 		{ &hf_secure_eul,
 		  { "EUL", "iec60870_asdu.eul", FT_UINT16, BASE_DEC, NULL, 0x0,
