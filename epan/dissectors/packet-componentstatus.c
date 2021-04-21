@@ -83,7 +83,7 @@ static const value_string group_values[] = {
   { 0, NULL }
 };
 
-#define CSR_GET_WORKLOAD(w) ((w == 0xffff) ? -1.0 : (double)(w / (double)0xfffe))
+#define CSR_GET_WORKLOAD(w) ((w == 0xffff) ? -1.0 : (float)(w / (float)0xfffe))
 
 static int hf_cspreport_association_receiver_id        = -1;
 static int hf_cspreport_association_receiver_id_group  = -1;
@@ -127,7 +127,7 @@ dissect_componentstatusprotocol_cspreport_association(tvbuff_t *message_tvb, pro
 {
   proto_item* receiver_id_item;
   proto_tree* receiver_id_tree;
-  u_int64_t   timestamp;
+  guint64     timestamp;
   nstime_t    t;
 
   receiver_id_item = proto_tree_add_item(message_tree, hf_cspreport_association_receiver_id, message_tvb, 0, 8, ENC_BIG_ENDIAN);
@@ -159,7 +159,7 @@ dissect_componentstatusprotocol_cspreport_message(tvbuff_t *message_tvb, proto_t
   int         association;
   gint        offset;
   float       workload;
-  u_int64_t   interval;
+  guint64     interval;
   nstime_t    t;
 
   interval = tvb_get_ntohl(message_tvb, 24);
@@ -203,7 +203,7 @@ dissect_componentstatusprotocol_message(tvbuff_t *message_tvb, packet_info *pinf
   proto_item* sender_id_item;
   proto_tree* sender_id_tree;
   guint8      type;
-  u_int64_t   timestamp;
+  guint64     timestamp;
   nstime_t    t;
 
   type = tvb_get_guint8(message_tvb, 0);
