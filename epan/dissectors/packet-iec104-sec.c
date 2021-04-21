@@ -3422,11 +3422,11 @@ proto_register_iec60870_asdu_sec(void)
 
 		{ &hf_secure_kwa,
 		  { "KWA", "iec60870_asdu.kwa", FT_UINT8, BASE_DEC, VALS(kwa_r_types), 0x0,
-		    "Key wrap algorithm", HFILL }},
+		    "Key Wrap Algorithm", HFILL }},
 
 		{ &hf_secure_kcm,
 		  { "KCM", "iec60870_asdu.kcm", FT_UINT8, BASE_DEC, VALS(kcm_r_types), 0x0,
-		    "Key change method", HFILL }},
+		    "Key Change Method", HFILL }},
 
 		{ &hf_secure_opr,
 		  { "OPR", "iec60870_asdu.opr", FT_UINT8, BASE_DEC, VALS(opr_r_types), 0x0,
@@ -3434,7 +3434,7 @@ proto_register_iec60870_asdu_sec(void)
 		
 		{ &hf_secure_err,
 		  { "ERR", "iec60870_asdu.err", FT_UINT8, BASE_DEC, VALS(err_r_types), 0x0,
-		    "Key wrap algorithm", HFILL }},
+		    "Error Code", HFILL }},
 
 		{ &hf_secure_etm,
 		  { "ETM", "iec60870_asdu.etm", FT_ABSOLUTE_TIME, ABSOLUTE_TIME_LOCAL, NULL, 0x0,
@@ -3442,43 +3442,43 @@ proto_register_iec60870_asdu_sec(void)
 
 		{ &hf_secure_kst,
 		  { "KST", "iec60870_asdu.kst", FT_UINT8, BASE_DEC, VALS(kst_r_types), 0x0,
-		    "Key status", HFILL }},
+		    "Key Status", HFILL }},
 
 		{ &hf_secure_mal,
 		  { "MAL", "iec60870_asdu.mal", FT_UINT8, BASE_DEC, VALS(mal_r_types), 0x0,
-		    "MAC algorithm", HFILL }},
+		    "MAC Algorithm", HFILL }},
 
 		{ &hf_secure_hln,
 		  { "HLN", "iec60870_asdu.hln", FT_UINT16, BASE_DEC, NULL, 0x0,
-		    "MAC lenght", HFILL }},
+		    "MAC Lenght", HFILL }},
 
 		{ &hf_secure_eln,
 		  { "ELN", "iec60870_asdu.eln", FT_UINT16, BASE_DEC, NULL, 0x0,
-		    "ERROR lenght", HFILL }},
+		    "Error Lenght", HFILL }},
 
 		{ &hf_secure_rsc,
 		  { "RSC", "iec60870_asdu.rsc", FT_UINT8, BASE_DEC, VALS(rsc_r_types), 0x0,
-		    "Reason for challenge", HFILL }},
+		    "Reason For Challenge", HFILL }},
 		
 		{ &hf_secure_cln,
 		  { "CLN", "iec60870_asdu.cln", FT_UINT16, BASE_DEC, NULL, 0x0,
-		    "Challenge data length", HFILL }},
+		    "Challenge Data Length", HFILL }},
 
 		{ &hf_secure_kcd,
 	       	  { "KCD", "iec60870_asdu.kcd", FT_NONE, BASE_NONE, NULL, 0x0,
-		    "Challenge data", HFILL }},
+		    "Key Status Pseudo-random Challenge Data", HFILL }},
 
 		{ &hf_secure_chd,
 	       	  { "CHD", "iec60870_asdu.chd", FT_NONE, BASE_NONE, NULL, 0x0,
-		    "Challenge data", HFILL }},
+		    "Challenge Data", HFILL }},
 		
 		{ &hf_secure_wkl,
 		  { "WKL", "iec60870_asdu.wkl", FT_UINT16, BASE_DEC, NULL, 0x0,
-		    "Wrapped key data length", HFILL }},
+		    "Wrapped Key Data Length", HFILL }},
 
 		{ &hf_secure_wkd,
 	       	  { "WKD", "iec60870_asdu.wkd", FT_NONE, BASE_NONE, NULL, 0x0,
-		    "Wrapper key data", HFILL }},
+		    "Wrapper Key Data", HFILL }},
 		
 		{ &hf_secure_mac,
 	       	  { "MAC", "iec60870_asdu.mac", FT_NONE, BASE_NONE, NULL, 0x0,
@@ -3494,24 +3494,28 @@ proto_register_iec60870_asdu_sec(void)
 				
 		{ &hf_secure_unl,
 		  { "UNL", "iec60870_asdu.unl", FT_UINT16, BASE_DEC, NULL, 0x0,
-		    "User Name length", HFILL }},				
+		    "User Name Length", HFILL }},				
 
 		{ &hf_secure_ukl,
 		  { "UKL", "iec60870_asdu.ukl", FT_UINT16, BASE_DEC, NULL, 0x0,
-		    "User Public Key length", HFILL }},				
+		    "User Public Key Length", HFILL }},				
 
 		{ &hf_secure_ccl,
 		  { "CCL", "iec60870_asdu.ccl", FT_UINT16, BASE_DEC, NULL, 0x0,
-		    "Controlling station challenge data length", HFILL }},
+		    "Controlling Station Challenge Data Length", HFILL }},
 		
 		{ &hf_secure_cgc,
 		  { "CGC", "iec60870_asdu.cgc", FT_NONE, BASE_NONE, NULL, 0x0,
-		    "Controlling station challenge data", HFILL }},
+		    "Controlling Station Challenge Data", HFILL }},
 		
 		{ &hf_secure_cdl,
 		  { "CDL", "iec60870_asdu.cdl", FT_UINT16, BASE_DEC, NULL, 0x0,
-		    "Controlled station challenge data length", HFILL }},
+		    "Controlled Station Challenge Data Length", HFILL }},
 
+		{ &hf_secure_cdc,
+	       	  { "CDC", "iec60870_asdu.cdc", FT_NONE, BASE_NONE, NULL, 0x0,
+		    "Controlled Station Challenge Data", HFILL }},
+	       
 		{ &hf_secure_url,
 		  { "URL", "iec60870_asdu.url", FT_UINT16, BASE_DEC, NULL, 0x0,
 		    "User Role", HFILL }},
@@ -3519,26 +3523,22 @@ proto_register_iec60870_asdu_sec(void)
 		{ &hf_secure_uei,
 		  { "UEI", "iec60870_asdu.uei", FT_UINT16, BASE_DEC, NULL, 0x0,
 		    "User Role Expiry Interval", HFILL }},
-
-		{ &hf_secure_cdc,
-	       	  { "CDC", "iec60870_asdu.cdc", FT_NONE, BASE_NONE, NULL, 0x0,
-		    "Controlled station challenge data", HFILL }},
 		
 		{ &hf_secure_cert,
 	       	  { "CERT", "iec60870_asdu.cert", FT_NONE, BASE_NONE, NULL, 0x0,
-		    "Certification data", HFILL }},
+		    "Certification Data", HFILL }},
 
 		{ &hf_secure_segment,
 	       	  { "SEGMENT", "iec60870_asdu.segment", FT_NONE, BASE_NONE, NULL, 0x0,
-		    "Segmentation data", HFILL }},
+		    "Segmentation Data", HFILL }},
 		
 		{ &hf_secure_eul,
 		  { "EUL", "iec60870_asdu.eul", FT_UINT16, BASE_DEC, NULL, 0x0,
-		    "Encrypted update key data length", HFILL }},
+		    "Encrypted Update Key Data Length", HFILL }},
 
 		{ &hf_secure_eud,
 	       	  { "EUD", "iec60870_asdu.eud", FT_NONE, BASE_NONE, NULL, 0x0,
-		    "Encrypted update key data", HFILL }},
+		    "Encrypted Update Key Data", HFILL }},
 		
 		{ &hf_ioa,
 		  { "IOA", "iec60870_asdu.ioa", FT_UINT24, BASE_DEC, NULL, 0x0,
