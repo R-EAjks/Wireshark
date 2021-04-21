@@ -3282,6 +3282,11 @@ proto_reg_handoff_iec60870_104_sec(void)
 #if DEBUG_MODULE
 	printf("proto_reg_handoff_iec60870_104_sec=%d\n", use_tls);
 #endif	
+<<<<<<< HEAD
+=======
+	/* create dissector handle, which is a handle associated with the protocol and the function called to do the actual dissecting */
+	iec60870_104_handle = create_dissector_handle(dissect_iec60870_104_tcp, proto_iec60870_104);
+>>>>>>> f121a8d25a90c5cb79717d54e5da865e6eacea68
 	
 	/* create a dissector handle, which is a handle associated with the protocol and the function called to do the actual dissecting */	
 	if(use_tls == TRUE)
