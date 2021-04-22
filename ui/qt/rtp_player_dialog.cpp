@@ -773,11 +773,6 @@ void RtpPlayerDialog::removeRtpStreams(QVector<rtpstream_id_t *> stream_ids)
     lockUI();
     int tli_count = ui->streamTreeWidget->topLevelItemCount();
 
-    if (last_ti_) {
-        highlightItem(last_ti_, false);
-        last_ti_ = NULL;
-    }
-
     for (int i=0; i < stream_ids.size(); i++) {
         for (int row = 0; row < tli_count; row++) {
             QTreeWidgetItem *ti = ui->streamTreeWidget->topLevelItem(row);
@@ -1094,7 +1089,7 @@ QTreeWidgetItem *RtpPlayerDialog::findItem(QCPAbstractPlottable *plottable)
     for (int row = 0; row < ui->streamTreeWidget->topLevelItemCount(); row++) {
         QTreeWidgetItem *ti = ui->streamTreeWidget->topLevelItem(row);
         RtpAudioGraph *audio_graph = ti->data(graph_audio_data_col_, Qt::UserRole).value<RtpAudioGraph*>();
-        if (audio_graph->isMyPlottable(plottable)) {
+        if (audio_graph && audio_graph->isMyPlottable(plottable)) {
             return ti;
         }
     }
@@ -1518,6 +1513,10 @@ void RtpPlayerDialog::on_streamTreeWidget_itemDoubleClicked(QTreeWidgetItem *ite
 
 void RtpPlayerDialog::removeRow(QTreeWidgetItem *ti)
 {
+    if (last_ti_ && (last_ti_ == ti)) {
+        highlightItem(last_ti_, false);
+        last_ti_ = NULL;
+    }
     RtpAudioStream *audio_stream = ti->data(stream_data_col_, Qt::UserRole).value<RtpAudioStream*>();
     if (audio_stream) {
         stream_hash_.remove(audio_stream->getHash(), audio_stream);
@@ -1565,11 +1564,6 @@ void RtpPlayerDialog::on_actionRemoveStream_triggered()
     QList<QTreeWidgetItem *> items = ui->streamTreeWidget->selectedItems();
 
     block_redraw_ = true;
-    if (last_ti_) {
-        highlightItem(last_ti_, false);
-        last_ti_ = NULL;
-    }
-    //for(int i = 0; i<items.count(); i++ ) {
     for(int i = items.count() - 1; i>=0; i-- ) {
         removeRow(items[i]);
     }
