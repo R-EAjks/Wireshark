@@ -2078,7 +2078,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 
 	memset(&asdu_secure, 0, sizeof(asdu_secure));
 	
-	col_set_str(pinfo->cinfo, COL_PROTOCOL, "IEC 60870-5-104 ASDU SEC");
+	col_set_str(pinfo->cinfo, COL_PROTOCOL, "IEC 60870-5-7 ASDU");
 
 	it104 = proto_tree_add_item(tree, proto_iec60870_asdu, tvb, offset, -1, ENC_NA);
 	it104tree = proto_item_add_subtree(it104, ett_asdu);
@@ -3107,7 +3107,7 @@ static int dissect_iec60870_104_apci(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 	wmem_strbuf_t * result_text;
 	struct asdu_parms parms;
 
-	col_set_str(pinfo->cinfo, COL_PROTOCOL, "IEC 60870-5-104 APCI SEC");
+	col_set_str(pinfo->cinfo, COL_PROTOCOL, "IEC 60870-5-7 APCI");
 
 	it104 = proto_tree_add_item(tree, proto_iec60870_104, tvb, 0, -1, ENC_NA);
 	it104tree = proto_item_add_subtree(it104, ett_apci);
@@ -3284,7 +3284,7 @@ proto_register_iec60870_104_sec(void)
 	};
 	
 	/* Register the protocol (name, short_name, filter_name) */
-	proto_iec60870_104 = proto_register_protocol("IEC 60870-5-104 APCI SEC", "IEC 60870-5-104 APCI SEC", "iec60870_104_sec");
+	proto_iec60870_104 = proto_register_protocol("IEC 60870-5-7 APCI", "IEC 60870-5-7 APCI", "iec60870_5_7_apci");
 
 	/* create a dissector handle, which is a handle associated with the protocol
 	   and the function called to do the actual dissecting */	
@@ -3861,7 +3861,7 @@ proto_register_iec60870_asdu_sec(void)
 	};
 
 	/* Register the protocol (name, short_name, filter_name) */
-	proto_iec60870_asdu = proto_register_protocol("IEC 60870-5-104 ASDU SEC", "IEC 60870-5-104 ASDU SEC", "iec60870_asdu_sec");
+	proto_iec60870_asdu = proto_register_protocol("IEC 60870-5-7 ASDU", "IEC 60870-5-7 ASDU", "iec60870_5_7_asdu");
 
 	/* create a dissector handle, which is a handle associated with the protocol
 	   and the function called to do the actual dissecting */	
