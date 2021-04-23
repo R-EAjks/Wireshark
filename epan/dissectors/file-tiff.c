@@ -271,13 +271,13 @@ static int hf_tiff_target_printer = -1;
 #define TIFF_TAG_COPYRIGHT 0x8298
 int hf_tiff_copyright = -1;
 
-static const value_string endianness_names[] = {
+static const value_string tiff_endianness_names[] = {
     { 0x4949, "Little-Endian" },
     { 0x4D4D, "Big-Endian" },
     { 0, NULL },
 };
 
-static const value_string tag_names[] = {
+static const value_string tiff_tag_names[] = {
     { TIFF_TAG_NEW_SUBFILE_TYPE, "New Subfile Type" },
     { TIFF_TAG_SUBFILE_TYPE, "Subfile Type" },
     { TIFF_TAG_IMAGE_WIDTH, "Image Width" },
@@ -368,7 +368,7 @@ static const value_string tag_names[] = {
 #define TIFF_TYPE_FLOAT 11
 #define TIFF_TYPE_DOUBLE 12
 
-static const value_string type_names[] = {
+static const value_string tiff_type_names[] = {
     { TIFF_TYPE_BYTE, "Byte" },
     { TIFF_TYPE_ASCII, "ASCII" },
     { TIFF_TYPE_SHORT, "Unsigned Short" },
@@ -384,7 +384,7 @@ static const value_string type_names[] = {
     { 0, NULL },
 };
 
-static const value_string compression_names[] = {
+static const value_string tiff_compression_names[] = {
     { 1, "Uncompressed" },
     { 2, "CITT 1D" },
     { 3, "Group 3 Fax" },
@@ -395,7 +395,7 @@ static const value_string compression_names[] = {
     { 0, NULL },
 };
 
-static const value_string photometric_interp_names[] = {
+static const value_string tiff_photometric_interp_names[] = {
     { 0, "White is Zero" },
     { 1, "Black is Zero" },
     { 2, "RGB" },
@@ -407,20 +407,20 @@ static const value_string photometric_interp_names[] = {
     { 0, NULL },
 };
 
-static const value_string threshholding_names[] = {
+static const value_string tiff_threshholding_names[] = {
     { 0, "None" },
     { 1, "Ordered" },
     { 2, "Randomized" },
     { 0, NULL },
 };
 
-static const value_string fill_order_names[] = {
+static const value_string tiff_fill_order_names[] = {
     { 1, "High-order first" },
     { 2, "Low-order first" },
     { 0, NULL },
 };
 
-static const value_string orientation_names[] = {
+static const value_string tiff_orientation_names[] = {
     { 1, "Origin at Top-Left, Horizontal Rows" },
     { 2, "Origin at Top-Right, Horizontal Rows" },
     { 3, "Origin at Bottom-Right, Horizontal Rows" },
@@ -432,13 +432,13 @@ static const value_string orientation_names[] = {
     { 0, NULL },
 };
 
-static const value_string planar_configuration_names[] = {
+static const value_string tiff_planar_configuration_names[] = {
     { 1, "Chunky" },
     { 2, "Planar" },
     { 0, NULL },
 };
 
-static const value_string gray_response_unit_names[] = {
+static const value_string tiff_gray_response_unit_names[] = {
     { 1, "Tenths" },
     { 2, "Hundredths" },
     { 3, "Thousandths" },
@@ -447,26 +447,26 @@ static const value_string gray_response_unit_names[] = {
     { 0, NULL },
 };
 
-static const value_string allow_uncompressed_names[] = {
+static const value_string tiff_allow_uncompressed_names[] = {
     { 0, "Not Allowed" },
     { 1, "Allowed" },
     { 0, NULL },
 };
 
-static const value_string resolution_unit_names[] = {
+static const value_string tiff_resolution_unit_names[] = {
     { 1, "None" },
     { 2, "Inch" },
     { 3, "Centimeter" },
     { 0, NULL },
 };
 
-static const value_string predictor_names[] = {
+static const value_string tiff_predictor_names[] = {
     { 1, "No Predictor" },
     { 2, "Horizontal Differencing" },
     { 0, NULL },
 };
 
-static const value_string ink_set_names[] = {
+static const value_string tiff_ink_set_names[] = {
     { 1, "CMYK" },
     { 2, "Not CMYK" },
     { 0, NULL },
@@ -476,7 +476,7 @@ static const value_string ink_set_names[] = {
 //
 // If the type isn't known, return -1.
 static gint
-type_len(const guint16 type) {
+tiff_type_len(const guint16 type) {
     switch (type) {
     case TIFF_TYPE_BYTE: return 1;
     case TIFF_TYPE_ASCII: return 1;
@@ -499,16 +499,16 @@ type_len(const guint16 type) {
 //
 // If the type isn't known, return -1.
 static gint
-data_len(const guint16 type, const guint32 count) {
-    const gint field = type_len(type);
+tiff_data_len(const guint16 type, const guint32 count) {
+    const gint field = tiff_type_len(type);
     if (field < 0) return -1;
     else return field * count;
 }
 
 static void
-dissect_tag_unknown(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 offset, guint16 type, guint32 count, gint encoding _U_)
+dissect_tiff_tag_unknown(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 offset, guint16 type, guint32 count, gint encoding _U_)
 {
-    const gint len = data_len(type, count);
+    const gint len = tiff_data_len(type, count);
 
     expert_add_info(pinfo, tree, &ei_tiff_unknown_tag);
 
@@ -529,7 +529,7 @@ dissect_tag_unknown(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32
 }
 
 static void
-dissect_single_uint(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 offset, guint16 type, guint32 count, gint encoding, int hfindex) {
+dissect_tiff_single_uint(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 offset, guint16 type, guint32 count, gint encoding, int hfindex) {
     if (count != 1) {
         expert_add_info_format(pinfo, tree, &ei_tiff_bad_entry, "Expected a single item; found %d items", count);
         return;
@@ -542,14 +542,14 @@ dissect_single_uint(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32
     } else if (type == TIFF_TYPE_LONG) {
         proto_tree_add_item(tree, hfindex, tvb, offset, 4, encoding);
     } else {
-        expert_add_info_format(pinfo, tree, &ei_tiff_bad_entry, "Expected an unsigned integer, found type %s", val_to_str_const(type, type_names, "Unknown"));
+        expert_add_info_format(pinfo, tree, &ei_tiff_bad_entry, "Expected an unsigned integer, found type %s", val_to_str_const(type, tiff_type_names, "Unknown"));
     }
 }
 
 static void
-dissect_array_uint(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 offset, guint16 type, guint32 count, gint encoding, int hfindex) {
+dissect_tiff_array_uint(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 offset, guint16 type, guint32 count, gint encoding, int hfindex) {
     if (!(type == TIFF_TYPE_BYTE || type == TIFF_TYPE_SHORT || type == TIFF_TYPE_LONG)) {
-        expert_add_info_format(pinfo, tree, &ei_tiff_bad_entry, "Expected an unsigned integer, found type %s", val_to_str_const(type, type_names, "Unknown"));
+        expert_add_info_format(pinfo, tree, &ei_tiff_bad_entry, "Expected an unsigned integer, found type %s", val_to_str_const(type, tiff_type_names, "Unknown"));
         return;
     }
 
@@ -558,8 +558,8 @@ dissect_array_uint(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 
         return;
     }
 
-    const gint item_len = type_len(type);
-    const gint len = data_len(type, count);
+    const gint item_len = tiff_type_len(type);
+    const gint len = tiff_data_len(type, count);
 
     guint32 item_offset;
     if (len <= 0 || item_len <= 0) {
@@ -581,7 +581,7 @@ dissect_array_uint(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 
 }
 
 static void
-dissect_single_string(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset, guint16 type, guint32 count, gint encoding, int hfindex) {
+dissect_tiff_single_string(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset, guint16 type, guint32 count, gint encoding, int hfindex) {
     if (type != TIFF_TYPE_ASCII) {
         expert_add_info_format(pinfo, tree, &ei_tiff_bad_entry, "Expected an ASCII string");
         return;
@@ -603,7 +603,7 @@ dissect_single_string(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint
 }
 
 static void
-dissect_single_urational(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset, guint16 type, guint32 count, gint encoding, int hfnumer, int hfdenom, int hfapprox) {
+dissect_tiff_single_urational(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset, guint16 type, guint32 count, gint encoding, int hfnumer, int hfdenom, int hfapprox) {
     if (count != 1) {
         expert_add_info_format(pinfo, tree, &ei_tiff_bad_entry, "Expected a single item; found %d items", count);
         return;
@@ -627,7 +627,7 @@ dissect_single_urational(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gu
 }
 
 static void
-dissect_t6_options(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset, guint16 type, guint32 count, gint encoding) {
+dissect_tiff_t6_options(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset, guint16 type, guint32 count, gint encoding) {
     if (count != 1) {
         expert_add_info_format(pinfo, tree, &ei_tiff_bad_entry, "Expected a single item; found %d items", count);
         return;
@@ -648,7 +648,7 @@ static void
 dissect_tiff_entry(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 offset, gint encoding) {
     const guint16 tag = tvb_get_guint16(tvb, offset, encoding);
 
-    proto_tree *entry_tree = proto_tree_add_subtree_format(tree, tvb, offset, 12, ett_ifd, NULL, "%s", val_to_str_const(tag, tag_names, "Unknown Entry"));
+    proto_tree *entry_tree = proto_tree_add_subtree_format(tree, tvb, offset, 12, ett_ifd, NULL, "%s", val_to_str_const(tag, tiff_tag_names, "Unknown Entry"));
 
     proto_tree_add_item(entry_tree, hf_tiff_entry_tag, tvb, offset, 2, encoding);
 
@@ -659,115 +659,115 @@ dissect_tiff_entry(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 
 
     switch (tag) {
     case TIFF_TAG_IMAGE_WIDTH:
-        dissect_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_image_width);
+        dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_image_width);
         break;
     case TIFF_TAG_IMAGE_LENGTH:
-        dissect_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_image_length);
+        dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_image_length);
         break;
     case TIFF_TAG_BITS_PER_SAMPLE:
-        dissect_array_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_bits_per_sample);
+        dissect_tiff_array_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_bits_per_sample);
         break;
     case TIFF_TAG_COMPRESSION:
-        dissect_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_compression);
+        dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_compression);
         break;
     case TIFF_TAG_PHOTOMETIC_INTERPRETATION:
-        dissect_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_photometric_interp);
+        dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_photometric_interp);
         break;
     case TIFF_TAG_THRESHHOLDING:
-        dissect_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_threshholding);
+        dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_threshholding);
         break;
     case TIFF_TAG_CELL_WIDTH:
-        dissect_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_cell_width);
+        dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_cell_width);
         break;
     case TIFF_TAG_CELL_LENGTH:
-        dissect_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_cell_length);
+        dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_cell_length);
         break;
     case TIFF_TAG_FILL_ORDER:
-        dissect_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_fill_order);
+        dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_fill_order);
         break;
     case TIFF_TAG_DOCUMENT_NAME:
-        dissect_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_document_name);
+        dissect_tiff_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_document_name);
         break;
     case TIFF_TAG_IMAGE_DESCRIPTION:
-        dissect_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_image_description);
+        dissect_tiff_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_image_description);
         break;
     case TIFF_TAG_MAKE:
-        dissect_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_make);
+        dissect_tiff_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_make);
         break;
     case TIFF_TAG_MODEL:
-        dissect_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_model);
+        dissect_tiff_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_model);
         break;
     case TIFF_TAG_STRIP_OFFSETS:
-        dissect_array_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_strip_offset);
+        dissect_tiff_array_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_strip_offset);
         break;
     case TIFF_TAG_ORIENTATION:
-        dissect_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_orientation);
+        dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_orientation);
         break;
     case TIFF_TAG_SAMPLES_PER_PIXEL:
-        dissect_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_samples_per_pixel);
+        dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_samples_per_pixel);
         break;
     case TIFF_TAG_ROWS_PER_STRIP:
-        dissect_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_rows_per_strip);
+        dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_rows_per_strip);
         break;
     case TIFF_TAG_STRIP_BYTE_COUNTS:
-        dissect_array_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_strip_byte_count);
+        dissect_tiff_array_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_strip_byte_count);
         break;
     case TIFF_TAG_X_RESOLUTION:
-        dissect_single_urational(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_x_res_numer, hf_tiff_x_res_denom, hf_tiff_x_res_approx);
+        dissect_tiff_single_urational(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_x_res_numer, hf_tiff_x_res_denom, hf_tiff_x_res_approx);
         break;
     case TIFF_TAG_Y_RESOLUTION:
-        dissect_single_urational(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_y_res_numer, hf_tiff_y_res_denom, hf_tiff_y_res_approx);
+        dissect_tiff_single_urational(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_y_res_numer, hf_tiff_y_res_denom, hf_tiff_y_res_approx);
         break;
     case TIFF_TAG_PLANAR_CONFIGURATION:
-        dissect_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_planar_configuration);
+        dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_planar_configuration);
         break;
     case TIFF_TAG_PAGE_NAME:
-        dissect_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_page_name);
+        dissect_tiff_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_page_name);
         break;
     case TIFF_TAG_GRAY_RESPONSE_UNIT:
-        dissect_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_gray_response_unit);
+        dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_gray_response_unit);
         break;
     case TIFF_TAG_T6_OPTIONS:
-        dissect_t6_options(tvb, pinfo, entry_tree, offset + 8, type, count, encoding);
+        dissect_tiff_t6_options(tvb, pinfo, entry_tree, offset + 8, type, count, encoding);
         break;
     case TIFF_TAG_RESOLUTION_UNIT:
-        dissect_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_resolution_unit);
+        dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_resolution_unit);
         break;
     case TIFF_TAG_SOFTWARE:
-        dissect_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_software);
+        dissect_tiff_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_software);
         break;
     case TIFF_TAG_DATE_TIME:
-        dissect_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_date_time);
+        dissect_tiff_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_date_time);
         break;
     case TIFF_TAG_ARTIST:
-        dissect_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_artist);
+        dissect_tiff_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_artist);
         break;
     case TIFF_TAG_HOST_COMPUTER:
-        dissect_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_host_computer);
+        dissect_tiff_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_host_computer);
         break;
     case TIFF_TAG_PREDICTOR:
-        dissect_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_predictor);
+        dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_predictor);
         break;
     case TIFF_TAG_TILE_WIDTH:
-        dissect_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_tile_width);
+        dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_tile_width);
         break;
     case TIFF_TAG_TILE_LENGTH:
-        dissect_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_tile_length);
+        dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_tile_length);
         break;
     case TIFF_TAG_INK_SET:
-        dissect_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_ink_set);
+        dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_ink_set);
         break;
     case TIFF_TAG_NUMBER_OF_INKS:
-        dissect_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_number_of_inks);
+        dissect_tiff_single_uint(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_number_of_inks);
         break;
     case TIFF_TAG_TARGET_PRINTER:
-        dissect_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_target_printer);
+        dissect_tiff_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_target_printer);
         break;
     case TIFF_TAG_COPYRIGHT:
-        dissect_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_copyright);
+        dissect_tiff_single_string(tvb, pinfo, entry_tree, offset + 8, type, count, encoding, hf_tiff_copyright);
         break;
     default:
-        dissect_tag_unknown(tvb, pinfo, entry_tree, offset + 8, type, count, encoding);
+        dissect_tiff_tag_unknown(tvb, pinfo, entry_tree, offset + 8, type, count, encoding);
     }
 }
 
@@ -843,7 +843,7 @@ proto_register_tiff(void)
     static hf_register_info hf[] = {
         { &hf_tiff_header_endianness,
             { "Endianness", "tiff.endianness",
-            FT_UINT16, BASE_HEX, VALS(endianness_names),
+            FT_UINT16, BASE_HEX, VALS(tiff_endianness_names),
             0x0, NULL, HFILL }
         },
         { &hf_tiff_header_magic,
@@ -868,12 +868,12 @@ proto_register_tiff(void)
         },
         { &hf_tiff_entry_tag,
             { "Tag", "tiff.tag",
-            FT_UINT16, BASE_DEC, VALS(tag_names),
+            FT_UINT16, BASE_DEC, VALS(tiff_tag_names),
             0x0, NULL, HFILL }
         },
         { &hf_tiff_entry_type,
             { "Type", "tiff.type",
-            FT_UINT16, BASE_DEC, VALS(type_names),
+            FT_UINT16, BASE_DEC, VALS(tiff_type_names),
             0x0, NULL, HFILL }
         },
         { &hf_tiff_entry_count,
@@ -908,17 +908,17 @@ proto_register_tiff(void)
         },
         { &hf_tiff_compression,
             { "Compression", "tiff.compression",
-            FT_UINT16, BASE_DEC, VALS(compression_names),
+            FT_UINT16, BASE_DEC, VALS(tiff_compression_names),
             0x0, NULL, HFILL }
         },
         { &hf_tiff_photometric_interp,
             { "Photometric Interpretation", "tiff.photometric_interp",
-            FT_UINT16, BASE_DEC, VALS(photometric_interp_names),
+            FT_UINT16, BASE_DEC, VALS(tiff_photometric_interp_names),
             0x0, NULL, HFILL }
         },
         { &hf_tiff_threshholding,
             { "Threshholding", "tiff.threshholding",
-            FT_UINT16, BASE_DEC, VALS(threshholding_names),
+            FT_UINT16, BASE_DEC, VALS(tiff_threshholding_names),
             0x0, NULL, HFILL }
         },
         { &hf_tiff_cell_width,
@@ -933,7 +933,7 @@ proto_register_tiff(void)
         },
         { &hf_tiff_fill_order,
             { "Fill Order", "tiff.fill_order",
-            FT_UINT16, BASE_DEC, VALS(fill_order_names),
+            FT_UINT16, BASE_DEC, VALS(tiff_fill_order_names),
             0x0, NULL, HFILL }
         },
         { &hf_tiff_document_name,
@@ -963,7 +963,7 @@ proto_register_tiff(void)
         },
         { &hf_tiff_orientation,
             { "Orientation", "tiff.orientation",
-            FT_UINT16, BASE_DEC, VALS(orientation_names),
+            FT_UINT16, BASE_DEC, VALS(tiff_orientation_names),
             0x0, NULL, HFILL }
         },
         { &hf_tiff_samples_per_pixel,
@@ -1013,7 +1013,7 @@ proto_register_tiff(void)
         },
         { &hf_tiff_planar_configuration,
             { "Planar Configuration", "tiff.planar_configuration",
-            FT_UINT16, BASE_DEC, VALS(planar_configuration_names),
+            FT_UINT16, BASE_DEC, VALS(tiff_planar_configuration_names),
             0x0, NULL, HFILL }
         },
         { &hf_tiff_page_name,
@@ -1023,7 +1023,7 @@ proto_register_tiff(void)
         },
         { &hf_tiff_gray_response_unit,
             { "Gray Response Unit", "tiff.gray_response_unit",
-            FT_UINT16, BASE_DEC, VALS(gray_response_unit_names),
+            FT_UINT16, BASE_DEC, VALS(tiff_gray_response_unit_names),
             0x0, NULL, HFILL }
         },
         { &hf_tiff_t6_options,
@@ -1038,12 +1038,12 @@ proto_register_tiff(void)
         },
         { &hf_tiff_t6_allow_uncompresed,
             { "Allow Uncompressed", "tiff.t6.allow_uncompressed",
-            FT_UINT32, BASE_HEX, VALS(allow_uncompressed_names),
+            FT_UINT32, BASE_HEX, VALS(tiff_allow_uncompressed_names),
             0x00000002, NULL, HFILL }
         },
         { &hf_tiff_resolution_unit,
             { "Resolution Unit", "tiff.resolution_unit",
-            FT_UINT16, BASE_DEC, VALS(resolution_unit_names),
+            FT_UINT16, BASE_DEC, VALS(tiff_resolution_unit_names),
             0x0, NULL, HFILL }
         },
         { &hf_tiff_software,
@@ -1068,7 +1068,7 @@ proto_register_tiff(void)
         },
         { &hf_tiff_predictor,
             { "Predictor", "tiff.predictor",
-            FT_UINT16, BASE_DEC, VALS(predictor_names),
+            FT_UINT16, BASE_DEC, VALS(tiff_predictor_names),
             0x0, NULL, HFILL }
         },
         { &hf_tiff_tile_width,
@@ -1083,7 +1083,7 @@ proto_register_tiff(void)
         },
         { &hf_tiff_ink_set,
             { "Ink Set", "tiff.ink_set",
-            FT_UINT16, BASE_DEC, VALS(ink_set_names),
+            FT_UINT16, BASE_DEC, VALS(tiff_ink_set_names),
             0x0, NULL, HFILL }
         },
         { &hf_tiff_number_of_inks,
