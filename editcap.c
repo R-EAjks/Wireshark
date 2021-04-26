@@ -79,6 +79,7 @@
 #include <wsutil/report_message.h>
 #include <wsutil/strnatcmp.h>
 #include <wsutil/str_util.h>
+#include <wsutil/wstlv.h>
 #include <cli_main.h>
 #include <version_info.h>
 #include <wsutil/pint.h>
@@ -2178,13 +2179,13 @@ main(int argc, char *argv[])
                     /* Copy and change rather than modify returned rec */
                     temp_rec = *rec;
                     /* The comment is not modified by dumper, cast away. */
-                    temp_rec.opt_comment = (char *)comment;
-                    temp_rec.has_comment_changed = TRUE;
+                    wstlv_add(&temp_rec.options_list, OPT_COMMENT, strlen(comment), comment);
+                    temp_rec.have_options_changed = TRUE;
                     rec = &temp_rec;
                 } else {
                     /* Copy and change rather than modify returned rec */
                     temp_rec = *rec;
-                    temp_rec.has_comment_changed = FALSE;
+                    temp_rec.have_options_changed = FALSE;
                     rec = &temp_rec;
                 }
             }

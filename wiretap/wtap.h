@@ -14,6 +14,7 @@
 #include <wsutil/buffer.h>
 #include <wsutil/nstime.h>
 #include <wsutil/inet_addr.h>
+#include <wsutil/wstlv.h>
 #include "wtap_opttypes.h"
 #include "ws_symbol_export.h"
 #include "ws_attributes.h"
@@ -1334,11 +1335,8 @@ typedef struct {
         wtap_syscall_header syscall_header;
         wtap_systemd_journal_header systemd_journal_header;
     } rec_header;
-    /*
-     * XXX - this should become a full set of options.
-     */
-    gchar     *opt_comment;     /* NULL if not available */
-    gboolean  has_comment_changed; /* TRUE if the comment has been changed. Currently only valid while dumping. */
+    wstlv_list options_list;       /* NULL if not available */
+    gboolean  have_options_changed; /* TRUE if the comment has been changed. Currently only valid while dumping. */
     GPtrArray *packet_verdict;     /* packet verdicts. It would have made more
                                       sense to put this in packet_header above
                                       but due to the way the current code is

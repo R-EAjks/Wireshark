@@ -21,6 +21,7 @@
 #include <wsutil/file_util.h>
 #include <wsutil/filesystem.h>
 #include <wsutil/json_dumper.h>
+#include <wsutil/wstlv.h>
 #include <version_info.h>
 
 #include <wiretap/merge.h>
@@ -249,7 +250,7 @@ ws_epan_new(capture_file *cf)
     ws_get_frame_ts,
     cap_file_provider_get_interface_name,
     cap_file_provider_get_interface_description,
-    cap_file_provider_get_user_comment
+    cap_file_provider_get_user_options
   };
 
   return epan_new(&cf->provider, &funcs);
@@ -299,7 +300,7 @@ cf_open(capture_file *cf, const char *fname, unsigned int type, gboolean is_temp
   cf->open_type   = type;
   cf->linktypes = g_array_sized_new(FALSE, FALSE, (guint) sizeof(int), 1);
   cf->count     = 0;
-  cf->packet_comment_count = 0;
+  cf->packet_option_count = 0;
   cf->displayed_count = 0;
   cf->marked_count = 0;
   cf->ignored_count = 0;
@@ -404,9 +405,9 @@ cf_close(capture_file *cf)
     free_frame_data_sequence(cf->provider.frames);
     cf->provider.frames = NULL;
   }
-  if (cf->provider.frames_user_comments) {
-    g_tree_destroy(cf->provider.frames_user_comments);
-    cf->provider.frames_user_comments = NULL;
+  if (cf->provider.frames_user_options) {
+    g_tree_destroy(cf->provider.frames_user_options);
+    cf->provider.frames_user_options = NULL;
   }
   cf_unselect_packet(cf);   /* nothing to select */
   cf->first_displayed = 0;
@@ -1287,8 +1288,7 @@ read_record(capture_file *cf, wtap_rec *rec, Buffer *buf, dfilter_t *dfcode,
     fdata = frame_data_sequence_add(cf->provider.frames, &fdlocal);
 
     cf->count++;
-    if (rec->opt_comment != NULL)
-      cf->packet_comment_count++;
+    cf->packet_option_count += wstlv_count(&rec->options_list);
     cf->f_datalen = offset + fdlocal.cap_len;
 
     /* When a redissection is in progress (or queued), do not process packets.
@@ -4001,19 +4001,18 @@ cf_update_section_comment(capture_file *cf, gchar *comment)
  * If the comment has been edited, it returns the result of the edit,
  * otherwise it returns the comment from the file.
  */
-char *
-cf_get_packet_comment(capture_file *cf, const frame_data *fd)
+wstlv_list
+cf_get_packet_options(capture_file *cf, const frame_data *fd)
 {
-  char *comment;
+  /* fetch user options */
+  if (fd->has_user_options)
+    return cap_file_provider_get_user_options(&cf->provider, fd);
 
-  /* fetch user comment */
-  if (fd->has_user_comment)
-    return g_strdup(cap_file_provider_get_user_comment(&cf->provider, fd));
-
-  /* fetch phdr comment */
-  if (fd->has_phdr_comment) {
+  /* fetch phdr options */
+  if (fd->has_phdr_options) {
     wtap_rec rec; /* Record metadata */
     Buffer buf;   /* Record data */
+    wstlv_list options = WSTLV_INIT;
 
     wtap_rec_init(&rec);
     ws_buffer_init(&buf, 1514);
@@ -4021,39 +4020,36 @@ cf_get_packet_comment(capture_file *cf, const frame_data *fd)
     if (!cf_read_record(cf, fd, &rec, &buf))
       { /* XXX, what we can do here? */ }
 
-    /* rec.opt_comment is owned by the record, copy it before it is gone. */
-    comment = g_strdup(rec.opt_comment);
+    /* rec.options_list is owned by the record, steal it before it is gone. */
+    options = rec.options_list;
+    rec.options_list = WSTLV_INIT;
     wtap_rec_cleanup(&rec);
     ws_buffer_free(&buf);
-    return comment;
+    return options;
   }
   return NULL;
 }
 
 /*
- * Update(replace) the comment on a capture from a frame
+ * Update(replace) the options on a capture from a frame
  */
 gboolean
-cf_set_user_packet_comment(capture_file *cf, frame_data *fd, const gchar *new_comment)
+cf_set_user_packet_options(capture_file *cf, frame_data *fd, const wstlv_list new_options)
 {
-  char *pkt_comment = cf_get_packet_comment(cf, fd);
+  wstlv_list pkt_options = cf_get_packet_options(cf, fd);
 
-  /* Check if the comment has changed */
-  if (!g_strcmp0(pkt_comment, new_comment)) {
-    g_free(pkt_comment);
+  /* Check if the options have changed */
+  if (!wstlv_list_compare(pkt_options, new_options)) {
     return FALSE;
   }
-  g_free(pkt_comment);
+  cf->packet_option_count -= wstlv_count(&pkt_options);
+  wstlv_clear(&pkt_options);
 
-  if (pkt_comment)
-    cf->packet_comment_count--;
+  cf->packet_option_count += wstlv_count(&new_options);
 
-  if (new_comment)
-    cf->packet_comment_count++;
+  cap_file_provider_set_user_options(&cf->provider, fd, new_options);
 
-  cap_file_provider_set_user_comment(&cf->provider, fd, new_comment);
-
-  expert_update_comment_count(cf->packet_comment_count);
+  expert_update_comment_count(cf->packet_option_count);
 
   /* OK, we have unsaved changes. */
   cf->unsaved_changes = TRUE;
@@ -4089,7 +4085,7 @@ cf_comment_types(capture_file *cf)
       break;
     }
   }
-  if (cf->packet_comment_count != 0)
+  if (cf->packet_option_count != 0)
     comment_types |= WTAP_COMMENT_PER_PACKET;
   return comment_types;
 }
@@ -4133,19 +4129,19 @@ save_record(capture_file *cf, frame_data *fdata, wtap_rec *rec,
   wtap_rec      new_rec;
   int           err;
   gchar        *err_info;
-  const char   *pkt_comment;
+  wstlv_list    pkt_options = WSTLV_INIT;
 
   /* Copy the record information from what was read in from the file. */
   new_rec = *rec;
 
   /* Make changes based on anything that the user has done but that
      hasn't been saved yet. */
-  if (fdata->has_user_comment)
-    pkt_comment = cap_file_provider_get_user_comment(&cf->provider, fdata);
+  if (fdata->has_user_options)
+    pkt_options = cap_file_provider_get_user_options(&cf->provider, fdata);
   else
-    pkt_comment = rec->opt_comment;
-  new_rec.opt_comment  = g_strdup(pkt_comment);
-  new_rec.has_comment_changed = fdata->has_user_comment ? TRUE : FALSE;
+    pkt_options = rec->options_list;
+  new_rec.options_list  = pkt_options;
+  new_rec.have_options_changed = fdata->has_user_options ? TRUE : FALSE;
   /* XXX - what if times have been shifted? */
 
   /* and save the packet */
@@ -4155,7 +4151,6 @@ save_record(capture_file *cf, frame_data *fdata, wtap_rec *rec,
     return FALSE;
   }
 
-  g_free(new_rec.opt_comment);
   return TRUE;
 }
 
@@ -4762,16 +4757,16 @@ cf_save_records(capture_file *cf, const char *fname, guint save_format,
       for (framenum = 1; framenum <= cf->count; framenum++) {
         fdata = frame_data_sequence_find(cf->provider.frames, framenum);
 
-        fdata->has_phdr_comment = FALSE;
-        fdata->has_user_comment = FALSE;
+        fdata->has_phdr_options = FALSE;
+        fdata->has_user_options = FALSE;
       }
 
-      if (cf->provider.frames_user_comments) {
-        g_tree_destroy(cf->provider.frames_user_comments);
-        cf->provider.frames_user_comments = NULL;
+      if (cf->provider.frames_user_options) {
+        g_tree_destroy(cf->provider.frames_user_options);
+        cf->provider.frames_user_options = NULL;
       }
 
-      cf->packet_comment_count = 0;
+      cf->packet_option_count = 0;
     }
   }
   return CF_WRITE_OK;

@@ -31,6 +31,7 @@
 #include <wsutil/crc32.h>
 #include <wsutil/strtoi.h>
 #include <wsutil/glib-compat.h>
+#include <wsutil/wstlv.h>
 
 #include "wtap-int.h"
 #include "file_wrappers.h"
@@ -1636,8 +1637,15 @@ static gboolean erf_write_anchor_meta_update_phdr(wtap_dumper *wdh, erf_dump_t *
   }
 
   /* Generate the metadata payload with the packet comment */
+  /* XXX - can ERF have more than one comment? */
   sections = g_ptr_array_new_with_free_func(erf_meta_section_free);
-  erf_comment_to_sections(wdh, ERF_META_SECTION_INFO, 0x8000 /*local to record*/, rec->opt_comment, sections);
+  if (wstlv_count(&rec->options_list) > 0) {
+    wstlv_item_t *item = wstlv_index((wstlv_list *)&rec->options_list, 0);
+    erf_comment_to_sections(wdh, ERF_META_SECTION_INFO, 0x8000 /*local to record*/, item->data, sections);
+  }
+  else {
+    erf_comment_to_sections(wdh, ERF_META_SECTION_INFO, 0x8000 /*local to record*/, NULL, sections);
+  }
 
   /* Write the metadata record, but not the packet record as what we do depends
    * on the WTAP_ENCAP */
@@ -1965,11 +1973,11 @@ static gboolean erf_dump(
    * construct a new header with additional Host ID and Anchor ID
    * and insert a metadata record before that frame */
   /*XXX: The user may have changed the comment to cleared! */
-  if(rec->opt_comment || rec->has_comment_changed) {
+  if(rec->options_list || rec->have_options_changed) {
     if (encap == WTAP_ENCAP_ERF) {
       /* XXX: What about ERF-in-pcapng with existing comment (that wasn't
        * modified)? */
-      if(rec->has_comment_changed) {
+      if(rec->have_options_changed) {
         memmove(&other_phdr, pseudo_header, sizeof(union wtap_pseudo_header));
         if(!erf_write_anchor_meta_update_phdr(wdh, dump_priv, rec, &other_phdr, err)) return FALSE;
         pseudo_header = &other_phdr;
@@ -2239,16 +2247,14 @@ static int erf_update_anchors_from_header(erf_t *erf_priv, wtap_rec *rec, union 
   if (comment) {
     /* Will be freed by either wtap_sequential_close (for rec = &wth->rec) or by
      * the caller of wtap_seek_read. See wtap_rec_cleanup. */
-    g_free(rec->opt_comment);
-    rec->opt_comment = g_strdup(comment);
     rec->presence_flags |= WTAP_HAS_COMMENTS;
+    wstlv_add(&rec->options_list, OPT_COMMENT, strlen(comment), comment);
   } else {
     /* WTAP_HAS_COMMENT has no visible effect?
      * Need to set opt_comment to NULL to prevent other packets
      * from displaying the same comment
      */
-    g_free(rec->opt_comment);
-    rec->opt_comment = NULL;
+    wstlv_clear(&rec->options_list);
   }
 
   return 0;

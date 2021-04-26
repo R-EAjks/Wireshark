@@ -15,6 +15,7 @@
 #include "config.h"
 
 #include <epan/wmem/wmem.h>
+#include <wsutil/wstlv.h>
 
 /* WSLUA_MODULE Dumper Saving Capture Files
 
@@ -384,8 +385,8 @@ WSLUA_METHOD Dumper_dump(lua_State* L) {
         rec.rec_header.packet_header.pseudo_header = *ph->wph;
     }
 
-    /* TODO: Can we get access to pinfo->pkt_comment here somehow? We
-     * should be copying it to pkthdr.opt_comment if we can. */
+    /* TODO: Can we get access to pinfo->pkt_options here somehow? We
+     * should be copying it to pkthdr.options_list if we can. */
 
     if (! wtap_dump(d, &rec, ba->data, &err, &err_info)) {
         switch (err) {
@@ -539,15 +540,15 @@ WSLUA_METHOD Dumper_dump_current(lua_State* L) {
     rec.rec_header.packet_header.pseudo_header = *lua_pinfo->pseudo_header;
 
     /*
-     * wtap_dump does not modify rec.opt_comment, so it should be possible to
-     * pass epan_get_user_comment() or lua_pinfo->rec->opt_comment directly.
+     * wtap_dump does not modify rec.options_list, so it should be possible to
+     * pass epan_get_user_options() or lua_pinfo->rec->options_list directly.
      * Temporarily duplicating the memory should not hurt though.
      */
-    if (lua_pinfo->fd->has_user_comment) {
-        rec.opt_comment = wmem_strdup(wmem_packet_scope(), epan_get_user_comment(lua_pinfo->epan, lua_pinfo->fd));
-        rec.has_comment_changed = TRUE;
-    } else if (lua_pinfo->fd->has_phdr_comment) {
-        rec.opt_comment = wmem_strdup(wmem_packet_scope(), lua_pinfo->rec->opt_comment);
+    if (lua_pinfo->fd->has_user_options) {
+        wstlv_clone(&rec.options_list, epan_get_user_options(lua_pinfo->epan, lua_pinfo->fd));
+        rec.have_options_changed = TRUE;
+    } else if (lua_pinfo->fd->has_phdr_options) {
+        wstlv_clone(&rec.options_list, lua_pinfo->rec->options_list);
     }
 
     data = (const guchar *)tvb_memdup(wmem_packet_scope(),tvb,0,rec.rec_header.packet_header.caplen);
@@ -567,6 +568,7 @@ WSLUA_METHOD Dumper_dump_current(lua_State* L) {
             break;
         }
     }
+    wstlv_clear(&rec.options_list);
 
     return 0;
 }

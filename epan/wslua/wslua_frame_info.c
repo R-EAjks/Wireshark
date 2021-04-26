@@ -55,8 +55,8 @@ WSLUA_METAMETHOD FrameInfo__tostring(lua_State* L) {
         lua_pushstring(L,"FrameInfo pointer is NULL!");
     } else {
         if (fi->rec)
-            lua_pushfstring(L, "FrameInfo: rec_type=%u, presence_flags=%d, caplen=%d, len=%d, pkt_encap=%d, opt_comment='%s'",
-                fi->rec->rec_type, fi->rec->presence_flags, fi->rec->rec_header.packet_header.caplen, fi->rec->rec_header.packet_header.len, fi->rec->rec_header.packet_header.pkt_encap, fi->rec->opt_comment);
+            lua_pushfstring(L, "FrameInfo: rec_type=%u, presence_flags=%d, caplen=%d, len=%d, pkt_encap=%d, #options=%d",
+                fi->rec->rec_type, fi->rec->presence_flags, fi->rec->rec_header.packet_header.caplen, fi->rec->rec_header.packet_header.len, wstlv_count(&fi->rec->options_list));
         else
             lua_pushstring(L, "FrameInfo rec pointer is NULL!");
     }
@@ -210,8 +210,8 @@ WSLUA_ATTRIBUTE_NAMED_NUMBER_SETTER(FrameInfo,encap,rec->rec_header.packet_heade
 // rec->opt_comment will be freed by wtap_sequential_close -> wtap_rec_cleanup.
 /* WSLUA_ATTRIBUTE FrameInfo_comment RW A string comment for the packet, if the
     `wtap_presence_flags.COMMENTS` was set in the presence flags; nil if there is no comment. */
-WSLUA_ATTRIBUTE_NAMED_STRING_GETTER(FrameInfo,comment,rec->opt_comment);
-WSLUA_ATTRIBUTE_NAMED_STRING_SETTER(FrameInfo,comment,rec->opt_comment,TRUE);
+//XXX WSLUA_ATTRIBUTE_NAMED_STRING_GETTER(FrameInfo,comment,rec->opt_comment);
+//XXX WSLUA_ATTRIBUTE_NAMED_STRING_SETTER(FrameInfo,comment,rec->opt_comment,TRUE);
 
 /* This table is ultimately registered as a sub-table of the class' metatable,
  * and if __index/__newindex is invoked then it calls the appropriate function
@@ -222,7 +222,7 @@ WSLUA_ATTRIBUTES FrameInfo_attributes[] = {
     WSLUA_ATTRIBUTE_RWREG(FrameInfo,flags),
     WSLUA_ATTRIBUTE_RWREG(FrameInfo,captured_length),
     WSLUA_ATTRIBUTE_RWREG(FrameInfo,original_length),
-    WSLUA_ATTRIBUTE_RWREG(FrameInfo,comment),
+    //WSLUA_ATTRIBUTE_RWREG(FrameInfo,comment),
     WSLUA_ATTRIBUTE_RWREG(FrameInfo,encap),
     WSLUA_ATTRIBUTE_RWREG(FrameInfo,time),
     WSLUA_ATTRIBUTE_RWREG(FrameInfo,data),
@@ -269,8 +269,8 @@ WSLUA_METAMETHOD FrameInfoConst__tostring(lua_State* L) {
         lua_pushstring(L,"FrameInfo pointer is NULL!");
     } else {
         if (fi->rec && !fi->expired)
-            lua_pushfstring(L, "FrameInfo: rec_type=%u, presence_flags=%d, caplen=%d, len=%d, pkt_encap=%d, opt_comment='%s'",
-                fi->rec->rec_type, fi->rec->presence_flags, fi->rec->rec_header.packet_header.caplen, fi->rec->rec_header.packet_header.len, fi->rec->rec_header.packet_header.pkt_encap, fi->rec->opt_comment);
+            lua_pushfstring(L, "FrameInfo: rec_type=%u, presence_flags=%d, caplen=%d, len=%d, pkt_encap=%d, #options=%d",
+                fi->rec->rec_type, fi->rec->presence_flags, fi->rec->rec_header.packet_header.caplen, fi->rec->rec_header.packet_header.len, fi->rec->rec_header.packet_header.pkt_encap, wstlv_count(&fi->rec->options_list));
         else
             lua_pushfstring(L, "FrameInfo has %s", fi->rec?"expired":"null rec pointer");
     }
@@ -359,7 +359,7 @@ WSLUA_ATTRIBUTE_NAMED_NUMBER_GETTER(FrameInfoConst,original_length,rec->rec_head
 WSLUA_ATTRIBUTE_NAMED_NUMBER_GETTER(FrameInfoConst,encap,rec->rec_header.packet_header.pkt_encap);
 
 /* WSLUA_ATTRIBUTE FrameInfoConst_comment RO A comment for the packet; nil if there is none. */
-WSLUA_ATTRIBUTE_NAMED_STRING_GETTER(FrameInfoConst,comment,rec->opt_comment);
+//XXX WSLUA_ATTRIBUTE_NAMED_STRING_GETTER(FrameInfoConst,comment,rec->opt_comment);
 
 WSLUA_ATTRIBUTES FrameInfoConst_attributes[] = {
     WSLUA_ATTRIBUTE_ROREG(FrameInfoConst,rec_type),
@@ -367,7 +367,7 @@ WSLUA_ATTRIBUTES FrameInfoConst_attributes[] = {
     WSLUA_ATTRIBUTE_ROREG(FrameInfoConst,captured_length),
     WSLUA_ATTRIBUTE_ROREG(FrameInfoConst,original_length),
     WSLUA_ATTRIBUTE_ROREG(FrameInfoConst,encap),
-    WSLUA_ATTRIBUTE_ROREG(FrameInfoConst,comment),
+    //WSLUA_ATTRIBUTE_ROREG(FrameInfoConst,comment),
     WSLUA_ATTRIBUTE_ROREG(FrameInfoConst,time),
     WSLUA_ATTRIBUTE_ROREG(FrameInfoConst,data),
     { NULL, NULL, NULL }

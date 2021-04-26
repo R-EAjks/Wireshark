@@ -1656,14 +1656,13 @@ void
 wtap_rec_init(wtap_rec *rec)
 {
 	memset(rec, 0, sizeof *rec);
-	ws_buffer_init(&rec->options_buf, 0);
 }
 
 void
 wtap_rec_cleanup(wtap_rec *rec)
 {
-	g_free(rec->opt_comment);
-	rec->opt_comment = NULL;
+	wstlv_clear(&rec->options_list);
+	rec->have_options_changed = FALSE;
 	ws_buffer_free(&rec->options_buf);
 	if (rec->packet_verdict != NULL) {
 		g_ptr_array_free(rec->packet_verdict, TRUE);

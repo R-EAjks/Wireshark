@@ -17,6 +17,7 @@
 #include <epan/epan.h>
 #include <epan/print.h>
 #include <ui/packet_range.h>
+#include <wsutil/wstlv.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -697,7 +698,7 @@ void cf_update_section_comment(capture_file *cf, gchar *comment);
  * @param fd the frame_data structure for the frame
  * @returns A comment (use g_free to free) or NULL if there is none.
  */
-char *cf_get_packet_comment(capture_file *cf, const frame_data *fd);
+wstlv_list cf_get_packet_options(capture_file *cf, const frame_data *fd);
 
 /**
  * Update(replace) the comment on a capture from a frame
@@ -706,7 +707,7 @@ char *cf_get_packet_comment(capture_file *cf, const frame_data *fd);
  * @param fd the frame_data structure for the frame
  * @param new_comment the string replacing the old comment
  */
-gboolean cf_set_user_packet_comment(capture_file *cf, frame_data *fd, const gchar *new_comment);
+gboolean cf_set_user_packet_options(capture_file *cf, frame_data *fd, const wstlv_list new_options);
 
 /**
  * What types of comments does this file have?

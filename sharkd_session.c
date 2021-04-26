@@ -20,6 +20,7 @@
 #include <glib.h>
 
 #include <wsutil/wsjson.h>
+#include <wsutil/wstlv.h>
 #include <wsutil/json_dumper.h>
 
 #include <file.h>
@@ -907,9 +908,9 @@ sharkd_session_process_frames(const char *buf, const jsmntok_t *tokens, int coun
 
 		sharkd_json_value_anyf("num", "%u", framenum);
 
-		if (fdata->has_user_comment || fdata->has_phdr_comment)
+		if (fdata->has_user_options || fdata->has_phdr_options)
 		{
-			if (!fdata->has_user_comment || sharkd_get_user_comment(fdata) != NULL)
+			if (!fdata->has_user_options || sharkd_get_user_options(fdata) != NULL)
 				sharkd_json_value_anyf("ct", "true");
 		}
 
@@ -2772,7 +2773,7 @@ sharkd_session_process_frame_cb(epan_dissect_t *edt, proto_tree *tree, struct ep
 {
 	packet_info *pi = &edt->pi;
 	frame_data *fdata = pi->fd;
-	const char *pkt_comment = NULL;
+	wstlv_list pkt_options = WSTLV_INIT;
 
 	const struct sharkd_frame_request_data * const req_data = (const struct sharkd_frame_request_data * const) data;
 	const gboolean display_hidden = (req_data) ? req_data->display_hidden : FALSE;
@@ -2781,13 +2782,16 @@ sharkd_session_process_frame_cb(epan_dissect_t *edt, proto_tree *tree, struct ep
 
 	sharkd_json_value_anyf("err", "0");
 
-	if (fdata->has_user_comment)
-		pkt_comment = sharkd_get_user_comment(fdata);
-	else if (fdata->has_phdr_comment)
-		pkt_comment = pi->rec->opt_comment;
+	if (fdata->has_user_options)
+		pkt_options = sharkd_get_user_options(fdata);
+	else if (fdata->has_phdr_options)
+		pkt_options = pi->rec->options_list;
 
-	if (pkt_comment)
-		sharkd_json_value_string("comment", pkt_comment);
+	if (wstlv_count(&pkt_options) > 0) {
+		// XXX I don't know enough about sharkd to know if it could handle multiple comments
+		wstlv_item_t *item = wstlv_index(&pkt_options, 0);
+		sharkd_json_value_string("comment", item->data);
+	}
 
 	if (tree)
 	{
@@ -3576,6 +3580,7 @@ sharkd_session_process_setcomment(char *buf, const jsmntok_t *tokens, int count)
 	const char *tok_frame   = json_find_attr(buf, tokens, count, "frame");
 	const char *tok_comment = json_find_attr(buf, tokens, count, "comment");
 
+	wstlv_list pkt_options = WSTLV_INIT;
 	guint32 framenum;
 	frame_data *fdata;
 	int ret;
@@ -3587,7 +3592,9 @@ sharkd_session_process_setcomment(char *buf, const jsmntok_t *tokens, int count)
 	if (!fdata)
 		return;
 
-	ret = sharkd_set_user_comment(fdata, tok_comment);
+	wstlv_add(&pkt_options, OPT_COMMENT, strlen(tok_comment), (gpointer) tok_comment);
+
+	ret = sharkd_set_user_options(fdata, pkt_options);
 
 	sharkd_json_simple_reply(ret, NULL);
 }

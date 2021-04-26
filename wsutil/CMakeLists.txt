@@ -72,6 +72,7 @@ set(WSUTIL_PUBLIC_HEADERS
 	ws_pipe.h
 	ws_printf.h
 	wsjson.h
+	wstlv.h
 	xtea.h
 )
 
@@ -124,6 +125,7 @@ set(WSUTIL_COMMON_FILES
 	ws_pipe.c
 	wsgcrypt.c
 	wsjson.c
+	wstlv.c
 	xtea.c
 )
 

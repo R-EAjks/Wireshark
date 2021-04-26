@@ -23,6 +23,7 @@
 #include "unit_strings.h"
 #include "ws_symbol_export.h"
 #include "wsutil/glib-compat.h"
+#include "wsutil/wstlv.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -747,7 +748,7 @@ WS_DLL_PUBLIC void mark_frame_as_depended_upon(packet_info *pinfo, guint32 frame
 typedef struct frame_data_s
 {
     int file_type_subtype;
-    const gchar  *pkt_comment; /**< NULL if not available */
+    wstlv_list pkt_options; /**< NULL if not available */
     struct epan_dissect *color_edt; /** Used strictly for "coloring rules" */
 
 } frame_data_t;
@@ -755,7 +756,7 @@ typedef struct frame_data_s
 /* Structure passed to the file dissector */
 typedef struct file_data_s
 {
-    const gchar  *pkt_comment; /**< NULL if not available */
+    wstlv_list pkt_options; /**< NULL if not available */
     struct epan_dissect *color_edt; /** Used strictly for "coloring rules" */
 
 } file_data_t;

@@ -258,8 +258,7 @@ wslua_filehandler_read(wtap *wth, wtap_rec *rec, Buffer *buf,
         *err = errno = 0;
     }
 
-    g_free(rec->opt_comment);
-    rec->opt_comment = NULL;
+    wstlv_clear(&rec->options_list);   /* Free memory from an earlier read. */
 
     fp = push_File(L, wth->fh);
     fc = push_CaptureInfo(L, wth, FALSE);
@@ -316,8 +315,7 @@ wslua_filehandler_seek_read(wtap *wth, gint64 seek_off,
         *err = errno = 0;
     }
 
-    g_free(rec->opt_comment);
-    rec->opt_comment = NULL;
+    wstlv_clear(&rec->options_list);   /* Free memory from an earlier read. */
 
     fp = push_File(L, wth->random_fh);
     fc = push_CaptureInfo(L, wth, FALSE);

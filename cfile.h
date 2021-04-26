@@ -17,6 +17,7 @@
 #include <epan/frame_data.h>
 #include <epan/frame_data_sequence.h>
 #include <wiretap/wtap.h>
+#include <wsutil/wstlv.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -59,7 +60,7 @@ struct packet_provider_data {
   frame_data  *prev_dis;
   frame_data  *prev_cap;
   frame_data_sequence *frames;       /* Sequence of frames, if we're keeping that information */
-  GTree       *frames_user_comments; /* BST with user comments for frames (key = frame_data) */
+  GTree       *frames_user_options;  /* BST with user options for frames (key = frame_data) */
 };
 
 typedef struct _capture_file {
@@ -78,7 +79,7 @@ typedef struct _capture_file {
   int                         lnk_t;                /* File link-layer type; could be WTAP_ENCAP_PER_PACKET */
   GArray                     *linktypes;            /* Array of packet link-layer types */
   guint32                     count;                /* Total number of frames */
-  guint64                     packet_comment_count; /* Number of comments in frames (could be >1 per frame... */
+  guint64                     packet_option_count;  /* Number of options in frames (could be >1 per frame... */
   guint32                     displayed_count;      /* Number of displayed frames */
   guint32                     marked_count;         /* Number of marked frames */
   guint32                     ignored_count;        /* Number of ignored frames */
@@ -131,8 +132,8 @@ extern void cap_file_init(capture_file *cf);
 
 const char *cap_file_provider_get_interface_name(struct packet_provider_data *prov, guint32 interface_id);
 const char *cap_file_provider_get_interface_description(struct packet_provider_data *prov, guint32 interface_id);
-const char *cap_file_provider_get_user_comment(struct packet_provider_data *prov, const frame_data *fd);
-void cap_file_provider_set_user_comment(struct packet_provider_data *prov, frame_data *fd, const char *new_comment);
+wstlv_list cap_file_provider_get_user_options(struct packet_provider_data *prov, const frame_data *fd);
+void cap_file_provider_set_user_options(struct packet_provider_data *prov, frame_data *fd, const wstlv_list new_options);
 
 #ifdef __cplusplus
 }

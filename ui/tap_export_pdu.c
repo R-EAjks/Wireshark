@@ -59,14 +59,14 @@ export_pdu_packet(void *tapdata, packet_info *pinfo, epan_dissect_t *edt, const 
 
     rec.rec_header.packet_header.pkt_encap = exp_pdu_tap_data->pkt_encap;
 
-    /* rec.opt_comment is not modified by wtap_dump, but if for some reason the
-     * epan_get_user_comment() or pinfo->rec->opt_comment are invalidated,
+    /* rec.options_list is not modified by wtap_dump, but if for some reason the
+     * epan_get_user_options() or pinfo->rec->options_list are invalidated,
      * copying it here does not hurt. (Can invalidation really happen?) */
-    if (pinfo->fd->has_user_comment) {
-        rec.opt_comment = g_strdup(epan_get_user_comment(edt->session, pinfo->fd));
-        rec.has_comment_changed = TRUE;
-    } else if (pinfo->fd->has_phdr_comment) {
-        rec.opt_comment = g_strdup(pinfo->rec->opt_comment);
+    if (pinfo->fd->has_user_options) {
+        wstlv_clone(&rec.options_list, epan_get_user_options(edt->session, pinfo->fd));
+        rec.have_options_changed = TRUE;
+    } else if (pinfo->fd->has_phdr_options) {
+        wstlv_clone(&rec.options_list, pinfo->rec->options_list);
     }
 
     /* XXX: should the rec.rec_header.packet_header.pseudo_header be set to the pinfo's pseudo-header? */
@@ -78,7 +78,7 @@ export_pdu_packet(void *tapdata, packet_info *pinfo, epan_dissect_t *edt, const 
     }
 
     g_free(packet_buf);
-    g_free(rec.opt_comment);
+    wstlv_destroy(&rec.options_list);
 
     return status;
 }
