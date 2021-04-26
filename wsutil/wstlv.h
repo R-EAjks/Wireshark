@@ -49,7 +49,7 @@ typedef struct wstlv_item_s {
  * @example
  *      guint n_items = wstlv_count(&mylist);
  */
-#define wstlv_count(list) ((list)==WSTLV_INIT ? (guint)0 : (*(list))->len)
+#define wstlv_count(list) (*(list)==WSTLV_INIT ? (guint)0 : (*(list))->len)
 
 /**
  * @brief Copy a data item into a TLV list, creating the list if necessary.
