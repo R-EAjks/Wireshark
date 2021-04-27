@@ -1038,9 +1038,7 @@ static int hf_rtps_udpv4_wan_locator_public_port                = -1;
 static int hf_rtps_udpv4_wan_binding_ping_port                  = -1;
 static int hf_rtps_udpv4_wan_binding_ping_flags                 = -1;
 static int hf_rtps_long_address                                 = -1;
-static int hf_rtps_param_group_coherent_set                     = -1;
-static int hf_rtps_param_end_group_coherent_set                 = -1;
-static int hf_rtps_param_mig_end_coherent_set_sample_count      = -1;
+static int hf_rtps_param_sm_sample_count                        = -1;
 
 /* Flag bits */
 static int hf_rtps_flag_reserved80                              = -1;
@@ -1637,7 +1635,7 @@ static const value_string parameter_id_v2_vals[] = {
   { PID_GROUP_COHERENT_SET,             "PID_GROUP_COHERENT_SET" },
   { PID_END_COHERENT_SET,               "PID_END_COHERENT_SET" },
   { PID_END_GROUP_COHERENT_SET,         "PID_END_GROUP_COHERENT_SET" },
-  { MIG_RTPS_PID_END_COHERENT_SET_SAMPLE_COUNT,  "MIG_RTPS_PID_END_COHERENT_SET_SAMPLE_COUNT" },
+  { MIG_RTPS_PID_END_COHERENT_SET_SAMPLE_COUNT,  "PID_END_COHERENT_SET_SAMPLE_COUNT" },
 
   /* The following PID are deprecated */
   { PID_DEADLINE_OFFERED,               "PID_DEADLINE_OFFERED [deprecated]" },
@@ -8010,16 +8008,8 @@ static gboolean dissect_parameter_sequence_v2(proto_tree *rtps_parameter_tree, p
     * +---------------+---------------+---------------+---------------+
     */
     case PID_GROUP_COHERENT_SET: {
-        guint64 hi = (guint64)tvb_get_guint32(tvb, offset, encoding);
-        guint64 lo = (guint64)tvb_get_guint32(tvb, offset + 4, encoding);
-        guint64 all = (hi << 32) | lo;
-
-        proto_tree_add_uint64(
-                rtps_parameter_tree,
-                hf_rtps_param_group_coherent_set,
-                tvb, offset,
-                sizeof(guint64),
-                all);
+        rtps_util_add_seq_number(rtps_parameter_tree, tvb, offset,
+            encoding, "sequenceNumber");
         break;
     }
     /* This parameter serializes a sequence number like the existing PID_COHERENT_SET
@@ -8035,16 +8025,8 @@ static gboolean dissect_parameter_sequence_v2(proto_tree *rtps_parameter_tree, p
      * +---------------+---------------+---------------+---------------+
      */
     case PID_END_GROUP_COHERENT_SET: {
-        guint64 hi = (guint64)tvb_get_guint32(tvb, offset, encoding);
-        guint64 lo = (guint64)tvb_get_guint32(tvb, offset + 4, encoding);
-        guint64 all = (hi << 32) | lo;
-
-        proto_tree_add_uint64(
-            rtps_parameter_tree,
-            hf_rtps_param_end_group_coherent_set,
-            tvb, offset,
-            sizeof(guint64),
-            all);
+        rtps_util_add_seq_number(rtps_parameter_tree, tvb, offset,
+            encoding, "sequenceNumber");
         break;
     }
     /* This parameter serializes a SN like the existing PID_COHERENT_SET and
@@ -8069,20 +8051,8 @@ static gboolean dissect_parameter_sequence_v2(proto_tree *rtps_parameter_tree, p
         coherent_set_entity_info *register_entry = NULL;
         coherent_set_info *coherent_set_info_entry;
 
-        coherent_seq_number = rtps_util_add_seq_number(
-                rtps_parameter_tree,
-                tvb,
-                offset,
-                encoding,
-                "coherenceSetSequenceNumber");
-        ti = proto_tree_add_uint64(
-                rtps_parameter_tree,
-                hf_rtps_coherent_set_end,
-                tvb,
-                0,
-                0,
-                coherent_seq_number);
-        proto_item_set_generated(ti);
+        coherent_seq_number = rtps_util_add_seq_number(rtps_parameter_tree, tvb, offset,
+            encoding, "sequenceNumber");
         /* Need to finish the stored coherence set */
         if (coherent_set_entity_info_object != NULL) {
             register_entry = (coherent_set_entity_info*)wmem_map_lookup(
@@ -8119,10 +8089,14 @@ static gboolean dissect_parameter_sequence_v2(proto_tree *rtps_parameter_tree, p
 
         proto_tree_add_uint(
             rtps_parameter_tree,
-            hf_rtps_param_mig_end_coherent_set_sample_count,
+            hf_rtps_param_sm_sample_count,
             tvb, offset,
             sizeof(guint32),
             sample_count);
+        /*
+        rtps_util_add_seq_number(rtps_parameter_tree, tvb, offset,
+            encoding, "sequenceNumber");
+        */
         break;
     }
     default:
@@ -14669,17 +14643,9 @@ void proto_register_rtps(void) {
     { &hf_rtps_long_address, {
         "Long address", "rtps.long_address", FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL }
     },
-    { &hf_rtps_param_group_coherent_set, {
-        "Group coherent set sequence number", "rtps.param.group_coherent_set",
-        FT_UINT64, BASE_DEC, NULL, 0, "Decimal value representing the value of PID_GROUP_COHERENT_SET parameter", HFILL }
-    },
-    { &hf_rtps_param_end_group_coherent_set, {
-        "End group coherent set sequence number", "rtps.param.end_group_coherent_set",
-        FT_UINT64, BASE_DEC, NULL, 0, "Decimal value representing the value of PID_END_GROUP_COHERENT_SET parameter", HFILL }
-    },
-    { &hf_rtps_param_mig_end_coherent_set_sample_count, {
-        "Ended coherent set sample count", "rtps.param.mig_end_coherent_set_sample_count",
-        FT_UINT32, BASE_DEC, NULL, 0, "Decimal value representing the value of MIG_RTPS_PID_END_COHERENT_SET_SAMPLE_COUNT parameter", HFILL }
+    { &hf_rtps_param_sm_sample_count, {
+        "sampleCount", "rtps.param.sample_count",
+        FT_UINT32, BASE_DEC, NULL, 0, "Decimal value representing the value of sampleCount parameter", HFILL }
     }
   };
 
