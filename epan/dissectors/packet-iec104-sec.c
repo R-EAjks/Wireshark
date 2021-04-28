@@ -30,7 +30,10 @@ void proto_reg_handoff_iec60870_104_sec(void);
 void proto_register_iec60870_104_sec(void);
 void proto_register_iec60870_asdu_sec(void);
 
+#if 0
 static dissector_handle_t tls_handle;
+#endif
+
 static dissector_handle_t iec60870_104_handle;
 static dissector_handle_t iec60870_apci_handle;
 static dissector_handle_t iec60870_asdu_handle;
@@ -96,8 +99,9 @@ typedef struct {
 	gboolean SE;      /* Select (1) / Execute (0) */
 } td_CmdInfo;
 
-#define IEC60870_104_SECURE_PORT 19998
-#define DEBUG_MODULE 1
+#define IEC60870_104_PORT_SEC 19998
+
+#define DEBUG_MODULE 0
 
 /* Protocol constants */
 #define APCI_START	0x68
@@ -1019,7 +1023,6 @@ static expert_field ei_iec104_apdu_invalid_len = EI_INIT;
 #define IEC101_SINGLE_CHAR    0xE5
 
 static gboolean use_tls = FALSE;
-static gboolean prefs_initialized = FALSE;
 
 /* Misc. functions for dissection of signal values */
 
@@ -1372,7 +1375,7 @@ static void get_BCR(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 }
 
 /******************************************************************************************************/
-/*    todo -- SEP = Single event of protection equipment                                               */
+/*    todo -- SEP = Single event of protection equipment                                              */
 /******************************************************************************************************/
 #if 0
 static void get_SEP(tvbuff_t *tvb _U_, guint8 *offset _U_, proto_tree *iec104_header_tree _U_)
@@ -1383,7 +1386,7 @@ static void get_SEP(tvbuff_t *tvb _U_, guint8 *offset _U_, proto_tree *iec104_he
 #endif
 
 /******************************************************************************************************/
-/*    QOS = Qualifier Of Set-point command                                                             */
+/*    QOS = Qualifier Of Set-point command                                                            */
 /******************************************************************************************************/
 static void get_QOS(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tree)
 {
@@ -2246,12 +2249,6 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 			asdu_secure.asn = asdu_secure.segmentation_control & F_ASN;
 			asdu_secure.fir = asdu_secure.segmentation_control & F_FIR;
 			asdu_secure.fin = asdu_secure.segmentation_control & F_FIN;
-
-#if 0
-			printf("asn=%d\n", asdu_secure.asn);
-			printf("fir=%d\n", asdu_secure.fir);
-			printf("fin=%d\n", asdu_secure.fin);
-#endif
 			
 			/* add to result_text Segmentation Control */
 			if (asduh.NumIx == 1) {
@@ -2287,11 +2284,6 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 			/* 'ASDU Details': ROOT ITEM */
 			proto_item_append_text(it104, ": %s '%s'", wmem_strbuf_get_str(result_text),
 					       Len >= offset ? val_to_str_const(asduh.TypeId, asdu_lngtypes, "<Unknown TypeId>") : "");
-#if 0
-			printf("Len = %d\n", Len);
-			printf("offset = %d\n", offset);
-			printf("parms->ioa_len = %d\n", parms->ioa_len);
-#endif
 			
 			break;
 			
@@ -3300,6 +3292,7 @@ proto_register_iec60870_104_sec(void)
 	/* 62351 Preference - Use TLS */
 	module_t *iec60870_104_module;
 	iec60870_104_module = prefs_register_protocol(proto_iec60870_104, proto_reg_handoff_iec60870_104_sec);
+
 	prefs_register_bool_preference(iec60870_104_module, "use_tls",
 				       "Use TLS (Transport Layer Security)",
 				       "Use TLS (Transport Layer Security)",
@@ -3312,34 +3305,48 @@ proto_register_iec60870_104_sec(void)
 void
 proto_reg_handoff_iec60870_104_sec(void)
 {
+	static gboolean handoff_initialized = FALSE;
+	static gboolean tls_initialized = FALSE;
+
+
 #if DEBUG_MODULE
-	printf("proto_reg_handoff_iec60870_104_sec=%d\n", use_tls);
+	printf("proto_reg_handoff_iec60870_104_sec_use_tls=%d\n", use_tls);
+	printf("proto_reg_handoff_iec60870_104_sec_handoff_initialized=%d\n", handoff_initialized);
+	printf("proto_reg_handoff_iec60870_104_sec_tls_initialized=%d\n", tls_initialized);
 #endif	
-	
-	/* create a dissector handle, which is a handle associated with the protocol and the function called to do the actual dissecting */	
-	if(use_tls == TRUE)
+
+	/* register the dissector handler so that TCP traffic associated with the port IEC60870_104_PORT calls the dissector */
+	if(handoff_initialized == FALSE)
 	{
+		/* register a dissector, which is a handle associated with the protocol and the function called to do the actual dissecting */
 		iec60870_104_handle = register_dissector("IEC104_TCP", dissect_iec60870_104_tcp, proto_iec60870_104);	
+
+		/* this function allow to see the port on preference tab */
+		dissector_add_uint_with_preference("tcp.port", IEC60870_104_PORT_SEC, iec60870_104_handle);
+		handoff_initialized = TRUE;
 	}
-	else if(use_tls == FALSE)
+	
+	/* add and delete tls layer */
+	if((use_tls == FALSE) && (tls_initialized == TRUE))
 	{
-		iec60870_104_handle = create_dissector_handle(dissect_iec60870_104_tcp, proto_iec60870_104);
+#if DEBUG_MODULE
+		printf("ssl_dissector_delete=%d\n", use_tls);
+#endif
+		ssl_dissector_delete(IEC60870_104_PORT_SEC, iec60870_104_handle);
+		dissector_delete_uint("tcp.port", IEC60870_104_PORT_SEC, iec60870_104_handle);
+		dissector_add_uint("tcp.port", IEC60870_104_PORT_SEC, iec60870_104_handle);
+		tls_initialized = FALSE;
 	}
-	
-	/* register the dissector handler so that TCP traffic associated with the port IEC60870_104_SECURE_PORT calls the dissector */
-	if(prefs_initialized == FALSE)
-	{		
-		dissector_add_uint_with_preference("tcp.port", IEC60870_104_SECURE_PORT, iec60870_104_handle);
-		prefs_initialized = TRUE;
-	}
-	
-	if(use_tls == TRUE)
+	if((use_tls == TRUE) && (tls_initialized == FALSE))
 	{
 #if DEBUG_MODULE
 		printf("ssl_dissector_add=%d\n", use_tls);
 #endif
-		ssl_dissector_add(IEC60870_104_SECURE_PORT, iec60870_104_handle);
+		ssl_dissector_add(IEC60870_104_PORT_SEC, iec60870_104_handle);
+#if 0
 		tls_handle = find_dissector_add_dependency("tls", proto_iec60870_104);
+#endif
+		tls_initialized = TRUE;
 	}
 }
 
