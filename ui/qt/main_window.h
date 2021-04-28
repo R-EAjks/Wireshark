@@ -250,7 +250,9 @@ private:
     QPointer<RtpStreamDialog> rtp_stream_dialog_;       // Singleton pattern used
     QPointer<VoipCallsDialog> voip_calls_dialog_;       // Singleton pattern used
     QPointer<VoipCallsDialog> sip_calls_dialog_;        // Singleton pattern used
+#ifdef QT_MULTIMEDIA_LIB
     QPointer<RtpPlayerDialog> rtp_player_dialog_;       // Singleton pattern used
+#endif
     QPointer<RtpAnalysisDialog> rtp_analysis_dialog_;   // Singleton pattern used
 
     void freeze();
@@ -363,9 +365,11 @@ public slots:
 
     void on_actionViewFullScreen_triggered(bool checked);
 
+#ifdef QT_MULTIMEDIA_LIB
     void rtpPlayerDialogReplaceRtpStreams(QVector<rtpstream_id_t *> stream_ids);
     void rtpPlayerDialogAddRtpStreams(QVector<rtpstream_id_t *> stream_ids);
     void rtpPlayerDialogRemoveRtpStreams(QVector<rtpstream_id_t *> stream_ids);
+#endif
     void rtpAnalysisDialogReplaceRtpStreams(QVector<rtpstream_id_t *> stream_ids);
     void rtpAnalysisDialogAddRtpStreams(QVector<rtpstream_id_t *> stream_ids);
     void rtpAnalysisDialogRemoveRtpStreams(QVector<rtpstream_id_t *> stream_ids);
@@ -686,7 +690,9 @@ private slots:
     void on_actionStatisticsHTTP2_triggered();
 
     void openTelephonyRtpStreamsDialog();
+#ifdef QT_MULTIMEDIA_LIB
     void openTelephonyRtpPlayerDialog();
+#endif
     void openTelephonyVoipCallsDialog(bool all_flows);
     void openTelephonyRtpAnalysisDialog();
     void on_actionTelephonyVoipCalls_triggered();
@@ -702,7 +708,9 @@ private slots:
     void on_actionTelephonyOsmuxPacketCounter_triggered();
     void on_actionTelephonyRtpStreams_triggered();
     void on_actionTelephonyRtpStreamAnalysis_triggered();
+#ifdef QT_MULTIMEDIA_LIB
     void on_actionTelephonyRtpPlayer_triggered();
+#endif
     void on_actionTelephonyRTSPPacketCounter_triggered();
     void on_actionTelephonySMPPOperations_triggered();
     void on_actionTelephonyUCPMessages_triggered();

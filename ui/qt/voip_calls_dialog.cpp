@@ -70,7 +70,9 @@ VoipCallsDialog::VoipCallsDialog(QWidget &parent, CaptureFile &cf, bool all_flow
     sequence_button_->setToolTip(ui->actionFlowSequence->toolTip());
     prepare_button_ = ui->buttonBox->addButton(ui->actionPrepareFilter->text(), QDialogButtonBox::ActionRole);
     prepare_button_->setToolTip(ui->actionPrepareFilter->toolTip());
+#ifdef QT_MULTIMEDIA_LIB
     player_button_ = RtpPlayerDialog::addPlayerButton(ui->buttonBox, this);
+#endif
 
     connect (ui->todCheckBox, &QAbstractButton::toggled, this, &VoipCallsDialog::switchTimeOfDay);
 

@@ -3308,6 +3308,7 @@ void MainWindow::on_actionStatisticsHTTP2_triggered()
 
 static QMutex telephony_dialog_mutex;
 
+#ifdef QT_MULTIMEDIA_LIB
 void MainWindow::openTelephonyRtpPlayerDialog()
 {
     if (!rtp_player_dialog_) {
@@ -3330,6 +3331,7 @@ void MainWindow::openTelephonyRtpPlayerDialog()
     }
     rtp_player_dialog_->show();
 }
+#endif
 
 void MainWindow::openTelephonyVoipCallsDialog(bool all_flows)
 {
@@ -3535,6 +3537,7 @@ void MainWindow::on_actionTelephonyRtpStreamAnalysis_triggered()
     telephony_dialog_mutex.unlock();
 }
 
+#ifdef QT_MULTIMEDIA_LIB
 void MainWindow::on_actionTelephonyRtpPlayer_triggered()
 {
     QVector<rtpstream_id_t *> stream_ids;
@@ -3559,6 +3562,7 @@ void MainWindow::on_actionTelephonyRtpPlayer_triggered()
     }
     telephony_dialog_mutex.unlock();
 }
+#endif
 
 void MainWindow::on_actionTelephonyRTSPPacketCounter_triggered()
 {
@@ -4133,6 +4137,7 @@ void MainWindow::activatePluginIFToolbar(bool)
     }
 }
 
+#ifdef QT_MULTIMEDIA_LIB
 void MainWindow::rtpPlayerDialogReplaceRtpStreams(QVector<rtpstream_id_t *> stream_ids)
 {
     telephony_dialog_mutex.lock();
@@ -4156,6 +4161,7 @@ void MainWindow::rtpPlayerDialogRemoveRtpStreams(QVector<rtpstream_id_t *> strea
     rtp_player_dialog_->removeRtpStreams(stream_ids);
     telephony_dialog_mutex.unlock();
 }
+#endif
 
 void MainWindow::rtpAnalysisDialogReplaceRtpStreams(QVector<rtpstream_id_t *> stream_ids)
 {

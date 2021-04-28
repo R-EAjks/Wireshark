@@ -269,7 +269,9 @@ RtpAnalysisDialog::RtpAnalysisDialog(QWidget &parent, CaptureFile &cf) :
     prepare_button->setToolTip(ui->actionPrepareButton->toolTip());
     prepare_button->setMenu(ui->menuPrepareFilter);
 
+#ifdef QT_MULTIMEDIA_LIB
     player_button_ = RtpPlayerDialog::addPlayerButton(ui->buttonBox, this);
+#endif
 
     QPushButton *export_btn = ui->buttonBox->addButton(ui->actionExportButton->text(), QDialogButtonBox::ActionRole);
     export_btn->setToolTip(ui->actionExportButton->toolTip());

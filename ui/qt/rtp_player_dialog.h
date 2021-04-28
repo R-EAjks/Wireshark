@@ -24,7 +24,9 @@
 #include <QTreeWidgetItem>
 #include <QMetaType>
 #include <ui/qt/widgets/qcustomplot.h>
+#ifdef QT_MULTIMEDIA_LIB
 #include <QAudioDeviceInfo>
+#endif
 
 namespace Ui {
 class RtpPlayerDialog;

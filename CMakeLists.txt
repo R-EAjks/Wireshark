@@ -1176,10 +1176,13 @@ if(BUILD_wireshark)
 	set(QT_PACKAGELIST
 		Qt5Core
 		Qt5LinguistTools
-		Qt5Multimedia
 		Qt5PrintSupport
 		Qt5Widgets
 	)
+	if(ENABLE_QT_MULTIMEDIA)
+		list(APPEND QT_PACKAGELIST Qt5Multimedia)
+	endif()
+
 	if(APPLE)
 		list(APPEND QT_PACKAGELIST Qt5MacExtras)
 		ws_find_package(Sparkle ENABLE_SPARKLE HAVE_SOFTWARE_UPDATE)
@@ -1205,6 +1208,9 @@ if(BUILD_wireshark)
 	set(QT_FOUND ON)
 	if(Qt5MacExtras_FOUND)
 		set(QT_MACEXTRAS_LIB 1)
+	endif()
+	if(Qt5Multimedia_FOUND)
+		set(QT_MULTIMEDIA_LIB 1)
 	endif()
 endif()
 

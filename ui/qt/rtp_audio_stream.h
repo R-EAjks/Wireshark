@@ -12,8 +12,6 @@
 
 #include "config.h"
 
-#ifdef QT_MULTIMEDIA_LIB
-
 #include <glib.h>
 
 #include <epan/address.h>
@@ -22,19 +20,21 @@
 #include <ui/qt/utils/rtp_audio_file.h>
 #include <ui/rtp_media.h>
 
-#include <QAudio>
 #include <QColor>
 #include <QMap>
 #include <QObject>
 #include <QSet>
 #include <QVector>
 #include <QIODevice>
-#include <QAudioOutput>
 
 class QAudioFormat;
 class QAudioOutput;
 class QIODevice;
 
+#ifdef QT_MULTIMEDIA_LIB
+
+#include <QAudio>
+#include <QAudioOutput>
 
 class RtpAudioStream : public QObject
 {

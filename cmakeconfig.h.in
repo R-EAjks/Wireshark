@@ -317,7 +317,7 @@
 #cmakedefine PACKAGE_VERSION
 
 /* Define if we have QtMultimedia */
-#define QT_MULTIMEDIA_LIB 1
+#cmakedefine QT_MULTIMEDIA_LIB 1
 
 /* Define if we have QtMacExtras */
 #cmakedefine QT_MACEXTRAS_LIB 1

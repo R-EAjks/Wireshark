@@ -179,7 +179,9 @@ SequenceDialog::SequenceDialog(QWidget &parent, CaptureFile &cf, SequenceInfo *i
 
     reset_button_ = ui->buttonBox->addButton(ui->actionResetDiagram->text(), QDialogButtonBox::ActionRole);
     reset_button_->setToolTip(ui->actionResetDiagram->toolTip());
+#ifdef QT_MULTIMEDIA_LIB
     player_button_ = RtpPlayerDialog::addPlayerButton(ui->buttonBox, this);
+#endif
     export_button_ = ui->buttonBox->addButton(ui->actionExportDiagram->text(), QDialogButtonBox::ActionRole);
     export_button_->setToolTip(ui->actionExportDiagram->toolTip());
 
