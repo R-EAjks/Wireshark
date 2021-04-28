@@ -1634,14 +1634,14 @@ static const value_string v10_template_types_ixia[] = {
     {  227, "HTTP Referer"},
     {  228, "HTTP UA-CPU"},
     {  229, "Email Messages"},
-    {  230, "Email Message ID"},
-    {  231, "Email Message Date"},
-    {  232, "Email Message Subject"},
-    {  233, "Email Message To"},
-    {  234, "Email Message From"},
-    {  235, "Email Message CC"},
-    {  236, "Email Message BCC"},
-    {  237, "Email Message Attachments"},
+    {  230, "Email Msg ID"},
+    {  231, "Email Msg Date"},
+    {  232, "Email Msg Subject"},
+    {  233, "Email Msg To"},
+    {  234, "Email Msg From"},
+    {  235, "Email Msg CC"},
+    {  236, "Email Msg BCC"},
+    {  237, "Email Msg Attachments"},
     {  238, "TLS Server Cert"},
     {  239, "TLS Server Cert Issuer"},
     {  240, "TLS Server Cert Issuer Attr"},
@@ -1680,7 +1680,7 @@ static const value_string v10_template_types_ixia[] = {
     {  273, "DNS Query Name"},
     {  274, "DNS Section Type"},
     {  275, "DNS Msg QR Flag"},
-    {  276, "DNS Canonical Name"},
+    {  276, "DNS Cname"},
     {  277, "DNS Mail Exchange Domain"},
     {  278, "DHCP Agent Circuit ID"},
     {  279, "JA3 fingerprint string"},
@@ -2176,6 +2176,19 @@ static const value_string v9_direction[] = {
     { 0, "Ingress" },
     { 1, "Egress" },
     { 0, NULL }
+};
+
+static const value_string v10_ixia_dns_section_type[] = {
+    {0, "Answer"},
+    {1, "Authoritative NS"},
+    {2, "Additional"},
+    {0, NULL}
+};
+
+static const value_string v10_ixia_req_res_flag[] = {
+    {0, "Request"},
+    {1, "Response"},
+    {0, NULL}
 };
 
 #define FORWARDING_STATUS_UNKNOWN 0
@@ -12768,22 +12781,6 @@ getprefix(const guint32 *addr, unsigned prefix)
     return address_to_str(wmem_packet_scope(), &prefix_addr);
 }
 
-static void
-pie_ixia_dns_section_type_str(gchar *result, guint32 type)
-{
-    const char *section_types[] = {"Answer", "Authoritative NS", "Additional"};
-    const char *val = type < array_length(section_types) ? section_types[type] : "Invalid";
-    g_snprintf( result, ITEM_LABEL_LENGTH, "%s", val);
-}
-
-static void
-pie_ixia_dns_qr_flag_str(gchar *result, guint32 flag)
-{
-    const char *qr_flags[] = {"Request", "Response"};
-    const char *val = flag < array_length(qr_flags) ? qr_flags[flag] : "Invalid";
-    g_snprintf( result, ITEM_LABEL_LENGTH, "%s", val);
-}
-
 void
 proto_register_netflow(void)
 {
@@ -18437,56 +18434,56 @@ proto_register_netflow(void)
 
         /* ixia, 3054 / 230 */
         {&hf_pie_ixia_email_msg_id,
-         {"Email Message ID", "cflow.pie.ixia.email-msg-id",
+         {"Email Msg ID", "cflow.pie.ixia.email-msg-id",
           FT_STRING, STR_ASCII, NULL, 0x0,
           "Email Message ID", HFILL}
         },
 
         /* ixia, 3054 / 231 */
         {&hf_pie_ixia_email_msg_date,
-         {"Email Message Date", "cflow.pie.ixia.email-msg-date",
+         {"Email Msg Date", "cflow.pie.ixia.email-msg-date",
           FT_STRING, STR_ASCII, NULL, 0x0,
           "Email Message Date", HFILL}
         },
 
         /* ixia, 3054 / 232 */
         {&hf_pie_ixia_email_msg_subject,
-         {"Email Message Subject", "cflow.pie.ixia.email-msg-subject",
+         {"Email Msg Subject", "cflow.pie.ixia.email-msg-subject",
           FT_STRING, STR_ASCII, NULL, 0x0,
           "Email Message Subject", HFILL}
         },
 
         /* ixia, 3054 / 233 */
         {&hf_pie_ixia_email_msg_to,
-         {"Email Message To", "cflow.pie.ixia.email-msg-to",
+         {"Email Msg To", "cflow.pie.ixia.email-msg-to",
           FT_STRING, STR_ASCII, NULL, 0x0,
           "Email Message To", HFILL}
         },
 
         /* ixia, 3054 / 234 */
         {&hf_pie_ixia_email_msg_from,
-         {"Email Message From", "cflow.pie.ixia.email-msg-from",
+         {"Email Msg From", "cflow.pie.ixia.email-msg-from",
           FT_STRING, STR_ASCII, NULL, 0x0,
           "Email Message From", HFILL}
         },
 
         /* ixia, 3054 / 235 */
         {&hf_pie_ixia_email_msg_cc,
-         {"Email Message CC", "cflow.pie.ixia.email-msg-cc",
+         {"Email Msg CC", "cflow.pie.ixia.email-msg-cc",
           FT_STRING, STR_ASCII, NULL, 0x0,
           "Email Message CC", HFILL}
         },
 
         /* ixia, 3054 / 236 */
         {&hf_pie_ixia_email_msg_bcc,
-         {"Email Message BCC", "cflow.pie.ixia.email-msg-bcc",
+         {"Email Msg BCC", "cflow.pie.ixia.email-msg-bcc",
           FT_STRING, STR_ASCII, NULL, 0x0,
           "Email Message BCC", HFILL}
         },
 
         /* ixia, 3054 / 237 */
         {&hf_pie_ixia_email_msg_attachments,
-         {"Email Message Attachments", "cflow.pie.ixia.email-msg-attachments",
+         {"Email Msg Attachments", "cflow.pie.ixia.email-msg-attachments",
           FT_STRING, STR_ASCII, NULL, 0x0,
           "Email Message attachments", HFILL}
         },
@@ -18607,14 +18604,14 @@ proto_register_netflow(void)
         {&hf_pie_ixia_dns_transaction_id,
          {"DNS Transaction Id", "cflow.pie.ixia.dns-transaction-id",
           FT_UINT16, BASE_HEX, NULL, 0x0,
-          "DNS Transaction Id", HFILL}
+          "DNS Transaction Identifier", HFILL}
         },
 
         /* ixia, 3054 / 255 */
         {&hf_pie_ixia_dns_opcode,
          {"DNS Msg Opcode", "cflow.pie.ixia.dns-msg-opcode",
           FT_UINT8, BASE_DEC, NULL, 0x0,
-          "DNS Message Opcode", HFILL}
+          "DNS Message Operation Code", HFILL}
         },
 
         /* ixia, 3054 / 256 */
@@ -18663,61 +18660,61 @@ proto_register_netflow(void)
         {&hf_pie_ixia_dns_qdcount,
          {"DNS HDR Question Count", "cflow.pie.ixia.dns-hdr-qdcount",
           FT_UINT16, BASE_DEC, NULL, 0x0,
-          "DNS HDR Question Count", HFILL}
+          "DNS Header Question Count", HFILL}
         },
 
         /* ixia, 3054 / 263 */
         {&hf_pie_ixia_dns_ancount,
          {"DNS HDR Answer Count", "cflow.pie.ixia.dns-hdr-ancount",
           FT_UINT16, BASE_DEC, NULL, 0x0,
-          "DNS HDR Answer Count", HFILL}
+          "DNS Header Answer Count", HFILL}
         },
 
         /* ixia, 3054 / 264 */
         {&hf_pie_ixia_dns_nscount,
          {"DNS HDR Auth NS Count", "cflow.pie.ixia.dns-hdr-nscount",
           FT_UINT16, BASE_DEC, NULL, 0x0,
-          "DNS HDR Austh NS Count", HFILL}
+          "DNS Header Auth NS Count", HFILL}
         },
 
         /* ixia, 3054 / 265 */
         {&hf_pie_ixia_dns_arcount,
          {"DNS HDR Additional Count", "cflow.pie.ixia.dns-hdr-arcount",
           FT_UINT16, BASE_DEC, NULL, 0x0,
-          "DNS HDR Additional Count", HFILL}
+          "DNS Header Additional Count", HFILL}
         },
 
         /* ixia, 3054 / 266 */
         {&hf_pie_ixia_dns_auth_answer,
          {"DNS HDR Flag Authoritative Answer", "cflow.pie.ixia.dns-hdr-auth-ans",
           FT_UINT8, BASE_DEC, NULL, 0x0,
-          "DNS HDR Flag Authoritative Answer", HFILL}
+          "DNS Header Flag Authoritative Answer", HFILL}
         },
 
         /* ixia, 3054 / 267 */
         {&hf_pie_ixia_dns_trucation,
          {"DNS HDR Flag Truncated", "cflow.pie.ixia.dns-hdr-truncated",
           FT_UINT8, BASE_DEC, NULL, 0x0,
-          "DNS HDR Flag Truncated", HFILL}
+          "DNS Header Flag Truncated", HFILL}
         },
 
         /* ixia, 3054 / 268 */
         {&hf_pie_ixia_dns_recursion_desired,
          {"DNS HDR Flag Recursion Desired", "cflow.pie.ixia.dns-hdr-rd",
           FT_UINT8, BASE_DEC, NULL, 0x0,
-          "DNS HDR Flag Recursion Desired", HFILL}
+          "DNS Header Flag Recursion Desired", HFILL}
         },
 
         /* ixia, 3054 / 269 */
         {&hf_pie_ixia_dns_recursion_avail,
          {"DNS HDR Flag Recursion Available", "cflow.pie.ixia.dns-hdr-ra",
           FT_UINT8, BASE_DEC, NULL, 0x0,
-          "DNS HDR Flag Recursion Available", HFILL}
+          "DNS Header Flag Recursion Available", HFILL}
         },
 
         /* ixia, 3054 / 270 */
         {&hf_pie_ixia_dns_rdata_len,
-         {"DNS RData Length", "cflow.pie.ixia.dns-rdata-len",
+         {"DNS RData Len", "cflow.pie.ixia.dns-rdata-len",
           FT_UINT16, BASE_DEC, NULL, 0x0,
           "DNS RData Length", HFILL}
         },
@@ -18746,20 +18743,20 @@ proto_register_netflow(void)
         /* ixia, 3054 / 274 */
         {&hf_pie_ixia_dns_section_type,
          {"DNS Msg Section Type", "cflow.pie.ixia.dns-section-type",
-          FT_UINT8, BASE_CUSTOM, CF_FUNC(pie_ixia_dns_section_type_str), 0x0,
-          "DNS Msg Section Type {0:Answer 1:Authoritative NS 2:Additional}", HFILL}
+          FT_UINT8, BASE_DEC, VALS(v10_ixia_dns_section_type), 0x0,
+          "DNS Message Section Type {0:Answer 1:Authoritative NS 2:Additional}", HFILL}
         },
 
         /* ixia, 3054 / 275 */
         {&hf_pie_ixia_dns_qr_flag,
          {"DNS HDR Flag QR", "cflow.pie.ixia.dns-hdr-qr",
-          FT_UINT8, BASE_CUSTOM, CF_FUNC(pie_ixia_dns_qr_flag_str), 0x0,
-          "DNS HDR Flag QR {0:Query, 1:Response}", HFILL}
+          FT_UINT8, BASE_DEC, VALS(v10_ixia_req_res_flag), 0x0,
+          "DNS Header Flag QR {0:Query, 1:Response}", HFILL}
         },
 
         /* ixia, 3054 / 276 */
         {&hf_pie_ixia_dns_canonical_name,
-         {"DNS Canonical Name", "cflow.pie.ixia.dns-cname",
+         {"DNS Cname", "cflow.pie.ixia.dns-cname",
           FT_STRING, STR_ASCII, NULL, 0x0,
           "DNS Canonical Name", HFILL}
         },
