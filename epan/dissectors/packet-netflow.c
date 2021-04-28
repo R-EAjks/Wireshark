@@ -1613,8 +1613,6 @@ static const value_string v10_template_types_ixia[] = {
     {  206, "DHCP Event Type"},
     {  207, "DHCP lease Duration"},
     {  208, "DHCP Servername"},
-    {  278, "DHCP Agent Circuit ID"},
-
     {  209, "RADIUS Messages"},
     {  210, "RADIUS Message Rx Timestamp"},
     {  211, "RADIUS Event Timestamp"},
@@ -1625,19 +1623,16 @@ static const value_string v10_template_types_ixia[] = {
     {  216, "RADIUS Filter ID"},
     {  217, "RADIUS Reply Message"},
     {  218, "RADIUS Called Station ID"},
-    {  225, "RADIUS Calling Station ID"},
-    {  261, "RADIUS Framed IP"},
-
     {  219, "HTTP Connection"},
     {  220, "HTTP Accept"},
     {  221, "HTTP Accept-Language"},
     {  222, "HTTP Accept-Encoding"},
     {  223, "HTTP Reason"},
     {  224, "HTTP Server"},
+    {  225, "RADIUS Calling Station ID"},
     {  226, "HTTP Content Length"},
     {  227, "HTTP Referer"},
     {  228, "HTTP UA-CPU"},
-
     {  229, "Email Messages"},
     {  230, "Email Message ID"},
     {  231, "Email Message Date"},
@@ -1647,7 +1642,6 @@ static const value_string v10_template_types_ixia[] = {
     {  235, "Email Message CC"},
     {  236, "Email Message BCC"},
     {  237, "Email Message Attachments"},
-
     {  238, "TLS Server Cert"},
     {  239, "TLS Server Cert Issuer"},
     {  240, "TLS Server Cert Issuer Attr"},
@@ -1663,7 +1657,6 @@ static const value_string v10_template_types_ixia[] = {
     {  250, "TLS Server Cert AltNames"},
     {  251, "TLS Server Cert AltNames Attr"},
     {  252, "TLS Server Cert AltNames Value"},
-
     {  253, "DNS Messages"},
     {  254, "DNS Transaction Id"},
     {  255, "DNS Msg Opcode"},
@@ -1672,6 +1665,7 @@ static const value_string v10_template_types_ixia[] = {
     {  258, "DNS Record TTL"},
     {  259, "DNS Raw Rdata"},
     {  260, "DNS Response Type"},
+    {  261, "RADIUS Framed IP"},
     {  262, "DNS Msg QD Count"},
     {  263, "DNS Msg AN Count"},
     {  264, "DNS Msg NS Count"},
@@ -1688,9 +1682,8 @@ static const value_string v10_template_types_ixia[] = {
     {  275, "DNS Msg QR Flag"},
     {  276, "DNS Canonical Name"},
     {  277, "DNS Mail Exchange Domain"},
-
+    {  278, "DHCP Agent Circuit ID"},
     {  279, "JA3 fingerprint string"},
-
     { 0, NULL }
 };
 static value_string_ext v10_template_types_ixia_ext = VALUE_STRING_EXT_INIT(v10_template_types_ixia);
@@ -10632,12 +10625,10 @@ dissect_v9_v10_pdu_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pdutree, 
             ti = proto_tree_add_item(pdutree, hf_pie_ixia_radius_framed_ip,
                                      tvb, offset, length, ENC_ASCII);
             break;
-            
         case ((VENDOR_IXIA << 16) | 262):
             ti = proto_tree_add_item(pdutree, hf_pie_ixia_dns_qdcount,
                                      tvb, offset, length, ENC_BIG_ENDIAN);
             break;
-     
         case ((VENDOR_IXIA << 16) | 263):
             ti = proto_tree_add_item(pdutree, hf_pie_ixia_dns_ancount,
                                      tvb, offset, length, ENC_BIG_ENDIAN);
