@@ -163,6 +163,7 @@ private:
 #endif
 
     void storeCustomColorsInRecent();
+    void clearRemovedMenuGroupItemsGroup(int group);
     void clearDynamicMenuGroupItems();
     void initializeIcons();
 

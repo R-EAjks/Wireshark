@@ -949,13 +949,18 @@ void WiresharkApplication::clearAddedMenuGroupItems()
     }
 }
 
+void WiresharkApplication::clearRemovedMenuGroupItemsGroup(int group)
+{
+    foreach (QAction *action, removed_menu_groups_[group]) {
+        delete action;
+    }
+    removed_menu_groups_[group].clear();
+}
+
 void WiresharkApplication::clearRemovedMenuGroupItems()
 {
     foreach (int group, removed_menu_groups_.keys()) {
-        foreach (QAction *action, removed_menu_groups_[group]) {
-            delete action;
-        }
-        removed_menu_groups_[group].clear();
+        clearRemovedMenuGroupItemsGroup(group);
     }
 }
 
