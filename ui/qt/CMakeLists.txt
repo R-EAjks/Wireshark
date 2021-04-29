@@ -210,6 +210,7 @@ set(WIRESHARK_QT_HEADERS
 	rsa_keys_frame.h
 	rtp_analysis_dialog.h
 	rtp_audio_stream.h
+	rtp_player_dialog.h
 	rtp_stream_dialog.h
 	scsi_service_response_time_dialog.h
 	sctp_all_assocs_dialog.h
@@ -449,6 +450,7 @@ set(WIRESHARK_QT_SRC
 	rsa_keys_frame.cpp
 	rtp_analysis_dialog.cpp
 	rtp_audio_stream.cpp
+	rtp_player_dialog.cpp
 	rtp_stream_dialog.cpp
 	scsi_service_response_time_dialog.cpp
 	sctp_all_assocs_dialog.cpp
@@ -478,12 +480,6 @@ set(WIRESHARK_QT_SRC
 	wireshark_dialog.cpp
 	${WIRESHARK_CUSTOM_QT_SRCS}
 )
-
-if(ENABLE_QT_MULTIMEDIA)
-	list(APPEND WIRESHARK_QT_SRC
-		rtp_player_dialog.cpp
-	)
-endif()
 
 if(ENABLE_PCAP)
 	list(APPEND WIRESHARK_QT_SRC

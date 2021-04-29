@@ -27,14 +27,15 @@
 #include <QVector>
 #include <QIODevice>
 
+#ifdef QT_MULTIMEDIA_LIB
 class QAudioFormat;
 class QAudioOutput;
 class QIODevice;
 
-#ifdef QT_MULTIMEDIA_LIB
-
 #include <QAudio>
 #include <QAudioOutput>
+#endif // QT_MULTIMEDIA_LIB
+
 
 class RtpAudioStream : public QObject
 {
@@ -51,7 +52,11 @@ public:
     void reset(double global_start_time);
     AudioRouting getAudioRouting();
     void setAudioRouting(AudioRouting audio_routing);
+#ifdef QT_MULTIMEDIA_LIB
     void decode(QAudioDeviceInfo out_device);
+#else
+    void decode();
+#endif
 
     double startRelTime() const { return start_rel_time_; }
     double stopRelTime() const { return stop_rel_time_; }
@@ -130,15 +135,19 @@ public:
     QRgb color() { return color_; }
     void setColor(QRgb color) { color_ = color; }
 
+#ifdef QT_MULTIMEDIA_LIB
     QAudio::State outputState() const;
+#endif
 
     void setJitterBufferSize(int jitter_buffer_size) { jitter_buffer_size_ = jitter_buffer_size; }
     void setTimingMode(TimingMode timing_mode) { timing_mode_ = timing_mode; }
     void setStartPlayTime(double start_play_time) { start_play_time_ = start_play_time; }
+#ifdef QT_MULTIMEDIA_LIB
     bool prepareForPlay(QAudioDeviceInfo out_device);
     void startPlaying();
     void pausePlaying();
     void stopPlaying();
+#endif
     void setStereoRequired(bool stereo_required) { stereo_required_ = stereo_required; }
     qint16 getMaxSampleValue() { return max_sample_val_; }
     void setMaxSampleValue(gint16 max_sample_val) { max_sample_val_used_ = max_sample_val; }
@@ -153,9 +162,11 @@ public:
     rtpstream_info_t *getStreamInfo() { return &rtpstream_; }
 
 signals:
+#ifdef QT_MULTIMEDIA_LIB
     void processedSecs(double secs);
     void playbackError(const QString error_msg);
     void finishedPlaying(RtpAudioStream *stream, QAudio::Error error);
+#endif
 
 private:
     // Used to identify unique streams.
@@ -181,7 +192,9 @@ private:
     QSet<QString> payload_names_;
     struct SpeexResamplerState_ *audio_resampler_;
     struct SpeexResamplerState_ *visual_resampler_;
+#ifdef QT_MULTIMEDIA_LIB
     QAudioOutput *audio_output_;
+#endif
     QMap<double, quint32> packet_timestamps_;
     QVector<qint16> visual_samples_;
     QVector<double> out_of_seq_timestamps_;
@@ -196,19 +209,25 @@ private:
     TimingMode timing_mode_;
     double start_play_time_;
 
+#ifdef QT_MULTIMEDIA_LIB
     const QString formatDescription(const QAudioFormat & format);
-    QString currentOutputDevice();
+#endif
 
+#ifdef QT_MULTIMEDIA_LIB
     void decodeAudio(QAudioDeviceInfo out_device);
-    void decodeVisual();
     quint32 calculateAudioOutRate(QAudioDeviceInfo out_device, unsigned int sample_rate, unsigned int requested_out_rate);
+#else
+    void decodeAudio();
+    quint32 calculateAudioOutRate(unsigned int sample_rate, unsigned int requested_out_rate);
+#endif
+    void decodeVisual();
     SAMPLE *resizeBufferIfNeeded(SAMPLE *buff, gint32 *buff_bytes, qint64 requested_size);
 
 private slots:
+#ifdef QT_MULTIMEDIA_LIB
     void outputStateChanged(QAudio::State new_state);
     void delayedStopStream();
+#endif
 };
-
-#endif // QT_MULTIMEDIA_LIB
 
 #endif // RTPAUDIOSTREAM_H

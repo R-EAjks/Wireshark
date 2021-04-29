@@ -277,9 +277,7 @@ RtpStreamDialog::RtpStreamDialog(QWidget &parent, CaptureFile &cf) :
     prepare_button_ = ui->buttonBox->addButton(ui->actionPrepareFilter->text(), QDialogButtonBox::ActionRole);
     prepare_button_->setToolTip(ui->actionPrepareFilter->toolTip());
     connect(prepare_button_, SIGNAL(pressed()), this, SLOT(on_actionPrepareFilter_triggered()));
-#ifdef QT_MULTIMEDIA_LIB
     player_button_ = RtpPlayerDialog::addPlayerButton(ui->buttonBox, this);
-#endif
     copy_button_ = ui->buttonBox->addButton(ui->actionCopyButton->text(), QDialogButtonBox::ActionRole);
     copy_button_->setToolTip(ui->actionCopyButton->toolTip());
     export_button_ = ui->buttonBox->addButton(ui->actionExportAsRtpDump->text(), QDialogButtonBox::ActionRole);
@@ -560,9 +558,7 @@ void RtpStreamDialog::updateWidgets()
     ui->actionCopyAsYaml->setEnabled(has_data);
     ui->actionAnalyze->setEnabled(enable);
 
-#if defined(QT_MULTIMEDIA_LIB)
     player_button_->setEnabled(enable);
-#endif
 
     WiresharkDialog::updateWidgets();
 }
@@ -888,7 +884,6 @@ QVector<rtpstream_id_t *>RtpStreamDialog::getSelectedRtpIds()
     return stream_ids;
 }
 
-#ifdef QT_MULTIMEDIA_LIB
 void RtpStreamDialog::rtpPlayerReplace()
 {
     if (ui->streamTreeWidget->selectedItems().count() < 1) return;
@@ -909,7 +904,6 @@ void RtpStreamDialog::rtpPlayerRemove()
 
     emit rtpPlayerDialogRemoveRtpStreams(getSelectedRtpIds());
 }
-#endif
 
 void RtpStreamDialog::rtpAnalysisReplace()
 {

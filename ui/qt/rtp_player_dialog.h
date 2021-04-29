@@ -24,6 +24,7 @@
 #include <QTreeWidgetItem>
 #include <QMetaType>
 #include <ui/qt/widgets/qcustomplot.h>
+
 #ifdef QT_MULTIMEDIA_LIB
 #include <QAudioDeviceInfo>
 #endif
@@ -73,7 +74,6 @@ public:
      */
     static QPushButton *addPlayerButton(QDialogButtonBox *button_box, QDialog *dialog);
 
-#ifdef QT_MULTIMEDIA_LIB
     ~RtpPlayerDialog();
 
     void accept();
@@ -132,16 +132,11 @@ private slots:
     void updateHintLabel();
     void resetXAxis();
     void updateGraphs();
-    void playFinished(RtpAudioStream *stream, QAudio::Error error);
 
     void setPlayPosition(double secs);
-    void setPlaybackError(const QString playback_error);
     void changeAudioRoutingOnItem(QTreeWidgetItem *ti, AudioRouting new_audio_routing);
     void changeAudioRouting(AudioRouting new_audio_routing);
     void invertAudioMutingOnItem(QTreeWidgetItem *ti);
-    void on_playButton_clicked();
-    void on_pauseButton_clicked();
-    void on_stopButton_clicked();
     void on_actionReset_triggered();
     void on_actionZoomIn_triggered();
     void on_actionZoomOut_triggered();
@@ -162,8 +157,6 @@ private slots:
     void on_actionAudioRoutingMuteInvert_triggered();
     void on_streamTreeWidget_itemSelectionChanged();
     void on_streamTreeWidget_itemDoubleClicked(QTreeWidgetItem *item, const int column);
-    void on_outputDeviceComboBox_currentIndexChanged(const QString &);
-    void on_outputAudioRate_currentIndexChanged(const QString &);
     void on_jitterSpinBox_valueChanged(double);
     void on_timingComboBox_currentIndexChanged(int);
     void on_todCheckBox_toggled(bool checked);
@@ -171,9 +164,18 @@ private slots:
     void on_actionSelectAll_triggered();
     void on_actionSelectInvert_triggered();
     void on_actionSelectNone_triggered();
+#ifdef QT_MULTIMEDIA_LIB
+    void setPlaybackError(const QString playback_error);
+    void playFinished(RtpAudioStream *stream, QAudio::Error error);
+    void on_playButton_clicked();
+    void on_pauseButton_clicked();
+    void on_stopButton_clicked();
+    void on_outputDeviceComboBox_currentIndexChanged(const QString &);
     void outputNotify();
     void on_actionPlay_triggered();
     void on_actionStop_triggered();
+#endif
+    void on_outputAudioRate_currentIndexChanged(const QString &);
     void on_actionSaveAudioFromCursor_triggered();
     void on_actionSaveAudioSyncStream_triggered();
     void on_actionSaveAudioSyncFile_triggered();
@@ -200,7 +202,9 @@ private:
     QSharedPointer<QCPAxisTickerDateTime> datetime_ticker_;
     bool stereo_available_;
     QList<RtpAudioStream *> playing_streams_;
+#ifdef QT_MULTIMEDIA_LIB
     QAudioOutput *marker_stream_;
+#endif
     quint32 marker_stream_requested_out_rate_;
     QTreeWidgetItem *last_ti_;
     bool listener_removed_;
@@ -228,15 +232,17 @@ private:
     const QString getFormatedTime(double f_time);
     const QString getFormatedHoveredTime();
     int getHoveredPacket();
-    QString currentOutputDeviceName();
     double getStartPlayMarker();
     void drawStartPlayMarker();
     void setStartPlayMarker(double new_time);
     void updateStartStopTime(rtpstream_info_t *rtpstream, bool is_first);
     void formatAudioRouting(QTreeWidgetItem *ti, AudioRouting audio_routing);
     bool isStereoAvailable();
+#ifdef QT_MULTIMEDIA_LIB
+    QString currentOutputDeviceName();
     QAudioOutput *getSilenceAudioOutput();
     QAudioDeviceInfo getCurrentDeviceInfo();
+#endif
     QTreeWidgetItem *findItemByCoords(QPoint point);
     QTreeWidgetItem *findItem(QCPAbstractPlottable *plottable);
     void handleItemHighlight(QTreeWidgetItem *ti, bool scroll);
@@ -262,11 +268,6 @@ private:
     void selectInaudible(bool select);
     QVector<rtpstream_id_t *>getSelectedRtpStreamIDs();
     void fillTappedColumns();
-
-#else // QT_MULTIMEDIA_LIB
-private:
-    Ui::RtpPlayerDialog *ui;
-#endif // QT_MULTIMEDIA_LIB
 };
 
 #endif // RTP_PLAYER_DIALOG_H

@@ -269,9 +269,7 @@ RtpAnalysisDialog::RtpAnalysisDialog(QWidget &parent, CaptureFile &cf) :
     prepare_button->setToolTip(ui->actionPrepareButton->toolTip());
     prepare_button->setMenu(ui->menuPrepareFilter);
 
-#ifdef QT_MULTIMEDIA_LIB
     player_button_ = RtpPlayerDialog::addPlayerButton(ui->buttonBox, this);
-#endif
 
     QPushButton *export_btn = ui->buttonBox->addButton(ui->actionExportButton->text(), QDialogButtonBox::ActionRole);
     export_btn->setToolTip(ui->actionExportButton->toolTip());
@@ -522,9 +520,7 @@ void RtpAnalysisDialog::updateWidgets()
     ui->actionPrepareFilterOne->setEnabled(enable_nav);
     ui->actionPrepareFilterAll->setEnabled(enable_tab);
 
-#if defined(QT_MULTIMEDIA_LIB)
     player_button_->setEnabled(enable_tab);
-#endif
 
     ui->tabWidget->setEnabled(enable_tab);
     hint.prepend("<small><i>");

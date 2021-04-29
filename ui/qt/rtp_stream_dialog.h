@@ -13,10 +13,7 @@
 #include "wireshark_dialog.h"
 
 #include "ui/rtp_stream.h"
-
-#ifdef QT_MULTIMEDIA_LIB
 #include "rtp_player_dialog.h"
-#endif
 
 #include <QAbstractButton>
 #include <QMenu>
@@ -44,22 +41,18 @@ signals:
     void packetsMarked();
     void updateFilter(QString filter, bool force = false);
     void goToPacket(int packet_num);
-#if QT_MULTIMEDIA_LIB
     void rtpPlayerDialogReplaceRtpStreams(QVector<rtpstream_id_t *> stream_ids);
     void rtpPlayerDialogAddRtpStreams(QVector<rtpstream_id_t *> stream_ids);
     void rtpPlayerDialogRemoveRtpStreams(QVector<rtpstream_id_t *> stream_ids);
-#endif
     void rtpAnalysisDialogReplaceRtpStreams(QVector<rtpstream_id_t *> stream_infos);
     void rtpAnalysisDialogAddRtpStreams(QVector<rtpstream_id_t *> stream_infos);
     void rtpAnalysisDialogRemoveRtpStreams(QVector<rtpstream_id_t *> stream_infos);
 
 public slots:
     void displayFilterSuccess(bool success);
-#if QT_MULTIMEDIA_LIB
     void rtpPlayerReplace();
     void rtpPlayerAdd();
     void rtpPlayerRemove();
-#endif
     void rtpAnalysisReplace();
     void rtpAnalysisAdd();
     void rtpAnalysisRemove();
@@ -88,9 +81,7 @@ private:
 
     void updateStreams();
     void updateWidgets();
-#if QT_MULTIMEDIA_LIB
     void showPlayer();
-#endif
     void setRtpStreamSelection(rtpstream_id_t *id, bool state);
 
     QList<QVariant> streamRowData(int row) const;

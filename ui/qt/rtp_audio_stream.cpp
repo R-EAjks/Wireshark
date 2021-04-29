@@ -9,8 +9,6 @@
 
 #include "rtp_audio_stream.h"
 
-#ifdef QT_MULTIMEDIA_LIB
-
 #ifdef HAVE_SPEEXDSP
 #include <speex/speex_resampler.h>
 #else
@@ -31,8 +29,11 @@
 #include <ui/qt/utils/rtp_audio_routing_filter.h>
 #include <ui/qt/utils/rtp_audio_file.h>
 
+#ifdef QT_MULTIMEDIA_LIB
 #include <QAudioFormat>
 #include <QAudioOutput>
+#endif // QT_MULTIMEDIA_LIB
+
 #include <QVariant>
 #include <QTimer>
 
@@ -54,7 +55,9 @@ RtpAudioStream::RtpAudioStream(QObject *parent, rtpstream_id_t *id, bool stereo_
     , audio_out_rate_(0)
     , audio_requested_out_rate_(0)
     , audio_resampler_(0)
+#ifdef QT_MULTIMEDIA_LIB
     , audio_output_(NULL)
+#endif
     , max_sample_val_(1)
     , max_sample_val_used_(1)
     , color_(0)
@@ -97,8 +100,10 @@ RtpAudioStream::~RtpAudioStream()
     rtpstream_info_free_data(&rtpstream_);
     rtpstream_id_free(&id_);
     if (audio_file_) delete audio_file_;
+#ifdef QT_MULTIMEDIA_LIB
     // temp_file_ is released by audio_output_
     if (audio_output_) delete audio_output_;
+#endif
 }
 
 bool RtpAudioStream::isMatch(const rtpstream_id_t *id) const
@@ -181,7 +186,11 @@ void RtpAudioStream::setAudioRouting(AudioRouting audio_routing)
     audio_routing_ = audio_routing;
 }
 
+#ifdef QT_MULTIMEDIA_LIB
 void RtpAudioStream::decode(QAudioDeviceInfo out_device)
+#else
+void RtpAudioStream::decode()
+#endif
 {
     if (rtp_packets_.size() < 1) return;
 
@@ -189,7 +198,11 @@ void RtpAudioStream::decode(QAudioDeviceInfo out_device)
         speex_resampler_reset_mem(audio_resampler_);
     }
     audio_file_->setFrameWriteStage();
+#ifdef QT_MULTIMEDIA_LIB
     decodeAudio(out_device);
+#else
+    decodeAudio();
+#endif
 
     // Skip silence at begin of the stream
     audio_file_->setFrameReadStage(prepend_samples_);
@@ -200,10 +213,15 @@ void RtpAudioStream::decode(QAudioDeviceInfo out_device)
 }
 
 // Side effect: it creates and initiates resampler if needed
+#ifdef QT_MULTIMEDIA_LIB
 quint32 RtpAudioStream::calculateAudioOutRate(QAudioDeviceInfo out_device, unsigned int sample_rate, unsigned int requested_out_rate)
+#else
+quint32 RtpAudioStream::calculateAudioOutRate(unsigned int sample_rate, unsigned int requested_out_rate)
+#endif
 {
     quint32 out_rate;
 
+#ifdef QT_MULTIMEDIA_LIB
     // Use the first non-zero rate we find. Ajust it to match
     // our audio hardware.
     QAudioFormat format;
@@ -224,7 +242,7 @@ quint32 RtpAudioStream::calculateAudioOutRate(QAudioDeviceInfo out_device, unsig
         audio_resampler_ = speex_resampler_init(1, sample_rate, out_rate, 10, NULL);
         RTP_STREAM_DEBUG("Started resampling from %u to (out) %u Hz.", sample_rate, out_rate);
     } else {
-        if ((requested_out_rate!=0) &&
+        if ((requested_out_rate != 0) &&
             (requested_out_rate != sample_rate)
            ) {
             out_rate = requested_out_rate;
@@ -234,13 +252,28 @@ quint32 RtpAudioStream::calculateAudioOutRate(QAudioDeviceInfo out_device, unsig
             out_rate = sample_rate;
         }
     }
+#else
+    if ((requested_out_rate != 0) &&
+        (requested_out_rate != sample_rate)
+       ) {
+        out_rate = requested_out_rate;
+        audio_resampler_ = speex_resampler_init(1, sample_rate, out_rate, 10, NULL);
+        RTP_STREAM_DEBUG("Started resampling from %u to (out) %u Hz.", sample_rate, out_rate);
+    } else {
+        out_rate = sample_rate;
+    }
+#endif
 
     RTP_STREAM_DEBUG("Audio sample rate is %u", out_rate);
 
     return out_rate;
 }
 
+#ifdef QT_MULTIMEDIA_LIB
 void RtpAudioStream::decodeAudio(QAudioDeviceInfo out_device)
+#else
+void RtpAudioStream::decodeAudio()
+#endif
 {
     // XXX This is more messy than it should be.
 
@@ -315,7 +348,11 @@ void RtpAudioStream::decodeAudio(QAudioDeviceInfo out_device)
             // We calculate audio_out_rate just for first sample_rate.
             // All later are just resampled to it.
             // Side effect: it creates and initiates resampler if needed
+#ifdef QT_MULTIMEDIA_LIB
             audio_out_rate_ = calculateAudioOutRate(out_device, sample_rate, audio_requested_out_rate_);
+#else
+            audio_out_rate_ = calculateAudioOutRate(sample_rate, audio_requested_out_rate_);
+#endif
 
             // Calculate count of prepend samples for the stream
             // The earliest stream starts at 0.
@@ -615,6 +652,7 @@ quint32 RtpAudioStream::nearestPacket(double timestamp, bool is_relative)
     return it.value();
 }
 
+#ifdef QT_MULTIMEDIA_LIB
 QAudio::State RtpAudioStream::outputState() const
 {
     if (!audio_output_) return QAudio::IdleState;
@@ -643,6 +681,7 @@ const QString RtpAudioStream::formatDescription(const QAudioFormat &format)
 
     return fmt_descr;
 }
+#endif
 
 QString RtpAudioStream::getIDAsQString()
 {
@@ -660,6 +699,7 @@ QString RtpAudioStream::getIDAsQString()
     return str;
 }
 
+#ifdef QT_MULTIMEDIA_LIB
 bool RtpAudioStream::prepareForPlay(QAudioDeviceInfo out_device)
 {
     qint64 start_pos;
@@ -811,6 +851,7 @@ void RtpAudioStream::delayedStopStream()
 {
     audio_output_->stop();
 }
+#endif
 
 SAMPLE *RtpAudioStream::resizeBufferIfNeeded(SAMPLE *buff, gint32 *buff_bytes, qint64 requested_size)
 {
@@ -857,4 +898,3 @@ bool RtpAudioStream::savePayload(QIODevice *file)
 }
 
 
-#endif // QT_MULTIMEDIA_LIB

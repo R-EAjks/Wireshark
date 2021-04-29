@@ -527,6 +527,11 @@ Default value of btn:[Output Audio Rate] is btn:[Automatic]. When multiple codec
 In this case user must manually select one of rates in btn:[Output Audio Rate], streams will be resampled and audio export succeeds.
 ====
 
+[NOTE]
+====
+If wireshark is compiled without QtMultimedia support, RTP Player is not able to play sounds. Play/Pause/Stop buttons are not shown and sound card selection shows "No audio" and is disabled. The rest of dialog works with no limitation and it is possible to export audio too.
+====
+
 [[ChTelRTSP]]
 
 === RTSP Window
