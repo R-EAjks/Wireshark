@@ -468,9 +468,12 @@ rtppacket_analyse(tap_rtp_stat_t *statinfo,
          * has total_nr == 1, but here while we're processing the Nth
          * packet, total_nr isn't incremented yet.
          * E.g., when we arrive here and total_nr == 1, we're actually on
-         * packet #2, and thus, the first dela. So interestingly, when we
+         * packet #2, and thus, the first delta. So interestingly, when we
          * divide by total_nr here, we're not dividing by the number of
          * packets, but by the number of deltas.
+         * Important: total_nr here is never 0; when the first packet is
+         * handled, that logic increments total_nr from 0 to 1; here, it is
+         * always >=1 .
          */
         statinfo->mean_delta = (statinfo->mean_delta*(statinfo->total_nr-1) + statinfo->delta) / statinfo->total_nr;
 
@@ -487,6 +490,9 @@ rtppacket_analyse(tap_rtp_stat_t *statinfo,
              * packet #2, and thus, the first diff. So interestingly, when we
              * divide by total_nr here, we're not dividing by the number of
              * packets, but by the number of diffs.
+             * Important: total_nr here is never 0; when the first packet is
+             * handled, that logic increments total_nr from 0 to 1; here, it is
+             * always >=1 .
              */
             statinfo->mean_jitter = (statinfo->mean_jitter*(statinfo->total_nr-1) + current_diff) / statinfo->total_nr;
 
