@@ -320,7 +320,7 @@ dissect_grpc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
         }
         /* ready to add information into protocol columns and tree */
         if (offset == 0) { /* change columns only when there is at least one grpc message will be parsed */
-            col_set_str(pinfo->cinfo, COL_PROTOCOL, "GRPC");
+            col_set_str(pinfo->cinfo, COL_PROTOCOL, "GRPC ");
             col_append_str(pinfo->cinfo, COL_INFO, " (GRPC)");
             col_set_fence(pinfo->cinfo, COL_PROTOCOL);
         }
