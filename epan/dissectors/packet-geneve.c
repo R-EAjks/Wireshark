@@ -48,7 +48,7 @@ static const range_string class_id_names[] = {
     { 0x0119, 0x0128, "Ericsson" }
     { 0x0129, 0xFEFF, "Unassigned" },
     { 0xFFF0, 0xFFFF, "Experimental" },
-    { 0, 0, NULL }
+    { 0, 0, NULL },
 };
 
 void proto_register_geneve(void);
