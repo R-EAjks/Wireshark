@@ -258,7 +258,7 @@ static const value_string eap_type_vals[] = {
 };
 value_string_ext eap_type_vals_ext = VALUE_STRING_EXT_INIT(eap_type_vals);
 
-const value_string eap_identity_prefix_vals[] = {
+static const value_string eap_identity_prefix_vals[] = {
   { 0x00, "Encrypted IMSI" },
   {  '0', "EAP-AKA Permanent" },
   {  '1', "EAP-SIM Permanent" },
@@ -354,7 +354,7 @@ static const value_string eap_sim_aka_attribute_vals[] = {
   { 151, "AT_DEVICE_IDENTITY" },
   { 0, NULL }
 };
-value_string_ext eap_sim_aka_attribute_vals_ext = VALUE_STRING_EXT_INIT(eap_sim_aka_attribute_vals);
+static value_string_ext eap_sim_aka_attribute_vals_ext = VALUE_STRING_EXT_INIT(eap_sim_aka_attribute_vals);
 
 static const value_string eap_sim_aka_notification_vals[] = {
   {    0, "General Failure after Authentication" },
@@ -927,6 +927,7 @@ dissect_eap_identity_wlan(tvbuff_t *tvb, packet_info* pinfo, proto_tree* tree, i
     (guint)(strlen(realm_tokens[2]) - strlen("mcc")), mcc);
 end:
   g_strfreev(tokens);
+  g_strfreev(realm_tokens);
 
   return ret;
 }

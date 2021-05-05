@@ -7256,11 +7256,21 @@ static stat_tap_table_item dhcp_stat_fields[] = {{TABLE_ITEM_STRING, TAP_ALIGN_L
 
 static void dhcp_stat_init(stat_tap_table_ui* new_stat)
 {
+	const char *table_name = "DHCP Statistics";
 	int num_fields = sizeof(dhcp_stat_fields)/sizeof(stat_tap_table_item);
-	stat_tap_table* table = stat_tap_init_table("DHCP Statistics", num_fields, 0, NULL);
+	stat_tap_table *table;
 	int i = 0;
 	stat_tap_table_item_type items[sizeof(dhcp_stat_fields)/sizeof(stat_tap_table_item)];
 
+	table = stat_tap_find_table(new_stat, table_name);
+	if (table) {
+		if (new_stat->stat_tap_reset_table_cb) {
+			new_stat->stat_tap_reset_table_cb(table);
+		}
+		return;
+	}
+
+	table = stat_tap_init_table(table_name, num_fields, 0, NULL);
 	stat_tap_add_table(new_stat, table);
 
 	/* Add a row for each value type */
@@ -7283,14 +7293,13 @@ dhcp_stat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _U_,
 	const char* value = (const char*)data;
 	stat_tap_table* table;
 	stat_tap_table_item_type* msg_data;
-	guint i = 0;
 	gint idx;
 
 	idx = str_to_val_idx(value, opt53_text);
 	if (idx < 0)
 		return TAP_PACKET_DONT_REDRAW;
 
-	table = g_array_index(stat_data->stat_tap_data->tables, stat_tap_table*, i);
+	table = g_array_index(stat_data->stat_tap_data->tables, stat_tap_table*, 0);
 	msg_data = stat_tap_get_field_data(table, idx, PACKET_COLUMN);
 	msg_data->value.uint_value++;
 	stat_tap_set_field_data(table, idx, PACKET_COLUMN, msg_data);

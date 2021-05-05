@@ -1158,11 +1158,21 @@ static stat_tap_table_item camel_stat_fields[] = {{TABLE_ITEM_STRING, TAP_ALIGN_
 
 static void camel_stat_init(stat_tap_table_ui* new_stat)
 {
+  const char *table_name = "CAMEL Message Counters";
   int num_fields = sizeof(camel_stat_fields)/sizeof(stat_tap_table_item);
-  stat_tap_table* table = stat_tap_init_table("CAMEL Message Counters", num_fields, 0, NULL);
+  stat_tap_table *table;
   int i;
   stat_tap_table_item_type items[sizeof(camel_stat_fields)/sizeof(stat_tap_table_item)];
 
+  table = stat_tap_find_table(new_stat, table_name);
+  if (table) {
+    if (new_stat->stat_tap_reset_table_cb) {
+      new_stat->stat_tap_reset_table_cb(table);
+    }
+    return;
+  }
+
+  table = stat_tap_init_table(table_name, num_fields, 0, NULL);
   stat_tap_add_table(new_stat, table);
 
   items[MESSAGE_TYPE_COLUMN].type = TABLE_ITEM_STRING;
@@ -1192,9 +1202,8 @@ camel_stat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _U_
   const struct camelsrt_info_t *csi = (const struct camelsrt_info_t *) csi_ptr;
   stat_tap_table* table;
   stat_tap_table_item_type* msg_data;
-  guint i = 0;
 
-  table = g_array_index(stat_data->stat_tap_data->tables, stat_tap_table*, i);
+  table = g_array_index(stat_data->stat_tap_data->tables, stat_tap_table*, 0);
   if (csi->opcode >= table->num_elements)
     return TAP_PACKET_DONT_REDRAW;
   msg_data = stat_tap_get_field_data(table, csi->opcode, COUNT_COLUMN);

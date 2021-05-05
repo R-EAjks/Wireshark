@@ -1117,7 +1117,7 @@ static const value_string win32_urb_function_vals[] = {
     {0x0034, "URB_FUNCTION_RESERVE_0X0034"},
     {0, NULL}
 };
-value_string_ext win32_urb_function_vals_ext = VALUE_STRING_EXT_INIT(win32_urb_function_vals);
+static value_string_ext win32_urb_function_vals_ext = VALUE_STRING_EXT_INIT(win32_urb_function_vals);
 
 static const value_string win32_usbd_status_vals[] = {
     {0x00000000, "USBD_STATUS_SUCCESS"},
@@ -1613,7 +1613,7 @@ static int usb_addr_to_str(const address* addr, gchar *buf, int buf_len _U_)
     const guint8 *addrp = (const guint8 *)addr->data;
 
     if(pletoh32(&addrp[0])==0xffffffff){
-        g_strlcpy(buf, "host", buf_len);
+        (void) g_strlcpy(buf, "host", buf_len);
     } else {
         g_snprintf(buf, buf_len, "%d.%d.%d", pletoh16(&addrp[8]),
                         pletoh32(&addrp[0]), pletoh32(&addrp[4]));
@@ -3877,12 +3877,8 @@ dissect_usb_setup_request(packet_info *pinfo, proto_tree *tree,
                     next_tvb, 0, 1, ENC_LITTLE_ENDIAN);
             dissect_usb_setup_generic(pinfo, setup_tree,
                     next_tvb, 1, usb_conv_info);
-        } else if (data_tvb) {
-            proto_tree_add_item(setup_tree, hf_usb_request_unknown_class,
-                    tvb, setup_offset, 1, ENC_LITTLE_ENDIAN);
-            dissect_usb_setup_generic(pinfo, setup_tree,
-                    tvb, setup_offset+1, usb_conv_info);
         }
+        /* at this point, non-standard request has been dissectored */
     }
 
     if (data_tvb)
@@ -4112,7 +4108,7 @@ dissect_darwin_buffer_packet_header(tvbuff_t *tvb, packet_info *pinfo, proto_tre
 }
 
 /* Set the usb_address_t fields based on the direction of the urb */
-void
+static void
 usb_set_addr(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, guint16 bus_id, guint16 device_address,
              int endpoint, gboolean req)
 {

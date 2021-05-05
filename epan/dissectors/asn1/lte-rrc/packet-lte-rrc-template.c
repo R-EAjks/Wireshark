@@ -1,7 +1,7 @@
 /* packet-lte-rrc-template.c
  * Routines for Evolved Universal Terrestrial Radio Access (E-UTRA);
  * Radio Resource Control (RRC) protocol specification
- * (3GPP TS 36.331 V16.3.0 Release 16) packet dissection
+ * (3GPP TS 36.331 V16.4.0 Release 16) packet dissection
  * Copyright 2008, Vincent Helfre
  * Copyright 2009-2021, Pascal Quantin
  *
@@ -17,6 +17,7 @@
 #include <stdlib.h>
 
 #include <epan/packet.h>
+#include <epan/prefs.h>
 #include <epan/to_str.h>
 #include <epan/asn1.h>
 #include <epan/expert.h>
@@ -48,6 +49,7 @@ void proto_register_lte_rrc(void);
 void proto_reg_handoff_lte_rrc(void);
 
 static dissector_handle_t nas_eps_handle = NULL;
+static dissector_handle_t nas_5gs_handle = NULL;
 static dissector_handle_t rrc_irat_ho_to_utran_cmd_handle = NULL;
 static dissector_handle_t rrc_sys_info_cont_handle = NULL;
 static dissector_handle_t gsm_a_dtap_handle = NULL;
@@ -63,6 +65,7 @@ static wmem_map_t *lte_rrc_system_info_value_changed_hash = NULL;
 static guint8     system_info_value_current;
 static gboolean   system_info_value_current_set;
 
+static gboolean lte_rrc_nas_in_root_tree;
 
 extern int proto_mac_lte;
 extern int proto_rlc_lte;
@@ -4444,6 +4447,7 @@ void proto_register_lte_rrc(void) {
   };
 
   expert_module_t* expert_lte_rrc;
+  module_t *lte_rrc_module;
 
   /* Register protocol */
   proto_lte_rrc = proto_register_protocol(PNAME, PSNAME, PFNAME);
@@ -4491,6 +4495,12 @@ void proto_register_lte_rrc(void) {
   reassembly_table_register(&lte_rrc_sib12_reassembly_table,
                         &addresses_reassembly_table_functions);
 
+  /* Register configuration preferences */
+  lte_rrc_module = prefs_register_protocol(proto_lte_rrc, NULL);
+  prefs_register_bool_preference(lte_rrc_module, "nas_in_root_tree",
+                                 "Show NAS PDU in root packet details",
+                                 "Whether the NAS PDU should be shown in the root packet details tree",
+                                 &lte_rrc_nas_in_root_tree);
 }
 
 
@@ -4500,6 +4510,7 @@ proto_reg_handoff_lte_rrc(void)
 {
   dissector_add_for_decode_as_with_preference("udp.port", lte_rrc_dl_ccch_handle);
   nas_eps_handle = find_dissector("nas-eps");
+  nas_5gs_handle = find_dissector("nas-5gs");
   rrc_irat_ho_to_utran_cmd_handle = find_dissector("rrc.irat.ho_to_utran_cmd");
   rrc_sys_info_cont_handle = find_dissector("rrc.sysinfo.cont");
   gsm_a_dtap_handle = find_dissector("gsm_a_dtap");

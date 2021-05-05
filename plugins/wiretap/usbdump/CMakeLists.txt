@@ -27,11 +27,6 @@ set_source_files_properties(
 	COMPILE_FLAGS "${WERROR_COMMON_FLAGS}"
 )
 
-include_directories(
-	${CMAKE_SOURCE_DIR}/wiretap
-	${CMAKE_CURRENT_SOURCE_DIR}
-)
-
 register_plugin_files(plugin.c
 	plugin_wtap
 	${WIRETAP_SRC}
@@ -48,7 +43,6 @@ CHECKAPI(
 	NAME
 	  usbdump
 	SWITCHES
-	  -g abort -g termoutput
 	SOURCES
 	  ${WIRETAP_SRC}
 	  ${WIRETAP_HEADERS}

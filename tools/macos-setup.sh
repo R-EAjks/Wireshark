@@ -19,11 +19,10 @@ shopt -s extglob
 DARWIN_MAJOR_VERSION=`uname -r | sed 's/\([0-9]*\).*/\1/'`
 
 #
-# To make this work on Leopard (rather than working *on* Snow Leopard
-# when building *for* Leopard) will take more work.
-#
-if [[ $DARWIN_MAJOR_VERSION -le 9 ]]; then
-    echo "This script does not support any versions of macOS before Snow Leopard" 1>&2
+# The minimum supported version of Qt is 5.6, so the minimum supported version
+# of macOS is OS X 10.8 (Mountain Lion), aka Darwin 12.0
+if [[ $DARWIN_MAJOR_VERSION -lt 12 ]]; then
+    echo "This script does not support any versions of macOS before Mountain Lion" 1>&2
     exit 1
 fi
 
@@ -69,26 +68,18 @@ PCRE_VERSION=8.44
 # CMake is required to do the build - and to build some of the
 # dependencies.
 #
-# Sigh.  CMake versions 3.7 and later fail on Lion due to issues with
-# Lion's libc++, and CMake 3.5 and 3.6 have an annoying "Make sure the
-# combination of SDK and Deployment Target are allowed" check that fails
-# in some cases.
-#
 # 3.19.2 is the first version to support Apple Silicon, but the precompiled
 # binary on cmake.org is only a universal binary that requires macOS 10.0
 # (Yosemite) or newer.
 #
-# So if you're on Lion, we choose version 3.5.2, otherwise on Mountain
-# Lion and Mavericks we choose the last stable release that works on
-# them (3.18.5), and on Yosemite and later we choose the latest stable
-# version (currently 3.19.2).
+# So on Mountain Lion and Mavericks we choose the last stable release that
+# works on them (3.18.6), and on Yosemite and later we choose the latest stable
+# version (currently 3.19.7).
 #
 if [[ $DARWIN_MAJOR_VERSION -gt 13 ]]; then
-    CMAKE_VERSION=${CMAKE_VERSION-3.19.2}
-elif [[ $DARWIN_MAJOR_VERSION -gt 11 ]]; then
-    CMAKE_VERSION=${CMAKE_VERSION-3.18.5}
+    CMAKE_VERSION=${CMAKE_VERSION-3.19.7}
 else
-    CMAKE_VERSION=${CMAKE_VERSION-3.5.2}
+    CMAKE_VERSION=${CMAKE_VERSION-3.18.6}
 fi
 
 #
@@ -123,12 +114,7 @@ LIBGCRYPT_VERSION=1.8.7
 # "QT_VERSION=5.10.1 ./macos-setup.sh"
 # will build and install with QT 5.10.1.
 #
-# Note that Qt 5, prior to 5.5.0, mishandles context menus in ways that,
-# for example, cause them not to work reliably in the packet detail or
-# packet data pane; see, for example, Qt bugs QTBUG-31937, QTBUG-41017,
-# and QTBUG-43464, all of which seem to be the same bug.
-#
-QT_VERSION=${QT_VERSION-5.12.6}
+QT_VERSION=${QT_VERSION-5.12.10}
 
 if [ "$QT_VERSION" ]; then
     QT_MAJOR_VERSION="`expr $QT_VERSION : '\([0-9][0-9]*\).*'`"
@@ -197,12 +183,12 @@ OPUS_VERSION=1.3.1
 # 3.7.6 is the final version of Python to have official packages for the
 # 64-bit/32-bit variant that supports 10.6 (Snow Leopard) through 10.8
 # (Mountain Lion), and 3.9.1 is the first version of Python to support
-# macOS 11 Big Sur and Apple Silicon (arm-based Macs).
+# macOS 11 Big Sur and Apple Silicon (Arm-based Macs).
 
-# So on Snow Leopard through Mountain Lion, choose 3.7.6, otherwise
-# get the latest stable version (3.9.1).
+# So on Mountain Lion, choose 3.7.6, otherwise get the latest stable version
+# (3.9.3).
 if [[ $DARWIN_MAJOR_VERSION -gt 12 ]]; then
-    PYTHON3_VERSION=3.9.1
+    PYTHON3_VERSION=3.9.3
 else
     PYTHON3_VERSION=3.7.6
 fi
@@ -601,21 +587,22 @@ install_cmake() {
             # Download the DMG and do a drag install, where "drag" means
             # "mv".
             #
-            # 3.0.* and 3.1.0 have a Darwin64-universal DMG.
-            # 3.1.1 and later have a Darwin-x86_64 DMG.
-	    # 3.19.2 and later have a macos-universal DMG.
-            # Probably not many people are still developing on 32-bit
-            # Macs, so we don't worry about them.
+            # 3.1.1 to 3.19.1 have a Darwin-x86_64 DMG.
+            # 3.19.2 has a macos-universal DMG for 10.10 and later
+            # 3.19.3 and later have a macos-universal DMG for 10.13 and later,
+            # and a macos10.10-universal DMG for 10.10 and later.
             #
-            if [ "$CMAKE_MINOR_VERSION" = 0 -o \
-                 "$CMAKE_VERSION" = 3.1.0 ]; then
-                type="Darwin64-universal"
-	    elif [ "$CMAKE_MINOR_VERSION" -lt 19 -o \
-		 "$CMAKE_VERSION" = 3.19.0 -o \
-		 "$CMAKE_VERSION" = 3.19.1 ]; then
+            if [ "$CMAKE_MINOR_VERSION" -lt 5]; then
+                echo "CMake $CMAKE_VERSION" is too old 1>&2
+            elif [ "$CMAKE_MINOR_VERSION" -lt 19 -o \
+                 "$CMAKE_VERSION" = 3.19.0 -o \
+                 "$CMAKE_VERSION" = 3.19.1 ]; then
                 type="Darwin-x86_64"
-	    else
-		type="macos-universal"
+            elif [ "$CMAKE_VERSION" = 3.19.2 -o \
+                 "$DARWIN_MAJOR_VERSION" -ge 17 ]; then
+                type="macos-universal"
+            else
+                type="macos10.0-universal"
             fi
             [ -f cmake-$CMAKE_VERSION-$type.dmg ] || curl -L -O https://cmake.org/files/v$CMAKE_MAJOR_MINOR_VERSION/cmake-$CMAKE_VERSION-$type.dmg || exit 1
             $no_build && echo "Skipping installation" && return
@@ -672,9 +659,9 @@ uninstall_cmake() {
             # Get rid of the previously downloaded and unpacked version,
             # whatever it might happen to be called.
             #
-            rm -f cmake-$installed_cmake_version-Darwin64-universal.dmg
             rm -f cmake-$installed_cmake_version-Darwin-x86_64.dmg
             rm -f cmake-$installed_cmake_version-macos-universal.dmg
+            rm -f cmake-$installed_cmake_version-macos10.0-universal.dmg
         fi
 
         installed_cmake_version=""
@@ -855,6 +842,9 @@ install_qt() {
         # 5.2.1:      qt-opensource-mac-x64-clang-{version}.dmg
         # 5.3 - 5.8:  qt-opensource-mac-x64-clang-{version}.dmg
         # 5.9 - 5.14: qt-opensource-mac-x64-{version}.dmg
+        # 5.15 - 6.0: Offline installers no longer provided.
+        # ( http://download.qt.io/archive/qt/5.15/5.15.0/OFFLINE_README.txt )
+        # XXX: We need a different approach for QT >= 5.15
         #
         case $QT_MAJOR_VERSION in
 
@@ -862,20 +852,24 @@ install_qt() {
             echo "Qt $QT_VERSION" is too old 1>&2
             ;;
 
-        5*)
+        5)
             case $QT_MINOR_VERSION in
 
-            0|1|2)
+            0|1|2|3|4|5)
                 echo "Qt $QT_VERSION" is too old 1>&2
                 ;;
 
-            3|4|5|6|7|8)
+            6|7|8)
                 QT_VOLUME=qt-opensource-mac-x64-clang-$QT_VERSION
                 ;;
 
             9|10|11|12|13|14)
                 QT_VOLUME=qt-opensource-mac-x64-$QT_VERSION
                 ;;
+            *)
+		echo "The Qt Company no longer provides open source offline installers for Qt $QT_VERSION" 1>&2
+		;;
+
             esac
             [ -f $QT_VOLUME.dmg ] || curl -L -O http://download.qt.io/archive/qt/$QT_MAJOR_MINOR_VERSION/$QT_MAJOR_MINOR_DOTDOT_VERSION/$QT_VOLUME.dmg || exit 1
             $no_build && echo "Skipping installation" && return
@@ -888,6 +882,9 @@ install_qt() {
             /Volumes/$QT_VOLUME/$QT_VOLUME.app/Contents/MacOS/$QT_VOLUME
             sudo hdiutil detach /Volumes/$QT_VOLUME
             touch qt-$QT_VERSION-done
+        *)
+            echo "The Qt Company no longer provides open source offline installers for Qt $QT_VERSION" 1>&2
+            ;;
         esac
     fi
 }
@@ -920,28 +917,15 @@ uninstall_qt() {
             5*)
                 case $installed_qt_minor_version in
 
-                0|1)
+                0|1|2)
                     echo "Qt $installed_qt_version" is too old 1>&2
-                    ;;
-
-                2)
-                    case $installed_qt_dotdot_version in
-
-                    0)
-                        installed_qt_volume=qt-mac-opensource-$installed_qt_version.dmg
-                        ;;
-
-                    1)
-                        installed_qt_volume=qt-opensource-mac-x64-clang-$installed_qt_version.dmg
-                        ;;
-                    esac
                     ;;
 
                 3|4|5|6|7|8)
                     installed_qt_volume=qt-opensource-mac-x64-clang-$installed_qt_version.dmg
                     ;;
 
-                9|10)
+                9|10|11|12|13|14)
                     installed_qt_volume=qt-opensource-mac-x64-$installed_qt_version.dmg
                     ;;
                 esac
@@ -2004,17 +1988,22 @@ uninstall_opus() {
 }
 
 install_python3() {
-    # The macos11.0 installer can be deployed to older versions, down to
+    # The macos11 installer can be deployed to older versions, down to
     # 10.9 (Mavericks), but is still considered experimental so continue
     # to use the 64-bit installer (10.9) on earlier releases for now.
     local macver=x10.9
     if [[ $DARWIN_MAJOR_VERSION -gt 19 ]]; then
-        # The macos11.0 installer is required for arm-based macs, which require
-        # macOS 11 Big Sur. Note that the 'x' was removed from the package name.
-        macver=11.0
+        # The macos11 installer is required for Arm-based Macs, which require
+        # macOS 11 Big Sur. Note that the package name is "11.0" (no x) for
+        # 3.9.1 but simply "11" for 3.9.2 (and later)
+        if [[ $PYTHON3_VERSION = 3.9.1 ]]; then
+            macver=11.0
+        else
+            macver=11
+        fi
     elif [[ $DARWIN_MAJOR_VERSION -lt 13 ]]; then
         # The 64-bit installer requires 10.9 (Mavericks), use the 64-bit/32-bit
-        # variant for 10.6 (Snow Leopard) through 10.8 (Mountain Lion).
+        # variant for 10.8 (Mountain Lion).
         macver=x10.6
     fi
     if [ "$PYTHON3_VERSION" -a ! -f python3-$PYTHON3_VERSION-done ] ; then
@@ -2052,6 +2041,7 @@ uninstall_python3() {
             #
             # Get rid of the previously downloaded and unpacked version.
             #
+            rm -f python-$installed_python3_version-macos11.pkg
             rm -f python-$installed_python3_version-macos11.0.pkg
             rm -f python-$installed_python3_version-macosx10.9.pkg
             rm -f python-$installed_python3_version-macosx10.6.pkg
@@ -3134,10 +3124,12 @@ then
 
             #
             # Is it for the deployment target or some later release?
+            # Starting with major 11, the minor version no longer matters.
             #
             if test "$sdk_major" -gt "$min_osx_target_major" -o \
                 \( "$sdk_major" -eq "$min_osx_target_major" -a \
-                   "$sdk_minor" -ge "$min_osx_target_minor" \)
+                \( "$sdk_major" -ge 11 -o \
+                   "$sdk_minor" -ge "$min_osx_target_minor" \) \)
             then
                 #
                 # Yes, use it.

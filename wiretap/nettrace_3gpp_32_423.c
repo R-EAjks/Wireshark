@@ -23,7 +23,6 @@
 
 #include "wtap-int.h"
 #include "file_wrappers.h"
-#include "pcap-encap.h"
 
 #include <epan/exported_pdu.h>
 #include <wsutil/buffer.h>
@@ -33,7 +32,6 @@
 #include <wsutil/inet_addr.h>
 
 
-#include "pcapng.h"
 #include "nettrace_3gpp_32_423.h"
 
 /* String constants sought in the XML data.
@@ -111,6 +109,10 @@ typedef struct exported_pdu_info {
 #define EXP_PDU_TAG_COL_PROT_BIT	0x0200
 
 
+static int nettrace_3gpp_32_423_file_type_subtype = -1;
+
+void register_nettrace_3gpp_32_423(void);
+
 /* Parse a string IPv4 or IPv6 address into bytes for exported_pdu_info.
  * Also parses the port pairs and transport layer type.
  */
@@ -144,7 +146,7 @@ nettrace_parse_address(char* curr_pos, char* next_pos, gboolean is_src_addr, exp
 
 	curr_pos = skip_pos;
 
-	g_strlcpy(str, curr_pos, 3);
+	(void) g_strlcpy(str, curr_pos, 3);
 	/* If we find "" here we have no IP address */
 	if (strcmp(str, "\"\"") == 0) {
 		return next_pos;
@@ -166,7 +168,7 @@ nettrace_parse_address(char* curr_pos, char* next_pos, gboolean is_src_addr, exp
 	if (str_len > WS_INET6_ADDRSTRLEN) {
 		return next_pos;
 	}
-	g_strlcpy(ip_addr_str, curr_pos, str_len);
+	(void) g_strlcpy(ip_addr_str, curr_pos, str_len);
 	curr_pos = end_pos;
 	if (ws_inet_pton6(ip_addr_str, &ip6_addr)) {
 		if (is_src_addr) {
@@ -330,7 +332,7 @@ nettrace_msg_to_packet(nettrace_3gpp_32_423_file_info_t *file_info, wtap_rec *re
 			goto end;
 		}
 
-		g_strlcpy(name_str, curr_pos, (gsize)name_str_len + 1);
+		(void) g_strlcpy(name_str, curr_pos, (gsize)name_str_len + 1);
 		ascii_strdown_inplace(name_str);
 
 	}
@@ -390,7 +392,7 @@ nettrace_msg_to_packet(nettrace_3gpp_32_423_file_info_t *file_info, wtap_rec *re
 		status = FALSE;
 		goto end;
 	}
-	g_strlcpy(proto_name_str, curr_pos, (gsize)proto_str_len+1);
+	(void) g_strlcpy(proto_name_str, curr_pos, (gsize)proto_str_len+1);
 	ascii_strdown_inplace(proto_name_str);
 
 	/* Do string matching and replace with Wiresharks protocol name */
@@ -402,7 +404,7 @@ nettrace_msg_to_packet(nettrace_3gpp_32_423_file_info_t *file_info, wtap_rec *re
 	/* XXX Do we need to check for function="S1"? */
 	if (strcmp(proto_name_str, "nas") == 0) {
 		/* Change to nas-eps_plain */
-		g_strlcpy(proto_name_str, c_nas_eps, sizeof(c_nas_eps));
+		(void) g_strlcpy(proto_name_str, c_nas_eps, sizeof(c_nas_eps));
 		proto_str_len = CLEN(c_nas_eps);
 	}
 	if (strcmp(proto_name_str, "map") == 0) {
@@ -413,14 +415,14 @@ nettrace_msg_to_packet(nettrace_3gpp_32_423_file_info_t *file_info, wtap_rec *re
 
 		if (strcmp(name_str, "sai_request") == 0) {
 			use_proto_table = TRUE;
-			g_strlcpy(dissector_table_str, c_sai_req, sizeof(c_sai_req));
+			(void) g_strlcpy(dissector_table_str, c_sai_req, sizeof(c_sai_req));
 			dissector_table_str_len = CLEN(c_sai_req);
 			dissector_table_val = 56;
 			exported_pdu_info.presence_flags |= EXP_PDU_TAG_COL_PROT_BIT;
 		}
 		else if (strcmp(name_str, "sai_response") == 0) {
 			use_proto_table = TRUE;
-			g_strlcpy(dissector_table_str, c_sai_rsp, sizeof(c_sai_rsp));
+			(void) g_strlcpy(dissector_table_str, c_sai_rsp, sizeof(c_sai_rsp));
 			dissector_table_str_len = CLEN(c_sai_rsp);
 			dissector_table_val = 56;
 			exported_pdu_info.presence_flags |= EXP_PDU_TAG_COL_PROT_BIT;
@@ -615,7 +617,7 @@ nettrace_msg_to_packet(nettrace_3gpp_32_423_file_info_t *file_info, wtap_rec *re
 		}
 		else {
 			/* Something wrong, bail out */
-			*err_info = g_strdup_printf("Could not parse hex data,bufzize %u index %u %c%c",
+			*err_info = g_strdup_printf("Could not parse hex data, bufsize %u index %u %c%c",
 				(pkt_data_len + exp_pdu_tags_len),
 				i,
 				chr1,
@@ -815,7 +817,7 @@ nettrace_3gpp_32_423_file_open(wtap *wth, int *err, gchar **err_info)
 	file_info->buffer = g_byte_array_sized_new(RINGBUFFER_START_SIZE);
 	g_byte_array_append(file_info->buffer, curr_pos, (guint)(bytes_read - (curr_pos - magic_buf)));
 
-	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_NETTRACE_3GPP_32_423;
+	wth->file_type_subtype = nettrace_3gpp_32_423_file_type_subtype;
 	wth->file_encap = WTAP_ENCAP_WIRESHARK_UPPER_PDU;
 	wth->file_tsprec = WTAP_TSPREC_MSEC;
 	wth->subtype_read = nettrace_read;
@@ -825,6 +827,31 @@ nettrace_3gpp_32_423_file_open(wtap *wth, int *err, gchar **err_info)
 	wth->priv = (void*)file_info;
 
 	return WTAP_OPEN_MINE;
+}
+
+static const struct supported_block_type nettrace_3gpp_32_423_blocks_supported[] = {
+	/*
+	 * We support packet blocks, with no comments or other options.
+	 */
+	{ WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info nettrace_3gpp_32_423_info = {
+	"3GPP TS 32.423 Trace", "3gpp32423", NULL, NULL,
+	FALSE, BLOCKS_SUPPORTED(nettrace_3gpp_32_423_blocks_supported),
+	NULL, NULL, NULL
+};
+
+void register_nettrace_3gpp_32_423(void)
+{
+	nettrace_3gpp_32_423_file_type_subtype = wtap_register_file_type_subtype(&nettrace_3gpp_32_423_info);
+
+	/*
+	 * Register name for backwards compatibility with the
+	 * wtap_filetypes table in Lua.
+	 */
+	wtap_register_backwards_compatibility_lua_name("NETTRACE_3GPP_32_423",
+	    nettrace_3gpp_32_423_file_type_subtype);
 }
 
 /*

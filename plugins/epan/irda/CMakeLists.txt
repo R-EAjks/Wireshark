@@ -29,8 +29,6 @@ set_source_files_properties(
 	COMPILE_FLAGS "${WERROR_COMMON_FLAGS}"
 )
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-
 register_plugin_files(plugin.c
 	plugin
 	${DISSECTOR_SRC}
@@ -47,7 +45,8 @@ CHECKAPI(
 	NAME
 	  irda
 	SWITCHES
-	  -g abort -g termoutput
+	  --group dissectors-prohibited
+	  --group dissectors-restricted
 	SOURCES
 	  ${DISSECTOR_SRC}
 	  ${DISSECTOR_HEADERS}

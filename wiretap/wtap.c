@@ -15,22 +15,42 @@
 
 #include "wtap-int.h"
 #include "wtap_opttypes.h"
-#include "pcapng.h"
 
 #include "file_wrappers.h"
 #include <wsutil/file_util.h>
 #include <wsutil/buffer.h>
+#ifdef HAVE_PLUGINS
+#include <wsutil/plugins.h>
+#endif
 
 #ifdef HAVE_PLUGINS
-
-
 static plugins_t *libwiretap_plugins = NULL;
+#endif
+
 static GSList *wtap_plugins = NULL;
 
+#ifdef HAVE_PLUGINS
 void
 wtap_register_plugin(const wtap_plugin *plug)
 {
 	wtap_plugins = g_slist_prepend(wtap_plugins, (wtap_plugin *)plug);
+}
+#else /* HAVE_PLUGINS */
+void
+wtap_register_plugin(const wtap_plugin *plug _U_)
+{
+	wtap_warn("wtap_register_plugin: built without support for binary plugins");
+}
+#endif /* HAVE_PLUGINS */
+
+int
+wtap_plugins_supported(void)
+{
+#ifdef HAVE_PLUGINS
+	return g_module_supported() ? 0 : 1;
+#else
+	return -1;
+#endif
 }
 
 static void
@@ -42,7 +62,6 @@ call_plugin_register_wtap_module(gpointer data, gpointer user_data _U_)
 		plug->register_wtap_module();
 	}
 }
-#endif /* HAVE_PLUGINS */
 
 /*
  * Return the size of the file, as reported by the OS.
@@ -195,7 +214,7 @@ wtap_add_generated_idb(wtap *wth)
 	g_assert(wth->file_tsprec != WTAP_TSPREC_UNKNOWN &&
 	    wth->file_tsprec != WTAP_TSPREC_PER_PACKET);
 
-	idb = wtap_block_create(WTAP_BLOCK_IF_DESCR);
+	idb = wtap_block_create(WTAP_BLOCK_IF_ID_AND_INFO);
 
 	if_descr_mand = (wtapng_if_descr_mandatory_t*)wtap_block_get_mandatory_data(idb);
 	if_descr_mand->wtap_encap = wth->file_encap;
@@ -295,7 +314,7 @@ wtap_get_debug_if_descr(const wtap_block_t if_descr,
 	guint64 tmp64;
 	gint8 itmp8;
 	guint8 tmp8;
-	wtapng_if_descr_filter_t* if_filter;
+	if_filter_opt_t if_filter;
 
 	g_assert(if_descr);
 
@@ -365,16 +384,30 @@ wtap_get_debug_if_descr(const wtap_block_t if_descr,
 				line_end);
 	}
 
-	if (wtap_block_get_custom_option_value(if_descr, OPT_IDB_FILTER, (void**)&if_filter) == WTAP_OPTTYPE_SUCCESS) {
-		g_string_append_printf(info,
-				"%*cFilter string = %s%s", indent, ' ',
-				if_filter->if_filter_str ? if_filter->if_filter_str : "NONE",
-				line_end);
+	if (wtap_block_get_if_filter_option_value(if_descr, OPT_IDB_FILTER, &if_filter) == WTAP_OPTTYPE_SUCCESS) {
+		switch (if_filter.type) {
 
-		g_string_append_printf(info,
-				"%*cBPF filter length = %u%s", indent, ' ',
-				if_filter->bpf_filter_len,
-				line_end);
+		case if_filter_pcap:
+			g_string_append_printf(info,
+					"%*cFilter string = %s%s", indent, ' ',
+					if_filter.data.filter_str,
+					line_end);
+			break;
+
+		case if_filter_bpf:
+			g_string_append_printf(info,
+					"%*cBPF filter length = %u%s", indent, ' ',
+					if_filter.data.bpf_prog.bpf_prog_len,
+					line_end);
+			break;
+
+		default:
+			g_string_append_printf(info,
+					"%*cUnknown filter type %u%s", indent, ' ',
+					if_filter.type,
+					line_end);
+			break;
+		}
 	}
 
 	if (wtap_block_get_string_option_value(if_descr, OPT_IDB_OS, &tmp_content) == WTAP_OPTTYPE_SUCCESS) {
@@ -1135,6 +1168,9 @@ static struct encap_type_info encap_table_base[] = {
 
 	/* WTAP_ENCAP_ZWAVE_SERIAL */
 	{ "zwave-serial", "Z-Wave Serial API packets" },
+
+	/* WTAP_ENCAP_ETW */
+	{ "etw", "Event Tracing for Windows messages" },
 };
 
 WS_DLL_LOCAL
@@ -1403,6 +1439,8 @@ wtap_close(wtap *wth)
 		file_close(wth->random_fh);
 
 	g_free(wth->priv);
+
+	g_free(wth->pathname);
 
 	if (wth->fast_seek != NULL) {
 		g_ptr_array_foreach(wth->fast_seek, g_fast_seek_item_free, NULL);
@@ -1769,11 +1807,12 @@ wtap_init(gboolean load_wiretap_plugins)
 	init_open_routines();
 	wtap_opttypes_initialize();
 	wtap_init_encap_types();
+	wtap_init_file_type_subtypes();
 	if (load_wiretap_plugins) {
 #ifdef HAVE_PLUGINS
 		libwiretap_plugins = plugins_init(WS_PLUGIN_WIRETAP);
-		g_slist_foreach(wtap_plugins, call_plugin_register_wtap_module, NULL);
 #endif
+		g_slist_foreach(wtap_plugins, call_plugin_register_wtap_module, NULL);
 	}
 }
 
@@ -1787,9 +1826,9 @@ wtap_cleanup(void)
 	wtap_opttypes_cleanup();
 	ws_buffer_cleanup();
 	cleanup_open_routines();
-#ifdef HAVE_PLUGINS
 	g_slist_free(wtap_plugins);
 	wtap_plugins = NULL;
+#ifdef HAVE_PLUGINS
 	plugins_cleanup(libwiretap_plugins);
 	libwiretap_plugins = NULL;
 #endif

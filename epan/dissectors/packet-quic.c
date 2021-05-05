@@ -15,12 +15,14 @@
  * https://tools.ietf.org/html/draft-ietf-quic-transport-33
  * https://tools.ietf.org/html/draft-ietf-quic-tls-33
  * https://tools.ietf.org/html/draft-ietf-quic-invariants-12
+ * https://tools.ietf.org/html/draft-ietf-quic-version-negotiation-03
  *
  * Extension:
  * https://tools.ietf.org/html/draft-ferrieuxhamchaoui-quic-lossbits-03
  * https://tools.ietf.org/html/draft-pauly-quic-datagram-05
  * https://tools.ietf.org/html/draft-huitema-quic-ts-02
  * https://tools.ietf.org/html/draft-iyengar-quic-delayed-ack-00
+ * https://tools.ietf.org/html/draft-deconinck-quic-multipath-06
  *
  * Currently supported QUIC version(s): draft-21, draft-22, draft-23, draft-24,
  * draft-25, draft-26, draft-27, draft-28, draft-29, draft-30, draft-31, draft-32,
@@ -167,6 +169,23 @@ static int hf_quic_fragment_multiple_tails = -1;
 static int hf_quic_fragment_too_long_fragment = -1;
 static int hf_quic_fragment_error = -1;
 static int hf_quic_fragment_count = -1;
+static int hf_quic_mp_add_address_first_byte	= -1;
+static int hf_quic_mp_add_address_reserved = -1;
+static int hf_quic_mp_add_address_port_present = -1;
+static int hf_quic_mp_add_address_ip_version = -1;
+static int hf_quic_mp_add_address_id = -1;
+static int hf_quic_mp_add_address_sq_number = -1;
+static int hf_quic_mp_add_address_interface_type = -1;
+static int hf_quic_mp_add_address_ip_address = -1;
+static int hf_quic_mp_add_address_ip_address_v6 = -1;
+static int hf_quic_mp_add_address_port = -1;
+static int hf_quic_mp_uniflow_id = -1;
+static int hf_quic_mp_receiving_uniflows = -1;
+static int hf_quic_mp_active_sending_uniflows = -1;
+static int hf_quic_mp_add_local_address_id = -1;
+static int hf_quic_mp_uniflow_info_section = -1;
+static int hf_quic_mp_receiving_uniflow_info_section = -1;
+static int hf_quic_mp_active_sending_uniflows_info_section = -1;
 
 static expert_field ei_quic_connection_unknown = EI_INIT;
 static expert_field ei_quic_ft_unknown = EI_INIT;
@@ -425,51 +444,62 @@ static inline gboolean is_quic_draft_max(guint32 version, guint8 max_version) {
     return draft_version && draft_version <= max_version;
 }
 
-const value_string quic_version_vals[] = {
-    { 0x00000000, "Version Negotiation" },
-    { 0x00000001, "1" },
+const range_string quic_version_vals[] = {
+    { 0x00000000, 0x00000000, "Version Negotiation" },
+    { 0x00000001, 0x00000001, "1" },
+    { 0x45474700, 0x454747ff, "Quant" },
+    { 0x50435130, 0x50435131, "Picoquic internal" },
+    { 0x50524f58, 0x50524f58, "Proxied QUIC (PROX)" },
     /* Versions QXXX < Q050 are dissected by Wireshark as GQUIC and not as QUIC.
        Nonetheless, some implementations report these values in "Version Negotiation"
        packets, so decode these fields */
-    { 0x51303433, "Google Q043" },
-    { 0x51303434, "Google Q044" },
-    { 0x51303436, "Google Q046" },
-    { 0x51303530, "Google Q050" },
-    { 0x54303530, "Google T050" },
-    { 0x54303531, "Google T051" },
-    { 0xfaceb001, "Facebook mvfst (draft-22)" },
-    { 0xfaceb002, "Facebook mvfst (draft-27)" },
-    { 0xfaceb00e, "Facebook mvfst (Experimental)" },
-    { 0xff000004, "draft-04" },
-    { 0xff000005, "draft-05" },
-    { 0xff000006, "draft-06" },
-    { 0xff000007, "draft-07" },
-    { 0xff000008, "draft-08" },
-    { 0xff000009, "draft-09" },
-    { 0xff00000a, "draft-10" },
-    { 0xff00000b, "draft-11" },
-    { 0xff00000c, "draft-12" },
-    { 0xff00000d, "draft-13" },
-    { 0xff00000e, "draft-14" },
-    { 0xff00000f, "draft-15" },
-    { 0xff000010, "draft-16" },
-    { 0xff000011, "draft-17" },
-    { 0xff000012, "draft-18" },
-    { 0xff000013, "draft-19" },
-    { 0xff000014, "draft-20" },
-    { 0xff000015, "draft-21" },
-    { 0xff000016, "draft-22" },
-    { 0xff000017, "draft-23" },
-    { 0xff000018, "draft-24" },
-    { 0xff000019, "draft-25" },
-    { 0xff00001a, "draft-26" },
-    { 0xff00001b, "draft-27" },
-    { 0xff00001c, "draft-28" },
-    { 0xff00001d, "draft-29" },
-    { 0xff00001e, "draft-30" },
-    { 0xff00001f, "draft-31" },
-    { 0xff000020, "draft-32" },
-    { 0, NULL }
+    { 0x51303433, 0x51303433, "Google Q043" },
+    { 0x51303434, 0x51303434, "Google Q044" },
+    { 0x51303436, 0x51303436, "Google Q046" },
+    { 0x51303530, 0x51303530, "Google Q050" },
+    { 0x51474f00, 0x51474fff, "QGO (QUIC GO)" },
+    { 0x54303530, 0x54303530, "Google T050" },
+    { 0x54303531, 0x54303531, "Google T051" },
+    { 0x91c17000, 0x91c170ff, "Quicly" },
+    { 0xabcd0000, 0xabcd000f, "MsQuic" },
+    { 0xf0f0f0f0, 0xf0f0f0ff, "ETH Zürich (Measurability experiments)" },
+    { 0xf0f0f1f0, 0xf0f0f1ff, "Telecom Italia (Measurability experiments)" },
+    { 0xf123f0c0, 0xf123f0cf, "MozQuic" },
+    { 0xfaceb001, 0xfaceb001, "Facebook mvfst (draft-22)" },
+    { 0xfaceb002, 0xfaceb002, "Facebook mvfst (draft-27)" },
+    { 0xfaceb003, 0xfaceb00d, "Facebook mvfst" },
+    { 0xfaceb00e, 0xfaceb00e, "Facebook mvfst (Experimental)" },
+    { 0xfaceb00f, 0xfaceb00f, "Facebook mvfst" },
+    { 0xff000004, 0xff000004, "draft-04" },
+    { 0xff000005, 0xff000005, "draft-05" },
+    { 0xff000006, 0xff000006, "draft-06" },
+    { 0xff000007, 0xff000007, "draft-07" },
+    { 0xff000008, 0xff000008, "draft-08" },
+    { 0xff000009, 0xff000009, "draft-09" },
+    { 0xff00000a, 0xff00000a, "draft-10" },
+    { 0xff00000b, 0xff00000b, "draft-11" },
+    { 0xff00000c, 0xff00000c, "draft-12" },
+    { 0xff00000d, 0xff00000d, "draft-13" },
+    { 0xff00000e, 0xff00000e, "draft-14" },
+    { 0xff00000f, 0xff00000f, "draft-15" },
+    { 0xff000010, 0xff000010, "draft-16" },
+    { 0xff000011, 0xff000011, "draft-17" },
+    { 0xff000012, 0xff000012, "draft-18" },
+    { 0xff000013, 0xff000013, "draft-19" },
+    { 0xff000014, 0xff000014, "draft-20" },
+    { 0xff000015, 0xff000015, "draft-21" },
+    { 0xff000016, 0xff000016, "draft-22" },
+    { 0xff000017, 0xff000017, "draft-23" },
+    { 0xff000018, 0xff000018, "draft-24" },
+    { 0xff000019, 0xff000019, "draft-25" },
+    { 0xff00001a, 0xff00001a, "draft-26" },
+    { 0xff00001b, 0xff00001b, "draft-27" },
+    { 0xff00001c, 0xff00001c, "draft-28" },
+    { 0xff00001d, 0xff00001d, "draft-29" },
+    { 0xff00001e, 0xff00001e, "draft-30" },
+    { 0xff00001f, 0xff00001f, "draft-31" },
+    { 0xff000020, 0xff000020, "draft-32" },
+    { 0, 0, NULL }
 };
 
 static const value_string quic_short_long_header_vals[] = {
@@ -497,41 +527,48 @@ static const value_string quic_long_packet_type_vals[] = {
 };
 
 /* https://github.com/quicwg/base-drafts/wiki/Temporary-IANA-Registry#quic-frame-types */
-#define FT_PADDING              0x00
-#define FT_PING                 0x01
-#define FT_ACK                  0x02
-#define FT_ACK_ECN              0x03
-#define FT_RESET_STREAM         0x04
-#define FT_STOP_SENDING         0x05
-#define FT_CRYPTO               0x06
-#define FT_NEW_TOKEN            0x07
-#define FT_STREAM_8             0x08
-#define FT_STREAM_9             0x09
-#define FT_STREAM_A             0x0a
-#define FT_STREAM_B             0x0b
-#define FT_STREAM_C             0x0c
-#define FT_STREAM_D             0x0d
-#define FT_STREAM_E             0x0e
-#define FT_STREAM_F             0x0f
-#define FT_MAX_DATA             0x10
-#define FT_MAX_STREAM_DATA      0x11
-#define FT_MAX_STREAMS_BIDI     0x12
-#define FT_MAX_STREAMS_UNI      0x13
-#define FT_DATA_BLOCKED         0x14
-#define FT_STREAM_DATA_BLOCKED  0x15
-#define FT_STREAMS_BLOCKED_BIDI 0x16
-#define FT_STREAMS_BLOCKED_UNI  0x17
-#define FT_NEW_CONNECTION_ID    0x18
-#define FT_RETIRE_CONNECTION_ID 0x19
-#define FT_PATH_CHALLENGE       0x1a
-#define FT_PATH_RESPONSE        0x1b
-#define FT_CONNECTION_CLOSE_TPT 0x1c
-#define FT_CONNECTION_CLOSE_APP 0x1d
-#define FT_HANDSHAKE_DONE       0x1e
-#define FT_DATAGRAM             0x30
-#define FT_DATAGRAM_LENGTH      0x31
-#define FT_ACK_FREQUENCY        0xAF
-#define FT_TIME_STAMP           0x02F5
+#define FT_PADDING                  0x00
+#define FT_PING                     0x01
+#define FT_ACK                      0x02
+#define FT_ACK_ECN                  0x03
+#define FT_RESET_STREAM             0x04
+#define FT_STOP_SENDING             0x05
+#define FT_CRYPTO                   0x06
+#define FT_NEW_TOKEN                0x07
+#define FT_STREAM_8                 0x08
+#define FT_STREAM_9                 0x09
+#define FT_STREAM_A                 0x0a
+#define FT_STREAM_B                 0x0b
+#define FT_STREAM_C                 0x0c
+#define FT_STREAM_D                 0x0d
+#define FT_STREAM_E                 0x0e
+#define FT_STREAM_F                 0x0f
+#define FT_MAX_DATA                 0x10
+#define FT_MAX_STREAM_DATA          0x11
+#define FT_MAX_STREAMS_BIDI         0x12
+#define FT_MAX_STREAMS_UNI          0x13
+#define FT_DATA_BLOCKED             0x14
+#define FT_STREAM_DATA_BLOCKED      0x15
+#define FT_STREAMS_BLOCKED_BIDI     0x16
+#define FT_STREAMS_BLOCKED_UNI      0x17
+#define FT_NEW_CONNECTION_ID        0x18
+#define FT_RETIRE_CONNECTION_ID     0x19
+#define FT_PATH_CHALLENGE           0x1a
+#define FT_PATH_RESPONSE            0x1b
+#define FT_CONNECTION_CLOSE_TPT     0x1c
+#define FT_CONNECTION_CLOSE_APP     0x1d
+#define FT_HANDSHAKE_DONE           0x1e
+#define FT_DATAGRAM                 0x30
+#define FT_MP_NEW_CONNECTION_ID     0x40
+#define FT_MP_RETIRE_CONNECTION_ID  0x41
+#define FT_MP_ACK                   0x42
+#define FT_MP_ACK_ECN               0x43
+#define FT_ADD_ADDRESS              0x44
+#define FT_REMOVE_ADDRESS           0x45
+#define FT_UNIFLOWS                 0x46
+#define FT_DATAGRAM_LENGTH          0x31
+#define FT_ACK_FREQUENCY            0xAF
+#define FT_TIME_STAMP               0x02F5
 
 static const range_string quic_frame_type_vals[] = {
     { 0x00, 0x00,   "PADDING" },
@@ -558,6 +595,12 @@ static const range_string quic_frame_type_vals[] = {
     { 0x1d, 0x1d,   "CONNECTION_CLOSE (Application)" },
     { 0x1e, 0x1e,   "HANDSHAKE_DONE" },
     { 0x30, 0x31,   "DATAGRAM" },
+    { 0x40, 0x40,   "MP_NEW_CONNECTION_ID" },
+    { 0x41, 0x41,   "MP_RETIRE_CONNECTION_ID" },
+    { 0x42, 0x43,   "MP_ACK" },
+    { 0x44, 0x44,   "ADD_ADDRESS" },
+    { 0x45, 0x45,   "REMOVE_ADDRESS" },
+    { 0x46, 0x46,   "UNIFLOWS" },
     { 0xaf, 0xaf,   "ACK_FREQUENCY" },
     { 0x02f5, 0x02f5, "TIME_STAMP" },
     { 0,    0,        NULL },
@@ -590,6 +633,7 @@ static const range_string quic_transport_error_code_vals[] = {
     { 0x0010, 0x0010, "NO_VIABLE_PATH" },
     { 0x0100, 0x01ff, "CRYPTO_ERROR" },
     /* 0x40 - 0x3fff Assigned via Specification Required policy. */
+    { 0x53F8, 0x53F8, "VERSION_NEGOTIATION_ERROR" },
     { 0, 0, NULL }
 };
 
@@ -1570,14 +1614,29 @@ dissect_quic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *quic_tree
         }
         break;
         case FT_ACK:
-        case FT_ACK_ECN:{
+        case FT_ACK_ECN:
+        case FT_MP_ACK:
+        case FT_MP_ACK_ECN:{
             guint64 ack_range_count;
             gint32 lenvar;
 
-            if (frame_type == FT_ACK) {
-                col_append_fstr(pinfo->cinfo, COL_INFO, ", ACK");
-            } else {
-                col_append_fstr(pinfo->cinfo, COL_INFO, ", ACK_ECN");
+            switch(frame_type){
+                case FT_ACK:
+                    col_append_fstr(pinfo->cinfo, COL_INFO, ", ACK");
+                break;
+                case FT_ACK_ECN:
+                    col_append_fstr(pinfo->cinfo, COL_INFO, ", ACK_ECN");
+                break;
+                case FT_MP_ACK:
+                    col_append_fstr(pinfo->cinfo, COL_INFO, ", MP_ACK");
+                    proto_tree_add_item_ret_varint(ft_tree, hf_quic_mp_uniflow_id, tvb, offset, -1, ENC_VARINT_QUIC, NULL, &lenvar);
+                    offset += lenvar;
+                break;
+                case FT_MP_ACK_ECN:
+                    col_append_fstr(pinfo->cinfo, COL_INFO, ", MP_ACK_ECN");
+                    proto_tree_add_item_ret_varint(ft_tree, hf_quic_mp_uniflow_id, tvb, offset, -1, ENC_VARINT_QUIC, NULL, &lenvar);
+                    offset += lenvar;
+                break;
             }
 
             proto_tree_add_item_ret_varint(ft_tree, hf_quic_ack_largest_acknowledged, tvb, offset, -1, ENC_VARINT_QUIC, NULL, &lenvar);
@@ -1825,13 +1884,24 @@ dissect_quic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *quic_tree
             offset += len_streamid;
         }
         break;
-        case FT_NEW_CONNECTION_ID:{
+        case FT_NEW_CONNECTION_ID:
+        case FT_MP_NEW_CONNECTION_ID:{
             gint32 len_sequence;
             gint32 len_retire_prior_to;
             gint32 nci_length;
+            gint32 lenvar = 0;
             gboolean valid_cid = FALSE;
 
-            col_append_fstr(pinfo->cinfo, COL_INFO, ", NCI");
+            switch(frame_type){
+                case FT_NEW_CONNECTION_ID:
+                    col_append_fstr(pinfo->cinfo, COL_INFO, ", NCI");
+                 break;
+                case FT_MP_NEW_CONNECTION_ID:
+                    col_append_fstr(pinfo->cinfo, COL_INFO, ", MP_NCI");
+                    proto_tree_add_item_ret_varint(ft_tree, hf_quic_mp_uniflow_id, tvb, offset, -1, ENC_VARINT_QUIC, NULL, &lenvar);
+                    offset += lenvar;
+                 break;
+            }
 
             proto_tree_add_item_ret_varint(ft_tree, hf_quic_nci_sequence, tvb, offset, -1, ENC_VARINT_QUIC, NULL, &len_sequence);
             offset += len_sequence;
@@ -1861,8 +1931,22 @@ dissect_quic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *quic_tree
             offset += 16;
         }
         break;
-        case FT_RETIRE_CONNECTION_ID:{
+        case FT_RETIRE_CONNECTION_ID:
+        case FT_MP_RETIRE_CONNECTION_ID:{
             gint32 len_sequence;
+            gint32 lenvar;
+
+            switch(frame_type){
+                case FT_RETIRE_CONNECTION_ID:
+                    col_append_fstr(pinfo->cinfo, COL_INFO, ", RC");
+                break;
+                case FT_MP_RETIRE_CONNECTION_ID:
+                    col_append_fstr(pinfo->cinfo, COL_INFO, ", MP_RC");
+                    proto_tree_add_item_ret_varint(ft_tree, hf_quic_mp_uniflow_id, tvb, offset, -1, ENC_VARINT_QUIC, NULL, &lenvar);
+                    offset += lenvar;
+                break;
+            }
+
             proto_tree_add_item_ret_varint(ft_tree, hf_quic_rci_sequence, tvb, offset, -1, ENC_VARINT_QUIC, NULL, &len_sequence);
             offset += len_sequence;
         }
@@ -1965,6 +2049,125 @@ dissect_quic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *quic_tree
             proto_tree_add_item_ret_varint(ft_tree, hf_quic_ts, tvb, offset, -1, ENC_VARINT_QUIC, NULL, &length);
             offset += (guint32)length;
 
+        }
+        break;
+        case FT_ADD_ADDRESS:{
+            gint32 length;
+            guint64 config_bits;
+
+            col_append_fstr(pinfo->cinfo, COL_INFO, ", ADD_ADDRESS");
+
+            static int * const config_fields[] = {
+                &hf_quic_mp_add_address_reserved,
+                &hf_quic_mp_add_address_port_present,
+                &hf_quic_mp_add_address_ip_version,
+                NULL
+            };
+
+            proto_tree_add_bitmask_ret_uint64(ft_tree, tvb, offset, hf_quic_mp_add_address_first_byte, ett_quic, config_fields, ENC_BIG_ENDIAN, &config_bits);
+            offset += 1;
+
+            proto_tree_add_item(ft_tree, hf_quic_mp_add_address_id, tvb, offset, 1, ENC_NA);
+            offset += 1;
+
+            proto_tree_add_item_ret_varint(ft_tree, hf_quic_mp_add_address_sq_number, tvb, offset, -1, ENC_VARINT_QUIC, NULL, &length);
+            offset += (guint32)length;
+
+            proto_tree_add_item(ft_tree, hf_quic_mp_add_address_interface_type, tvb, offset, 1, ENC_NA);
+            offset += 1;
+
+            if ((config_bits & 0x06) == 0x06) {
+                ws_in6_addr addr;
+                tvb_get_ipv6(tvb, offset, &addr);
+                proto_tree_add_ipv6(ft_tree, hf_quic_mp_add_address_ip_address_v6, tvb, offset, 16, &addr);
+                offset += 16;
+            } else {
+                guint32 ip_config = tvb_get_ipv4(tvb, offset);
+                proto_tree_add_ipv4(ft_tree, hf_quic_mp_add_address_ip_address, tvb, offset, 4, ip_config);
+                offset += 4;
+            }
+
+            if ((config_bits & 0x10 ) == 0x10) {
+                proto_tree_add_item(ft_tree, hf_quic_mp_add_address_port, tvb, offset, 2, ENC_NA);
+                offset += 2;
+            }
+        }
+        break;
+        case FT_REMOVE_ADDRESS:{
+            gint32 length;
+
+            col_append_fstr(pinfo->cinfo, COL_INFO, ", REMOVE_ADDRESS");
+
+            proto_tree_add_item(ft_tree, hf_quic_mp_add_address_id, tvb, offset, 1, ENC_NA);
+            offset += 1;
+
+            proto_tree_add_item_ret_varint(ft_tree, hf_quic_mp_add_address_sq_number, tvb, offset, -1, ENC_VARINT_QUIC, NULL, &length);
+            offset += (guint32)length;
+        }
+        break;
+        case FT_UNIFLOWS:{
+            gint32 length;
+            gint32 len_receiving_uniflows;
+            gint32 len_active_sending_uniflows;
+            gint32 len_uniflow_id;
+
+            guint64 ret_receiving_uniflows;
+            guint64 ret_active_sending_uniflows;
+
+            col_append_fstr(pinfo->cinfo, COL_INFO, ", UNIFLOWS");
+
+            proto_tree_add_item_ret_varint(ft_tree, hf_quic_mp_add_address_sq_number, tvb, offset, -1, ENC_VARINT_QUIC, NULL, &length);
+            offset += (guint32)length;
+
+            proto_tree_add_item_ret_varint(ft_tree, hf_quic_mp_receiving_uniflows, tvb, offset, -1, ENC_VARINT_QUIC, &ret_receiving_uniflows, &len_receiving_uniflows);
+            offset += (guint32)len_receiving_uniflows;
+
+            proto_tree_add_item_ret_varint(ft_tree, hf_quic_mp_active_sending_uniflows, tvb, offset, -1, ENC_VARINT_QUIC, &ret_active_sending_uniflows, &len_active_sending_uniflows);
+            offset += (guint32)len_active_sending_uniflows;
+
+            proto_item *receiving_uniflows_ft;
+            proto_tree *receiving_uniflows_tree;
+
+            receiving_uniflows_ft = proto_tree_add_item(ft_tree, hf_quic_mp_receiving_uniflow_info_section , tvb, offset, 1, ENC_NA);
+            receiving_uniflows_tree = proto_item_add_subtree(receiving_uniflows_ft, ett_quic_ft);
+
+            for (guint64 i = 0; i < ret_receiving_uniflows; i++) {
+                proto_item *item_ft;
+                proto_tree *item_tree;
+
+                item_ft = proto_tree_add_item(receiving_uniflows_tree, hf_quic_mp_uniflow_info_section, tvb, offset, 1, ENC_NA);
+                item_tree = proto_item_add_subtree(item_ft, ett_quic_ft);
+
+                len_uniflow_id = 0;
+
+                proto_tree_add_item_ret_varint(item_tree, hf_quic_mp_uniflow_id, tvb, offset, -1, ENC_VARINT_QUIC, NULL, &len_uniflow_id);
+                offset += (guint32)len_uniflow_id;
+
+                proto_tree_add_item(item_tree, hf_quic_mp_add_local_address_id , tvb, offset, 1, ENC_NA);
+                offset += 1;
+            }
+
+            proto_item *active_sending_uniflows_ft;
+            proto_tree *active_sending_uniflows_tree;
+
+            active_sending_uniflows_ft = proto_tree_add_item(ft_tree, hf_quic_mp_active_sending_uniflows_info_section, tvb, offset, 1, ENC_NA);
+            active_sending_uniflows_tree = proto_item_add_subtree(active_sending_uniflows_ft, ett_quic_ft);
+
+            for (guint64 i = 0; i < ret_active_sending_uniflows; i++) {
+                proto_item *item_ft;
+                proto_tree *item_tree;
+
+                item_ft = proto_tree_add_item(active_sending_uniflows_tree, hf_quic_mp_uniflow_info_section, tvb, offset, 1, ENC_NA);
+                item_tree = proto_item_add_subtree(item_ft, ett_quic_ft);
+
+                len_uniflow_id = 0;
+
+                proto_tree_add_item_ret_varint(item_tree, hf_quic_mp_uniflow_id, tvb, offset, -1, ENC_VARINT_QUIC, NULL, &len_uniflow_id);
+                offset += (guint32)len_uniflow_id;
+
+                proto_tree_add_item(item_tree, hf_quic_mp_add_local_address_id , tvb, offset, 1, ENC_NA);
+                offset += 1;
+            }
         }
         break;
         default:
@@ -2419,10 +2622,8 @@ quic_update_key(guint32 version, int hash_algo, quic_pp_state_t *pp_state)
  * the packet protection cipher. The application layer protocol is also queried.
  */
 static quic_hp_cipher *
-quic_get_1rtt_hp_cipher(packet_info *pinfo, quic_info_data_t *quic_info, gboolean from_server)
+quic_get_1rtt_hp_cipher(packet_info *pinfo, quic_info_data_t *quic_info, gboolean from_server, const char **error)
 {
-    const char *error = NULL;
-
     /* Keys were previously not available. */
     if (quic_info->skip_decryption) {
         return NULL;
@@ -2444,6 +2645,7 @@ quic_get_1rtt_hp_cipher(packet_info *pinfo, quic_info_data_t *quic_info, gboolea
             // Hello are somehow misdetected as Short Packet, then this
             // optimization should probably be removed.
             quic_info->skip_decryption = TRUE;
+            *error = "Missing TLS handshake or unsupported ciphers";
             return NULL;
         }
 
@@ -2451,18 +2653,19 @@ quic_get_1rtt_hp_cipher(packet_info *pinfo, quic_info_data_t *quic_info, gboolea
         if (!quic_get_traffic_secret(pinfo, quic_info->hash_algo, client_pp, TRUE) ||
             !quic_get_traffic_secret(pinfo, quic_info->hash_algo, server_pp, FALSE)) {
             quic_info->skip_decryption = TRUE;
+            *error = "Secrets are not available";
             return NULL;
         }
 
         // Create initial cipher handles for Key Phase 0 using the 1-RTT keys.
         if (!quic_hp_cipher_prepare(&client_pp->hp_cipher, quic_info->hash_algo,
-                                    quic_info->cipher_algo, client_pp->next_secret, &error) ||
+                                    quic_info->cipher_algo, client_pp->next_secret, error) ||
             !quic_pp_cipher_prepare(&client_pp->pp_ciphers[0], quic_info->hash_algo,
-                                    quic_info->cipher_algo, quic_info->cipher_mode, client_pp->next_secret, &error) ||
+                                    quic_info->cipher_algo, quic_info->cipher_mode, client_pp->next_secret, error) ||
             !quic_hp_cipher_prepare(&server_pp->hp_cipher, quic_info->hash_algo,
-                                    quic_info->cipher_algo, server_pp->next_secret, &error) ||
+                                    quic_info->cipher_algo, server_pp->next_secret, error) ||
             !quic_pp_cipher_prepare(&server_pp->pp_ciphers[0], quic_info->hash_algo,
-                                    quic_info->cipher_algo, quic_info->cipher_mode, server_pp->next_secret, &error)) {
+                                    quic_info->cipher_algo, quic_info->cipher_mode, server_pp->next_secret, error)) {
             quic_info->skip_decryption = TRUE;
             return NULL;
         }
@@ -3044,11 +3247,15 @@ dissect_quic_short_header(tvbuff_t *tvb, packet_info *pinfo, proto_tree *quic_tr
     }
 #ifdef HAVE_LIBGCRYPT_AEAD
     if (!PINFO_FD_VISITED(pinfo) && conn) {
+        const gchar *error = NULL;
         guint32 pkn32 = 0;
-        quic_hp_cipher *hp_cipher = quic_get_1rtt_hp_cipher(pinfo, conn, from_server);
+        quic_hp_cipher *hp_cipher = quic_get_1rtt_hp_cipher(pinfo, conn, from_server, &error);
         if (quic_is_hp_cipher_initialized(hp_cipher) && quic_decrypt_header(tvb, 1 + dcid.len, hp_cipher, conn->cipher_algo, &first_byte, &pkn32, loss_bits_negotiated)) {
             quic_set_full_packet_number(conn, quic_packet, from_server, first_byte, pkn32);
             quic_packet->first_byte = first_byte;
+        }
+        if (error) {
+            quic_packet->decryption.error = wmem_strdup(wmem_file_scope(), error);
         }
     } else if (conn && quic_packet->pkn_len) {
         first_byte = quic_packet->first_byte;
@@ -3090,6 +3297,12 @@ dissect_quic_short_header(tvbuff_t *tvb, packet_info *pinfo, proto_tree *quic_tr
         pp_cipher = quic_get_pp_cipher(key_phase, conn, from_server);
     }
 #endif /* HAVE_LIBGCRYPT_AEAD */
+
+    if (quic_packet->decryption.error) {
+        expert_add_info_format(pinfo, quic_tree, &ei_quic_decryption_failed,
+                               "Failed to create decryption context: %s", quic_packet->decryption.error);
+        return offset;
+    }
     if (!conn || conn->skip_decryption || quic_packet->pkn_len == 0) {
         return offset;
     }
@@ -3122,13 +3335,23 @@ dissect_quic_short_header(tvbuff_t *tvb, packet_info *pinfo, proto_tree *quic_tr
     return offset;
 }
 
+void
+quic_proto_tree_add_version(tvbuff_t *tvb, proto_tree *tree, int hfindex, guint offset)
+{
+    guint32 version;
+    proto_item *ti;
+
+    ti = proto_tree_add_item_ret_uint(tree, hfindex, tvb, offset, 4, ENC_BIG_ENDIAN, &version);
+    if ((version & 0x0F0F0F0F) == 0x0a0a0a0a) {
+        proto_item_append_text(ti, " (GREASE)");
+    }
+}
+
 static int
 dissect_quic_version_negotiation(tvbuff_t *tvb, packet_info *pinfo, proto_tree *quic_tree, const quic_packet_info_t *quic_packet)
 {
     guint       offset = 0;
     quic_cid_t  dcid = {.len=0}, scid = {.len=0};
-    guint32 supported_version;
-    proto_item *ti;
 
     col_set_str(pinfo->cinfo, COL_INFO, "Version Negotiation");
 
@@ -3139,10 +3362,7 @@ dissect_quic_version_negotiation(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
 
     /* Supported Version */
     while(tvb_reported_length_remaining(tvb, offset) > 0){
-        ti = proto_tree_add_item_ret_uint(quic_tree, hf_quic_supported_version, tvb, offset, 4, ENC_BIG_ENDIAN, &supported_version);
-        if ((supported_version & 0x0F0F0F0F) == 0x0a0a0a0a) {
-            proto_item_append_text(ti, " (GREASE)");
-        }
+        quic_proto_tree_add_version(tvb, quic_tree, hf_quic_supported_version, offset);
         offset += 4;
     }
 
@@ -3527,7 +3747,7 @@ quic_cleanup(void)
 /* Follow QUIC Stream functionality {{{ */
 
 static gchar *
-quic_follow_conv_filter(packet_info *pinfo, guint *stream, guint *sub_stream)
+quic_follow_conv_filter(epan_dissect_t *edt _U_, packet_info *pinfo, guint *stream, guint *sub_stream)
 {
     if (((pinfo->net_src.type == AT_IPv4 && pinfo->net_dst.type == AT_IPv4) ||
         (pinfo->net_src.type == AT_IPv6 && pinfo->net_dst.type == AT_IPv6))) {
@@ -3658,12 +3878,12 @@ proto_register_quic(void)
         },
         { &hf_quic_version,
           { "Version", "quic.version",
-            FT_UINT32, BASE_HEX, VALS(quic_version_vals), 0x0,
+            FT_UINT32, BASE_RANGE_STRING | BASE_HEX, RVALS(quic_version_vals), 0x0,
             NULL, HFILL }
         },
         { &hf_quic_supported_version,
           { "Supported Version", "quic.supported_version",
-            FT_UINT32, BASE_HEX, VALS(quic_version_vals), 0x0,
+            FT_UINT32, BASE_RANGE_STRING | BASE_HEX, RVALS(quic_version_vals), 0x0,
             NULL, HFILL }
         },
         { &hf_quic_vn_unused,
@@ -3685,6 +3905,91 @@ proto_register_quic(void)
           { "Spin Bit", "quic.spin_bit",
             FT_BOOLEAN, 8, NULL, 0x20,
             "Latency Spin Bit", HFILL }
+        },
+        { &hf_quic_mp_add_address_first_byte,
+          { "Config", "quic.mp_first_byte",
+            FT_UINT8, BASE_HEX, NULL, 0,
+            NULL, HFILL }
+        },
+        { &hf_quic_mp_add_address_reserved,
+          { "Reserved", "quic.mp_reserved_bit",
+            FT_UINT8, BASE_DEC, NULL, 0xE0,
+            NULL, HFILL }
+        },
+        { &hf_quic_mp_add_address_port_present,
+          { "Port presence", "quic.port_presence_bit",
+            FT_BOOLEAN, 8, NULL, 0x10,
+            "Must be 1", HFILL }
+        },
+        { &hf_quic_mp_add_address_ip_version,
+          { "IP Version", "quic.ip_version",
+            FT_UINT8, BASE_DEC, NULL, 0x0f,
+            NULL, HFILL }
+        },
+       { &hf_quic_mp_add_address_id,
+          { "Address ID", "quic.mp_address_id",
+            FT_UINT64, BASE_DEC, NULL, 0x0,
+            NULL, HFILL }
+        },
+       { &hf_quic_mp_add_address_sq_number,
+          { "Sequence Number", "quic.mp_sequence_number",
+            FT_UINT64, BASE_DEC, NULL, 0x0,
+            NULL, HFILL }
+        },
+       { &hf_quic_mp_add_address_interface_type,
+          { "Interface Type", "quic.mp_interface_type",
+            FT_UINT64, BASE_DEC, NULL, 0x0,
+            NULL, HFILL }
+        },
+       { &hf_quic_mp_add_address_ip_address,
+          { "IP Address", "quic.mp_ip_address",
+            FT_IPv4, BASE_NONE,
+            NULL, 0x0, NULL, HFILL }
+        },
+       { &hf_quic_mp_add_address_ip_address_v6,
+          { "IP Address", "quic.mp_ip_address_v6",
+            FT_IPv6, BASE_NONE,
+            NULL, 0x0, NULL, HFILL }
+        },
+        { &hf_quic_mp_add_address_port,
+          { "Port", "quic.mp_port",
+            FT_UINT32, BASE_DEC, NULL, 0x0,
+            NULL, HFILL }
+        },
+       { &hf_quic_mp_uniflow_id,
+          { "Uniflow ID", "quic.mp_uniflow_id",
+            FT_UINT64, BASE_DEC, NULL, 0x0,
+            NULL, HFILL }
+        },
+       { &hf_quic_mp_receiving_uniflows,
+          { "Receiving uniflows", "quic.mp_receiving_uniflows",
+            FT_UINT64, BASE_DEC, NULL, 0x0,
+            NULL, HFILL }
+        },
+       { &hf_quic_mp_active_sending_uniflows,
+          { "Active sending uniflows", "quic.mp_act_send_uf",
+            FT_UINT64, BASE_DEC, NULL, 0x0,
+            NULL, HFILL }
+        },
+       { &hf_quic_mp_receiving_uniflow_info_section,
+          { "Receiving uniflows", "quic.mp_receiving_uniflows_section",
+            FT_NONE, BASE_NONE, NULL, 0x0,
+            NULL, HFILL }
+        },
+       { &hf_quic_mp_active_sending_uniflows_info_section,
+          { "Active sending uniflows", "quic.mp_act_send_uf_section",
+            FT_NONE, BASE_NONE, NULL, 0x0,
+            NULL, HFILL }
+        },
+       { &hf_quic_mp_uniflow_info_section,
+          { "Uniflow Info Section", "quic.mp_uniflow_info_section",
+            FT_NONE, BASE_NONE, NULL, 0x0,
+            NULL, HFILL }
+        },
+       { &hf_quic_mp_add_local_address_id ,
+          { "Local address id", "quic.mp_add_local_address_id",
+            FT_UINT64, BASE_DEC, NULL, 0x0,
+            NULL, HFILL }
         },
         { &hf_quic_short_reserved,
           { "Reserved", "quic.short.reserved",

@@ -99,6 +99,7 @@ class File:
                 return False
 
         # Try splitting into 2 words recognised at various points.
+        # Allow 3-letter words.
         length = len(word)
         for idx in range(3, length-3):
             word1 = word[0:idx]
@@ -107,19 +108,30 @@ class File:
             if not spell.unknown([word1, word2]):
                 return True
 
-        # Run through, looking for any number of separate words.
-        next_word_start = 0
-        for idx in range(1, length+1):
-            w = word[next_word_start:idx]
-            if  len(w) > 3 and not spell.unknown([w]):
-                next_word_start = idx
-        if next_word_start == length:
-            return True
+        return self.checkMultiWordsRecursive(word)
+
+    def checkMultiWordsRecursive(self, word):
+        length = len(word)
+        #print('word=', word)
+        if length < 4:
+            return False
+
+        for idx in range(4, length+1):
+            w = word[0:idx]
+            #print('considering', w)
+            if not spell.unknown([w]):
+                #print('Recognised!')
+                if idx == len(word):
+                    #print('Was end of word, so TRUEE!!!!')
+                    return True
+                else:
+                    #print('More to go..')
+                    if self.checkMultiWordsRecursive(word[idx:]):
+                        return True
 
         return False
 
-
-    # Check the spelling of all the words we have found fir tgus fuke,
+    # Check the spelling of all the words we have found
     def spellCheck(self):
 
         num_values = len(self.values)
@@ -209,7 +221,7 @@ def removeContractions(code_string):
                      "you’d", "developer’s", "doesn’t", "what’s", "let’s", "haven’t", "can’t", "you’ve",
                      "shouldn’t", "didn’t", "wouldn’t", "aren’t", "there’s", "packet’s", "couldn’t", "world’s",
                      "needn’t", "graph’s", "table’s", "parent’s", "entity’s", "server’s", "node’s",
-                     "querier’s", "sender’s", "receiver’s", "computer’s"]
+                     "querier’s", "sender’s", "receiver’s", "computer’s", "frame’s", "vendor’s", "system’s"]
     for c in contractions:
         code_string = code_string.replace(c, "")
         code_string = code_string.replace(c.capitalize(), "")
@@ -220,23 +232,28 @@ def removeContractions(code_string):
 def removeComments(code_string):
     code_string = re.sub(re.compile(r"/\*.*?\*/",re.DOTALL ) ,"" ,code_string) # C-style comment
     # Remove this for now as can get tripped up if see htpps://www.... within a string!
-    #code_string = re.sub(re.compile(r"//.*?\n" ) ,"" ,code_string)             # C++-style comment
+    code_string = re.sub(re.compile(r"^\s*//.*?\n" ) ,"" ,code_string)             # C++-style comment
     return code_string
 
 def removeSingleQuotes(code_string):
+    code_string = code_string.replace('\\\\', " ")        # Separate at \\
     code_string = code_string.replace('\"\\\\\"', "")
     code_string = code_string.replace("\\\"", " ")
     code_string = code_string.replace("'\"'", "")
+    code_string = code_string.replace('…', ' ')
     return code_string
 
 def removeHexSpecifiers(code_string):
-    # TODO: replace with single regexp?
-    code_string = code_string.replace('0x%02X', "")
-    code_string = code_string.replace('0x%02x', "")
-    code_string = code_string.replace('0x%04X', "")
-    code_string = code_string.replace('0x%04x', "")
-    code_string = code_string.replace('0x%08X', "")
-    code_string = code_string.replace('0x%08x', "")
+    # Find all hex numbers
+
+    looking = True
+    while looking:
+        m = re.search(r'(0x[0-9a-fA-F]*)', code_string)
+        if m:
+            code_string = code_string.replace(m.group(0), "")
+        else:
+            looking = False
+
     return code_string
 
 
@@ -272,6 +289,9 @@ def findStrings(filename):
 
 # Test for whether the given file was automatically generated.
 def isGeneratedFile(filename):
+    if not filename.endswith('.c'):
+        return False
+
     # Open file
     f_read = open(os.path.join(filename), 'r')
     lines_tested = 0
@@ -318,7 +338,7 @@ def findFilesInFolder(folder):
     return files_to_check
 
 
-# Check the given dissector file.
+# Check the given file.
 def checkFile(filename):
     # Check file exists - e.g. may have been deleted in a recent commit.
     if not os.path.exists(filename):
@@ -335,9 +355,9 @@ def checkFile(filename):
 
 # command-line args.  Controls which files should be checked.
 # If no args given, will just scan epan/dissectors folder.
-parser = argparse.ArgumentParser(description='Check calls in dissectors')
+parser = argparse.ArgumentParser(description='Check spellings in specified files')
 parser.add_argument('--file', action='store', default='',
-                    help='specify individual dissector file to test')
+                    help='specify individual file to test')
 parser.add_argument('--folder', action='store', default='',
                     help='specify folder to test')
 parser.add_argument('--commits', action='store',
@@ -362,28 +382,26 @@ elif args.commits:
     command = ['git', 'diff', '--name-only', 'HEAD~' + args.commits]
     files = [f.decode('utf-8')
              for f in subprocess.check_output(command).splitlines()]
-    # Will examine dissector files only
-    files = list(filter(lambda f : isAppropriateFile(f), files))
+    # Filter files
+    files = list(filter(lambda f : isAppropriateFile(f) and not isGeneratedFile(f), files))
 elif args.open:
     # Unstaged changes.
     command = ['git', 'diff', '--name-only']
     files = [f.decode('utf-8')
              for f in subprocess.check_output(command).splitlines()]
-    # Only interested in dissector files.
-    files = list(filter(lambda f : is_dissector_file(f), files))
+    # Filter files.
+    files = list(filter(lambda f : isAppropriateFile(f) and not isGeneratedFile(f), files))
     # Staged changes.
     command = ['git', 'diff', '--staged', '--name-only']
     files_staged = [f.decode('utf-8')
                     for f in subprocess.check_output(command).splitlines()]
-    # Only interested in dissector files.
-    files_staged = list(filter(lambda f : is_dissector_file(f), files_staged))
-    for f in files:
-        files.append(f)
+    # Filter files.
+    files_staged = list(filter(lambda f : isAppropriateFile(f) and not isGeneratedFile(f), files_staged))
     for f in files_staged:
         if not f in files:
             files.append(f)
 else:
-    # By default, scan dissectors
+    # By default, scan dissectors directory
     folder = os.path.join('epan', 'dissectors')
     # But overwrite with any folder entry.
     if args.folder:
@@ -417,7 +435,7 @@ for f in files:
 
 
 
-# Show the most commonly not-recognised words. TODO: depend upon a command-line option here?
+# Show the most commonly not-recognised words.
 print('')
 counter = Counter(missing_words).most_common(100)
 if len(counter) > 0:

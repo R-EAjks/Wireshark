@@ -21,6 +21,7 @@
 #include "k12.h"
 
 #include <wsutil/str_util.h>
+#include <wsutil/glib-compat.h>
 
 /*
  * See
@@ -35,6 +36,10 @@
  * of the records with various types, it does not indicate how those records
  * are stored in the file.
  */
+
+static int k12_file_type_subtype = -1;
+
+void register_k12(void);
 
 /* #define DEBUG_K12 */
 #ifdef DEBUG_K12
@@ -595,7 +600,7 @@ process_packet_data(wtap_rec *rec, Buffer *target, guint8 *buffer,
 
     ts = pntoh64(buffer + K12_PACKET_TIMESTAMP);
 
-    rec->ts.secs = (guint32) ((ts / 2000000) + 631152000);
+    rec->ts.secs = (time_t) ((ts / 2000000) + 631152000);
     rec->ts.nsecs = (guint32) ( (ts % 2000000) * 500 );
 
     rec->rec_header.packet_header.len = rec->rec_header.packet_header.caplen = length;
@@ -1056,8 +1061,8 @@ wtap_open_return_val k12_open(wtap *wth, int *err, gchar **err_info) {
                 g_free(rec);
                 return WTAP_OPEN_ERROR;
             }
-            rec->input_name = (gchar *)g_memdup(read_buffer + K12_SRCDESC_HWPART + hwpart_len, name_len);
-            rec->stack_file = (gchar *)g_memdup(read_buffer + K12_SRCDESC_HWPART + hwpart_len + name_len, stack_len);
+            rec->input_name = (gchar *)g_memdup2(read_buffer + K12_SRCDESC_HWPART + hwpart_len, name_len);
+            rec->stack_file = (gchar *)g_memdup2(read_buffer + K12_SRCDESC_HWPART + hwpart_len + name_len, stack_len);
 
             ascii_strdown_inplace (rec->stack_file);
 
@@ -1080,7 +1085,7 @@ wtap_open_return_val k12_open(wtap *wth, int *err, gchar **err_info) {
         file_data->num_of_records--;
     } while(1);
 
-    wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_K12;
+    wth->file_type_subtype = k12_file_type_subtype;
     wth->file_encap = WTAP_ENCAP_K12;
     wth->snapshot_length = 0;
     wth->subtype_read = k12_read;
@@ -1106,7 +1111,7 @@ typedef struct {
     guint32 file_offset;
 } k12_dump_t;
 
-int k12_dump_can_write_encap(int encap) {
+static int k12_dump_can_write_encap(int encap) {
 
     if (encap == WTAP_ENCAP_PER_PACKET)
         return WTAP_ERR_ENCAP_PER_PACKET_UNSUPPORTED;
@@ -1367,7 +1372,7 @@ static gboolean k12_dump_finish(wtap_dumper *wdh, int *err, gchar **err_info _U_
 }
 
 
-gboolean k12_dump_open(wtap_dumper *wdh, int *err, gchar **err_info _U_) {
+static gboolean k12_dump_open(wtap_dumper *wdh, int *err, gchar **err_info _U_) {
     k12_dump_t *k12;
 
     if ( ! wtap_dump_file_write(wdh, k12_file_magic, 8, err)) {
@@ -1387,6 +1392,31 @@ gboolean k12_dump_open(wtap_dumper *wdh, int *err, gchar **err_info _U_) {
     k12->file_offset  = K12_FILE_HDR_LEN;
 
     return TRUE;
+}
+
+static const struct supported_block_type k12_blocks_supported[] = {
+    /*
+     * We support packet blocks, with no comments or other options.
+     */
+    { WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info k12_info = {
+    "Tektronix K12xx 32-bit .rf5 format", "rf5", "rf5", NULL,
+    TRUE, BLOCKS_SUPPORTED(k12_blocks_supported),
+    k12_dump_can_write_encap, k12_dump_open, NULL
+};
+
+void register_k12(void)
+{
+    k12_file_type_subtype = wtap_register_file_type_subtype(&k12_info);
+
+    /*
+     * Register name for backwards compatibility with the
+     * wtap_filetypes table in Lua.
+     */
+    wtap_register_backwards_compatibility_lua_name("K12",
+                                                   k12_file_type_subtype);
 }
 
 /*

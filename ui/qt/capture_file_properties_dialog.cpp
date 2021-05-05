@@ -184,7 +184,7 @@ QString CaptureFilePropertiesDialog::summaryToHtml()
         << table_data_tmpl.arg(summary.file_sha1)
         << table_row_end;
 
-    QString format_str = wtap_file_type_subtype_string(summary.file_type);
+    QString format_str = wtap_file_type_subtype_description(summary.file_type);
     const char *compression_type_description = wtap_compression_type_description(summary.compression_type);
     if (compression_type_description != nullptr) {
         format_str += QString(" (%1)").arg(compression_type_description);
@@ -631,16 +631,3 @@ void CaptureFilePropertiesDialog::on_buttonBox_rejected()
 {
     reject();
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

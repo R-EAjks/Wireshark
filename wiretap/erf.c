@@ -30,11 +30,10 @@
 
 #include <wsutil/crc32.h>
 #include <wsutil/strtoi.h>
+#include <wsutil/glib-compat.h>
 
 #include "wtap-int.h"
 #include "file_wrappers.h"
-#include "pcap-encap.h"
-#include "pcapng.h"
 #include "erf.h"
 #include "erf_record.h"
 #include "erf-common.h"
@@ -176,6 +175,10 @@ struct erf_meta_read_state {
 static gboolean erf_wtap_blocks_to_erf_sections(wtap_block_t block, GPtrArray *sections, guint16 section_type, guint16 section_id, wtap_block_foreach_func func);
 
 static guint32 erf_meta_read_tag(struct erf_meta_tag*, guint8*, guint32);
+
+static int erf_file_type_subtype = -1;
+
+void register_erf(void);
 
 static guint erf_anchor_mapping_hash(gconstpointer key) {
   const struct erf_anchor_mapping *anchor_map = (const struct erf_anchor_mapping*) key;
@@ -542,7 +545,7 @@ extern wtap_open_return_val erf_open(wtap *wth, int *err, gchar **err_info)
   }
 
   /* This is an ERF file */
-  wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_ERF;
+  wth->file_type_subtype = erf_file_type_subtype;
   wth->snapshot_length = 0;     /* not available in header, only in frame */
 
   /*
@@ -707,7 +710,7 @@ static gboolean erf_read_header(wtap *wth, FILE_T fh,
   {
     guint64 ts = pletoh64(&erf_header->ts);
 
-    /*if ((erf_header->type & 0x7f) != ERF_TYPE_META || wth->file_type_subtype != WTAP_FILE_TYPE_SUBTYPE_ERF) {*/
+    /*if ((erf_header->type & 0x7f) != ERF_TYPE_META || wth->file_type_subtype != file_type_subtype_erf) {*/
       rec->rec_type = REC_TYPE_PACKET;
     /*
      * XXX: ERF_TYPE_META records should ideally be FT_SPECIFIC for display
@@ -1107,12 +1110,12 @@ static void erf_write_wtap_option_to_interface_tag(wtap_block_t block _U_,
       break;
     case OPT_IDB_FILTER:
       {
-        wtapng_if_descr_filter_t *filter;
+        if_filter_opt_t *filter;
+        filter = &optval->if_filterval;
         tag_ptr->type = 0xF800;
-        filter = (wtapng_if_descr_filter_t*)&optval->customval;
-        if(filter->if_filter_str) {
+        if(filter->type == if_filter_pcap) {
           tag_ptr->type = ERF_META_TAG_filter;
-          tag_ptr->value = (guint8*)g_strdup(filter->if_filter_str);
+          tag_ptr->value = (guint8*)g_strdup(filter->data.filter_str);
           tag_ptr->length = (guint16)strlen((char*)tag_ptr->value);
         }
       }
@@ -2008,7 +2011,7 @@ static gboolean erf_dump(
   return TRUE;
 }
 
-int erf_dump_can_write_encap(int encap)
+static int erf_dump_can_write_encap(int encap)
 {
 
   if(encap == WTAP_ENCAP_PER_PACKET)
@@ -2020,7 +2023,7 @@ int erf_dump_can_write_encap(int encap)
   return 0;
 }
 
-int erf_dump_open(wtap_dumper *wdh, int *err _U_, gchar **err_info _U_)
+static int erf_dump_open(wtap_dumper *wdh, int *err _U_, gchar **err_info _U_)
 {
   erf_dump_t *dump_priv;
   gchar *s;
@@ -2451,7 +2454,7 @@ static int erf_populate_interface(erf_t *erf_priv, wtap *wth, union wtap_pseudo_
     return if_map->interfaces[if_num].if_index;
   }
 
-  int_data = wtap_block_create(WTAP_BLOCK_IF_DESCR);
+  int_data = wtap_block_create(WTAP_BLOCK_IF_ID_AND_INFO);
   int_data_mand = (wtapng_if_descr_mandatory_t*)wtap_block_get_mandatory_data(int_data);
 
   int_data_mand->wtap_encap = WTAP_ENCAP_ERF;
@@ -2710,7 +2713,7 @@ static int populate_interface_info(erf_t *erf_priv, wtap *wth, union wtap_pseudo
   int interface_index = -1;
   wtap_block_t int_data = NULL;
   wtapng_if_descr_mandatory_t* int_data_mand = NULL;
-  wtapng_if_descr_filter_t if_filter = {0};
+  if_filter_opt_t if_filter;
   guint32 if_num = 0;
   struct erf_if_info* if_info = NULL;
 
@@ -2840,9 +2843,10 @@ static int populate_interface_info(erf_t *erf_priv, wtap *wth, union wtap_pseudo
         wtap_block_add_string_option(int_data, OPT_COMMENT, tag.value, tag.length);
         break;
       case ERF_META_TAG_filter:
-        if_filter.if_filter_str = g_strndup((gchar*) tag.value, tag.length);
-        wtap_block_add_custom_option(int_data, OPT_IDB_FILTER, &if_filter, sizeof if_filter);
-        g_free(if_filter.if_filter_str);
+        if_filter.type = if_filter_pcap;
+        if_filter.data.filter_str = g_strndup((gchar*) tag.value, tag.length);
+        wtap_block_add_if_filter_option(int_data, OPT_IDB_FILTER, &if_filter);
+        g_free(if_filter.data.filter_str);
         if_info->set_flags.filter = 1;
         break;
       default:
@@ -2866,16 +2870,18 @@ static int populate_interface_info(erf_t *erf_priv, wtap *wth, union wtap_pseudo
   if (!if_info->set_flags.filter) {
     if (state->if_map->module_filter_str) {
       /* Duplicate because might use with multiple interfaces */
-      if_filter.if_filter_str = state->if_map->module_filter_str;
-      wtap_block_add_custom_option(int_data, OPT_IDB_FILTER, &if_filter, sizeof if_filter);
+      if_filter.type = if_filter_pcap;
+      if_filter.data.filter_str = state->if_map->module_filter_str;
+      wtap_block_add_if_filter_option(int_data, OPT_IDB_FILTER, &if_filter);
       /*
        * Don't set flag because stream is more specific than module.
        */
     } else if (state->if_map->capture_filter_str) {
       /* TODO: display separately? Note that we could have multiple captures
        * from multiple hosts in the file */
-      if_filter.if_filter_str = state->if_map->capture_filter_str;
-      wtap_block_add_custom_option(int_data, OPT_IDB_FILTER, &if_filter, sizeof if_filter);
+      if_filter.type = if_filter_pcap;
+      if_filter.data.filter_str = state->if_map->capture_filter_str;
+      wtap_block_add_if_filter_option(int_data, OPT_IDB_FILTER, &if_filter);
     }
   }
 
@@ -2901,7 +2907,7 @@ static int populate_stream_info(erf_t *erf_priv _U_, wtap *wth, union wtap_pseud
   int interface_index = -1;
   wtap_block_t int_data = NULL;
   wtapng_if_descr_mandatory_t* int_data_mand = NULL;
-  wtapng_if_descr_filter_t if_filter = {0};
+  if_filter_opt_t if_filter;
   guint32 if_num = 0;
   gint32 stream_num = -1;
   guint8 *tag_ptr_tmp;
@@ -3011,9 +3017,10 @@ static int populate_stream_info(erf_t *erf_priv _U_, wtap *wth, union wtap_pseud
         case ERF_META_TAG_filter:
           /* Override only if not set */
           if (!if_info->set_flags.filter) {
-            if_filter.if_filter_str = g_strndup((gchar*) tag.value, tag.length);
-            wtap_block_add_custom_option(int_data, OPT_IDB_FILTER, &if_filter, sizeof if_filter);
-            g_free(if_filter.if_filter_str);
+            if_filter.type = if_filter_pcap;
+            if_filter.data.filter_str = g_strndup((gchar*) tag.value, tag.length);
+            wtap_block_add_if_filter_option(int_data, OPT_IDB_FILTER, &if_filter);
+            g_free(if_filter.data.filter_str);
             if_info->set_flags.filter = 1;
           }
           break;
@@ -3247,7 +3254,7 @@ static int populate_summary_info(erf_t *erf_priv, wtap *wth, union wtap_pseudo_h
          * before the interface information, as we associate them to interface
          * data.
          */
-        post_list = g_list_append(post_list, g_memdup(&state, sizeof(struct erf_meta_read_state)));
+        post_list = g_list_append(post_list, g_memdup2(&state, sizeof(struct erf_meta_read_state)));
         break;
       case ERF_META_SECTION_SOURCE:
       case ERF_META_SECTION_DNS:
@@ -3385,6 +3392,71 @@ static void erf_close(wtap *wth)
   erf_priv_free(erf_priv);
   /* XXX: Prevent double free by wtap_close() */
   wth->priv = NULL;
+}
+
+static const struct supported_option_type section_block_options_supported[] = {
+  { OPT_COMMENT, ONE_OPTION_SUPPORTED }, /* XXX - multiple? */
+  { OPT_SHB_USERAPPL, ONE_OPTION_SUPPORTED }
+};
+
+static const struct supported_option_type interface_block_options_supported[] = {
+  { OPT_COMMENT, ONE_OPTION_SUPPORTED }, /* XXX - multiple? */
+  { OPT_IDB_NAME, ONE_OPTION_SUPPORTED },
+  { OPT_IDB_DESCR, ONE_OPTION_SUPPORTED },
+  { OPT_IDB_OS, ONE_OPTION_SUPPORTED },
+  { OPT_IDB_TSOFFSET, ONE_OPTION_SUPPORTED },
+  { OPT_IDB_SPEED, ONE_OPTION_SUPPORTED },
+  { OPT_IDB_IP4ADDR, ONE_OPTION_SUPPORTED }, /* XXX - multiple? */
+  { OPT_IDB_IP6ADDR, ONE_OPTION_SUPPORTED }, /* XXX - multiple? */
+  { OPT_IDB_FILTER, ONE_OPTION_SUPPORTED },
+  { OPT_IDB_FCSLEN, ONE_OPTION_SUPPORTED }
+};
+
+static const struct supported_option_type packet_block_options_supported[] = {
+  { OPT_COMMENT, ONE_OPTION_SUPPORTED } /* XXX - multiple? */
+};
+
+static const struct supported_block_type erf_blocks_supported[] = {
+  /*
+   * Per-file comments and application supported; section blocks
+   * are used for that.
+   * ERF files have only one section.  (XXX - true?)
+   */
+  { WTAP_BLOCK_SECTION, ONE_BLOCK_SUPPORTED, OPTION_TYPES_SUPPORTED(section_block_options_supported) },
+
+  /*
+   * ERF supports multiple interfaces, with information, and
+   * supports associating packets with interfaces.  Interface
+   * description blocks are used for that.
+   */
+  { WTAP_BLOCK_IF_ID_AND_INFO, MULTIPLE_BLOCKS_SUPPORTED, OPTION_TYPES_SUPPORTED(interface_block_options_supported) },
+
+  /*
+   * Name resolution is supported, but we don't support comments.
+   */
+  { WTAP_BLOCK_NAME_RESOLUTION, ONE_BLOCK_SUPPORTED, NO_OPTIONS_SUPPORTED },
+
+  /*
+   * ERF is a capture format, so it obviously supports packets.
+   */
+  { WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, OPTION_TYPES_SUPPORTED(packet_block_options_supported) }
+};
+
+static const struct file_type_subtype_info erf_info = {
+  "Endace ERF capture", "erf", "erf", NULL,
+  FALSE, BLOCKS_SUPPORTED(erf_blocks_supported),
+  erf_dump_can_write_encap, erf_dump_open, NULL
+};
+
+void register_erf(void)
+{
+  erf_file_type_subtype = wtap_register_file_type_subtype(&erf_info);
+
+  /*
+   * Register name for backwards compatibility with the
+   * wtap_filetypes table in Lua.
+   */
+  wtap_register_backwards_compatibility_lua_name("ERF", erf_file_type_subtype);
 }
 
 /*

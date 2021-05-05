@@ -126,16 +126,112 @@ typedef struct wtap_block *wtap_block_t;
 
 /*
  * Currently supported blocks; these are not the pcapng block type values
- * for them, they're identifiers used internally.
+ * for them, they're identifiers used internally, and more than one
+ * pcapng block type may use a given block type.
+ *
+ * Note that, in a given file format, this information won't necessarily
+ * appear in the form of blocks in the file, even though they're presented
+ * to the caller of libwiretap as blocks when reading and and are presented
+ * by the caller of libwiretap as blocks when writing.  See, for example,
+ * the iptrace file format, in which the interface name is given as part
+ * of the packet record header; we synthesize those blocks when reading
+ * (we don't currently support writing that format, but if we did, we'd
+ * get the interface name from the block and put it in the packet record
+ * header).
+ *
+ * WTAP_BLOCK_IF_ID_AND_INFO is a block that not only gives
+ * descriptive information about an interface but *also* assigns an
+ * ID to the interface, so that every packet has either an explicit
+ * or implicit interface ID indicating on which the packet arrived.
+ *
+ * It does *not* refer to information about interfaces that does not
+ * allow identification of the interface on which a packet arrives
+ * (I'm looking at *you*, Microsoft Network Monitor...).  Do *not*
+ * indicate support for that block if your capture format merely
+ * gives a list of interface information without having every packet
+ * explicitly or implicitly (as in, for example, the pcapng Simple
+ * Packet Block) indicate on which of those interfaces the packet
+ * arrived.
+ *
+ * WTAP_BLOCK_PACKET (which corresponds to the Enhanced Packet Block,
+ * the Simple Packet Block, and the deprecated Packet Block) is not
+ * currently used; it's reserved for future use.  The same applies
+ * to WTAP_BLOCK_SYSTEMD_JOURNAL.
  */
 typedef enum {
-    WTAP_BLOCK_NG_SECTION = 0,
-    WTAP_BLOCK_IF_DESCR,
-    WTAP_BLOCK_NG_NRB,
-    WTAP_BLOCK_IF_STATS,
-    WTAP_BLOCK_DSB,
-    WTAP_BLOCK_END_OF_LIST
+    WTAP_BLOCK_SECTION = 0,
+    WTAP_BLOCK_IF_ID_AND_INFO,
+    WTAP_BLOCK_NAME_RESOLUTION,
+    WTAP_BLOCK_IF_STATISTICS,
+    WTAP_BLOCK_DECRYPTION_SECRETS,
+    WTAP_BLOCK_PACKET,
+    WTAP_BLOCK_FT_SPECIFIC_REPORT,
+    WTAP_BLOCK_FT_SPECIFIC_EVENT,
+    WTAP_BLOCK_SYSTEMD_JOURNAL,
+    MAX_WTAP_BLOCK_TYPE_VALUE
 } wtap_block_type_t;
+
+/**
+ * Holds the required data from a WTAP_BLOCK_SECTION.
+ */
+typedef struct wtapng_section_mandatory_s {
+    guint64             section_length; /**< 64-bit value specifying the length in bytes of the
+                                         *     following section.
+                                         *     Section Length equal -1 (0xFFFFFFFFFFFFFFFF) means
+                                         *     that the size of the section is not specified
+                                         *   Note: if writing to a new file, this length will
+                                         *     be invalid if anything changes, such as the other
+                                         *     members of this struct, or the packets written.
+                                         */
+} wtapng_mandatory_section_t;
+
+/** struct holding the information to build an WTAP_BLOCK_IF_ID_AND_INFO.
+ *  the interface_data array holds an array of wtap_block_t
+ *  representing interfacs, one per interface.
+ */
+typedef struct wtapng_iface_descriptions_s {
+    GArray *interface_data;
+} wtapng_iface_descriptions_t;
+
+/**
+ * Holds the required data from a WTAP_BLOCK_IF_ID_AND_INFO.
+ */
+typedef struct wtapng_if_descr_mandatory_s {
+    int                    wtap_encap;            /**< link_type translated to wtap_encap */
+    guint64                time_units_per_second;
+    int                    tsprecision;           /**< WTAP_TSPREC_ value for this interface */
+
+    guint32                snap_len;
+
+    guint8                 num_stat_entries;
+    GArray                *interface_statistics;  /**< An array holding the interface statistics from
+                                                   *     pcapng ISB:s or equivalent(?)*/
+} wtapng_if_descr_mandatory_t;
+
+/**
+ * Holds the required data from a WTAP_BLOCK_IF_STATISTICS.
+ */
+typedef struct wtapng_if_stats_mandatory_s {
+    guint32  interface_id;
+    guint32  ts_high;
+    guint32  ts_low;
+} wtapng_if_stats_mandatory_t;
+
+/**
+ * Holds the required data from a WTAP_BLOCK_DECRYPTION_SECRETS.
+ */
+typedef struct wtapng_dsb_mandatory_s {
+    guint32                secrets_type;            /** Type of secrets stored in data (see secrets-types.h) */
+    guint32                secrets_len;             /** Length of the secrets data in bytes */
+    guint8                *secrets_data;            /** Buffer of secrets (not NUL-terminated) */
+} wtapng_dsb_mandatory_t;
+
+/**
+ * Holds the required data from a WTAP_BLOCK_FT_SPECIFIC_REPORT.
+ */
+typedef struct wtapng_ft_specific_mandatory_s {
+    guint     record_type;      /* the type of record this is - file type-specific value */
+} wtapng_ft_specific_mandatory_t;
 
 /* Currently supported option types */
 typedef enum {
@@ -144,7 +240,7 @@ typedef enum {
     WTAP_OPTTYPE_STRING,
     WTAP_OPTTYPE_IPv4,
     WTAP_OPTTYPE_IPv6,
-    WTAP_OPTTYPE_CUSTOM
+    WTAP_OPTTYPE_IF_FILTER
 } wtap_opttype_e;
 
 typedef enum {
@@ -156,11 +252,34 @@ typedef enum {
     WTAP_OPTTYPE_ALREADY_EXISTS = -5
 } wtap_opttype_return_val;
 
-struct wtap_opttype_custom
-{
-    void* data;
-    guint size;
-};
+/* Interface description data - if_filter option structure */
+
+/* BPF instruction */
+typedef struct wtap_bpf_insn_s {
+    guint16                code;
+    guint8                 jt;
+    guint8                 jf;
+    guint32                k;
+} wtap_bpf_insn_t;
+
+/*
+ * Type of filter.
+ */
+typedef enum {
+    if_filter_pcap = 0, /* pcap filter string */
+    if_filter_bpf  = 1  /* BPF program */
+} if_filter_type_e;
+
+typedef struct if_filter_opt_s {
+    if_filter_type_e type;
+    union {
+        gchar             *filter_str;   /**< pcap filter string */
+        struct wtap_bpf_insns {
+            guint          bpf_prog_len; /**< number of BPF instructions */
+            wtap_bpf_insn_t *bpf_prog;   /**< BPF instructions */
+        }                  bpf_prog;     /**< BPF program */
+    }                      data;
+} if_filter_opt_t;
 
 /*
  * Structure describing a value of an option.
@@ -171,7 +290,7 @@ typedef union {
     guint32 ipv4val;    /* network byte order */
     ws_in6_addr ipv6val;
     char *stringval;
-    struct wtap_opttype_custom customval;
+    if_filter_opt_t if_filterval;
 } wtap_optval_t;
 
 /*
@@ -222,6 +341,13 @@ WS_DLL_PUBLIC void wtap_block_free(wtap_block_t block);
  * @param[in] block_array Array of blocks to be freed
  */
 WS_DLL_PUBLIC void wtap_block_array_free(GArray* block_array);
+
+/** Provide type of a block
+ *
+ * @param[in] block Block from which to retrieve mandatory data
+ * @return Block type.
+ */
+WS_DLL_PUBLIC wtap_block_type_t wtap_block_get_type(wtap_block_t block);
 
 /** Provide mandatory data of a block
  *
@@ -423,6 +549,20 @@ WS_DLL_PUBLIC wtap_opttype_return_val
 wtap_block_set_string_option_value_format(wtap_block_t block, guint option_id, const char *format, ...)
                                           G_GNUC_PRINTF(3,4);
 
+/** Set string option value for nth instance of a particular option in a block
+ * to a printf-formatted string
+ *
+ * @param[in] block Block in which to set the option value
+ * @param[in] option_id Identifier value for option
+ * @param[in] idx Instance number of option with that ID
+ * @param[in] format printf-like format string
+ * @return wtap_opttype_return_val - WTAP_OPTTYPE_SUCCESS if successful,
+ * error code otherwise
+ */
+WS_DLL_PUBLIC wtap_opttype_return_val
+wtap_block_set_nth_string_option_value_format(wtap_block_t block, guint option_id, guint idx, const char *format, ...)
+                                              G_GNUC_PRINTF(4,5);
+
 /** Get string option value from a block
  *
  * @param[in] block Block from which to get the option value
@@ -446,19 +586,18 @@ wtap_block_get_string_option_value(wtap_block_t block, guint option_id, char** v
 WS_DLL_PUBLIC wtap_opttype_return_val
 wtap_block_get_nth_string_option_value(wtap_block_t block, guint option_id, guint idx, char** value) G_GNUC_WARN_UNUSED_RESULT;
 
-/** Add a "custom" option value to a block
+/** Add an if_filter option value to a block
  *
  * @param[in] block Block to which to add the option
  * @param[in] option_id Identifier value for option
  * @param[in] value Value of option
- * @param[in] value_size Size of value
  * @return wtap_opttype_return_val - WTAP_OPTTYPE_SUCCESS if successful,
  * error code otherwise
  */
 WS_DLL_PUBLIC wtap_opttype_return_val
-wtap_block_add_custom_option(wtap_block_t block, guint option_id, void* value, size_t value_size);
+wtap_block_add_if_filter_option(wtap_block_t block, guint option_id, if_filter_opt_t* value);
 
-/** Set a "custom" option value in a block
+/** Set an if_filter option value in a block
  *
  * @param[in] block Block in which to set the option value
  * @param[in] option_id Identifier value for option
@@ -467,18 +606,18 @@ wtap_block_add_custom_option(wtap_block_t block, guint option_id, void* value, s
  * error code otherwise
  */
 WS_DLL_PUBLIC wtap_opttype_return_val
-wtap_block_set_custom_option_value(wtap_block_t block, guint option_id, void* value);
+wtap_block_set_if_filter_option_value(wtap_block_t block, guint option_id, if_filter_opt_t* value);
 
-/** Get a "custom" option value from a block
+/** Get an if_filter option value from a block
  *
  * @param[in] block Block from which to get the option value
  * @param[in] option_id Identifier value for option
- * @param[out] value Returned value of option
+ * @param[out] value Returned value of option value
  * @return wtap_opttype_return_val - WTAP_OPTTYPE_SUCCESS if successful,
  * error code otherwise
  */
 WS_DLL_PUBLIC wtap_opttype_return_val
-wtap_block_get_custom_option_value(wtap_block_t block, guint option_id, void** value) G_GNUC_WARN_UNUSED_RESULT;
+wtap_block_get_if_filter_option_value(wtap_block_t block, guint option_id, if_filter_opt_t* value) G_GNUC_WARN_UNUSED_RESULT;
 
 /** Remove an option from a block
  *
@@ -522,9 +661,6 @@ WS_DLL_PUBLIC wtap_block_t wtap_block_make_copy(wtap_block_t block);
 typedef void (*wtap_block_foreach_func)(wtap_block_t block, guint option_id, wtap_opttype_e option_type, wtap_optval_t *option, void *user_data);
 WS_DLL_PUBLIC void wtap_block_foreach_option(wtap_block_t block, wtap_block_foreach_func func, void* user_data);
 
-WS_DLL_PUBLIC int wtap_opttype_register_custom_block_type(const char* name, const char* description, wtap_block_create_func create,
-                                                wtap_mand_free_func free_mand, wtap_mand_copy_func copy_mand);
-
 /** Cleanup the internal structures
  */
 WS_DLL_PUBLIC void wtap_opttypes_cleanup(void);
@@ -534,4 +670,3 @@ WS_DLL_PUBLIC void wtap_opttypes_cleanup(void);
 #endif /* __cplusplus */
 
 #endif /* WTAP_OPT_TYPES_H */
-

@@ -231,6 +231,27 @@ dfw_append_function(dfwork_t *dfw, stnode_t *node, dfvm_value_t **p_jmp)
 	return val2->value.numeric;
 }
 
+/* returns register number */
+static int
+dfw_append_put_pcre(dfwork_t *dfw, GRegex *pcre)
+{
+	dfvm_insn_t	*insn;
+	dfvm_value_t	*val1, *val2;
+	int		reg;
+
+	insn = dfvm_insn_new(PUT_PCRE);
+	val1 = dfvm_value_new(PCRE);
+	val1->value.pcre = pcre;
+	val2 = dfvm_value_new(REGISTER);
+	reg = dfw->first_constant--;
+	val2->value.numeric = reg;
+	insn->arg1 = val1;
+	insn->arg2 = val2;
+	dfw_append_const(dfw, insn);
+
+	return reg;
+}
+
 
 /**
  * Adds an instruction for a relation operator where the values are already
@@ -295,7 +316,7 @@ gen_relation_in(dfwork_t *dfw, stnode_t *st_arg1, stnode_t *st_arg2)
 	dfvm_insn_t	*insn;
 	dfvm_value_t	*val1, *val2, *val3;
 	dfvm_value_t	*jmp1 = NULL, *jmp2 = NULL, *jmp3 = NULL;
-	int		reg1 = -1, reg2 = -1, reg3 = -1;
+	int		reg1;
 	stnode_t	*node1, *node2;
 	GSList		*nodelist_head, *nodelist;
 	GSList		*jumplist = NULL;
@@ -312,6 +333,8 @@ gen_relation_in(dfwork_t *dfw, stnode_t *st_arg1, stnode_t *st_arg2)
 		nodelist = g_slist_next(nodelist);
 
 		if (node2) {
+			int	reg2, reg3;
+
 			/* Range element: add lower/upper bound test. */
 			reg2 = gen_entity(dfw, node1, &jmp2);
 			reg3 = gen_entity(dfw, node2, &jmp3);
@@ -329,6 +352,8 @@ gen_relation_in(dfwork_t *dfw, stnode_t *st_arg1, stnode_t *st_arg2)
 			insn->arg3 = val3;
 			dfw_append_insn(dfw, insn);
 		} else {
+			int	reg2;
+
 			/* Normal element: add equality test. */
 			reg2 = gen_entity(dfw, node1, &jmp2);
 
@@ -399,6 +424,9 @@ gen_entity(dfwork_t *dfw, stnode_t *st_arg, dfvm_value_t **p_jmp)
 	}
 	else if (e_type == STTYPE_FUNCTION) {
 		reg = dfw_append_function(dfw, st_arg, p_jmp);
+	}
+	else if (e_type == STTYPE_PCRE) {
+		reg = dfw_append_put_pcre(dfw, (GRegex *)stnode_steal_data(st_arg));
 	}
 	else {
 		/* printf("sttype_id is %u\n", (unsigned)e_type); */

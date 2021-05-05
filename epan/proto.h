@@ -40,9 +40,6 @@
 #include "register.h"
 #include "ws_symbol_export.h"
 #include "ws_attributes.h"
-#ifdef HAVE_PLUGINS
-#include "wsutil/plugins.h"
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -542,7 +539,7 @@ void proto_report_dissector_bug(const char *format, ...)
  *  8-byte time_t and an 8-byte nanoseconds field.)
  *
  *  ENC_TIME_NTP - 8 bytes; the first 4 bytes are seconds since the NTP
- *  epoch (1901-01-01 00:00:00 GMT) and the next 4 bytes are 1/2^32's of
+ *  epoch (1900-01-01 00:00:00 GMT) and the next 4 bytes are 1/2^32's of
  *  a second since that second.  (I.e., a 64-bit count of 1/2^32's of a
  *  second since the NTP epoch, with the upper 32 bits first and the
  *  lower 32 bits second, even when little-endian.)
@@ -551,9 +548,9 @@ void proto_report_dissector_bug(const char *format, ...)
  *  and z/Architecture epoch (1900-01-01 00:00:00 GMT).
  *
  *  ENC_TIME_RTPS - 8 bytes; the first 4 bytes are seconds since the UN*X
- *  epoch and the next 4 bytes are are 1/2^32's of a second since that
+ *  epoch and the next 4 bytes are 1/2^32's of a second since that
  *  second.  (I.e., it's the offspring of a mating between UN*X time and
- *  NTP time.)  It's used by the Object Management Group's Real-Time
+ *  NTP time).  It's used by the Object Management Group's Real-Time
  *  Publish-Subscribe Wire Protocol for the Data Distribution Service.
  *
  *  ENC_TIME_SECS_USECS - 8 bytes; the first 4 bytes are seconds and the
@@ -568,14 +565,24 @@ void proto_report_dissector_bug(const char *format, ...)
  *  If the time is absolute, it's milliseconds since the UN*X epoch.
  *
  *  ENC_TIME_SECS_NTP - 4 bytes, representing a count of seconds since
- *  the NTP epoch.  (I.e., seconds since the NTP epoch.)
+ *  the NTP epoch.
  *
  *  ENC_TIME_RFC_3971 - 8 bytes, representing a count of 1/64ths of a
  *  second since the UN*X epoch; see section 5.3.1 "Timestamp Option"
  *  in RFC 3971.
  *
  *  ENC_TIME_MSEC_NTP - 4-8 bytes, representing a count of milliseconds since
- *  the NTP epoch.  (I.e., milliseconds since the NTP epoch.)
+ *  the NTP epoch.
+ *
+ *  ENC_MIP6 - 8 bytes; the first 48 bits are seconds since the UN*X epoch
+ *  and the remaining 16 bits indicate the number of 1/65536's of a second
+ *  since that second.
+ *
+ *  ENC_TIME_CLASSIC_MAC_OS_SECS - 4-8 bytes, representing a count of seconds
+ *  since January 1, 1904, 00:00:00 UTC.
+ *
+ *  ENC_TIME_NSECS - 8 bytes, representing a value in nanoseconds.
+ *  If the time is absolute, it's nanoseconds since the UN*X epoch.
  *
  * The backwards-compatibility names are defined as hex numbers so that
  * the script to generate init.lua will add them as global variables,
@@ -596,6 +603,7 @@ void proto_report_dissector_bug(const char *format, ...)
 #define ENC_TIME_MSEC_NTP            0x00000022
 #define ENC_TIME_MIP6                0x00000024
 #define ENC_TIME_CLASSIC_MAC_OS_SECS 0x00000026
+#define ENC_TIME_NSECS               0x00000028
 
 /*
  * For cases where a string encoding contains a timestamp, use one
@@ -799,7 +807,7 @@ typedef struct
 } crumb_spec_t;
 
 /*
- * Flag fields.  Do not assign values greater than 0x00000080 unless you
+ * Flag fields.  Do not assign values greater than 0x000FFFFF unless you
  * shuffle the expert information upward; see below.
  */
 
@@ -1031,7 +1039,6 @@ extern gboolean proto_tree_traverse_post_order(proto_tree *tree,
 WS_DLL_PUBLIC void proto_tree_children_foreach(proto_tree *tree,
     proto_tree_foreach_func func, gpointer data);
 
-#ifdef HAVE_PLUGINS
 typedef struct {
     void (*register_protoinfo)(void);   /* routine to call to register protocol information */
     void (*register_handoff)(void);     /* routine to call to register dissector handoff */
@@ -1039,7 +1046,6 @@ typedef struct {
 
 /** Register dissector plugin with the plugin system. */
 WS_DLL_PUBLIC void proto_register_plugin(const proto_plugin *plugin);
-#endif
 
 /** Sets up memory used by proto routines. Called at program startup */
 void proto_init(GSList *register_all_plugin_protocols_list,
@@ -3256,7 +3262,8 @@ typedef enum
     PROTO_CHECKSUM_E_BAD = 0,
     PROTO_CHECKSUM_E_GOOD,
     PROTO_CHECKSUM_E_UNVERIFIED,
-    PROTO_CHECKSUM_E_NOT_PRESENT
+    PROTO_CHECKSUM_E_NOT_PRESENT,
+    PROTO_CHECKSUM_E_ILLEGAL
 } proto_checksum_enum_e;
 
 #define PROTO_CHECKSUM_NO_FLAGS     0x00    /**< Don't use any flags */

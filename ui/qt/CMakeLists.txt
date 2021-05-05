@@ -9,10 +9,6 @@
 
 ADD_CUSTOM_CMAKE_INCLUDE()
 
-include_directories(
-		${GCRYPT_INCLUDE_DIRS}
-)
-
 set(WIRESHARK_WIDGET_HEADERS
 	widgets/additional_toolbar.h
 	widgets/apply_line_edit.h
@@ -41,6 +37,7 @@ set(WIRESHARK_WIDGET_HEADERS
 	widgets/packet_list_header.h
 	widgets/profile_tree_view.h
 	widgets/range_syntax_lineedit.h
+	widgets/rtp_audio_graph.h
 	widgets/splash_overlay.h
 	widgets/stock_icon_tool_button.h
 	widgets/syntax_line_edit.h
@@ -66,6 +63,10 @@ set(WIRESHARK_UTILS_HEADERS
 	utils/idata_printable.h
 	utils/proto_node.h
 	utils/qt_ui_utils.h
+	utils/rtp_audio_routing.h
+	utils/rtp_audio_routing_filter.h
+	utils/rtp_audio_silence_generator.h
+	utils/rtp_audio_file.h
 	utils/stock_icon.h
 	utils/tango_colors.h
 	utils/variant_pointer.h
@@ -281,6 +282,7 @@ set(WIRESHARK_WIDGET_SRCS
 	widgets/pref_module_view.cpp
 	widgets/profile_tree_view.cpp
 	widgets/range_syntax_lineedit.cpp
+	widgets/rtp_audio_graph.cpp
 	widgets/splash_overlay.cpp
 	widgets/stock_icon_tool_button.cpp
 	widgets/syntax_line_edit.cpp
@@ -305,6 +307,10 @@ set(WIRESHARK_UTILS_SRCS
 	utils/frame_information.cpp
 	utils/proto_node.cpp
 	utils/qt_ui_utils.cpp
+	utils/rtp_audio_routing.cpp
+	utils/rtp_audio_routing_filter.cpp
+	utils/rtp_audio_silence_generator.cpp
+	utils/rtp_audio_file.cpp
 	utils/stock_icon.cpp
 	utils/wireshark_mime_data.cpp
 	utils/wireshark_zip_helper.cpp
@@ -626,14 +632,11 @@ set(WIRESHARK_QT_QRC
 	${CMAKE_CURRENT_BINARY_DIR}/i18n.qrc
 )
 
-include_directories(
-	${CMAKE_CURRENT_BINARY_DIR}
-	${CMAKE_CURRENT_SOURCE_DIR}
-)
-
-set(CMAKE_AUTOMOC TRUE)
-set(CMAKE_AUTOUIC TRUE)
-set(CMAKE_AUTORCC TRUE)
+if(CMAKE_VERSION VERSION_LESS "3.10.0")
+	set(CMAKE_AUTOMOC ON)
+	set(CMAKE_AUTOUIC ON)
+	set(CMAKE_AUTORCC ON)
+endif()
 
 if(NOT Qt5Widgets_VERSION VERSION_LESS "5.9")
 	# Drop the file modification time of source files from generated files
@@ -707,15 +710,22 @@ add_library(qtui OBJECT
 	wireshark-tap-register.c
 )
 
-target_include_directories(qtui SYSTEM
-	PUBLIC
+target_include_directories(qtui
+	SYSTEM PUBLIC
 		${QT_INCLUDE_DIRS}
 		${WINSPARKLE_INCLUDE_DIRS}
 		${SPEEXDSP_INCLUDE_DIRS}
-	PRIVATE
+)
+
+target_include_directories(qtui
+	SYSTEM PRIVATE
 		# Can't use imported target, linking object libraries for usage requirements
 		# requires CMake 3.12
 		${PCAP_INCLUDE_DIRS}
+		${GCRYPT_INCLUDE_DIRS}
+	PRIVATE
+		${CMAKE_CURRENT_BINARY_DIR}
+		${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 target_compile_definitions(qtui
@@ -729,6 +739,9 @@ set_target_properties(qtui PROPERTIES
 	# Ensure .qm files are generated before autogenerating i18n.qrc
 	AUTOGEN_TARGET_DEPENDS "${WIRESHARK_QT_QM}"
 )
+if(MSVC)
+	set_target_properties(qtui PROPERTIES LINK_FLAGS_DEBUG "${WS_MSVC_DEBUG_LINK_FLAGS}")
+endif()
 
 CHECKAPI(
 	NAME

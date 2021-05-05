@@ -202,8 +202,9 @@ static const value_string oktypenames[] = {
 
 static const string_string errortypenames[] = {
     { "E0", "Syntax error: unknown command (CMDUNKN)" },
-    { "E1", "Syntax error: wrong number of arguments (PARSE_NARGS)" },
-    { "E2", "Syntax error: unknown modifiers (PARSE_MODS)" },
+    { "E1", "Syntax error: invalid number of arguments (PARSE_NARGS)" },
+    { "E2", "Syntax error: modifiers are not supported by the command (PARSE_MODS)" },
+    { "E3", "Syntax error: subcommand is not supported (PARSE_SUBC)" },
     { "E5", "PARSE_1" },
     { "E6", "PARSE_2" },
     { "E7", "PARSE_3" },
@@ -218,18 +219,23 @@ static const string_string errortypenames[] = {
     { "E16", "PARSE_16" },
     { "E17", "PARSE_6" },
     { "E18", "PARSE_7" },
-    { "E25", "Software error: return string too big (RTOOBIG_1)" },
-    { "E31", "INVLARG_1" },
-    { "E32", "INVLARG_2" },
-    { "E33", "INVLARG_3" },
-    { "E34", "INVLARG_4" },
-    { "E35", "INVLARG_5" },
-    { "E50", "SESUNKN" },
+    { "E19", "PARSE_8" },
+    { "E25", "Software error: output buffer overflow (RTOOBIG_1)" },
+    { "E26", "Software error: output buffer overflow (RTOOBIG_2)" },
+    { "E31", "Syntax error: invalid local address (INVLARG_1)" },
+    { "E32", "Syntax error: invalid remote address (INVLARG_2)" },
+    { "E33", "Syntax error: can't find local address for remote address (INVLARG_3)" },
+    { "E34", "Syntax error: invalid local address (INVLARG_4)" },
+    { "E35", "Syntax error: no codecs (INVLARG_5)" },
+    { "E36", "Syntax error: cannot match local address for the session (INVLARG_6)" },
+    { "E50", "Software error: session not found (SESUNKN)" },
     { "E60", "PLRFAIL" },
+    { "E62", "Software error: unsupported/invalid counter name (QRYFAIL)" },
     { "E65", "CPYFAIL" },
     { "E68", "STSFAIL" },
     { "E71", "Software error: can't create listener (LSTFAIL_1)" },
     { "E72", "Software error: can't create listener (LSTFAIL_2)" },
+    { "E75", "Software error: must permit notification socket with -n (NSOFF)" },
     { "E81", "Out of memory (NOMEM_1)" },
     { "E82", "Out of memory (NOMEM_2)" },
     { "E83", "Out of memory (NOMEM_3)" },
@@ -238,6 +244,8 @@ static const string_string errortypenames[] = {
     { "E86", "Out of memory (NOMEM_6)" },
     { "E87", "Out of memory (NOMEM_7)" },
     { "E88", "Out of memory (NOMEM_8)" },
+    { "E89", "Out of memory (NOMEM_9)" },
+    { "E98", "OVERLOAD" },
     { "E99", "Software error: proxy is in the deorbiting-burn mode, new session rejected (SLOWSHTDN)" },
     { 0, NULL }
 };
@@ -469,7 +477,6 @@ rtpproxy_add_notify_addr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *rtpproxy
     gint tmp = 0;
     gboolean ipv6 = FALSE;
     guint32 ipaddr[4]; /* Enough room for IPv4 or IPv6 */
-    proto_item *ti;
 
     /* Check for at least one colon */
     offset = tvb_find_guint8(tvb, begin, end, ':');
@@ -496,15 +503,19 @@ rtpproxy_add_notify_addr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *rtpproxy
             (guint16) g_ascii_strtoull((gchar*)tvb_get_string_enc(wmem_packet_scope(), tvb, offset+1, end - (offset+1), ENC_ASCII), NULL, 10));
     }
     else{
+        proto_item *ti = NULL;
         /* Only port is supplied - take IPv4/IPv6 from  ip.src/ipv6.src respectively */
         expert_add_info(pinfo, rtpproxy_tree, &ei_rtpproxy_notify_no_ip);
-        if (pinfo->src.type == AT_IPv4)
+        if (pinfo->src.type == AT_IPv4) {
             ti = proto_tree_add_ipv4(rtpproxy_tree, hf_rtpproxy_notify_ipv4, tvb, begin, 0, *(const guint32*)(pinfo->src.data));
-        else
+        } else if (pinfo->src.type == AT_IPv6) {
             ti = proto_tree_add_ipv6(rtpproxy_tree, hf_rtpproxy_notify_ipv6, tvb, begin, 0, (const ws_in6_addr *)(pinfo->src.data));
-        proto_item_set_generated(ti);
-        proto_tree_add_uint(rtpproxy_tree, hf_rtpproxy_notify_port, tvb, begin, end - begin,
-            (guint16) g_ascii_strtoull((gchar*)tvb_get_string_enc(wmem_packet_scope(), tvb, begin, end - begin, ENC_ASCII), NULL, 10));
+        }
+        if (ti) {
+            proto_item_set_generated(ti);
+            proto_tree_add_uint(rtpproxy_tree, hf_rtpproxy_notify_port, tvb, begin, end - begin,
+                (guint16) g_ascii_strtoull((gchar*)tvb_get_string_enc(wmem_packet_scope(), tvb, begin, end - begin, ENC_ASCII), NULL, 10));
+        }
     }
 }
 

@@ -13,11 +13,11 @@
 
 #include "ws_symbol_export.h"
 
+#include <epan/value_string.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
-
-#include <epan/value_string.h>
 
 /*
  * Maximum length of an IEEE 802.3 frame; Ethernet type/length values
@@ -215,6 +215,18 @@ extern "C" {
 
 #ifndef ETHERTYPE_VLAN
 #define ETHERTYPE_VLAN			0x8100	/* 802.1Q Virtual LAN */
+#endif
+
+#ifndef ETHERTYPE_SLPP
+#define ETHERTYPE_SLPP			0x8102	/* Nortel/Avaya/Extremenetworks Simple Loop Protection Protocol */
+#endif
+
+#ifndef ETHERTYPE_VLACP
+#define ETHERTYPE_VLACP			0x8103	/* Nortel/Avaya/Extremenetworks virtual LACP */
+#endif
+
+#ifndef ETHERTYPE_OLDSLPP
+#define ETHERTYPE_OLDSLPP		0x8104	/* Nortel/Avaya/Extremenetworks Simple Loop Protection Protocol */
 #endif
 
 #ifndef ETHERTYPE_NSRP

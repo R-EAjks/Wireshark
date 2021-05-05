@@ -8179,20 +8179,20 @@ static int dissect_oap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
         guint8 no_of_bits = 5;
         guint8 i;
         guint8 bit = 3;
-        g_strlcpy(str, "...", 20);
+        (void) g_strlcpy(str, "...", 20);
 
         /* read the bits for the int */
         for (i = 0; i < no_of_bits; i++)
         {
             if (bit && (!(bit % 4)))
-                g_strlcat(str, " ", 20);
+                (void) g_strlcat(str, " ", 20);
 
             bit++;
 
             if (opcode & mask)
-                g_strlcat(str, "1", 20);
+                (void) g_strlcat(str, "1", 20);
             else
-                g_strlcat(str, "0", 20);
+                (void) g_strlcat(str, "0", 20);
 
             mask = mask >> 1;
         }
@@ -11314,8 +11314,8 @@ static void dof_register_dpp_2(void)
     {
         { &ei_dpp2_dof_10_flags_zero, { "dof.dpp.v2.flags_zero", PI_UNDECODED, PI_ERROR, "DPS-10: Reserved flag bits must be zero.", EXPFILL } },
         { &ei_dpp_default_flags, { "dof.dpp.v2.flags_included", PI_COMMENTS_GROUP, PI_NOTE, "Default flag value is included explicitly.", EXPFILL } },
-        { &ei_dpp_explicit_sender_sid_included, { "dof.dpp.v2.sender_sid_included", PI_COMMENT, PI_NOTE, "Explicit SID could be optimized, same as sender.", EXPFILL } },
-        { &ei_dpp_explicit_receiver_sid_included, { "dof.dpp.v2.receiver_sid_included", PI_COMMENT, PI_NOTE, "Explicit SID could be optimized, same as receiver.", EXPFILL } },
+        { &ei_dpp_explicit_sender_sid_included, { "dof.dpp.v2.sender_sid_included", PI_PROTOCOL, PI_NOTE, "Explicit SID could be optimized, same as sender.", EXPFILL } },
+        { &ei_dpp_explicit_receiver_sid_included, { "dof.dpp.v2.receiver_sid_included", PI_PROTOCOL, PI_NOTE, "Explicit SID could be optimized, same as receiver.", EXPFILL } },
 #ifdef LIBGCRYPT_OK
         { &ei_dpp_no_security_context, { "dof.dpp.v2.no_context", PI_UNDECODED, PI_WARN, "No security context to enable packet decryption.", EXPFILL } },
 #else
@@ -11823,8 +11823,8 @@ static void dof_oap_handoff(void)
 
 /* SGMP Registration Support */
 
-void dof_register_sgmp_130(void);
-void dof_reg_handoff_sgmp_130(void);
+static void dof_register_sgmp_130(void);
+static void dof_reg_handoff_sgmp_130(void);
 
 static void dof_sgmp_reset(void)
 {
@@ -11834,7 +11834,7 @@ static void dof_sgmp_cleanup(void)
 {
 }
 
-void dof_register_sgmp_130(void)
+static void dof_register_sgmp_130(void)
 {
     static hf_register_info hf[] =
     {
@@ -11897,7 +11897,7 @@ void dof_register_sgmp_130(void)
 /**
  * The registration hand-off routine
  */
-void dof_reg_handoff_sgmp_130(void)
+static void dof_reg_handoff_sgmp_130(void)
 {
     dissector_handle_t sgmp_handle = create_dissector_handle(dissect_sgmp, proto_sgmp);
 

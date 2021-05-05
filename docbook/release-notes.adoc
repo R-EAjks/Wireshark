@@ -31,8 +31,8 @@ See the “New and Updated Features” section below for more details.
 
 The following features are new (or have been significantly updated) since version 3.4.0:
 
-* The Windows installers now ship with Npcap 1.10.
-They previously shipped with Npcap 1.00.
+* The Windows installers now ship with Npcap 1.31.
+They previously shipped with Npcap 1.20.
 
 * TCP conversations now support a completeness criteria, which facilitates the identification of TCP streams having any
   of opening or closing handshakes, a payload, in any combination. It is accessed with the new tcp.completeness filter.
@@ -46,9 +46,32 @@ They previously shipped with Npcap 1.00.
   created to dissect DLT_ETW packets so Wireshark can display the DLT_ETW packet header, its message and packet_etw dissector
   calls packet_mbim sub_dissector if its provider matches the MBIM provider GUID.
 
+* "Follow DCCP stream" feature to filter for and extract the contents of DCCP streams.
+
+* Wireshark now supports dissecting the rtp packet with OPUS payload.
+
+* Importing captures from text files is now also possible based on regular expressions. By specifying a regex capturing a single
+  packet including capturing groups for relevant fields a textfile can be converted to a libcap capture file. Supported data
+  encodings are plain-hexadecimal, -octal, -binary and base64.
+  Also the timestamp format now allows the second-fractions to be placed anywhere in the timestamp and it will be stored with
+  nanosecond instead of microsecond precision.
+
+* Significant RTP Player redesign and improvements (see Wireshark User Documentation, https://www.wireshark.org/docs/wsug_html_chunked/ChTelPlayingCalls.html[Playing VoIP Calls] and https://www.wireshark.org/docs/wsug_html_chunked/_rtp.html#ChTelRtpPlayer[RTP Player Window])
+** RTP Player can play many streams in row
+** UI is more responsive
+** RTP Player maintains playlist, other tools can add/remove streams to it
+** Every stream can be muted or routed to L/R channel for replay
+** Save audio is moved from RTP Analysis to RTP Player. RTP Player saves what was played. RTP Player can save in multichannel .au or .wav.
+** RTP Player added to menu Telephony>RTP>RTP Player
+
+* VoIP dialogs (VoIP Calls, RTP Streams, RTP Analysis, RTP Player, SIP Flows) are non-modal, can stay opened on background
+** Same tools are provided acros all dialogs (Prepare Filter, Analyse, RTP Player ...)
+
+* Follow stream is now able to follow SIP call by SIP.Call-ID
+
 // === Removed Features and Support
 
-//=== Removed Dissectors
+// === Removed Dissectors
 
 // === New File Format Decoding Support
 
@@ -66,6 +89,7 @@ Kerberos SPAKE
 O-RAN fronthaul UC-plane (O-RAN)
 PDU Transport Protocol
 State Synchronization Protocol (SSyncP)
+UAVCAN\CAN
 --
 
 === Updated Protocol Support
@@ -111,7 +135,7 @@ The User’s Guide, manual pages and various other documentation can be found at
 https://www.wireshark.org/docs/
 
 Community support is available on
-https://ask.wireshark.org/[Wireshark’sQ&A site]
+https://ask.wireshark.org/[Wireshark’s Q&A site]
 and on the wireshark-users mailing list.
 Subscription information and archives for all of Wireshark’s mailing lists can be found on
 https://www.wireshark.org/lists/[the web site].

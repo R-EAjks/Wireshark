@@ -5261,7 +5261,7 @@ static const value_string ansi_a_ms_info_rec_signal_tone_vals[] = {
     { 0, NULL }
 };
 
-const value_string ansi_a_ms_info_rec_signal_isdn_alert_vals[] = {
+static const value_string ansi_a_ms_info_rec_signal_isdn_alert_vals[] = {
     { 0x0,      "Normal Alerting" },
     { 0x1,      "Intergroup Alerting" },
     { 0x2,      "Special/Priority Alerting" },
@@ -10575,14 +10575,24 @@ static stat_tap_table_item dtap_stat_fields[] = {{TABLE_ITEM_UINT, TAP_ALIGN_RIG
 
 static void ansi_a_dtap_stat_init(stat_tap_table_ui* new_stat)
 {
+    const char *table_name = "ANSI A-I/F DTAP Statistics";
     int num_fields = sizeof(dtap_stat_fields)/sizeof(stat_tap_table_item);
-    stat_tap_table* table = stat_tap_init_table("ANSI A-I/F DTAP Statistics", num_fields, 0, NULL);
+    stat_tap_table *table;
     int i = 0;
     stat_tap_table_item_type items[sizeof(dtap_stat_fields)/sizeof(stat_tap_table_item)];
 
+    table = stat_tap_find_table(new_stat, table_name);
+    if (table) {
+        if (new_stat->stat_tap_reset_table_cb) {
+            new_stat->stat_tap_reset_table_cb(table);
+        }
+        return;
+    }
+
+    table = stat_tap_init_table(table_name, num_fields, 0, NULL);
     stat_tap_add_table(new_stat, table);
 
-    /* Add a fow for each value type */
+    /* Add a row for each value type */
     while (ansi_a_dtap_strings[i].strptr)
     {
         items[IEI_COLUMN].type = TABLE_ITEM_UINT;
@@ -10643,14 +10653,24 @@ static stat_tap_table_item bsmap_stat_fields[] = {{TABLE_ITEM_UINT, TAP_ALIGN_RI
 
 static void ansi_a_bsmap_stat_init(stat_tap_table_ui* new_stat)
 {
+    const char *table_name = "ANSI A-I/F BSMAP Statistics";
     int num_fields = sizeof(bsmap_stat_fields)/sizeof(stat_tap_table_item);
-    stat_tap_table* table = stat_tap_init_table("ANSI A-I/F BSMAP Statistics", num_fields, 0, NULL);
+    stat_tap_table *table;
     int i = 0;
     stat_tap_table_item_type items[sizeof(bsmap_stat_fields)/sizeof(stat_tap_table_item)];
 
+    table = stat_tap_find_table(new_stat, table_name);
+    if (table) {
+        if (new_stat->stat_tap_reset_table_cb) {
+            new_stat->stat_tap_reset_table_cb(table);
+        }
+        return;
+    }
+
+    table = stat_tap_init_table(table_name, num_fields, 0, NULL);
     stat_tap_add_table(new_stat, table);
 
-    /* Add a fow for each value type */
+    /* Add a row for each value type */
     while (ansi_a_bsmap_strings[i].strptr)
     {
         items[IEI_COLUMN].type = TABLE_ITEM_UINT;

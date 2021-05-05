@@ -61,7 +61,11 @@ QWidget * ExtArgTimestamp::createEditor(QWidget * parent)
             text = storeValue.trimmed();
     }
 
+#if QT_VERSION >= QT_VERSION_CHECK(5, 8, 0)
+    ts = QDateTime::fromSecsSinceEpoch(text.toInt());
+#else
     ts = QDateTime::fromTime_t(text.toInt());
+#endif
     tsBox = new QDateTimeEdit(ts, parent);
     tsBox->setDisplayFormat(QLocale::system().dateTimeFormat());
     tsBox->setCalendarPopup(true);
@@ -83,7 +87,11 @@ void ExtArgTimestamp::onDateTimeChanged(QDateTime t)
 
 QString ExtArgTimestamp::defaultValue()
 {
+#if QT_VERSION >= QT_VERSION_CHECK(5, 8, 0)
+    return QString::number(QDateTime::currentDateTime().toSecsSinceEpoch());
+#else
     return QString::number(QDateTime::currentDateTime().toTime_t());
+#endif
 }
 
 bool ExtArgTimestamp::isValid()
@@ -98,7 +106,11 @@ bool ExtArgTimestamp::isValid()
 
 QString ExtArgTimestamp::value()
 {
+#if QT_VERSION >= QT_VERSION_CHECK(5, 8, 0)
+    return QString::number(ts.toSecsSinceEpoch());
+#else
     return QString::number(ts.toTime_t());
+#endif
 }
 
 QString ExtArgTimestamp::prefValue()
@@ -895,16 +907,3 @@ void ExtcapArgument::onBoolChanged(bool)
 {
     emit valueChanged();
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

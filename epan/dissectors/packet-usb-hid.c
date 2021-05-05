@@ -3310,7 +3310,7 @@ static const value_string keycode_vals[] = {
 
     {0, NULL}
 };
-value_string_ext keycode_vals_ext = VALUE_STRING_EXT_INIT(keycode_vals);
+static value_string_ext keycode_vals_ext = VALUE_STRING_EXT_INIT(keycode_vals);
 
 static guint32
 hid_unpack_value(guint8 *data, unsigned int idx, unsigned int size)
@@ -3339,6 +3339,7 @@ hid_unpack_signed(guint8 *data, unsigned int idx, unsigned int size, gint32 *val
 }
 
 
+#define MAX_REPORT_DESCRIPTOR_COUNT 100000 // Arbitrary
 static gboolean
 parse_report_descriptor(report_descriptor_t *rdesc)
 {
@@ -3493,6 +3494,10 @@ parse_report_descriptor(report_descriptor_t *rdesc)
 
                         usage_max = hid_unpack_value(data, i, size);
                         if (usage_min > usage_max) {
+                            goto err;
+                        }
+
+                        if (wmem_array_get_count(field.usages) + usage_max - usage_min >= MAX_REPORT_DESCRIPTOR_COUNT) {
                             goto err;
                         }
 
@@ -3721,7 +3726,7 @@ get_usage_page_item_string(guint32 usage_page, guint32 id)
     if (!str)
         str = "Reserved";
 
-    return g_strdup_printf(str, id);
+    return wmem_strdup_printf(wmem_packet_scope(), str, id);
 }
 
 /* Dissector for the data in a HID main report. */
@@ -3945,8 +3950,6 @@ dissect_usb_hid_report_localitem_data(packet_info *pinfo _U_, proto_tree *tree, 
             break;
     }
     offset += bSize;
-
-    g_free(str);
 
     return offset;
 }

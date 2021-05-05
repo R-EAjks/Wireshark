@@ -54,7 +54,7 @@ _inet_pton(int af, const gchar *src, gpointer dst)
             g_critical("ws_inet_pton6: EAFNOSUPPORT");
         }
         else {
-            g_assert(0);
+            g_assert_not_reached();
         }
         errno = EAFNOSUPPORT;
     }
@@ -80,7 +80,7 @@ _inet_ntop(int af, gconstpointer src, gchar *dst, guint dst_size)
                 break;
         }
         /* set result to something that can't be confused with a valid conversion */
-        g_strlcpy(dst, errmsg, dst_size);
+        (void) g_strlcpy(dst, errmsg, dst_size);
         /* set errno for caller */
         errno = saved_errno;
     }

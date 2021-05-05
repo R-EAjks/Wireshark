@@ -15,6 +15,8 @@
 #ifndef __RTP_MEDIA_H__
 #define __RTP_MEDIA_H__
 
+#include <glib.h>
+
 /** @file
  *  "RTP Player" dialog box common routines.
  *  @ingroup main_ui_group
@@ -24,8 +26,6 @@
 extern "C" {
 #endif /* __cplusplus */
 
-#include <glib.h>
-
 /****************************************************************************/
 /* INTERFACE */
 /****************************************************************************/
@@ -33,6 +33,8 @@ extern "C" {
 typedef gint16 SAMPLE;
 #define SAMPLE_MAX G_MAXINT16
 #define SAMPLE_MIN G_MININT16
+#define SAMPLE_NaN SAMPLE_MIN
+#define SAMPLE_BYTES (sizeof(SAMPLE) / sizeof(char))
 
 /* Defines an RTP packet */
 typedef struct _rtp_packet {
@@ -78,16 +80,3 @@ size_t decode_rtp_packet(rtp_packet_t *rp, SAMPLE **out_buff, GHashTable *decode
 #endif /* __cplusplus */
 
 #endif /* __RTP_MEDIA_H__ */
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

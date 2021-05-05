@@ -8553,8 +8553,16 @@ dissect_gsm_map_ms_ADD_Info(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int of
 
 static int
 dissect_gsm_map_ms_LAC(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-  offset = dissect_ber_octet_string(implicit_tag, actx, tree, tvb, offset, hf_index,
-                                       NULL);
+#line 1198 "./asn1/gsm_map/gsm_map.cnf"
+  tvbuff_t *parameter_tvb = NULL;
+  offset = dissect_ber_octet_string(implicit_tag, actx, tree, tvb, offset, -1,
+                                       &parameter_tvb);
+
+  if (parameter_tvb) {
+    actx->created_item = proto_tree_add_item(tree, hf_index, parameter_tvb, 0, 2, ENC_BIG_ENDIAN);
+  }
+
+
 
   return offset;
 }
@@ -17804,7 +17812,7 @@ const value_string gsm_old_GSMMAPLocalErrorcode_vals[] = {
   {  16, "illegalSS-Operation" },
   {  17, "ss-ErrorStatus" },
   {  18, "ss-NotAvailable" },
-  {  19, "ss-SubscriptionViolatio" },
+  {  19, "ss-SubscriptionViolation" },
   {  20, "ss-Incompatibility" },
   {  21, "facilityNotSupported" },
   {  22, "ongoingGroupCall" },
@@ -17822,7 +17830,7 @@ const value_string gsm_old_GSMMAPLocalErrorcode_vals[] = {
   {  34, "systemFailure" },
   {  35, "dataMissing" },
   {  36, "unexpectedDataValue" },
-  {  37, "pw-RegistrationFailur" },
+  {  37, "pw-RegistrationFailure" },
   {  38, "negativePW-Check" },
   {  39, "noRoamingNumberAvailable" },
   {  40, "tracingBufferFull" },
@@ -17843,8 +17851,8 @@ const value_string gsm_old_GSMMAPLocalErrorcode_vals[] = {
   {  59, "mm-EventNotSupported" },
   {  60, "atsi-NotAllowed" },
   {  61, "atm-NotAllowed" },
-  {  62, "informationNotAvailabl" },
-  {  71, "unknownAlphabe" },
+  {  62, "informationNotAvailable" },
+  {  71, "unknownAlphabet" },
   {  72, "ussd-Busy" },
   { 0, NULL }
 };
@@ -24069,6 +24077,7 @@ static stat_tap_table_item gsm_map_stat_fields[] = {
 
 static void gsm_map_stat_init(stat_tap_table_ui* new_stat)
 {
+  const char *table_name = "GSM MAP Operation Statistics";
   int num_fields = sizeof(gsm_map_stat_fields)/sizeof(stat_tap_table_item);
   stat_tap_table* table;
   guint i;
@@ -24087,7 +24096,15 @@ static void gsm_map_stat_init(stat_tap_table_ui* new_stat)
   items[TOT_BYTES_COLUMN].type = TABLE_ITEM_UINT;
   items[AVG_BYTES_COLUMN].type = TABLE_ITEM_FLOAT;
 
-  table = stat_tap_init_table("GSM MAP Operation Statistics", num_fields, 0, NULL);
+  table = stat_tap_find_table(new_stat, table_name);
+  if (table) {
+    if (new_stat->stat_tap_reset_table_cb) {
+      new_stat->stat_tap_reset_table_cb(table);
+    }
+    return;
+  }
+
+  table = stat_tap_init_table(table_name, num_fields, 0, NULL);
   stat_tap_add_table(new_stat, table);
 
   /* Add a row for each value type */
@@ -24115,9 +24132,8 @@ gsm_map_stat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _
   stat_tap_table* table;
   stat_tap_table_item_type *invoke_data, *fwd_bytes_data, *result_data, *rev_bytes_data, *avg_data;
   guint invokes, fwd_bytes, results, rev_bytes;
-  guint i = 0;
 
-  table = g_array_index(stat_data->stat_tap_data->tables, stat_tap_table*, i);
+  table = g_array_index(stat_data->stat_tap_data->tables, stat_tap_table*, 0);
 
   invoke_data = stat_tap_get_field_data(table, gmtr->opcode, INVOKES_COLUMN);
   fwd_bytes_data = stat_tap_get_field_data(table, gmtr->opcode, NUM_BYTES_FWD_COLUMN);
@@ -26388,7 +26404,7 @@ void proto_register_gsm_map(void) {
         NULL, HFILL }},
     { &hf_gsm_map_ms_lac,
       { "lac", "gsm_map.ms.lac",
-        FT_BYTES, BASE_NONE, NULL, 0,
+        FT_UINT16, BASE_DEC_HEX, NULL, 0,
         NULL, HFILL }},
     { &hf_gsm_map_ms_identity,
       { "identity", "gsm_map.ms.identity",
@@ -32000,7 +32016,7 @@ void proto_register_gsm_map(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-gsm_map-hfarr.c ---*/
-#line 3321 "./asn1/gsm_map/packet-gsm_map-template.c"
+#line 3329 "./asn1/gsm_map/packet-gsm_map-template.c"
   };
 
   /* List of subtrees */
@@ -32755,7 +32771,7 @@ void proto_register_gsm_map(void) {
     &ett_NokiaMAP_Extensions_AllowedServiceData,
 
 /*--- End of included file: packet-gsm_map-ettarr.c ---*/
-#line 3360 "./asn1/gsm_map/packet-gsm_map-template.c"
+#line 3368 "./asn1/gsm_map/packet-gsm_map-template.c"
   };
 
   static ei_register_info ei[] = {
@@ -32899,7 +32915,7 @@ void proto_register_gsm_map(void) {
 
 
 /*--- End of included file: packet-gsm_map-dis-tab.c ---*/
-#line 3420 "./asn1/gsm_map/packet-gsm_map-template.c"
+#line 3428 "./asn1/gsm_map/packet-gsm_map-template.c"
   oid_add_from_string("ericsson-gsm-Map-Ext","1.2.826.0.1249.58.1.0" );
   oid_add_from_string("accessTypeNotAllowed-id","1.3.12.2.1107.3.66.1.2");
   /*oid_add_from_string("map-ac networkLocUp(1) version3(3)","0.4.0.0.1.0.1.3" );

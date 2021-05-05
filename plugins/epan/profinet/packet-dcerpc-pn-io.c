@@ -5086,7 +5086,7 @@ dissect_PDInterfaceMrpDataAdjust_block(tvbuff_t *tvb, int offset,
     guint16   u16Role;
     guint8    u8LengthDomainName;
     guint8    u8NumberOfMrpInstances;
-    int       iStartOffset = offset;
+    int       endoffset = offset + u16BodyLength;
 
 
     if (u8BlockVersionHigh != 1 || u8BlockVersionLow > 1) { /* added low version == 1 */
@@ -5097,49 +5097,49 @@ dissect_PDInterfaceMrpDataAdjust_block(tvbuff_t *tvb, int offset,
 
     if (u8BlockVersionLow == 0) /*dissect LowVersion == 0 */
     {
-    offset = dissect_pn_align4(tvb, offset, pinfo, tree);
+        offset = dissect_pn_align4(tvb, offset, pinfo, tree);
 
-    /* MRP_DomainUUID */
-    offset = dissect_dcerpc_uuid_t(tvb, offset, pinfo, tree, drep,
-                        hf_pn_io_mrp_domain_uuid, &uuid);
-    /* MRP_Role */
-    offset = dissect_dcerpc_uint16(tvb, offset, pinfo, tree, drep,
-                    hf_pn_io_mrp_role, &u16Role);
-    /* Padding */
-    offset = dissect_pn_align4(tvb, offset, pinfo, tree);
+        /* MRP_DomainUUID */
+        offset = dissect_dcerpc_uuid_t(tvb, offset, pinfo, tree, drep,
+                            hf_pn_io_mrp_domain_uuid, &uuid);
+        /* MRP_Role */
+        offset = dissect_dcerpc_uint16(tvb, offset, pinfo, tree, drep,
+                        hf_pn_io_mrp_role, &u16Role);
+        /* Padding */
+        offset = dissect_pn_align4(tvb, offset, pinfo, tree);
 
-    /* MRP_LengthDomainName */
-    offset = dissect_dcerpc_uint8(tvb, offset, pinfo, tree, drep,
-                    hf_pn_io_mrp_length_domain_name, &u8LengthDomainName);
-    /* MRP_DomainName */
-    /* XXX - IEC 61158-6-10 Edition 4.0 says, in section 5.2.17.2.4 "Coding
-       of the field MRP_DomainName", that "This field shall be coded as
-       data type OctetString with 1 to 240 octets according to Table 702
-       and 4.3.1.4.15.2."
+        /* MRP_LengthDomainName */
+        offset = dissect_dcerpc_uint8(tvb, offset, pinfo, tree, drep,
+                        hf_pn_io_mrp_length_domain_name, &u8LengthDomainName);
+        /* MRP_DomainName */
+        /* XXX - IEC 61158-6-10 Edition 4.0 says, in section 5.2.17.2.4 "Coding
+           of the field MRP_DomainName", that "This field shall be coded as
+           data type OctetString with 1 to 240 octets according to Table 702
+           and 4.3.1.4.15.2."
 
-       It then says, in subsection 4.3.1.4.15.2 "Encoding" of section
-       4.3.1.4.15 "Coding of the field NameOfStationValue", that "This
-       field shall be coded as data type OctetString with 1 to 240
-       octets. The definition of IETF RFC 5890 and the following syntax
-       applies: ..."
+           It then says, in subsection 4.3.1.4.15.2 "Encoding" of section
+           4.3.1.4.15 "Coding of the field NameOfStationValue", that "This
+           field shall be coded as data type OctetString with 1 to 240
+           octets. The definition of IETF RFC 5890 and the following syntax
+           applies: ..."
 
-       RFC 5890 means Punycode; should we translate the domain name to
-       UTF-8 and show both the untranslated and translated domain name?
+           RFC 5890 means Punycode; should we translate the domain name to
+           UTF-8 and show both the untranslated and translated domain name?
 
-       They don't mention anything about the RFC 1035 encoding of
-       domain names as mentioned in section 3.1 "Name space definitions",
-       with the labels being counted strings; does that mean that this
-       is just an ASCII string to be interpreted as a Punycode Unicode
-       domain name? */
-    proto_tree_add_item (tree, hf_pn_io_mrp_domain_name, tvb, offset, u8LengthDomainName, ENC_ASCII|ENC_NA);
-    offset += u8LengthDomainName;
+           They don't mention anything about the RFC 1035 encoding of
+           domain names as mentioned in section 3.1 "Name space definitions",
+           with the labels being counted strings; does that mean that this
+           is just an ASCII string to be interpreted as a Punycode Unicode
+           domain name? */
+        proto_tree_add_item (tree, hf_pn_io_mrp_domain_name, tvb, offset, u8LengthDomainName, ENC_ASCII|ENC_NA);
+        offset += u8LengthDomainName;
 
-    /* Padding */
-    offset = dissect_pn_align4(tvb, offset, pinfo, tree);
-    if ((offset - iStartOffset) < u16BodyLength)
-    {
-        offset = dissect_blocks(tvb, offset, pinfo, tree, drep);
-    }
+        /* Padding */
+        offset = dissect_pn_align4(tvb, offset, pinfo, tree);
+        while (endoffset > offset)
+        {
+            offset = dissect_a_block(tvb, offset, pinfo, tree, drep);
+        }
     }
     else if (u8BlockVersionLow == 1) /*dissect LowVersion == 1 */
     {
@@ -9098,7 +9098,7 @@ dissect_ExpectedSubmoduleBlockReq_block(tvbuff_t *tvb, int offset,
     io_data_object = wmem_new0(wmem_file_scope(), ioDataObject);
     io_data_object->profisafeSupported = FALSE;
     io_data_object->moduleNameStr = (gchar*)wmem_alloc(wmem_file_scope(), MAX_NAMELENGTH);
-    g_strlcpy(io_data_object->moduleNameStr, "Unknown", MAX_NAMELENGTH);
+    (void) g_strlcpy(io_data_object->moduleNameStr, "Unknown", MAX_NAMELENGTH);
     vendorMatch = FALSE;
     deviceMatch = FALSE;
     gsdmlFoundFlag = FALSE;
@@ -11306,6 +11306,68 @@ dissect_IPNIO_Write_resp(tvbuff_t *tvb, int offset,
     offset = dissect_IPNIO_resp_header(tvb, offset, pinfo, tree, di, drep);
 
     offset = dissect_IODWriteRes(tvb, offset, pinfo, tree, drep);
+
+    return offset;
+}
+
+
+/* dissect any number of PN-RSI blocks */
+int
+dissect_rsi_blocks(tvbuff_t* tvb, int offset,
+    packet_info* pinfo, proto_tree* tree, guint8* drep, guint32 u32FOpnumOffsetOpnum, int type)
+{
+    pnio_ar_t* ar = NULL;
+    guint      recursion_count = 0;
+    guint16    u16Index = 0;
+    guint32    u32RecDataLen = 0;
+
+
+    switch (u32FOpnumOffsetOpnum) {
+    case(0x0): // Connect request or response
+        offset = dissect_blocks(tvb, offset, pinfo, tree, drep);
+        break;
+    case(0x2): // Read request or response
+        offset = dissect_RecordDataRead(tvb, offset, pinfo, tree, drep, u16Index, u32RecDataLen);
+        break;
+    case(0x3): // Write request or response
+        if (type == PDU_TYPE_REQ)
+            offset = dissect_IODWriteReq(tvb, offset, pinfo, tree, drep, &ar, recursion_count);
+        else if (type == PDU_TYPE_RSP)
+            offset = dissect_IODWriteRes(tvb, offset, pinfo, tree, drep);
+        break;
+    case(0x4): // Control request or response
+        offset = dissect_blocks(tvb, offset, pinfo, tree, drep);
+        break;
+    case(0x5): // ReadImplicit request or response
+        offset = dissect_RecordDataRead(tvb, offset, pinfo, tree, drep, u16Index, u32RecDataLen);
+        break;
+    case(0x6): // ReadConnectionless request or response
+        offset = dissect_RecordDataRead(tvb, offset, pinfo, tree, drep, u16Index, u32RecDataLen);
+        break;
+    case(0x7): // ReadNotification request or response
+        offset = dissect_RecordDataRead(tvb, offset, pinfo, tree, drep, u16Index, u32RecDataLen);
+        break;
+    case(0x8): // PrmWriteMore request or response
+        if (type == PDU_TYPE_REQ)
+            offset = dissect_IODWriteReq(tvb, offset, pinfo, tree, drep, &ar, recursion_count);
+        else if (type == PDU_TYPE_RSP)
+            offset = dissect_IODWriteRes(tvb, offset, pinfo, tree, drep);
+        break;
+    case(0x9): // PrmWriteEnd request or response
+        if (type == PDU_TYPE_REQ)
+            offset = dissect_IODWriteReq(tvb, offset, pinfo, tree, drep, &ar, recursion_count);
+        else if (type == PDU_TYPE_RSP)
+            offset = dissect_IODWriteRes(tvb, offset, pinfo, tree, drep);
+        break;
+    default:
+        col_append_str(pinfo->cinfo, COL_INFO, "Reserved");
+        offset = dissect_pn_undecoded(tvb, offset, pinfo, tree, tvb_captured_length(tvb));
+        break;
+    }
+
+    if (ar != NULL) {
+        pnio_ar_info(tvb, pinfo, tree, ar);
+    }
 
     return offset;
 }

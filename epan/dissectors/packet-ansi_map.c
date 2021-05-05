@@ -16086,11 +16086,21 @@ static stat_tap_table_item stat_fields[] = {{TABLE_ITEM_UINT, TAP_ALIGN_RIGHT, "
 
 static void ansi_map_stat_init(stat_tap_table_ui* new_stat)
 {
+    const char *table_name = "ANSI MAP Operation Statistics";
     int num_fields = sizeof(stat_fields)/sizeof(stat_tap_table_item);
-    stat_tap_table* table = stat_tap_init_table("ANSI MAP Operation Statistics", num_fields, 0, "ansi_map.op_code");
+    stat_tap_table *table;
     int i = 0;
     stat_tap_table_item_type items[sizeof(stat_fields)/sizeof(stat_tap_table_item)];
 
+    table = stat_tap_find_table(new_stat, table_name);
+    if (table) {
+        if (new_stat->stat_tap_reset_table_cb) {
+            new_stat->stat_tap_reset_table_cb(table);
+        }
+        return;
+    }
+
+    table = stat_tap_init_table(table_name, num_fields, 0, "ansi_map.op_code");
     stat_tap_add_table(new_stat, table);
 
     /* Add a fow for each value type */
@@ -16120,13 +16130,13 @@ ansi_map_stat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt 
     const ansi_map_tap_rec_t    *data_p = (const ansi_map_tap_rec_t *)data;
     stat_tap_table* table;
     stat_tap_table_item_type* item_data;
-    guint i = 0, count, total_bytes;
+    guint count, total_bytes;
 
     /* Only tracking field values we know */
     if (try_val_to_str(data_p->message_type, ansi_map_opr_code_strings) == NULL)
         return TAP_PACKET_DONT_REDRAW;
 
-    table = g_array_index(stat_data->stat_tap_data->tables, stat_tap_table*, i);
+    table = g_array_index(stat_data->stat_tap_data->tables, stat_tap_table*, 0);
 
     item_data = stat_tap_get_field_data(table, data_p->message_type, COUNT_COLUMN);
     item_data->value.uint_value++;
@@ -16476,11 +16486,11 @@ void proto_register_ansi_map(void) {
 
         { &hf_ansi_map_mslocation_lat,
           { "Latitude in tenths of a second", "ansi_map.mslocation.lat",
-            FT_UINT8, BASE_DEC, NULL, 0,
+            FT_UINT24, BASE_DEC, NULL, 0,
             NULL, HFILL }},
         { &hf_ansi_map_mslocation_long,
           { "Longitude in tenths of a second", "ansi_map.mslocation.long",
-            FT_UINT8, BASE_DEC, NULL, 0,
+            FT_UINT24, BASE_DEC, NULL, 0,
             "Switch Number (SWNO)", HFILL }},
         { &hf_ansi_map_mslocation_res,
           { "Resolution in units of 1 foot", "ansi_map.mslocation.res",
@@ -19199,7 +19209,7 @@ void proto_register_ansi_map(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-ansi_map-hfarr.c ---*/
-#line 5361 "./asn1/ansi_map/packet-ansi_map-template.c"
+#line 5371 "./asn1/ansi_map/packet-ansi_map-template.c"
     };
 
     /* List of subtrees */
@@ -19460,7 +19470,7 @@ void proto_register_ansi_map(void) {
     &ett_ansi_map_ReturnData,
 
 /*--- End of included file: packet-ansi_map-ettarr.c ---*/
-#line 5394 "./asn1/ansi_map/packet-ansi_map-template.c"
+#line 5404 "./asn1/ansi_map/packet-ansi_map-template.c"
     };
 
     static ei_register_info ei[] = {

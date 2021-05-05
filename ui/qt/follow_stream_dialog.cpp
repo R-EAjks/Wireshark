@@ -13,9 +13,11 @@
 #include "main_window.h"
 #include "wireshark_application.h"
 
+#include "frame_tvbuff.h"
 #include "epan/follow.h"
 #include "epan/dissectors/packet-tcp.h"
 #include "epan/dissectors/packet-udp.h"
+#include "epan/dissectors/packet-dccp.h"
 #include "epan/dissectors/packet-http2.h"
 #include "epan/dissectors/packet-quic.h"
 #include "epan/prefs.h"
@@ -93,6 +95,9 @@ FollowStreamDialog::FollowStreamDialog(QWidget &parent, CaptureFile &cf, follow_
     case FOLLOW_UDP:
         follower_ = get_follow_by_name("UDP");
         break;
+    case FOLLOW_DCCP:
+        follower_ = get_follow_by_name("DCCP");
+        break;
     case FOLLOW_HTTP:
         follower_ = get_follow_by_name("HTTP");
         break;
@@ -101,6 +106,9 @@ FollowStreamDialog::FollowStreamDialog(QWidget &parent, CaptureFile &cf, follow_
         break;
     case FOLLOW_QUIC:
         follower_ = get_follow_by_name("QUIC");
+        break;
+    case FOLLOW_SIP:
+        follower_ = get_follow_by_name("SIP");
         break;
     default :
         g_assert_not_reached();
@@ -519,10 +527,12 @@ FollowStreamDialog::readStream()
 
     case FOLLOW_TCP :
     case FOLLOW_UDP :
+    case FOLLOW_DCCP :
     case FOLLOW_HTTP :
     case FOLLOW_HTTP2:
     case FOLLOW_QUIC:
     case FOLLOW_TLS :
+    case FOLLOW_SIP :
         ret = readFollowStream();
         break;
 
@@ -879,7 +889,7 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
     if (use_stream_index) {
         follow_filter = gchar_free_to_qstring(get_follow_index_func(follower_)(stream_num, sub_stream_num));
     } else {
-        follow_filter = gchar_free_to_qstring(get_follow_conv_func(follower_)(&cap_file_.capFile()->edt->pi, &stream_num, &sub_stream_num));
+        follow_filter = gchar_free_to_qstring(get_follow_conv_func(follower_)(cap_file_.capFile()->edt, &cap_file_.capFile()->edt->pi, &stream_num, &sub_stream_num));
     }
     if (follow_filter.isEmpty()) {
         QMessageBox::warning(this,
@@ -932,6 +942,18 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
     case FOLLOW_UDP:
     {
         int stream_count = get_udp_stream_count();
+        ui->streamNumberSpinBox->blockSignals(true);
+        ui->streamNumberSpinBox->setMaximum(stream_count-1);
+        ui->streamNumberSpinBox->setValue(stream_num);
+        ui->streamNumberSpinBox->blockSignals(false);
+        ui->streamNumberSpinBox->setToolTip(tr("%Ln total stream(s).", "", stream_count));
+        ui->streamNumberLabel->setToolTip(ui->streamNumberSpinBox->toolTip());
+
+        break;
+    }
+    case FOLLOW_DCCP:
+    {
+        int stream_count = get_dccp_stream_count();
         ui->streamNumberSpinBox->blockSignals(true);
         ui->streamNumberSpinBox->setMaximum(stream_count-1);
         ui->streamNumberSpinBox->setValue(stream_num);
@@ -994,6 +1016,19 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
     case FOLLOW_HTTP:
         /* No extra handling */
         break;
+    case FOLLOW_SIP:
+    {
+        /* There are no more streams */
+        ui->streamNumberSpinBox->setEnabled(false);
+        ui->streamNumberSpinBox->blockSignals(true);
+        ui->streamNumberSpinBox->setMaximum(0);
+        ui->streamNumberSpinBox->setValue(0);
+        ui->streamNumberSpinBox->blockSignals(false);
+        ui->streamNumberSpinBox->setToolTip(tr("No streams"));
+        ui->streamNumberLabel->setToolTip(ui->streamNumberSpinBox->toolTip());
+
+        break;
+    }
     }
 
     beginRetapPackets();
@@ -1138,16 +1173,3 @@ FollowStreamDialog::readFollowStream()
 
     return FRS_OK;
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

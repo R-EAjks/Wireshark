@@ -370,7 +370,11 @@ void PacketList::colorsChanged()
     }
 
     // Set the style sheet
-    setStyleSheet(active_style + inactive_style + hover_style);
+    if(prefs.gui_qt_packet_list_hover_style) {
+        setStyleSheet(active_style + inactive_style + hover_style);
+    } else {
+        setStyleSheet(active_style + inactive_style);
+    }
 }
 
 QString PacketList::joinSummaryRow(QStringList col_parts, int row, SummaryCopyType type)
@@ -683,10 +687,12 @@ void PacketList::contextMenuEvent(QContextMenuEvent *event)
     ctx_menu->addMenu(submenu);
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeFollowTCPStream"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeFollowUDPStream"));
+    submenu->addAction(window()->findChild<QAction *>("actionAnalyzeFollowDCCPStream"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeFollowTLSStream"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeFollowHTTPStream"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeFollowHTTP2Stream"));
     submenu->addAction(window()->findChild<QAction *>("actionAnalyzeFollowQUICStream"));
+    submenu->addAction(window()->findChild<QAction *>("actionAnalyzeFollowSIPCall"));
 
     ctx_menu->addSeparator();
 
@@ -799,6 +805,10 @@ void PacketList::mousePressEvent (QMouseEvent *event)
     if (midButton && cap_file_ && packet_list_model_)
     {
         packet_list_model_->toggleFrameMark(QModelIndexList() << curIndex);
+
+        // Make sure the packet list's frame.marked related field text is updated.
+        redrawVisiblePackets();
+
         create_far_overlay_ = true;
         packets_bar_update();
     }
@@ -883,6 +893,10 @@ void PacketList::mouseMoveEvent (QMouseEvent *event)
             }
 
             drag->exec(Qt::CopyAction);
+        }
+        else
+        {
+            delete mimeData;
         }
     }
 }
@@ -1585,6 +1599,10 @@ void PacketList::markFrame()
         frames << currentIndex();
 
     packet_list_model_->toggleFrameMark(frames);
+
+    // Make sure the packet list's frame.marked related field text is updated.
+    redrawVisiblePackets();
+
     create_far_overlay_ = true;
     packets_bar_update();
 }
@@ -1594,6 +1612,10 @@ void PacketList::markAllDisplayedFrames(bool set)
     if (!cap_file_ || !packet_list_model_) return;
 
     packet_list_model_->setDisplayedFrameMark(set);
+
+    // Make sure the packet list's frame.marked related field text is updated.
+    redrawVisiblePackets();
+
     create_far_overlay_ = true;
     packets_bar_update();
 }
@@ -2020,16 +2042,3 @@ void PacketList::rowsInserted(const QModelIndex &parent, int start, int end)
     QTreeView::rowsInserted(parent, start, end);
     rows_inserted_ = true;
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

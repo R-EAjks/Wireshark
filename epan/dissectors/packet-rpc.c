@@ -368,13 +368,12 @@ rpcstat_init(struct register_srt* srt, GArray* srt_array)
 static tap_packet_status
 rpcstat_packet(void *pss, packet_info *pinfo, epan_dissect_t *edt _U_, const void *prv)
 {
-	guint i = 0;
 	srt_stat_table *rpc_srt_table;
 	srt_data_t *data = (srt_data_t *)pss;
 	const rpc_call_info_value *ri = (const rpc_call_info_value *)prv;
 	rpcstat_tap_data_t* tap_data;
 
-	rpc_srt_table = g_array_index(data->srt_array, srt_stat_table*, i);
+	rpc_srt_table = g_array_index(data->srt_array, srt_stat_table*, 0);
 	tap_data = (rpcstat_tap_data_t*)rpc_srt_table->table_specific_data;
 
 	if ((int)ri->proc >= rpc_srt_table->num_procs) {
@@ -562,7 +561,7 @@ rpc_init_prog(int proto, guint32 prog, int ett, size_t nvers,
 
 				continue;
 			}
-			dissector_add_custom_table_handle("rpc.call", g_memdup(&key, sizeof(rpc_proc_info_key)),
+			dissector_add_custom_table_handle("rpc.call", g_memdup2(&key, sizeof(rpc_proc_info_key)),
 						create_dissector_handle_with_name(proc->dissect_call, value->proto_id, proc->strptr));
 
 			if (proc->dissect_reply == NULL) {
@@ -577,7 +576,7 @@ rpc_init_prog(int proto, guint32 prog, int ett, size_t nvers,
 
 				continue;
 			}
-			dissector_add_custom_table_handle("rpc.reply", g_memdup(&key, sizeof(rpc_proc_info_key)),
+			dissector_add_custom_table_handle("rpc.reply", g_memdup2(&key, sizeof(rpc_proc_info_key)),
 					create_dissector_handle_with_name(proc->dissect_reply, value->proto_id, proc->strptr));
 		}
 	}
@@ -3927,12 +3926,20 @@ static stat_tap_table_item rpc_prog_stat_fields[] = {
 
 static void rpc_prog_stat_init(stat_tap_table_ui* new_stat)
 {
+	const char *table_name = "ONC-RPC Program Statistics";
 	int num_fields = sizeof(rpc_prog_stat_fields)/sizeof(stat_tap_table_item);
-	stat_tap_table* table;
+	stat_tap_table *table;
 
-	table = stat_tap_init_table("ONC-RPC Program Statistics", num_fields, 0, NULL);
+	table = stat_tap_find_table(new_stat, table_name);
+	if (table) {
+		if (new_stat->stat_tap_reset_table_cb) {
+			new_stat->stat_tap_reset_table_cb(table);
+		}
+		return;
+	}
+
+	table = stat_tap_init_table(table_name, num_fields, 0, NULL);
 	stat_tap_add_table(new_stat, table);
-
 }
 
 static tap_packet_status

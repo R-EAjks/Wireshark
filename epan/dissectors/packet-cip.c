@@ -1327,7 +1327,7 @@ static const value_string cip_pccc_gs_st_vals[] = {
    { 0,                          NULL }
 };
 
-value_string_ext cip_pccc_gs_st_vals_ext = VALUE_STRING_EXT_INIT(cip_pccc_gs_st_vals);
+static value_string_ext cip_pccc_gs_st_vals_ext = VALUE_STRING_EXT_INIT(cip_pccc_gs_st_vals);
 
 /* Translate function to string - PCCC Extended Status codes */
 static const value_string cip_pccc_es_st_vals[] = {
@@ -1369,7 +1369,7 @@ static const value_string cip_pccc_es_st_vals[] = {
    { 0,                          NULL }
 };
 
-value_string_ext cip_pccc_es_st_vals_ext = VALUE_STRING_EXT_INIT(cip_pccc_es_st_vals);
+static value_string_ext cip_pccc_es_st_vals_ext = VALUE_STRING_EXT_INIT(cip_pccc_es_st_vals);
 
 /* Translate PCCC Function Codes */
 static const value_string cip_pccc_fnc_06_vals[] = {
@@ -1388,7 +1388,7 @@ static const value_string cip_pccc_fnc_06_vals[] = {
    { 0,                          NULL }
 };
 
-value_string_ext cip_pccc_fnc_06_vals_ext = VALUE_STRING_EXT_INIT(cip_pccc_fnc_06_vals);
+static value_string_ext cip_pccc_fnc_06_vals_ext = VALUE_STRING_EXT_INIT(cip_pccc_fnc_06_vals);
 
 static const value_string cip_pccc_fnc_07_vals[] = {
     { PCCC_FNC_07_00, "Disable outputs" },
@@ -1401,7 +1401,7 @@ static const value_string cip_pccc_fnc_07_vals[] = {
    { 0,                          NULL }
 };
 
-value_string_ext cip_pccc_fnc_07_vals_ext = VALUE_STRING_EXT_INIT(cip_pccc_fnc_07_vals);
+static value_string_ext cip_pccc_fnc_07_vals_ext = VALUE_STRING_EXT_INIT(cip_pccc_fnc_07_vals);
 
 static const value_string cip_pccc_fnc_0f_vals[] = {
     { PCCC_FNC_0F_00, "Word range write" },
@@ -1448,7 +1448,7 @@ static const value_string cip_pccc_fnc_0f_vals[] = {
    { 0,                          NULL }
 };
 
-value_string_ext cip_pccc_fnc_0f_vals_ext = VALUE_STRING_EXT_INIT(cip_pccc_fnc_0f_vals);
+static value_string_ext cip_pccc_fnc_0f_vals_ext = VALUE_STRING_EXT_INIT(cip_pccc_fnc_0f_vals);
 
 /* Translate PCCC File Types */
 static const value_string cip_pccc_file_types_vals[] = {
@@ -1480,7 +1480,7 @@ static const value_string cip_pccc_file_types_vals[] = {
    { 0,                          NULL }
 };
 
-value_string_ext cip_pccc_file_type_vals_ext = VALUE_STRING_EXT_INIT(cip_pccc_file_types_vals);
+static value_string_ext cip_pccc_file_type_vals_ext = VALUE_STRING_EXT_INIT(cip_pccc_file_types_vals);
 
 /* Translate PCCC CPU Modes */
 #if 0
@@ -1504,7 +1504,7 @@ static const value_string cip_pccc_cpu_mode_80_vals[] = {
    { 0,                          NULL }
 };
 
-value_string_ext cip_pccc_cpu_mode_80_vals_ext = VALUE_STRING_EXT_INIT(cip_pccc_cpu_mode_80_vals);
+static value_string_ext cip_pccc_cpu_mode_80_vals_ext = VALUE_STRING_EXT_INIT(cip_pccc_cpu_mode_80_vals);
 
 /* Translate Vendor IDs */
 static const value_string cip_vendor_vals[] = {
@@ -2900,7 +2900,7 @@ const value_string cip_class_names_vals[] = {
    { 0,        NULL                             }
 };
 
-const value_string cip_id_state_vals[] = {
+static const value_string cip_id_state_vals[] = {
    { 0, "Nonexistent" },
    { 1, "Device Self Testing" },
    { 2, "Standby" },
@@ -2911,7 +2911,7 @@ const value_string cip_id_state_vals[] = {
    { 0, NULL }
 };
 
-const range_string cip_port_type_vals[] = {
+static const range_string cip_port_type_vals[] = {
    { 0, 0, "Any - no routing" },
    { 1, 1, "Reserved for legacy use" },
    { 2, 2, "ControlNet" },
@@ -5549,7 +5549,7 @@ int dissect_cip_attribute(packet_info *pinfo, proto_tree *tree, proto_item *item
       if (date != NULL)
           strftime(date_str, 20, "%b %d, %Y", date);
       else
-          g_strlcpy(date_str, "Not representable", sizeof date_str);
+          (void) g_strlcpy(date_str, "Not representable", sizeof date_str);
       proto_tree_add_uint_format_value(tree, *(attr->phf), tvb, offset, 2, temp_data, "%s", date_str);
       consumed = 2;
       break;
@@ -6874,7 +6874,7 @@ dissect_cip_cm_data( proto_tree *item_tree, tvbuff_t *tvb, int offset, int item_
             p_remove_proto_data(wmem_file_scope(), pinfo, proto_cip, 0);
             p_add_proto_data(wmem_file_scope(), pinfo, proto_cip, 0, pembedded_req_info );
 
-            proto_tree_add_uint_format( item_tree, hf_cip_cm_sc, tvb, 0, 0, SC_CM_UNCON_SEND|CIP_SC_RESPONSE_MASK, "(Service: Unconnected Send (Response))" );
+            proto_item_set_generated(proto_tree_add_uint_format( item_tree, hf_cip_cm_sc, tvb, 0, 0, SC_CM_UNCON_SEND|CIP_SC_RESPONSE_MASK, "Service: Unconnected Send (Response)" ));
             next_tvb = tvb_new_subset_length(tvb, offset, item_length);
 
             display_previous_request_path(pembedded_req_info, item_tree, tvb, pinfo, NULL, FALSE);

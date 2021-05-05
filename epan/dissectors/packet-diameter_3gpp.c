@@ -416,6 +416,8 @@ static int hf_diameter_3gpp_acc_res_dat_flags_bit7 = -1;
 static int hf_diameter_3gpp_acc_res_dat_flags_bit8 = -1;
 static int hf_diameter_3gpp_acc_res_dat_flags_bit9 = -1;
 static int hf_diameter_3gpp_acc_res_dat_flags_bit10 = -1;
+static int hf_diameter_3gpp_acc_res_dat_flags_bit11 = -1;
+static int hf_diameter_3gpp_acc_res_dat_flags_bit12 = -1;
 static int hf_diameter_3gpp_acc_res_dat_flags_spare_bits = -1;
 static int hf_diameter_3gpp_ida_flags_spare_bits = -1;
 static int hf_diameter_3gpp_pua_flags_spare_bits = -1;
@@ -1449,6 +1451,23 @@ dissect_diameter_3gpp_location_estimate(tvbuff_t *tvb, packet_info *pinfo, proto
     return tvb_reported_length(tvb);
 }
 
+/* AVP Code: 1263 Access-Network-Information
+* 3GPP TS 32.299
+* The Access-Network-Information AVP (AVP code 1263) is of type OctetString
+* and indicates one instance of the SIP P-header "P-Access-Network-Info".
+* In SIP, as per RFC 7315 [404], the content of the "P-Access-Network-Info"
+* header is known as the access-net-spec.
+*/
+static int
+dissect_diameter_3gpp_access_network_information(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data _U_)
+{
+    int offset = 0;
+    int length = tvb_reported_length(tvb);
+
+    dissect_sip_p_access_network_info_header(tvb, tree, offset, length);
+
+    return length;
+}
 
 /* AVP Code: 1304 Secondary-RAT-Type
 * 3GPP TS 32.299
@@ -1916,7 +1935,9 @@ dissect_diameter_3gpp_acc_res_data(tvbuff_t *tvb, packet_info *pinfo _U_, proto_
 {
     static int * const flags[] = {
         &hf_diameter_3gpp_acc_res_dat_flags_spare_bits,
-        &hf_diameter_3gpp_acc_res_dat_flags_bit10,
+        &hf_diameter_3gpp_acc_res_dat_flags_bit12,
+        &hf_diameter_3gpp_acc_res_dat_flags_bit11,
+        &hf_diameter_3gpp_acc_res_dat_flags_bit10, /* NR in 5GS Not Allowed*/
         &hf_diameter_3gpp_acc_res_dat_flags_bit9,
         &hf_diameter_3gpp_acc_res_dat_flags_bit8,
         &hf_diameter_3gpp_acc_res_dat_flags_bit7,
@@ -2952,6 +2973,9 @@ proto_reg_handoff_diameter_3gpp(void)
     /* AVP Code: 1242 location estimate */
     dissector_add_uint("diameter.3gpp", 1242, create_dissector_handle(dissect_diameter_3gpp_location_estimate, proto_diameter_3gpp));
 
+    /* AVP Code: 1263 Access-Network-Information */
+    dissector_add_uint("diameter.3gpp", 1263, create_dissector_handle(dissect_diameter_3gpp_access_network_information, proto_diameter_3gpp));
+
     /* AVP Code: 1304 Secondary-RAT-Type */
 	dissector_add_uint("diameter.3gpp", 1304, create_dissector_handle(dissect_diameter_3gpp_secondary_rat_type, proto_diameter_3gpp));
 
@@ -3107,7 +3131,7 @@ static const value_string diameter_3gpp_qos_reliability_vals[] = {
     { 0, NULL }
 };
 
-const range_string diameter_3gpp_qos_delay_cls_vals[] = {
+static const range_string diameter_3gpp_qos_delay_cls_vals[] = {
     { 0x00, 0x00, "Subscribed delay class (in MS to net); Reserved (in net to MS)" },
     { 0x01, 0x01, "Delay class 1" },
     { 0x02, 0x02, "Delay class 2" },
@@ -3118,7 +3142,7 @@ const range_string diameter_3gpp_qos_delay_cls_vals[] = {
     { 0, 0, NULL }
 };
 
-const range_string diameter_3gpp_qos_prec_class_vals[] = {
+static const range_string diameter_3gpp_qos_prec_class_vals[] = {
     { 0x00, 0x00, "Subscribed precedence (MS to net); Reserved (net to MS)" },
     { 0x01, 0x01, "High priority" },
     { 0x02, 0x02, "Normal priority" },
@@ -3128,7 +3152,7 @@ const range_string diameter_3gpp_qos_prec_class_vals[] = {
     { 0, 0, NULL }
 };
 
-const range_string diameter_3gpp_qos_peak_thr_vals[] = {
+static const range_string diameter_3gpp_qos_peak_thr_vals[] = {
     { 0x00, 0x00, "Subscribed peak throughput (MS to net); Reserved (net to MS)" },
     { 0x01, 0x01, "Up to 1 000 octet/s" },
     { 0x02, 0x02, "Up to 2 000 octet/s" },
@@ -3144,7 +3168,7 @@ const range_string diameter_3gpp_qos_peak_thr_vals[] = {
     { 0, 0, NULL }
 };
 
-const range_string diameter_3gpp_qos_mean_thr_vals[] = {
+static const range_string diameter_3gpp_qos_mean_thr_vals[] = {
     { 0x00, 0x00, "Subscribed peak throughput (MS to net); Reserved (net to MS)" },
     { 0x01, 0x01, "100 octet/h" },
     { 0x02, 0x02, "200 octet/h" },
@@ -3170,7 +3194,7 @@ const range_string diameter_3gpp_qos_mean_thr_vals[] = {
     { 0, 0, NULL }
 };
 
-const value_string diameter_3gpp_qos_del_of_err_sdu_vals[] = {
+static const value_string diameter_3gpp_qos_del_of_err_sdu_vals[] = {
     { 0x00, "Subscribed delivery of erroneous SDUs (MS to net); Reserved (net to MS)" },
     { 0x01, "No detect ('-')" },
     { 0x02, "Erroneous SDUs are delivered ('yes')" },
@@ -3179,7 +3203,7 @@ const value_string diameter_3gpp_qos_del_of_err_sdu_vals[] = {
     { 0, NULL }
 };
 
-const value_string diameter_3gpp_qos_del_order_vals[] = {
+static const value_string diameter_3gpp_qos_del_order_vals[] = {
     { 0x00, "Subscribed delivery order (MS to net); Reserved (net to MS)" },
     { 0x01, "With delivery order ('yes')" },
     { 0x02, "Without delivery order ('no')" },
@@ -3187,7 +3211,7 @@ const value_string diameter_3gpp_qos_del_order_vals[] = {
     { 0, NULL }
 };
 
-const value_string diameter_3gpp_qos_traffic_cls_vals[] = {
+static const value_string diameter_3gpp_qos_traffic_cls_vals[] = {
     { 0x00, "Subscribed traffic class (MS to net); Reserved (net to MS)" },
     { 0x01, "Conversational class" },
     { 0x02, "Streaming class" },
@@ -3197,7 +3221,7 @@ const value_string diameter_3gpp_qos_traffic_cls_vals[] = {
     { 0, NULL }
 };
 
-const value_string diameter_3gpp_qos_sdu_err_rat_vals[] = {
+static const value_string diameter_3gpp_qos_sdu_err_rat_vals[] = {
     { 0x00, "Subscribed SDU error ratio (MS to net); Reserved (net to MS)" },
     { 0x01, "1E-2" },
     { 0x02, "7E-3" },
@@ -3210,7 +3234,7 @@ const value_string diameter_3gpp_qos_sdu_err_rat_vals[] = {
     { 0, NULL }
 };
 
-const value_string diameter_3gpp_qos_ber_vals[] = {
+static const value_string diameter_3gpp_qos_ber_vals[] = {
     { 0x00, "Subscribed residual BER (MS to net); Reserved (net to MS)" },
     { 0x01, "5E-2" },
     { 0x02, "1E-2" },
@@ -3225,15 +3249,17 @@ const value_string diameter_3gpp_qos_ber_vals[] = {
     { 0, NULL }
 };
 
-const value_string diameter_3gpp_qos_traff_hdl_pri_vals[] = {
+#if 0
+static const value_string diameter_3gpp_qos_traff_hdl_pri_vals[] = {
     { 0x00, "Subscribed traffic handling priority (MS to net); Reserved (net to MS)" },
     { 0x01, "Priority level 1" },
     { 0x02, "Priority level 2" },
     { 0x03, "Priority level 3" },
     { 0, NULL }
 };
+#endif
 
-const true_false_string diameter_3gpp_qos_signalling_ind_value = {
+static const true_false_string diameter_3gpp_qos_signalling_ind_value = {
     "Optimised for signalling traffic",
     "Not optimised for signalling traffic"
 };
@@ -4419,9 +4445,19 @@ proto_register_diameter_3gpp(void)
             FT_BOOLEAN, 32, TFS(&tfs_set_notset), 0x00000400,
             NULL, HFILL }
         },
+        { &hf_diameter_3gpp_acc_res_dat_flags_bit11,
+        { "LTE-M Not Allowed", "diameter.3gpp.acc_res_dat_flags_bit11",
+            FT_BOOLEAN, 32, TFS(&tfs_set_notset), 0x00000800,
+            NULL, HFILL }
+        },
+        { &hf_diameter_3gpp_acc_res_dat_flags_bit12,
+        { "WB-E-UTRAN Except LTE-M Not Allowed", "diameter.3gpp.acc_res_dat_flags_bit12",
+            FT_BOOLEAN, 32, TFS(&tfs_set_notset), 0x00001000,
+            NULL, HFILL }
+        },
         { &hf_diameter_3gpp_acc_res_dat_flags_spare_bits,
         { "Spare", "diameter.3gpp.acc_res_dat_flags_spare",
-            FT_UINT32, BASE_HEX, NULL, 0xFFFFF800,
+            FT_UINT32, BASE_HEX, NULL, 0xFFFFe000,
             NULL, HFILL }
         },
 

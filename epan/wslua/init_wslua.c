@@ -618,6 +618,10 @@ static int wslua_panic(lua_State* LS) {
     return 0; /* keep gcc happy */
 }
 
+static gint string_compare(gconstpointer a, gconstpointer b) {
+    return strcmp((const char*)a, (const char*)b);
+}
+
 static int lua_load_plugins(const char *dirname, register_cb cb, gpointer client_data,
                             gboolean count_only, const gboolean is_user, GHashTable *loaded_files)
 {
@@ -626,6 +630,9 @@ static int lua_load_plugins(const char *dirname, register_cb cb, gpointer client
     gchar         *filename, *dot;
     const gchar   *name;
     int            plugins_counter = 0;
+    GList         *sorted_dirnames = NULL;
+    GList         *sorted_filenames = NULL;
+    GList         *l = NULL;
 
     if ((dir = ws_dir_open(dirname, 0, NULL)) != NULL) {
         while ((file = ws_dir_read_name(dir)) != NULL) {
@@ -636,8 +643,7 @@ static int lua_load_plugins(const char *dirname, register_cb cb, gpointer client
 
             filename = g_strdup_printf("%s" G_DIR_SEPARATOR_S "%s", dirname, name);
             if (test_for_directory(filename) == EISDIR) {
-                plugins_counter += lua_load_plugins(filename, cb, client_data, count_only, is_user, loaded_files);
-                g_free(filename);
+                sorted_dirnames = g_list_prepend(sorted_dirnames, (gpointer)filename);
                 continue;
             }
 
@@ -654,26 +660,49 @@ static int lua_load_plugins(const char *dirname, register_cb cb, gpointer client
                 continue;
             }
 
+            if (file_exists(filename)) {
+                sorted_filenames = g_list_prepend(sorted_filenames, (gpointer)filename);
+            }
+            else {
+                g_free(filename);
+            }
+        }
+        ws_dir_close(dir);
+    }
+
+    /* Depth first; ie, process subdirectories (in ASCIIbetical order) before files */
+    if (sorted_dirnames != NULL) {
+        sorted_dirnames = g_list_sort(sorted_dirnames, string_compare);
+        for (l = sorted_dirnames; l != NULL; l = l->next) {
+            plugins_counter += lua_load_plugins((const char *)l->data, cb, client_data, count_only, is_user, loaded_files);
+        }
+        g_list_free_full(sorted_dirnames, g_free);
+    }
+
+    /* Process files in ASCIIbetical order */
+    if (sorted_filenames != NULL) {
+        sorted_filenames = g_list_sort(sorted_filenames, string_compare);
+        for (l = sorted_filenames; l != NULL; l = l->next) {
+            filename = (gchar *)l->data;
+            name = strrchr(filename, G_DIR_SEPARATOR) + 1;
+
             /* Check if we have already loaded this file name, if provided with a set */
             if (loaded_files && g_hash_table_lookup_extended(loaded_files, name, NULL, NULL)) {
-                g_free(filename);
                 continue;
             }
 
-            if (file_exists(filename)) {
-                if (!count_only) {
-                    if (cb)
-                        (*cb)(RA_LUA_PLUGINS, name, client_data);
-                    lua_load_plugin_script(name, filename, is_user ? dirname : NULL, 0);
-                }
+            if (!count_only) {
+                if (cb)
+                    (*cb)(RA_LUA_PLUGINS, name, client_data);
+                lua_load_plugin_script(name, filename, is_user ? dirname : NULL, 0);
+
                 if (loaded_files) {
                     g_hash_table_insert(loaded_files, g_strdup(name), NULL);
                 }
-                plugins_counter++;
             }
-            g_free(filename);
+            plugins_counter++;
         }
-        ws_dir_close(dir);
+        g_list_free_full(sorted_filenames, g_free);
     }
 
     return plugins_counter;
@@ -923,7 +952,30 @@ void wslua_init(register_cb cb, gpointer client_data) {
 
     lua_atpanic(L,wslua_panic);
 
-    /* the init_routines table (accessible by the user) */
+    /*
+     * The init_routines table (accessible by the user).
+     *
+     * For a table a, a.init is syntactic sugar for a["init"], and
+     *
+     *    function t.a.b.c.f () body end
+     *
+     * is syntactic sugar for
+     *
+     *    t.a.b.c.f = function () body end
+     *
+     * so
+     *
+     *    function proto.init () body end
+     *
+     * means
+     *
+     *    proto["init"] = function () body end
+     *
+     * and the Proto class has an "init" method, with Proto_set_init()
+     * being the setter for that method; that routine adds the Lua
+     * function passed to it as a Lua argument to the WSLUA_INIT_ROUTINES
+     * table - i.e., "init_routines".
+     */
     lua_newtable (L);
     lua_setglobal(L, WSLUA_INIT_ROUTINES);
 

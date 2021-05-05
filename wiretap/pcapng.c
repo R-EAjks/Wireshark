@@ -23,9 +23,11 @@
 
 #include <wsutil/ws_printf.h>
 #include <wsutil/strtoi.h>
+#include <wsutil/glib-compat.h>
 
 #include "wtap-int.h"
 #include "file_wrappers.h"
+#include "required_file_handlers.h"
 #include "pcap-common.h"
 #include "pcap-encap.h"
 #include "pcapng.h"
@@ -129,9 +131,13 @@ typedef struct pcapng_name_resolution_block_s {
 
 /*
  * Minimum Sysdig size = minimum block size + packed size of sysdig_event_phdr.
+ * Minimum Sysdig event v2 header size = minimum block size + packed size of sysdig_event_v2_phdr (which, in addition
+ * to sysdig_event_phdr, includes the nparams 32bit value).
  */
 #define SYSDIG_EVENT_HEADER_SIZE ((16 + 64 + 64 + 32 + 16)/8) /* CPU ID + TS + TID + Event len + Event type */
 #define MIN_SYSDIG_EVENT_SIZE    ((guint32)(MIN_BLOCK_SIZE + SYSDIG_EVENT_HEADER_SIZE))
+#define SYSDIG_EVENT_V2_HEADER_SIZE ((16 + 64 + 64 + 32 + 16 + 32)/8) /* CPU ID + TS + TID + Event len + Event type + nparams */
+#define MIN_SYSDIG_EVENT_V2_SIZE    ((guint32)(MIN_BLOCK_SIZE + SYSDIG_EVENT_V2_HEADER_SIZE))
 
 /*
  * We require __REALTIME_TIMESTAMP in the Journal Export Format reader in
@@ -239,7 +245,6 @@ typedef struct {
     wtap_new_ipv6_callback_t add_new_ipv6;
 } pcapng_t;
 
-#ifdef HAVE_PLUGINS
 /*
  * Table for plugins to handle particular block types.
  *
@@ -280,6 +285,7 @@ register_pcapng_block_type_handler(guint block_type, block_reader reader,
     case BLOCK_TYPE_EPB:
     case BLOCK_TYPE_DSB:
     case BLOCK_TYPE_SYSDIG_EVENT:
+    case BLOCK_TYPE_SYSDIG_EVENT_V2:
     case BLOCK_TYPE_SYSTEMD_JOURNAL:
         /*
          * Yes; we already handle it, and don't allow a replacement to
@@ -344,18 +350,42 @@ register_pcapng_block_type_handler(guint block_type, block_reader reader,
  * Tables for plugins to handle particular options for particular block
  * types.
  *
- * An option has a handler routine, which is passed an indication of
- * whether this section of the file is byte-swapped, the length of the
- * option, the data of the option, a pointer to an error code, and a
- * pointer to a pointer variable for an error string.
+ * An option has three handler routines:
  *
- * It checks whether the length and option are valid, and, if they aren't,
- * returns FALSE, setting the error code to the appropriate error (normally
- * WTAP_ERR_BAD_FILE) and the error string to an appropriate string
- * indicating the problem.
+ *   An option parser, used when reading an option from a file:
  *
- * Otherwise, if this section of the file is byte-swapped, it byte-swaps
- * multi-byte numerical values, so that it's in the host byte order.
+ *     The option parser is passed an indication of whether this section
+ *     of the file is byte-swapped, the length of the option, the data of
+ *     the option, a pointer to an error code, and a pointer to a pointer
+ *     variable for an error string.
+ *
+ *     It checks whether the length and option are valid, and, if they
+ *     aren't, returns FALSE, setting the error code to the appropriate
+ *     error (normally WTAP_ERR_BAD_FILE) and the error string to an
+ *     appropriate string indicating the problem.
+ *
+ *     Otherwise, if this section of the file is byte-swapped, it byte-swaps
+ *     multi-byte numerical values, so that it's in the host byte order.
+ *
+ *   An option sizer, used when writing an option to a file:
+ *
+ *     The option sizer is passed the option identifier for the option
+ *     and a wtap_optval_t * that points to the data for the option.
+ *
+ *     It calculates how many bytes the option's data requires, not
+ *     including any padding bytes, and returns that value.
+ *
+ *   An option writer, used when writing an option to a file:
+ *
+ *     The option writer is passed a wtap_dumper * to which the
+ *     option data should be written, the option identifier for
+ *     the option, a wtap_optval_t * that points to the data for
+ *     the option, and an int * into which an error code should
+ *     be stored if an error occurs when writing the option.
+ *
+ *     It returns a gboolean value of TRUE if the attempt to
+ *     write the option succeeds and FALSE if the attempt to
+ *     write the option gets an error.
  */
 
 /*
@@ -376,7 +406,9 @@ register_pcapng_block_type_handler(guint block_type, block_reader reader,
 #define NUM_BT_INDICES      7
 
 typedef struct {
-    option_handler_fn hfunc;
+    option_parser parser;
+    option_sizer sizer;
+    option_writer writer;
 } option_handler;
 
 static GHashTable *option_handlers[NUM_BT_INDICES];
@@ -411,6 +443,7 @@ get_block_type_index(guint block_type, guint *bt_index)
             break;
 
         case BLOCK_TYPE_SYSDIG_EVENT:
+        case BLOCK_TYPE_SYSDIG_EVENT_V2:
         /* case BLOCK_TYPE_SYSDIG_EVF: */
             *bt_index = BT_INDEX_EVT;
             break;
@@ -436,7 +469,9 @@ get_block_type_index(guint block_type, guint *bt_index)
 
 void
 register_pcapng_option_handler(guint block_type, guint option_code,
-                               option_handler_fn hfunc)
+                               option_parser parser,
+                               option_sizer sizer,
+                               option_writer writer)
 {
     guint bt_index;
     option_handler *handler;
@@ -456,11 +491,12 @@ register_pcapng_option_handler(guint block_type, guint option_code,
                                                           NULL, g_free);
     }
     handler = g_new(option_handler, 1);
-    handler->hfunc = hfunc;
+    handler->parser = parser;
+    handler->sizer = sizer;
+    handler->writer = writer;
     g_hash_table_insert(option_handlers[bt_index],
-                              GUINT_TO_POINTER(option_code), handler);
+                        GUINT_TO_POINTER(option_code), handler);
 }
-#endif /* HAVE_PLUGINS */
 
 static int
 pcapng_read_option(FILE_T fh, const section_info_t *section_info,
@@ -528,6 +564,121 @@ typedef enum {
     PCAPNG_BLOCK_ERROR
 } block_return_val;
 
+static void
+pcapng_process_string_option(wtapng_block_t *wblock,
+                             pcapng_option_header_t *ohp,
+                             guint8 *option_content,
+                             guint opt_cont_buf_len)
+{
+    /*
+     * XXX - should we support empty strings?
+     */
+    if (ohp->option_length > 0 && ohp->option_length < opt_cont_buf_len) {
+        /*
+         * If this option can appear only once in a block, this call
+         * will fail on the second and later occurrences of the option;
+         * we silently ignore the failure.
+         */
+        wtap_block_add_string_option(wblock->block, ohp->option_code, (const char *)option_content, ohp->option_length);
+    }
+}
+
+static void
+pcapng_process_timestamp_option(wtapng_block_t *wblock,
+                                const section_info_t *section_info,
+                                pcapng_option_header_t *ohp,
+                                guint8 *option_content,
+                                guint opt_cont_buf_len)
+{
+    if (ohp->option_length == 8 && ohp->option_length < opt_cont_buf_len) {
+        guint32 high, low;
+        guint64 timestamp;
+
+        /*  Don't cast a guint8 * into a guint32 *--the
+         *  guint8 * may not point to something that's
+         *  aligned correctly.
+         */
+        memcpy(&high, option_content, sizeof(guint32));
+        memcpy(&low, option_content + sizeof(guint32), sizeof(guint32));
+        if (section_info->byte_swapped) {
+            high = GUINT32_SWAP_LE_BE(high);
+            low = GUINT32_SWAP_LE_BE(low);
+        }
+        timestamp = (guint64)high;
+        timestamp <<= 32;
+        timestamp += (guint64)low;
+        /*
+         * If this option can appear only once in a block, this call
+         * will fail on the second and later occurrences of the option;
+         * we silently ignore the failure.
+         */
+        wtap_block_add_uint64_option(wblock->block, ohp->option_code, timestamp);
+    }
+}
+
+static void
+pcapng_process_uint64_option(wtapng_block_t *wblock,
+                             const section_info_t *section_info,
+                             pcapng_option_header_t *ohp,
+                             guint8 *option_content,
+                             guint opt_cont_buf_len)
+{
+    if (ohp->option_length == 8 && ohp->option_length < opt_cont_buf_len) {
+        guint64 uint64;
+        /*  Don't cast a guint8 * into a guint64 *--the
+         *  guint8 * may not point to something that's
+         *  aligned correctly.
+         */
+        memcpy(&uint64, option_content, sizeof(guint64));
+        if (section_info->byte_swapped)
+            uint64 = GUINT64_SWAP_LE_BE(uint64);
+        /*
+         * If this option can appear only once in a block, this call
+         * will fail on the second and later occurrences of the option;
+         * we silently ignore the failure.
+         */
+        wtap_block_add_uint64_option(wblock->block, ohp->option_code, uint64);
+    }
+}
+
+#ifdef HAVE_PLUGINS
+static gboolean
+pcap_process_unhandled_option(wtapng_block_t *wblock,
+                              guint bt_index,
+                              const section_info_t *section_info,
+                              pcapng_option_header_t *ohp,
+                              guint8 *option_content,
+                              int *err, gchar **err_info)
+{
+    option_handler *handler;
+
+    /*
+     * Do we have a handler for this packet block option code?
+     */
+    if (option_handlers[bt_index] != NULL &&
+        (handler = (option_handler *)g_hash_table_lookup(option_handlers[bt_index],
+                                                         GUINT_TO_POINTER((guint)ohp->option_code))) != NULL) {
+        /* Yes - call the handler. */
+        if (!handler->parser(wblock->block, section_info->byte_swapped,
+                             ohp->option_length, option_content, err, err_info))
+            /* XXX - free anything? */
+            return FALSE;
+    }
+    return TRUE;
+}
+#else
+static gboolean
+pcap_process_unhandled_option(wtapng_block_t *wblock _U_,
+                              guint bt_index _U_,
+                              const section_info_t *section_info _U_,
+                              pcapng_option_header_t *ohp _U_,
+                              guint8 *option_content _U_,
+                              int *err _U_, gchar **err_info _U_)
+{
+    return TRUE;
+}
+#endif
+
 static block_return_val
 pcapng_read_section_header_block(FILE_T fh, pcapng_block_header_t *bh,
                                  section_info_t *section_info,
@@ -542,25 +693,18 @@ pcapng_read_section_header_block(FILE_T fh, pcapng_block_header_t *bh,
     pcapng_section_header_block_t shb;
     pcapng_option_header_t oh;
     wtapng_mandatory_section_t* section_data;
-    gchar* tmp_content;
 
     guint8 *option_content = NULL; /* Allocate as large as the options block */
 
     /* read fixed-length part of the block */
     if (!wtap_read_bytes(fh, &shb, sizeof shb, err, err_info)) {
-        if (*err == WTAP_ERR_SHORT_READ) {
-            /*
-             * This block is too short to be an SHB.
-             *
-             * If we're reading this as part of an open,
-             * the file is too short to be a pcapng file.
-             *
-             * If we're not, we treat PCAPNG_BLOCK_NOT_SHB and
-             * PCAPNG_BLOCK_ERROR the same, so we can just return
-             * PCAPNG_BLOCK_NOT_SHB in both cases.
-             */
-            return PCAPNG_BLOCK_NOT_SHB;
-        }
+        /*
+         * Even if this is just a short read, report it as an error.
+         * It *is* a read error except when we're doing an open, in
+         * which case it's a "this isn't a pcapng file" indication.
+         * The open code will call us directly, and treat a short
+         * read error as such an indication.
+         */
         return PCAPNG_BLOCK_ERROR;
     }
 
@@ -628,8 +772,22 @@ pcapng_read_section_header_block(FILE_T fh, pcapng_block_header_t *bh,
         return PCAPNG_BLOCK_ERROR;
     }
 
-    /* we currently only understand SHB V1.0 */
-    if (version_major != 1 || version_minor > 0) {
+    /* Currently only SHB versions 1.0 and 1.2 are supported;
+       version 1.2 is treated as being the same as version 1.0.
+       See the current version of the pcapng specification.
+
+       Version 1.2 is written by some programs that write additional
+       block types (which can be read by any code that handles them,
+       regarless of whether the minor version if 0 or 2, so that's
+       not a reason to change the minor version number).
+
+       XXX - the pcapng specification says that readers should
+       just ignore sections with an unsupported version number;
+       presumably they can also report an error if they skip
+       all the way to the end of the file without finding
+       any versions that they support. */
+    if (!(version_major == 1 &&
+          (version_minor == 0 || version_minor == 2))) {
         *err = WTAP_ERR_UNSUPPORTED;
         *err_info = g_strdup_printf("pcapng_read_section_header_block: unknown SHB version %u.%u",
                                     version_major, version_minor);
@@ -640,7 +798,7 @@ pcapng_read_section_header_block(FILE_T fh, pcapng_block_header_t *bh,
     section_info->version_major = version_major;
     section_info->version_minor = version_minor;
 
-    wblock->block = wtap_block_create(WTAP_BLOCK_NG_SECTION);
+    wblock->block = wtap_block_create(WTAP_BLOCK_SECTION);
     section_data = (wtapng_mandatory_section_t*)wtap_block_get_mandatory_data(wblock->block);
     /* 64bit section_length (currently unused) */
     if (section_info->byte_swapped) {
@@ -671,7 +829,23 @@ pcapng_read_section_header_block(FILE_T fh, pcapng_block_header_t *bh,
         }
         to_read -= bytes_read;
 
-        /* handle option content */
+        /*
+         * Handle option content.
+         *
+         * ***DO NOT*** add any items to this table that are not
+         * standardized option codes in either section 3.5 "Options"
+         * of the current pcapng spec, at
+         *
+         *    https://pcapng.github.io/pcapng/draft-tuexen-opsawg-pcapng.html#name-options
+         *
+         * or in the list of options in section 4.1 "Section Header Block"
+         * of the current pcapng spec, at
+         *
+         *    https://pcapng.github.io/pcapng/draft-tuexen-opsawg-pcapng.html#name-section-header-block
+         *
+         * All option codes in this switch statement here must be listed
+         * in one of those places as standardized option types.
+         */
         switch (oh.option_code) {
             case(OPT_EOFOPT):
                 if (to_read != 0) {
@@ -683,51 +857,21 @@ pcapng_read_section_header_block(FILE_T fh, pcapng_block_header_t *bh,
                 }
                 break;
             case(OPT_COMMENT):
-                if (oh.option_length > 0 && oh.option_length < opt_cont_buf_len) {
-                    tmp_content = g_strndup((char *)option_content, oh.option_length);
-                    wtap_block_add_string_option(wblock->block, OPT_COMMENT, option_content, oh.option_length);
-                    pcapng_debug("pcapng_read_section_header_block: opt_comment %s", tmp_content);
-                    g_free(tmp_content);
-                } else {
-                    pcapng_debug("pcapng_read_section_header_block: opt_comment length %u seems strange", oh.option_length);
-                }
+                pcapng_process_string_option(wblock, &oh, option_content, opt_cont_buf_len);
                 break;
             case(OPT_SHB_HARDWARE):
-                if (oh.option_length > 0 && oh.option_length < opt_cont_buf_len) {
-                    tmp_content = g_strndup((char *)option_content, oh.option_length);
-                    /* Fails with multiple options; we silently ignore the failure */
-                    wtap_block_add_string_option(wblock->block, OPT_SHB_HARDWARE, option_content, oh.option_length);
-                    pcapng_debug("pcapng_read_section_header_block: shb_hardware %s", tmp_content);
-                    g_free(tmp_content);
-                } else {
-                    pcapng_debug("pcapng_read_section_header_block: shb_hardware length %u seems strange", oh.option_length);
-                }
+                pcapng_process_string_option(wblock, &oh, option_content, opt_cont_buf_len);
                 break;
             case(OPT_SHB_OS):
-                if (oh.option_length > 0 && oh.option_length < opt_cont_buf_len) {
-                    tmp_content = g_strndup((char *)option_content, oh.option_length);
-                    /* Fails with multiple options; we silently ignore the failure */
-                    wtap_block_add_string_option(wblock->block, OPT_SHB_OS, option_content, oh.option_length);
-                    pcapng_debug("pcapng_read_section_header_block: shb_os %s", tmp_content);
-                    g_free(tmp_content);
-                } else {
-                    pcapng_debug("pcapng_read_section_header_block: shb_os length %u seems strange, opt buffsize %u", oh.option_length,to_read);
-                }
+                pcapng_process_string_option(wblock, &oh, option_content, opt_cont_buf_len);
                 break;
             case(OPT_SHB_USERAPPL):
-                if (oh.option_length > 0 && oh.option_length < opt_cont_buf_len) {
-                    tmp_content = g_strndup((char *)option_content, oh.option_length);
-                    /* Fails with multiple options; we silently ignore the failure */
-                    wtap_block_add_string_option(wblock->block, OPT_SHB_USERAPPL, option_content, oh.option_length);
-                    pcapng_debug("pcapng_read_section_header_block: shb_user_appl %s", tmp_content);
-                    g_free(tmp_content);
-                } else {
-                    pcapng_debug("pcapng_read_section_header_block: shb_user_appl length %u seems strange", oh.option_length);
-                }
+                pcapng_process_string_option(wblock, &oh, option_content, opt_cont_buf_len);
                 break;
             default:
-                pcapng_debug("pcapng_read_section_header_block: unknown option %u - ignoring %u bytes",
-                              oh.option_code, oh.option_length);
+                if (!pcap_process_unhandled_option(wblock, BT_INDEX_SHB, section_info, &oh, option_content, err, err_info))
+                    return PCAPNG_BLOCK_ERROR;
+                break;
         }
     }
     g_free(option_content);
@@ -756,8 +900,6 @@ pcapng_read_if_descr_block(wtap *wth, FILE_T fh, pcapng_block_header_t *bh,
     guint   link_type;
     pcapng_option_header_t oh;
     guint8 *option_content = NULL; /* Allocate as large as the options block */
-    gchar* tmp_content;
-    guint64 tmp64;
 
     /*
      * Is this block long enough to be an IDB?
@@ -779,7 +921,7 @@ pcapng_read_if_descr_block(wtap *wth, FILE_T fh, pcapng_block_header_t *bh,
     }
 
     /* mandatory values */
-    wblock->block = wtap_block_create(WTAP_BLOCK_IF_DESCR);
+    wblock->block = wtap_block_create(WTAP_BLOCK_IF_ID_AND_INFO);
     if_descr_mand = (wtapng_if_descr_mandatory_t*)wtap_block_get_mandatory_data(wblock->block);
     if (section_info->byte_swapped) {
         link_type = GUINT16_SWAP_LE_BE(idb.linktype);
@@ -829,7 +971,23 @@ pcapng_read_if_descr_block(wtap *wth, FILE_T fh, pcapng_block_header_t *bh,
         }
         to_read -= bytes_read;
 
-        /* handle option content */
+        /*
+         * Handle option content.
+         *
+         * ***DO NOT*** add any items to this table that are not
+         * standardized option codes in either section 3.5 "Options"
+         * of the current pcapng spec, at
+         *
+         *    https://pcapng.github.io/pcapng/draft-tuexen-opsawg-pcapng.html#name-options
+         *
+         * or in the list of options in section 4.2 "Interface Description
+         * Block" of the current pcapng spec, at
+         *
+         *    https://pcapng.github.io/pcapng/draft-tuexen-opsawg-pcapng.html#name-interface-description-block
+         *
+         * All option codes in this switch statement here must be listed
+         * in one of those places as standardized option types.
+         */
         switch (oh.option_code) {
             case(OPT_EOFOPT): /* opt_endofopt */
                 if (to_read != 0) {
@@ -839,52 +997,16 @@ pcapng_read_if_descr_block(wtap *wth, FILE_T fh, pcapng_block_header_t *bh,
                 to_read = 0;
                 break;
             case(OPT_COMMENT): /* opt_comment */
-                if (oh.option_length > 0 && oh.option_length < opt_cont_buf_len) {
-                    tmp_content = g_strndup((char *)option_content, oh.option_length);
-                    wtap_block_add_string_option(wblock->block, oh.option_code, option_content, oh.option_length);
-                    pcapng_debug("pcapng_read_if_descr_block: opt_comment %s", tmp_content);
-                    g_free(tmp_content);
-                } else {
-                    pcapng_debug("pcapng_read_if_descr_block: opt_comment length %u seems strange", oh.option_length);
-                }
+                pcapng_process_string_option(wblock, &oh, option_content, opt_cont_buf_len);
                 break;
             case(OPT_IDB_NAME): /* if_name */
-                if (oh.option_length > 0 && oh.option_length < opt_cont_buf_len) {
-                    tmp_content = g_strndup((char *)option_content, oh.option_length);
-                    /* Fails with multiple options; we silently ignore the failure */
-                    wtap_block_add_string_option(wblock->block, oh.option_code, option_content, oh.option_length);
-                    pcapng_debug("pcapng_read_if_descr_block: if_name %s", tmp_content);
-                    g_free(tmp_content);
-                } else {
-                    pcapng_debug("pcapng_read_if_descr_block: if_name length %u seems strange", oh.option_length);
-                }
+                pcapng_process_string_option(wblock, &oh, option_content, opt_cont_buf_len);
                 break;
             case(OPT_IDB_DESCR): /* if_description */
-                if (oh.option_length > 0 && oh.option_length < opt_cont_buf_len) {
-                    tmp_content = g_strndup((char *)option_content, oh.option_length);
-                    /* Fails with multiple options; we silently ignore the failure */
-                    wtap_block_add_string_option(wblock->block, oh.option_code, option_content, oh.option_length);
-                    pcapng_debug("pcapng_read_if_descr_block: if_description %s", tmp_content);
-                    g_free(tmp_content);
-                } else {
-                    pcapng_debug("pcapng_read_if_descr_block: if_description length %u seems strange", oh.option_length);
-                }
+                pcapng_process_string_option(wblock, &oh, option_content, opt_cont_buf_len);
                 break;
             case(OPT_IDB_SPEED): /* if_speed */
-                if (oh.option_length == 8) {
-                    /*  Don't cast a guint8 * into a guint64 *--the
-                     *  guint8 * may not point to something that's
-                     *  aligned correctly.
-                     */
-                    memcpy(&tmp64, option_content, sizeof(guint64));
-                    if (section_info->byte_swapped)
-                        tmp64 = GUINT64_SWAP_LE_BE(tmp64);
-                    /* Fails with multiple options; we silently ignore the failure */
-                    wtap_block_add_uint64_option(wblock->block, oh.option_code, tmp64);
-                    pcapng_debug("pcapng_read_if_descr_block: if_speed %" G_GINT64_MODIFIER "u (bps)", tmp64);
-                } else {
-                    pcapng_debug("pcapng_read_if_descr_block: if_speed length %u not 8 as expected", oh.option_length);
-                }
+                pcapng_process_uint64_option(wblock, section_info, &oh, option_content, opt_cont_buf_len);
                 break;
             case(OPT_IDB_TSRESOL): /* if_tsresol */
                 if (oh.option_length == 1) {
@@ -937,21 +1059,54 @@ pcapng_read_if_descr_block(wtap *wth, FILE_T fh, pcapng_block_header_t *bh,
                  */
             case(OPT_IDB_FILTER): /* if_filter */
                 if (oh.option_length > 0 && oh.option_length < opt_cont_buf_len) {
-                    wtapng_if_descr_filter_t if_filter = {0};
+                    if_filter_opt_t if_filter;
 
                     /* The first byte of the Option Data keeps a code of the filter used (e.g. if this is a libpcap string,
                      * or BPF bytecode.
                      */
                     if (option_content[0] == 0) {
-                        if_filter.if_filter_str = g_strndup((char *)option_content+1, oh.option_length-1);
-                        pcapng_debug("pcapng_read_if_descr_block: if_filter_str %s oh.option_length %u", if_filter.if_filter_str, oh.option_length);
+                        if_filter.type = if_filter_pcap;
+                        if_filter.data.filter_str = g_strndup((char *)option_content+1, oh.option_length-1);
+                        pcapng_debug("pcapng_read_if_descr_block: filter_str %s oh.option_length %u", if_filter.filter_str, oh.option_length);
+                        /* Fails with multiple options; we silently ignore the failure */
+                        wtap_block_add_if_filter_option(wblock->block, oh.option_code, &if_filter);
+                        g_free(if_filter.data.filter_str);
                     } else if (option_content[0] == 1) {
-                        if_filter.bpf_filter_len = oh.option_length-1;
-                        if_filter.if_filter_bpf_bytes = option_content+1;
+                        /*
+                         * XXX - byte-swap the code and k fields
+                         * of each instruction as needed!
+                         *
+                         * XXX - what if oh.option_length-1 is not a
+                         * multiple of the size of a BPF instruction?
+                         */
+                        guint num_insns;
+                        const guint8 *insn_in;
+
+                        if_filter.type = if_filter_bpf;
+                        num_insns = (oh.option_length-1)/8;
+                        insn_in = option_content+1;
+                        if_filter.data.bpf_prog.bpf_prog_len = num_insns;
+                        if_filter.data.bpf_prog.bpf_prog = g_new(wtap_bpf_insn_t, num_insns);
+                        for (guint i = 0; i < num_insns; i++) {
+                            wtap_bpf_insn_t *insn = &if_filter.data.bpf_prog.bpf_prog[i];
+
+                            memcpy(&insn->code, insn_in, 2);
+                            if (section_info->byte_swapped)
+                                insn->code = GUINT16_SWAP_LE_BE(insn->code);
+                            insn_in += 2;
+                            memcpy(&insn->jt, insn_in, 1);
+                            insn_in += 1;
+                            memcpy(&insn->jf, insn_in, 1);
+                            insn_in += 1;
+                            memcpy(&insn->k, insn_in, 4);
+                            if (section_info->byte_swapped)
+                                insn->k = GUINT32_SWAP_LE_BE(insn->k);
+                            insn_in += 4;
+                        }
+                        /* Fails with multiple options; we silently ignore the failure */
+                        wtap_block_add_if_filter_option(wblock->block, oh.option_code, &if_filter);
+                        g_free(if_filter.data.bpf_prog.bpf_prog);
                     }
-                    /* Fails with multiple options; we silently ignore the failure */
-                    wtap_block_add_custom_option(wblock->block, oh.option_code, &if_filter, sizeof if_filter);
-                    g_free(if_filter.if_filter_str);
                 } else {
                     pcapng_debug("pcapng_read_if_descr_block: if_filter length %u seems strange", oh.option_length);
                 }
@@ -962,15 +1117,7 @@ pcapng_read_if_descr_block(wtap *wth, FILE_T fh, pcapng_block_header_t *bh,
                  * This can be different from the same information that can be contained by the Section Header Block (Section 3.1 (Section Header Block (mandatory)))
                  * because the capture can have been done on a remote machine. "Windows XP SP2" / "openSUSE 10.2" / ...
                  */
-                if (oh.option_length > 0 && oh.option_length < opt_cont_buf_len) {
-                    tmp_content = g_strndup((char *)option_content, oh.option_length);
-                    /* Fails with multiple options; we silently ignore the failure */
-                    wtap_block_add_string_option(wblock->block, oh.option_code, option_content, oh.option_length);
-                    pcapng_debug("pcapng_read_if_descr_block: if_os %s", tmp_content);
-                    g_free(tmp_content);
-                } else {
-                    pcapng_debug("pcapng_read_if_descr_block: if_os length %u seems strange", oh.option_length);
-                }
+                pcapng_process_string_option(wblock, &oh, option_content, opt_cont_buf_len);
                 break;
             case(OPT_IDB_FCSLEN): /* if_fcslen */
                 if (oh.option_length == 1) {
@@ -983,15 +1130,7 @@ pcapng_read_if_descr_block(wtap *wth, FILE_T fh, pcapng_block_header_t *bh,
                 }
                 break;
             case(OPT_IDB_HARDWARE): /* if_hardware */
-                if (oh.option_length > 0 && oh.option_length < opt_cont_buf_len) {
-                    tmp_content = g_strndup((char *)option_content, oh.option_length);
-                    /* Fails with multiple options; we silently ignore the failure */
-                    wtap_block_add_string_option(wblock->block, oh.option_code, option_content, oh.option_length);
-                    pcapng_debug("pcapng_read_if_descr_block: if_hardware %s", tmp_content);
-                    g_free(tmp_content);
-                } else {
-                    pcapng_debug("pcapng_read_if_descr_block: if_description length %u seems strange", oh.option_length);
-                }
+                pcapng_process_string_option(wblock, &oh, option_content, opt_cont_buf_len);
                 break;
 
             /* TODO: process these! */
@@ -1039,8 +1178,9 @@ pcapng_read_if_descr_block(wtap *wth, FILE_T fh, pcapng_block_header_t *bh,
                  * be useful for highly synchronized capture systems? 1234
                  */
             default:
-                pcapng_debug("pcapng_read_if_descr_block: unknown option %u - ignoring %u bytes",
-                              oh.option_code, oh.option_length);
+                if (!pcap_process_unhandled_option(wblock, BT_INDEX_IDB, section_info, &oh, option_content, err, err_info))
+                    return FALSE;
+                break;
         }
     }
 
@@ -1100,7 +1240,7 @@ pcapng_read_decryption_secrets_block(FILE_T fh, pcapng_block_header_t *bh,
     }
 
     /* mandatory values */
-    wblock->block = wtap_block_create(WTAP_BLOCK_DSB);
+    wblock->block = wtap_block_create(WTAP_BLOCK_DECRYPTION_SECRETS);
     dsb_mand = (wtapng_dsb_mandatory_t *)wtap_block_get_mandatory_data(wblock->block);
     if (section_info->byte_swapped) {
       dsb_mand->secrets_type = GUINT32_SWAP_LE_BE(dsb.secrets_type);
@@ -1115,7 +1255,7 @@ pcapng_read_decryption_secrets_block(FILE_T fh, pcapng_block_header_t *bh,
       *err_info = g_strdup_printf("%s: secrets block is too large: %u", G_STRFUNC, dsb_mand->secrets_len);
       return FALSE;
     }
-    dsb_mand->secrets_data = (char *)g_malloc0(dsb_mand->secrets_len);
+    dsb_mand->secrets_data = (guint8 *)g_malloc0(dsb_mand->secrets_len);
     if (!wtap_read_bytes(fh, dsb_mand->secrets_data, dsb_mand->secrets_len, err, err_info)) {
         pcapng_debug("%s: failed to read DSB", G_STRFUNC);
         return FALSE;
@@ -1158,9 +1298,6 @@ pcapng_read_packet_block(FILE_T fh, pcapng_block_header_t *bh,
     gpointer option_content_copy;
     int pseudo_header_len;
     int fcslen;
-#ifdef HAVE_PLUGINS
-    option_handler *handler;
-#endif
 
     /* "(Enhanced) Packet Block" read fixed part */
     if (enhanced) {
@@ -1317,7 +1454,7 @@ pcapng_read_packet_block(FILE_T fh, pcapng_block_header_t *bh,
 
     memset((void *)&wblock->rec->rec_header.packet_header.pseudo_header, 0, sizeof(union wtap_pseudo_header));
     pseudo_header_len = pcap_process_pseudo_header(fh,
-                                                   WTAP_FILE_TYPE_SUBTYPE_PCAPNG,
+                                                   FALSE, /* not a Nokia pcap - not a pcap at all */
                                                    iface_info.wtap_encap,
                                                    packet.cap_len,
                                                    wblock->rec,
@@ -1398,7 +1535,23 @@ pcapng_read_packet_block(FILE_T fh, pcapng_block_header_t *bh,
         }
         to_read -= bytes_read;
 
-        /* handle option content */
+        /*
+         * Handle option content.
+         *
+         * ***DO NOT*** add any items to this table that are not
+         * standardized option codes in either section 3.5 "Options"
+         * of the current pcapng spec, at
+         *
+         *    https://pcapng.github.io/pcapng/draft-tuexen-opsawg-pcapng.html#name-options
+         *
+         * or in the list of options in section 4.3 "Enhanced Packet Block"
+         * of the current pcapng spec, at
+         *
+         *    https://pcapng.github.io/pcapng/draft-tuexen-opsawg-pcapng.html#name-enhanced-packet-block
+         *
+         * All option codes in this switch statement here must be listed
+         * in one of those places as standardized option types.
+         */
         switch (oh->option_code) {
             case(OPT_EOFOPT):
                 if (to_read != 0) {
@@ -1530,7 +1683,7 @@ pcapng_read_packet_block(FILE_T fh, pcapng_block_header_t *bh,
                     wblock->rec->packet_verdict = g_ptr_array_new_with_free_func((GDestroyNotify) g_bytes_unref);
                 }
 
-                option_content_copy = g_memdup(option_content, oh->option_length);
+                option_content_copy = g_memdup2(option_content, oh->option_length);
 
                 /* For Linux XDP and TC we might need to byte swap */
                 if (section_info->byte_swapped &&
@@ -1552,29 +1705,13 @@ pcapng_read_packet_block(FILE_T fh, pcapng_block_header_t *bh,
                              option_content[0], oh->option_length - 1);
                 break;
             default:
-#ifdef HAVE_PLUGINS
-                /*
-                 * Do we have a handler for this packet block option code?
-                 */
-                if (option_handlers[BT_INDEX_PBS] != NULL &&
-                    (handler = (option_handler *)g_hash_table_lookup(option_handlers[BT_INDEX_PBS],
-                                                                   GUINT_TO_POINTER((guint)oh->option_code))) != NULL) {
-                    /* Yes - call the handler. */
-                    if (!handler->hfunc(section_info->byte_swapped,
-                                        oh->option_length, option_content,
-                                        err, err_info))
-                        /* XXX - free anything? */
-                        return FALSE;
-                } else
-#endif
-                {
-                    pcapng_debug("pcapng_read_packet_block: unknown option %u - ignoring %u bytes",
-                                  oh->option_code, oh->option_length);
-                }
+                pcapng_debug("pcapng_read_packet_block: unknown option %u - ignoring %u bytes",
+                              oh->option_code, oh->option_length);
+                break;
         }
     }
 
-    pcap_read_post_process(WTAP_FILE_TYPE_SUBTYPE_PCAPNG, iface_info.wtap_encap,
+    pcap_read_post_process(FALSE, iface_info.wtap_encap,
                            wblock->rec, ws_buffer_start_ptr(wblock->frame_buffer),
                            section_info->byte_swapped, fcslen);
 
@@ -1710,7 +1847,7 @@ pcapng_read_simple_packet_block(FILE_T fh, pcapng_block_header_t *bh,
 
     memset((void *)&wblock->rec->rec_header.packet_header.pseudo_header, 0, sizeof(union wtap_pseudo_header));
     pseudo_header_len = pcap_process_pseudo_header(fh,
-                                                   WTAP_FILE_TYPE_SUBTYPE_PCAPNG,
+                                                   FALSE,
                                                    iface_info.wtap_encap,
                                                    simple_packet.cap_len,
                                                    wblock->rec,
@@ -1735,7 +1872,7 @@ pcapng_read_simple_packet_block(FILE_T fh, pcapng_block_header_t *bh,
             return FALSE;
     }
 
-    pcap_read_post_process(WTAP_FILE_TYPE_SUBTYPE_PCAPNG, iface_info.wtap_encap,
+    pcap_read_post_process(FALSE, iface_info.wtap_encap,
                            wblock->rec, ws_buffer_start_ptr(wblock->frame_buffer),
                            section_info->byte_swapped, iface_info.fcslen);
 
@@ -1809,10 +1946,6 @@ pcapng_read_name_resolution_block(FILE_T fh, pcapng_block_header_t *bh,
     int bytes_read;
     pcapng_option_header_t oh;
     guint8 *option_content;
-#ifdef HAVE_PLUGINS
-    option_handler *handler;
-#endif
-    gchar* tmp_content;
 
     /*
      * Is this block long enough to be an NRB?
@@ -1833,7 +1966,7 @@ pcapng_read_name_resolution_block(FILE_T fh, pcapng_block_header_t *bh,
 
     /* Ensure we have a name resolution block */
     if (wblock->block == NULL) {
-        wblock->block = wtap_block_create(WTAP_BLOCK_NG_NRB);
+        wblock->block = wtap_block_create(WTAP_BLOCK_NAME_RESOLUTION);
     }
 
     /*
@@ -2047,7 +2180,23 @@ read_options:
         }
         to_read -= bytes_read;
 
-        /* handle option content */
+        /*
+         * Handle option content.
+         *
+         * ***DO NOT*** add any items to this table that are not
+         * standardized option codes in either section 3.5 "Options"
+         * of the current pcapng spec, at
+         *
+         *    https://pcapng.github.io/pcapng/draft-tuexen-opsawg-pcapng.html#name-options
+         *
+         * or in the list of options in section 4.5 "Name Resolution Block"
+         * of the current pcapng spec, at
+         *
+         *    https://pcapng.github.io/pcapng/draft-tuexen-opsawg-pcapng.html#name-name-resolution-block
+         *
+         * All option codes in this switch statement here must be listed
+         * in one of those places as standardized option types.
+         */
         switch (oh.option_code) {
             case(OPT_EOFOPT):
                 if (to_read != 0) {
@@ -2057,38 +2206,12 @@ read_options:
                 to_read = 0;
                 break;
             case(OPT_COMMENT):
-                if (oh.option_length > 0 && oh.option_length < opt_cont_buf_len) {
-                    tmp_content = g_strndup((char *)option_content, oh.option_length);
-                    wtap_block_add_string_option(wblock->block, OPT_COMMENT, option_content, oh.option_length);
-                    pcapng_debug("pcapng_read_name_resolution_block: length %u opt_comment '%s'", oh.option_length, tmp_content);
-                    g_free(tmp_content);
-                } else {
-                    pcapng_debug("pcapng_read_name_resolution_block: opt_comment length %u seems strange", oh.option_length);
-                }
+                pcapng_process_string_option(wblock, &oh, option_content, opt_cont_buf_len);
                 break;
             default:
-#ifdef HAVE_PLUGINS
-                /*
-                 * Do we have a handler for this network resolution block option code?
-                 */
-                if (option_handlers[BT_INDEX_NRB] != NULL &&
-                    (handler = (option_handler *)g_hash_table_lookup(option_handlers[BT_INDEX_NRB],
-                                                                   GUINT_TO_POINTER((guint)oh.option_code))) != NULL) {
-                    /* Yes - call the handler. */
-                    if (!handler->hfunc(section_info->byte_swapped,
-                                        oh.option_length, option_content,
-                                        err, err_info)) {
-
-                        g_free(option_content);
-                        ws_buffer_free(&nrb_rec);
-                        return FALSE;
-                    }
-                } else
-#endif
-                {
-                    pcapng_debug("pcapng_read_name_resolution_block: unknown option %u - ignoring %u bytes",
-                                  oh.option_code, oh.option_length);
-                }
+                if (!pcap_process_unhandled_option(wblock, BT_INDEX_NRB, section_info, &oh, option_content, err, err_info))
+                    return FALSE;
+                break;
         }
     }
 
@@ -2115,7 +2238,6 @@ pcapng_read_interface_statistics_block(FILE_T fh, pcapng_block_header_t *bh,
     pcapng_option_header_t oh;
     guint8 *option_content = NULL; /* Allocate as large as the options block */
     wtapng_if_stats_mandatory_t* if_stats_mand;
-    char* tmp_content;
 
     /*
      * Is this block long enough to be an ISB?
@@ -2136,7 +2258,7 @@ pcapng_read_interface_statistics_block(FILE_T fh, pcapng_block_header_t *bh,
         return FALSE;
     }
 
-    wblock->block = wtap_block_create(WTAP_BLOCK_IF_STATS);
+    wblock->block = wtap_block_create(WTAP_BLOCK_IF_STATISTICS);
     if_stats_mand = (wtapng_if_stats_mandatory_t*)wtap_block_get_mandatory_data(wblock->block);
     if (section_info->byte_swapped) {
         if_stats_mand->interface_id = GUINT32_SWAP_LE_BE(isb.interface_id);
@@ -2171,7 +2293,23 @@ pcapng_read_interface_statistics_block(FILE_T fh, pcapng_block_header_t *bh,
         }
         to_read -= bytes_read;
 
-        /* handle option content */
+        /*
+         * Handle option content.
+         *
+         * ***DO NOT*** add any items to this table that are not
+         * standardized option codes in either section 3.5 "Options"
+         * of the current pcapng spec, at
+         *
+         *    https://pcapng.github.io/pcapng/draft-tuexen-opsawg-pcapng.html#name-options
+         *
+         * or in the list of options in section 4.6 "Interface Statistics
+         * Block" of the current pcapng spec, at
+         *
+         *    https://pcapng.github.io/pcapng/draft-tuexen-opsawg-pcapng.html#name-interface-statistics-block
+         *
+         * All option codes in this switch statement here must be listed
+         * in one of those places as standardized option types.
+         */
         switch (oh.option_code) {
             case(OPT_EOFOPT): /* opt_endofopt */
                 if (to_read != 0) {
@@ -2181,153 +2319,33 @@ pcapng_read_interface_statistics_block(FILE_T fh, pcapng_block_header_t *bh,
                 to_read = 0;
                 break;
             case(OPT_COMMENT): /* opt_comment */
-                if (oh.option_length > 0 && oh.option_length < opt_cont_buf_len) {
-                    tmp_content = g_strndup((char *)option_content, oh.option_length);
-                    wtap_block_add_string_option(wblock->block, OPT_COMMENT, option_content, oh.option_length);
-                    pcapng_debug("pcapng_read_interface_statistics_block: opt_comment %s", tmp_content);
-                    g_free(tmp_content);
-                } else {
-                    pcapng_debug("pcapng_read_interface_statistics_block: opt_comment length %u seems strange", oh.option_length);
-                }
+                pcapng_process_string_option(wblock, &oh, option_content, opt_cont_buf_len);
                 break;
             case(OPT_ISB_STARTTIME): /* isb_starttime */
-                if (oh.option_length == 8) {
-                    guint32 high, low;
-                    guint64 starttime;
-
-                    /*  Don't cast a guint8 * into a guint32 *--the
-                     *  guint8 * may not point to something that's
-                     *  aligned correctly.
-                     */
-                    memcpy(&high, option_content, sizeof(guint32));
-                    memcpy(&low, option_content + sizeof(guint32), sizeof(guint32));
-                    if (section_info->byte_swapped) {
-                        high = GUINT32_SWAP_LE_BE(high);
-                        low = GUINT32_SWAP_LE_BE(low);
-                    }
-                    starttime = (guint64)high;
-                    starttime <<= 32;
-                    starttime += (guint64)low;
-                    /* Fails with multiple options; we silently ignore the failure */
-                    wtap_block_add_uint64_option(wblock->block, OPT_ISB_STARTTIME, starttime);
-                    pcapng_debug("pcapng_read_interface_statistics_block: isb_starttime %" G_GINT64_MODIFIER "u", starttime);
-                } else {
-                    pcapng_debug("pcapng_read_interface_statistics_block: isb_starttime length %u not 8 as expected", oh.option_length);
-                }
+                pcapng_process_timestamp_option(wblock, section_info, &oh, option_content, opt_cont_buf_len);
                 break;
             case(OPT_ISB_ENDTIME): /* isb_endtime */
-                if (oh.option_length == 8) {
-                    guint32 high, low;
-                    guint64 endtime;
-
-                    /*  Don't cast a guint8 * into a guint32 *--the
-                     *  guint8 * may not point to something that's
-                     *  aligned correctly.
-                     */
-                    memcpy(&high, option_content, sizeof(guint32));
-                    memcpy(&low, option_content + sizeof(guint32), sizeof(guint32));
-                    if (section_info->byte_swapped) {
-                        high = GUINT32_SWAP_LE_BE(high);
-                        low = GUINT32_SWAP_LE_BE(low);
-                    }
-                    endtime = (guint64)high;
-                    endtime <<= 32;
-                    endtime += (guint64)low;
-                    /* Fails with multiple options; we silently ignore the failure */
-                    wtap_block_add_uint64_option(wblock->block, OPT_ISB_ENDTIME, endtime);
-                    pcapng_debug("pcapng_read_interface_statistics_block: isb_endtime %" G_GINT64_MODIFIER "u", endtime);
-                } else {
-                    pcapng_debug("pcapng_read_interface_statistics_block: isb_starttime length %u not 8 as expected", oh.option_length);
-                }
+                pcapng_process_timestamp_option(wblock, section_info, &oh, option_content, opt_cont_buf_len);
                 break;
             case(OPT_ISB_IFRECV): /* isb_ifrecv */
-                if (oh.option_length == 8) {
-                    guint64 ifrecv;
-                    /*  Don't cast a guint8 * into a guint64 *--the
-                     *  guint8 * may not point to something that's
-                     *  aligned correctly.
-                     */
-                    memcpy(&ifrecv, option_content, sizeof(guint64));
-                    if (section_info->byte_swapped)
-                        ifrecv = GUINT64_SWAP_LE_BE(ifrecv);
-                    /* Fails with multiple options; we silently ignore the failure */
-                    wtap_block_add_uint64_option(wblock->block, OPT_ISB_IFRECV, ifrecv);
-                    pcapng_debug("pcapng_read_interface_statistics_block: isb_ifrecv %" G_GINT64_MODIFIER "u", ifrecv);
-                } else {
-                    pcapng_debug("pcapng_read_interface_statistics_block: isb_ifrecv length %u not 8 as expected", oh.option_length);
-                }
+                pcapng_process_uint64_option(wblock, section_info, &oh, option_content, opt_cont_buf_len);
                 break;
             case(OPT_ISB_IFDROP): /* isb_ifdrop */
-                if (oh.option_length == 8) {
-                    guint64 ifdrop;
-                    /*  Don't cast a guint8 * into a guint64 *--the
-                     *  guint8 * may not point to something that's
-                     *  aligned correctly.
-                     */
-                    memcpy(&ifdrop, option_content, sizeof(guint64));
-                    if (section_info->byte_swapped)
-                        ifdrop = GUINT64_SWAP_LE_BE(ifdrop);
-                    /* Fails with multiple options; we silently ignore the failure */
-                    wtap_block_add_uint64_option(wblock->block, OPT_ISB_IFDROP, ifdrop);
-                    pcapng_debug("pcapng_read_interface_statistics_block: isb_ifdrop %" G_GINT64_MODIFIER "u", ifdrop);
-                } else {
-                    pcapng_debug("pcapng_read_interface_statistics_block: isb_ifdrop length %u not 8 as expected", oh.option_length);
-                }
+                pcapng_process_uint64_option(wblock, section_info, &oh, option_content, opt_cont_buf_len);
                 break;
             case(OPT_ISB_FILTERACCEPT): /* isb_filteraccept 6 */
-                if (oh.option_length == 8) {
-                    guint64 filteraccept;
-                    /*  Don't cast a guint8 * into a guint64 *--the
-                     *  guint8 * may not point to something that's
-                     *  aligned correctly.
-                     */
-                    memcpy(&filteraccept, option_content, sizeof(guint64));
-                    if (section_info->byte_swapped)
-                        filteraccept = GUINT64_SWAP_LE_BE(filteraccept);
-                    /* Fails with multiple options; we silently ignore the failure */
-                    wtap_block_add_uint64_option(wblock->block, OPT_ISB_FILTERACCEPT, filteraccept);
-                    pcapng_debug("pcapng_read_interface_statistics_block: isb_filteraccept %" G_GINT64_MODIFIER "u", filteraccept);
-                } else {
-                    pcapng_debug("pcapng_read_interface_statistics_block: isb_filteraccept length %u not 8 as expected", oh.option_length);
-                }
+                pcapng_process_uint64_option(wblock, section_info, &oh, option_content, opt_cont_buf_len);
                 break;
             case(OPT_ISB_OSDROP): /* isb_osdrop 7 */
-                if (oh.option_length == 8) {
-                    guint64 osdrop;
-                    /*  Don't cast a guint8 * into a guint64 *--the
-                     *  guint8 * may not point to something that's
-                     *  aligned correctly.
-                     */
-                    memcpy(&osdrop, option_content, sizeof(guint64));
-                    if (section_info->byte_swapped)
-                        osdrop = GUINT64_SWAP_LE_BE(osdrop);
-                    /* Fails with multiple options; we silently ignore the failure */
-                    wtap_block_add_uint64_option(wblock->block, OPT_ISB_OSDROP, osdrop);
-                    pcapng_debug("pcapng_read_interface_statistics_block: isb_osdrop %" G_GINT64_MODIFIER "u", osdrop);
-                } else {
-                    pcapng_debug("pcapng_read_interface_statistics_block: isb_osdrop length %u not 8 as expected", oh.option_length);
-                }
+                pcapng_process_uint64_option(wblock, section_info, &oh, option_content, opt_cont_buf_len);
                 break;
             case(OPT_ISB_USRDELIV): /* isb_usrdeliv 8  */
-                if (oh.option_length == 8) {
-                    guint64 usrdeliv;
-                    /*  Don't cast a guint8 * into a guint64 *--the
-                     *  guint8 * may not point to something that's
-                     *  aligned correctly.
-                     */
-                    memcpy(&usrdeliv, option_content, sizeof(guint64));
-                    if (section_info->byte_swapped)
-                        usrdeliv = GUINT64_SWAP_LE_BE(usrdeliv);
-                    /* Fails with multiple options; we silently ignore the failure */
-                    wtap_block_add_uint64_option(wblock->block, OPT_ISB_USRDELIV, usrdeliv);
-                    pcapng_debug("pcapng_read_interface_statistics_block: isb_usrdeliv %" G_GINT64_MODIFIER "u", usrdeliv);
-                } else {
-                    pcapng_debug("pcapng_read_interface_statistics_block: isb_usrdeliv length %u not 8 as expected", oh.option_length);
-                }
+                pcapng_process_uint64_option(wblock, section_info, &oh, option_content, opt_cont_buf_len);
                 break;
             default:
-                pcapng_debug("pcapng_read_interface_statistics_block: unknown option %u - ignoring %u bytes",
-                              oh.option_code, oh.option_length);
+                if (!pcap_process_unhandled_option(wblock, BT_INDEX_ISB, section_info, &oh, option_content, err, err_info))
+                    return FALSE;
+                break;
         }
     }
 
@@ -2355,11 +2373,19 @@ pcapng_read_sysdig_event_block(FILE_T fh, pcapng_block_header_t *bh,
     guint64 thread_id;
     guint32 event_len;
     guint16 event_type;
+    guint32 nparams = 0;
+    guint min_event_size;
 
-    if (bh->block_total_length < MIN_SYSDIG_EVENT_SIZE) {
+    if (bh->block_type == BLOCK_TYPE_SYSDIG_EVENT_V2) {
+        min_event_size = MIN_SYSDIG_EVENT_V2_SIZE;
+    } else {
+        min_event_size = MIN_SYSDIG_EVENT_SIZE;
+    }
+
+    if (bh->block_total_length < min_event_size) {
         *err = WTAP_ERR_BAD_FILE;
         *err_info = g_strdup_printf("%s: total block length %u is too small (< %u)", G_STRFUNC,
-                                    bh->block_total_length, MIN_SYSDIG_EVENT_SIZE);
+                                    bh->block_total_length, min_event_size);
         return FALSE;
     }
 
@@ -2375,11 +2401,9 @@ pcapng_read_sysdig_event_block(FILE_T fh, pcapng_block_header_t *bh,
                   bh->block_total_length);
 
     wblock->rec->rec_type = REC_TYPE_SYSCALL;
-    wblock->rec->rec_header.syscall_header.record_type = BLOCK_TYPE_SYSDIG_EVENT;
+    wblock->rec->rec_header.syscall_header.record_type = bh->block_type;
     wblock->rec->presence_flags = WTAP_HAS_TS|WTAP_HAS_CAP_LEN /*|WTAP_HAS_INTERFACE_ID */;
     wblock->rec->tsprec = WTAP_TSPREC_NSEC;
-
-    block_read = block_total_length;
 
     if (!wtap_read_bytes(fh, &cpu_id, sizeof cpu_id, err, err_info)) {
         pcapng_debug("pcapng_read_packet_block: failed to read sysdig event cpu id");
@@ -2401,8 +2425,13 @@ pcapng_read_sysdig_event_block(FILE_T fh, pcapng_block_header_t *bh,
         pcapng_debug("pcapng_read_packet_block: failed to read sysdig event type");
         return FALSE;
     }
+    if (bh->block_type == BLOCK_TYPE_SYSDIG_EVENT_V2) {
+        if (!wtap_read_bytes(fh, &nparams, sizeof nparams, err, err_info)) {
+            pcapng_debug("pcapng_read_packet_block: failed to read sysdig number of parameters");
+            return FALSE;
+        }
+    }
 
-    block_read -= MIN_SYSDIG_EVENT_SIZE;
     wblock->rec->rec_header.syscall_header.byte_order = G_BYTE_ORDER;
 
     /* XXX Use Gxxx_FROM_LE macros instead? */
@@ -2424,10 +2453,13 @@ pcapng_read_sysdig_event_block(FILE_T fh, pcapng_block_header_t *bh,
         wblock->rec->rec_header.syscall_header.thread_id = thread_id;
         wblock->rec->rec_header.syscall_header.event_len = event_len;
         wblock->rec->rec_header.syscall_header.event_type = event_type;
+        wblock->rec->rec_header.syscall_header.nparams = nparams;
     }
 
     wblock->rec->ts.secs = (time_t) (ts / 1000000000);
     wblock->rec->ts.nsecs = (int) (ts % 1000000000);
+
+    block_read = block_total_length - min_event_size;
 
     wblock->rec->rec_header.syscall_header.event_filelen = block_read;
 
@@ -2478,13 +2510,15 @@ pcapng_read_systemd_journal_export_block(wtap *wth, FILE_T fh, pcapng_block_head
                                 entry_length, err, err_info)) {
         return FALSE;
     }
-    ws_buffer_increase_length(wblock->frame_buffer, entry_length);
 
-    /* We don't have memmem available everywhere, so we get to use strstr. */
-    ws_buffer_append(wblock->frame_buffer, (guint8 * ) "", 1);
+    /*
+     * We don't have memmem available everywhere, so we get to add space for
+     * a trailing \0 for strstr below.
+     */
+    ws_buffer_assure_space(wblock->frame_buffer, entry_length+1);
 
     gchar *buf_ptr = (gchar *) ws_buffer_start_ptr(wblock->frame_buffer);
-    while (entry_length > 0 && buf_ptr[entry_length] == '\0') {
+    while (entry_length > 0 && buf_ptr[entry_length-1] == '\0') {
         entry_length--;
     }
 
@@ -2498,6 +2532,8 @@ pcapng_read_systemd_journal_export_block(wtap *wth, FILE_T fh, pcapng_block_head
     pcapng_debug("%s: entry_length %u", G_STRFUNC, entry_length);
 
     size_t rt_ts_len = strlen(SDJ__REALTIME_TIMESTAMP);
+
+    buf_ptr[entry_length] = '\0';
     char *ts_pos = strstr(buf_ptr, SDJ__REALTIME_TIMESTAMP);
 
     if (!ts_pos) {
@@ -2603,8 +2639,33 @@ pcapng_read_unknown_block(FILE_T fh, pcapng_block_header_t *bh,
     return TRUE;
 }
 
+static gboolean
+pcapng_read_and_check_block_trailer(FILE_T fh, pcapng_block_header_t *bh,
+                           section_info_t *section_info,
+                           int *err, gchar **err_info)
+{
+    guint32 block_total_length;
 
-static block_return_val
+    /* sanity check: first and second block lengths must match */
+    if (!wtap_read_bytes(fh, &block_total_length, sizeof block_total_length,
+                         err, err_info)) {
+        pcapng_debug("pcapng_read_and_check_block_trailer: couldn't read second block length");
+        return FALSE;
+    }
+
+    if (section_info->byte_swapped)
+        block_total_length = GUINT32_SWAP_LE_BE(block_total_length);
+
+    if (block_total_length != bh->block_total_length) {
+        *err = WTAP_ERR_BAD_FILE;
+        *err_info = g_strdup_printf("pcapng_read_and_check_block_trailer: total block lengths (first %u and second %u) don't match",
+                                    bh->block_total_length, block_total_length);
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static gboolean
 pcapng_read_block(wtap *wth, FILE_T fh, pcapng_t *pn,
                   section_info_t *section_info,
                   section_info_t *new_section_info,
@@ -2613,27 +2674,13 @@ pcapng_read_block(wtap *wth, FILE_T fh, pcapng_t *pn,
 {
     block_return_val ret;
     pcapng_block_header_t bh;
-    guint32 block_total_length;
 
     wblock->block = NULL;
 
     /* Try to read the (next) block header */
     if (!wtap_read_bytes_or_eof(fh, &bh, sizeof bh, err, err_info)) {
         pcapng_debug("pcapng_read_block: wtap_read_bytes_or_eof() failed, err = %d.", *err);
-        if (*err == 0 || *err == WTAP_ERR_SHORT_READ) {
-            /*
-             * Short read or EOF.
-             *
-             * If we're reading this as part of an open,
-             * the file is too short to be a pcapng file.
-             *
-             * If we're not, we treat PCAPNG_BLOCK_NOT_SHB and
-             * PCAPNG_BLOCK_ERROR the same, so we can just return
-             * PCAPNG_BLOCK_NOT_SHB in both cases.
-             */
-            return PCAPNG_BLOCK_NOT_SHB;
-        }
-        return PCAPNG_BLOCK_ERROR;
+        return FALSE;
     }
 
     /*
@@ -2669,7 +2716,7 @@ pcapng_read_block(wtap *wth, FILE_T fh, pcapng_t *pn,
         ret = pcapng_read_section_header_block(fh, &bh, new_section_info,
                                                wblock, err, err_info);
         if (ret != PCAPNG_BLOCK_OK) {
-            return ret;
+            return FALSE;
         }
 
         /*
@@ -2681,17 +2728,7 @@ pcapng_read_block(wtap *wth, FILE_T fh, pcapng_t *pn,
     } else {
         /*
          * Not an SHB.
-         *
-         * If section_info is null, it means we're calling this from
-         * pcapng_open() to see whether the file begins with an SHB.
-         * It doesn't, which means that it is not a pcapng file.
          */
-        if (section_info == NULL) {
-            *err = 0;
-            *err_info = NULL;
-            return PCAPNG_BLOCK_NOT_SHB;
-        }
-
         if (section_info->byte_swapped) {
             bh.block_type         = GUINT32_SWAP_LE_BE(bh.block_type);
             bh.block_total_length = GUINT32_SWAP_LE_BE(bh.block_total_length);
@@ -2710,72 +2747,74 @@ pcapng_read_block(wtap *wth, FILE_T fh, pcapng_t *pn,
             *err = WTAP_ERR_BAD_FILE;
             *err_info = g_strdup_printf("pcapng_read_block: total block length %u is too large (> %u)",
                                         bh.block_total_length, MAX_BLOCK_SIZE);
-            return PCAPNG_BLOCK_ERROR;
+            return FALSE;
         }
 
+        /*
+         * ***DO NOT*** add any items to this table that are not
+         * standardized block types in the current pcapng spec at
+         *
+         *    https://pcapng.github.io/pcapng/draft-tuexen-opsawg-pcapng.html
+         *
+         * All block types in this switch statement here must be
+         * listed there as standardized block types, ideally with
+         * a description.
+         */
         switch (bh.block_type) {
             case(BLOCK_TYPE_IDB):
                 if (!pcapng_read_if_descr_block(wth, fh, &bh, section_info, wblock, err, err_info))
-                    return PCAPNG_BLOCK_ERROR;
+                    return FALSE;
                 break;
             case(BLOCK_TYPE_PB):
                 if (!pcapng_read_packet_block(fh, &bh, section_info, wblock, err, err_info, FALSE))
-                    return PCAPNG_BLOCK_ERROR;
+                    return FALSE;
                 break;
             case(BLOCK_TYPE_SPB):
                 if (!pcapng_read_simple_packet_block(fh, &bh, section_info, wblock, err, err_info))
-                    return PCAPNG_BLOCK_ERROR;
+                    return FALSE;
                 break;
             case(BLOCK_TYPE_EPB):
                 if (!pcapng_read_packet_block(fh, &bh, section_info, wblock, err, err_info, TRUE))
-                    return PCAPNG_BLOCK_ERROR;
+                    return FALSE;
                 break;
             case(BLOCK_TYPE_NRB):
                 if (!pcapng_read_name_resolution_block(fh, &bh, pn, section_info, wblock, err, err_info))
-                    return PCAPNG_BLOCK_ERROR;
+                    return FALSE;
                 break;
             case(BLOCK_TYPE_ISB):
                 if (!pcapng_read_interface_statistics_block(fh, &bh, section_info, wblock, err, err_info))
-                    return PCAPNG_BLOCK_ERROR;
+                    return FALSE;
                 break;
             case(BLOCK_TYPE_DSB):
                 if (!pcapng_read_decryption_secrets_block(fh, &bh, section_info, wblock, err, err_info))
-                    return PCAPNG_BLOCK_ERROR;
+                    return FALSE;
                 break;
             case(BLOCK_TYPE_SYSDIG_EVENT):
+            case(BLOCK_TYPE_SYSDIG_EVENT_V2):
             /* case(BLOCK_TYPE_SYSDIG_EVF): */
                 if (!pcapng_read_sysdig_event_block(fh, &bh, section_info, wblock, err, err_info))
-                    return PCAPNG_BLOCK_ERROR;
+                    return FALSE;
                 break;
             case(BLOCK_TYPE_SYSTEMD_JOURNAL):
                 if (!pcapng_read_systemd_journal_export_block(wth, fh, &bh, pn, wblock, err, err_info))
-                    return PCAPNG_BLOCK_ERROR;
+                    return FALSE;
                 break;
             default:
                 pcapng_debug("pcapng_read_block: Unknown block_type: 0x%x (block ignored), block total length %d", bh.block_type, bh.block_total_length);
                 if (!pcapng_read_unknown_block(fh, &bh, section_info, wblock, err, err_info))
-                    return PCAPNG_BLOCK_ERROR;
+                    return FALSE;
                 break;
         }
     }
 
-    /* sanity check: first and second block lengths must match */
-    if (!wtap_read_bytes(fh, &block_total_length, sizeof block_total_length,
-                         err, err_info)) {
-        pcapng_debug("pcapng_check_block_trailer: couldn't read second block length");
-        return PCAPNG_BLOCK_ERROR;
+    /*
+     * Read and check the block trailer.
+     */
+    if (!pcapng_read_and_check_block_trailer(fh, &bh, section_info, err, err_info)) {
+        /* Not readable or not valid. */
+        return FALSE;
     }
-
-    if (section_info->byte_swapped)
-        block_total_length = GUINT32_SWAP_LE_BE(block_total_length);
-
-    if (block_total_length != bh.block_total_length) {
-        *err = WTAP_ERR_BAD_FILE;
-        *err_info = g_strdup_printf("pcapng_check_block_trailer: total block lengths (first %u and second %u) don't match",
-                                    bh.block_total_length, block_total_length);
-        return PCAPNG_BLOCK_ERROR;
-    }
-    return PCAPNG_BLOCK_OK;
+    return TRUE;
 }
 
 /* Process an IDB that we've just read. The contents of wblock are copied as needed. */
@@ -2783,7 +2822,7 @@ static void
 pcapng_process_idb(wtap *wth, section_info_t *section_info,
                    wtapng_block_t *wblock)
 {
-    wtap_block_t int_data = wtap_block_create(WTAP_BLOCK_IF_DESCR);
+    wtap_block_t int_data = wtap_block_create(WTAP_BLOCK_IF_ID_AND_INFO);
     interface_info_t iface_info;
     wtapng_if_descr_mandatory_t *if_descr_mand = (wtapng_if_descr_mandatory_t*)wtap_block_get_mandatory_data(int_data),
                                 *wblock_if_descr_mand = (wtapng_if_descr_mandatory_t*)wtap_block_get_mandatory_data(wblock->block);
@@ -2826,33 +2865,65 @@ pcapng_process_dsb(wtap *wth, wtapng_block_t *wblock)
 wtap_open_return_val
 pcapng_open(wtap *wth, int *err, gchar **err_info)
 {
-    pcapng_t pn;
     wtapng_block_t wblock;
     pcapng_t *pcapng;
     pcapng_block_header_t bh;
     gint64 saved_offset;
     section_info_t first_section, new_section, *current_section;
 
-    /* we don't know the byte swapping of the file yet */
-    first_section.byte_swapped = FALSE;
-    first_section.version_major = -1;
-    first_section.version_minor = -1;
-    first_section.shb_off = 0; /* it's at the very beginning of the file */
-
-    /* we don't expect any packet blocks yet */
-    wblock.frame_buffer = NULL;
-    wblock.rec = NULL;
-
     pcapng_debug("pcapng_open: opening file");
     /*
      * Read first block.
      *
-     * There is no current section_info yet, so don't pass any.
-     * Pass a pointer to first_section to fill in.
+     * First, try to read the block header.
      */
-    switch (pcapng_read_block(wth, wth->fh, &pn, NULL, &first_section, &wblock,
-                              err, err_info)) {
+    if (!wtap_read_bytes_or_eof(wth->fh, &bh, sizeof bh, err, err_info)) {
+        pcapng_debug("pcapng_open: wtap_read_bytes_or_eof() failed, err = %d.", *err);
+        if (*err == 0 || *err == WTAP_ERR_SHORT_READ) {
+            /*
+             * Short read or EOF.
+             *
+             * We're reading this as part of an open, so
+             * the file is too short to be a pcapng file.
+             */
+            *err = 0;
+            g_free(*err_info);
+            *err_info = NULL;
+            return WTAP_OPEN_NOT_MINE;
+        }
+        return WTAP_OPEN_ERROR;
+    }
 
+    /*
+     * If this is a pcapng file, the first block must be a
+     * Section Header Block.
+     */
+    if (bh.block_type != BLOCK_TYPE_SHB) {
+        /*
+         * Not an SHB, so this isn't a pcapng file.
+         *
+         * XXX - check for damage from transferring a file
+         * between Windows and UN*X as text rather than
+         * binary data?
+         */
+        pcapng_debug("pcapng_open: first block type %u not SHB", wblock.type);
+        return WTAP_OPEN_NOT_MINE;
+    }
+
+    pcapng_debug("pcapng_open: got an SHB");
+
+    /*
+     * Now try to read the block body, filling in the section_info_t
+     * for the first section.
+     */
+    wblock.type = bh.block_type;
+    wblock.block = NULL;
+    /* we don't expect any packet blocks yet */
+    wblock.frame_buffer = NULL;
+    wblock.rec = NULL;
+
+    switch (pcapng_read_section_header_block(wth->fh, &bh, &first_section,
+                                             &wblock, err, err_info)) {
     case PCAPNG_BLOCK_OK:
         /* No problem */
         break;
@@ -2866,21 +2937,30 @@ pcapng_open(wtap *wth, int *err, gchar **err_info)
         return WTAP_OPEN_NOT_MINE;
 
     case PCAPNG_BLOCK_ERROR:
-        /* An I/O error, or this probably *is* a pcapng file but not a valid one. */
         wtap_block_free(wblock.block);
+        if (*err == WTAP_ERR_SHORT_READ) {
+            /*
+             * Short read.
+             *
+             * We're reading this as part of an open, so
+             * the file is too short to be a pcapng file.
+             */
+            *err = 0;
+            g_free(*err_info);
+            *err_info = NULL;
+            return WTAP_OPEN_NOT_MINE;
+        }
+        /* An I/O error. */
         return WTAP_OPEN_ERROR;
     }
 
-    /* first block must be a "Section Header Block" */
-    if (wblock.type != BLOCK_TYPE_SHB) {
-        /*
-         * XXX - check for damage from transferring a file
-         * between Windows and UN*X as text rather than
-         * binary data?
-         */
-        pcapng_debug("pcapng_open: first block type %u not SHB", wblock.type);
+    /*
+     * Read and check the block trailer.
+     */
+    if (!pcapng_read_and_check_block_trailer(wth->fh, &bh, &first_section, err, err_info)) {
+        /* Not readable or not valid. */
         wtap_block_free(wblock.block);
-        return WTAP_OPEN_NOT_MINE;
+        return WTAP_OPEN_ERROR;
     }
 
     /*
@@ -2897,7 +2977,6 @@ pcapng_open(wtap *wth, int *err, gchar **err_info)
     wth->file_tsprec = WTAP_TSPREC_UNKNOWN;
     pcapng = g_new(pcapng_t, 1);
     wth->priv = (void *)pcapng;
-    *pcapng = pn;
     /*
      * We're currently processing the first section; as this is written
      * in C, that's section 0. :-)
@@ -2910,22 +2989,35 @@ pcapng_open(wtap *wth, int *err, gchar **err_info)
     first_section.interfaces = g_array_new(FALSE, FALSE, sizeof(interface_info_t));
 
     /*
+     * The first section is at the very beginning of the file.
+     */
+    first_section.shb_off = 0;
+
+    /*
      * Allocate the sections table with space reserved for the first
      * section, and add that section.
      */
     pcapng->sections = g_array_sized_new(FALSE, FALSE, sizeof(section_info_t), 1);
     g_array_append_val(pcapng->sections, first_section);
 
+    /*
+     * Set the callbacks for new addresses to null; if our caller wants
+     * to be called, they will set them to point to the appropriate
+     * caller.
+     */
+    pcapng->add_new_ipv4 = NULL;
+    pcapng->add_new_ipv6 = NULL;
+
     wth->subtype_read = pcapng_read;
     wth->subtype_seek_read = pcapng_seek_read;
     wth->subtype_close = pcapng_close;
-    wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_PCAPNG;
+    wth->file_type_subtype = pcapng_file_type_subtype;
 
     /* Always initialize the list of Decryption Secret Blocks such that a
      * wtap_dumper can refer to it right after opening the capture file. */
     wth->dsbs = g_array_new(FALSE, FALSE, sizeof(wtap_block_t));
 
-    /* Loop over all IDB:s that appear before any packets */
+    /* Loop over all IDBs that appear before any packets */
     while (1) {
         /* peek at next block */
         /* Try to read the (next) block header */
@@ -2956,12 +3048,11 @@ pcapng_open(wtap *wth, int *err, gchar **err_info)
         pcapng_debug("pcapng_open: Check for more IDBs, block_type 0x%x", bh.block_type);
 
         if (bh.block_type != BLOCK_TYPE_IDB) {
-            break;  /* No more IDB:s */
+            break;  /* No more IDBs */
         }
 
-        if (pcapng_read_block(wth, wth->fh, pcapng, current_section,
-                              &new_section, &wblock,
-                              err, err_info) != PCAPNG_BLOCK_OK) {
+        if (!pcapng_read_block(wth, wth->fh, pcapng, current_section,
+                              &new_section, &wblock, err, err_info)) {
             wtap_block_free(wblock.block);
             if (*err == 0) {
                 pcapng_debug("No more IDBs available...");
@@ -3013,9 +3104,8 @@ pcapng_read(wtap *wth, wtap_rec *rec, Buffer *buf, int *err,
         /*
          * Read the next block.
          */
-        if (pcapng_read_block(wth, wth->fh, pcapng, current_section,
-                              &new_section, &wblock,
-                              err, err_info) != PCAPNG_BLOCK_OK) {
+        if (!pcapng_read_block(wth, wth->fh, pcapng, current_section,
+                              &new_section, &wblock, err, err_info)) {
             pcapng_debug("pcapng_read: data_offset is finally %" G_GINT64_MODIFIER "d", *data_offset);
             pcapng_debug("pcapng_read: couldn't read packet block");
             wtap_block_free(wblock.block);
@@ -3108,7 +3198,7 @@ pcapng_read(wtap *wth, wtap_rec *rec, Buffer *buf, int *err,
                         wtapng_if_descr_mand->interface_statistics = g_array_new(FALSE, FALSE, sizeof(wtap_block_t));
                     }
 
-                    if_stats = wtap_block_create(WTAP_BLOCK_IF_STATS);
+                    if_stats = wtap_block_create(WTAP_BLOCK_IF_STATISTICS);
                     if_stats_mand = (wtapng_if_stats_mandatory_t*)wtap_block_get_mandatory_data(if_stats);
                     if_stats_mand->interface_id  = if_stats_mand_block->interface_id;
                     if_stats_mand->ts_high       = if_stats_mand_block->ts_high;
@@ -3187,9 +3277,8 @@ pcapng_seek_read(wtap *wth, gint64 seek_off,
     wblock.rec = rec;
 
     /* read the block */
-    if (pcapng_read_block(wth, wth->random_fh, pcapng, section_info,
-                          &new_section, &wblock,
-                          err, err_info) != PCAPNG_BLOCK_OK) {
+    if (!pcapng_read_block(wth, wth->random_fh, pcapng, section_info,
+                          &new_section, &wblock, err, err_info)) {
         pcapng_debug("pcapng_seek_read: couldn't read packet block (err=%d).",
                       *err);
         wtap_block_free(wblock.block);
@@ -3290,12 +3379,21 @@ pcapng_write_block_t;
 static gboolean pcapng_write_option_string(wtap_dumper *wdh, guint option_id, char *str, int *err)
 {
     struct pcapng_option_header option_hdr;
-    guint32 size = (guint32)strlen(str) & 0xffff;
+    size_t size = strlen(str);
     const guint32 zero_pad = 0;
     guint32 pad;
 
     if (size == 0)
         return TRUE;
+    if (size > 65535) {
+        /*
+         * Too big to fit in the option.
+         * Don't write anything.
+         *
+         * XXX - truncate it?  Report an error?
+         */
+        return TRUE;
+    }
 
     /* String options don't consider pad bytes part of the length */
     option_hdr.type         = (guint16)option_id;
@@ -3321,6 +3419,68 @@ static gboolean pcapng_write_option_string(wtap_dumper *wdh, guint option_id, ch
 
         wdh->bytes_dumped += pad;
     }
+
+    return TRUE;
+}
+
+static gboolean pcapng_write_option_uint8(wtap_dumper *wdh, guint option_id, guint8 uint8, int *err)
+{
+    struct pcapng_option_header option_hdr;
+    const guint32 zero_pad = 0;
+
+    option_hdr.type         = (guint16)option_id;
+    option_hdr.value_length = (guint16)1;
+    if (!wtap_dump_file_write(wdh, &option_hdr, 4, err))
+        return FALSE;
+    wdh->bytes_dumped += 4;
+
+    if (!wtap_dump_file_write(wdh, &uint8, 1, err))
+        return FALSE;
+    wdh->bytes_dumped += 1;
+
+    if (!wtap_dump_file_write(wdh, &zero_pad, 3, err))
+        return FALSE;
+    wdh->bytes_dumped += 3;
+
+    return TRUE;
+}
+
+static gboolean pcapng_write_option_timestamp(wtap_dumper *wdh, guint option_id, guint64 timestamp, int *err)
+{
+    struct pcapng_option_header option_hdr;
+    guint32 high, low;
+
+    option_hdr.type         = (guint16)option_id;
+    option_hdr.value_length = (guint16)8;
+    if (!wtap_dump_file_write(wdh, &option_hdr, 4, err))
+        return FALSE;
+    wdh->bytes_dumped += 4;
+
+    high = (guint32)(timestamp >> 32);
+    low = (guint32)(timestamp >> 0);
+    if (!wtap_dump_file_write(wdh, &high, sizeof(guint32), err))
+        return FALSE;
+    wdh->bytes_dumped += 4;
+    if (!wtap_dump_file_write(wdh, &low, sizeof(guint32), err))
+        return FALSE;
+    wdh->bytes_dumped += 4;
+
+    return TRUE;
+}
+
+static gboolean pcapng_write_option_uint64(wtap_dumper *wdh, guint option_id, guint64 uint64, int *err)
+{
+    struct pcapng_option_header option_hdr;
+
+    option_hdr.type         = (guint16)option_id;
+    option_hdr.value_length = (guint16)8;
+    if (!wtap_dump_file_write(wdh, &option_hdr, 4, err))
+        return FALSE;
+    wdh->bytes_dumped += 4;
+
+    if (!wtap_dump_file_write(wdh, &uint64, sizeof(guint64), err))
+        return FALSE;
+    wdh->bytes_dumped += 8;
 
     return TRUE;
 }
@@ -3547,6 +3707,17 @@ pcapng_write_enhanced_packet_block(wtap_dumper *wdh, const wtap_rec *rec,
     int_data = g_array_index(wdh->interface_data, wtap_block_t,
                              epb.interface_id);
     int_data_mand = (wtapng_if_descr_mandatory_t*)wtap_block_get_mandatory_data(int_data);
+    if (int_data_mand->wtap_encap != rec->rec_header.packet_header.pkt_encap) {
+        /*
+         * Our caller is doing something bad.
+         */
+        *err = WTAP_ERR_INTERNAL;
+        *err_info = g_strdup_printf("pcapng: interface %u encap %d != packet encap %d",
+                                    epb.interface_id,
+                                    int_data_mand->wtap_encap,
+                                    rec->rec_header.packet_header.pkt_encap);
+        return FALSE;
+    }
     ts = ((guint64)rec->ts.secs) * int_data_mand->time_units_per_second +
         (((guint64)rec->ts.nsecs) * int_data_mand->time_units_per_second) / 1000000000;
     epb.timestamp_high      = (guint32)(ts >> 32);
@@ -4382,7 +4553,6 @@ static void compute_isb_option_size(wtap_block_t block _U_, guint option_id, wta
 static void write_wtap_isb_option(wtap_block_t block _U_, guint option_id, wtap_opttype_e option_type _U_, wtap_optval_t *optval, void* user_data)
 {
     pcapng_write_block_t* write_block = (pcapng_write_block_t*)user_data;
-    struct pcapng_option_header option_hdr;
 
     /* Don't continue if there has been an error */
     if (!write_block->success)
@@ -4398,29 +4568,9 @@ static void write_wtap_isb_option(wtap_block_t block _U_, guint option_id, wtap_
         break;
     case OPT_ISB_STARTTIME:
     case OPT_ISB_ENDTIME:
-        {
-            guint32 high, low;
-
-            option_hdr.type         = option_id;
-            option_hdr.value_length = 8;
-            if (!wtap_dump_file_write(write_block->wdh, &option_hdr, 4, write_block->err)) {
-                write_block->success = FALSE;
-                return;
-            }
-            write_block->wdh->bytes_dumped += 4;
-
-            high = (guint32)(optval->uint64val >> 32);
-            low = (guint32)(optval->uint64val >> 0);
-            if (!wtap_dump_file_write(write_block->wdh, &high, sizeof(guint32), write_block->err)) {
-                write_block->success = FALSE;
-                return;
-            }
-            write_block->wdh->bytes_dumped += 4;
-            if (!wtap_dump_file_write(write_block->wdh, &low, sizeof(guint32), write_block->err)) {
-                write_block->success = FALSE;
-                return;
-            }
-            write_block->wdh->bytes_dumped += 4;
+        if (!pcapng_write_option_timestamp(write_block->wdh, option_id, optval->uint64val, write_block->err)) {
+            write_block->success = FALSE;
+            return;
         }
         break;
     case OPT_ISB_IFRECV:
@@ -4428,20 +4578,9 @@ static void write_wtap_isb_option(wtap_block_t block _U_, guint option_id, wtap_
     case OPT_ISB_FILTERACCEPT:
     case OPT_ISB_OSDROP:
     case OPT_ISB_USRDELIV:
-        {
-            option_hdr.type         = option_id;
-            option_hdr.value_length = 8;
-            if (!wtap_dump_file_write(write_block->wdh, &option_hdr, 4, write_block->err)) {
-                write_block->success = FALSE;
-                return;
-            }
-            write_block->wdh->bytes_dumped += 4;
-
-            if (!wtap_dump_file_write(write_block->wdh, &optval->uint64val, sizeof(guint64), write_block->err)) {
-                write_block->success = FALSE;
-                return;
-            }
-            write_block->wdh->bytes_dumped += 8;
+        if (!pcapng_write_option_uint64(write_block->wdh, option_id, optval->uint64val, write_block->err)) {
+            write_block->success = FALSE;
+            return;
         }
         break;
     default:
@@ -4537,22 +4676,26 @@ static void compute_idb_option_size(wtap_block_t block _U_, guint option_id, wta
         break;
     case OPT_IDB_FILTER:
         {
-            wtapng_if_descr_filter_t* filter = (wtapng_if_descr_filter_t*)optval->customval.data;
+            if_filter_opt_t* filter = &optval->if_filterval;
             guint32 pad;
-            if (filter->if_filter_str != NULL) {
-                size = (guint32)(strlen(filter->if_filter_str) + 1) & 0xffff;
-                if ((size % 4)) {
-                    pad = 4 - (size % 4);
-                } else {
-                    pad = 0;
-                }
-
-                size += pad;
+            if (filter->type == if_filter_pcap) {
+                size = (guint32)(strlen(filter->data.filter_str) + 1) & 0xffff;
+            } else if (filter->type == if_filter_bpf) {
+                size = (guint32)((filter->data.bpf_prog.bpf_prog_len * 8) + 1) & 0xffff;
+            } else {
+                /* Unknown type; don't write it */
+                size = 0;
             }
+            if ((size % 4)) {
+                pad = 4 - (size % 4);
+            } else {
+                pad = 0;
+            }
+            size += pad;
         }
         break;
     case OPT_IDB_FCSLEN:
-        /* XXX - Not currently writing value */
+        size = 1;
         break;
     default:
         /* Unknown options - size by datatype? */
@@ -4590,89 +4733,119 @@ static void write_wtap_idb_option(wtap_block_t block _U_, guint option_id, wtap_
         }
         break;
     case OPT_IDB_SPEED:
-        option_hdr.type         = option_id;
-        option_hdr.value_length = 8;
-        if (!wtap_dump_file_write(write_block->wdh, &option_hdr, 4, write_block->err)) {
+        if (!pcapng_write_option_uint64(write_block->wdh, option_id, optval->uint64val, write_block->err)) {
             write_block->success = FALSE;
             return;
         }
-        write_block->wdh->bytes_dumped += 4;
-
-        if (!wtap_dump_file_write(write_block->wdh, &optval->uint64val, sizeof(guint64), write_block->err)) {
-            write_block->success = FALSE;
-            return;
-        }
-        write_block->wdh->bytes_dumped += 8;
         break;
     case OPT_IDB_TSRESOL:
-        option_hdr.type         = option_id;
-        option_hdr.value_length = 1;
-        if (!wtap_dump_file_write(write_block->wdh, &option_hdr, 4, write_block->err)) {
+        if (!pcapng_write_option_uint8(write_block->wdh, option_id, optval->uint8val, write_block->err)) {
             write_block->success = FALSE;
             return;
         }
-        write_block->wdh->bytes_dumped += 4;
-
-        if (!wtap_dump_file_write(write_block->wdh, &optval->uint8val, 1, write_block->err)) {
-            write_block->success = FALSE;
-            return;
-        }
-        write_block->wdh->bytes_dumped += 1;
-
-        if (!wtap_dump_file_write(write_block->wdh, &zero_pad, 3, write_block->err)) {
-            write_block->success = FALSE;
-            return;
-        }
-        write_block->wdh->bytes_dumped += 3;
         break;
     case OPT_IDB_FILTER:
         {
-            wtapng_if_descr_filter_t* filter = (wtapng_if_descr_filter_t*)optval->customval.data;
+            if_filter_opt_t* filter = &optval->if_filterval;
             guint32 size, pad;
-            if (filter->if_filter_str != NULL) {
-                size = (guint32)(strlen(filter->if_filter_str) + 1) & 0xffff;
-                if ((size % 4)) {
-                    pad = 4 - (size % 4);
-                } else {
-                    pad = 0;
-                }
+            guint8 filter_type;
+            size_t filter_data_len;
+            switch (filter->type) {
 
-                option_hdr.type         = option_id;
-                option_hdr.value_length = size;
-                if (!wtap_dump_file_write(write_block->wdh, &option_hdr, 4, write_block->err)) {
+            case if_filter_pcap:
+                filter_type = 0; /* pcap filter string */
+                filter_data_len = strlen(filter->data.filter_str);
+                if (filter_data_len > 65534) {
+                    /*
+                     * Too big to fit in the option.
+                     * Don't write anything.
+                     *
+                     * XXX - truncate it?  Report an error?
+                     */
+                    return;
+                }
+                break;
+
+            case if_filter_bpf:
+                filter_type = 1; /* BPF filter program */
+                filter_data_len = filter->data.bpf_prog.bpf_prog_len*8;
+                if (filter_data_len > 65528) {
+                    /*
+                     * Too big to fit in the option.  (The filter length
+                     * must be a multiple of 8, as that's the length
+                     * of a BPF instruction.)  Don't write anything.
+                     *
+                     * XXX - truncate it?  Report an error?
+                     */
+                    return;
+                }
+                break;
+
+            default:
+                /* Unknown filter type; don't write anything. */
+                return;
+            }
+            size = (guint32)(filter_data_len + 1);
+            if ((size % 4)) {
+                pad = 4 - (size % 4);
+            } else {
+                pad = 0;
+            }
+
+            option_hdr.type         = option_id;
+            option_hdr.value_length = size;
+            if (!wtap_dump_file_write(write_block->wdh, &option_hdr, 4, write_block->err)) {
+                write_block->success = FALSE;
+                return;
+            }
+            write_block->wdh->bytes_dumped += 4;
+
+            /* Write the filter type */
+            if (!wtap_dump_file_write(write_block->wdh, &filter_type, 1, write_block->err)) {
+                write_block->success = FALSE;
+                return;
+            }
+            write_block->wdh->bytes_dumped += 1;
+
+            switch (filter->type) {
+
+            case if_filter_pcap:
+                /* Write the filter string */
+                if (!wtap_dump_file_write(write_block->wdh, filter->data.filter_str, filter_data_len, write_block->err)) {
                     write_block->success = FALSE;
                     return;
                 }
-                write_block->wdh->bytes_dumped += 4;
+                write_block->wdh->bytes_dumped += filter_data_len;
+                break;
 
-                /* Write the zero indicating libpcap filter variant */
-                if (!wtap_dump_file_write(write_block->wdh, &zero_pad, 1, write_block->err)) {
+            case if_filter_bpf:
+                if (!wtap_dump_file_write(write_block->wdh, filter->data.bpf_prog.bpf_prog, filter_data_len, write_block->err)) {
                     write_block->success = FALSE;
                     return;
                 }
-                write_block->wdh->bytes_dumped += 1;
+                write_block->wdh->bytes_dumped += filter_data_len;
+                break;
 
-                /* if_filter_str_len includes the leading byte indicating filter type (libpcap str or BPF code) */
-                if (!wtap_dump_file_write(write_block->wdh, filter->if_filter_str, size-1, write_block->err)) {
+            default:
+                g_assert_not_reached();
+                return;
+            }
+
+            /* write padding (if any) */
+            if (pad != 0) {
+                if (!wtap_dump_file_write(write_block->wdh, &zero_pad, pad, write_block->err)) {
                     write_block->success = FALSE;
                     return;
                 }
-                write_block->wdh->bytes_dumped += size - 1;
-
-                /* write padding (if any) */
-                if (pad != 0) {
-                    if (!wtap_dump_file_write(write_block->wdh, &zero_pad, pad, write_block->err)) {
-                        write_block->success = FALSE;
-                        return;
-                    }
-                    write_block->wdh->bytes_dumped += pad;
-                }
-
+                write_block->wdh->bytes_dumped += pad;
             }
         }
         break;
     case OPT_IDB_FCSLEN:
-        /* XXX - Not currently writing value */
+        if (!pcapng_write_option_uint8(write_block->wdh, option_id, optval->uint8val, write_block->err)) {
+            write_block->success = FALSE;
+            return;
+        }
         break;
     default:
         /* Unknown options - size by datatype? */
@@ -4766,7 +4939,7 @@ static gboolean pcapng_add_idb(wtap_dumper *wdh, wtap_block_t idb,
 	/*
 	 * Add a copy of this IDB to our array of IDBs.
 	 */
-	idb_copy = wtap_block_create(WTAP_BLOCK_IF_DESCR);
+	idb_copy = wtap_block_create(WTAP_BLOCK_IF_ID_AND_INFO);
 	wtap_block_copy(idb_copy, idb);
 	g_array_append_val(wdh->interface_data, idb_copy);
 
@@ -4897,7 +5070,7 @@ static gboolean pcapng_dump_finish(wtap_dumper *wdh, int *err,
 
 /* Returns TRUE on success, FALSE on failure; sets "*err" to an error code on
    failure */
-gboolean
+static gboolean
 pcapng_dump_open(wtap_dumper *wdh, int *err, gchar **err_info _U_)
 {
     guint i;
@@ -4915,7 +5088,7 @@ pcapng_dump_open(wtap_dumper *wdh, int *err, gchar **err_info _U_)
     pcapng_debug("pcapng_dump_open: wrote section header block.");
 
     /* Write the Interface description blocks */
-    pcapng_debug("pcapng_dump_open: Number of IDB:s to write (number of interfaces) %u",
+    pcapng_debug("pcapng_dump_open: Number of IDBs to write (number of interfaces) %u",
                   wdh->interface_data->len);
 
     for (i = 0; i < wdh->interface_data->len; i++) {
@@ -4947,7 +5120,7 @@ pcapng_dump_open(wtap_dumper *wdh, int *err, gchar **err_info _U_)
 
 /* Returns 0 if we could write the specified encapsulation type,
    an error indication otherwise. */
-int pcapng_dump_can_write_encap(int wtap_encap)
+static int pcapng_dump_can_write_encap(int wtap_encap)
 {
     pcapng_debug("pcapng_dump_can_write_encap: encap = %d (%s)",
                   wtap_encap,
@@ -4980,6 +5153,129 @@ gboolean pcapng_encap_is_ft_specific(int encap)
         return TRUE;
     }
     return FALSE;
+}
+
+/*
+ * pcapng supports several block types, and supports more than one
+ * of them.
+ *
+ * It also supports comments for many block types, as well as other
+ * option types.
+ */
+
+/* Options for section blocks. */
+static const struct supported_option_type section_block_options_supported[] = {
+    { OPT_COMMENT, MULTIPLE_OPTIONS_SUPPORTED },
+    { OPT_SHB_HARDWARE, ONE_OPTION_SUPPORTED },
+    { OPT_SHB_USERAPPL, ONE_OPTION_SUPPORTED }
+};
+
+/* Options for interface blocks. */
+static const struct supported_option_type interface_block_options_supported[] = {
+    { OPT_COMMENT, MULTIPLE_OPTIONS_SUPPORTED },
+    { OPT_IDB_NAME, ONE_OPTION_SUPPORTED },
+    { OPT_IDB_DESCR, ONE_OPTION_SUPPORTED },
+    { OPT_IDB_IP4ADDR, MULTIPLE_OPTIONS_SUPPORTED },
+    { OPT_IDB_IP6ADDR, MULTIPLE_OPTIONS_SUPPORTED },
+    { OPT_IDB_MACADDR, ONE_OPTION_SUPPORTED },
+    { OPT_IDB_EUIADDR, ONE_OPTION_SUPPORTED },
+    { OPT_IDB_SPEED, ONE_OPTION_SUPPORTED },
+    { OPT_IDB_TSRESOL, ONE_OPTION_SUPPORTED },
+    { OPT_IDB_TZONE, ONE_OPTION_SUPPORTED },
+    { OPT_IDB_FILTER, ONE_OPTION_SUPPORTED },
+    { OPT_IDB_OS, ONE_OPTION_SUPPORTED },
+    { OPT_IDB_FCSLEN, ONE_OPTION_SUPPORTED },
+    { OPT_IDB_TSOFFSET, ONE_OPTION_SUPPORTED },
+    { OPT_IDB_HARDWARE, ONE_OPTION_SUPPORTED }
+};
+
+/* Options for name resolution blocks. */
+static const struct supported_option_type name_resolution_block_options_supported[] = {
+    { OPT_COMMENT, MULTIPLE_OPTIONS_SUPPORTED },
+    { OPT_NS_DNSNAME, ONE_OPTION_SUPPORTED },
+    { OPT_NS_DNSIP4ADDR, ONE_OPTION_SUPPORTED },
+    { OPT_NS_DNSIP6ADDR, ONE_OPTION_SUPPORTED }
+};
+
+/* Options for interface statistics blocks. */
+static const struct supported_option_type interface_statistics_block_options_supported[] = {
+    { OPT_COMMENT, MULTIPLE_OPTIONS_SUPPORTED },
+    { OPT_ISB_STARTTIME, ONE_OPTION_SUPPORTED },
+    { OPT_ISB_ENDTIME, ONE_OPTION_SUPPORTED },
+    { OPT_ISB_IFRECV, ONE_OPTION_SUPPORTED },
+    { OPT_ISB_IFDROP, ONE_OPTION_SUPPORTED },
+    { OPT_ISB_FILTERACCEPT, ONE_OPTION_SUPPORTED },
+    { OPT_ISB_OSDROP, ONE_OPTION_SUPPORTED },
+    { OPT_ISB_USRDELIV, ONE_OPTION_SUPPORTED }
+};
+
+/* Options for decryption secrets blocks. */
+static const struct supported_option_type decryption_secrets_block_options_supported[] = {
+    { OPT_COMMENT, MULTIPLE_OPTIONS_SUPPORTED }
+};
+
+/* Options for packet blocks. */
+static const struct supported_option_type packet_block_options_supported[] = {
+    /* XXX - pending use of wtap_block_t's for packets */
+    { OPT_COMMENT, MULTIPLE_OPTIONS_SUPPORTED }
+};
+
+/* Options for file-type-sepcific reports. */
+static const struct supported_option_type ft_specific_report_block_options_supported[] = {
+    { OPT_COMMENT, MULTIPLE_OPTIONS_SUPPORTED }
+};
+
+/* Options for file-type-sepcific event. */
+static const struct supported_option_type ft_specific_event_block_options_supported[] = {
+    { OPT_COMMENT, MULTIPLE_OPTIONS_SUPPORTED }
+};
+
+/* Options for systemd journal entry. */
+static const struct supported_option_type systemd_journal_block_options_supported[] = {
+    { OPT_COMMENT, MULTIPLE_OPTIONS_SUPPORTED }
+};
+
+static const struct supported_block_type pcapng_blocks_supported[] = {
+    /* Multiple sections. */
+    { WTAP_BLOCK_SECTION, MULTIPLE_BLOCKS_SUPPORTED, OPTION_TYPES_SUPPORTED(section_block_options_supported) },
+
+    /* Multiple interfaces. */
+    { WTAP_BLOCK_IF_ID_AND_INFO, MULTIPLE_BLOCKS_SUPPORTED, OPTION_TYPES_SUPPORTED(interface_block_options_supported) },
+
+    /* Multiple blocks of name resolution information */
+    { WTAP_BLOCK_NAME_RESOLUTION, MULTIPLE_BLOCKS_SUPPORTED, OPTION_TYPES_SUPPORTED(name_resolution_block_options_supported) },
+
+    /* Multiple blocks of interface statistics. */
+    { WTAP_BLOCK_IF_STATISTICS, MULTIPLE_BLOCKS_SUPPORTED, OPTION_TYPES_SUPPORTED(interface_statistics_block_options_supported) },
+
+    /* Multiple blocks of decryption secrets. */
+    { WTAP_BLOCK_DECRYPTION_SECRETS, MULTIPLE_BLOCKS_SUPPORTED, OPTION_TYPES_SUPPORTED(decryption_secrets_block_options_supported) },
+
+    /* And, obviously, multiple packets. */
+    { WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, OPTION_TYPES_SUPPORTED(packet_block_options_supported) },
+
+    /* Multiple file-type specific reports (including local ones). */
+    { WTAP_BLOCK_FT_SPECIFIC_REPORT, MULTIPLE_BLOCKS_SUPPORTED, OPTION_TYPES_SUPPORTED(ft_specific_report_block_options_supported) },
+
+    /* Multiple file-type specific events (including local ones). */
+    { WTAP_BLOCK_FT_SPECIFIC_EVENT, MULTIPLE_BLOCKS_SUPPORTED, OPTION_TYPES_SUPPORTED(ft_specific_event_block_options_supported) },
+
+    /* Multiple systemd journal records. */
+    { WTAP_BLOCK_SYSTEMD_JOURNAL, MULTIPLE_BLOCKS_SUPPORTED, OPTION_TYPES_SUPPORTED(systemd_journal_block_options_supported) },
+};
+
+static const struct file_type_subtype_info pcapng_info = {
+    "Wireshark/... - pcapng", "pcapng", "pcapng", "ntar",
+    FALSE, BLOCKS_SUPPORTED(pcapng_blocks_supported),
+    pcapng_dump_can_write_encap, pcapng_dump_open, NULL
+};
+
+void register_pcapng(void)
+{
+    pcapng_file_type_subtype = wtap_register_file_type_subtype(&pcapng_info);
+
+    wtap_register_backwards_compatibility_lua_name("PCAPNG",
+                                                   pcapng_file_type_subtype);
 }
 
 /*

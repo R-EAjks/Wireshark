@@ -31,7 +31,7 @@
 #include "file_wrappers.h"
 #include "commview.h"
 
-#include <wsutil/frequency-utils.h>
+#include <wsutil/802_11-utils.h>
 
 typedef struct commview_header {
 	guint16		data_len;
@@ -89,6 +89,10 @@ static gboolean commview_read_header(commview_header_t *cv_hdr, FILE_T fh,
 static gboolean commview_dump(wtap_dumper *wdh,	const wtap_rec *rec,
 			      const guint8 *pd, int *err, gchar **err_info);
 
+static int commview_file_type_subtype = -1;
+
+void register_commview(void);
+
 wtap_open_return_val commview_open(wtap *wth, int *err, gchar **err_info)
 {
 	commview_header_t cv_hdr;
@@ -122,7 +126,7 @@ wtap_open_return_val commview_open(wtap *wth, int *err, gchar **err_info)
 	wth->subtype_read = commview_read;
 	wth->subtype_seek_read = commview_seek_read;
 
-	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_COMMVIEW;
+	wth->file_type_subtype = commview_file_type_subtype;
 	wth->file_encap = WTAP_ENCAP_PER_PACKET;
 	wth->file_tsprec = WTAP_TSPREC_USEC;
 
@@ -163,6 +167,7 @@ commview_read_packet(FILE_T fh, wtap_rec *rec, Buffer *buf,
 
 		case BAND_11A:
 			rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy = PHDR_802_11_PHY_11A;
+			rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy_info.info_11a.has_channel_type = FALSE;
 			rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy_info.info_11a.has_turbo_type = TRUE;
 			rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy_info.info_11a.turbo_type =
 			    PHDR_802_11A_TURBO_TYPE_NORMAL;
@@ -171,6 +176,7 @@ commview_read_packet(FILE_T fh, wtap_rec *rec, Buffer *buf,
 
 		case BAND_11B:
 			rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy = PHDR_802_11_PHY_11B;
+			rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy_info.info_11b.has_short_preamble = FALSE;
 			frequency = ieee80211_chan_to_mhz(cv_hdr.channel, TRUE);
 			break;
 
@@ -252,6 +258,35 @@ commview_read_packet(FILE_T fh, wtap_rec *rec, Buffer *buf,
 		if (cv_hdr.noise_level != 0) {
 			rec->rec_header.packet_header.pseudo_header.ieee_802_11.noise_dbm = -cv_hdr.noise_level;
 			rec->rec_header.packet_header.pseudo_header.ieee_802_11.has_noise_dbm = TRUE;
+		}
+		if (rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy == PHDR_802_11_PHY_UNKNOWN) {
+			/*
+			 * We don't know they PHY, but we do have the
+			 * data rate; try to guess it based on the
+			 * data rate and center frequency.
+			 */
+			if (RATE_IS_DSSS(rec->rec_header.packet_header.pseudo_header.ieee_802_11.data_rate)) {
+				/* 11b */
+				rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy = PHDR_802_11_PHY_11B;
+				rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy_info.info_11b.has_short_preamble = FALSE;
+			} else if (RATE_IS_OFDM(rec->rec_header.packet_header.pseudo_header.ieee_802_11.data_rate)) {
+				/* 11a or 11g, depending on the band. */
+				if (rec->rec_header.packet_header.pseudo_header.ieee_802_11.has_frequency) {
+					if (FREQ_IS_BG(rec->rec_header.packet_header.pseudo_header.ieee_802_11.frequency)) {
+						/* 11g */
+						rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy = PHDR_802_11_PHY_11G;
+					} else {
+						/* 11a */
+						rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy = PHDR_802_11_PHY_11A;
+					}
+				}
+			}
+		} else if (rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy == PHDR_802_11_PHY_11G) {
+			if (RATE_IS_DSSS(rec->rec_header.packet_header.pseudo_header.ieee_802_11.data_rate)) {
+				/* DSSS, so 11b. */
+				rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy = PHDR_802_11_PHY_11B;
+				rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy_info.info_11b.has_short_preamble = FALSE;
+			}
 		}
 		break;
 
@@ -357,7 +392,8 @@ commview_read_header(commview_header_t *cv_hdr, FILE_T fh, int *err,
 
 /* Returns 0 if we can write out the specified encapsulation type
  * into a CommView format file. */
-int commview_dump_can_write_encap(int encap)
+static int
+commview_dump_can_write_encap(int encap)
 {
 	switch (encap) {
 
@@ -375,7 +411,8 @@ int commview_dump_can_write_encap(int encap)
 
 /* Returns TRUE on success, FALSE on failure;
    sets "*err" to an error code on failure */
-gboolean commview_dump_open(wtap_dumper *wdh, int *err _U_, gchar **err_info _U_)
+static gboolean
+commview_dump_open(wtap_dumper *wdh, int *err _U_, gchar **err_info _U_)
 {
 	wdh->subtype_write = commview_dump;
 
@@ -594,6 +631,31 @@ static gboolean commview_dump(wtap_dumper *wdh,
 	wdh->bytes_dumped += rec->rec_header.packet_header.caplen;
 
 	return TRUE;
+}
+
+static const struct supported_block_type commview_blocks_supported[] = {
+	/*
+	 * We support packet blocks, with no comments or other options.
+	 */
+	{ WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info commview_info = {
+	"TamoSoft CommView", "commview", "ncf", NULL,
+	FALSE, BLOCKS_SUPPORTED(commview_blocks_supported),
+	commview_dump_can_write_encap, commview_dump_open, NULL
+};
+
+void register_commview(void)
+{
+	commview_file_type_subtype = wtap_register_file_type_subtype(&commview_info);
+
+	/*
+	 * Register name for backwards compatibility with the
+	 * wtap_filetypes table in Lua.
+	 */
+	wtap_register_backwards_compatibility_lua_name("COMMVIEW",
+	    commview_file_type_subtype);
 }
 
 /*

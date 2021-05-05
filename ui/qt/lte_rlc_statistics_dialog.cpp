@@ -990,7 +990,7 @@ lte_rlc_statistics_init(const char *args, void*) {
 
 static stat_tap_ui lte_rlc_statistics_ui = {
     REGISTER_STAT_GROUP_TELEPHONY_LTE,
-    QT_TR_NOOP("RLC Statistics"),
+    QT_TRANSLATE_NOOP("LteRlcStatisticsDialog", "RLC Statistics"),
     "rlc-lte,stat",
     lte_rlc_statistics_init,
     0,
@@ -998,22 +998,13 @@ static stat_tap_ui lte_rlc_statistics_ui = {
 };
 
 extern "C" {
+
+void register_tap_listener_qt_lte_rlc_statistics(void);
+
 void
 register_tap_listener_qt_lte_rlc_statistics(void)
 {
     register_stat_tap_ui(&lte_rlc_statistics_ui, NULL);
 }
-}
 
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */
+}

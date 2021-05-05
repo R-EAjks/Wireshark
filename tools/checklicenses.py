@@ -70,6 +70,9 @@ PATH_SPECIFIC_ALLOWED_LICENSES = {
     'wimaxasncp/dictionary.dtd': [
         'UNKNOWN',
     ],
+    'CONTRIBUTING.md': [
+        'UNKNOWN',
+    ],
     'doc/': [
         'UNKNOWN',
     ],
@@ -95,9 +98,6 @@ PATH_SPECIFIC_ALLOWED_LICENSES = {
         'UNKNOWN',
     ],
     'epan/except.h': [
-        'UNKNOWN',
-    ],
-    'cmake/TestFileOffsetBits.c': [
         'UNKNOWN',
     ],
     # Generated header files by lex/lemon/whatever

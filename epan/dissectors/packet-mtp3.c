@@ -826,10 +826,19 @@ static stat_tap_table_item mtp3_stat_fields[] = {
 
 static void mtp3_stat_init(stat_tap_table_ui* new_stat)
 {
+  const char *table_name = "MTP3 Statistics";
   int num_fields = sizeof(mtp3_stat_fields)/sizeof(stat_tap_table_item);
-  stat_tap_table* table;
+  stat_tap_table *table;
 
-  table = stat_tap_init_table("MTP3 Statistics", num_fields, 0, NULL);
+  table = stat_tap_find_table(new_stat, table_name);
+  if (table) {
+    if (new_stat->stat_tap_reset_table_cb) {
+      new_stat->stat_tap_reset_table_cb(table);
+    }
+    return;
+  }
+
+  table = stat_tap_init_table(table_name, num_fields, 0, NULL);
   stat_tap_add_table(new_stat, table);
 }
 
@@ -902,13 +911,13 @@ mtp3_stat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _U_,
     item_data = stat_tap_get_field_data(table, element, OPC_COLUMN);
     mtp3_addr_to_str_buf(&m3tr->addr_opc, str, 256);
     item_data->value.string_value = g_strdup(str);
-    item_data->user_data.ptr_value = g_memdup(&m3tr->addr_opc, sizeof(mtp3_tap_rec_t));
+    item_data->user_data.ptr_value = g_memdup2(&m3tr->addr_opc, sizeof(mtp3_tap_rec_t));
     stat_tap_set_field_data(table, element, OPC_COLUMN, item_data);
 
     item_data = stat_tap_get_field_data(table, element, DPC_COLUMN);
     mtp3_addr_to_str_buf(&m3tr->addr_dpc, str, 256);
     item_data->value.string_value = g_strdup(str);
-    item_data->user_data.ptr_value = g_memdup(&m3tr->addr_dpc, sizeof(mtp3_tap_rec_t));
+    item_data->user_data.ptr_value = g_memdup2(&m3tr->addr_dpc, sizeof(mtp3_tap_rec_t));
     stat_tap_set_field_data(table, element, DPC_COLUMN, item_data);
 
     sis = try_val_to_str(m3tr->mtp3_si_code, mtp3_service_indicator_code_short_vals);

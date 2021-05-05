@@ -2743,7 +2743,7 @@ const value_string scsi_status_val[] = {
 };
 
 
-const value_string scsi_wb_mode_val[] = {
+static const value_string scsi_wb_mode_val[] = {
     {0x0, "Write combined header and data"},
     {0x1, "Vendor specific"},
     {0x2, "Write data"},
@@ -2758,7 +2758,7 @@ const value_string scsi_wb_mode_val[] = {
     {0, NULL},
 };
 
-const value_string scsi_senddiag_st_code_val[] = {
+static const value_string scsi_senddiag_st_code_val[] = {
     {0, ""},
     {0x1, "Start short self-test in background"},
     {0x2, "Start extended self-test in background"},
@@ -2770,7 +2770,7 @@ const value_string scsi_senddiag_st_code_val[] = {
     {0, NULL},
 };
 
-const true_false_string scsi_senddiag_pf_val = {
+static const true_false_string scsi_senddiag_pf_val = {
     "Standard Page Format",
     "Vendor-specific Page Format",
 };
@@ -5312,13 +5312,13 @@ dissect_spc_reportluns(tvbuff_t *tvb_a, packet_info *pinfo _U_,
     }
 }
 
-const value_string mpi_action_vals[] = {
+static const value_string mpi_action_vals[] = {
     {MPI_MANAGEMENT_PROTOCOL_IN           , "Management Protocol In"},
     {MPI_REPORT_SUPPORTED_OPERATION_CODES , "Report Supported Opcodes"},
     {0, NULL}
 };
 
-const value_string report_opcodes_options_vals[] = {
+static const value_string report_opcodes_options_vals[] = {
     {0, "Report ALL opcodes"},
     {1, "Report ONE opcode, NO service action"},
     {2, "Report ONE opcode, WITH service action"},
@@ -6865,7 +6865,7 @@ proto_register_scsi(void)
           {"Buffer Offset", "scsi.spc.wb.bufoff", FT_UINT24, BASE_HEX, NULL,
            0x0, NULL, HFILL}},
         { &hf_scsi_paramlen24,
-          {"Parameter List Length", "scsi.cdb.paramlen24", FT_UINT24, BASE_HEX,
+          {"Parameter List Length", "scsi.cdb.paramlen24", FT_UINT24, BASE_DEC_HEX,
            NULL, 0x0, NULL, HFILL}},
         { &hf_scsi_senddiag_st_code,
           {"Self-Test Code", "scsi.spc.senddiag.code", FT_UINT8, BASE_HEX,
@@ -7239,7 +7239,7 @@ proto_register_scsi(void)
           { "Address Mode", "scsi.lun.address_mode", FT_UINT8, BASE_HEX,
           VALS(scsi_lun_address_mode_vals), 0xc0, "Addressing mode for the LUN", HFILL }},
         { &hf_scsi_extended_add_method_len,
-          { "Extended Address Method Length", "scsi.lun.extended_address_method.len", FT_UINT8, BASE_HEX,
+          { "Extended Address Method Length", "scsi.lun.extended_address_method.len", FT_UINT8, BASE_DEC_HEX,
           NULL, 0x30, "Extended Address Method Specific Field", HFILL }},
         { &hf_scsi_extended_add_method,
           { "Extended Address Method", "scsi.lun.extended_address_method", FT_UINT8, BASE_HEX,

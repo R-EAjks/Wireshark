@@ -116,6 +116,9 @@ my %APIs = (
                 'strtod',
                 'strcasecmp',
                 'strncasecmp',
+                # Deprecated in glib 2.68 in favor of g_memdup2
+                # We have our local implementation for older versions
+                'g_memdup',
                 'g_strcasecmp',
                 'g_strncasecmp',
                 'g_strup',
@@ -272,8 +275,8 @@ my %APIs = (
                 'qVariantFromValue'
                 ] },
 
-        # APIs that make the program exit. Dissectors shouldn't call these
-        'abort' => { 'count_errors' => 1, 'functions' => [
+        'dissectors-prohibited' => { 'count_errors' => 1, 'functions' => [
+                # APIs that make the program exit. Dissectors shouldn't call these.
                 'abort',
                 'assert',
                 'assert_perror',
@@ -282,8 +285,9 @@ my %APIs = (
                 'g_error',
                 ] },
 
-        # APIs that print to the terminal. Dissectors shouldn't call these
-        'termoutput' => { 'count_errors' => 0, 'functions' => [
+        'dissectors-restricted' => { 'count_errors' => 0, 'functions' => [
+                # APIs that print to the terminal. Dissectors shouldn't call these.
+                # FIXME: Explain what to use instead.
                 'printf',
                 'g_warning',
                 ] },

@@ -13,7 +13,13 @@
 #include "file_wrappers.h"
 #include "atm.h"
 #include "snoop.h"
+#include <wsutil/802_11-utils.h>
+
 /* See RFC 1761 for a description of the "snoop" file format. */
+
+typedef struct {
+	gboolean is_shomiti;
+} snoop_t;
 
 /* Magic number in "snoop" files. */
 static const char snoop_magic[] = {
@@ -84,6 +90,11 @@ static gboolean snoop_read_shomiti_wireless_pseudoheader(FILE_T fh,
     int *header_size);
 static gboolean snoop_dump(wtap_dumper *wdh, const wtap_rec *rec,
     const guint8 *pd, int *err, gchar **err_info);
+
+static int snoop_file_type_subtype = -1;
+static int shomiti_file_type_subtype = -1;
+
+void register_snoop(void);
 
 /*
  * See
@@ -238,6 +249,7 @@ wtap_open_return_val snoop_open(wtap *wth, int *err, gchar **err_info)
 	#define NUM_SHOMITI_ENCAPS (sizeof shomiti_encap / sizeof shomiti_encap[0])
 	int file_encap;
 	gint64 saved_offset;
+	snoop_t *snoop;
 
 	/* Read in the string that should be at the start of a "snoop" file */
 	if (!wtap_read_bytes(wth->fh, magic, sizeof magic, err, err_info)) {
@@ -362,9 +374,6 @@ wtap_open_return_val snoop_open(wtap *wth, int *err, gchar **err_info)
 			return WTAP_OPEN_ERROR;
 		}
 		file_encap = shomiti_encap[hdr.network];
-
-		/* This is a Shomiti file */
-		wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_SHOMITI;
 	} else if (hdr.network & SNOOP_PRIVATE_BIT) {
 		if ((hdr.network^SNOOP_PRIVATE_BIT) >= NUM_SNOOP_PRIVATE_ENCAPS
 		    || snoop_private_encap[hdr.network^SNOOP_PRIVATE_BIT] == WTAP_ENCAP_UNKNOWN) {
@@ -374,9 +383,6 @@ wtap_open_return_val snoop_open(wtap *wth, int *err, gchar **err_info)
 			return WTAP_OPEN_ERROR;
 		}
 		file_encap = snoop_private_encap[hdr.network^SNOOP_PRIVATE_BIT];
-
-		/* This is a snoop file */
-		wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_SNOOP;
 	} else {
 		if (hdr.network >= NUM_SNOOP_ENCAPS
 		    || snoop_encap[hdr.network] == WTAP_ENCAP_UNKNOWN) {
@@ -386,9 +392,6 @@ wtap_open_return_val snoop_open(wtap *wth, int *err, gchar **err_info)
 			return WTAP_OPEN_ERROR;
 		}
 		file_encap = snoop_encap[hdr.network];
-
-		/* This is a snoop file */
-		wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_SNOOP;
 	}
 
 	/*
@@ -396,11 +399,15 @@ wtap_open_return_val snoop_open(wtap *wth, int *err, gchar **err_info)
 	 * records, so we use the same routines to read snoop and
 	 * Shomiti files.
 	 */
+	wth->file_type_subtype = is_shomiti ? shomiti_file_type_subtype : snoop_file_type_subtype;
+	snoop = g_new0(snoop_t, 1);
+	wth->priv = (void *)snoop;
 	wth->subtype_read = snoop_read;
 	wth->subtype_seek_read = snoop_seek_read;
 	wth->file_encap = file_encap;
 	wth->snapshot_length = 0;	/* not available in header */
 	wth->file_tsprec = WTAP_TSPREC_USEC;
+	snoop->is_shomiti = is_shomiti;
 
 	/*
 	 * Add an IDB; we don't know how many interfaces were
@@ -413,6 +420,28 @@ wtap_open_return_val snoop_open(wtap *wth, int *err, gchar **err_info)
 	return WTAP_OPEN_MINE;
 }
 
+/*
+ * XXX - pad[3] is the length of the header, not including
+ * the length of the pad field; is it a 1-byte field, a 2-byte
+ * field with pad[2] usually being 0, a 3-byte field with
+ * pad[1] and pad[2] usually being 0, or a 4-byte field?
+ *
+ * If it's not a 4-byte field, is there anything significant
+ * in the other bytes?
+ *
+ * Can the header length ever be less than 8, so that not
+ * all the fields following pad are present?
+ *
+ * What's in undecrypt?  In captures I've seen, undecrypt[0]
+ * is usually 0x00 but sometimes 0x02 or 0x06, and undecrypt[1]
+ * is either 0x00 or 0x02.
+ *
+ * What's in preamble?  In captures I've seen, it's 0x00.
+ *
+ * What's in code?  In captures I've seen, it's 0x01 or 0x03.
+ *
+ * If the header is longer than 8 bytes, what are the other fields?
+ */
 typedef struct {
 	guint8 pad[4];
 	guint8 undecrypt[2];
@@ -467,6 +496,7 @@ static int
 snoop_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec,
     Buffer *buf, int *err, gchar **err_info)
 {
+	snoop_t *snoop = (snoop_t *)wth->priv;
 	struct snooprec_hdr hdr;
 	guint32 rec_size;
 	guint32	packet_size;
@@ -547,7 +577,7 @@ snoop_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec,
 		 * this frame; if this is a Shomit file, we assume there
 		 * is.  (XXX - or should we treat it a "maybe"?)
 		 */
-		if (wth->file_type_subtype == WTAP_FILE_TYPE_SUBTYPE_SHOMITI)
+		if (snoop->is_shomiti)
 			rec->rec_header.packet_header.pseudo_header.eth.fcs_len = 4;
 		else
 			rec->rec_header.packet_header.pseudo_header.eth.fcs_len = 0;
@@ -716,12 +746,6 @@ snoop_read_shomiti_wireless_pseudoheader(FILE_T fh,
 	 * XXX - presumably that means that the header length
 	 * doesn't include the length field, as we've read
 	 * 12 bytes total.
-	 *
-	 * XXX - what's in the other 3 bytes of the padding?  Is it a
-	 * 4-byte length field?
-	 * XXX - is there anything in the rest of the header of interest?
-	 * XXX - are there any files where the header is shorter than
-	 * 4 bytes of length plus 8 bytes of information?
 	 */
 	if (whdr.pad[3] < 8) {
 		*err = WTAP_ERR_BAD_FILE;
@@ -745,6 +769,28 @@ snoop_read_shomiti_wireless_pseudoheader(FILE_T fh,
 	pseudo_header->ieee_802_11.data_rate = whdr.rate;
 	pseudo_header->ieee_802_11.has_signal_percent = TRUE;
 	pseudo_header->ieee_802_11.signal_percent = whdr.signal;
+
+	/*
+	 * We don't know they PHY, but we do have the data rate;
+	 * try to guess the PHY based on the data rate and channel.
+	 */
+	if (RATE_IS_DSSS(pseudo_header->ieee_802_11.data_rate)) {
+		/* 11b */
+		pseudo_header->ieee_802_11.phy = PHDR_802_11_PHY_11B;
+		pseudo_header->ieee_802_11.phy_info.info_11b.has_short_preamble = FALSE;
+	} else if (RATE_IS_OFDM(pseudo_header->ieee_802_11.data_rate)) {
+		/* 11a or 11g, depending on the band. */
+		if (CHAN_IS_BG(pseudo_header->ieee_802_11.channel)) {
+			/* 11g */
+			pseudo_header->ieee_802_11.phy = PHDR_802_11_PHY_11G;
+			pseudo_header->ieee_802_11.phy_info.info_11g.has_mode = FALSE;
+		} else {
+			/* 11a */
+			pseudo_header->ieee_802_11.phy = PHDR_802_11_PHY_11A;
+			pseudo_header->ieee_802_11.phy_info.info_11a.has_channel_type = FALSE;
+			pseudo_header->ieee_802_11.phy_info.info_11a.has_turbo_type = FALSE;
+		}
+	}
 
 	/* add back the header and don't forget the pad as well */
 	*header_size = rsize + 8 + 4;
@@ -772,7 +818,7 @@ static const int wtap_encap[] = {
 
 /* Returns 0 if we could write the specified encapsulation type,
    an error indication otherwise. */
-int snoop_dump_can_write_encap(int encap)
+static int snoop_dump_can_write_encap(int encap)
 {
 	/* Per-packet encapsulations aren't supported. */
 	if (encap == WTAP_ENCAP_PER_PACKET)
@@ -786,7 +832,7 @@ int snoop_dump_can_write_encap(int encap)
 
 /* Returns TRUE on success, FALSE on failure; sets "*err" to an error code on
    failure */
-gboolean snoop_dump_open(wtap_dumper *wdh, int *err, gchar **err_info _U_)
+static gboolean snoop_dump_open(wtap_dumper *wdh, int *err, gchar **err_info _U_)
 {
 	struct snoop_hdr file_hdr;
 
@@ -909,6 +955,47 @@ static gboolean snoop_dump(wtap_dumper *wdh,
 	if (!wtap_dump_file_write(wdh, zeroes, padlen, err))
 		return FALSE;
 	return TRUE;
+}
+
+static const struct supported_block_type snoop_blocks_supported[] = {
+	/*
+	 * We support packet blocks, with no comments or other options.
+	 */
+	{ WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info snoop_info = {
+	"Sun snoop", "snoop", "snoop", "cap",
+	FALSE, BLOCKS_SUPPORTED(snoop_blocks_supported),
+	snoop_dump_can_write_encap, snoop_dump_open, NULL
+};
+
+static const struct supported_block_type shomiti_blocks_supported[] = {
+	/*
+	 * We support packet blocks, with no comments or other options.
+	 */
+	{ WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info shomiti_info = {
+	"Shomiti/Finisar Surveyor", "shomiti", "cap", NULL,
+	FALSE, BLOCKS_SUPPORTED(shomiti_blocks_supported),
+	NULL, NULL, NULL
+};
+
+void register_snoop(void)
+{
+	snoop_file_type_subtype = wtap_register_file_type_subtype(&snoop_info);
+	shomiti_file_type_subtype = wtap_register_file_type_subtype(&shomiti_info);
+
+	/*
+	 * Register names for backwards compatibility with the
+	 * wtap_filetypes table in Lua.
+	 */
+	wtap_register_backwards_compatibility_lua_name("SNOOP",
+	    snoop_file_type_subtype);
+	wtap_register_backwards_compatibility_lua_name("SHOMITI",
+	    shomiti_file_type_subtype);
 }
 
 /*

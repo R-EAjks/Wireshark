@@ -10,13 +10,13 @@
 #ifndef __PACKET_QUIC_H__
 #define __PACKET_QUIC_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
-
 #include "ws_symbol_export.h"
 
 #include <wsutil/wsgcrypt.h>	/* needed to define HAVE_LIBGCRYPT_AEAD */
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 /**
  * Metadata for a STREAM frame.
@@ -77,7 +77,8 @@ void
 quic_add_connection(packet_info *pinfo, const quic_cid_t *cid);
 void
 quic_add_loss_bits(packet_info *pinfo, guint64 value);
-
+void
+quic_proto_tree_add_version(tvbuff_t *tvb, proto_tree *tree, int hfindex, guint offset);
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

@@ -48,7 +48,7 @@
 
 #include "extcap.h"
 #ifdef HAVE_LIBPCAP
-#include <caputils/iface_monitor.h>
+#include <capture/iface_monitor.h>
 #endif
 
 #include "ui/filter_files.h"
@@ -650,6 +650,10 @@ WiresharkApplication::WiresharkApplication(int &argc,  char **argv) :
 
     setAttribute(Qt::AA_UseHighDpiPixmaps);
 
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0) && defined(Q_OS_WIN)
+    setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
+#endif
+
 #if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
     setAttribute(Qt::AA_DisableWindowContextHelpButton);
 #endif
@@ -759,15 +763,6 @@ WiresharkApplication::WiresharkApplication(int &argc,  char **argv) :
 
     // Application-wide style sheet
     QString app_style_sheet = qApp->styleSheet();
-#if defined(Q_OS_MAC) && QT_VERSION < QT_VERSION_CHECK(5, 6, 0)
-    // Qt uses the HITheme API to draw splitters. In recent versions of macOS
-    // this looks particularly bad: https://bugreports.qt.io/browse/QTBUG-43425
-    // This doesn't look native but it looks better than Yosemite's bit-rotten
-    // rendering of HIThemeSplitterDrawInfo.
-    app_style_sheet +=
-            "QSplitter::handle:vertical { height: 0px; }\n"
-            "QSplitter::handle:horizontal { width: 0px; }\n";
-#endif
     qApp->setStyleSheet(app_style_sheet);
 
     // If our window text is lighter than the window background, assume the theme is dark.
@@ -1362,16 +1357,3 @@ void WiresharkApplication::gotoFrame(int frame)
     MainWindow * mw = qobject_cast<MainWindow *>(mainWindow());
     mw->gotoFrame(frame);
 }
-
- /*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -13,16 +13,16 @@
 #ifndef __FOLLOW_H__
 #define __FOLLOW_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
-
 #include <epan/epan.h>
 #include <epan/packet.h>
 #include <epan/ipv6.h>
 #include <epan/tap.h>
 #include <epan/wmem/wmem.h>
 #include "ws_symbol_export.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 typedef enum {
   TCP_STREAM = 0,
@@ -42,9 +42,11 @@ typedef enum {
     FOLLOW_TCP,
     FOLLOW_TLS,
     FOLLOW_UDP,
+    FOLLOW_DCCP,
     FOLLOW_HTTP,
     FOLLOW_HTTP2,
     FOLLOW_QUIC,
+    FOLLOW_SIP,
 } follow_type_t;
 
 /* Show Type */
@@ -100,7 +102,7 @@ typedef struct _follow_info {
 struct register_follow;
 typedef struct register_follow register_follow_t;
 
-typedef gchar* (*follow_conv_filter_func)(packet_info *pinfo, guint *stream, guint *sub_stream);
+typedef gchar* (*follow_conv_filter_func)(epan_dissect_t *edt, packet_info *pinfo, guint *stream, guint *sub_stream);
 typedef gchar* (*follow_index_filter_func)(guint stream, guint sub_stream);
 typedef gchar* (*follow_address_filter_func)(address* src_addr, address* dst_addr, int src_port, int dst_port);
 typedef gchar* (*follow_port_to_display_func)(wmem_allocator_t *allocator, guint port);

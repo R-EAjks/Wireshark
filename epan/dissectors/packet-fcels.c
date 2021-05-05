@@ -1048,7 +1048,7 @@ dissect_fcels_logout (tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
         }
 
         proto_tree_add_item (logo_tree, hf_fcels_nportid, tvb, offset, 3, ENC_NA);
-        proto_tree_add_item (logo_tree, hf_fcels_npname, tvb, offset+3, 6, ENC_NA);
+        proto_tree_add_item (logo_tree, hf_fcels_npname, tvb, offset+3, 8, ENC_NA);
     }
 }
 
@@ -1592,7 +1592,7 @@ dissect_fcels_lirr (tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
     }
 }
 
-const true_false_string tfs_srl_flag = { "Scan only specified FL Port", "Scan all loops in domain" };
+static const true_false_string tfs_srl_flag = { "Scan only specified FL Port", "Scan all loops in domain" };
 
 static void
 dissect_fcels_srl (tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,

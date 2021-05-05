@@ -34,9 +34,19 @@ struct nvme_cmd_ctx {
     nstime_t cmd_end_time;
     gboolean fabric;     /* indicate whether cmd fabric type or not */
 
+    union {
+        struct {
+            guint16 cns;
+        } cmd_identify;
+        struct {
+            guint16 lsi;
+            guint8 lid;
+            guint8 lsp;
+            guint64 off;
+            guint8 uid_idx;
+        } get_logpage;
+    } cmd_ctx;
     guint8  opcode;
-    guint32 remote_key;
-    guint16 resp_type;
 };
 
 void
@@ -46,16 +56,17 @@ void
 nvme_publish_cmd_latency(proto_tree *tree, struct nvme_cmd_ctx *cmd_ctx,
                          int field_index);
 void
-nvme_publish_cqe_to_cmd_link(proto_tree *cqe_tree, tvbuff_t *cqe_tvb,
+nvme_publish_to_cmd_link(proto_tree *tree, tvbuff_t *tvb,
                              int hf_index, struct nvme_cmd_ctx *cmd_ctx);
 void
-nvme_publish_cmd_to_cqe_link(proto_tree *cmd_tree, tvbuff_t *cqe_tvb,
+nvme_publish_to_cqe_link(proto_tree *tree, tvbuff_t *tvb,
                              int hf_index, struct nvme_cmd_ctx *cmd_ctx);
-
 void
-nvme_publish_data_pdu_to_cmd_link(proto_tree *pdu_tree, tvbuff_t *nvme_tvb,
-                           int hf_index, struct nvme_cmd_ctx *cmd_ctx);
-
+nvme_publish_to_data_req_link(proto_tree *tree, tvbuff_t *tvb,
+                             int hf_index, struct nvme_cmd_ctx *cmd_ctx);
+void
+nvme_publish_to_data_resp_link(proto_tree *tree, tvbuff_t *tvb,
+                             int hf_index, struct nvme_cmd_ctx *cmd_ctx);
 void nvme_update_cmd_end_info(packet_info *pinfo, struct nvme_cmd_ctx *cmd_ctx);
 
 void
@@ -64,16 +75,26 @@ nvme_add_cmd_to_pending_list(packet_info *pinfo, struct nvme_q_ctx *q_ctx,
                              void *ctx, guint16 cmd_id);
 void* nvme_lookup_cmd_in_pending_list(struct nvme_q_ctx *q_ctx, guint16 cmd_id);
 
-void nvme_add_data_request(packet_info *pinfo, struct nvme_q_ctx *q_ctx,
-                           struct nvme_cmd_ctx *cmd_ctx, void *ctx);
-void* nvme_lookup_data_request(struct nvme_q_ctx *q_ctx, guint32 key);
+struct keyed_data_req
+{
+    guint64 addr;
+    guint32 key;
+    guint32 size;
+};
+
+void
+nvme_add_data_request(struct nvme_q_ctx *q_ctx, struct nvme_cmd_ctx *cmd_ctx,
+                                struct keyed_data_req *req);
+
+struct nvme_cmd_ctx*
+nvme_lookup_data_request(struct nvme_q_ctx *q_ctx, struct keyed_data_req *req);
 
 void
 nvme_add_data_response(struct nvme_q_ctx *q_ctx,
-                       struct nvme_cmd_ctx *cmd_ctx, guint32 rkey);
-void*
-nvme_lookup_data_response(packet_info *pinfo, struct nvme_q_ctx *q_ctx,
-                          guint32 rkey);
+                       struct nvme_cmd_ctx *cmd_ctx, guint32 rkey, guint32 frame_num);
+struct nvme_cmd_ctx*
+nvme_lookup_data_response(struct nvme_q_ctx *q_ctx,
+                          guint32 rkey, guint32 frame_num);
 
 void
 nvme_add_cmd_cqe_to_done_list(struct nvme_q_ctx *q_ctx,
@@ -82,8 +103,8 @@ void*
 nvme_lookup_cmd_in_done_list(packet_info *pinfo, struct nvme_q_ctx *q_ctx,
                              guint16 cmd_id);
 
-void dissect_nvme_cmd_sgl(tvbuff_t *cmd_tvb, proto_tree *cmd_tree,
-                          int field_index, struct nvme_cmd_ctx *cmd_ctx);
+void dissect_nvme_cmd_sgl(tvbuff_t *cmd_tvb, proto_tree *cmd_tree, int field_index,
+                 struct nvme_q_ctx *q_ctx, struct nvme_cmd_ctx *cmd_ctx, gboolean visited);
 
 void
 dissect_nvme_cmd(tvbuff_t *nvme_tvb, packet_info *pinfo, proto_tree *root_tree,

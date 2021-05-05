@@ -2058,7 +2058,7 @@ inflate_http2_header_block(tvbuff_t *tvb, packet_info *pinfo, guint offset, prot
 #endif
 
 static gchar*
-http2_follow_conv_filter(packet_info *pinfo, guint *stream, guint *sub_stream)
+http2_follow_conv_filter(epan_dissect_t *edt _U_, packet_info *pinfo, guint *stream, guint *sub_stream)
 {
     http2_session_t *h2session;
     struct tcp_analysis *tcpd;
@@ -3927,7 +3927,7 @@ proto_register_http2(void)
               "Must be zero", HFILL }
         },
         { &hf_http2_goaway_last_stream_id,
-            { "Promised-Stream-ID", "http2.goaway.last_stream_id",
+            { "Last-Stream-ID", "http2.goaway.last_stream_id",
                FT_UINT32, BASE_DEC, NULL, MASK_HTTP2_PRIORITY,
               "Contains the highest numbered stream identifier for which the sender of the GOAWAY frame has received frames on and might have taken some action on", HFILL }
         },

@@ -317,10 +317,10 @@ static const value_string wccp_version_val[] = {
   { 0, NULL}
 };
 
-const true_false_string tfs_src_dest_port = { "Source port", "Destination port" };
-const true_false_string tfs_redirect_protocol0 = { "Redirect only protocol 0 (IP)", "Redirect all traffic" };
-const true_false_string tfs_historical_current = { "Historical", "Current" };
-const true_false_string tfs_version_min_max = {"WCCP version set is maximum supported by CE", "WCCP version set is minimum supported by CE"};
+static const true_false_string tfs_src_dest_port = { "Source port", "Destination port" };
+static const true_false_string tfs_redirect_protocol0 = { "Redirect only protocol 0 (IP)", "Redirect all traffic" };
+static const true_false_string tfs_historical_current = { "Historical", "Current" };
+static const true_false_string tfs_version_min_max = {"WCCP version set is maximum supported by CE", "WCCP version set is minimum supported by CE"};
 
 static const value_string wccp_address_family_val[] = {
   { 0, "Reserved" },
@@ -786,7 +786,7 @@ wccp_bucket_info(guint8 bucket_info, proto_tree *bucket_tree, guint32 start,
 
 #define SECURITY_INFO_LEN               4
 
-const value_string security_option_vals[] = {
+static const value_string security_option_vals[] = {
   { WCCP2_NO_SECURITY, "None" },
   { WCCP2_MD5_SECURITY, "MD5" },
   { 0,    NULL }
@@ -823,7 +823,7 @@ dissect_wccp2_security_info(tvbuff_t *tvb, int offset, gint length,
 #define WCCP2_SERVICE_STANDARD          0
 #define WCCP2_SERVICE_DYNAMIC           1
 
-const value_string service_type_vals[] = {
+static const value_string service_type_vals[] = {
   { WCCP2_SERVICE_STANDARD, "Standard predefined service"},
   { WCCP2_SERVICE_DYNAMIC, "Dynamic CE defined service" },
   { 0,    NULL }
@@ -2377,7 +2377,6 @@ dissect_wccp2_info(tvbuff_t *tvb, int offset,
                    packet_info *pinfo, proto_tree *wccp_tree,
                    guint32 message_type)
 {
-  int length_remaining;
   guint16 type;
   guint16 item_length;
   proto_item *tf;
@@ -2420,7 +2419,7 @@ dissect_wccp2_info(tvbuff_t *tvb, int offset,
   */
   find_wccp_address_table(tvb,offset,pinfo,wccp_tree, &wccp_wccp_address_table);
 
-  while ((length_remaining = tvb_reported_length_remaining(tvb, offset)) > 0) {
+  while (tvb_reported_length_remaining(tvb, offset) > 0) {
     type = tvb_get_ntohs(tvb, offset);
     switch (type) {
 

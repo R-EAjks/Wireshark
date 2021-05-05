@@ -43,6 +43,8 @@ static uat_plen_record_t *uat_plen_records = NULL;
 static uat_t *plen_uat = NULL;
 static guint num_plen_uat = 0;
 
+void register_tap_listener_pinfo_stat_tree(void);
+
 static void *uat_plen_record_copy_cb(void *n, const void *o, size_t siz _U_) {
 	const uat_plen_record_t *r = (const uat_plen_record_t *)o;
 	uat_plen_record_t *rn = (uat_plen_record_t *)n;
@@ -271,7 +273,8 @@ static tap_packet_status plen_stats_tree_packet(stats_tree *st, packet_info *pin
 }
 
 /* register all pinfo trees */
-void register_pinfo_stat_trees(void) {
+void register_tap_listener_pinfo_stat_tree(void)
+{
 	module_t *stat_module;
 
 	static uat_field_t plen_uat_flds[] = {

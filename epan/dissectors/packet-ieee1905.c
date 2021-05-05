@@ -31,6 +31,7 @@
 #include <epan/reassemble.h>
 #include "packet-wps.h"
 #include "packet-wifi-dpp.h"
+#include "packet-ieee80211.h"
 
 static dissector_handle_t eapol_handle;
 
@@ -7384,9 +7385,6 @@ static int * const ieee1905_encap_dpp_flags[] = {
   NULL
 };
 
-guint
-add_ff_action_public_fields(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, int offset, guint8 code);
-
 static int
 dissect_1905_encap_dpp(tvbuff_t *tvb, packet_info *pinfo _U_,
         proto_tree *tree, guint offset, guint16 len _U_)
@@ -8412,7 +8410,7 @@ ieee1905_fragment_free_persistent_key(gpointer ptr)
 
 static reassembly_table g_ieee1905_reassembly_table;
 
-const reassembly_table_functions ieee1905_reassembly_table_functions = {
+static reassembly_table_functions ieee1905_reassembly_table_functions = {
     ieee1905_fragment_hash,
     ieee1905_fragment_equal,
     ieee1905_fragment_temporary_key,
@@ -9103,7 +9101,8 @@ proto_register_ieee1905(void)
 
         { &hf_ieee1905_association_flag,
           { "Association event", "ieee1905.assoc_event.assoc_event",
-            FT_BOOLEAN, 8, TFS(&tfs_ieee1905_association_event_flag), 0x20, NULL, HFILL }},
+            FT_BOOLEAN, 8, TFS(&tfs_ieee1905_association_event_flag),
+            0x80, NULL, HFILL }},
 
         { &hf_ieee1905_association_client_mac_addr,
           { "Client mac address", "ieee1905.assoc_event.client_mac",

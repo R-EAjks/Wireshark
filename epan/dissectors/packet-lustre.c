@@ -1011,7 +1011,7 @@ VALUE_STRING_ARRAY2(lustre_op_codes);
 VALUE_STRING_ENUM(lustre_LMTypes);
 VALUE_STRING_ARRAY(lustre_LMTypes);
 
-const true_false_string lnet_flags_set_truth = { "Set", "Unset" };
+static const true_false_string lnet_flags_set_truth = { "Set", "Unset" };
 
 #define lustre_layout_intent_opc_vals_VALUE_STRING_LIST(XXX)    \
     XXX(LAYOUT_INTENT_ACCESS,     0, "ACCESS")                  \
@@ -1202,7 +1202,8 @@ VALUE_STRING_ARRAY2(lustre_barrier_status_vals);
 #define LDLM_FL_RESENT                  0x0100000000000000ULL
 #define LDLM_FL_COS_ENABLED             0x0200000000000000ULL
 
-const value_string lustre_ldlm_flags_vals[] = {
+#if 0
+static const value_string lustre_ldlm_flags_vals[] = {
   {LDLM_FL_LOCK_CHANGED,        "LDLM_FL_LOCK_CHANGED"},
   {LDLM_FL_BLOCK_GRANTED,       "LDLM_FL_BLOCK_GRANTED"},
   {LDLM_FL_BLOCK_CONV,          "LDLM_FL_BLOCK_CONV"},
@@ -1222,6 +1223,7 @@ const value_string lustre_ldlm_flags_vals[] = {
   {LDLM_FL_AST_DISCARD_DATA,    "LDLM_FL_AST_DISCARD_DATA"},
   { 0, NULL }
 };
+#endif
 
 /********************************************************************
  *
@@ -1480,7 +1482,7 @@ VALUE_STRING_ARRAY(fld_op_vals);
 #define UPDATE_REQUEST_MAGIC_V1 0xBDDE0001
 #define UPDATE_REQUEST_MAGIC_V2 0xBDDE0002
 
-const value_string update_request_magic_vals[] = {
+static const value_string update_request_magic_vals[] = {
     {UPDATE_REQUEST_MAGIC_V1, "UPDATE_REQUEST_MAGIC_V1"},
     {UPDATE_REQUEST_MAGIC_V2, "UPDATE_REQUEST_MAGIC_V2"},
     {0, NULL}
@@ -8562,13 +8564,13 @@ proto_register_lustre(void)
     expert_module_t *expert_lustre;
     static ei_register_info ei[] = {
         { &ei_lustre_buflen,
-          { "lustre.bad_buflen", PI_ERROR, PI_MALFORMED, "Buffer length mis-match", EXPFILL } },
+          { "lustre.bad_buflen", PI_MALFORMED, PI_ERROR, "Buffer length mis-match", EXPFILL } },
         { &ei_lustre_badopc,
-          { "lustre.bad_opcode", PI_WARN, PI_PROTOCOL, "BAD OPCODE", EXPFILL } },
+          { "lustre.bad_opcode", PI_PROTOCOL, PI_WARN, "BAD OPCODE", EXPFILL } },
         { &ei_lustre_badmagic,
-          { "lustre.bad_magic", PI_WARN, PI_PROTOCOL, "BAD Magic Value", EXPFILL } },
+          { "lustre.bad_magic", PI_PROTOCOL, PI_WARN, "BAD Magic Value", EXPFILL } },
         { &ei_lustre_obsopc,
-          { "lustre.old_opcode", PI_NOTE, PI_DEPRECATED, "Deprecated Opcode", EXPFILL } },
+          { "lustre.old_opcode", PI_DEPRECATED, PI_NOTE, "Deprecated Opcode", EXPFILL } },
     };
 
     proto_lustre = proto_register_protocol("Lustre", "lustre", "lustre");

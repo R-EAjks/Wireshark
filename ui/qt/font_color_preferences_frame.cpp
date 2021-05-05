@@ -25,8 +25,8 @@
 //: These are pangrams. Feel free to replace with nonsense text that spans your alphabet.
 //: https://en.wikipedia.org/wiki/Pangram
 static const char *font_pangrams_[] = {
-    QT_TR_NOOP("Example GIF query packets have jumbo window sizes"),
-    QT_TR_NOOP("Lazy badgers move unique waxy jellyfish packets")
+    QT_TRANSLATE_NOOP("FontColorPreferencesFrame", "Example GIF query packets have jumbo window sizes"),
+    QT_TRANSLATE_NOOP("FontColorPreferencesFrame", "Lazy badgers move unique waxy jellyfish packets")
 };
 const int num_font_pangrams_ = (sizeof font_pangrams_ / sizeof font_pangrams_[0]);
 
@@ -412,16 +412,3 @@ void FontColorPreferencesFrame::on_deprecatedFilterBGPushButton_clicked()
 {
     changeColor(pref_deprecated_bg_);
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

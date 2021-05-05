@@ -482,8 +482,9 @@ static const struct {
 	/* USB 2.0/1.1/1.0 packets as transmitted over the cable */
 	{ 288,		WTAP_ENCAP_USB_2_0 },
 
-	/* windows ETL*/
-	{ 290,		WTAP_ENCAP_ETL},
+	/* Event Tracing for Windows records */
+	{ 290,		WTAP_ENCAP_ETW },
+
 	/*
 	 * To repeat:
 	 *
@@ -1432,7 +1433,7 @@ pcap_read_erf_pseudoheader(FILE_T fh, wtap_rec *rec,
 	 * This allows an ultimate resolution of 1/(2^32) seconds, or approximately 233 picoseconds */
 	if (rec) {
 		guint64 ts = pseudo_header->erf.phdr.ts;
-		rec->ts.secs = (guint32) (ts >> 32);
+		rec->ts.secs = (time_t) (ts >> 32);
 		ts = ((ts & 0xffffffff) * 1000 * 1000 * 1000);
 		ts += (ts & 0x80000000) << 1; /* rounding */
 		rec->ts.nsecs = ((guint32) (ts >> 32));
@@ -2113,7 +2114,7 @@ pcap_byteswap_nflog_pseudoheader(wtap_rec *rec, guint8 *pd)
 }
 
 int
-pcap_process_pseudo_header(FILE_T fh, int file_type, int wtap_encap,
+pcap_process_pseudo_header(FILE_T fh, gboolean is_nokia, int wtap_encap,
     guint packet_size, wtap_rec *rec, int *err, gchar **err_info)
 {
 	int phdr_len = 0;
@@ -2121,7 +2122,7 @@ pcap_process_pseudo_header(FILE_T fh, int file_type, int wtap_encap,
 	switch (wtap_encap) {
 
 	case WTAP_ENCAP_ATM_PDUS:
-		if (file_type == WTAP_FILE_TYPE_SUBTYPE_PCAP_NOKIA) {
+		if (is_nokia) {
 			/*
 			 * Nokia IPSO ATM.
 			 */
@@ -2143,7 +2144,7 @@ pcap_process_pseudo_header(FILE_T fh, int file_type, int wtap_encap,
 		break;
 
 	case WTAP_ENCAP_ETHERNET:
-		if (file_type == WTAP_FILE_TYPE_SUBTYPE_PCAP_NOKIA) {
+		if (is_nokia) {
 			/*
 			 * Nokia IPSO.  Pseudo header has already been read, but it's not considered
 			 * part of the packet size, so reread it to store the data for later (when saving)
@@ -2266,13 +2267,13 @@ pcap_process_pseudo_header(FILE_T fh, int file_type, int wtap_encap,
 }
 
 void
-pcap_read_post_process(int file_type, int wtap_encap,
+pcap_read_post_process(gboolean is_nokia, int wtap_encap,
     wtap_rec *rec, guint8 *pd, gboolean bytes_swapped, int fcs_len)
 {
 	switch (wtap_encap) {
 
 	case WTAP_ENCAP_ATM_PDUS:
-		if (file_type == WTAP_FILE_TYPE_SUBTYPE_PCAP_NOKIA) {
+		if (is_nokia) {
 			/*
 			 * Nokia IPSO ATM.
 			 *

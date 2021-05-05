@@ -125,7 +125,7 @@ void DecodeAsDelegate::decodeAddProtocol(const gchar *, const gchar *proto_name,
     if (!proto_list)
         return;
 
-    dissector_info_t *dissector_info = new dissector_info_t();
+    dissector_info_t  *dissector_info = new dissector_info_t();
     dissector_info->proto_name = proto_name;
     dissector_info->dissector_handle = (dissector_handle_t) value;
 
@@ -274,7 +274,6 @@ QWidget* DecodeAsDelegate::createEditor(QWidget *parentWidget, const QStyleOptio
         for (protocol = protocols.begin(); protocol != protocols.end(); ++protocol)
         {
             cb_editor->addItem(protocol.key(), VariantPointer<dissector_info_t>::asQVariant(protocol.value()));
-            delete *protocol;
         }
 
         //Make sure the combo box is at least as wide as the column
@@ -377,15 +376,3 @@ void UatDelegate::updateEditorGeometry(QWidget *editor,
     QStyledItemDelegate::updateEditorGeometry(editor, option, index);
 }
 #endif
-
-/* * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

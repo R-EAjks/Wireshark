@@ -162,6 +162,9 @@ See <<ChAdvFollowStreamSection>>.
 |menu:Follow[UDP Stream] |menu:Analyze[] |
 Same functionality as “Follow TCP Stream” but for UDP “streams”.
 
+|menu:Follow[DCCP Stream] |menu:Analyze[] |
+Same functionality as “Follow TCP Stream” but for DCCP streams.
+
 |menu:Follow[TLS Stream] |menu:Analyze[] |
 Same functionality as “Follow TCP Stream” but for TLS or SSL streams.
 See the wiki page on link:{wireshark-wiki-url}SSL[SSL] for instructions
@@ -965,7 +968,7 @@ Hexadecimal Value::
   Search for a specific byte sequence in the packet data.
 +
 For example, use “ef:bb:bf” to find the next packet that contains the
-link:{wikipedia-main-url}/Byte_order_mark[UTF-8 byte order mark].
+link:{wikipedia-main-url}Byte_order_mark[UTF-8 byte order mark].
 
 String::
   Find a string in the packet data, with various options.

@@ -963,9 +963,9 @@ static const gchar* get_pid_name( gint ot, gint pid )
 */
 static const guint8* decrypt_data_security_data_with_key( const guint8* key, const guint8* encrypted, gint encrypted_size, const guint8* cemi, gint cemi_size )
 {
-  guint8 ctr_0[ 16 ];
-  guint8 b_0[ 16 ];
-  guint8 mac[ 16 ];
+  guint8 ctr_0[ KNX_KEY_LENGTH ];
+  guint8 b_0[ KNX_KEY_LENGTH ];
+  guint8 mac[ KNX_KEY_LENGTH ];
   guint8* a_bytes = 0;
   const guint8* p_bytes = NULL;
   gint a_length = 0;
@@ -1240,8 +1240,9 @@ static guint16 dissect_ot( tvbuff_t *tvb, packet_info *pinfo, proto_item *node, 
     proto_item_append_text( node, ", OT=%u", ot );
 
     proto_tree_add_item( list, hf_cemi_ot, tvb, offset, 2, ENC_BIG_ENDIAN );
+    offset += 2;
 
-    *p_offset = offset += 2;
+    *p_offset = offset;
     return ot;
   }
 

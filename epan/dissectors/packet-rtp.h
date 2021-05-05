@@ -34,7 +34,9 @@ struct _rtp_info {
 	unsigned int  info_payload_type;
 	unsigned int  info_padding_count;
 	guint16       info_seq_num;
+	guint32       info_extended_seq_num;
 	guint32       info_timestamp;
+	guint64       info_extended_timestamp;
 	guint32       info_sync_src;
 	guint         info_data_len;       /* length of raw rtp data as reported */
 	gboolean      info_all_data_present; /* FALSE if data is cut off */
@@ -133,15 +135,19 @@ void rtp_dyn_payload_insert(rtp_dyn_payload_t *rtp_dyn_payload,
 /* Replaces the given payload type key in the hash table, with the encoding name and sample rate.
    This makes copies of the encoding name, scoped to the life of the capture file or sooner if
    rtp_dyn_payload_free is called. The replaced encoding name is free'd immediately. */
+/* Not used anymore
 WS_DLL_PUBLIC
 void rtp_dyn_payload_replace(rtp_dyn_payload_t *rtp_dyn_payload,
 							const guint pt,
 							const gchar* encoding_name,
 							const int sample_rate);
+*/
 
 /* removes the given payload type */
+/* Not used anymore
 WS_DLL_PUBLIC
 gboolean rtp_dyn_payload_remove(rtp_dyn_payload_t *rtp_dyn_payload, const guint pt);
+*/
 
 /* retrieves the encoding name for the given payload type; the string returned is only valid
    until the entry is replaced, removed, or the hash table is destroyed, so duplicate it if
@@ -179,7 +185,7 @@ struct _rtp_conversation_info
     guint32 extended_seqno;                         /**> the sequence number, extended to a 32-bit
                                                      * int to guarantee it increasing monotonically
                                                      */
-
+    guint64 extended_timestamp;                     /**> timestamp extended to 64-bit */
     struct _rtp_private_conv_info *rtp_conv_info;   /**> conversation info private
                                                      * to the rtp dissector
                                                      */

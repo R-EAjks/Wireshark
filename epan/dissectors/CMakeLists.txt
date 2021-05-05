@@ -13,12 +13,6 @@ add_subdirectory(asn1 EXCLUDE_FROM_ALL)
 add_subdirectory(dcerpc EXCLUDE_FROM_ALL)
 add_subdirectory(pidl EXCLUDE_FROM_ALL)
 
-include_directories(
-	${CMAKE_CURRENT_BINARY_DIR}
-	${CMAKE_CURRENT_SOURCE_DIR}
-	${CMAKE_SOURCE_DIR}/epan
-)
-
 add_custom_command(
 	OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/packet-ncp2222.c
 	COMMAND ${PYTHON_EXECUTABLE}
@@ -260,6 +254,7 @@ set(DISSECTOR_PUBLIC_HEADERS
 	packet-ansi_map.h
 	packet-ansi_tcap.h
 	packet-arp.h
+	packet-asap+enrp-common.h
 	packet-atalk.h
 	packet-atm.h
 	packet-atn-ulcs.h
@@ -276,6 +271,7 @@ set(DISSECTOR_PUBLIC_HEADERS
 	packet-btavctp.h
 	packet-btavdtp.h
 	packet-btavrcp.h
+	packet-btbredr_rf.h
 	packet-bthci_acl.h
 	packet-bthci_cmd.h
 	packet-bthci_evt.h
@@ -563,6 +559,7 @@ set(DISSECTOR_PUBLIC_HEADERS
 	packet-smrse.h
 	packet-snmp.h
 	packet-socketcan.h
+	packet-someip.h
 	packet-spice.h
 	packet-sprt.h
 	packet-sscop.h
@@ -587,6 +584,7 @@ set(DISSECTOR_PUBLIC_HEADERS
 	packet-tte.h
 	packet-ua.h
 	packet-uaudp.h
+	packet-uavcan-dsdl.h
 	packet-ubertooth.h
 	packet-udp.h
 	packet-umts_fp.h
@@ -649,6 +647,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/file-png.c
 	${CMAKE_CURRENT_SOURCE_DIR}/file-rbm.c
 	${CMAKE_CURRENT_SOURCE_DIR}/file-rfc7468.c
+	${CMAKE_CURRENT_SOURCE_DIR}/file-tiff.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-2dparityfec.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-3com-njack.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-3com-xns.c
@@ -705,6 +704,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-aruba-papi.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ar_drone.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-asap.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-asap+enrp-common.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ascend.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-asf.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-asphodel.c
@@ -778,6 +778,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-btl2cap.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-btle.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-btle_rf.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-btlmp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-btmesh.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-btmesh-pbadv.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-btmesh-provisioning.c
@@ -912,6 +913,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-dcerpc-spoolss.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-dcerpc-svcctl.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-dcerpc-tapi.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-dcerpc-taskschedulerservice.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-dcerpc-tkn4int.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-dcerpc-trksvr.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-dcerpc-ubikdisk.c
@@ -1486,6 +1488,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-netlink-netfilter.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-netlink-net_dm.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-netlink-nl80211.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-netlink-psample.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-netlink-route.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-netlink-sock_diag.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-netlink.c
@@ -1549,6 +1552,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-openwire.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-opsi.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-optommp.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-opus.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-oran.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-osc.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-oscore.c
@@ -1690,6 +1694,8 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-rtp-ed137.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-rtpproxy.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-rtps.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-rtps-virtual-transport.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-rtps-processed.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-rtsp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-rudp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-rwall.c
@@ -1729,6 +1735,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-sgsap.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-shim6.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-sigcomp.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-signal-pdu.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-simple.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-simulcrypt.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-sip.c
@@ -1830,6 +1837,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-tnef.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-tns.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-tpkt.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-tplink-smarthome.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-tpm20.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-tpncp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-tr.c
@@ -1849,6 +1857,8 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ua3g.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-uasip.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-uaudp.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-uavcan-can.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-uavcan-dsdl.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ubdp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ubertooth.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ucp.c
@@ -1890,6 +1900,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-vcdu.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-vicp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-vines.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-vj-comp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-vlan.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-vmlab.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-vnc.c
@@ -2010,7 +2021,7 @@ set(ALL_DISSECTOR_SRC
 )
 
 #
-# We pass the arguments to make-dissectors in a file to avoid limitations
+# We pass the arguments to make-regs.py in a file to avoid limitations
 # with the number of arguments handled by main().
 #
 file(GENERATE
@@ -2049,6 +2060,24 @@ add_library(dissectors OBJECT
 	${DISSECTOR_SUPPORT_SRC}
 )
 
+target_include_directories(dissectors
+	SYSTEM PRIVATE
+		${GCRYPT_INCLUDE_DIRS}
+		${GNUTLS_INCLUDE_DIRS}
+		${KERBEROS_INCLUDE_DIRS}
+		${LIBXML2_INCLUDE_DIRS}
+		${LZ4_INCLUDE_DIRS}
+		${NGHTTP2_INCLUDE_DIRS}
+		${SMI_INCLUDE_DIRS}
+		${SNAPPY_INCLUDE_DIRS}
+		${ZLIB_INCLUDE_DIRS}
+		${ZSTD_INCLUDE_DIRS}
+	PRIVATE
+		${CMAKE_CURRENT_BINARY_DIR}
+		${CMAKE_CURRENT_SOURCE_DIR}
+		${CMAKE_SOURCE_DIR}/epan
+)
+
 set_target_properties(dissectors PROPERTIES
 	FOLDER "Libs/epan/dissectors"
 	COMPILE_DEFINITIONS "WS_BUILD_DLL"
@@ -2065,8 +2094,8 @@ CHECKAPI(
 	NAME
 	  dissectors
 	SWITCHES
-	  --group abort
-	  --group termoutput:5 --summary-group termoutput
+	  --group dissectors-prohibited
+	  --group dissectors-restricted:5 --summary-group dissectors-restricted
 	  --file ${CHECKAPI_FILE_LIST}
 	SOURCES
 	  ${DISSECTOR_SUPPORT_SRC}

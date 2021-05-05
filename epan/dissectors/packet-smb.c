@@ -1865,7 +1865,7 @@ get_unicode_or_ascii_string(tvbuff_t *tvb, int *offsetp,
 			cur[copylen] = '\0';
 
 			if (overflow)
-				g_strlcat(cur, "...",MAX_UNICODE_STR_LEN+3+1);
+				(void) g_strlcat(cur, "...",MAX_UNICODE_STR_LEN+3+1);
 
 			string_len = *len;
 			string = cur;
@@ -1907,7 +1907,7 @@ smb_file_specific_rights(tvbuff_t *tvb, gint offset, proto_tree *tree, guint32 m
 
 	proto_tree_add_bitmask_list_value(tree, tvb, offset, 4, mask_flags, mask);
 }
-struct access_mask_info smb_file_access_mask_info = {
+static struct access_mask_info smb_file_access_mask_info = {
 	"FILE",				/* Name of specific rights */
 	smb_file_specific_rights,	/* Dissection function */
 	NULL,				/* Generic mapping table */
@@ -1938,7 +1938,7 @@ smb_dir_specific_rights(tvbuff_t *tvb, gint offset, proto_tree *tree, guint32 ma
 
 	proto_tree_add_bitmask_list_value(tree, tvb, offset, 4, mask_flags, mask);
 }
-struct access_mask_info smb_dir_access_mask_info = {
+static struct access_mask_info smb_dir_access_mask_info = {
 	"DIR",				/* Name of specific rights */
 	smb_dir_specific_rights,	/* Dissection function */
 	NULL,				/* Generic mapping table */
@@ -2487,7 +2487,7 @@ dissect_file_ext_attr_bits(tvbuff_t *tvb, proto_tree *parent_tree, int offset,
 }
 
 /* 3.11 */
-int
+static int
 dissect_file_ext_attr(tvbuff_t *tvb, proto_tree *parent_tree, int offset)
 {
 	guint32 mask;
@@ -5941,7 +5941,7 @@ dissect_search_resume_key(tvbuff_t *tvb, packet_info *pinfo _U_,
 		TRUE, TRUE, bcp);
 	CHECK_STRING_SUBR(fn);
 	/* ensure that it's null-terminated */
-	g_strlcpy(fname, fn, 11+1);
+	(void) g_strlcpy(fname, fn, 11+1);
 	proto_tree_add_string(tree, hf_smb_file_name, tvb, offset, 11,
 		fname);
 	COUNT_BYTES_SUBR(fn_len);
@@ -6019,7 +6019,7 @@ dissect_search_dir_info(tvbuff_t *tvb, packet_info *pinfo,
 		TRUE, TRUE, bcp);
 	CHECK_STRING_SUBR(fn);
 	/* ensure that it's null-terminated */
-	g_strlcpy(fname, fn, 13+1);
+	(void) g_strlcpy(fname, fn, 13+1);
 	proto_tree_add_string(tree, hf_smb_file_name, tvb, offset, fn_len,
 		fname);
 	COUNT_BYTES_SUBR(fn_len);

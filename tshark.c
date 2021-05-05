@@ -18,8 +18,17 @@
 #include <locale.h>
 #include <limits.h>
 
-#ifdef HAVE_GETOPT_H
+/*
+ * If we have getopt_long() in the system library, include <getopt.h>.
+ * Otherwise, we're using our own getopt_long() (either because the
+ * system has getopt() but not getopt_long(), as with some UN*Xes,
+ * or because it doesn't even have getopt(), as with Windows), so
+ * include our getopt_long()'s header.
+ */
+#ifdef HAVE_GETOPT_LONG
 #include <getopt.h>
+#else
+#include <wsutil/wsgetopt.h>
 #endif
 
 #include <errno.h>
@@ -32,10 +41,6 @@
 #include <signal.h>
 #endif
 
-#ifndef HAVE_GETOPT_LONG
-#include "wsutil/wsgetopt.h"
-#endif
-
 #include <glib.h>
 
 #include <epan/exceptions.h>
@@ -43,6 +48,7 @@
 
 #include <ui/clopts_common.h>
 #include <ui/cmdarg_err.h>
+#include <ui/exit_codes.h>
 #include <ui/urls.h>
 #include <wsutil/filesystem.h>
 #include <wsutil/file_util.h>
@@ -53,7 +59,6 @@
 #include <cli_main.h>
 #include <version_info.h>
 #include <wiretap/wtap_opttypes.h>
-#include <wiretap/pcapng.h>
 
 #include "globals.h"
 #include <epan/timestamp.h>
@@ -97,15 +102,15 @@
 
 #include "capture_opts.h"
 
-#include "caputils/capture-pcap-util.h"
+#include "capture/capture-pcap-util.h"
 
 #ifdef HAVE_LIBPCAP
-#include "caputils/capture_ifinfo.h"
+#include "capture/capture_ifinfo.h"
 #ifdef _WIN32
-#include "caputils/capture-wpcap.h"
+#include "capture/capture-wpcap.h"
 #endif /* _WIN32 */
-#include <capchild/capture_session.h>
-#include <capchild/capture_sync.h>
+#include <capture/capture_session.h>
+#include <capture/capture_sync.h>
 #include <ui/capture_info.h>
 #endif /* HAVE_LIBPCAP */
 #include "log.h"
@@ -114,6 +119,9 @@
 #include <wsutil/str_util.h>
 #include <wsutil/utf8_entities.h>
 #include <wsutil/json_dumper.h>
+#ifdef _WIN32
+#include <wsutil/win32-utils.h>
+#endif
 
 #include "extcap.h"
 
@@ -121,18 +129,10 @@
 #include <wsutil/plugins.h>
 #endif
 
-/* Exit codes */
-#define INVALID_OPTION 1
-#define INVALID_INTERFACE 2
-#define INVALID_FILE 2
-#define INVALID_FILTER 2
-#define INVALID_EXPORT 2
-#define INVALID_CAPABILITY 2
-#define INVALID_TAP 2
-#define INVALID_DATA_LINK 2
-#define INVALID_TIMESTAMP_TYPE 2
-#define INVALID_CAPTURE 2
-#define INIT_FAILED 2
+/* Additional exit codes */
+#define INVALID_EXPORT          2
+#define INVALID_TAP             2
+#define INVALID_CAPTURE         2
 
 #define LONGOPT_EXPORT_OBJECTS          LONGOPT_BASE_APPLICATION+1
 #define LONGOPT_COLOR                   LONGOPT_BASE_APPLICATION+2
@@ -160,12 +160,13 @@ static gboolean epan_auto_reset = FALSE;
  * The way the packet decode is to be written.
  */
 typedef enum {
-  WRITE_TEXT,   /* summary or detail text */
-  WRITE_XML,    /* PDML or PSML */
-  WRITE_FIELDS, /* User defined list of fields */
-  WRITE_JSON,   /* JSON */
-  WRITE_JSON_RAW,   /* JSON only raw hex */
-  WRITE_EK      /* JSON bulk insert to Elasticsearch */
+  WRITE_NONE,     /* dummy initial state */
+  WRITE_TEXT,     /* summary or detail text */
+  WRITE_XML,      /* PDML or PSML */
+  WRITE_FIELDS,   /* User defined list of fields */
+  WRITE_JSON,     /* JSON */
+  WRITE_JSON_RAW, /* JSON only raw hex */
+  WRITE_EK        /* JSON bulk insert to Elasticsearch */
   /* Add CSV and the like here */
 } output_action_e;
 
@@ -174,7 +175,7 @@ static gboolean do_dissection;     /* TRUE if we have to dissect each packet */
 static gboolean print_packet_info; /* TRUE if we're to print packet information */
 static gboolean print_summary;     /* TRUE if we're to print packet summary information */
 static gboolean print_details;     /* TRUE if we're to print packet details information */
-static gboolean print_hex;         /* TRUE if we're to print hex/ascci information */
+static gboolean print_hex;         /* TRUE if we're to print hex/ascii information */
 static gboolean line_buffered;
 static gboolean quiet = FALSE;
 static gboolean really_quiet = FALSE;
@@ -252,19 +253,29 @@ static process_file_status_t process_cap_file(capture_file *, char *, int, gbool
 static gboolean process_packet_single_pass(capture_file *cf,
     epan_dissect_t *edt, gint64 offset, wtap_rec *rec, Buffer *buf,
     guint tap_flags);
-static void show_print_file_io_error(int err);
+static void show_print_file_io_error(void);
 static gboolean write_preamble(capture_file *cf);
 static gboolean print_packet(capture_file *cf, epan_dissect_t *edt);
 static gboolean write_finale(void);
 
-static void failure_warning_message(const char *msg_format, va_list ap);
-static void open_failure_message(const char *filename, int err,
-    gboolean for_writing);
-static void read_failure_message(const char *filename, int err);
-static void write_failure_message(const char *filename, int err);
-static void failure_message_cont(const char *msg_format, va_list ap);
+static void tshark_cmdarg_err(const char *msg_format, va_list ap);
+static void tshark_cmdarg_err_cont(const char *msg_format, va_list ap);
 
 static GHashTable *output_only_tables = NULL;
+
+static void
+list_capture_types(void) {
+  GArray *writable_type_subtypes;
+
+  fprintf(stderr, "tshark: The available capture file types for the \"-F\" flag are:\n");
+  writable_type_subtypes = wtap_get_writable_file_types_subtypes(FT_SORT_BY_NAME);
+  for (guint i = 0; i < writable_type_subtypes->len; i++) {
+    int ft = g_array_index(writable_type_subtypes, int, i);
+    fprintf(stderr, "    %s - %s\n", wtap_file_type_subtype_name(ft),
+            wtap_file_type_subtype_description(ft));
+  }
+  g_array_free(writable_type_subtypes, TRUE);
+}
 
 struct string_elem {
   const char *sstr;   /* The short string */
@@ -287,44 +298,38 @@ string_elem_print(gpointer data)
 }
 
 static void
-list_capture_types(void) {
-  int                 i;
-  struct string_elem *captypes;
-  GSList             *list = NULL;
-
-  captypes = g_new(struct string_elem, WTAP_NUM_FILE_TYPES_SUBTYPES);
-
-  fprintf(stderr, "tshark: The available capture file types for the \"-F\" flag are:\n");
-  for (i = 0; i < WTAP_NUM_FILE_TYPES_SUBTYPES; i++) {
-    if (wtap_dump_can_open(i)) {
-      captypes[i].sstr = wtap_file_type_subtype_short_string(i);
-      captypes[i].lstr = wtap_file_type_subtype_string(i);
-      list = g_slist_insert_sorted(list, &captypes[i], string_compare);
-    }
-  }
-  g_slist_free_full(list, string_elem_print);
-  g_free(captypes);
-}
-
-static void
 list_read_capture_types(void) {
-  int                 i;
+  guint               i;
+  size_t              num_file_types;
   struct string_elem *captypes;
   GSList             *list = NULL;
   const char *magic = "Magic-value-based";
   const char *heuristic = "Heuristics-based";
 
-  /* this is a hack, but WTAP_NUM_FILE_TYPES_SUBTYPES is always >= number of open routines so we're safe */
-  captypes = g_new(struct string_elem, WTAP_NUM_FILE_TYPES_SUBTYPES);
+  /* How many readable file types are there? */
+  num_file_types = 0;
+  for (i = 0; open_routines[i].name != NULL; i++)
+    num_file_types++;
+  captypes = g_new(struct string_elem, num_file_types);
 
   fprintf(stderr, "tshark: The available read file types for the \"-X read_format:\" option are:\n");
-  for (i = 0; open_routines[i].name != NULL; i++) {
+  for (i = 0; i < num_file_types && open_routines[i].name != NULL; i++) {
     captypes[i].sstr = open_routines[i].name;
     captypes[i].lstr = (open_routines[i].type == OPEN_INFO_MAGIC) ? magic : heuristic;
     list = g_slist_insert_sorted(list, &captypes[i], string_compare);
   }
   g_slist_free_full(list, string_elem_print);
   g_free(captypes);
+}
+
+static void
+list_export_pdu_taps(void) {
+  fprintf(stderr, "tshark: The available export tap names for the \"-U tap_name\" option are:\n");
+  for (GSList *export_pdu_tap_name_list = get_export_pdu_tap_list();
+       export_pdu_tap_name_list != NULL;
+       export_pdu_tap_name_list = g_slist_next(export_pdu_tap_name_list)) {
+    fprintf(stderr, "    %s\n", (const char*)(export_pdu_tap_name_list->data));
+  }
 }
 
 static void
@@ -697,6 +702,18 @@ int
 main(int argc, char *argv[])
 {
   char                *err_msg;
+  static const struct report_message_routines tshark_report_routines = {
+    failure_message,
+    failure_message,
+    open_failure_message,
+    read_failure_message,
+    write_failure_message,
+    cfile_open_failure_message,
+    cfile_dump_open_failure_message,
+    cfile_read_failure_message,
+    cfile_write_failure_message,
+    cfile_close_failure_message
+  };
   int                  opt;
   static const struct option long_options[] = {
     {"help", no_argument, NULL, 'h'},
@@ -711,6 +728,7 @@ main(int argc, char *argv[])
     {0, 0, 0, 0 }
   };
   gboolean             arg_error = FALSE;
+  gboolean             has_extcap_options = FALSE;
 
   int                  err;
   gchar               *err_info;
@@ -720,15 +738,14 @@ main(int argc, char *argv[])
   volatile int         exit_status = EXIT_SUCCESS;
 #ifdef HAVE_LIBPCAP
   int                  caps_queries = 0;
-  gboolean             start_capture = FALSE;
   GList               *if_list;
-  gchar               *err_str;
+  gchar               *err_str, *err_str_secondary;
   struct bpf_program   fcode;
 #else
   gboolean             capture_option_specified = FALSE;
   volatile int         max_packet_count = 0;
 #endif
-  volatile int         out_file_type = WTAP_FILE_TYPE_SUBTYPE_PCAPNG;
+  volatile int         out_file_type = WTAP_FILE_TYPE_SUBTYPE_UNKNOWN;
   volatile gboolean    out_file_name_res = FALSE;
   volatile int         in_file_type = WTAP_TYPE_AUTO;
   gchar               *volatile cf_name = NULL;
@@ -779,7 +796,7 @@ main(int argc, char *argv[])
 
   tshark_debug("tshark started with %d args", argc);
 
-  cmdarg_err_init(failure_warning_message, failure_message_cont);
+  cmdarg_err_init(tshark_cmdarg_err, tshark_cmdarg_err_cont);
 
 #ifdef _WIN32
   create_app_running_mutex();
@@ -834,6 +851,11 @@ main(int argc, char *argv[])
    * *after* epan_init() gets called, so that the dissectors have had a
    * chance to register their preferences.
    *
+   * Spawning a bunch of extcap processes can delay program startup,
+   * particularly on Windows. Check to see if we have any options that
+   * might require extcap and set has_extcap_options = TRUE if that's
+   * the case.
+   *
    * XXX - can we do this all with one getopt_long() call, saving the
    * arguments we can't handle until after initializing libwireshark,
    * and then process them after initializing libwireshark?
@@ -851,9 +873,25 @@ main(int argc, char *argv[])
         goto clean_exit;
       }
       break;
+    case 'G':
+      if (g_str_has_suffix(optarg, "prefs") || strcmp(optarg, "folders") == 0) {
+        has_extcap_options = TRUE;
+      }
+      break;
+    case 'i':
+      has_extcap_options = TRUE;
+      break;
+    case 'o':
+      if (g_str_has_prefix(optarg, "extcap.")) {
+        has_extcap_options = TRUE;
+      }
+      break;
     case 'P':        /* Print packet summary info even when writing to a file */
       print_packet_info = TRUE;
       print_summary = TRUE;
+      break;
+    case 'r':        /* Read capture file x */
+      cf_name = g_strdup(optarg);
       break;
     case 'O':        /* Only output these protocols */
       output_only = g_strdup(optarg);
@@ -907,9 +945,7 @@ main(int argc, char *argv[])
                     tshark_log_handler, NULL /* user_data */);
 #endif
 
-  init_report_message(failure_warning_message, failure_warning_message,
-                      open_failure_message, read_failure_message,
-                      write_failure_message);
+  init_report_message("TShark", &tshark_report_routines);
 
 #ifdef HAVE_LIBPCAP
   capture_opts_init(&global_capture_opts);
@@ -923,6 +959,11 @@ main(int argc, char *argv[])
   timestamp_set_precision(TS_PREC_AUTO);
   timestamp_set_seconds_type(TS_SECONDS_DEFAULT);
 
+  /*
+   * Libwiretap must be initialized before libwireshark is, so that
+   * dissection-time handlers for file-type-dependent blocks can
+   * register using the file type/subtype value for the file type.
+   */
   wtap_init(TRUE);
 
   /* Register all dissectors; we must do this before checking for the
@@ -937,16 +978,16 @@ main(int argc, char *argv[])
   /* Register all tap listeners; we do this before we parse the arguments,
      as the "-z" argument can specify a registered tap. */
 
-  /* we register the plugin taps before the other taps because
-     stats_tree taps plugins will be registered as tap listeners
-     by stats_tree_stat.c and need to registered before that */
-#ifdef HAVE_PLUGINS
-  register_all_plugin_tap_listeners();
-#endif
-  /* Register all tap listeners. */
-  for (tap_reg_t *t = tap_reg_listener; t->cb_func != NULL; t++) {
-    t->cb_func();
+  register_all_tap_listeners(tap_reg_listener);
+
+  /*
+   * An empty cf_name indicates that we're capturing, and we might
+   * be doing so on an extcap interface.
+   */
+  if (has_extcap_options || !cf_name) {
+    extcap_register_preferences();
   }
+
   conversation_table_set_gui_info(init_iousers);
   hostlist_table_set_gui_info(init_hostlists);
   srt_table_iterate_tables(register_srt_tables, NULL);
@@ -970,7 +1011,6 @@ main(int argc, char *argv[])
       if (strcmp(argv[2], "column-formats") == 0)
         column_dump_column_formats();
       else if (strcmp(argv[2], "currentprefs") == 0) {
-        extcap_register_preferences();
         epan_load_settings();
         write_prefs(NULL);
       }
@@ -1106,7 +1146,7 @@ main(int argc, char *argv[])
     case LONGOPT_COMPRESS_TYPE:        /* compress type */
       /* These are options only for packet capture. */
 #ifdef HAVE_LIBPCAP
-      exit_status = capture_opts_add_opt(&global_capture_opts, opt, optarg, &start_capture);
+      exit_status = capture_opts_add_opt(&global_capture_opts, opt, optarg);
       if (exit_status != 0) {
         goto clean_exit;
       }
@@ -1117,7 +1157,7 @@ main(int argc, char *argv[])
       break;
     case 'c':        /* Stop after x packets */
 #ifdef HAVE_LIBPCAP
-      exit_status = capture_opts_add_opt(&global_capture_opts, opt, optarg, &start_capture);
+      exit_status = capture_opts_add_opt(&global_capture_opts, opt, optarg);
       if (exit_status != 0) {
         goto clean_exit;
       }
@@ -1128,7 +1168,7 @@ main(int argc, char *argv[])
     case 'w':        /* Write to file x */
       output_file_name = g_strdup(optarg);
 #ifdef HAVE_LIBPCAP
-      exit_status = capture_opts_add_opt(&global_capture_opts, opt, optarg, &start_capture);
+      exit_status = capture_opts_add_opt(&global_capture_opts, opt, optarg);
       if (exit_status != 0) {
         goto clean_exit;
       }
@@ -1173,7 +1213,7 @@ main(int argc, char *argv[])
       }
       break;
     case 'F':
-      out_file_type = wtap_short_string_to_file_type_subtype(optarg);
+      out_file_type = wtap_name_to_file_type_subtype(optarg);
       if (out_file_type < 0) {
         cmdarg_err("\"%s\" isn't a valid capture file type", optarg);
         list_capture_types();
@@ -1296,8 +1336,8 @@ main(int argc, char *argv[])
       quiet = TRUE;
       really_quiet = TRUE;
       break;
-    case 'r':        /* Read capture file x */
-      cf_name = g_strdup(optarg);
+    case 'r':
+      /* already processed; just ignore it now */
       break;
     case 'R':        /* Read file filter */
       rfilter = optarg;
@@ -1309,6 +1349,12 @@ main(int argc, char *argv[])
       separator = optarg;
       break;
     case 'T':        /* printing Type */
+      /* output_action has been already set. It means multiple -T. */
+      if (output_action > WRITE_NONE) {
+        cmdarg_err("Multiple -T parameters are unsupported");
+        exit_status = INVALID_OPTION;
+        goto clean_exit;
+      }
       print_packet_info = TRUE;
       if (strcmp(optarg, "text") == 0) {
         output_action = WRITE_TEXT;
@@ -1380,20 +1426,13 @@ main(int argc, char *argv[])
       }
       break;
     case 'U':        /* Export PDUs to file */
-    {
-        GSList *export_pdu_tap_name_list = NULL;
-
-        if (!*optarg) {
-            cmdarg_err("A tap name is required. Valid names are:");
-            for (export_pdu_tap_name_list = get_export_pdu_tap_list(); export_pdu_tap_name_list; export_pdu_tap_name_list = g_slist_next(export_pdu_tap_name_list)) {
-                cmdarg_err("%s\n", (const char*)(export_pdu_tap_name_list->data));
-            }
+        if (strcmp(optarg, "") == 0 || strcmp(optarg, "?") == 0) {
+            list_export_pdu_taps();
             exit_status = INVALID_OPTION;
             goto clean_exit;
         }
         pdu_export_arg = g_strdup(optarg);
         break;
-    }
     case 'v':         /* Show version and exit */
       show_version();
       /* We don't really have to cleanup here, but it's a convenient way to test
@@ -1487,6 +1526,14 @@ main(int argc, char *argv[])
       break;
     }
   }
+
+  /* set the default output action to TEXT */
+  if (output_action == WRITE_NONE)
+    output_action = WRITE_TEXT;
+
+  /* set the default file type to pcapng */
+  if (out_file_type == WTAP_FILE_TYPE_SUBTYPE_UNKNOWN)
+    out_file_type = wtap_pcapng_file_type_subtype();
 
   /*
    * Print packet summary information is the default if neither -V or -x
@@ -1726,16 +1773,19 @@ main(int argc, char *argv[])
 
       if (global_capture_opts.saving_to_file) {
         /* They specified a "-w" flag, so we'll be saving to a capture file. */
+        gboolean use_pcapng;
 
         /* When capturing, we only support writing pcap or pcapng format. */
-        if (out_file_type != WTAP_FILE_TYPE_SUBTYPE_PCAP &&
-            out_file_type != WTAP_FILE_TYPE_SUBTYPE_PCAPNG) {
+        if (out_file_type == wtap_pcapng_file_type_subtype()) {
+          use_pcapng = TRUE;
+        } else if (out_file_type == wtap_pcap_file_type_subtype()) {
+          use_pcapng = FALSE;
+        } else {
           cmdarg_err("Live captures can only be saved in pcap or pcapng format.");
           exit_status = INVALID_OPTION;
           goto clean_exit;
         }
-        if (global_capture_opts.capture_comment &&
-            out_file_type != WTAP_FILE_TYPE_SUBTYPE_PCAPNG) {
+        if (global_capture_opts.capture_comment && !use_pcapng) {
           cmdarg_err("A capture comment can only be written to a pcapng file.");
           exit_status = INVALID_OPTION;
           goto clean_exit;
@@ -1778,7 +1828,7 @@ main(int argc, char *argv[])
           exit_status = INVALID_OPTION;
           goto clean_exit;
         }
-        global_capture_opts.use_pcapng = (out_file_type == WTAP_FILE_TYPE_SUBTYPE_PCAPNG) ? TRUE : FALSE;
+        global_capture_opts.use_pcapng = use_pcapng;
       } else {
         /* They didn't specify a "-w" flag, so we won't be saving to a
            capture file.  Check for options that only make sense if
@@ -1994,6 +2044,7 @@ main(int argc, char *argv[])
       if (exp_pdu_error) {
           cmdarg_err("Cannot register tap: %s", exp_pdu_error);
           g_free(exp_pdu_error);
+          list_export_pdu_taps();
           exit_status = INVALID_TAP;
           goto clean_exit;
       }
@@ -2011,14 +2062,16 @@ main(int argc, char *argv[])
       }
 
       /* Activate the export PDU tap */
+      /* Write to our output file with this comment (if the type supports it,
+       * otherwise exp_pdu_open() will ignore the comment) */
       comment = g_strdup_printf("Dump of PDUs from %s", cf_name);
-      exp_pdu_status = exp_pdu_open(&exp_pdu_tap_data, exp_fd, comment,
+      exp_pdu_status = exp_pdu_open(&exp_pdu_tap_data, exp_pdu_filename,
+                                    out_file_type, exp_fd, comment,
                                     &err, &err_info);
       g_free(comment);
       if (!exp_pdu_status) {
-          cfile_dump_open_failure_message("TShark", exp_pdu_filename,
-                                          err, err_info,
-                                          WTAP_FILE_TYPE_SUBTYPE_PCAPNG);
+          cfile_dump_open_failure_message(exp_pdu_filename, err, err_info,
+                                          out_file_type);
           exit_status = INVALID_EXPORT;
           goto clean_exit;
       }
@@ -2131,48 +2184,44 @@ main(int argc, char *argv[])
       goto clean_exit;
     }
 
-    /* if requested, list the link layer types and exit */
+    /*
+     * If requested, list the link layer types and/or time stamp types
+     * and exit.
+     */
     if (caps_queries) {
-        guint i;
+      guint i;
 
-        /* Get the list of link-layer types for the capture devices. */
-        for (i = 0; i < global_capture_opts.ifaces->len; i++) {
-          interface_options *interface_opts;
-          if_capabilities_t *caps;
-          char *auth_str = NULL;
-          int if_caps_queries = caps_queries;
+      /* Get the list of link-layer types for the capture devices. */
+      exit_status = EXIT_SUCCESS;
+      for (i = 0; i < global_capture_opts.ifaces->len; i++) {
+        interface_options *interface_opts;
+        if_capabilities_t *caps;
+        char *auth_str = NULL;
 
-          interface_opts = &g_array_index(global_capture_opts.ifaces, interface_options, i);
+        interface_opts = &g_array_index(global_capture_opts.ifaces, interface_options, i);
 #ifdef HAVE_PCAP_REMOTE
-          if (interface_opts->auth_type == CAPTURE_AUTH_PWD) {
-              auth_str = g_strdup_printf("%s:%s", interface_opts->auth_username, interface_opts->auth_password);
-          }
-#endif
-          caps = capture_get_if_capabilities(interface_opts->name, interface_opts->monitor_mode, auth_str, &err_str, NULL);
-          g_free(auth_str);
-          if (caps == NULL) {
-            cmdarg_err("%s", err_str);
-            g_free(err_str);
-            exit_status = INVALID_CAPABILITY;
-            goto clean_exit;
-          }
-          if ((if_caps_queries & CAPS_QUERY_LINK_TYPES) && caps->data_link_types == NULL) {
-            cmdarg_err("The capture device \"%s\" has no data link types.", interface_opts->name);
-            exit_status = INVALID_DATA_LINK;
-            goto clean_exit;
-          }
-          if ((if_caps_queries & CAPS_QUERY_TIMESTAMP_TYPES) && caps->timestamp_types == NULL) {
-            cmdarg_err("The capture device \"%s\" has no timestamp types.", interface_opts->name);
-            exit_status = INVALID_TIMESTAMP_TYPE;
-            goto clean_exit;
-          }
-          if (interface_opts->monitor_mode)
-                if_caps_queries |= CAPS_MONITOR_MODE;
-          capture_opts_print_if_capabilities(caps, interface_opts->name, if_caps_queries);
-          free_if_capabilities(caps);
+        if (interface_opts->auth_type == CAPTURE_AUTH_PWD) {
+          auth_str = g_strdup_printf("%s:%s", interface_opts->auth_username, interface_opts->auth_password);
         }
-        exit_status = EXIT_SUCCESS;
-        goto clean_exit;
+#endif
+        caps = capture_get_if_capabilities(interface_opts->name, interface_opts->monitor_mode,
+                                           auth_str, &err_str, &err_str_secondary, NULL);
+        g_free(auth_str);
+        if (caps == NULL) {
+          cmdarg_err("%s%s%s", err_str, err_str_secondary ? "\n" : "", err_str_secondary ? err_str_secondary : "");
+          g_free(err_str);
+          g_free(err_str_secondary);
+          exit_status = INVALID_CAPABILITY;
+          break;
+        }
+        exit_status = capture_opts_print_if_capabilities(caps, interface_opts,
+                                                         caps_queries);
+        free_if_capabilities(caps);
+        if (exit_status != EXIT_SUCCESS) {
+          break;
+        }
+      }
+      goto clean_exit;
     }
 
     /*
@@ -2209,7 +2258,7 @@ main(int argc, char *argv[])
 
     if (print_packet_info) {
       if (!write_preamble(&cfile)) {
-        show_print_file_io_error(errno);
+        show_print_file_io_error();
         exit_status = INVALID_FILE;
         goto clean_exit;
       }
@@ -2247,7 +2296,7 @@ main(int argc, char *argv[])
 
     if (print_packet_info) {
       if (!write_finale()) {
-        show_print_file_io_error(errno);
+        show_print_file_io_error();
       }
     }
 
@@ -3226,7 +3275,7 @@ process_packet_second_pass(capture_file *cf, epan_dissect_t *edt,
         fflush(stdout);
 
       if (ferror(stdout)) {
-        show_print_file_io_error(errno);
+        show_print_file_io_error();
         exit(2);
       }
     }
@@ -3247,11 +3296,14 @@ process_new_idbs(wtap *wth, wtap_dumper *pdh, int *err, gchar **err_info)
 
   while ((if_data = wtap_get_next_interface_description(wth)) != NULL) {
     /*
-     * Only add IDBs if we're writing to a file and the output file
-     * requires interface IDs; otherwise, it doesn't support writing IDBs.
+     * Only add interface blocks if the output file supports (meaning
+     * *requires*) them.
+     *
+     * That mean that the abstract interface provided by libwiretap
+     * involves WTAP_BLOCK_IF_ID_AND_INFO blocks.
      */
     if (pdh != NULL) {
-      if (wtap_uses_interface_ids(wtap_dump_file_type_subtype(pdh))) {
+      if (wtap_file_type_subtype_supports_block(wtap_dump_file_type_subtype(pdh), WTAP_BLOCK_IF_ID_AND_INFO) != BLOCK_NOT_SUPPORTED) {
         if (!wtap_dump_add_idb(pdh, if_data, err, err_info))
           return FALSE;
       }
@@ -3539,7 +3591,7 @@ process_cap_file(capture_file *cf, char *save_file, int out_file_type,
 
     if (pdh == NULL) {
       /* We couldn't set up to write to the capture file. */
-      cfile_dump_open_failure_message("TShark", save_file, err, err_info,
+      cfile_dump_open_failure_message(save_file, err, err_info,
                                       out_file_type);
       status = PROCESS_FILE_NO_FILE_PROCESSED;
       goto out;
@@ -3548,7 +3600,7 @@ process_cap_file(capture_file *cf, char *save_file, int out_file_type,
     /* Set up to print packet information. */
     if (print_packet_info) {
       if (!write_preamble(cf)) {
-        show_print_file_io_error(errno);
+        show_print_file_io_error();
         status = PROCESS_FILE_NO_FILE_PROCESSED;
         goto out;
       }
@@ -3662,8 +3714,7 @@ process_cap_file(capture_file *cf, char *save_file, int out_file_type,
 
     case PASS_READ_ERROR:
       /* Read error. */
-      cfile_read_failure_message("TShark", cf->filename, err_pass1,
-                                 err_info_pass1);
+      cfile_read_failure_message(cf->filename, err_pass1, err_info_pass1);
       status = PROCESS_FILE_ERROR;
       break;
 
@@ -3687,7 +3738,7 @@ process_cap_file(capture_file *cf, char *save_file, int out_file_type,
 
     case PASS_READ_ERROR:
       /* Read error. */
-      cfile_read_failure_message("TShark", cf->filename, err, err_info);
+      cfile_read_failure_message(cf->filename, err, err_info);
       status = PROCESS_FILE_ERROR;
       break;
 
@@ -3695,8 +3746,8 @@ process_cap_file(capture_file *cf, char *save_file, int out_file_type,
       /* Write error.
          XXX - framenum is not necessarily the frame number in
          the input file if there was a read filter. */
-      cfile_write_failure_message("TShark", cf->filename, save_file,
-                                  err, err_info, err_framenum, out_file_type);
+      cfile_write_failure_message(cf->filename, save_file, err, err_info,
+                                  err_framenum, out_file_type);
       status = PROCESS_FILE_ERROR;
       break;
 
@@ -3711,7 +3762,7 @@ process_cap_file(capture_file *cf, char *save_file, int out_file_type,
       if (pdh && out_file_name_res) {
         if (!wtap_dump_set_addrinfo_list(pdh, get_addrinfo_list())) {
           cmdarg_err("The file format \"%s\" doesn't support name resolution information.",
-                     wtap_file_type_subtype_short_string(out_file_type));
+                     wtap_file_type_subtype_name(out_file_type));
         }
       }
       /* Now close the capture file. */
@@ -3729,7 +3780,7 @@ process_cap_file(capture_file *cf, char *save_file, int out_file_type,
   } else {
     if (print_packet_info) {
       if (!write_finale()) {
-        show_print_file_io_error(errno);
+        show_print_file_io_error();
         status = PROCESS_FILE_ERROR;
       }
     }
@@ -3829,7 +3880,7 @@ process_packet_single_pass(capture_file *cf, epan_dissect_t *edt, gint64 offset,
         fflush(stdout);
 
       if (ferror(stdout)) {
-        show_print_file_io_error(errno);
+        show_print_file_io_error();
         exit(2);
       }
     }
@@ -4247,6 +4298,9 @@ print_packet(capture_file *cf, epan_dissect_t *edt)
     write_ek_proto_tree(output_fields, print_summary, print_hex, protocolfilter,
                         protocolfilter_flags, edt, &cf->cinfo, stdout);
     return !ferror(stdout);
+
+  default:
+    g_assert_not_reached();
   }
 
   if (print_hex) {
@@ -4368,14 +4422,14 @@ cf_open(capture_file *cf, const char *fname, unsigned int type, gboolean is_temp
   return CF_OK;
 
 fail:
-  cfile_open_failure_message("TShark", fname, *err, err_info);
+  cfile_open_failure_message(fname, *err, err_info);
   return CF_ERROR;
 }
 
 static void
-show_print_file_io_error(int err)
+show_print_file_io_error(void)
 {
-  switch (err) {
+  switch (errno) {
 
   case ENOSPC:
     cmdarg_err("Not all the packets could be printed because there is "
@@ -4390,13 +4444,37 @@ show_print_file_io_error(int err)
 #endif
 
   case EPIPE:
+    /*
+     * This almost certainly means "the next program after us in
+     * the pipeline exited before we were finished writing", so
+     * this isn't a real error, it just means we're done.  (We
+     * don't get SIGPIPE because libwireshark ignores SIGPIPE
+     * to avoid getting killed if writing to the MaxMind process
+     * gets SIGPIPE because that process died.)
+     *
+     * Presumably either that program exited deliberately (for
+     * example, "head -N" read N lines and printed them), in
+     * which case there's no error to report, or it terminated
+     * due to an error or a signal, in which case *that's* the
+     * error and that error has been reported.
+     */
+    break;
+
+  default:
+#ifdef _WIN32
+    if (errno == EINVAL && _doserrno == ERROR_NO_DATA) {
       /*
-       * This almost certainly means "the next program after us in
-       * the pipeline exited before we were finished writing", so
-       * this isn't a real error, it just means we're done.  (We
-       * don't get SIGPIPE because libwireshark ignores SIGPIPE
-       * to avoid getting killed if writing to the MaxMind process
-       * gets SIGPIPE because that process died.)
+       * XXX - on Windows, a write to a pipe where the read side
+       * has been closed apparently may return the Windows error
+       * ERROR_BROKEN_PIPE, which the Visual Studio C library maps
+       * to EPIPE, or may return the Windows error ERROR_NO_DATA,
+       * which the Visual Studio C library maps to EINVAL.
+       *
+       * Either of those almost certainly means "the next program
+       * after us in the pipeline exited before we were finished
+       * writing", so, if _doserrno is ERROR_NO_DATA, this isn't
+       * a real error, it just means we're done.  (Windows doesn't
+       * SIGPIPE.)
        *
        * Presumably either that program exited deliberately (for
        * example, "head -N" read N lines and printed them), in
@@ -4405,20 +4483,28 @@ show_print_file_io_error(int err)
        * error and that error has been reported.
        */
       break;
+    }
 
-  default:
+    /*
+     * It's a different error; report it, but with the error
+     * message for _doserrno, which will give more detail
+     * than just "Invalid argument".
+     */
     cmdarg_err("An error occurred while printing packets: %s.",
-      g_strerror(err));
+      win32strerror(_doserrno));
+#else
+    cmdarg_err("An error occurred while printing packets: %s.",
+      g_strerror(errno));
+#endif
     break;
   }
 }
 
 /*
- * General errors and warnings are reported with an console message
- * in TShark.
+ * Report an error in command-line arguments.
  */
 static void
-failure_warning_message(const char *msg_format, va_list ap)
+tshark_cmdarg_err(const char *msg_format, va_list ap)
 {
   fprintf(stderr, "tshark: ");
   vfprintf(stderr, msg_format, ap);
@@ -4426,34 +4512,13 @@ failure_warning_message(const char *msg_format, va_list ap)
 }
 
 /*
- * Open/create errors are reported with an console message in TShark.
+ * Report additional information for an error in command-line arguments.
  */
 static void
-open_failure_message(const char *filename, int err, gboolean for_writing)
+tshark_cmdarg_err_cont(const char *msg_format, va_list ap)
 {
-  fprintf(stderr, "tshark: ");
-  fprintf(stderr, file_open_error_message(err, for_writing), filename);
+  vfprintf(stderr, msg_format, ap);
   fprintf(stderr, "\n");
-}
-
-/*
- * Read errors are reported with an console message in TShark.
- */
-static void
-read_failure_message(const char *filename, int err)
-{
-  cmdarg_err("An error occurred while reading from the file \"%s\": %s.",
-             filename, g_strerror(err));
-}
-
-/*
- * Write errors are reported with an console message in TShark.
- */
-static void
-write_failure_message(const char *filename, int err)
-{
-  cmdarg_err("An error occurred while writing to the file \"%s\": %s.",
-             filename, g_strerror(err));
 }
 
 static void reset_epan_mem(capture_file *cf,epan_dissect_t *edt, gboolean tree, gboolean visual)
@@ -4469,16 +4534,6 @@ static void reset_epan_mem(capture_file *cf,epan_dissect_t *edt, gboolean tree, 
   cf->epan = tshark_epan_new(cf);
   epan_dissect_init(edt, cf->epan, tree, visual);
   cf->count = 0;
-}
-
-/*
- * Report additional information for an error in command-line arguments.
- */
-static void
-failure_message_cont(const char *msg_format, va_list ap)
-{
-  vfprintf(stderr, msg_format, ap);
-  fprintf(stderr, "\n");
 }
 
 /*

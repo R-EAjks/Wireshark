@@ -109,7 +109,7 @@ struct ptvcursor {
 	PROTO_REGISTRAR_GET_NTH(hfindex, hfinfo);			\
 	if (PTREE_DATA(tree)->count > prefs.gui_max_tree_items) {			\
 		free_block;						\
-		if (getenv("WIRESHARK_ABORT_ON_TOO_MANY_ITEMS") != NULL) \
+		if (wireshark_abort_on_too_many_items) \
 			g_error("Adding %s would put more than %d items in the tree -- possible infinite loop (max number of items can be increased in advanced preferences)", \
 			    hfinfo->abbrev, prefs.gui_max_tree_items);	\
 		/* Let the exception handler add items to the tree */	\
@@ -444,18 +444,21 @@ proto_compare_name(gconstpointer p1_arg, gconstpointer p2_arg)
 	return g_ascii_strcasecmp(p1->short_name, p2->short_name);
 }
 
-#ifdef HAVE_PLUGINS
 static GSList *dissector_plugins = NULL;
 
+#ifdef HAVE_PLUGINS
 void
 proto_register_plugin(const proto_plugin *plug)
 {
-	if (!plug) {
-		/* XXX print useful warning */
-		return;
-	}
 	dissector_plugins = g_slist_prepend(dissector_plugins, (proto_plugin *)plug);
 }
+#else /* HAVE_PLUGINS */
+void
+proto_register_plugin(const proto_plugin *plug _U_)
+{
+	g_warning("proto_register_plugin: built without support for binary plugins");
+}
+#endif /* HAVE_PLUGINS */
 
 static void
 call_plugin_register_protoinfo(gpointer data, gpointer user_data _U_)
@@ -476,7 +479,6 @@ call_plugin_register_handoff(gpointer data, gpointer user_data _U_)
 		plug->register_handoff();
 	}
 }
-#endif /* HAVE_PLUGINS */
 
 /* initialize data structures and register protocols and fields */
 void
@@ -527,12 +529,10 @@ proto_init(GSList *register_all_plugin_protocols_list,
 		((void (*)(register_cb, gpointer))l->data)(cb, client_data);
 	}
 
-#ifdef HAVE_PLUGINS
 	/* Now call the registration routines for all dissector plugins. */
 	if (cb)
 		(*cb)(RA_PLUGIN_REGISTER, NULL, client_data);
 	g_slist_foreach(dissector_plugins, call_plugin_register_protoinfo, NULL);
-#endif
 
 	/* Now call the "handoff registration" routines of all built-in
 	   dissectors; those routines register the dissector in other
@@ -545,12 +545,10 @@ proto_init(GSList *register_all_plugin_protocols_list,
 		((void (*)(register_cb, gpointer))l->data)(cb, client_data);
 	}
 
-#ifdef HAVE_PLUGINS
 	/* Now do the same with dissector plugins. */
 	if (cb)
 		(*cb)(RA_PLUGIN_HANDOFF, NULL, client_data);
 	g_slist_foreach(dissector_plugins, call_plugin_register_handoff, NULL);
-#endif
 
 	/* sort the protocols by protocol name */
 	protocols = g_list_sort(protocols, proto_compare_name);
@@ -643,10 +641,8 @@ proto_cleanup(void)
 	proto_free_deregistered_fields();
 	proto_cleanup_base();
 
-#ifdef HAVE_PLUGINS
 	g_slist_free(dissector_plugins);
 	dissector_plugins = NULL;
-#endif
 }
 
 static gboolean
@@ -1121,10 +1117,8 @@ ptvcursor_new_subtree_levels(ptvcursor_t *ptvc)
 	DISSECTOR_ASSERT(ptvc->pushed_tree_max <= SUBTREE_MAX_LEVELS-SUBTREE_ONCE_ALLOCATION_NUMBER);
 	ptvc->pushed_tree_max += SUBTREE_ONCE_ALLOCATION_NUMBER;
 
-	pushed_tree = (subtree_lvl *)wmem_alloc(wmem_packet_scope(), sizeof(subtree_lvl) * ptvc->pushed_tree_max);
+	pushed_tree = (subtree_lvl *)wmem_realloc(wmem_packet_scope(), (void *)ptvc->pushed_tree, sizeof(subtree_lvl) * ptvc->pushed_tree_max);
 	DISSECTOR_ASSERT(pushed_tree != NULL);
-	if (ptvc->pushed_tree)
-		memcpy(pushed_tree, ptvc->pushed_tree, ptvc->pushed_tree_max - SUBTREE_ONCE_ALLOCATION_NUMBER);
 	ptvc->pushed_tree = pushed_tree;
 }
 
@@ -2224,6 +2218,27 @@ get_time_value(proto_tree *tree, tvbuff_t *tvb, const gint start,
 				time_stamp->secs  = 0;
 				time_stamp->nsecs = 0;
 				report_type_length_mismatch(tree, "a time-in-milliseconds time stamp", length, (length < 4));
+			}
+			break;
+
+		case ENC_TIME_NSECS|ENC_BIG_ENDIAN:
+		case ENC_TIME_NSECS|ENC_LITTLE_ENDIAN:
+			/*
+			 * nanoseconds, 1 to 8 bytes.
+			 * For absolute times, it's nanoseconds since the
+			 * UN*X epoch.
+			 */
+
+			if (length >= 1 && length <= 8) {
+				guint64 nsecs;
+
+				nsecs = get_uint64_value(tree, tvb, start, length, encoding);
+				time_stamp->secs  = (time_t)(nsecs / 1000000000);
+				time_stamp->nsecs = (int)(nsecs % 1000000000);
+			} else {
+				time_stamp->secs  = 0;
+				time_stamp->nsecs = 0;
+				report_type_length_mismatch(tree, "a time-in-nanoseconds time stamp", length, (length < 4));
 			}
 			break;
 
@@ -3784,6 +3799,7 @@ proto_tree_add_item_ret_display_string_and_length(proto_tree *tree, int hfindex,
 	case FT_UINT_BYTES:
 		proto_tree_set_bytes(new_fi, value, n);
 		break;
+
 	default:
 		g_assert_not_reached();
 	}
@@ -6747,7 +6763,7 @@ proto_custom_set(proto_tree* tree, GSList *field_ids, gint occurrence,
 						} else {
 							number_out = hfinfo_char_value_format(hfinfo, number_buf, number);
 
-							g_strlcpy(expr+offset_e, number_out, size-offset_e);
+							(void) g_strlcpy(expr+offset_e, number_out, size-offset_e);
 						}
 
 						offset_e = (int)strlen(expr);
@@ -6781,7 +6797,7 @@ proto_custom_set(proto_tree* tree, GSList *field_ids, gint occurrence,
 						} else {
 							number_out = hfinfo_numeric_value_format(hfinfo, number_buf, number);
 
-							g_strlcpy(expr+offset_e, number_out, size-offset_e);
+							(void) g_strlcpy(expr+offset_e, number_out, size-offset_e);
 						}
 
 						offset_e = (int)strlen(expr);
@@ -6811,7 +6827,7 @@ proto_custom_set(proto_tree* tree, GSList *field_ids, gint occurrence,
 						} else {
 							number_out = hfinfo_numeric_value_format64(hfinfo, number_buf, number64);
 
-							g_strlcpy(expr+offset_e, number_out, size-offset_e);
+							(void) g_strlcpy(expr+offset_e, number_out, size-offset_e);
 						}
 
 						offset_e = (int)strlen(expr);
@@ -6879,7 +6895,7 @@ proto_custom_set(proto_tree* tree, GSList *field_ids, gint occurrence,
 
 				default:
 					/* for all others, just copy "result" to "expr" */
-					g_strlcpy(expr, result, size);
+					(void) g_strlcpy(expr, result, size);
 					break;
 			}
 
@@ -6983,13 +6999,13 @@ proto_item_prepend_text(proto_item *pi, const char *format, ...)
 			ITEM_LABEL_NEW(PNODE_POOL(pi), fi->rep);
 			proto_item_fill_label(fi, representation);
 		} else
-			g_strlcpy(representation, fi->rep->representation, ITEM_LABEL_LENGTH);
+			(void) g_strlcpy(representation, fi->rep->representation, ITEM_LABEL_LENGTH);
 
 		va_start(ap, format);
 		g_vsnprintf(fi->rep->representation,
 			ITEM_LABEL_LENGTH, format, ap);
 		va_end(ap);
-		g_strlcat(fi->rep->representation, representation, ITEM_LABEL_LENGTH);
+		(void) g_strlcat(fi->rep->representation, representation, ITEM_LABEL_LENGTH);
 	}
 }
 
@@ -8772,7 +8788,7 @@ register_string_errors(void)
 	proto_set_cant_toggle(proto_string_errors);
 }
 
-#define PROTO_PRE_ALLOC_HF_FIELDS_MEM (230000+PRE_ALLOC_EXPERT_FIELDS_MEM)
+#define PROTO_PRE_ALLOC_HF_FIELDS_MEM (235000+PRE_ALLOC_EXPERT_FIELDS_MEM)
 static int
 proto_register_field_init(header_field_info *hfinfo, const int parent)
 {
@@ -8949,7 +8965,7 @@ label_mark_truncated(char *label_str, gsize name_pos)
 		*last_char = '\0';
 
 	} else if (name_pos < ITEM_LABEL_LENGTH)
-		g_strlcpy(label_str + name_pos, trunc_str, ITEM_LABEL_LENGTH - name_pos);
+		(void) g_strlcpy(label_str + name_pos, trunc_str, ITEM_LABEL_LENGTH - name_pos);
 }
 
 static gsize
@@ -9026,7 +9042,7 @@ proto_item_fill_label(field_info *fi, gchar *label_str)
 	switch (hfinfo->type) {
 		case FT_NONE:
 		case FT_PROTOCOL:
-			g_strlcpy(label_str, hfinfo->name, ITEM_LABEL_LENGTH);
+			(void) g_strlcpy(label_str, hfinfo->name, ITEM_LABEL_LENGTH);
 			break;
 
 		case FT_BOOLEAN:
@@ -10038,7 +10054,7 @@ hfinfo_char_value_format_display(int display, char buf[7], guint32 value)
 				break;
 
 			default:
-				g_assert_not_reached();
+				REPORT_DISSECTOR_BUG("Invalid base: %d", FIELD_DISPLAY(display));
 			}
 		}
 		*(--ptr) = '\\';
@@ -10111,7 +10127,7 @@ hfinfo_number_value_format_display(const header_field_info *hfinfo, int display,
 			}
 
 		default:
-			g_assert_not_reached();
+			REPORT_DISSECTOR_BUG("Invalid base: %d", FIELD_DISPLAY(display));
 	}
 	return ptr;
 }
@@ -10151,7 +10167,7 @@ hfinfo_number_value_format_display64(const header_field_info *hfinfo, int displa
 			return ptr;
 
 		default:
-			g_assert_not_reached();
+			REPORT_DISSECTOR_BUG("Invalid base: %d", FIELD_DISPLAY(display));
 	}
 
 	return ptr;
@@ -10173,7 +10189,7 @@ hfinfo_number_value_format(const header_field_info *hfinfo, char buf[32], guint3
 }
 
 static const char *
-hfinfo_number_value_format64(const header_field_info *hfinfo, char buf[64], guint64 value)
+hfinfo_number_value_format64(const header_field_info *hfinfo, char buf[48], guint64 value)
 {
 	int display = hfinfo->display;
 
@@ -10234,7 +10250,7 @@ hfinfo_numeric_value_format(const header_field_info *hfinfo, char buf[32], guint
 }
 
 static const char *
-hfinfo_numeric_value_format64(const header_field_info *hfinfo, char buf[64], guint64 value)
+hfinfo_numeric_value_format64(const header_field_info *hfinfo, char buf[48], guint64 value)
 {
 	/* Get the underlying BASE_ value */
 	int display = FIELD_DISPLAY(hfinfo->display);
@@ -10291,7 +10307,7 @@ hfinfo_number_vals_format(const header_field_info *hfinfo, char buf[32], guint32
 }
 
 static const char *
-hfinfo_number_vals_format64(const header_field_info *hfinfo, char buf[64], guint64 value)
+hfinfo_number_vals_format64(const header_field_info *hfinfo, char buf[48], guint64 value)
 {
 	/* Get the underlying BASE_ value */
 	int display = FIELD_DISPLAY(hfinfo->display);
@@ -11504,12 +11520,6 @@ construct_match_selected_string(field_info *finfo, epan_dissect_t *edt,
 			}
 			break;
 
-		case FT_PCRE:
-			/* FT_PCRE never appears as a type for a registered field. It is
-			 * only used internally. */
-			DISSECTOR_ASSERT_NOT_REACHED();
-			break;
-
 		/* By default, use the fvalue's "to_string_repr" method. */
 		default:
 			/* Figure out the string length needed.
@@ -11586,7 +11596,7 @@ proto_item_add_bitmask_tree(proto_item *item, tvbuff_t *tvb, const int offset,
 		REPORT_DISSECTOR_BUG("Illegal call of proto_item_add_bitmask_tree without fields");
 
 	if (len < 0 || len > 8)
-		g_assert_not_reached();
+		REPORT_DISSECTOR_BUG("Invalid len: %d", len);
 	/**
 	 * packet-frame.c uses len=0 since the value is taken from the packet
 	 * metadata, not the packet bytes. In that case, assume that all bits
@@ -12599,8 +12609,8 @@ _proto_tree_add_bits_format_value(proto_tree *tree, const int hfindex,
 
 	str = decode_bits_in_field(bit_offset, no_of_bits, value);
 
-	g_strlcat(str, " = ", 256+64);
-	g_strlcat(str, hf_field->name, 256+64);
+	(void) g_strlcat(str, " = ", 256+64);
+	(void) g_strlcat(str, hf_field->name, 256+64);
 
 	/*
 	 * This function does not receive an actual value but a dimensionless pointer to that value.
@@ -12949,6 +12959,7 @@ const value_string proto_checksum_vals[] = {
 	{ PROTO_CHECKSUM_E_GOOD,       "Good" },
 	{ PROTO_CHECKSUM_E_UNVERIFIED, "Unverified" },
 	{ PROTO_CHECKSUM_E_NOT_PRESENT, "Not present" },
+	{ PROTO_CHECKSUM_E_ILLEGAL,    "Illegal" },
 
 	{ 0,        NULL }
 };

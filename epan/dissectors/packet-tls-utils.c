@@ -448,6 +448,7 @@ const value_string ssl_extension_curves[] = {
     { 28, "brainpoolP512r1" }, /* RFC 7027 */
     { 29, "x25519" }, /* RFC 8446 / RFC 8422 */
     { 30, "x448" }, /* RFC 8446 / RFC 8422 */
+    { 41, "curveSM2" }, /* RFC 8998 */
     { 256, "ffdhe2048" }, /* RFC 7919 */
     { 257, "ffdhe3072" }, /* RFC 7919 */
     { 258, "ffdhe4096" }, /* RFC 7919 */
@@ -825,7 +826,7 @@ static const value_string ssl_31_ciphersuite[] = {
     { 0x00C3, "TLS_DHE_DSS_WITH_CAMELLIA_256_CBC_SHA256" },
     { 0x00C4, "TLS_DHE_RSA_WITH_CAMELLIA_256_CBC_SHA256" },
     { 0x00C5, "TLS_DH_anon_WITH_CAMELLIA_256_CBC_SHA256" },
-    /* draft-yang-tls-tls13-sm-suites */
+    /* RFC 8998 */
     { 0x00C6, "TLS_SM4_GCM_SM3" },
     { 0x00C7, "TLS_SM4_CCM_SM3" },
     /* 0x00,0xC8-FE Unassigned */
@@ -1247,6 +1248,7 @@ const value_string tls13_signature_algorithm[] = {
     { 0x0503, "ecdsa_secp384r1_sha384" },
     { 0x0601, "rsa_pkcs1_sha512" },
     { 0x0603, "ecdsa_secp521r1_sha512" },
+    { 0x0708, "sm2sig_sm3" },
     { 0x0804, "rsa_pss_rsae_sha256" },
     { 0x0805, "rsa_pss_rsae_sha384" },
     { 0x0806, "rsa_pss_rsae_sha512" },
@@ -1950,6 +1952,7 @@ const value_string quic_transport_parameter_id[] = {
     { SSL_HND_QUIC_TP_GREASE_QUIC_BIT, "grease_quic_bit" },
     { SSL_HND_QUIC_TP_ENABLE_TIME_STAMP, "enable_time_stamp" },
     { SSL_HND_QUIC_TP_ENABLE_TIME_STAMP_V2, "enable_time_stamp_v2" },
+    { SSL_HND_QUIC_TP_VERSION_NEGOTIATION, "version_negotiation" },
     { SSL_HND_QUIC_TP_MIN_ACK_DELAY, "min_ack_delay" },
     { SSL_HND_QUIC_TP_GOOGLE_USER_AGENT, "google_user_agent" },
     { SSL_HND_QUIC_TP_GOOGLE_KEY_UPDATE_NOT_YET_SUPPORTED, "google_key_update_not_yet_supported" },
@@ -2938,6 +2941,15 @@ static const SslCipherSuite cipher_suites[]={
     {0xC017,KEX_ECDH_ANON,      ENC_3DES,       DIG_SHA,    MODE_CBC   },   /* TLS_ECDH_anon_WITH_3DES_EDE_CBC_SHA */
     {0xC018,KEX_ECDH_ANON,      ENC_AES,        DIG_SHA,    MODE_CBC   },   /* TLS_ECDH_anon_WITH_AES_128_CBC_SHA */
     {0xC019,KEX_ECDH_ANON,      ENC_AES256,     DIG_SHA,    MODE_CBC   },   /* TLS_ECDH_anon_WITH_AES_256_CBC_SHA */
+    {0xC01A,KEX_SRP_SHA,        ENC_3DES,       DIG_SHA,    MODE_CBC   },   /* TLS_SRP_SHA_WITH_3DES_EDE_CBC_SHA */
+    {0xC01B,KEX_SRP_SHA_RSA,    ENC_3DES,       DIG_SHA,    MODE_CBC   },   /* TLS_SRP_SHA_RSA_WITH_3DES_EDE_CBC_SHA */
+    {0xC01C,KEX_SRP_SHA_DSS,    ENC_3DES,       DIG_SHA,    MODE_CBC   },   /* TLS_SRP_SHA_DSS_WITH_3DES_EDE_CBC_SHA */
+    {0xC01D,KEX_SRP_SHA,        ENC_AES,        DIG_SHA,    MODE_CBC   },   /* TLS_SRP_SHA_WITH_AES_128_CBC_SHA */
+    {0xC01E,KEX_SRP_SHA_RSA,    ENC_AES,        DIG_SHA,    MODE_CBC   },   /* TLS_SRP_SHA_RSA_WITH_AES_128_CBC_SHA */
+    {0xC01F,KEX_SRP_SHA_DSS,    ENC_AES,        DIG_SHA,    MODE_CBC   },   /* TLS_SRP_SHA_DSS_WITH_AES_128_CBC_SHA */
+    {0xC020,KEX_SRP_SHA,        ENC_AES256,     DIG_SHA,    MODE_CBC   },   /* TLS_SRP_SHA_WITH_AES_256_CBC_SHA */
+    {0xC021,KEX_SRP_SHA_RSA,    ENC_AES256,     DIG_SHA,    MODE_CBC   },   /* TLS_SRP_SHA_RSA_WITH_AES_256_CBC_SHA */
+    {0xC022,KEX_SRP_SHA_DSS,    ENC_AES256,     DIG_SHA,    MODE_CBC   },   /* TLS_SRP_SHA_DSS_WITH_AES_256_CBC_SHA */
     {0xC023,KEX_ECDHE_ECDSA,    ENC_AES,        DIG_SHA256, MODE_CBC   },   /* TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256 */
     {0xC024,KEX_ECDHE_ECDSA,    ENC_AES256,     DIG_SHA384, MODE_CBC   },   /* TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384 */
     {0xC025,KEX_ECDH_ECDSA,     ENC_AES,        DIG_SHA256, MODE_CBC   },   /* TLS_ECDH_ECDSA_WITH_AES_128_CBC_SHA256 */
@@ -7584,11 +7596,21 @@ ssl_dissect_hnd_hello_ext_quic_transport_parameters(ssl_common_dissect_t *hf, tv
                 offset += parameter_length;
             break;
             case SSL_HND_QUIC_TP_GOOGLE_QUIC_VERSION:
-                for (i = 0; i < parameter_length; i += 4) {
-                    proto_tree_add_item(parameter_tree, hf->hf.hs_ext_quictp_parameter_google_quic_version,
-                                        tvb, offset + i, 4, ENC_BIG_ENDIAN);
-		}
-                offset += parameter_length;
+                proto_tree_add_item(parameter_tree, hf->hf.hs_ext_quictp_parameter_google_quic_version,
+                                    tvb, offset, 4, ENC_BIG_ENDIAN);
+                offset += 4;
+                if (hnd_type == SSL_HND_ENCRYPTED_EXTENSIONS) { /* From server */
+                    guint32 versions_length;
+
+                    proto_tree_add_item_ret_uint(parameter_tree, hf->hf.hs_ext_quictp_parameter_google_supported_versions_length,
+                                                 tvb, offset, 1, ENC_NA, &versions_length);
+                    offset += 1;
+                    for (i = 0; i < versions_length / 4; i++) {
+                        quic_proto_tree_add_version(tvb, parameter_tree,
+                                                    hf->hf.hs_ext_quictp_parameter_google_supported_version, offset);
+                        offset += 4;
+                    }
+                }
             break;
             case SSL_HND_QUIC_TP_GOOGLE_INITIAL_RTT:
                 proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_google_initial_rtt,
@@ -7625,6 +7647,44 @@ ssl_dissect_hnd_hello_ext_quic_transport_parameters(ssl_common_dissect_t *hf, tv
                 proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_enable_time_stamp_v2,
                                                tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
                 offset += parameter_length;
+            break;
+	    case SSL_HND_QUIC_TP_VERSION_NEGOTIATION:
+	        if (hnd_type == SSL_HND_CLIENT_HELLO) {
+                    quic_proto_tree_add_version(tvb, parameter_tree,
+                                                hf->hf.hs_ext_quictp_parameter_currently_attempted_version, offset);
+                    offset += 4;
+                    quic_proto_tree_add_version(tvb, parameter_tree,
+                                                hf->hf.hs_ext_quictp_parameter_previously_attempted_version, offset);
+                    offset += 4;
+                    proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_received_negotiation_version_count,
+                                                   tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
+                    offset += len;
+                    for (i = 0; i < value; i++) {
+                        quic_proto_tree_add_version(tvb, parameter_tree,
+                                                    hf->hf.hs_ext_quictp_parameter_received_negotiation_version, offset);
+                        offset += 4;
+                    }
+                    proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_compatible_version_count,
+                                                   tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
+                    offset += len;
+                    for (i = 0; i < value; i++) {
+                        quic_proto_tree_add_version(tvb, parameter_tree,
+                                                    hf->hf.hs_ext_quictp_parameter_compatible_version, offset);
+                        offset += 4;
+                    }
+                } else {
+                    quic_proto_tree_add_version(tvb, parameter_tree,
+                                                hf->hf.hs_ext_quictp_parameter_negotiated_version, offset);
+                    offset += 4;
+                    proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_supported_version_count,
+                                                   tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
+                    offset += len;
+                    for (i = 0; i < value; i++) {
+                        quic_proto_tree_add_version(tvb, parameter_tree,
+                                                    hf->hf.hs_ext_quictp_parameter_supported_version, offset);
+                        offset += 4;
+                    }
+                }
             break;
             case SSL_HND_QUIC_TP_FACEBOOK_PARTIAL_RELIABILITY:
                 proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_facebook_partial_reliability,
@@ -7985,6 +8045,29 @@ ssl_dissect_hnd_hello_ext_ec_point_formats(ssl_common_dissect_t *hf, tvbuff_t *t
         offset++;
         ecpf_length--;
     }
+
+    return offset;
+}
+
+static gint
+ssl_dissect_hnd_hello_ext_srp(ssl_common_dissect_t *hf, tvbuff_t *tvb,
+                               packet_info *pinfo, proto_tree *tree,
+                               guint32 offset, guint32 next_offset)
+{
+    /* https://tools.ietf.org/html/rfc5054#section-2.8.1
+     *  opaque srp_I<1..2^8-1>;
+     */
+    guint32 username_len;
+
+    if (!ssl_add_vector(hf, tvb, pinfo, tree, offset, next_offset, &username_len,
+                        hf->hf.hs_ext_srp_len, 1, G_MAXUINT8)) {
+        return next_offset;
+    }
+    offset++;
+
+    proto_tree_add_item(tree, hf->hf.hs_ext_srp_username,
+                        tvb, offset, username_len, ENC_UTF_8|ENC_NA);
+    offset += username_len;
 
     return offset;
 }
@@ -9158,11 +9241,21 @@ ssl_dissect_hnd_cert_url(ssl_common_dissect_t *hf, tvbuff_t *tvb, proto_tree *tr
 void
 ssl_dissect_hnd_compress_certificate(ssl_common_dissect_t *hf, tvbuff_t *tvb, proto_tree *tree,
                                       guint32 offset, guint32 offset_end, packet_info *pinfo,
-                                      SslSession *session _U_, SslDecryptSession *ssl _U_,
-                                      gboolean is_from_server _U_, gboolean is_dtls _U_)
+                                      SslSession *session, SslDecryptSession *ssl,
+                                      gboolean is_from_server, gboolean is_dtls)
 {
+    guint32 algorithm, uncompressed_length;
     guint32 compressed_certificate_message_length;
+    tvbuff_t *uncompressed_tvb = NULL;
+    proto_item *ti;
     /*
+     * enum {
+     *     zlib(1),
+     *     brotli(2),
+     *     zstd(3),
+     *     (65535)
+     * } CertificateCompressionAlgorithm;
+     *
      * struct {
      *       CertificateCompressionAlgorithm algorithm;
      *       uint24 uncompressed_length;
@@ -9170,12 +9263,12 @@ ssl_dissect_hnd_compress_certificate(ssl_common_dissect_t *hf, tvbuff_t *tvb, pr
      * } CompressedCertificate;
      */
 
-    proto_tree_add_item(tree, hf->hf.hs_ext_compress_certificate_algorithm,
-                        tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint(tree, hf->hf.hs_ext_compress_certificate_algorithm,
+                                 tvb, offset, 2, ENC_BIG_ENDIAN, &algorithm);
     offset += 2;
 
-    proto_tree_add_item(tree, hf->hf.hs_ext_compress_certificate_uncompressed_length,
-                       tvb, offset, 3, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint(tree, hf->hf.hs_ext_compress_certificate_uncompressed_length,
+                                 tvb, offset, 3, ENC_BIG_ENDIAN, &uncompressed_length);
     offset += 3;
 
     /* opaque compressed_certificate_message<1..2^24-1>; */
@@ -9185,10 +9278,33 @@ ssl_dissect_hnd_compress_certificate(ssl_common_dissect_t *hf, tvbuff_t *tvb, pr
     }
     offset += 3;
 
-    proto_tree_add_item(tree, hf->hf.hs_ext_compress_certificate_compressed_certificate_message,
-                        tvb, offset, compressed_certificate_message_length, ENC_NA);
+    ti = proto_tree_add_item(tree, hf->hf.hs_ext_compress_certificate_compressed_certificate_message,
+                             tvb, offset, compressed_certificate_message_length, ENC_NA);
 
-    /* TODO: Add Certificate decompression following algo... (Need to implement brotli too)*/
+    /* Certificate decompression following algorithm */
+    switch (algorithm) {
+    case 2: /* brotli */
+        uncompressed_tvb = tvb_child_uncompress_brotli(tvb, tvb, offset, compressed_certificate_message_length);
+	break;
+    /* TODO: add other algorithms */
+    }
+
+    if (uncompressed_tvb) {
+        proto_tree *uncompressed_tree;
+
+        if (uncompressed_length != tvb_captured_length(uncompressed_tvb)) {
+            proto_tree_add_expert_format(tree, pinfo, &hf->ei.decompression_error,
+                                         tvb, offset, offset_end - offset,
+                                         "Invalid uncompressed length %u (expected %u)",
+                                         tvb_captured_length(uncompressed_tvb),
+                                         uncompressed_length);
+        } else {
+            uncompressed_tree = proto_item_add_subtree(ti, hf->ett.uncompressed_certificates);
+            ssl_dissect_hnd_cert(hf, uncompressed_tvb, uncompressed_tree,
+                                 0, uncompressed_length, pinfo, session, ssl, is_from_server, is_dtls);
+            add_new_data_source(pinfo, uncompressed_tvb, "Uncompressed certificate(s)");
+        }
+    }
 }
 
 /* Dissection of TLS Extensions in Client Hello, Server Hello, etc. {{{ */
@@ -9261,6 +9377,9 @@ ssl_dissect_hnd_extension(ssl_common_dissect_t *hf, tvbuff_t *tvb, proto_tree *t
             break;
         case SSL_HND_HELLO_EXT_EC_POINT_FORMATS:
             offset = ssl_dissect_hnd_hello_ext_ec_point_formats(hf, tvb, ext_tree, offset);
+            break;
+        case SSL_HND_HELLO_EXT_SRP:
+            offset = ssl_dissect_hnd_hello_ext_srp(hf, tvb, pinfo, ext_tree, offset, next_offset);
             break;
         case SSL_HND_HELLO_EXT_SIGNATURE_ALGORITHMS:
         case SSL_HND_HELLO_EXT_SIGNATURE_ALGORITHMS_CERT: /* since TLS 1.3 draft -23 */

@@ -10,11 +10,8 @@
 #ifndef __EPAN_H__
 #define __EPAN_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
-
 #include <glib.h>
+
 #include <epan/tvbuff.h>
 #include <epan/prefs.h>
 #include <epan/frame_data.h>
@@ -22,11 +19,15 @@ extern "C" {
 #include <epan/register.h>
 #include "ws_symbol_export.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 /** Global variable holding the content of the corresponding environment variable
  * to save fetching it repeatedly.
  */
 extern gboolean wireshark_abort_on_dissector_bug;
+extern gboolean wireshark_abort_on_too_many_items;
 
 typedef struct epan_dissect epan_dissect_t;
 
@@ -51,10 +52,6 @@ struct packet_provider_funcs {
 	const char *(*get_interface_description)(struct packet_provider_data *prov, guint32 interface_id);
 	const char *(*get_user_comment)(struct packet_provider_data *prov, const frame_data *fd);
 };
-
-#ifdef HAVE_PLUGINS
-extern plugins_t *libwireshark_plugins;
-#endif
 
 /**
 	@section Epan The Enhanced Packet ANalyzer
@@ -118,7 +115,6 @@ e_prefs *epan_load_settings(void);
 WS_DLL_PUBLIC
 void epan_cleanup(void);
 
-#ifdef HAVE_PLUGINS
 typedef struct {
 	void (*init)(void);
 	void (*dissect_init)(epan_dissect_t *);
@@ -130,7 +126,14 @@ typedef struct {
 } epan_plugin;
 
 WS_DLL_PUBLIC void epan_register_plugin(const epan_plugin *plugin);
-#endif
+
+/** Returns_
+ *     0 if plugins can be loaded for all of libwireshark (tap, dissector, epan).
+ *     1 if plugins are not supported by the platform.
+ *    -1 if plugins were disabled in the build configuration.
+ */
+WS_DLL_PUBLIC int epan_plugins_supported(void);
+
 /**
  * Initialize the table of conversations.  Conversations are identified by
  * their endpoints; they are used for protocols such as IP, TCP, and UDP,

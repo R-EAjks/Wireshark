@@ -60,6 +60,17 @@ extern "C" {
     #define DIAG_OFF_PEDANTIC
     #define DIAG_ON_PEDANTIC
   #endif
+
+  /*
+   * Do any pre-5.0 versions of Clang understand -Winitializer-overrides?
+   */
+  #if WS_IS_AT_LEAST_CLANG_VERSION(4,0)
+    #define DIAG_OFF_INIT_TWICE DIAG_OFF(initializer-overrides)
+    #define DIAG_ON_INIT_TWICE DIAG_ON(initializer-overrides)
+  #else
+    #define DIAG_OFF_INIT_TWICE
+    #define DIAG_ON_INIT_TWICE
+  #endif
 #elif defined(__GNUC__)
   /*
    * GCC, or a compiler (other than Clang) that claims to be GCC.
@@ -83,9 +94,18 @@ extern "C" {
      */
     #define DIAG_OFF_PEDANTIC DIAG_OFF(pedantic)
     #define DIAG_ON_PEDANTIC DIAG_ON(pedantic)
+
+    /*
+     * GCC 4.2 and later understand -Woverride-init.
+     */
+    #define DIAG_OFF_INIT_TWICE DIAG_OFF(override-init)
+    #define DIAG_ON_INIT_TWICE DIAG_ON(override-init)
   #else
     #define DIAG_OFF_PEDANTIC
     #define DIAG_ON_PEDANTIC
+
+    #define DIAG_OFF_INIT_TWICE
+    #define DIAG_ON_INIT_TWICE
   #endif
 #endif
 
@@ -102,6 +122,8 @@ extern "C" {
   #define DIAG_ON(x)
   #define DIAG_OFF_PEDANTIC
   #define DIAG_ON_PEDANTIC
+  #define DIAG_OFF_INIT_TWICE
+  #define DIAG_ON_INIT_TWICE
 #endif
 
 /* Use for clang specific pragmas, so we can keep -Wpragmas enabled */
@@ -184,6 +206,27 @@ extern "C" {
     #define DIAG_ON_FLEX \
       DIAG_ON(sign-compare)
   #endif
+#endif
+
+/*
+ * Suppress warnings about casting away constness.
+ * Do this only if you know that the pointer is to something that can
+ * be written and, in this context, should be writable.
+ */
+#if defined(__GNUC__) || defined(__clang__)
+  /*
+   * GCC or a compiler that claims to be GCC-compatible.
+   * We throw in Clang just in case clang-cl doesn't define
+   * __GNUC__; if it does, __GNUC__ should suffice.
+   */
+  #define DIAG_OFF_CAST_AWAY_CONST DIAG_OFF(cast-qual)
+  #define DIAG_ON_CAST_AWAY_CONST DIAG_OFF(cast-qual)
+#elif defined(_MSC_VER)
+  #define DIAG_OFF_CAST_AWAY_CONST
+  #define DIAG_ON_CAST_AWAY_CONST
+#else
+  #define DIAG_OFF_CAST_AWAY_CONST
+  #define DIAG_ON_CAST_AWAY_CONST
 #endif
 
 /*

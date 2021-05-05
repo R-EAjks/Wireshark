@@ -23,6 +23,7 @@
 #include <epan/to_str.h>
 #include <epan/proto_data.h>
 #include <wsutil/pow2.h>
+#include <wsutil/pint.h>
 #include "packet-gsm_map.h"
 #include "packet-gsm_a_common.h"
 #include "packet-e212.h"
@@ -3478,9 +3479,8 @@ de_esm_pdn_addr(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_,
 {
     guint32 curr_offset;
     guint8  pdn_type;
-    ws_in6_addr   interface_id;
+    guint8  interface_id[8];
 
-    memset(&interface_id, 0, sizeof(interface_id));
     curr_offset = offset;
 
     pdn_type  = tvb_get_guint8(tvb, offset) & 0x7;
@@ -3500,8 +3500,10 @@ de_esm_pdn_addr(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_,
              * contains an IPv6 interface identifier. Bit 8 of octet 4 represents the most significant bit
              * of the IPv6 interface identifier and bit 1 of octet 11 the least significant bit.
              */
-            tvb_memcpy(tvb, (guint8*)&interface_id.bytes[8], curr_offset, 8);
-            proto_tree_add_ipv6(tree, hf_nas_eps_esm_pdn_ipv6_if_id, tvb, curr_offset, 8, &interface_id);
+            tvb_memcpy(tvb, interface_id, curr_offset, 8);
+            proto_tree_add_bytes_format_value(tree, hf_nas_eps_esm_pdn_ipv6_if_id, tvb, curr_offset, 8, NULL,
+                                              "::%x:%x:%x:%x", pntoh16(&interface_id[0]), pntoh16(&interface_id[2]),
+                                              pntoh16(&interface_id[4]), pntoh16(&interface_id[6]));
             curr_offset+=8;
             break;
         case 3:
@@ -3512,8 +3514,10 @@ de_esm_pdn_addr(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_,
              * significant bit. Bit 8 of octet 12 represents the most significant bit of the IPv4 address
              * and bit 1 of octet 15 the least significant bit.
              */
-            tvb_memcpy(tvb, (guint8*)&interface_id.bytes[8], curr_offset, 8);
-            proto_tree_add_ipv6(tree, hf_nas_eps_esm_pdn_ipv6_if_id, tvb, curr_offset, 8, &interface_id);
+            tvb_memcpy(tvb, interface_id, curr_offset, 8);
+            proto_tree_add_bytes_format_value(tree, hf_nas_eps_esm_pdn_ipv6_if_id, tvb, curr_offset, 8, NULL,
+                                              "::%x:%x:%x:%x", pntoh16(&interface_id[0]), pntoh16(&interface_id[2]),
+                                              pntoh16(&interface_id[4]), pntoh16(&interface_id[6]));
             curr_offset+=8;
             proto_tree_add_item(tree, hf_nas_eps_esm_pdn_ipv4, tvb, curr_offset, 4, ENC_BIG_ENDIAN);
             curr_offset+=4;
@@ -3559,12 +3563,12 @@ static const value_string nas_eps_esm_pdn_type_values[] = {
 /*
  * 9.9.4.13a Re-attempt indicator
  */
-const true_false_string nas_eps_esm_eplmnc_value = {
+static const true_false_string nas_eps_esm_eplmnc_value = {
     "UE is not allowed to re-attempt the procedure in an equivalent PLMN",
     "UE is allowed to re-attempt the procedure in an equivalent PLMN"
 };
 
-const true_false_string nas_eps_esm_ratc_value = {
+static const true_false_string nas_eps_esm_ratc_value = {
     "UE is not allowed to re-attempt the procedure in A/Gb mode or Iu mode or N1 mode",
     "UE is allowed to re-attempt the procedure in A/Gb mode or Iu mode or N1 mode"
 };
@@ -3851,11 +3855,9 @@ de_esm_user_data_cont(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_,
 
     it = proto_tree_add_item(tree, hf_nas_eps_esm_user_data_cont, tvb, offset, len, ENC_NA);
     if (g_nas_eps_decode_user_data_container_as != DECODE_USER_DATA_AS_NONE) {
-        proto_tree *subtree;
         tvbuff_t *user_data_cont_tvb;
         volatile dissector_handle_t handle;
 
-        subtree = proto_item_add_subtree(it, ett_nas_eps_esm_user_data_cont);
         user_data_cont_tvb = tvb_new_subset_length_caplen(tvb, offset, len, len);
         if (g_nas_eps_decode_user_data_container_as == DECODE_USER_DATA_AS_IP) {
             guint8 first_byte = tvb_get_guint8(user_data_cont_tvb, 0);
@@ -3876,9 +3878,11 @@ de_esm_user_data_cont(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_,
             col_append_str(pinfo->cinfo, COL_INFO, ", ");
             col_set_fence(pinfo->cinfo, COL_INFO);
             TRY {
-                call_dissector_only(handle, user_data_cont_tvb, pinfo, subtree, NULL);
+                proto_tree *toptree = proto_tree_get_root(tree);
+                call_dissector_only(handle, user_data_cont_tvb, pinfo, toptree, NULL);
             } CATCH_BOUNDS_ERRORS {
                 /* Dissection exception: message was probably non IP and heuristic was too weak */
+                proto_tree *subtree = proto_item_add_subtree(it, ett_nas_eps_esm_user_data_cont);
                 show_exception(user_data_cont_tvb, pinfo, subtree, EXCEPT_CODE, GET_MESSAGE);
             } ENDTRY
         }
@@ -8087,7 +8091,7 @@ proto_register_nas_eps(void)
     },
     { &hf_nas_eps_esm_pdn_ipv6_if_id,
         {"PDN IPv6 if id", "nas_eps.esm.pdn_ipv6_if_id",
-        FT_IPv6, BASE_NONE, NULL, 0x0,
+        FT_BYTES, BASE_NONE, NULL, 0x0,
         NULL, HFILL}
     },
     { &hf_nas_eps_esm_eplmnc,

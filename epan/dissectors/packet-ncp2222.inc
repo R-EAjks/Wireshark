@@ -2117,7 +2117,7 @@ ncp_hash_insert(conversation_t *conversation, guint8 nw_sequence,
     request_value->req_nds_flags = 0;
     request_value->nds_request_verb = 0;
     request_value->nds_version = 0;
-    g_strlcpy(request_value->object_name, "", 256);
+    (void) g_strlcpy(request_value->object_name, "", 256);
     request_value->nds_frag = TRUE;
 
     wmem_map_insert(ncp_req_hash, request_key, request_value);
@@ -2137,7 +2137,7 @@ ncp_eid_hash_insert(guint32 nw_eid)
     request_eid_key->nw_eid = nw_eid;
 
     request_eid_value = wmem_new0(wmem_file_scope(), ncp_req_eid_hash_value);
-    g_strlcpy(request_eid_value->object_name, "", 256);
+    (void) g_strlcpy(request_eid_value->object_name, "", 256);
 
     wmem_map_insert(ncp_req_eid_hash, request_eid_key, request_eid_value);
 
@@ -5253,7 +5253,7 @@ process_multivalues(proto_tree *ncp_tree, tvbuff_t *tvb, packet_info *pinfo, nds
         ioffset = ioffset + 4;
         ioffset = print_es_type(estree, tvb, values, value3, ioffset);
         /* values.vstring is being overwritten. So store the resolve name to a global value */
-        g_strlcpy(mv_resolve_name_string, values->vstring, 128);
+        (void) g_strlcpy(mv_resolve_name_string, values->vstring, 128);
         value4 = tvb_get_letohl(tvb, ioffset);
         aitem = proto_tree_add_uint_format(ntree, hf_referral_record, tvb, ioffset, 4,
                                            value4, "Referral Protocols - %u", value4);
@@ -6804,7 +6804,6 @@ void
 nds_defrag(tvbuff_t *tvb, packet_info *pinfo, guint32 nw_connection, guint8 sequence, guint16 type, proto_tree *tree, struct novell_tap *ncp_tap)
 {
     int                 i, frag_count=0;
-    guint               len=0;
     guint32             tid = 1;
     tvbuff_t            *frag_tvb = NULL;
     fragment_head       *fd_head;
@@ -6898,6 +6897,8 @@ nds_defrag(tvbuff_t *tvb, packet_info *pinfo, guint32 nw_connection, guint8 sequ
     /* Now we process the fragments */
     if (request_value->nds_frag || (request_value->nds_end_frag == pinfo->num))
     {
+        guint len;
+
         /* Check to see of this is a fragment. If so then mark as a fragment. */
         if (frags[frag_count].nds_frag==0xffffffff) {
             request_value->nds_frag = FALSE;
@@ -7960,7 +7961,7 @@ dissect_nds_reply(tvbuff_t *tvb, packet_info *pinfo,
             if (!request_eid_value) {
                 request_eid_value = ncp_eid_hash_insert(global_eid);
                 if (global_object_name != NULL)
-                    g_strlcpy(request_eid_value->object_name, global_object_name, 256);
+                    (void) g_strlcpy(request_eid_value->object_name, global_object_name, 256);
                 else
                     request_eid_value->object_name[0] = '\0';
             }
@@ -7998,7 +7999,6 @@ dissect_ncp_reply(tvbuff_t *tvb, packet_info *pinfo,
     guint8               completion_code=0;
     ptvcursor_t         *ptvc = NULL;
     const char          *error_string;
-    guint32              nds_offset = 0;
     guint32              nds_error_code = 0;
     /*guint32              nds_reply_buffer = 0;*/
     const char          *nds_error_string = NULL;
@@ -8118,6 +8118,8 @@ dissect_ncp_reply(tvbuff_t *tvb, packet_info *pinfo,
     if (type == NCP_SERVICE_REPLY && ncp_rec && ncp_rec->func==0x68 &&
         ncp_rec->subfunc==0x02 && (tvb_reported_length_remaining(tvb, 8) >= 8))
     {
+        guint32 nds_offset;
+
         nds_offset = 8;
         /*nds_reply_buffer = tvb_get_letohl(tvb, nds_offset);*/
         nds_offset += 4;
@@ -8312,7 +8314,7 @@ dissect_nds_request(tvbuff_t *tvb, packet_info *pinfo,
     const char*              global_object_name = NULL;
     guint32                  global_eid=0;
     gboolean                 resolve_eid=FALSE;
-    guint32                  global_flags, nds_prot_flags=0;
+    guint32                  global_flags;
     guint32                  version, value1;
     nds_val                  temp_value;
 
@@ -8459,6 +8461,7 @@ dissect_nds_request(tvbuff_t *tvb, packet_info *pinfo,
             }
 
             if (nds_frag == 0xffffffff) {
+                guint32 nds_prot_flags;
 
                 if (ncp_tree) {
                     proto_tree_add_item(ncp_tree, hf_ncp_fragment_size, tvb, 12, 4, ENC_LITTLE_ENDIAN);
@@ -8506,7 +8509,7 @@ dissect_nds_request(tvbuff_t *tvb, packet_info *pinfo,
                         col_append_fstr(pinfo->cinfo, COL_INFO, " -> %s", global_object_name);
                         if (!pinfo->fd->visited) {
                             if (request_value)
-                                g_strlcpy(request_value->object_name, global_object_name, 256);
+                                (void) g_strlcpy(request_value->object_name, global_object_name, 256);
                         }
                         foffset += 4+value1;
                         foffset += align_4(tvb, foffset);
@@ -8560,7 +8563,7 @@ dissect_nds_request(tvbuff_t *tvb, packet_info *pinfo,
                         col_append_fstr(pinfo->cinfo, COL_INFO, " -> %s", global_object_name);
                         if (!pinfo->fd->visited) {
                             if (request_value)
-                                g_strlcpy(request_value->object_name, global_object_name, 256);
+                                (void) g_strlcpy(request_value->object_name, global_object_name, 256);
                         }
                         foffset += 4+value1;
                         foffset += align_4(tvb, foffset);
@@ -8716,7 +8719,7 @@ dissect_nds_request(tvbuff_t *tvb, packet_info *pinfo,
                     col_append_fstr(pinfo->cinfo, COL_INFO, " -> %s", global_object_name);
                     if (!pinfo->fd->visited) {
                         if (request_value)
-                            g_strlcpy(request_value->object_name, global_object_name, 256);
+                            (void) g_strlcpy(request_value->object_name, global_object_name, 256);
                     }
                     foffset += 4+value1;
                     foffset += align_4(tvb, foffset);
@@ -8860,7 +8863,7 @@ dissect_nds_request(tvbuff_t *tvb, packet_info *pinfo,
                     col_append_fstr(pinfo->cinfo, COL_INFO, " -> %s", global_object_name);
                     if (!pinfo->fd->visited) {
                         if (request_value)
-                            g_strlcpy(request_value->object_name, global_object_name, 256);
+                            (void) g_strlcpy(request_value->object_name, global_object_name, 256);
                     }
                     foffset += 4+value1;
                     foffset += align_4(tvb, foffset);
@@ -8939,7 +8942,7 @@ dissect_nds_request(tvbuff_t *tvb, packet_info *pinfo,
                     col_append_fstr(pinfo->cinfo, COL_INFO, " -> %s", global_object_name);
                     if (!pinfo->fd->visited) {
                         if (request_value)
-                            g_strlcpy(request_value->object_name, global_object_name, 256);
+                            (void) g_strlcpy(request_value->object_name, global_object_name, 256);
                     }
                     foffset += 4+value1;
                     foffset += align_4(tvb, foffset);
@@ -8969,7 +8972,7 @@ dissect_nds_request(tvbuff_t *tvb, packet_info *pinfo,
                     col_append_fstr(pinfo->cinfo, COL_INFO, " -> %s", global_object_name);
                     if (!pinfo->fd->visited) {
                         if (request_value)
-                            g_strlcpy(request_value->object_name, global_object_name, 256);
+                            (void) g_strlcpy(request_value->object_name, global_object_name, 256);
                     }
                     break;
                 case 0x0e: /* Not Defined */
@@ -9015,7 +9018,7 @@ dissect_nds_request(tvbuff_t *tvb, packet_info *pinfo,
                     col_append_fstr(pinfo->cinfo, COL_INFO, " -> %s", global_object_name);
                     if (!pinfo->fd->visited) {
                         if (request_value)
-                            g_strlcpy(request_value->object_name, global_object_name, 256);
+                            (void) g_strlcpy(request_value->object_name, global_object_name, 256);
                     }
                     foffset += 4+value1;
                     foffset += align_4(tvb, foffset);
@@ -9041,7 +9044,7 @@ dissect_nds_request(tvbuff_t *tvb, packet_info *pinfo,
                     col_append_fstr(pinfo->cinfo, COL_INFO, " -> %s", global_object_name);
                     if (!pinfo->fd->visited) {
                         if (request_value)
-                            g_strlcpy(request_value->object_name, global_object_name, 256);
+                            (void) g_strlcpy(request_value->object_name, global_object_name, 256);
                     }
                     break;
                 case 0x12:

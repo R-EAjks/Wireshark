@@ -20,8 +20,17 @@
 #include <locale.h>
 #include <errno.h>
 
-#ifdef HAVE_GETOPT_H
+/*
+ * If we have getopt_long() in the system library, include <getopt.h>.
+ * Otherwise, we're using our own getopt_long() (either because the
+ * system has getopt() but not getopt_long(), as with some UN*Xes,
+ * or because it doesn't even have getopt(), as with Windows), so
+ * include our getopt_long()'s header.
+ */
+#ifdef HAVE_GETOPT_LONG
 #include <getopt.h>
+#else
+#include <wsutil/wsgetopt.h>
 #endif
 
 #include <glib.h>
@@ -42,10 +51,6 @@
 #include <wsutil/report_message.h>
 #include <wsutil/str_util.h>
 
-#ifndef HAVE_GETOPT_LONG
-#include "wsutil/wsgetopt.h"
-#endif
-
 #include "ui/failure_message.h"
 
 static void
@@ -56,11 +61,10 @@ print_usage(FILE *output)
 }
 
 /*
- * General errors and warnings are reported with an console message
- * in captype.
+ * Report an error in command-line arguments.
  */
 static void
-failure_warning_message(const char *msg_format, va_list ap)
+captype_cmdarg_err(const char *msg_format, va_list ap)
 {
   fprintf(stderr, "captype: ");
   vfprintf(stderr, msg_format, ap);
@@ -71,7 +75,7 @@ failure_warning_message(const char *msg_format, va_list ap)
  * Report additional information for an error in command-line arguments.
  */
 static void
-failure_message_cont(const char *msg_format, va_list ap)
+captype_cmdarg_err_cont(const char *msg_format, va_list ap)
 {
   vfprintf(stderr, msg_format, ap);
   fprintf(stderr, "\n");
@@ -81,6 +85,18 @@ int
 main(int argc, char *argv[])
 {
   char  *init_progfile_dir_error;
+  static const struct report_message_routines captype_report_routines = {
+      failure_message,
+      failure_message,
+      open_failure_message,
+      read_failure_message,
+      write_failure_message,
+      cfile_open_failure_message,
+      cfile_dump_open_failure_message,
+      cfile_read_failure_message,
+      cfile_write_failure_message,
+      cfile_close_failure_message
+  };
   wtap  *wth;
   int    err;
   gchar *err_info;
@@ -103,7 +119,7 @@ main(int argc, char *argv[])
   setlocale(LC_ALL, "");
 #endif
 
-  cmdarg_err_init(failure_warning_message, failure_message_cont);
+  cmdarg_err_init(captype_cmdarg_err, captype_cmdarg_err_cont);
 
   /* Initialize the version information. */
   ws_init_version_info("Captype (Wireshark)", NULL, NULL, NULL);
@@ -129,8 +145,7 @@ main(int argc, char *argv[])
     g_free(init_progfile_dir_error);
   }
 
-  init_report_message(failure_warning_message, failure_warning_message,
-                      NULL, NULL, NULL);
+  init_report_message("captype", &captype_report_routines);
 
   wtap_init(TRUE);
 
@@ -168,13 +183,13 @@ main(int argc, char *argv[])
     wth = wtap_open_offline(argv[i], WTAP_TYPE_AUTO, &err, &err_info, FALSE);
 
     if(wth) {
-      printf("%s: %s\n", argv[i], wtap_file_type_subtype_short_string(wtap_file_type_subtype(wth)));
+      printf("%s: %s\n", argv[i], wtap_file_type_subtype_name(wtap_file_type_subtype(wth)));
       wtap_close(wth);
     } else {
       if (err == WTAP_ERR_FILE_UNKNOWN_FORMAT)
         printf("%s: unknown\n", argv[i]);
       else {
-        cfile_open_failure_message("captype", argv[i], err, err_info);
+        cfile_open_failure_message(argv[i], err, err_info);
         overall_error_status = 2; /* remember that an error has occurred */
       }
     }

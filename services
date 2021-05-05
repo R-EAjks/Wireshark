@@ -131,7 +131,7 @@ netbios-ssn	139/tcp/udp	# NETBIOS Session Service
 emfis-data	140/tcp/udp	# EMFIS Data Service
 emfis-cntl	141/tcp/udp	# EMFIS Control Service
 bl-idm		142/tcp/udp	# Britton-Lee IDM
-imap		143/tcp/udp	# Internet Message Access Protocol
+imap		143/tcp		# Internet Message Access Protocol
 uma		144/tcp/udp	# Universal Management Architecture
 uaac		145/tcp/udp	# UAAC Protocol
 iso-tp0		146/tcp/udp	# ISO-IP0
@@ -711,7 +711,7 @@ ftps-data	989/tcp/udp	# ftp protocol, data, over TLS/SSL
 ftps		990/tcp/udp	# ftp protocol, control, over TLS/SSL
 nas		991/tcp/udp	# Netnews Administration System
 telnets		992/tcp/udp	# telnet protocol over TLS/SSL
-imaps		993/tcp/udp	# IMAP over TLS protocol
+imaps		993/tcp		# IMAP over TLS protocol
 pop3s		995/tcp/udp	# POP3 over TLS protocol
 vsinet		996/tcp/udp
 maitrd		997/tcp/udp
@@ -1220,7 +1220,7 @@ ingreslock	1524/tcp/udp	# ingres
 orasrv		1525/tcp/udp	# oracle
 pdap-np		1526/tcp/udp	# Prospero Data Access Prot non-priv
 tlisrv		1527/tcp/udp	# oracle
-ngr-t		1528/udp	# NGR transport protocol for mobile ad-hoc networks
+norp		1528/tcp/udp/sctp	# Not Only a Routeing Protocol
 coauthor	1529/tcp/udp	# oracle
 rap-service	1530/tcp/udp
 rap-listen	1531/tcp/udp
@@ -4620,7 +4620,7 @@ openmailpxy	5768/tcp/udp	# OpenMail CMTS Server
 spramsca	5769/tcp/udp	# x509solutions Internal CA
 spramsd		5770/tcp/udp	# x509solutions Secure Data
 netagent	5771/tcp/udp	# NetAgent
-dali-port	5777/tcp/udp	# DALI Port
+starfield-io	5777/tcp/udp	# Control commands and responses
 vts-rpc		5780/tcp	# Visual Tag System RPC
 3par-evts	5781/tcp/udp	# 3PAR Event Reporting Service
 3par-mgmt	5782/tcp/udp	# 3PAR Management Service
@@ -4657,6 +4657,7 @@ wbem-exp-https	5990/tcp/udp	# WBEM Export HTTPS
 nuxsl		5991/tcp/udp	# NUXSL
 consul-insight	5992/tcp/udp	# Consul InSight Security
 cim-rs		5993/tcp	# DMTF WBEM CIM REST
+rms-agent	5994/tcp	# RMS Agent Listening Service
 cvsup		5999/tcp/udp	# CVSup
 x11		6000-6063/tcp/udp	# X Window System
 ndl-ahp-svc	6064/tcp/udp	# NDL-AHP-SVC
@@ -5156,6 +5157,7 @@ http-alt	8008/tcp/udp	# HTTP Alternate
 nvme-disc	8009/tcp	# NVMe over Fabrics Discovery Service
 cfg-cloud	8015/tcp	# Configuration Cloud Service
 ads-s		8016/tcp	# Beckhoff Automation Device Specification
+cisco-cloudsec	8017/udp	# Cisco Cloudsec Dataplane Port Number
 qbdb		8019/tcp/udp	# QB DB Dynamic Port
 intu-ec-svcdisc	8020/tcp/udp	# Intuit Entitlement Service and Discovery
 intu-ec-client	8021/tcp/udp	# Intuit Entitlement Client

@@ -160,7 +160,7 @@ int VoipCallsInfoModel::columnCount(const QModelIndex &parent) const
 QVariant VoipCallsInfoModel::timeData(nstime_t *abs_ts, nstime_t *rel_ts) const
 {
     if (mTimeOfDay_) {
-        return QDateTime::fromTime_t(nstime_to_sec(abs_ts)).toTimeSpec(Qt::LocalTime).toString("yyyy-MM-dd hh:mm:ss");
+        return QDateTime::fromMSecsSinceEpoch(nstime_to_msec(abs_ts), Qt::LocalTime).toString("yyyy-MM-dd hh:mm:ss");
     } else {
         // XXX Pull digit count from capture file precision
         return QString::number(nstime_to_sec(rel_ts), 'f', 6);
@@ -246,16 +246,3 @@ bool VoipCallsInfoSortedModel::lessThan(const QModelIndex &source_left, const QM
     // fallback to string cmp on other fields
     return QSortFilterProxyModel::lessThan(source_left, source_right);
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */
