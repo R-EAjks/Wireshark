@@ -647,6 +647,8 @@ static int hf_oml_msg_disc = -1;
 static int hf_oml_placement = -1;
 static int hf_oml_sequence = -1;
 static int hf_oml_length = -1;
+static int hf_oml_manuf_id_len = -1;
+static int hf_oml_manuf_id_val = -1;
 /* FOM header */
 static int hf_oml_fom_msgtype = -1;
 static int hf_oml_fom_objclass = -1;
@@ -1944,7 +1946,14 @@ static int
 dissect_oml_manuf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		  int offset, proto_item *top_ti)
 {
-	if (tvb_get_guint8(tvb, offset) != 0x0d ||
+	guint32 len;
+
+	proto_tree_add_item_ret_uint(tree, hf_oml_manuf_id_len, tvb,
+				     offset, 1, ENC_NA, &len);
+	proto_tree_add_item(tree, hf_oml_manuf_id_val, tvb,
+			    offset + 1, len, ENC_ASCII|ENC_NA);
+
+	if (len != sizeof(ipaccess_magic) ||
 	    tvb_memeql(tvb, offset+1, ipaccess_magic, sizeof(ipaccess_magic)))
 		return offset;
 
@@ -2042,6 +2051,16 @@ proto_register_abis_oml(void)
 			{ "Length Indicator", "gsm_abis_oml.length",
 			  FT_UINT8, BASE_DEC, NULL, 0,
 			  "Total length of payload", HFILL }
+		},
+		{ &hf_oml_manuf_id_len,
+			{ "Manufacturer ID Length", "gsm_abis_oml.manuf_id_len",
+			  FT_UINT8, BASE_DEC, NULL, 0,
+			  NULL, HFILL }
+		},
+		{ &hf_oml_manuf_id_val,
+			{ "Manufacturer ID Value", "gsm_abis_oml.manuf_id_val",
+			  FT_STRING, BASE_NONE, NULL, 0,
+			  NULL, HFILL }
 		},
 		{ &hf_oml_fom_msgtype,
 			{ "FOM Message Type", "gsm_abis_oml.fom.msg_type",
