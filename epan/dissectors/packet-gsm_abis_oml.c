@@ -746,6 +746,7 @@ static int ett_oml_fom = -1;
 static int ett_oml_fom_att = -1;
 
 static expert_field ei_unknown_type = EI_INIT;
+static expert_field ei_unknown_manuf = EI_INIT;
 static expert_field ei_length_mismatch = EI_INIT;
 
 enum {
@@ -1953,13 +1954,14 @@ dissect_oml_manuf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 	proto_tree_add_item(tree, hf_oml_manuf_id_val, tvb,
 			    offset + 1, len, ENC_ASCII|ENC_NA);
 
-	if (len != sizeof(ipaccess_magic) ||
-	    tvb_memeql(tvb, offset+1, ipaccess_magic, sizeof(ipaccess_magic)))
+	if (len == sizeof(ipaccess_magic) &&
+	    tvb_memeql(tvb, offset+1, ipaccess_magic, sizeof(ipaccess_magic))) {
+		offset += (int)sizeof(ipaccess_magic) + 1;
+		return dissect_oml_fom(tvb, pinfo, tree, offset, top_ti);
+	} else {
+		expert_add_info(pinfo, top_ti, &ei_unknown_manuf);
 		return offset;
-
-	offset += (int)sizeof(ipaccess_magic) + 1;
-
-	return dissect_oml_fom(tvb, pinfo, tree, offset, top_ti);
+	}
 }
 
 static int
@@ -2558,6 +2560,8 @@ proto_register_abis_oml(void)
 	static ei_register_info ei[] = {
 		{ &ei_unknown_type, { "gsm_abis_oml.expert.unknown_type", PI_PROTOCOL, PI_NOTE,
 				      "Unknown TLV type", EXPFILL }},
+		{ &ei_unknown_manuf, { "gsm_abis_oml.expert.unknown_manuf", PI_PROTOCOL, PI_WARN,
+				      "Unknown manufacturer ID", EXPFILL }},
 		{ &ei_length_mismatch, { "gsm_abis_oml.expert.length_mismatch", PI_PROTOCOL, PI_WARN,
 					 "Indicated length does not match the actual", EXPFILL }},
 	};
