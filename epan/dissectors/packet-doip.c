@@ -23,6 +23,7 @@
 #include "config.h"
 #include <epan/packet.h>
 #include <epan/dissectors/packet-tcp.h>
+#include <epan/addr_resolv.h>
 
 void proto_register_doip(void);
 void proto_reg_handoff_doip(void);
@@ -419,7 +420,20 @@ static dissector_handle_t doip_handle;
 static dissector_handle_t uds_handle;
 static gint proto_doip    = -1;
 
+static proto_item *
+doip_prototree_add_with_resolv(proto_tree* doip_tree, int hfindex, tvbuff_t* tvb, const gint start, gint length, const guint encoding) {
+    guint diag_addr;
+    proto_item* ti;
+    gchar* name;
 
+    ti = proto_tree_add_item_ret_uint(doip_tree, hfindex, tvb, start, length, encoding, &diag_addr);
+    name = get_diag_address_name(wmem_packet_scope(), diag_addr);
+    if (name != NULL) {
+        proto_item_append_text(ti, " (%s)", name);
+    }
+
+    return ti;
+}
 
 static void
 add_header(proto_tree *doip_tree, tvbuff_t *tvb)
@@ -456,7 +470,7 @@ add_vehicle_identification_vin_fields(proto_tree *doip_tree, tvbuff_t *tvb)
 static void
 add_routing_activation_request_fields(proto_tree *doip_tree, tvbuff_t *tvb, guint8 version)
 {
-    proto_tree_add_item(doip_tree, hf_source_address, tvb, DOIP_ROUTING_ACTIVATION_REQ_SRC_OFFSET, DOIP_ROUTING_ACTIVATION_REQ_SRC_LEN, ENC_BIG_ENDIAN);
+    doip_prototree_add_with_resolv(doip_tree, hf_source_address, tvb, DOIP_ROUTING_ACTIVATION_REQ_SRC_OFFSET, DOIP_ROUTING_ACTIVATION_REQ_SRC_LEN, ENC_BIG_ENDIAN);
 
     if (version == ISO13400_2010) {
         proto_tree_add_item(doip_tree, hf_activation_type_v1, tvb, DOIP_ROUTING_ACTIVATION_REQ_TYPE_OFFSET, DOIP_ROUTING_ACTIVATION_REQ_TYPE_LEN_V1, ENC_NA);
@@ -479,8 +493,8 @@ add_routing_activation_request_fields(proto_tree *doip_tree, tvbuff_t *tvb, guin
 static void
 add_routing_activation_response_fields(proto_tree *doip_tree, tvbuff_t *tvb)
 {
-    proto_tree_add_item(doip_tree, hf_tester_logical_address, tvb, DOIP_ROUTING_ACTIVATION_RES_TESTER_OFFSET, DOIP_ROUTING_ACTIVATION_RES_TESTER_LEN, ENC_BIG_ENDIAN);
-    proto_tree_add_item(doip_tree, hf_source_address, tvb, DOIP_ROUTING_ACTIVATION_RES_ENTITY_OFFSET, DOIP_ROUTING_ACTIVATION_RES_ENTITY_LEN, ENC_BIG_ENDIAN);
+    doip_prototree_add_with_resolv(doip_tree, hf_tester_logical_address, tvb, DOIP_ROUTING_ACTIVATION_RES_TESTER_OFFSET, DOIP_ROUTING_ACTIVATION_RES_TESTER_LEN, ENC_BIG_ENDIAN);
+    doip_prototree_add_with_resolv(doip_tree, hf_source_address, tvb, DOIP_ROUTING_ACTIVATION_RES_ENTITY_OFFSET, DOIP_ROUTING_ACTIVATION_RES_ENTITY_LEN, ENC_BIG_ENDIAN);
     proto_tree_add_item(doip_tree, hf_response_code, tvb, DOIP_ROUTING_ACTIVATION_RES_CODE_OFFSET, DOIP_ROUTING_ACTIVATION_RES_CODE_LEN, ENC_NA);
     proto_tree_add_item(doip_tree, hf_reserved_iso, tvb, DOIP_ROUTING_ACTIVATION_RES_ISO_OFFSET, DOIP_ROUTING_ACTIVATION_RES_ISO_LEN, ENC_BIG_ENDIAN);
 
@@ -494,7 +508,7 @@ static void
 add_vehicle_announcement_message_fields(proto_tree *doip_tree, tvbuff_t *tvb)
 {
     proto_tree_add_item(doip_tree, hf_vin, tvb, DOIP_VEHICLE_ANNOUNCEMENT_VIN_OFFSET, DOIP_COMMON_VIN_LEN, ENC_ASCII | ENC_NA);
-    proto_tree_add_item(doip_tree, hf_logical_address, tvb, DOIP_VEHICLE_ANNOUNCEMENT_ADDRESS_OFFSET, DOIP_VEHICLE_ANNOUNCEMENT_ADDRESS_LEN, ENC_BIG_ENDIAN);
+    doip_prototree_add_with_resolv(doip_tree, hf_logical_address, tvb, DOIP_VEHICLE_ANNOUNCEMENT_ADDRESS_OFFSET, DOIP_VEHICLE_ANNOUNCEMENT_ADDRESS_LEN, ENC_BIG_ENDIAN);
     proto_tree_add_item(doip_tree, hf_eid, tvb, DOIP_VEHICLE_ANNOUNCEMENT_EID_OFFSET, DOIP_COMMON_EID_LEN, ENC_NA);
     proto_tree_add_item(doip_tree, hf_gid, tvb, DOIP_VEHICLE_ANNOUNCEMENT_GID_OFFSET, DOIP_VEHICLE_ANNOUNCEMENT_GID_LEN, ENC_NA);
     proto_tree_add_item(doip_tree, hf_futher_action, tvb, DOIP_VEHICLE_ANNOUNCEMENT_ACTION_OFFSET, DOIP_VEHICLE_ANNOUNCEMENT_ACTION_LEN, ENC_BIG_ENDIAN);
@@ -509,7 +523,7 @@ add_vehicle_announcement_message_fields(proto_tree *doip_tree, tvbuff_t *tvb)
 static void
 add_alive_check_response_fields(proto_tree *doip_tree, tvbuff_t *tvb)
 {
-    proto_tree_add_item(doip_tree, hf_source_address, tvb, DOIP_ALIVE_CHECK_RESPONSE_SOURCE_OFFSET, DOIP_ALIVE_CHECK_RESPONSE_SOURCE_LEN, ENC_BIG_ENDIAN);
+    doip_prototree_add_with_resolv(doip_tree, hf_source_address, tvb, DOIP_ALIVE_CHECK_RESPONSE_SOURCE_OFFSET, DOIP_ALIVE_CHECK_RESPONSE_SOURCE_LEN, ENC_BIG_ENDIAN);
 }
 
 
@@ -535,8 +549,8 @@ add_power_mode_information_response_fields(proto_tree *doip_tree, tvbuff_t *tvb)
 static void
 add_diagnostic_message_fields(proto_tree *doip_tree, tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree)
 {
-    proto_tree_add_item(doip_tree, hf_source_address, tvb, DOIP_DIAG_COMMON_SOURCE_OFFSET, DOIP_DIAG_COMMON_SOURCE_LEN, ENC_BIG_ENDIAN);
-    proto_tree_add_item(doip_tree, hf_target_address, tvb, DOIP_DIAG_COMMON_TARGET_OFFSET, DOIP_DIAG_COMMON_TARGET_LEN, ENC_BIG_ENDIAN);
+    doip_prototree_add_with_resolv(doip_tree, hf_source_address, tvb, DOIP_DIAG_COMMON_SOURCE_OFFSET, DOIP_DIAG_COMMON_SOURCE_LEN, ENC_BIG_ENDIAN);
+    doip_prototree_add_with_resolv(doip_tree, hf_target_address, tvb, DOIP_DIAG_COMMON_TARGET_OFFSET, DOIP_DIAG_COMMON_TARGET_LEN, ENC_BIG_ENDIAN);
 
     if (uds_handle != 0) {
         call_dissector(uds_handle, tvb_new_subset_length_caplen(tvb, DOIP_DIAG_MESSAGE_DATA_OFFSET, -1, -1), pinfo, parent_tree);
@@ -549,8 +563,8 @@ add_diagnostic_message_fields(proto_tree *doip_tree, tvbuff_t *tvb, packet_info 
 static void
 add_diagnostic_message_ack_fields(proto_tree *doip_tree, tvbuff_t *tvb)
 {
-    proto_tree_add_item(doip_tree, hf_source_address, tvb, DOIP_DIAG_COMMON_SOURCE_OFFSET, DOIP_DIAG_COMMON_SOURCE_LEN, ENC_BIG_ENDIAN);
-    proto_tree_add_item(doip_tree, hf_target_address, tvb, DOIP_DIAG_COMMON_TARGET_OFFSET, DOIP_DIAG_COMMON_TARGET_LEN, ENC_BIG_ENDIAN);
+    doip_prototree_add_with_resolv(doip_tree, hf_source_address, tvb, DOIP_DIAG_COMMON_SOURCE_OFFSET, DOIP_DIAG_COMMON_SOURCE_LEN, ENC_BIG_ENDIAN);
+    doip_prototree_add_with_resolv(doip_tree, hf_target_address, tvb, DOIP_DIAG_COMMON_TARGET_OFFSET, DOIP_DIAG_COMMON_TARGET_LEN, ENC_BIG_ENDIAN);
     proto_tree_add_item(doip_tree, hf_ack_code, tvb, DOIP_DIAG_MESSAGE_ACK_CODE_OFFSET, DOIP_DIAG_MESSAGE_ACK_CODE_LEN, ENC_NA);
 
     if (tvb_captured_length_remaining(tvb, DOIP_DIAG_MESSAGE_ACK_PREVIOUS_OFFSET) > 0) {
@@ -562,8 +576,8 @@ add_diagnostic_message_ack_fields(proto_tree *doip_tree, tvbuff_t *tvb)
 static void
 add_diagnostic_message_nack_fields(proto_tree *doip_tree, tvbuff_t *tvb)
 {
-    proto_tree_add_item(doip_tree, hf_source_address, tvb, DOIP_DIAG_COMMON_SOURCE_OFFSET, DOIP_DIAG_COMMON_SOURCE_LEN, ENC_BIG_ENDIAN);
-    proto_tree_add_item(doip_tree, hf_target_address, tvb, DOIP_DIAG_COMMON_TARGET_OFFSET, DOIP_DIAG_COMMON_TARGET_LEN, ENC_BIG_ENDIAN);
+    doip_prototree_add_with_resolv(doip_tree, hf_source_address, tvb, DOIP_DIAG_COMMON_SOURCE_OFFSET, DOIP_DIAG_COMMON_SOURCE_LEN, ENC_BIG_ENDIAN);
+    doip_prototree_add_with_resolv(doip_tree, hf_target_address, tvb, DOIP_DIAG_COMMON_TARGET_OFFSET, DOIP_DIAG_COMMON_TARGET_LEN, ENC_BIG_ENDIAN);
     proto_tree_add_item(doip_tree, hf_nack_code, tvb, DOIP_DIAG_MESSAGE_NACK_CODE_OFFSET, DOIP_DIAG_MESSAGE_NACK_CODE_LEN, ENC_NA);
 
     if (tvb_captured_length_remaining(tvb, DOIP_DIAG_MESSAGE_NACK_PREVIOUS_OFFSET) > 0) {
