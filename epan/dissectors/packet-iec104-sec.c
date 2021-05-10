@@ -49,7 +49,6 @@ struct asduheader {
 	guint8 TypeId;
 	guint8 TNCause;
 	guint32 IOA;
-	
 	guint8 NumIx;
 	guint8 SQ;
 	guint8 DataLength;
@@ -123,9 +122,9 @@ typedef struct {
  * |  |  |  |  |  |  |  |  |
  * -------------------------
 */
-#define F_CAUSE 0x3F
-#define F_NEGA  0x40
 #define F_TEST  0x80
+#define F_NEGA  0x40
+#define F_CAUSE 0x3F
 
 /* variable structure qualifier
  * -------------------------
@@ -189,12 +188,12 @@ static const value_string apci_types [] = {
 
 /* Constants relative to the filed, independent of the field position in the byte */
 /* U (Unnumbered) constants */
-#define U_STARTDT_ACT 	0x01
-#define U_STARTDT_CON	0x02
-#define U_STOPDT_ACT 	0x04
-#define U_STOPDT_CON	0x08
-#define U_TESTFR_ACT 	0x10
-#define U_TESTFR_CON	0x20
+#define U_STARTDT_ACT 		0x01
+#define U_STARTDT_CON	 	0x02
+#define U_STOPDT_ACT 		0x04
+#define U_STOPDT_CON	 	0x08
+#define U_TESTFR_ACT 		0x10
+#define U_TESTFR_CON	 	0x20
 
 static const value_string u_types[] = {
 	{ U_STARTDT_ACT,		"STARTDT act" },
@@ -206,7 +205,7 @@ static const value_string u_types[] = {
 	{ 0, NULL }
 };
 
-/* ASDU types (TypeId) defined in 7.2.1.1 of 60870-5-101 Definition of the semantics of the values of the TYPE IDENTIFICATION field */
+/* ASDU types (TypeId) defined in 60870-5-101 7.2.1.1 Definition of the semantics of the values of the TYPE IDENTIFICATION field */
 
 #define M_SP_NA_1  1     /* single-point information 								*/
 #define M_SP_TA_1  2     /* single-point information with time tag 	 					*/
@@ -854,16 +853,16 @@ static int hf_apcitx = -1;
 static int hf_apcirx = -1;
 static int hf_apcidata = -1;
 
-static int hf_typeid = -1;
-static int hf_sq  = -1;
-static int hf_numix  = -1;
+static int hf_addr    = -1;
+static int hf_oa  = -1;
+static int hf_typeid   = -1;
 
 static int hf_causetx  = -1;
 static int hf_nega  = -1;
 static int hf_test  = -1;
 
-static int hf_oa     = -1;
-static int hf_addr   = -1;
+
+
 static int hf_ioa    = -1;
 
 static int hf_secure_asn  = -1;
@@ -916,6 +915,8 @@ static int hf_secure_uei  = -1;
 static int hf_secure_ukl  = -1;
 static int hf_secure_userpubkey = -1;
 
+static int hf_numix  = -1;
+static int hf_sq  = -1;
 static int hf_cp24time  = -1;
 static int hf_cp24time_ms  = -1;
 static int hf_cp24time_min  = -1;
@@ -978,9 +979,7 @@ static int hf_qcc  = -1;
 static int hf_qcc_rqt  = -1;
 static int hf_qcc_frz  = -1;
 static int hf_qrp  = -1;
-
 static int hf_tsc  = -1;
-
 static int hf_bcr_count = -1;
 static int hf_bcr_sq = -1;
 static int hf_bcr_cy = -1;
@@ -994,9 +993,7 @@ static int hf_asdu_normval = -1;
 static int hf_asdu_scalval = -1;
 static int hf_asdu_raw_data = -1;
 
-/* Dissector data structure globals */
 static gint ett_apci = -1;
-
 static gint ett_asdu = -1;
 static gint ett_asdu_objects = -1;
 static gint ett_siq = -1;
@@ -1200,7 +1197,7 @@ static void get_DIQ(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_header_tre
 {
 	proto_item* ti;
 	proto_tree* diq_tree;
-	
+
 	ti = proto_tree_add_item(iec104_header_tree, hf_diq, tvb, *offset, 1, ENC_LITTLE_ENDIAN);
 	diq_tree = proto_item_add_subtree(ti, ett_diq);
 
@@ -2096,7 +2093,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 
 	/* 60870-5-101 par 7.2.2 Variable structure qualifier */
 	Bytex = tvb_get_guint8(tvb, 1);
-	asduh.SQ = Bytex & F_SQ; 
+	asduh.SQ = Bytex & F_SQ;
 	asduh.NumIx = Bytex & F_NUMIX; 
 	proto_tree_add_item(it104tree, hf_sq, tvb, offset, 1, ENC_LITTLE_ENDIAN); /* single (0) or sequence (1) */
 	proto_tree_add_item(it104tree, hf_numix, tvb, offset, 1, ENC_LITTLE_ENDIAN); /* number of information objects or elements */
@@ -2104,13 +2101,13 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 
 	/* 60870-5-101 par 7.2.3 Cause of transmission (lenght 2) */
 	asduh.TNCause = tvb_get_guint8(tvb, offset);
-	
-	proto_tree_add_item(it104tree, hf_causetx, tvb, offset, 1, ENC_LITTLE_ENDIAN); /* cause */
-	proto_tree_add_item(it104tree, hf_nega, tvb, offset, 1, ENC_LITTLE_ENDIAN); /* negative */
-	proto_tree_add_item(it104tree, hf_test, tvb, offset, 1, ENC_LITTLE_ENDIAN); /* test */
-
+	proto_tree_add_item(it104tree, hf_causetx, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+	proto_tree_add_item(it104tree, hf_nega, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+	proto_tree_add_item(it104tree, hf_test, tvb, offset, 1, ENC_LITTLE_ENDIAN);
 	offset += 1;
 
+	/* Originator address */
+	/* This is only present if the Cause of Tx field is 2 octets */
 	if (parms->cot_len == 2) {
 		asduh.OA = tvb_get_guint8(tvb, offset); /* originator address */
 		proto_tree_add_item(it104tree, hf_oa, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -2121,11 +2118,11 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 	proto_tree_add_item_ret_uint(it104tree, hf_addr, tvb, offset, parms->asdu_addr_len, ENC_LITTLE_ENDIAN, &asduh.Addr);
 	offset += parms->asdu_addr_len;
 
+	/* cause of transmission string */
 	cause_str = val_to_str(asduh.TNCause & F_CAUSE, causetx_types, " <CauseTx=%u>");
 
-	
 	/* print packet info to show on result_text 
-	   ASDU=35252 M_ME_NA_1 Inrogen IOA[8]=100-107 'measured value, normalized value' */
+	   example: ASDU=35252 M_ME_NA_1 Inrogen IOA[8]=100-107 'measured value, normalized value' */
 	wmem_strbuf_append_printf(result_text, "ASDU=%u %s %s", asduh.Addr, val_to_str(asduh.TypeId, asdu_types, "<TypeId=%u>"), cause_str);
 
 	switch (asduh.TypeId)
@@ -2295,8 +2292,8 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 	/* 'Signal Details': TREE */
 	/* -------- get signal value and status based on ASDU type id */
 
-	switch (asduh.TypeId)
-	{
+	/* main switch for all ASDU type ID */
+	switch (asduh.TypeId) {
 		case M_SP_NA_1:
 		case M_SP_TA_1:
 		case M_DP_NA_1:
@@ -2346,7 +2343,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 		case P_ME_NA_1:
 		case P_ME_NB_1:
 		case P_ME_NC_1:
-			
+
 			/* -- object values */
 			for(i = 0; i < asduh.NumIx; i++)
 			{
@@ -2368,21 +2365,15 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 						return offset;
 					}
 					get_InfoObjectAddress(&asdu_info_obj_addr, tvb, &offset, trSignal, parms->ioa_len);
-				}
-				/* -------- following Information object address depending on SQ */
-				else
-				{
-					/* <=> SQ=1, info obj addr = startaddr++ */
-					if (asduh.SQ) 
+				} else {
+					/* -------- following Information object address depending on SQ */
+					if (asduh.SQ) /* <=> SQ=1, info obj addr = startaddr++ */
 					{
 						proto_item *ti;
 						asdu_info_obj_addr++;
 						ti = proto_tree_add_uint(trSignal, hf_ioa, tvb, 0, 0, asdu_info_obj_addr);
 						proto_item_set_generated(ti);
-					}
-					/* SQ=0, info obj addr given */
-					else
-					{ 
+					} else { /* SQ=0, info obj addr given */
 						/* --------  Information object address */
 						/* check length */
 						if(Len < (guint)(offset + 3)) {
@@ -2474,7 +2465,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 				case M_SP_TB_1: /* 30	Single-point information with time tag CP56Time2a */
 					get_SIQ(tvb, &offset, trSignal);
 					get_CP56Time(tvb, &offset, trSignal);
-					break;					
+					break;
 				case M_DP_TB_1: /* 31	Double-point information with time tag CP56Time2a */
 					get_DIQ(tvb, &offset, trSignal);
 					get_CP56Time(tvb, &offset, trSignal);
@@ -2925,11 +2916,7 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 		       
 		case S_ER_NA_1: /* 87 authentication error */
 
-#if 1			
 			get_CSQ(tvb, &offset, it104tree);
-#else
-			get_KSQ(tvb, &offset, it104tree);
-#endif			
 			get_USR(tvb, &offset, it104tree, NULL);
 			get_AID(tvb, &offset, it104tree, NULL);
 			get_ERR(tvb, &offset, it104tree);
@@ -3067,12 +3054,11 @@ static int dissect_iec60870_104_asdu(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 
 			if (Len - offset > 0)
 				proto_tree_add_item(it104tree, hf_asdu_raw_data, tvb, offset, Len - offset, ENC_NA);
-
 			offset = Len;
 
 			break;
 	} /* end 'switch (asdu_typeid)' */
-	
+
 	/* check correct apdu length */
 	if (Len != offset) {
 		expert_add_info(pinfo, it104tree, &ei_iec104_apdu_invalid_len);
@@ -3363,6 +3349,14 @@ proto_register_iec60870_asdu_sec(void)
 	/* ASDU Protocol header fields */
 	static hf_register_info hf_as[] = {
 
+		{ &hf_addr,
+		  { "Addr", "iec60870_asdu.addr", FT_UINT16, BASE_DEC, NULL, 0x0,
+		    "Common Address of Asdu", HFILL }},
+
+		{ &hf_oa,
+		  { "OA", "iec60870_asdu.oa", FT_UINT8, BASE_DEC, NULL, 0x0,
+		    "Originator Address", HFILL }},
+
 		{ &hf_typeid,
 		  { "TypeId", "iec60870_asdu.typeid", FT_UINT8, BASE_DEC, VALS(asdu_types), 0x0,
 		    "Asdu Type Id", HFILL }},
@@ -3374,7 +3368,7 @@ proto_register_iec60870_asdu_sec(void)
 		{ &hf_numix,
 		  { "NumIx", "iec60870_asdu.numix", FT_UINT8, BASE_DEC, NULL, 0x7F,
 		    "Number of Information Objects/Elements", HFILL }},
-		
+
 		{ &hf_causetx,
 		  { "CauseTx", "iec60870_asdu.causetx", FT_UINT8, BASE_DEC, VALS(causetx_types), F_CAUSE,
 		    "Cause of Transmission", HFILL }},
@@ -3386,14 +3380,6 @@ proto_register_iec60870_asdu_sec(void)
 		{ &hf_test,
 		  { "Test", "iec60870_asdu.test", FT_BOOLEAN, 8, NULL, F_TEST,
 		    NULL, HFILL }},
-
-		{ &hf_oa,
-		  { "OA", "iec60870_asdu.oa", FT_UINT8, BASE_DEC, NULL, 0x0,
-		    "Originator Address", HFILL }},
-
-		{ &hf_addr,
-		  { "Addr", "iec60870_asdu.addr", FT_UINT16, BASE_DEC, NULL, 0x0,
-		    "Common Address of Asdu", HFILL }},
 
 		{ &hf_secure_asn,
 		  { "ASN", "iec60870_asdu.asn", FT_UINT8, BASE_DEC, NULL, F_ASN,
