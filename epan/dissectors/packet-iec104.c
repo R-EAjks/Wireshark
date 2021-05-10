@@ -3985,7 +3985,7 @@ proto_reg_handoff_iec60870_104(void)
 		handoff_initialized = TRUE;
 	}
 
-	/* add and delete TLS layer */
+	/* delete TLS layer */
 	if((use_tls == FALSE) && (tls_initialized == TRUE))
 	{
 #if DEBUG_MODULE
@@ -3997,6 +3997,7 @@ proto_reg_handoff_iec60870_104(void)
 		tls_initialized = FALSE;
 	}
 
+	/* add TLS layer */
 	if((use_tls == TRUE) && (tls_initialized == FALSE))
 	{
 #if DEBUG_MODULE
