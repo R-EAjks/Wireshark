@@ -4007,6 +4007,7 @@ void proto_register_mysql(void)
 void proto_reg_handoff_mysql(void)
 {
 	tls_handle = find_dissector("tls");
+	
 	dissector_add_uint_with_preference("tcp.port", TCP_PORT_MySQL, mysql_handle);
 }
 
