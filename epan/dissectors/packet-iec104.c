@@ -1144,7 +1144,7 @@ static void get_CP56Time(tvbuff_t *tvb, guint8 *offset, proto_tree *iec104_heade
 	guint16 ms;
 	guint8 value;
 	guint8 su;
-	struct tm tm;
+	struct tm tm = {0};
 	nstime_t  datetime;
 	proto_item* ti;
 	proto_tree* cp56time_tree;
