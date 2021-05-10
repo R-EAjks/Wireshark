@@ -7,6 +7,10 @@
  * Copyright (c) 2009 by Kjell Hultman <kjell.hultman@gmail.com>
  * Added dissection of signal (ASDU) information.
  * Kjell is also a masculine name, but a Scandinavian one.
+
+ * Copyright (c) 2020 by Maurizio Greci <greci.maurizio@gmail.com>
+ * Routines for IEC-60870-5-7
+ * Security extensions to IEC 60870-5-101 and IEC 60870-5-104 protocols (applying IEC 62351)
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
