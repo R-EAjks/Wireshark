@@ -24,6 +24,8 @@
 #include <epan/prefs.h>
 #include <epan/expert.h>
 #include "packet-tcp.h"
+#include "packet-tls.h"
+#include "packet-tls-utils.h"
 
 void proto_register_iec60870_104(void);
 void proto_reg_handoff_iec60870_104(void);
@@ -33,6 +35,7 @@ void proto_reg_handoff_iec60870_101(void);
 
 void proto_register_iec60870_asdu(void);
 
+static dissector_handle_t iec60870_104_handle;
 static dissector_handle_t iec60870_asdu_handle;
 
 /* the asdu header structure */
@@ -94,7 +97,7 @@ typedef struct {
 #define IEC60870_104_PORT      2404
 #define IEC60870_104_PORT_SEC 19998
 
-#define DEBUG_MODULE 1
+#define DEBUG_MODULE 0
 
 static guint port_sec = IEC60870_104_PORT_SEC;
 static gboolean use_tls = FALSE;
@@ -3406,11 +3409,11 @@ proto_register_iec60870_104(void)
 	proto_register_subtree_array(ett_ap, array_length(ett_ap));
 
 	module_t *iec60870_104_module;
-	iec60870_104_module = prefs_register_protocol(proto_iec60870_104, NULL);
+	iec60870_104_module = prefs_register_protocol(proto_iec60870_104, proto_reg_handoff_iec60870_104);
 
 	prefs_register_bool_preference(iec60870_104_module, "use_tls",
-				       "Use TLS (Transport Layer Security)",
-				       "Use TLS (Transport Layer Security)",
+				       "IEC 60870-5-7 Use TLS (Transport Layer Security)",
+				       "Use TLS for IEC 60870-5-7",
 				       &use_tls);
 
 	prefs_register_uint_preference(iec60870_104_module, "tls_port",
@@ -3961,15 +3964,43 @@ proto_register_iec60870_asdu(void)
 void
 proto_reg_handoff_iec60870_104(void)
 {
-#if DEBUG_MODULE
-	printf("proto_reg_handoff_iec60870_104=%d\n", port_sec);
-#endif		
-	dissector_handle_t iec60870_104_handle;
-
-	iec60870_104_handle = create_dissector_handle(dissect_iec60870_104_tcp, proto_iec60870_104);
+	static gboolean handoff_initialized = FALSE;
+	static gboolean tls_initialized = FALSE;
 	
-	dissector_add_uint_with_preference("tcp.port", IEC60870_104_PORT, iec60870_104_handle);
-	dissector_add_uint("tcp.port", port_sec, iec60870_104_handle);
+#if DEBUG_MODULE
+	printf("proto_reg_handoff_iec60870_104=%d\n", use_tls);
+#endif		
+
+	/* register the dissector handler so that TCP traffic associated with the port IEC60870_104_PORT calls the dissector */
+	if(handoff_initialized == FALSE)
+	{		
+		iec60870_104_handle = register_dissector("IEC104_TCP", dissect_iec60870_104_tcp, proto_iec60870_104);
+		
+		dissector_add_uint_with_preference("tcp.port", IEC60870_104_PORT, iec60870_104_handle);
+		dissector_add_uint("tcp.port", port_sec, iec60870_104_handle);
+		handoff_initialized = TRUE;
+	}
+
+	/* add and delete TLS layer */
+	if((use_tls == FALSE) && (tls_initialized == TRUE))
+	{
+#if DEBUG_MODULE
+		printf("ssl_dissector_delete=%d\n", use_tls);
+#endif
+		ssl_dissector_delete(port_sec, iec60870_104_handle);
+		dissector_delete_uint("tcp.port", port_sec, iec60870_104_handle);
+		dissector_add_uint("tcp.port", port_sec, iec60870_104_handle);
+		tls_initialized = FALSE;
+	}
+
+	if((use_tls == TRUE) && (tls_initialized == FALSE))
+	{
+#if DEBUG_MODULE
+		printf("ssl_dissector_add=%d\n", use_tls);
+#endif
+		ssl_dissector_add(port_sec, iec60870_104_handle);
+		tls_initialized = TRUE;
+	}	
 }
 
 /******************************************************************************************************/
