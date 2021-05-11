@@ -556,23 +556,24 @@ void CaptureFilePropertiesDialog::fillDetails()
         }
     }
 
-    if (cap_file_.capFile()->packet_comment_count > 0) {
+    if (cap_file_.capFile()->packet_option_count > 0) {
         cursor.insertBlock();
         cursor.insertHtml(section_tmpl_.arg(tr("Packet Comments")));
 
         for (guint32 framenum = 1; framenum <= cap_file_.capFile()->count ; framenum++) {
             frame_data *fdata = frame_data_sequence_find(cap_file_.capFile()->provider.frames, framenum);
-            char *pkt_comment = cf_get_packet_comment(cap_file_.capFile(), fdata);
-
-            if (pkt_comment) {
+            wstlv_list pkt_options = cf_get_packet_options(cap_file_.capFile(), fdata);
+            GSList *comments = wstlv_search(&pkt_options, OPT_COMMENT);
+            for (GSList *elem = comments; elem != NULL; elem = elem->next) {
                 QString frame_comment_html = tr("<p>Frame %1: ").arg(framenum);
-                QString raw_comment = gchar_free_to_qstring(pkt_comment);
+                QString raw_comment = gchar_free_to_qstring(wstlv_item_str((wstlv_item_t *)elem->data));
 
                 frame_comment_html += html_escape(raw_comment).replace('\n', "<br>");
                 frame_comment_html += "</p>\n";
                 cursor.insertBlock();
                 cursor.insertHtml(frame_comment_html);
             }
+            g_slist_free(comments);
         }
     }
     ui->detailsTextEdit->verticalScrollBar()->setValue(0);

@@ -235,7 +235,7 @@ sharkd_epan_new(capture_file *cf)
     sharkd_get_frame_ts,
     cap_file_provider_get_interface_name,
     cap_file_provider_get_interface_description,
-    cap_file_provider_get_user_comment
+    cap_file_provider_get_user_options
   };
 
   return epan_new(&cf->provider, &funcs);
@@ -762,16 +762,16 @@ sharkd_filter(const char *dftext, guint8 **result)
   return framenum;
 }
 
-const char *
-sharkd_get_user_comment(const frame_data *fd)
+wstlv_list
+sharkd_get_user_options(const frame_data *fd)
 {
-  return cap_file_provider_get_user_comment(&cfile.provider, fd);
+  return cap_file_provider_get_user_options(&cfile.provider, fd);
 }
 
 int
-sharkd_set_user_comment(frame_data *fd, const gchar *new_comment)
+sharkd_set_user_options(frame_data *fd, const wstlv_list new_options)
 {
-  cap_file_provider_set_user_comment(&cfile.provider, fd, new_comment);
+  cap_file_provider_set_user_options(&cfile.provider, fd, new_options);
   return 0;
 }
 

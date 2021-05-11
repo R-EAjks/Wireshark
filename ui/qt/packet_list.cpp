@@ -1376,7 +1376,7 @@ QString PacketList::packetComment()
 {
     int row = currentIndex().row();
     const frame_data *fdata;
-    char *pkt_comment;
+    // XXX char *pkt_comment;
 
     if (!cap_file_ || !packet_list_model_) return NULL;
 
@@ -1384,10 +1384,13 @@ QString PacketList::packetComment()
 
     if (!fdata) return NULL;
 
+    /* XXX
     pkt_comment = cf_get_packet_comment(cap_file_, fdata);
     if (!pkt_comment) return NULL;
 
     return gchar_free_to_qstring(pkt_comment);
+    */
+    return NULL;
 }
 
 void PacketList::setPacketComment(QString new_comment)
@@ -1409,7 +1412,9 @@ void PacketList::setPacketComment(QString new_comment)
         new_packet_comment = qstring_strdup(new_comment);
     }
 
+    /* XXX
     cf_set_user_packet_comment(cap_file_, fdata, new_packet_comment);
+    */
     g_free(new_packet_comment);
 
     redrawVisiblePackets();
@@ -1420,22 +1425,33 @@ QString PacketList::allPacketComments()
     guint32 framenum;
     frame_data *fdata;
     QString buf_str;
+    wstlv_list pkt_opts;
+    GSList *comments = NULL;
+    GSList *elem = NULL;
 
     if (!cap_file_) return buf_str;
 
     for (framenum = 1; framenum <= cap_file_->count ; framenum++) {
         fdata = frame_data_sequence_find(cap_file_->provider.frames, framenum);
 
-        char *pkt_comment = cf_get_packet_comment(cap_file_, fdata);
+        pkt_opts = cf_get_packet_options(cap_file_, fdata);
+        comments = wstlv_search(&pkt_opts, OPT_COMMENT);
+        for (elem = comments; elem != NULL; elem = elem->next) {
+            char *pkt_comment = wstlv_item_str((wstlv_item_t *)elem->data);
 
-        if (pkt_comment) {
-            buf_str.append(QString(tr("Frame %1: %2\n\n")).arg(framenum).arg(pkt_comment));
-            g_free(pkt_comment);
+            if (pkt_comment) {
+                buf_str.append(QString(tr("Frame %1: %2\n\n")).arg(framenum).arg(pkt_comment));
+                g_free(pkt_comment);
+            }
+            if (buf_str.length() > max_comments_to_fetch_) {
+                buf_str.append(QString(tr("[ Comment text exceeds %1. Stopping. ]"))
+                            .arg(format_size(max_comments_to_fetch_, format_size_unit_bytes|format_size_prefix_si)));
+                break;
+            }
         }
+        g_slist_free(comments);
         if (buf_str.length() > max_comments_to_fetch_) {
-            buf_str.append(QString(tr("[ Comment text exceeds %1. Stopping. ]"))
-                           .arg(format_size(max_comments_to_fetch_, format_size_unit_bytes|format_size_prefix_si)));
-            return buf_str;
+            break;
         }
     }
     return buf_str;
@@ -1453,7 +1469,8 @@ void PacketList::deleteAllPacketComments()
     for (framenum = 1; framenum <= cap_file_->count ; framenum++) {
         fdata = frame_data_sequence_find(cap_file_->provider.frames, framenum);
 
-        cf_set_user_packet_comment(cap_file_, fdata, NULL);
+        // XXX deletes all options, not just comments
+        cf_set_user_packet_options(cap_file_, fdata, NULL);
     }
 
     redrawVisiblePackets();

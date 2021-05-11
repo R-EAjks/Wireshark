@@ -432,11 +432,11 @@ epan_new(struct packet_provider_data *prov,
 	return session;
 }
 
-const char *
-epan_get_user_comment(const epan_t *session, const frame_data *fd)
+wstlv_list
+epan_get_user_options(const epan_t *session, const frame_data *fd)
 {
-	if (session->funcs.get_user_comment)
-		return session->funcs.get_user_comment(session->prov, fd);
+	if (session->funcs.get_user_options)
+		return session->funcs.get_user_options(session->prov, fd);
 
 	return NULL;
 }

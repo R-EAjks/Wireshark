@@ -28,6 +28,7 @@
 #include <epan/tap.h>
 #include <epan/expert.h>
 #include <wsutil/wsgcrypt.h>
+#include <wsutil/wstlv.h>
 #include <wsutil/str_util.h>
 #include <epan/proto_data.h>
 #include <wmem/wmem.h>
@@ -285,6 +286,9 @@ dissect_frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* 
 	frame_data_t *fr_data = (frame_data_t*)data;
 	const color_filter_t *color_filter;
 	dissector_handle_t dissector_handle;
+	GSList *pkt_comments = NULL;
+	GSList *list_item = NULL;
+	wstlv_item_t *tlv_item = NULL;
 
 	tree=parent_tree;
 
@@ -390,16 +394,19 @@ dissect_frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* 
 		break;
 	}
 
-	if (fr_data->pkt_comment) {
+	pkt_comments = wstlv_search(&fr_data->pkt_options, OPT_COMMENT);
+	if (pkt_comments != NULL) {
 		item = proto_tree_add_item(tree, proto_pkt_comment, tvb, 0, 0, ENC_NA);
 		comments_tree = proto_item_add_subtree(item, ett_comments);
-		comment_item = proto_tree_add_string_format(comments_tree, hf_comments_text, tvb, 0, 0,
-									   fr_data->pkt_comment, "%s",
-									   fr_data->pkt_comment);
-		expert_add_info_format(pinfo, comment_item, &ei_comments_text,
-							       "%s",  fr_data->pkt_comment);
-
-
+		for (list_item = pkt_comments; list_item != NULL; list_item = list_item->next) {
+			tlv_item = (wstlv_item_t *)list_item->data;
+			comment_item = proto_tree_add_string_format(comments_tree, hf_comments_text, tvb, 0, 0,
+					tlv_item->data, "%.*s",
+					tlv_item->length, (char *)tlv_item->data);
+			expert_add_info_format(pinfo, comment_item, &ei_comments_text,
+					"%.*s", tlv_item->length, (char *)tlv_item->data);
+		}
+		g_slist_free(pkt_comments);
 	}
 
 	/* if FRAME is not referenced from any filters we don't need to worry about

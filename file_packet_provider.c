@@ -69,24 +69,24 @@ cap_file_provider_get_interface_description(struct packet_provider_data *prov, g
   return NULL;
 }
 
-const char *
-cap_file_provider_get_user_comment(struct packet_provider_data *prov, const frame_data *fd)
+wstlv_list
+cap_file_provider_get_user_options(struct packet_provider_data *prov, const frame_data *fd)
 {
-  if (prov->frames_user_comments)
-     return (const char *)g_tree_lookup(prov->frames_user_comments, fd);
+  if (prov->frames_user_options)
+     return (const wstlv_list)g_tree_lookup(prov->frames_user_options, fd);
 
   /* g_warning? */
   return NULL;
 }
 
 void
-cap_file_provider_set_user_comment(struct packet_provider_data *prov, frame_data *fd, const char *new_comment)
+cap_file_provider_set_user_options(struct packet_provider_data *prov, frame_data *fd, const wstlv_list new_options)
 {
-  if (!prov->frames_user_comments)
-    prov->frames_user_comments = g_tree_new_full(frame_cmp, NULL, NULL, g_free);
+  if (!prov->frames_user_options)
+    prov->frames_user_options = g_tree_new_full(frame_cmp, NULL, NULL, wstlv_destroy);
 
-  /* insert new packet comment */
-  g_tree_replace(prov->frames_user_comments, fd, g_strdup(new_comment));
+  /* insert new packet options */
+  g_tree_replace(prov->frames_user_options, fd, new_options);
 
-  fd->has_user_comment = TRUE;
+  fd->has_user_options = TRUE;
 }

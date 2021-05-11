@@ -1486,8 +1486,7 @@ pcapng_read_packet_block(FILE_T fh, pcapng_block_header_t *bh,
     }
 
     /* Option defaults */
-    g_free(wblock->rec->opt_comment);   /* Free memory from an earlier read. */
-    wblock->rec->opt_comment = NULL;
+    wstlv_clear(&wblock->rec->options_list);   /* Free memory from an earlier read. */
     wblock->rec->rec_header.packet_header.drop_count  = -1;
     wblock->rec->rec_header.packet_header.pack_flags  = 0;
     wblock->rec->rec_header.packet_header.packet_id  = 0;
@@ -1563,9 +1562,8 @@ pcapng_read_packet_block(FILE_T fh, pcapng_block_header_t *bh,
             case(OPT_COMMENT):
                 if (oh->option_length > 0 && oh->option_length < opt_cont_buf_len) {
                     wblock->rec->presence_flags |= WTAP_HAS_COMMENTS;
-                    g_free(wblock->rec->opt_comment);
-                    wblock->rec->opt_comment = g_strndup((char *)option_content, oh->option_length);
-                    pcapng_debug("pcapng_read_packet_block: length %u opt_comment '%s'", oh->option_length, wblock->rec->opt_comment);
+                    wstlv_add(&wblock->rec->options_list, oh->option_code, oh->option_length, (gconstpointer)option_content);
+                    pcapng_debug("pcapng_read_packet_block: length %u opt_comment '%.*s'", oh->option_length, oh->option_length, option_content);
                 } else {
                     pcapng_debug("pcapng_read_packet_block: opt_comment length %u seems strange", oh->option_length);
                 }
@@ -1834,8 +1832,7 @@ pcapng_read_simple_packet_block(FILE_T fh, pcapng_block_header_t *bh,
     wblock->rec->ts.secs = 0;
     wblock->rec->ts.nsecs = 0;
     wblock->rec->rec_header.packet_header.interface_id = 0;
-    g_free(wblock->rec->opt_comment);   /* Free memory from an earlier read. */
-    wblock->rec->opt_comment = NULL;
+    wstlv_clear(&wblock->rec->options_list);   /* Free memory from an earlier read. */
     wblock->rec->rec_header.packet_header.drop_count = 0;
     wblock->rec->rec_header.packet_header.pack_flags = 0;
     wblock->rec->rec_header.packet_header.packet_id = 0;
@@ -3615,6 +3612,7 @@ pcapng_write_enhanced_packet_block(wtap_dumper *wdh, const wtap_rec *rec,
     guint32 comment_len = 0, comment_pad_len = 0;
     wtap_block_t int_data;
     wtapng_if_descr_mandatory_t *int_data_mand;
+    guint i;
 
     /* Don't write anything we're not willing to read. */
     if (rec->rec_header.packet_header.caplen > wtap_max_snaplen_for_encap(wdh->encap)) {
@@ -3630,15 +3628,9 @@ pcapng_write_enhanced_packet_block(wtap_dumper *wdh, const wtap_rec *rec,
     }
 
     /* Check if we should write comment option */
-    if (rec->opt_comment) {
+    if (rec->options_list) {
         have_options = TRUE;
-        comment_len = (guint32)strlen(rec->opt_comment) & 0xffff;
-        if ((comment_len % 4)) {
-            comment_pad_len = 4 - (comment_len % 4);
-        } else {
-            comment_pad_len = 0;
-        }
-        options_total_length = options_total_length + comment_len + comment_pad_len + 4 /* comment options tag */ ;
+        options_total_length += wstlv_size_padded((wstlv_list *)&rec->options_list);
     }
     if (rec->presence_flags & WTAP_HAS_PACK_FLAGS) {
         have_options = TRUE;
@@ -3658,7 +3650,7 @@ pcapng_write_enhanced_packet_block(wtap_dumper *wdh, const wtap_rec *rec,
     }
     if (rec->presence_flags & WTAP_HAS_VERDICT && rec->packet_verdict != NULL) {
 
-        for(guint i = 0; i < rec->packet_verdict->len; i++) {
+        for(i = 0; i < rec->packet_verdict->len; i++) {
             gsize len;
             GBytes *verdict = (GBytes *) g_ptr_array_index(rec->packet_verdict, i);
 
@@ -3797,29 +3789,44 @@ pcapng_write_enhanced_packet_block(wtap_dumper *wdh, const wtap_rec *rec,
      *                                defined in the Linux pbf.h include).
      * opt_endofopt    0   0          It delimits the end of the optional fields. This block cannot be repeated within a given list of options.
      */
-    if (rec->opt_comment) {
-        option_hdr.type         = OPT_COMMENT;
-        option_hdr.value_length = comment_len;
-        if (!wtap_dump_file_write(wdh, &option_hdr, 4, err))
-            return FALSE;
-        wdh->bytes_dumped += 4;
-
-        /* Write the comments string */
-        pcapng_debug("pcapng_write_enhanced_packet_block, comment:'%s' comment_len %u comment_pad_len %u" , rec->opt_comment, comment_len, comment_pad_len);
-        if (!wtap_dump_file_write(wdh, rec->opt_comment, comment_len, err))
-            return FALSE;
-        wdh->bytes_dumped += comment_len;
-
-        /* write padding (if any) */
-        if (comment_pad_len != 0) {
-            if (!wtap_dump_file_write(wdh, &zero_pad, comment_pad_len, err))
+    if (rec->options_list) {
+        /* NB. This block technically writes ANY options that have found their way into
+         * rec->options_list, not just OPT_COMMENTs. So far our code only uses it for
+         * comments, though.
+         */
+        for (i = 0; i < wstlv_count(&rec->options_list); i++) {
+            wstlv_item_t *item = wstlv_index((wstlv_list *)&rec->options_list, i);
+            comment_len = item->length;
+            if ((comment_len % 4)) {
+                comment_pad_len = 4 - (comment_len % 4);
+            } else {
+                comment_pad_len = 0;
+            }
+            option_hdr.type         = item->type;
+            option_hdr.value_length = comment_len;
+            if (!wtap_dump_file_write(wdh, &option_hdr, 4, err))
                 return FALSE;
-            wdh->bytes_dumped += comment_pad_len;
-        }
+            wdh->bytes_dumped += 4;
 
-        pcapng_debug("pcapng_write_enhanced_packet_block: Wrote Options comments: comment_len %u, comment_pad_len %u",
-                      comment_len,
-                      comment_pad_len);
+            /* Write the comments string */
+            if (item->type == OPT_COMMENT) {
+                pcapng_debug("pcapng_write_enhanced_packet_block, comment:'%.*s' comment_len %u comment_pad_len %u" , comment_len, (gchar *)item->data, comment_len, comment_pad_len);
+            }
+            if (!wtap_dump_file_write(wdh, (void *)item->data, comment_len, err))
+                return FALSE;
+            wdh->bytes_dumped += comment_len;
+
+            /* write padding (if any) */
+            if (comment_pad_len != 0) {
+                if (!wtap_dump_file_write(wdh, &zero_pad, comment_pad_len, err))
+                    return FALSE;
+                wdh->bytes_dumped += comment_pad_len;
+            }
+
+            pcapng_debug("pcapng_write_enhanced_packet_block: Wrote Options comments: comment_len %u, comment_pad_len %u",
+                        comment_len,
+                        comment_pad_len);
+        }
     }
     if (rec->presence_flags & WTAP_HAS_PACK_FLAGS) {
         option_hdr.type         = OPT_EPB_FLAGS;
@@ -3867,7 +3874,7 @@ pcapng_write_enhanced_packet_block(wtap_dumper *wdh, const wtap_rec *rec,
     }
     if (rec->presence_flags & WTAP_HAS_VERDICT && rec->packet_verdict != NULL) {
 
-        for(guint i = 0; i < rec->packet_verdict->len; i++) {
+        for(i = 0; i < rec->packet_verdict->len; i++) {
             gsize len;
             GBytes *verdict = (GBytes *) g_ptr_array_index(rec->packet_verdict, i);
             const guint8 *verdict_data = (const guint8 *) g_bytes_get_data(verdict, &len);

@@ -16,6 +16,7 @@
 #include <epan/prefs.h>
 #include <epan/frame_data.h>
 #include <wsutil/plugins.h>
+#include <wsutil/wstlv.h>
 #include <epan/register.h>
 #include "ws_symbol_export.h"
 
@@ -50,7 +51,7 @@ struct packet_provider_funcs {
 	const nstime_t *(*get_frame_ts)(struct packet_provider_data *prov, guint32 frame_num);
 	const char *(*get_interface_name)(struct packet_provider_data *prov, guint32 interface_id);
 	const char *(*get_interface_description)(struct packet_provider_data *prov, guint32 interface_id);
-	const char *(*get_user_comment)(struct packet_provider_data *prov, const frame_data *fd);
+	wstlv_list (*get_user_options)(struct packet_provider_data *prov, const frame_data *fd);
 };
 
 /**
@@ -154,7 +155,7 @@ typedef struct epan_session epan_t;
 WS_DLL_PUBLIC epan_t *epan_new(struct packet_provider_data *prov,
     const struct packet_provider_funcs *funcs);
 
-WS_DLL_PUBLIC const char *epan_get_user_comment(const epan_t *session, const frame_data *fd);
+WS_DLL_PUBLIC wstlv_list epan_get_user_options(const epan_t *session, const frame_data *fd);
 
 WS_DLL_PUBLIC const char *epan_get_interface_name(const epan_t *session, guint32 interface_id);
 

@@ -574,12 +574,12 @@ dissect_record(epan_dissect_t *edt, int file_type_subtype,
 	frame_delta_abs_time(edt->session, fd, fd->frame_ref_num, &edt->pi.rel_ts);
 
 	/* pkt comment use first user, later from rec */
-	if (fd->has_user_comment)
-		frame_dissector_data.pkt_comment = epan_get_user_comment(edt->session, fd);
-	else if (fd->has_phdr_comment)
-		frame_dissector_data.pkt_comment = rec->opt_comment;
+	if (fd->has_user_options)
+		frame_dissector_data.pkt_options = epan_get_user_options(edt->session, fd);
+	else if (fd->has_phdr_options)
+		frame_dissector_data.pkt_options = rec->options_list;
 	else
-		frame_dissector_data.pkt_comment = NULL;
+		frame_dissector_data.pkt_options = NULL;
 	frame_dissector_data.file_type_subtype = file_type_subtype;
 	frame_dissector_data.color_edt = edt; /* Used strictly for "coloring rules" */
 
@@ -643,12 +643,12 @@ dissect_file(epan_dissect_t *edt, wtap_rec *rec,
 
 	TRY {
 		/* pkt comment use first user, later from rec */
-		if (fd->has_user_comment)
-			file_dissector_data.pkt_comment = epan_get_user_comment(edt->session, fd);
-		else if (fd->has_phdr_comment)
-			file_dissector_data.pkt_comment = rec->opt_comment;
+		if (fd->has_user_options)
+			file_dissector_data.pkt_options = epan_get_user_options(edt->session, fd);
+		else if (fd->has_phdr_options)
+			file_dissector_data.pkt_options = rec->options_list;
 		else
-			file_dissector_data.pkt_comment = NULL;
+			file_dissector_data.pkt_options = NULL;
 		file_dissector_data.color_edt = edt; /* Used strictly for "coloring rules" */
 
 
