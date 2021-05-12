@@ -1457,7 +1457,7 @@ main(int argc, char *argv[])
       /* already processed; just ignore it now */
       break;
     case 'Y':
-      dfilter = optarg;
+      dfilter = g_strdup(optarg);
       break;
     case 'z':
       /* We won't call the init function for the stat this soon
@@ -2344,6 +2344,7 @@ clean_exit:
   wtap_cleanup();
   free_progdirs();
   dfilter_free(dfcode);
+  g_free(dfilter);
   return exit_status;
 }
 
