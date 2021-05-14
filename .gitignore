@@ -77,6 +77,18 @@ epan/dissectors/asn1/*/*-stamp
 epan/dissectors/pidl/*-stamp
 epan/dissectors/dcerpc/*-stamp
 
+# Debian #
+##########
+debian/*.debhelper
+debian/files
+debian/lib*/*
+debian/*.log
+debian/*.substvars
+debian/tmp
+debian/wireshark*/*
+debian/tshark/*
+.pc
+
 # Doc #
 ########
 *.html
