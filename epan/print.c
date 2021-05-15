@@ -994,9 +994,9 @@ static void
 write_json_proto_node_dynamic(proto_node *node, write_json_data *data)
 {
     if (node->first_child == NULL) {
-        return write_json_proto_node_no_value(node, data);
+        write_json_proto_node_no_value(node, data);
     } else {
-        return write_json_proto_node_children(node, data);
+        write_json_proto_node_children(node, data);
     }
 }
 
