@@ -82,10 +82,6 @@
 #include <zstd.h>
 #endif
 
-#ifdef HAVE_MAXMINDDB
-#include <maxminddb.h>
-#endif
-
 #ifdef HAVE_NGHTTP2
 #include <nghttp2/nghttp2ver.h>
 #endif
