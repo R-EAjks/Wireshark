@@ -11,6 +11,7 @@
 #define __WS_ASSERT_H__
 
 #include <ws_attributes.h>
+#include <stdlib.h>
 
 /*
  * ws_assert() cannot produce side effects, otherwise code will
@@ -20,7 +21,7 @@
 #ifndef WS_DISABLE_ASSERT
 #define ws_assert(expr) g_assert(expr)
 #else
-#define ws_assert(expr)
+#define ws_assert(expr) (void)0
 #endif
 
 /*
@@ -33,13 +34,18 @@
  * g_assert_not_reached() and G_DISABLE_ASSERT. However if that is not
  * the case then g_assert_not_reached() is simply (void)0 and that
  * causes the spurious warnings, because the compiler can't tell anymore
- * that a certain code path is not used. We add the call to g_abort() so
+ * that a certain code path is not used. We add the call to abort() so
  * that the function never returns, even with G_DISABLE_ASSERT.
  */
 static inline
 WS_NORETURN void ws_assert_not_reached(void) {
     g_assert_not_reached();
-    g_abort();
+    abort();
 };
+
+/* ws_assert_bounds() is always enabled. For bounds check where the array
+ * size is known sometimes it's just not worth disabling assertions.
+ */
+#define ws_assert_bounds(expr) g_assert_true(expr)
 
 #endif /* __WS_ASSERT_H__ */
