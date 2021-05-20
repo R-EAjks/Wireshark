@@ -2200,7 +2200,7 @@ dissect_gtpv2_mm_ctx_for_cs_to_ps_srvcc(tvbuff_t *tvb, packet_info *pinfo _U_, p
 static void
 dissect_gtpv2_apn(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, proto_item *item, guint16 length, guint8 message_type _U_, guint8 instance _U_, session_args_t * args _U_)
 {
-    guint8 *apn    = NULL;
+    const guint8 *apn    = NULL;
 
     proto_tree_add_item_ret_string(tree, hf_gtpv2_apn, tvb, 0, length, ENC_APN_STR | ENC_NA, wmem_packet_scope(), &apn);
     if (apn) {
