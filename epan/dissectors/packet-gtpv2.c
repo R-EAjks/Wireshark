@@ -7351,7 +7351,7 @@ dissect_gtpv2_apn_and_relative_capacity(tvbuff_t *tvb, packet_info *pinfo _U_, p
 {
     int       offset = 0;
     guint8 oct, apn_length;
-    guint8 *apn    = NULL;
+    const guint8 *apn    = NULL;
 
     oct = tvb_get_guint8(tvb, offset);
     proto_tree_add_item(tree, hf_gtpv2_relative_capacity, tvb, offset, 1, ENC_BIG_ENDIAN);
