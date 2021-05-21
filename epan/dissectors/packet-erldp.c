@@ -919,7 +919,7 @@ void proto_register_erldp(void) {
     { &hf_erldp_flags_ets_compressed, { "ETS Compressed", "erldp.flags.ets_compressed",
                         FT_BOOLEAN, 64, TFS(&tfs_true_false), 0x8000,
                         NULL, HFILL }},
-    { &hf_erldp_flags_utf8_atoms, { "UTF64 Atoms", "erldp.flags.utf8_atoms",
+    { &hf_erldp_flags_utf8_atoms, { "UTF8 Atoms", "erldp.flags.utf8_atoms",
                         FT_BOOLEAN, 64, TFS(&tfs_true_false), 0x10000,
                         NULL, HFILL }},
     { &hf_erldp_flags_map_tag, { "Map Tag", "erldp.flags.map_tag",
