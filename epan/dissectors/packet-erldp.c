@@ -372,7 +372,7 @@ static gint dissect_etf_tuple_content(gboolean large, packet_info *pinfo, tvbuff
   return offset;
 }
 
-static gint dissect_etf_big_ext(tvbuff_t *tvb, gint offset, gint32 len, proto_tree *tree, const gchar **value_str) {
+static gint dissect_etf_big_ext(tvbuff_t *tvb, gint offset, guint32 len, proto_tree *tree, const gchar **value_str) {
       guint8 sign;
       gint32 i;
 
@@ -417,8 +417,8 @@ static gint dissect_etf_big_ext(tvbuff_t *tvb, gint offset, gint32 len, proto_tr
 }
 
 static gint dissect_etf_type_content(guint8 tag, packet_info *pinfo, tvbuff_t *tvb, gint offset, proto_tree *tree, const gchar **value_str) {
-  gint32 len, int_val, i;
-  guint32 uint_val;
+  gint32 int_val;
+  guint32 len, i, uint_val;
   guint32 id;
   const guint8 *str_val;
 
@@ -464,7 +464,7 @@ static gint dissect_etf_type_content(guint8 tag, packet_info *pinfo, tvbuff_t *t
       proto_tree_add_item_ret_string(tree, hf_erldp_float_ext, tvb, offset, 31, ENC_NA|ENC_UTF_8, wmem_packet_scope(), &str_val);
       offset += 31;
       if (value_str)
-        *value_str = str_val;
+        *value_str = (const gchar *)str_val;
       break;
 
     case NEW_FLOAT_EXT:
@@ -482,7 +482,7 @@ static gint dissect_etf_type_content(guint8 tag, packet_info *pinfo, tvbuff_t *t
       proto_tree_add_item_ret_string(tree, hf_erldp_atom_text, tvb, offset, len, ENC_NA|ENC_UTF_8, wmem_packet_scope(), &str_val);
       offset += len;
       if (value_str)
-        *value_str = str_val;
+        *value_str = (const gchar *)str_val;
       break;
 
     case SMALL_ATOM_UTF8_EXT:
@@ -491,7 +491,7 @@ static gint dissect_etf_type_content(guint8 tag, packet_info *pinfo, tvbuff_t *t
       proto_tree_add_item_ret_string(tree, hf_erldp_atom_text, tvb, offset, len, ENC_NA|ENC_UTF_8, wmem_packet_scope(), &str_val);
       offset += len;
       if (value_str)
-        *value_str = str_val;
+        *value_str = (const gchar *)str_val;
       break;
 
     case PORT_EXT:
@@ -696,7 +696,7 @@ static gint dissect_etf_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       pinfo->fragmented = TRUE;
 
       frag_msg = fragment_add_seq_next(&erldp_reassembly_table,
-                                       tvb, offset, pinfo, sequence_id, NULL,
+                                       tvb, offset, pinfo, (guint32)sequence_id, NULL,
                                        len_rem, fragment_id != 1);
 
       next_tvb = process_reassembled_data(tvb, offset, pinfo,
