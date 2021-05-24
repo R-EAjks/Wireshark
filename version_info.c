@@ -418,6 +418,19 @@ get_runtime_version_info(void (*additional_info)(GString *))
 	/* Get info about installed memory */
 	get_mem_info(str);
 
+	/* GLib */
+	g_string_append_printf(str, ", with GLib %u.%u.%u",
+			glib_major_version, glib_minor_version, glib_micro_version);
+
+	/* zlib */
+#if defined(HAVE_ZLIB) && !defined(_WIN32)
+	g_string_append_printf(str, ", with zlib %s", zlibVersion());
+#endif
+
+	/* Additional application-dependent information */
+	if (additional_info)
+		(*additional_info)(str);
+
 	/*
 	 * Locale.
 	 *
@@ -437,16 +450,6 @@ get_runtime_version_info(void (*additional_info)(GString *))
 	else {
 		g_string_append(str, ", with default locale");
 	}
-
-
-	/* Additional application-dependent information */
-	if (additional_info)
-		(*additional_info)(str);
-
-	/* zlib */
-#if defined(HAVE_ZLIB) && !defined(_WIN32)
-	g_string_append_printf(str, ", with zlib %s", zlibVersion());
-#endif
 
 	/* plugins */
 #ifdef HAVE_PLUGINS
