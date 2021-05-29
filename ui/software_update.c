@@ -21,7 +21,7 @@
  * - The application name (fixed, "Wireshark")
  * - The application version ("<major>.<minor>.<micro>")
  * - The operating system (variable, one of "Windows" or "macOS")
- * - The architecture name (variable, one of "x86", "x86-64")
+ * - The architecture name (variable, one of "x86", "x86-64", or "arm-64")
  * - The locale (fixed, "en-US")
  * - The update channel (variable, one of "development" or "stable") + .xml
  *
