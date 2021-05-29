@@ -57,8 +57,10 @@
 #define SU_ARCH "x86-64"
 #elif defined(__i386__) || defined(_M_IX86)
 #define SU_ARCH "x86"
+#elif defined(__arm64__)
+#define SU_ARCH "arm-64"
 #else
-#error HAVE_SOFTWARE_UPDATE can only be defined for x86-64 or x86.
+#error HAVE_SOFTWARE_UPDATE can only be defined for x86-64 or x86 or arm-64.
 #endif
 
 static char *get_appcast_update_url(software_update_channel_e chan) {
