@@ -3364,7 +3364,7 @@ dissect_data_chunk(tvbuff_t *chunk_tvb,
       proto_tree_add_item(chunk_tree, hf_data_chunk_stream_seq_number, chunk_tvb, DATA_CHUNK_STREAM_SEQ_NUMBER_OFFSET,   DATA_CHUNK_STREAM_SEQ_NUMBER_LENGTH,   ENC_BIG_ENDIAN);
       proto_tree_add_item(chunk_tree, hf_data_chunk_payload_proto_id,  chunk_tvb, DATA_CHUNK_PAYLOAD_PROTOCOL_ID_OFFSET, DATA_CHUNK_PAYLOAD_PROTOCOL_ID_LENGTH, ENC_BIG_ENDIAN);
     }
-    proto_item_append_text(chunk_item, "(%s, ", (u_bit) ? "unordered" : "ordered");
+    proto_item_append_text(chunk_item, " (%s, ", (u_bit) ? "unordered" : "ordered");
     if (b_bit) {
       if (e_bit)
         proto_item_append_text(chunk_item, "complete");
