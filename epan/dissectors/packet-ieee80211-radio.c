@@ -1066,6 +1066,7 @@ dissect_wlan_radio_phdr(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, 
                         data_rate,
                         "%.1f Mb/s",
                        data_rate);
+                  have_data_rate = TRUE;
                 }
               }
             }
@@ -1094,6 +1095,7 @@ dissect_wlan_radio_phdr(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, 
                 data_rate,
                 "%.1f Mb/s",
                 data_rate);
+            have_data_rate = TRUE;
           }
         }
       }
