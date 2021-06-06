@@ -2385,7 +2385,7 @@ pcapng_handle_generic_custom_block(FILE_T fh, pcapng_block_header_t *bh,
 {
     guint to_read;
 
-    ws_debug("%s: unknown pen %u", G_STRFUNC, pen);
+    ws_debug("unknown pen %u", pen);
     if (bh->block_total_length % 4) {
         to_read = bh->block_total_length + 4 - (bh->block_total_length % 4);
     } else {
@@ -2428,7 +2428,7 @@ pcapng_read_custom_block(FILE_T fh, pcapng_block_header_t *bh,
 
     /* Custom block read fixed part */
     if (!wtap_read_bytes(fh, &cb, sizeof cb, err, err_info)) {
-        ws_debug("%s: failed to read pen", G_STRFUNC);
+        ws_debug("failed to read pen");
         return FALSE;
     }
     if (section_info->byte_swapped) {
@@ -2436,7 +2436,7 @@ pcapng_read_custom_block(FILE_T fh, pcapng_block_header_t *bh,
     } else {
         pen = cb.pen;
     }
-    ws_debug("%s: pen %u, custom data and option length %u", G_STRFUNC, pen, bh->block_total_length - MIN_CB_SIZE);
+    ws_debug("pen %u, custom data and option length %u", pen, bh->block_total_length - MIN_CB_SIZE);
 
     switch (pen) {
         default:
@@ -4205,8 +4205,8 @@ pcapng_write_custom_block(wtap_dumper *wdh, const wtap_rec *rec,
     /* write block header */
     bh.block_type = BLOCK_TYPE_CB_COPY;
     bh.block_total_length = (guint32)sizeof(bh) + (guint32)sizeof(cb) + rec->rec_header.custom_block_header.length + pad_len + 4;
-    ws_debug("%s: writing %u bytes, %u padded",
-             G_STRFUNC, rec->rec_header.custom_block_header.length,
+    ws_debug("writing %u bytes, %u padded",
+             rec->rec_header.custom_block_header.length,
              bh.block_total_length);
     if (!wtap_dump_file_write(wdh, &bh, sizeof bh, err)) {
         return FALSE;
