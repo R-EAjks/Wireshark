@@ -30,6 +30,7 @@
 #include <wsutil/wsgcrypt.h>
 #include <wsutil/str_util.h>
 #include <epan/proto_data.h>
+#include <epan/addr_resolv.h>
 #include <wmem/wmem.h>
 
 #include "packet-frame.h"
@@ -162,22 +163,6 @@ static const val64_string verdict_ebpf_xdp_types[] = {
 	{ 3, "XDP_TX"},
 	{ 4, "XDP_REDIRECT"},
 	{ 0, NULL }
-};
-
-/*
- * Some values taken from
- * https://www.iana.org/assignments/enterprise-numbers/enterprise-numbers
- */
-
-static const value_string pen_values[] = {
-	{    63, "Apple" },
-	{   311, "Microsoft" },
-	{  2238, "FreeBSD" },
-	{ 10949, "Netflix" },
-	{ 30155, "OpenBSD" },
-	{ 32388, "NetBSD" },
-	{ 32622, "CACE Technologies" },
-	{     0, NULL }
 };
 
 static dissector_table_t wtap_encap_dissector_table;
@@ -543,7 +528,7 @@ dissect_frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* 
 				proto_item_append_text(ti, " (%u bits)", frame_len * 8);
 			}
 			proto_item_append_text(ti, " of custom data and options, PEN %s (%u)",
-			                       val_to_str_const(pinfo->rec->rec_header.custom_block_header.pen, pen_values, "Unknown"),
+			                       enterprises_lookup(pinfo->rec->rec_header.custom_block_header.pen, "Unknown"),
 			                       pinfo->rec->rec_header.custom_block_header.pen);
 			proto_item_append_text(ti, ", copying%s allowed",
 			                       pinfo->rec->rec_header.custom_block_header.copy_allowed ? "" : " not");
@@ -869,10 +854,14 @@ dissect_frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* 
 
 			case REC_TYPE_CUSTOM_BLOCK:
 				col_set_str(pinfo->cinfo, COL_PROTOCOL, "PCAPNG");
-				proto_tree_add_uint(fh_tree, hf_frame_cb_pen, tvb, 0, 0, pinfo->rec->rec_header.custom_block_header.pen);
+				proto_tree_add_uint_format_value(fh_tree, hf_frame_cb_pen, tvb, 0, 0,
+				                                 pinfo->rec->rec_header.custom_block_header.pen,
+				                                 "%s (%u)",
+				                                 enterprises_lookup(pinfo->rec->rec_header.custom_block_header.pen, "Unknown"),
+				                                 pinfo->rec->rec_header.custom_block_header.pen);
 				proto_tree_add_boolean(fh_tree, hf_frame_cb_copy_allowed, tvb, 0, 0, pinfo->rec->rec_header.custom_block_header.copy_allowed);
 				col_add_fstr(pinfo->cinfo, COL_INFO, "Custom Block: PEN = %s (%d), will%s be copied",
-				             val_to_str_const(pinfo->rec->rec_header.custom_block_header.pen, pen_values, "Unknown"),
+				             enterprises_lookup(pinfo->rec->rec_header.custom_block_header.pen, "Unknown"),
 				             pinfo->rec->rec_header.custom_block_header.pen,
 				             pinfo->rec->rec_header.custom_block_header.copy_allowed ? "" : " not");
 				call_data_dissector(tvb, pinfo, parent_tree);
@@ -1266,7 +1255,7 @@ proto_register_frame(void)
 
 		{ &hf_frame_cb_pen,
 		  { "Private Enterprise Number", "frame.cb_pen",
-		    FT_UINT32, BASE_DEC, VALS(pen_values), 0x0,
+		    FT_UINT32, BASE_DEC, NULL, 0x0,
 		    "IANA assigned private enterprise number (PEN)", HFILL }},
 
 		{ &hf_frame_cb_copy_allowed,
