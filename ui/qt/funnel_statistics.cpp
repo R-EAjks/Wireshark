@@ -183,7 +183,8 @@ void FunnelStatistics::emitSetDisplayFilter(const QString filter)
 
 void FunnelStatistics::reloadPackets()
 {
-    capture_file_.reload();
+    // This will trigger a packet redissection.
+    wsApp->emitAppSignal(WiresharkApplication::PacketDissectionChanged);
 }
 
 void FunnelStatistics::reloadLuaPlugins()
