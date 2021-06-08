@@ -2192,7 +2192,7 @@ file_needs_reopen(int fd, const char* filename)
 }
 
 gboolean
-write_file_binary_mode(const char *filename, const void *content, size_t content_len)
+write_file_binary_mode(const char *filename, const void *content, gint64 content_len)
 {
     int fd;
     size_t bytes_left;

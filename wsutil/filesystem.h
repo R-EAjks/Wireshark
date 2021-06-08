@@ -316,7 +316,7 @@ WS_DLL_PUBLIC gboolean file_needs_reopen(int fd, const char* filename);
  * displays a simple dialog window with the error message.
  */
 WS_DLL_PUBLIC gboolean write_file_binary_mode(const char *filename,
-    const void *content, size_t content_len);
+    const void *content, gint64 content_len);
 
 /*
  * Copy a file in binary mode, for those operating systems that care about
