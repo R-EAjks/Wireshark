@@ -72,9 +72,9 @@ find_path( GLIB2_INTERNAL_INCLUDE_DIR
 	NAMES
 		glibconfig.h
 	HINTS
-		"${GLIB2_INCLUDEDIR}"
-		"${GLIB2_HINTS}/lib"
 		"${glib2LibDir}"
+		"${GLIB2_INCLUDEDIR}"
+		"${GLIB2_HINTS}/include"
 		${CMAKE_SYSTEM_LIBRARY_PATH}
 	PATH_SUFFIXES
 		glib-2.0/include
