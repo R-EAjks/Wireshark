@@ -327,8 +327,11 @@ static gboolean need_timeout_workaround;
 #define WRITER_THREAD_TIMEOUT 100000 /* usecs */
 
 static void
-dumpcap_log_writer(const char *message, enum ws_log_domain domain,
-                    enum ws_log_level level, void *ptr);
+dumpcap_log_writer(const char *format, va_list ap,
+                                   const char *prefix,
+                                   const char *domain,
+                                   enum ws_log_level level,
+                                   void *user_data);
 
 /* capture related options */
 static capture_options global_capture_opts;
@@ -4844,6 +4847,8 @@ main(int argc, char *argv[])
 #endif
     GString          *str;
 
+    g_set_prgname("dumpcap");
+
     /* Initialize log handler early so we can have proper logging during startup. */
     ws_log_init(dumpcap_log_writer);
 
@@ -4856,6 +4861,7 @@ main(int argc, char *argv[])
         cmdarg_err("Invalid log level \"%s\"", opt_err_val);
         exit (1);
     }
+    ws_log_set_domain_filter_args(&argc, argv);
 
 #ifdef _WIN32
     create_app_running_mutex();
@@ -5567,29 +5573,30 @@ main(int argc, char *argv[])
 }
 
 static void
-dumpcap_log_writer(const char *message, enum ws_log_domain domain _U_,
-                    enum ws_log_level level _U_, void *ptr _U_)
+dumpcap_log_writer(const char *format, va_list ap,
+                                   const char *prefix,
+                                   const char *domain _U_,
+                                   enum ws_log_level level _U_,
+                                   void *user_data _U_)
 {
 #if defined(DEBUG_DUMPCAP) || defined(DEBUG_CHILD_DUMPCAP)
 #ifdef DEBUG_DUMPCAP
-        fprintf(stderr, "%s\n", message);
-        fflush(stderr);
+    ws_log_fprint(stderr, format, ap, prefix);
 #endif
 #ifdef DEBUG_CHILD_DUMPCAP
-        fprintf(debug_log, "%s\n", message);
-        fflush(debug_log);
+    ws_log_fprint(debug_log, format, ap, prefix);
 #endif
-    return;
-#endif
-
-    /* Messages goto stderr or    */
-    /*  to parent especially formatted if dumpcap running as child. */
+#else
+    /* Messages goto stderr or to parent especially formatted if dumpcap
+     * is running as child. */
     if (capture_child) {
-        sync_pipe_errmsg_to_parent(2, message, "");
+        gchar *msg = g_strdup_vprintf(format, ap);
+        sync_pipe_errmsg_to_parent(2, msg, "");
+        g_free(msg);
     } else {
-        fprintf(stderr, "%s", message);
-        fflush(stderr);
+        ws_log_fprint(stderr, format, ap, prefix);
     }
+#endif
 }
 
 

@@ -40,31 +40,27 @@ enum ws_log_level {
 #endif
 
 
-/** Signature for registering a log writer. */
-typedef void (ws_log_writer_t)(const char *message,
-                                   enum ws_log_domain domain,
+/** Callback for registering a log writer. */
+typedef void (ws_log_writer_cb)(const char *format, va_list ap,
+                                   const char *prefix,
+                                   const char *domain,
                                    enum ws_log_level level,
                                    void *user_data);
 
 
-typedef void (ws_log_writer_free_data_t)(void *user_data);
+/** Callback for freeing a user data pointer. */
+typedef void (ws_log_writer_free_data_cb)(void *user_data);
 
 
+/** Writes to stream a new log line and flushes. */
 WS_DLL_PUBLIC
-void ws_log_default_writer(const char *message,
-                                   enum ws_log_domain domain,
-                                   enum ws_log_level level,
-                                   void *user_data);
+void ws_log_fprint(FILE *fp, const char *format, va_list ap,
+                                   const char *prefix);
 
 
 /** Convert a numerical level to its string representation. */
 WS_DLL_PUBLIC
 const char *ws_log_level_to_string(enum ws_log_level level);
-
-
-/** Convert a numerical domain to its string representation. */
-WS_DLL_PUBLIC
-const char *ws_log_domain_to_string(enum ws_log_domain domain);
 
 
 /** Checks if the active log level would discard a message for the given
@@ -107,6 +103,23 @@ WS_DLL_PUBLIC
 const char *ws_log_set_level_args(int *argcp, char **argv);
 
 
+/** Set a domain filter from a string.
+ *
+ * Domain filter is a case insensitive list separated by ',' or ';'. Only
+ * the domains in the filter will generate output; the others will be muted.
+ */
+WS_DLL_PUBLIC
+void ws_log_set_domain_filter_str(const char *domain_filter);
+
+
+/** Set the active domain from an argv vector.
+ *
+ * Same as above but parses the filter from the command line arguments.
+ */
+WS_DLL_PUBLIC
+void ws_log_set_domain_filter_args(int *argcp, char **argv);
+
+
 /** Initializes the logging code.
  *
  * Must be called at startup before using the log API. If provided the
@@ -114,7 +127,7 @@ const char *ws_log_set_level_args(int *argcp, char **argv);
  * is NULL the default log writer is used.
  */
 WS_DLL_PUBLIC
-void ws_log_init(ws_log_writer_t *writer);
+void ws_log_init(ws_log_writer_cb *writer);
 
 
 /** Initializes the logging code.
@@ -124,8 +137,8 @@ void ws_log_init(ws_log_writer_t *writer);
  * is passed it will be called with user_data when the program terminates.
  */
 WS_DLL_PUBLIC
-void ws_log_init_with_data(ws_log_writer_t *writer, void *user_data,
-                              ws_log_writer_free_data_t *free_user_data);
+void ws_log_init_with_data(ws_log_writer_cb *writer, void *user_data,
+                              ws_log_writer_free_data_cb *free_user_data);
 
 
 /** This function is called to output a message to the log.
@@ -133,15 +146,16 @@ void ws_log_init_with_data(ws_log_writer_t *writer, void *user_data,
  * Takes a format string and a variable number of arguments.
  */
 WS_DLL_PUBLIC
-void ws_log(enum ws_log_domain domain, enum ws_log_level level,
+void ws_log(const char *domain, enum ws_log_level level,
                     const char *format, ...) G_GNUC_PRINTF(3,4);
+
 
 /** This function is called to output a message to the log.
  *
  * Takes a format string and a 'va_list'.
  */
 WS_DLL_PUBLIC
-void ws_logv(enum ws_log_domain domain, enum ws_log_level level,
+void ws_logv(const char *domain, enum ws_log_level level,
                     const char *format, va_list ap);
 
 
@@ -151,7 +165,7 @@ void ws_logv(enum ws_log_domain domain, enum ws_log_level level,
  * information. 'func' may be NULL.
  */
 WS_DLL_PUBLIC
-void ws_log_full(enum ws_log_domain domain, enum ws_log_level level,
+void ws_log_full(const char *domain, enum ws_log_level level,
                     const char *file, int line, const char *func,
                     const char *format, ...) G_GNUC_PRINTF(6,7);
 

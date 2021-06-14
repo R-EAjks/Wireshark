@@ -447,6 +447,8 @@ main(int argc, char *argv[])
     setlocale(LC_ALL, "");
 #endif
 
+    g_set_prgname("rawshark");
+
     /* Initialize log handler early so we can have proper logging during startup. */
     ws_log_init(NULL);
 
@@ -459,6 +461,7 @@ main(int argc, char *argv[])
         cmdarg_err("Invalid log level \"%s\"", opt_err_val);
         return INVALID_OPTION;
     }
+    ws_log_set_domain_filter_args(&argc, argv);
 
     /* Initialize the version information. */
     ws_init_version_info("Rawshark (Wireshark)", NULL,

@@ -114,6 +114,8 @@ main(int argc, char *argv[])
     cfile_close_failure_message
   };
 
+  g_set_prgname("sharkd");
+
   /* Initialize log handler early so we can have proper logging during startup. */
   ws_log_init(NULL);
 
@@ -126,6 +128,7 @@ main(int argc, char *argv[])
     cmdarg_err("Invalid log level \"%s\"", opt_err_val);
     return INIT_FAILED;
   }
+  ws_log_set_domain_filter_args(&argc, argv);
 
   /*
    * Get credential information for later use, and drop privileges

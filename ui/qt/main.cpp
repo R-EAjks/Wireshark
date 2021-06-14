@@ -529,6 +529,8 @@ int main(int argc, char *qt_argv[])
     macos_enable_layer_backing();
 #endif
 
+    g_set_prgname("wireshark");
+
     /* Initialize log handler early so we can have proper logging during startup. */
     ws_log_init(console_log_writer);
 
@@ -587,6 +589,7 @@ int main(int argc, char *qt_argv[])
         cmdarg_err("Invalid log level \"%s\"", opt_err_val);
         exit_application(INVALID_OPTION);
     }
+    ws_log_set_domain_filter_args(&argc, argv);
 
     /*
      * Get credential information for later use, and drop privileges
