@@ -11,6 +11,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <time.h>
 #include <stdarg.h>
 #ifdef HAVE_UNISTD_H
@@ -20,6 +21,7 @@
 
 #include <wsutil/ws_assert.h>
 #include <wsutil/time_util.h>
+#include <wsutil/file_util.h>
 
 #define PREFIX_BUFSIZE  128
 
@@ -31,9 +33,11 @@
 
 static enum ws_log_level current_log_level = LOG_LEVEL_NONE;
 
+static gboolean color_enabled = FALSE;
+
 static const char *registered_appname = NULL;
 
-GPtrArray *domain_filter = NULL;
+static GPtrArray *domain_filter = NULL;
 
 static ws_log_writer_cb *registered_log_writer = NULL;
 
@@ -45,17 +49,6 @@ static FILE *custom_log = NULL;
 
 
 static void ws_log_cleanup(void);
-
-
-void
-ws_log_fprint(FILE *fp, const char *format, va_list ap,
-                                const char *prefix)
-{
-    fputs(prefix, fp);
-    vfprintf(fp, format, ap);
-    fputc('\n', fp);
-    fflush(fp);
-}
 
 
 const char *ws_log_level_to_string(enum ws_log_level level)
@@ -153,75 +146,108 @@ enum ws_log_level ws_log_set_level_str(const char *str_level)
 }
 
 
-static const char *log_prune_argv(int count, char **ptr, int prune_extra,
-                                const char *arg, int *ret_argc)
+static const char *opt_level   = "--log-level";
+static const char *opt_domains = "--log-domains";
+static const char *opt_file    = "--log-file";
+
+
+int ws_log_parse_args(int *argc_ptr, char *argv[], void (*print_err)(const char *, ...))
 {
-    /*
-     * We found a log option. We will remove it from
-     * the argv by moving up the other strings in the array. This is
-     * so that it doesn't generate an unrecognized option
-     * error further along in the initialization process.
-     */
+    char **ptr = argv;
+    int count = *argc_ptr;
+    int ret = 0;
+    size_t optlen;
+    const char *option, *value;
+    int prune_extra;
 
-    /* Include the terminating NULL in the memmove. */
-    memmove(ptr, ptr + 1 + prune_extra, (count - prune_extra) * sizeof(*ptr));
-    *ret_argc -= (1 + prune_extra);
-    return arg;
-}
-
-
-const char *log_parse_args(int *argc_ptr, char *argv[], const char *option)
-{
-    char **p;
-    int c;
-    size_t optlen = strlen(option);
-    const char *value;
-
-    for (p = argv, c = *argc_ptr; *p != NULL; p++, c--) {
-        if (strncmp(*p, option, optlen) == 0) {
-            value = *p + optlen;
-            /* Two possibilities:
-             *      --<option> <value>
-             * or
-             *      --<option>=<value>
-             */
-            if (value[0] == '\0') {
-                /* value is separated with blank space */
-                value = *(p + 1);
-
-                /* If the option value after the blank is missing or stars with '-' just ignore it.
-                 * But we should probably signal an error (missing required value). */
-                if (value == NULL || !*value || *value == '-') {
-                    return log_prune_argv(c, p, 0, NULL, argc_ptr);
-                }
-                return log_prune_argv(c, p, 1, value, argc_ptr);
-            }
-            else if (value[0] == '=') {
-                /* value is after equals */
-                value += 1;
-                return log_prune_argv(c, p, 0, value, argc_ptr);
-            }
-            /* we didn't find what we want */
+    while (*ptr != NULL) {
+        if (g_str_has_prefix(*ptr, opt_level)) {
+            option = opt_level;
+            optlen = strlen(opt_level);
         }
+        else if (g_str_has_prefix(*ptr, opt_domains)) {
+            option = opt_domains;
+            optlen = strlen(opt_domains);
+        }
+        else if (g_str_has_prefix(*ptr, opt_file)) {
+            option = opt_file;
+            optlen = strlen(opt_file);
+        }
+        else {
+            ptr += 1;
+            count -= 1;
+            continue;
+        }
+
+        value = *ptr + optlen;
+        /* Two possibilities:
+         *      --<option> <value>
+         * or
+         *      --<option>=<value>
+         */
+        if (value[0] == '\0') {
+            /* value is separated with blank space */
+            value = *(ptr + 1);
+            prune_extra = 1;
+
+            if (value == NULL || !*value || *value == '-') {
+                /* If the option value after the blank starts with '-' assume
+                 * it is another option. */
+                print_err("Option \"%s\" requires a value.\n", *ptr);
+                option = NULL;
+                prune_extra = 0;
+                ret += 1;
+            }
+        }
+        else if (value[0] == '=') {
+            /* value is after equals */
+            value += 1;
+            prune_extra = 0;
+        }
+        else {
+            /* Option isn't known. */
+            ptr += 1;
+            count -= 1;
+            continue;
+        }
+
+        if (option == opt_level) {
+            if (ws_log_set_level_str(value) == LOG_LEVEL_NONE) {
+                print_err("Invalid log level \"%s\"\n", value);
+                ret += 1;
+            }
+        }
+        else if (option == opt_domains) {
+            ws_log_set_domain_filter_str(value);
+        }
+        else if (option == opt_file) {
+            FILE *fp = ws_fopen(value, "w");
+            if (fp == NULL) {
+                print_err("Error opening file '%s' for writing: %s\n", value, g_strerror(errno));
+                ret += 1;
+            }
+            else {
+                ws_log_add_custom_file(fp);
+            }
+        }
+        else {
+            /* Option value missing or invalid, do nothing. */
+        }
+
+        /*
+         * We found a log option. We will remove it from
+         * the argv by moving up the other strings in the array. This is
+         * so that it doesn't generate an unrecognized option
+         * error further along in the initialization process.
+         */
+        /* Include the terminating NULL in the memmove. */
+        memmove(ptr, ptr + 1 + prune_extra, (count - prune_extra) * sizeof(*ptr));
+        /* No need to increment ptr here. */
+        count -= (1 + prune_extra);
+        *argc_ptr -= (1 + prune_extra);
     }
-    return NULL; /* No log-level option, ignore and return success. */
-}
 
-
-const char *ws_log_set_level_args(int *argc_ptr, char *argv[])
-{
-    const char *optval = NULL;
-    enum ws_log_level level;
-
-    optval = log_parse_args(argc_ptr, argv, "--log-level");
-    if (optval == NULL)
-        return NULL;
-
-    level = ws_log_set_level_str(optval);
-    if (level == LOG_LEVEL_NONE)
-        return optval;
-
-    return NULL;
+    return ret;
 }
 
 
@@ -246,26 +272,24 @@ void ws_log_set_domain_filter_str(const char *str_filter)
 }
 
 
-void ws_log_set_domain_filter_args(int *argc_ptr, char *argv[])
+void ws_log_init(ws_log_writer_cb *writer)
 {
-    const char *optval = NULL;
+    const char *env;
 
-    optval = log_parse_args(argc_ptr, argv, "--log-domains");
-    if (optval == NULL)
-        return;
-
-    ws_log_set_domain_filter_str(optval);
-}
-
-
-void ws_log_init(ws_log_writer_cb *_writer)
-{
     registered_appname = g_get_prgname();
 
-    if (_writer)
-        registered_log_writer = _writer;
+    if (writer)
+        registered_log_writer = writer;
 
-    const char *env;
+    /*
+     * Some versions of Windows 10 support ANSI color escapes, we should
+     * check for that somehow. We also assume every non-Windows console
+     * supports it.
+     */
+#ifndef _WIN32
+    if (ws_isatty(ws_fileno(stderr)))
+        color_enabled = TRUE;
+#endif
 
     current_log_level = DEFAULT_LOG_LEVEL;
 
@@ -291,139 +315,98 @@ void ws_log_init_with_data(ws_log_writer_cb *writer, void *user_data,
 }
 
 
-static inline const char *_lvl_to_str(enum ws_log_level level)
-{
-    switch (level) {
-        case LOG_LEVEL_NONE:       return "(NONE)";
-        case LOG_LEVEL_ERROR:      return "ERROR";
-        case LOG_LEVEL_CRITICAL:   return "CRITICAL";
-        case LOG_LEVEL_WARNING:    return "WARNING";
-        case LOG_LEVEL_MESSAGE:    return "MESSAGE";
-        case LOG_LEVEL_INFO:       return "INFO";
-        case LOG_LEVEL_DEBUG:      return "DEBUG";
-        default:
-            return "(BOGUS LOG LEVEL)";
-    }
-}
+#define TIMESTAMP_BUFSIZE   sizeof("HH:MM:SS.mmm")
 
-
-struct logstr {
-    char buffer[PREFIX_BUFSIZE];
-    char *ptr;
-    int free;
-};
-
-
-static inline void logstr_init(struct logstr *str)
-{
-    str->free = (int)(sizeof(str->buffer) - 1);
-    str->buffer[sizeof(str->buffer) - 1] = '\0';
-    str->ptr = str->buffer;
-
-#ifndef WS_DISABLE_ASSERT
-    memset(str->buffer, 0, sizeof(str->buffer));
-#endif
-}
-
-
-static inline int logstr_snprintf(struct logstr *str, const char *fmt, ...)
-{
-    int write;
-    va_list ap;
-
-    if (str->free <= 0)
-        return -1;
-
-    va_start(ap, fmt);
-    write = vsnprintf(str->ptr, str->free, fmt, ap);
-    va_end(ap);
-
-    if (write < 0 || write >= str->free) {
-        str->ptr = NULL;
-        str->free = -1;
-        return -1;
-    }
-
-    str->ptr += write;
-    ws_assert(str->ptr < str->buffer + sizeof(str->buffer));
-    str->free -= write;
-    ws_assert(str->free > 0);
-    return 0;
-}
-
-
-static void create_log_time(struct logstr *str)
+static void create_log_time(char *buf, size_t bufsize)
 {
     time_t curr;
     struct tm *today;
     guint64 microseconds;
+
+    ws_assert(buf && bufsize >= TIMESTAMP_BUFSIZE);
 
     time(&curr);
     today = localtime(&curr);
     microseconds = create_timestamp();
 
     if (G_UNLIKELY(today == NULL)) {
-        logstr_snprintf(str, " ");
+        *buf = '\0';
         return;
     }
 
-    logstr_snprintf(str, " %02d:%02d:%02d.%03" G_GUINT64_FORMAT,
+    snprintf(buf, bufsize, "%02d:%02d:%02d.%03" G_GUINT64_FORMAT,
                 today->tm_hour, today->tm_min, today->tm_sec,
                 microseconds % 1000000 / 1000);
 }
 
 
-static void logstr_prefix_print(struct logstr *str,
+static void log_write_do_work(FILE *fp, gboolean use_color, const char *timestamp,
                                 const char *domain,  enum ws_log_level level,
-                                const char *file, int line, const char *func)
+                                const char *file, int line, const char *func,
+                                const char *user_format, va_list user_ap)
 {
 #ifndef _WIN32
-    logstr_snprintf(str, " ** (%s:%ld)",
-                    registered_appname ? registered_appname : "PID", getpid());
+    fprintf(fp, " ** (%s:%ld) ",
+                    registered_appname ? registered_appname : "PID", (long)getpid());
 #else
     if (registered_appname)
-        logstr_snprintf(str, " ** (%s)", registered_appname);
+        fprintf(fp, " ** (%s) ", registered_appname);
     else
-        logstr_snprintf(str, " **");
+        fprintf(fp, " ** ");
 #endif
 
-    create_log_time(str);
+    fputs(timestamp, fp);
 
-    logstr_snprintf(str, " [%s-%s]", domain, _lvl_to_str(level));
+    const char *level_str = ws_log_level_to_string(level);
 
-    if (func)
-        logstr_snprintf(str, " %s()", func);
-    else if (file && line >= 0)
-        logstr_snprintf(str, " (%d)%s", file, line);
+    if (strcmp(domain, LOG_DOMAIN_DEFAULT) != 0)
+        fprintf(fp, " [%s-%s]", domain, level_str);
+    else
+        fprintf(fp, " [%s]", level_str);
+
+    if (file && line >= 0)
+        fprintf(fp, " %s:%d", file, line);
     else if (file)
-        logstr_snprintf(str, " %s", file);
+        fprintf(fp, " %s", file);
 
-    logstr_snprintf(str, " -- ");
+    fputs(" -- ", fp);
+
+    if (func) {
+        if (use_color) {
+            fputs("\033[34m", fp); /* color on */
+        }
+        fprintf(fp, "%s(): " , func);
+        if (use_color) {
+            fputs("\033[0m", fp); /* color off */
+        }
+    }
+
+    vfprintf(fp, user_format, user_ap);
+    fputc('\n', fp);
+    fflush(fp);
 }
 
 
-static void log_internal_write(const char *domain, enum ws_log_level level,
+static void log_write_dispatch(const char *domain, enum ws_log_level level,
                             const char *file, int line, const char *func,
                             const char *user_format, va_list user_ap)
 {
-    struct logstr prefix;
+    char tstamp[TIMESTAMP_BUFSIZE];
 
-    logstr_init(&prefix);
+    create_log_time(tstamp, sizeof(tstamp));
 
-    logstr_prefix_print(&prefix, domain, level, file, line, func);
-
-    /* Call the registered writer, or the default if one wasn't registered. */
     if (registered_log_writer) {
-        registered_log_writer(user_format, user_ap, prefix.buffer,
-                                domain, level, registered_log_writer_data);
+        registered_log_writer(domain, level, tstamp, file, line, func,
+                        user_format, user_ap, registered_log_writer_data);
     }
     else {
-        ws_log_fprint(stderr, user_format, user_ap, prefix.buffer);
+        log_write_do_work(stderr, color_enabled, tstamp, domain, level, file, line, func,
+                        user_format, user_ap);
     }
 
-    /* If we have a custom file, write to it _also_. */
     if (custom_log) {
-        ws_log_fprint(custom_log, user_format, user_ap, prefix.buffer);
+        log_write_do_work(custom_log, FALSE, tstamp, domain, level, file, line, func,
+                        user_format, user_ap);
     }
 
     if (level == LOG_LEVEL_ERROR) {
@@ -439,7 +422,7 @@ void ws_logv(const char *domain, enum ws_log_level level,
     if (log_drop_message(domain, level))
         return;
 
-    log_internal_write(domain, level, NULL, -1, NULL, format, ap);
+    log_write_dispatch(domain, level, NULL, -1, NULL, format, ap);
 }
 
 
@@ -452,7 +435,7 @@ void ws_log(const char *domain, enum ws_log_level level,
         return;
 
     va_start(ap, format);
-    log_internal_write(domain, level, NULL, -1, NULL, format, ap);
+    log_write_dispatch(domain, level, NULL, -1, NULL, format, ap);
     va_end(ap);
 }
 
@@ -467,8 +450,18 @@ void ws_log_full(const char *domain, enum ws_log_level level,
         return;
 
     va_start(ap, format);
-    log_internal_write(domain, level, file, line, func, format, ap);
+    log_write_dispatch(domain, level, file, line, func, format, ap);
     va_end(ap);
+}
+
+
+void ws_log_default_writer(const char *domain, enum ws_log_level level,
+                            const char *timestamp,
+                            const char *file, int line, const char *func,
+                            const char *user_format, va_list user_ap,
+                            void *user_data _U_)
+{
+    log_write_do_work(stderr, color_enabled, timestamp, domain, level, file, line, func, user_format, user_ap);
 }
 
 
@@ -493,9 +486,6 @@ void ws_log_add_custom_file(FILE *fp)
 {
         if (custom_log != NULL) {
             fclose(custom_log);
-            custom_log = NULL;
         }
-        if (fp != NULL) {
-            custom_log = fp;
-        }
+        custom_log = fp;
 }

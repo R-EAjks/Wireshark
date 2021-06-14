@@ -41,10 +41,10 @@ enum ws_log_level {
 
 
 /** Callback for registering a log writer. */
-typedef void (ws_log_writer_cb)(const char *format, va_list ap,
-                                   const char *prefix,
-                                   const char *domain,
-                                   enum ws_log_level level,
+typedef void (ws_log_writer_cb)(const char *domain, enum ws_log_level level,
+                                   const char *timestamp,
+                                   const char *file, int line, const char *func,
+                                   const char *user_format, va_list user_ap,
                                    void *user_data);
 
 
@@ -52,10 +52,12 @@ typedef void (ws_log_writer_cb)(const char *format, va_list ap,
 typedef void (ws_log_writer_free_data_cb)(void *user_data);
 
 
-/** Writes to stream a new log line and flushes. */
 WS_DLL_PUBLIC
-void ws_log_fprint(FILE *fp, const char *format, va_list ap,
-                                   const char *prefix);
+void ws_log_default_writer(const char *domain, enum ws_log_level level,
+                            const char *timestamp,
+                            const char *file, int line, const char *func,
+                            const char *user_format, va_list user_ap,
+                            void *user_data);
 
 
 /** Convert a numerical level to its string representation. */
@@ -93,16 +95,6 @@ WS_DLL_PUBLIC
 enum ws_log_level ws_log_set_level_str(const char *str_level);
 
 
-/** Set the active log level from an argv vector.
- *
- * Will search the arv for the option parameter "--log-level=<string>".
- * If it finds the parameter and the string is valid sets the log level and
- * returns NULL (success). Othwerise returns the invalid option argument after '='.
- */
-WS_DLL_PUBLIC
-const char *ws_log_set_level_args(int *argcp, char **argv);
-
-
 /** Set a domain filter from a string.
  *
  * Domain filter is a case insensitive list separated by ',' or ';'. Only
@@ -112,12 +104,12 @@ WS_DLL_PUBLIC
 void ws_log_set_domain_filter_str(const char *domain_filter);
 
 
-/** Set the active domain from an argv vector.
+/** Parses the command line arguments for log options.
  *
- * Same as above but parses the filter from the command line arguments.
+ * Returns zero for no error, non-zero for a bad option value.
  */
 WS_DLL_PUBLIC
-void ws_log_set_domain_filter_args(int *argcp, char **argv);
+int ws_log_parse_args(int *argc_ptr, char *argv[], void (*print_err)(const char *, ...));
 
 
 /** Initializes the logging code.
