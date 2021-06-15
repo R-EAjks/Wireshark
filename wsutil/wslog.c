@@ -22,7 +22,6 @@
 #include <wsutil/ws_assert.h>
 #include <wsutil/file_util.h>
 
-#define PREFIX_BUFSIZE  128
 
 #define ENV_VAR_LEVEL       "WIRESHARK_LOG_LEVEL"
 #define ENV_VAR_DOMAINS     "WIRESHARK_LOG_DOMAINS"
@@ -82,6 +81,11 @@ gboolean ws_log_level_is_active(enum ws_log_level level)
 gboolean ws_log_domain_is_active(const char *domain)
 {
     if (domain_filter == NULL)
+        return TRUE;
+
+    /* We don't filter the default domain. Default means undefined, pretty much
+     * every permanent call to ws_log should be using a chosen domain. */
+    if (strcmp(domain, LOG_DOMAIN_DEFAULT) == 0)
         return TRUE;
 
     for (guint i = 0; i < domain_filter->len; i++) {
@@ -280,14 +284,15 @@ void ws_log_init(ws_log_writer_cb *writer)
     if (writer)
         registered_log_writer = writer;
 
-    /*
-     * Some versions of Windows 10 support ANSI color escapes, we should
-     * check for that somehow. We also assume every non-Windows console
-     * supports it.
-     */
-#ifndef _WIN32
-    if (ws_isatty(ws_fileno(stderr)))
-        color_enabled = TRUE;
+#if GLIB_CHECK_VERSION(2,50,0)
+    color_enabled = g_log_writer_supports_color(ws_fileno(stderr));
+#elif !defined(_WIN32)
+    /* We assume every non-Windows console supports color. */
+    color_enabled = (ws_isatty(ws_fileno(stderr)) == 1);
+#else
+     /* Our Windows build version of GLib is pretty recent, we are probably
+      * fine here, unless we want to do better than GLib. */
+    color_enabled = FALSE;
 #endif
 
     current_log_level = DEFAULT_LOG_LEVEL;
@@ -313,6 +318,16 @@ void ws_log_init_with_data(ws_log_writer_cb *writer, void *user_data,
     ws_log_init(writer);
 }
 
+
+static inline const char *color_on(gboolean enable)
+{
+    return enable ? "\033[34m" : ""; /* blue */
+}
+
+static inline const char *color_off(gboolean enable)
+{
+    return enable ? "\033[0m" : "";
+}
 
 static void log_write_do_work(FILE *fp, gboolean use_color, const char *timestamp,
                                 const char *domain,  enum ws_log_level level,
@@ -346,15 +361,8 @@ static void log_write_do_work(FILE *fp, gboolean use_color, const char *timestam
 
     fputs(" -- ", fp);
 
-    if (func) {
-        if (use_color) {
-            fputs("\033[34m", fp); /* color on */
-        }
-        fprintf(fp, "%s(): " , func);
-        if (use_color) {
-            fputs("\033[0m", fp); /* color off */
-        }
-    }
+    if (func)
+        fprintf(fp, "%s%s()%s: " , color_on(use_color), func, color_off(use_color));
 
     vfprintf(fp, user_format, user_ap);
     fputc('\n', fp);
@@ -401,6 +409,9 @@ static void log_write_dispatch(const char *domain, enum ws_log_level level,
 void ws_logv(const char *domain, enum ws_log_level level,
                     const char *format, va_list ap)
 {
+    if (domain == NULL || domain[0] == '\0')
+        domain = LOG_DOMAIN_DEFAULT;
+
     if (log_drop_message(domain, level))
         return;
 
@@ -408,10 +419,27 @@ void ws_logv(const char *domain, enum ws_log_level level,
 }
 
 
+void ws_logv_full(const char *domain, enum ws_log_level level,
+                    const char *file, int line, const char *func,
+                    const char *format, va_list ap)
+{
+    if (domain == NULL || domain[0] == '\0')
+        domain = LOG_DOMAIN_DEFAULT;
+
+    if (log_drop_message(domain, level))
+        return;
+
+    log_write_dispatch(domain, level, file, line, func, format, ap);
+}
+
+
 void ws_log(const char *domain, enum ws_log_level level,
                     const char *format, ...)
 {
     va_list ap;
+
+    if (domain == NULL || domain[0] == '\0')
+        domain = LOG_DOMAIN_DEFAULT;
 
     if (log_drop_message(domain, level))
         return;
@@ -427,6 +455,9 @@ void ws_log_full(const char *domain, enum ws_log_level level,
                     const char *format, ...)
 {
     va_list ap;
+
+    if (domain == NULL || domain[0] == '\0')
+        domain = LOG_DOMAIN_DEFAULT;
 
     if (log_drop_message(domain, level))
         return;

@@ -33,6 +33,12 @@ enum ws_log_level {
      _LOG_LEVEL_LAST
 };
 
+/*
+ * Which log domain to use is a matter of policy. Any string is valid (names
+ * using parenthesis should be avoided). There are no hard rules but using a
+ * non-default pre-defined log domain is a good rule of thumb.
+ */
+
 #include <ws_log_domains.h>
 
 #ifndef WS_LOG_DOMAIN
@@ -160,6 +166,17 @@ WS_DLL_PUBLIC
 void ws_log_full(const char *domain, enum ws_log_level level,
                     const char *file, int line, const char *func,
                     const char *format, ...) G_GNUC_PRINTF(6,7);
+
+
+/** This function is called to output a message to the log.
+ *
+ * In addition to the message this function accepts file/line/function
+ * information. 'func' may be NULL.
+ */
+WS_DLL_PUBLIC
+void ws_logv_full(const char *domain, enum ws_log_level level,
+                    const char *file, int line, const char *func,
+                    const char *format, va_list ap);
 
 
 #define _LOG_FULL(level, ...) ws_log_full(WS_LOG_DOMAIN, level,  \
