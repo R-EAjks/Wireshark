@@ -1735,6 +1735,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-sercosiii.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ses.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-sflow.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-sftp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-sgsap.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-shim6.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-sigcomp.c

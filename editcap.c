@@ -188,6 +188,7 @@ static const struct {
     guint32     id;
 } secrets_types[] = {
     { "tls",    SECRETS_TYPE_TLS },
+    { "ssh",    SECRETS_TYPE_SSH },
     { "wg",     SECRETS_TYPE_WIREGUARD },
 };
 
