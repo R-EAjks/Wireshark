@@ -16,6 +16,7 @@
 #include "ui/recent.h"
 #include "wsutil/filesystem.h"
 #include "epan/prefs.h"
+#include <ui/version_info.h>
 
 #include <ui/qt/models/profile_model.h>
 
@@ -27,7 +28,13 @@
 #include <QFont>
 #include <QTemporaryDir>
 
+#include <QJsonObject>
+#include <QJsonDocument>
+
 Q_LOGGING_CATEGORY(profileLogger, "wireshark.profiles")
+
+static QMap<int, QVariantMap> jsonCache_;
+#define PROFILE_DESCRIPTION_FILE "profile.json"
 
 ProfileSortModel::ProfileSortModel(QObject * parent):
     QSortFilterProxyModel (parent),
@@ -136,12 +143,17 @@ ProfileModel::ProfileModel(QObject * parent) :
     }
     g_list_free(files);
 
+    /* Add JSON filename for import/export */
+    profile_files_ << PROFILE_DESCRIPTION_FILE;
+
     loadProfiles();
 }
 
 void ProfileModel::loadProfiles()
 {
     emit beginResetModel();
+
+    jsonCache_.clear();
 
     bool refresh = profiles_.count() > 0;
 
@@ -258,11 +270,50 @@ profile_def * ProfileModel::guard(int row) const
     return profiles_.value(row, Q_NULLPTR);
 }
 
+QString ProfileModel::profileJson(const QModelIndex &idx) const
+{
+    QString filePath = QDir::toNativeSeparators(dataPath(idx, true).toString() + QDir::separator() + PROFILE_DESCRIPTION_FILE);
+    QFileInfo fi(filePath);
+    if ( fi.exists() && fi.isFile() )
+        return filePath;
+
+    return QString();
+}
+
+QVariantMap ProfileModel::profileInfo(const QModelIndex &idx) const
+{
+    if (idx.isValid() && jsonCache_.keys().contains(idx.row()))
+        return jsonCache_[idx.row()];
+
+    QString filePath = profileJson(idx);
+    if ( filePath.isEmpty() )
+        return QVariantMap();
+
+    QFile loadFile(filePath);
+
+    if (!loadFile.open(QIODevice::ReadOnly))
+        return QVariantMap();
+
+    QByteArray saveData = loadFile.readAll();
+
+    QJsonDocument loadDoc(QJsonDocument::fromJson(saveData));
+    if (! loadDoc.isEmpty() ) 
+    {
+        QVariantMap result = loadDoc.object().toVariantMap();
+        jsonCache_.insert(idx.row(), result);
+        return result;
+    }
+
+    return QVariantMap();
+}
+
 QVariant ProfileModel::dataDisplay(const QModelIndex &index) const
 {
     profile_def * prof = guard(index);
     if (! prof)
         return QVariant();
+
+    QVariantMap profileObject = profileInfo(index);
 
     switch (index.column())
     {
@@ -275,6 +326,22 @@ QVariant ProfileModel::dataDisplay(const QModelIndex &index) const
             return tr("Global");
         else
             return tr("Personal");
+    case COL_AUTHOR:
+        if (profileObject.isEmpty() && (prof->status == PROF_STAT_DEFAULT || prof->is_global))
+            return tr("Built-in");
+
+        if ( profileObject.contains("author") )
+            return profileObject["author"].toString();
+        else
+            return QVariant();
+    case COL_VERSION:
+        if (profileObject.isEmpty() && (prof->status == PROF_STAT_DEFAULT || prof->is_global))
+            return QString(get_ws_vcs_version_info());
+
+        if ( profileObject.contains("version") )
+            return profileObject["version"].toString();
+        else
+            return QVariant();
     default:
         break;
     }
@@ -446,13 +513,31 @@ QVariant ProfileModel::dataToolTipRole(const QModelIndex &idx) const
     if (! prof)
         return QVariant();
 
+    QVariantMap profileObject = profileInfo(idx);
+
+    QString msg;
     if (prof->is_global)
-        return tr("This is a system provided profile");
+        msg = tr("This is a system provided profile");
     else
-        return dataPath(idx);
+        msg = dataPath(idx).toString();
+
+    if (idx.column() == COL_AUTHOR)
+    { 
+        if ((prof->status == PROF_STAT_DEFAULT || prof->is_global) && ! profileObject.contains("email"))
+            return QVariant();
+        
+        if (profileObject.contains("email"))
+            return profileObject["email"];
+    } 
+    else if (idx.column() == COL_NAME && profileObject.contains("description"))
+    {
+        msg = profileObject["description"].toString() + "\n\n" + msg;
+    }
+
+    return msg;
 }
 
-QVariant ProfileModel::dataPath(const QModelIndex &index) const
+QVariant ProfileModel::dataPath(const QModelIndex &index, bool emptyOrPathOnly) const
 {
     if (! index.isValid() || profiles_.count() <= index.row())
         return QVariant();
@@ -464,7 +549,7 @@ QVariant ProfileModel::dataPath(const QModelIndex &index) const
     if (checkInvalid(index))
     {
         int ref = this->findAsReference(prof->name);
-        if (ref != index.row() && ref >= 0)
+        if (ref != index.row() && ref >= 0 && ! emptyOrPathOnly)
         {
             profile_def * prof = guard(ref);
             QString msg = tr("A profile change for this name is pending");
@@ -473,19 +558,19 @@ QVariant ProfileModel::dataPath(const QModelIndex &index) const
             return msg;
         }
 
-        return tr("This is an invalid profile definition");
+        return emptyOrPathOnly ? QVariant() : tr("This is an invalid profile definition");
     }
 
     if ((prof->status == PROF_STAT_NEW || prof->status == PROF_STAT_CHANGED || prof->status == PROF_STAT_COPY) && checkDuplicate(index))
-        return tr("A profile already exists with this name");
+        return emptyOrPathOnly ? QVariant() : tr("A profile already exists with this name");
 
     if (checkIfDeleted(index))
     {
-        return tr("A profile with this name is being deleted");
+        return emptyOrPathOnly ? QVariant() : tr("A profile with this name is being deleted");
     }
 
     if (prof->is_import)
-        return tr("Imported profile");
+        return emptyOrPathOnly ? QVariant() : tr("Imported profile");
 
     switch (prof->status)
     {
@@ -493,7 +578,7 @@ QVariant ProfileModel::dataPath(const QModelIndex &index) const
         if (!reset_default_)
             return gchar_free_to_qstring(get_persconffile_path("", FALSE));
         else
-            return tr("Resetting to default");
+            return emptyOrPathOnly ? QVariant() : tr("Resetting to default");
     case PROF_STAT_EXISTS:
         {
             QString profile_path;
@@ -510,18 +595,18 @@ QVariant ProfileModel::dataPath(const QModelIndex &index) const
             QString errMsg;
 
             if (! checkNameValidity(prof->name, &errMsg))
-                return errMsg;
+                return emptyOrPathOnly ? QVariant() : errMsg;
             else
-                return tr("Created from default settings");
+                return emptyOrPathOnly ? QVariant() : tr("Created from default settings");
         }
     case PROF_STAT_CHANGED:
         {
             QString msg;
             if (! ProfileModel::checkNameValidity(QString(prof->name), &msg))
-                return msg;
+                return emptyOrPathOnly ? QVariant() : msg;
 
             if (prof->reference)
-                return tr("Renamed from: %1").arg(prof->reference);
+                return emptyOrPathOnly ? QVariant() : tr("Renamed from: %1").arg(prof->reference);
 
             return QVariant();
         }
@@ -566,7 +651,7 @@ QVariant ProfileModel::dataPath(const QModelIndex &index) const
                     msg.append(QString(" (%1)").arg(appendix));
             }
 
-            return msg;
+            return emptyOrPathOnly ? QVariant() : msg;
         }
     }
 
@@ -638,6 +723,10 @@ QVariant ProfileModel::headerData(int section, Qt::Orientation orientation, int 
         {
         case COL_NAME:
             return tr("Profile");
+        case COL_AUTHOR:
+            return tr("Author");
+        case COL_VERSION:
+            return tr("Version");
         case COL_TYPE:
             return tr("Type");
         default:
@@ -813,6 +902,8 @@ void ProfileModel::deleteEntry(QModelIndex idx)
     if (! idx.isValid())
         return;
 
+    jsonCache_.clear();
+
     QModelIndexList temp;
     temp << idx;
     deleteEntries(temp);
@@ -876,6 +967,8 @@ void ProfileModel::doResetModel(bool reset_import)
     reset_default_ = false;
     if (reset_import)
         profiles_imported_ = false;
+
+    jsonCache_.clear();
 
     loadProfiles();
 }

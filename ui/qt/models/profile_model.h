@@ -57,6 +57,8 @@ public:
 
     enum {
         COL_NAME,
+        COL_VERSION,
+        COL_AUTHOR,
         COL_TYPE,
         _LAST_ENTRY
     } columns_;
@@ -138,6 +140,9 @@ private:
     profile_def * guard(int row) const;
     GList * entry(profile_def *) const;
 
+    QString profileJson(const QModelIndex &index) const;
+    QVariantMap profileInfo(const QModelIndex &index) const;
+
     int findByNameAndVisibility(QString name, bool isGlobal = false, bool searchReference = false) const;
     int findAsReference(QString reference) const;
 
@@ -150,7 +155,7 @@ private:
     QVariant dataFontRole(const QModelIndex & idx) const;
     QVariant dataBackgroundRole(const QModelIndex & idx) const;
     QVariant dataToolTipRole(const QModelIndex & idx) const;
-    QVariant dataPath(const QModelIndex & idx) const;
+    QVariant dataPath(const QModelIndex & idx, bool emptyOrPathOnly = false) const;
 
 #ifdef HAVE_MINIZIP
     QStringList exportFileList(QModelIndexList items);
