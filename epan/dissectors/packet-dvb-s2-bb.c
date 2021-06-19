@@ -273,7 +273,7 @@ static void
 dvb_s2_gse_defragment_init(void)
 {
   reassembly_table_init(&dvb_s2_gse_reassembly_table,
-                        &addresses_reassembly_table_functions);
+                        &conversation_reassembly_table_functions);
 }
 
 static gint ett_dvb_s2_gse_fragments = -1;
@@ -1036,17 +1036,8 @@ virtual_stream_init(void)
     virtual_stream_count = 1;
 }
 
-/* Data that is associated with one BBFrame, used by GSE or TS packets
- * contained within it. Lifetime of the packet.
- */
-typedef struct {
-    address src;
-    address dst;
-    port_type ptype;
-    guint32 srcport;
-    guint32 destport;
-    guint8  isi;
-} dvbs2_bb_data;
+#define GSE_CONV_KEY 0
+#define GSE_DIR_KEY 1
 
 /* GSE defragmentation related data, one set of data per conversation.
  * Two tables are used. One is for the first pass, and contains the most
@@ -1140,7 +1131,7 @@ static guint8 compute_crc8(tvbuff_t *p, guint8 len, guint offset)
 }
 
 /* *** Code to actually dissect the packets *** */
-static int dissect_dvb_s2_gse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
+static int dissect_dvb_s2_gse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
     int         new_off                      = 0;
     guint8      labeltype, isi = 0;
@@ -1156,13 +1147,10 @@ static int dissect_dvb_s2_gse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
     gboolean   update_col_info = TRUE;
     gboolean   complete = FALSE;
 
-    dvbs2_bb_data     *pdata;
     conversation_t    *conv;
     gse_analysis_data *gse_data;
 
-    address save_src, save_dst;
-    port_type save_ptype;
-    guint32 save_srcport, save_destport;
+    gint save_p2p_dir;
 
     static int * const gse_header_bitfields[] = {
         &hf_dvb_s2_gse_hdr_start,
@@ -1190,31 +1178,27 @@ static int dissect_dvb_s2_gse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
     } else {
         /* Not padding, parse as a GSE Header */
 
-        copy_address_shallow(&save_src, &pinfo->src);
-        copy_address_shallow(&save_dst, &pinfo->dst);
-        save_ptype = pinfo->ptype;
-        save_srcport = pinfo->srcport;
-        save_destport = pinfo->destport;
-
-        /* We restore the original addresses and ports before each
-         * GSE packet so reassembly works. We do it here, because
-         * we don't want to restore them after calling a subdissector
-         * (so that the final values are that from the last protocol
-         * in the last PDU), but we also don't want to restore them
-         * if the remainder is just padding either, for the same reason.
-         * So we restore them here after the test for padding.
+        /* We reassemble using a conversation so that reassembly works.
+         * GSE should only be called from DVB BB, which sets p2p_dir and has a
+         * unidirectional endpoint conversation. (If somehow in the future GSE
+         * is called from other dissectors, we should check the conversation
+         * direction, as done in the BB dissector; that would also lead to
+         * the possibilty of multiple layers of GSE, and hence the need to
+         * use current_layer_num when adding the proto_data below.)
          */
-        if (data) { // Called from the BBFrame dissector
-            pdata = (dvbs2_bb_data *)data;
-            isi = pdata->isi;
-            copy_address_shallow(&pinfo->src, &pdata->src);
-            copy_address_shallow(&pinfo->dst, &pdata->dst);
-            pinfo->ptype = pdata->ptype;
-            pinfo->srcport = pdata->srcport;
-            pinfo->destport = pdata->destport;
-        }
 
-        conv = find_or_create_conversation(pinfo);
+        conv = (conversation_t*)p_get_proto_data(pinfo->pool, pinfo, proto_dvb_s2_gse, GSE_CONV_KEY);
+        if (conv == NULL) {
+            conv = find_or_create_conversation(pinfo);
+            /* For the first GSE subpacket, this will have the correct values;
+             * for later packets pinfo might have been overwritten, so we store
+             * the conversation as proto_data.
+             */
+            p_add_proto_data(pinfo->pool, pinfo, proto_dvb_s2_gse, GSE_CONV_KEY, conv);
+            p_add_proto_data(pinfo->pool, pinfo, proto_dvb_s2_gse, GSE_DIR_KEY, GINT_TO_POINTER(pinfo->p2p_dir));
+        }
+        save_p2p_dir = pinfo->p2p_dir;
+        pinfo->p2p_dir = GPOINTER_TO_INT(p_get_proto_data(pinfo->pool, pinfo, proto_dvb_s2_gse, GSE_DIR_KEY));
         gse_data = get_gse_analysis_data(conv);
 
         /* Length in header does not include header itself */
@@ -1246,7 +1230,7 @@ static int dissect_dvb_s2_gse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
                     /* Delete any previous in-progress reassembly if
                      * we get a new start packet. */
                     data_tvb = fragment_delete(&dvb_s2_gse_reassembly_table,
-                        pinfo, fragid, NULL);
+                        pinfo, fragid, conv);
                     /* Since we use fragment_add_seq_next, which (as part of
                      * the fragment_*_check family) moves completed assemblies
                      * to a new table (and only checks the completed table
@@ -1265,7 +1249,7 @@ static int dissect_dvb_s2_gse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
                      * Discard the packet if no buffer is in the re-assembly
                      * state for the Frag ID (check with fragment_get).
                      */
-                    if (frag_data && fragment_get(&dvb_s2_gse_reassembly_table, pinfo, fragid, NULL)) {
+                    if (frag_data && fragment_get(&dvb_s2_gse_reassembly_table, pinfo, fragid, conv)) {
                         subpacket_data = get_gse_subpacket_data(gse_data, pinfo->num, fragid, TRUE);
                         subpacket_data->labeltype = frag_data->labeltype;
                     }
@@ -1281,7 +1265,7 @@ static int dissect_dvb_s2_gse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
             }
             if (subpacket_data) {
                 dvbs2_frag_head = fragment_add_seq_next(&dvb_s2_gse_reassembly_table, tvb, new_off,
-                    pinfo, fragid, NULL, data_len, BIT_IS_CLEAR(gse_hdr, DVB_S2_GSE_HDR_STOP_POS));
+                    pinfo, fragid, conv, data_len, BIT_IS_CLEAR(gse_hdr, DVB_S2_GSE_HDR_STOP_POS));
             }
             next_tvb = process_reassembled_data(tvb, new_off, pinfo, "Reassembled GSE",
                 dvbs2_frag_head, &dvb_s2_gse_frag_items, &update_col_info, tree);
@@ -1371,11 +1355,12 @@ static int dissect_dvb_s2_gse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 
         data_tvb = tvb_new_subset_remaining(next_tvb, new_off);
 
-        copy_address_shallow(&pinfo->src, &save_src);
-        copy_address_shallow(&pinfo->dst, &save_dst);
-        pinfo->ptype = save_ptype;
-        pinfo->srcport = save_srcport;
-        pinfo->destport = save_destport;
+        pinfo->p2p_dir = save_p2p_dir;
+        /* Now clear use_endpoint so that any subdissectors will use the
+         * forthcoming IP addresses, UDP/TCP ports, etc. for creating
+         * conversations instead of the DVB BBF endpoint.
+         */
+        pinfo->use_endpoint = FALSE;
 
         if (complete) {
             switch (gse_proto) {
@@ -1468,7 +1453,6 @@ static int dissect_dvb_s2_bb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
     stream_t *ts_stream;
     stream_pdu_fragment_t *ts_frag;
     fragment_head *fd_head;
-    dvbs2_bb_data *pdata;
 
     gboolean    npd;
     guint8      input8, matype1, crc8, isi = 0, issyi;
@@ -1574,8 +1558,7 @@ static int dissect_dvb_s2_bb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
      * overwrite the pinfo addresses & ports, which are used as keys for
      * reassembly tables, conversations, and other purposes.
      *
-     * Thus, we need to save the current values before any subdissectors
-     * are run, and restore them each time before each subpacket.
+     * One solution is to use the conversation endpoint for reassembly.
      *
      * When BBFrames are carried over UDP or RTP we can't necessarily rely on
      * the ISI being unique - a capture might include different streams sent
@@ -1604,34 +1587,15 @@ static int dissect_dvb_s2_bb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
         } else {
             pinfo->p2p_dir = P2P_DIR_RECV;
         }
-
     } else {
         virtual_id = isi;
         pinfo->p2p_dir = P2P_DIR_SENT;
     }
+    conversation_create_endpoint_by_id(pinfo, ENDPOINT_DVBBBF, virtual_id, 0);
     subcircuit = find_conversation_by_id(pinfo->num, ENDPOINT_DVBBBF, virtual_id, 0);
     if (subcircuit == NULL) {
         subcircuit = conversation_new_by_id(pinfo->num, ENDPOINT_DVBBBF, virtual_id, 0);
     }
-
-    /* conversation_create_endpoint() could be useful for the subdissectors
-     * this calls (whether GSE or TS, and replace passing the packet data
-     * below), but it could cause problems when the subdissectors of those
-     * subdissectors try and call find_or_create_conversation().
-     * pinfo->use_endpoint doesn't affect reassembly tables in the default
-     * reassembly functions, either. So maybe the eventual approach is
-     * to create an endpoint but set pinfo->use_endpoint back to FALSE, and
-     * also make the GSE and MP2T dissectors more (DVB BBF) endpoint aware,
-     * including in their reassembly functions.
-     */
-
-    pdata = wmem_new0(wmem_packet_scope(), dvbs2_bb_data);
-    copy_address_shallow(&pdata->src, &pinfo->src);
-    copy_address_shallow(&pdata->dst, &pinfo->dst);
-    pdata->ptype = pinfo->ptype;
-    pdata->srcport = pinfo->srcport;
-    pdata->destport = pinfo->destport;
-    pdata->isi = isi;
 
     switch (matype1 & DVB_S2_BB_TSGS_MASK) {
     case DVB_S2_BB_TSGS_GENERIC_CONTINUOUS:
@@ -1656,7 +1620,7 @@ static int dissect_dvb_s2_bb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
                     new_off += DVB_S2_BB_EIP_CRC32_LEN;
                 } else {
                     /* start DVB-GSE dissector */
-                    sub_dissected = dissect_dvb_s2_gse(tvb_new_subset_length(tvb, new_off, bb_data_len), pinfo, tree, pdata);
+                    sub_dissected = dissect_dvb_s2_gse(tvb_new_subset_length(tvb, new_off, bb_data_len), pinfo, tree, NULL);
                     new_off += sub_dissected;
 
                     if ((sub_dissected <= bb_data_len) && (sub_dissected >= DVB_S2_GSE_MINSIZE)) {

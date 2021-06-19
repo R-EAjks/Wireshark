@@ -22,7 +22,6 @@
 #include <epan/conversation.h>
 #include <epan/expert.h>
 #include <epan/reassemble.h>
-#include <epan/address_types.h>
 #include <epan/proto_data.h>
 #include <epan/exceptions.h>
 #include <epan/show_exception.h>
@@ -149,8 +148,6 @@ static int hf_mp2t_af_e_m_3 = -1;
 /* static int hf_mp2t_payload = -1; */
 static int hf_mp2t_stuff_bytes = -1;
 static int hf_mp2t_pointer = -1;
-
-static int mp2t_no_address_type = -1;
 
 static const value_string mp2t_sync_byte_vals[] = {
     { MP2T_SYNC_BYTE, "Correct" },
@@ -301,6 +298,15 @@ typedef struct subpacket_analysis_data {
     guint32     frag_id;
 } subpacket_analysis_data_t;
 
+/* Keys for adding to proto_data. We could reuse the same key for different
+ * items stored wmem_file_scope() vs pinfo->pool, but it's cleaner to be
+ * unique (and prevents errors if we decide to change the scope of one.)
+ */
+
+#define MP2T_PACKET_ANALYSIS_KEY 0
+#define MP2T_CONV_KEY 1
+#define MP2T_DIR_KEY 2
+
 typedef struct packet_analysis_data {
 
     /* Contain information for each MPEG2-TS packet in the current big packet */
@@ -444,12 +450,17 @@ static guint
 mp2t_get_packet_length(tvbuff_t *tvb, guint offset, packet_info *pinfo,
             guint32 frag_id, enum pid_payload_type pload_type)
 {
-    fragment_head *frag;
-    tvbuff_t      *len_tvb = NULL, *frag_tvb = NULL, *data_tvb = NULL;
-    gint           pkt_len = 0;
-    guint          remaining_len;
+    fragment_head  *frag;
+    conversation_t *conv;
+    tvbuff_t       *len_tvb = NULL, *frag_tvb = NULL, *data_tvb = NULL;
+    gint            pkt_len = 0, save_p2p_dir;
+    guint           remaining_len;
 
-    frag = fragment_get(&mp2t_reassembly_table, pinfo, frag_id, NULL);
+    conv = (conversation_t *)p_get_proto_data(pinfo->pool, pinfo, proto_mp2t, MP2T_CONV_KEY);
+    save_p2p_dir = pinfo->p2p_dir;
+    pinfo->p2p_dir = GPOINTER_TO_INT(p_get_proto_data(pinfo->pool, pinfo, proto_mp2t, MP2T_DIR_KEY));
+    frag = fragment_get(&mp2t_reassembly_table, pinfo, frag_id, conv);
+    pinfo->p2p_dir = save_p2p_dir;
     if (frag)
         frag = frag->next;
 
@@ -507,26 +518,26 @@ mp2t_fragment_handle(tvbuff_t *tvb, guint offset, packet_info *pinfo,
         guint frag_offset, guint frag_len,
         gboolean fragment_last, enum pid_payload_type pload_type)
 {
-    fragment_head *frag_msg;
-    tvbuff_t      *new_tvb;
-    const char    *save_proto;
-    gboolean       save_fragmented;
-    address        save_src, save_dst;
+    fragment_head  *frag_msg;
+    tvbuff_t       *new_tvb;
+    conversation_t *conv;
+    const char     *save_proto;
+    gint            save_p2p_dir;
+    gboolean        save_fragmented;
 
     save_fragmented = pinfo->fragmented;
     pinfo->fragmented = TRUE;
-    copy_address_shallow(&save_src, &pinfo->src);
-    copy_address_shallow(&save_dst, &pinfo->dst);
+    /* It's possible that a fragment in the same packet set an address already,
+     * (e.g., with MPE), so use the conversation to reassemble.
+     */
+    save_p2p_dir = pinfo->p2p_dir;
 
-    /* It's possible that a fragment in the same packet set an address already
-     * This will change the hash value, we need to make sure it's NULL */
-
-    set_address(&pinfo->src, mp2t_no_address_type, 0, NULL);
-    set_address(&pinfo->dst, mp2t_no_address_type, 0, NULL);
+    conv = (conversation_t *)p_get_proto_data(pinfo->pool, pinfo, proto_mp2t, MP2T_CONV_KEY);
+    pinfo->p2p_dir = GPOINTER_TO_INT(p_get_proto_data(pinfo->pool, pinfo, proto_mp2t, MP2T_DIR_KEY));
 
     /* check length; send frame for reassembly */
     frag_msg = fragment_add_check(&mp2t_reassembly_table,
-            tvb, offset, pinfo, frag_id, NULL,
+            tvb, offset, pinfo, frag_id, conv,
             frag_offset,
             frag_len,
             !fragment_last);
@@ -536,8 +547,7 @@ mp2t_fragment_handle(tvbuff_t *tvb, guint offset, packet_info *pinfo,
             frag_msg, &mp2t_msg_frag_items,
             NULL, tree);
 
-    copy_address_shallow(&pinfo->src, &save_src);
-    copy_address_shallow(&pinfo->dst, &save_dst);
+    pinfo->p2p_dir = save_p2p_dir;
 
     if (new_tvb) {
         proto_tree_add_item(tree, hf_msg_ts_packet_reassembled, tvb, 0, 0, ENC_NA);
@@ -699,11 +709,11 @@ mp2t_process_fragmented_payload(tvbuff_t *tvb, gint offset, guint remaining_len,
         frag_tot_len = pid_analysis->frag_tot_len;
         fragmentation = pid_analysis->fragmentation;
         frag_id = pid_analysis->frag_id;
-        pdata = (packet_analysis_data_t *)p_get_proto_data(wmem_file_scope(), pinfo, proto_mp2t, 0);
+        pdata = (packet_analysis_data_t *)p_get_proto_data(wmem_file_scope(), pinfo, proto_mp2t, MP2T_PACKET_ANALYSIS_KEY);
         if (!pdata) {
             pdata = wmem_new0(wmem_file_scope(), packet_analysis_data_t);
             pdata->subpacket_table = wmem_tree_new(wmem_file_scope());
-            p_add_proto_data(wmem_file_scope(), pinfo, proto_mp2t, 0, pdata);
+            p_add_proto_data(wmem_file_scope(), pinfo, proto_mp2t, MP2T_PACKET_ANALYSIS_KEY, pdata);
 
         } else {
             spdata = (subpacket_analysis_data_t *)wmem_tree_lookup32(pdata->subpacket_table, offset);
@@ -720,7 +730,7 @@ mp2t_process_fragmented_payload(tvbuff_t *tvb, gint offset, guint remaining_len,
         }
     } else {
         /* Get saved values */
-        pdata = (packet_analysis_data_t *)p_get_proto_data(wmem_file_scope(), pinfo, proto_mp2t, 0);
+        pdata = (packet_analysis_data_t *)p_get_proto_data(wmem_file_scope(), pinfo, proto_mp2t, MP2T_PACKET_ANALYSIS_KEY);
         if (!pdata) {
             /* Occurs for the first packets in the capture which cannot be reassembled */
             return;
@@ -1287,10 +1297,39 @@ dissect_mp2t( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
 {
     volatile guint offset = 0;
     conversation_t *conv;
+    gint           p2p_dir = P2P_DIR_UNKNOWN;
     const char     *saved_proto;
 
+    /* We can find MP2TS on top of a wide variety of protocols, including
+     * UDP and RTP, USB bulk transfer, L2TP PW, in its own link-layer
+     * encapsulation, or on DVB Base Band (which itself can be on UDP or
+     * RTP, or possibly its own link-layer.)
+     *
+     * Different streams can use the same PID, so we want to make sure
+     * that reassembly correctly puts together fragments from the same
+     * conversation, and doesn't mix them from multiple conversations.
+     * In addition, some subdissectors, like MPE, can carry protocols
+     * like IPv4 and thus overwrite the pinfo source and destination
+     * addresses and ports, and we need to make sure that doesn't
+     * interfere with reassembly either.
+     *
+     * Our approach that deals with both problems is having the reassembly
+     * use the unique conversation index (which does require testing the
+     * direction because conversations can be bidirectional.)
+     */
     conv = find_or_create_conversation(pinfo);
-
+    p_add_proto_data(pinfo->pool, pinfo, proto_mp2t, MP2T_CONV_KEY, conv);
+    if (addresses_equal(&pinfo->src, conversation_key_addr1(conv->key_ptr))) {
+        p2p_dir = P2P_DIR_SENT;
+    } else if (addresses_equal(&pinfo->dst, conversation_key_addr1(conv->key_ptr))) {
+        p2p_dir = P2P_DIR_RECV;
+    } else {
+        /* DVB Base Band Frames, or some other endpoint, that doesn't set the
+         * address.
+         */
+        p2p_dir = pinfo->p2p_dir;
+    }
+    p_add_proto_data(pinfo->pool, pinfo, proto_mp2t, MP2T_DIR_KEY, GINT_TO_POINTER(p2p_dir));
     for (; tvb_reported_length_remaining(tvb, offset) >= MP2T_PACKET_SIZE; offset += MP2T_PACKET_SIZE) {
         /*
          * Dissect the TSP.
@@ -1632,12 +1671,10 @@ proto_register_mp2t(void)
     expert_mp2t = expert_register_protocol(proto_mp2t);
     expert_register_field_array(expert_mp2t, ei, array_length(ei));
 
-    mp2t_no_address_type = address_type_dissector_register("AT_MP2T_NONE", "No MP2T Address", none_addr_to_str, none_addr_str_len, NULL, NULL, none_addr_len, NULL, NULL);
-
     heur_subdissector_list = register_heur_dissector_list("mp2t.pid", proto_mp2t);
     /* Register init of processing of fragmented DEPI packets */
     reassembly_table_register(&mp2t_reassembly_table,
-        &addresses_ports_reassembly_table_functions);
+        &conversation_reassembly_table_functions);
 }
 
 
