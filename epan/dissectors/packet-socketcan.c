@@ -19,6 +19,7 @@
 #include <epan/prefs.h>
 #include <epan/expert.h>
 #include <epan/decode_as.h>
+#include <epan/proto_data.h>
 #include <wiretap/wtap.h>
 
 #include "packet-sll.h"
@@ -319,7 +320,7 @@ dissect_socketcan_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
 		if (!heuristic_first)
 		{
-			if (!dissector_try_payload_new(subdissector_table, next_tvb, pinfo, tree, TRUE, &can_info))
+			if (!dissector_try_uint_new(subdissector_table, can_info.id, next_tvb, pinfo, tree, TRUE, &can_info))
 			{
 				if (!dissector_try_heuristic(heur_subdissector_list, next_tvb, pinfo, tree, &heur_dtbl_entry, &can_info))
 				{
@@ -331,7 +332,7 @@ dissect_socketcan_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		{
 			if (!dissector_try_heuristic(heur_subdissector_list, next_tvb, pinfo, tree, &heur_dtbl_entry, &can_info))
 			{
-				if (!dissector_try_payload_new(subdissector_table, next_tvb, pinfo, tree, FALSE, &can_info))
+				if (!dissector_try_uint_new(subdissector_table, can_info.id, next_tvb, pinfo, tree, FALSE, &can_info))
 				{
 					call_data_dissector(next_tvb, pinfo, tree);
 				}
@@ -419,7 +420,7 @@ dissect_socketcanfd_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
 	if(!heuristic_first)
 	{
-		if (!dissector_try_payload_new(subdissector_table, next_tvb, pinfo, tree, TRUE, &can_info))
+		if (!dissector_try_uint_new(subdissector_table, can_info.id, next_tvb, pinfo, tree, TRUE, &can_info))
 		{
 			if(!dissector_try_heuristic(heur_subdissector_list, next_tvb, pinfo, tree, &heur_dtbl_entry, &can_info))
 			{
@@ -431,7 +432,7 @@ dissect_socketcanfd_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 	{
 		if (!dissector_try_heuristic(heur_subdissector_list, next_tvb, pinfo, tree, &heur_dtbl_entry, &can_info))
 		{
-			if(!dissector_try_payload_new(subdissector_table, next_tvb, pinfo, tree, FALSE, &can_info))
+			if (!dissector_try_uint_new(subdissector_table, can_info.id, next_tvb, pinfo, tree, FALSE, &can_info))
 			{
 				call_data_dissector(next_tvb, pinfo, tree);
 			}
@@ -454,6 +455,19 @@ dissect_socketcan_fd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 	    byte_swap ? ENC_ANTI_HOST_ENDIAN : ENC_HOST_ENDIAN);
 }
 
+static gpointer
+can_id_value(packet_info* pinfo)
+{
+	return p_get_proto_data(pinfo->pool, pinfo, proto_can, pinfo->curr_layer_num);
+}
+
+static void
+can_id_prompt(packet_info* pinfo, gchar* result)
+{
+	g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "CAN ID 0x%08x as",
+		GPOINTER_TO_UINT(p_get_proto_data(pinfo->pool, pinfo, proto_can, pinfo->curr_layer_num)));
+}
+
 void
 proto_register_socketcan(void)
 {
@@ -462,7 +476,7 @@ proto_register_socketcan(void)
 			&hf_can_infoent_ext,
 			{
 				"Identifier", "can.id",
-				FT_UINT32, BASE_HEX,
+				FT_UINT32, BASE_DEC_HEX,
 				NULL, CAN_EFF_MASK,
 				NULL, HFILL
 			}
@@ -471,7 +485,7 @@ proto_register_socketcan(void)
 			&hf_can_infoent_std,
 			{
 				"Identifier", "can.id",
-				FT_UINT32, BASE_HEX,
+				FT_UINT32, BASE_DEC_HEX,
 				NULL, CAN_SFF_MASK,
 				NULL, HFILL
 			}
@@ -865,7 +879,18 @@ proto_register_socketcan(void)
 		" before using a sub-dissector registered to \"decode as\"",
 		&heuristic_first);
 
-	subdissector_table = register_decode_as_next_proto(proto_can, "can.subdissector", "CAN next level dissector", NULL);
+	/* Dissector table for CAN ID and Decode As handling */
+	static build_valid_func  can_da_build_value[1] = { can_id_value };
+	static decode_as_value_t can_da_values = { can_id_prompt, 1, can_da_build_value };
+
+	static decode_as_t can_da = { "can", "can.subdissector",
+					1, 0, &can_da_values,
+					NULL, NULL,
+					decode_as_default_populate_list, decode_as_default_reset, decode_as_default_change, NULL };
+
+
+	subdissector_table = register_dissector_table("can.subdissector", "CAN ID", proto_can, FT_UINT32, BASE_DEC);
+	register_decode_as(&can_da);
 
 	heur_subdissector_list = register_heur_dissector_list("can", proto_can);
 }
