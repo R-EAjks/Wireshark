@@ -32,7 +32,8 @@ typedef enum {
     IOG_ITEM_UNIT_CALC_MIN,
     IOG_ITEM_UNIT_CALC_AVERAGE,
     IOG_ITEM_UNIT_CALC_LOAD,
-    IOG_ITEM_UNIT_LAST = IOG_ITEM_UNIT_CALC_LOAD,
+    IOG_ITEM_UNIT_DIRECT,
+    IOG_ITEM_UNIT_LAST = IOG_ITEM_UNIT_DIRECT,
     NUM_IOG_ITEM_UNITS
 } io_graph_item_unit_t;
 
@@ -59,6 +60,17 @@ typedef struct _io_graph_item_t {
     guint32  extreme_frame_in_invl; /* frame with min/max value */
     guint32  last_frame_in_invl;
 } io_graph_item_t;
+
+/**
+* Simple struct to hold a timestamp and the number of a packet
+* with an associated value. In a chart for a time series timestamp
+* is intended to be used as x while value is intended to be used as y.
+*/
+typedef struct _time_series_item_t {
+    double timestamp;
+    double value;
+    guint32 packet_number;
+} time_series_item_t;
 
 /** Reset (zero) an io_graph_item_t.
  *

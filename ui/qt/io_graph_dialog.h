@@ -23,6 +23,8 @@
 #include <ui/qt/models/uat_model.h>
 #include <ui/qt/models/uat_delegate.h>
 
+#include <QVector>
+#include <QString>
 #include <QIcon>
 #include <QMenu>
 #include <QTextStream>
@@ -39,6 +41,8 @@ class QCPAxisTickerDateTime;
 
 // GTK+ sets this to 100000 (NUM_IO_ITEMS)
 const int max_io_items_ = 250000;
+const int max_time_series_items_per_sub_list_ = 10000;
+
 
 // XXX - Move to its own file?
 class IOGraph : public QObject {
@@ -97,6 +101,10 @@ private:
     static void tapReset(void *iog_ptr);
     static tap_packet_status tapPacket(void *iog_ptr, packet_info *pinfo, epan_dissect_t *edt, const void *data);
     static void tapDraw(void *iog_ptr);
+    int get_time_series_count();
+    bool get_time_series_item(int index, time_series_item_t* time_series_item);
+    bool get_time_series_item_by_packet_number(guint32 packet_number, time_series_item_t* time_series_item);
+    bool get_time_series_item_with_next_greater_or_equal_timestamp(double timestamp, time_series_item_t* time_series_item);
 
     void calculateScaledValueUnit();
     template<class DataMap> double maxValueFromGraphData(const DataMap &map);
@@ -121,6 +129,16 @@ private:
     // much as is feasible.
     io_graph_item_t items_[max_io_items_];
     int cur_idx_;
+
+    /** time series stores the data in a list of lists.
+    * This has performance benefits as it is not necessary to copy
+    * all elements when the list needs to be extended.
+    * Only another block of max_time_series_items_per_sub_list_ elments
+    * needs to be allocaded and appended.
+    * So time series can store any number of items without having
+    * a degrading performance on long lists.
+    */
+    QVector<QVector<time_series_item_t>> time_series_;
 };
 
 namespace Ui {

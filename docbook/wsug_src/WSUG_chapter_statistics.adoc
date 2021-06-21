@@ -442,11 +442,17 @@ LOAD(Y Field):::
 If the “Y Field” is a relative time value, this is the sum of the “Y Field” values divided by the interval time.
 This can be useful for tracking response times.
 
+DIRECT(Y Field):::
+Every value of the specified “Y Field” is shown directly. No intervals are calculated and no aggregation function like MAX, MIN, AVG or so will be applied.
+Settings for Interval and SMA Period won't have an effect on this graph.
+This mode is usefull for plotting time series of fields.
+
 Y Field::
 The display filter field from which to extract values for the Y axis calculations listed above.
 
 SMA Period::
 Show an average of values over a specified period of intervals.
+SMA Period will not affect graphs that are in "DIRECT(Y Field)" mode for Y Axis.
 
 The chart as a whole can be configured using the controls under the graph list:
 
@@ -467,6 +473,7 @@ When using the mouse inside the graph area, either drag the graph contents or se
 
 Interval::
 Set the interval period for the graph.
+Interval will not affect graphs that are in "DIRECT(Y Field)" mode for Y Axis.
 
 Time of day::
 Switch between showing the absolute time of day or the time relative from the start of capture in the X axis.

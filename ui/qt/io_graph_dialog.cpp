@@ -111,6 +111,7 @@ static const value_string y_axis_vs[] = {
     { IOG_ITEM_UNIT_CALC_MIN, "MIN(Y Field)" },
     { IOG_ITEM_UNIT_CALC_AVERAGE, "AVG(Y Field)" },
     { IOG_ITEM_UNIT_CALC_LOAD, "LOAD(Y Field)" },
+    { IOG_ITEM_UNIT_DIRECT, "DIRECT(Y Field)" },
     { 0, NULL }
 };
 
@@ -590,7 +591,7 @@ void IOGraphDialog::syncGraphSettings(int row)
 
     /* plot style depend on the value unit, so set it first. */
     data_str = uat_model_->data(uat_model_->index(row, colYAxis)).toString();
-    iog->setValueUnits((int) str_to_val(qUtf8Printable(data_str), y_axis_vs, IOG_ITEM_UNIT_PACKETS));
+    iog->setValueUnits((int)str_to_val(qUtf8Printable(data_str), y_axis_vs, IOG_ITEM_UNIT_PACKETS));
     iog->setValueUnitField(uat_model_->data(uat_model_->index(row, colYField)).toString());
 
     iog->setColor(uat_model_->data(uat_model_->index(row, colColor), Qt::DecorationRole).value<QColor>().rgb());
@@ -1815,7 +1816,17 @@ void IOGraph::setValueUnits(int val_units)
 
         if (old_val_units != val_units) {
             setFilter(filter_); // Check config & prime vu field
-            if (val_units < IOG_ITEM_UNIT_CALC_SUM) {
+
+            if ((val_units_ == IOG_ITEM_UNIT_DIRECT && old_val_units != IOG_ITEM_UNIT_DIRECT)
+                || (val_units_ != IOG_ITEM_UNIT_DIRECT && old_val_units == IOG_ITEM_UNIT_DIRECT))
+            {
+                if (visible_)
+                {
+                    emit requestRetap();
+                }
+            }
+            else if (val_units_ < IOG_ITEM_UNIT_CALC_SUM)
+            {
                 emit requestRecalc();
             }
         }
@@ -1872,25 +1883,53 @@ double IOGraph::startOffset()
     return 0.0;
 }
 
-int IOGraph::packetFromTime(double ts)
+int IOGraph::packetFromTime(double timestamp)
 {
-    int idx = ts * 1000 / interval_;
-    if (idx >= 0 && idx < (int) cur_idx_) {
-        switch (val_units_) {
-        case IOG_ITEM_UNIT_CALC_MAX:
-        case IOG_ITEM_UNIT_CALC_MIN:
-            return items_[idx].extreme_frame_in_invl;
-        default:
-            return items_[idx].last_frame_in_invl;
+    // Use time series mechanism
+    if (val_units_ == IOG_ITEM_UNIT_DIRECT)
+    {
+        int count = get_time_series_count();
+        time_series_item_t time_series_item = {};
+        if (get_time_series_item_with_next_greater_or_equal_timestamp(timestamp, &time_series_item))
+        {
+            return time_series_item.packet_number;
         }
+        else if (count > 0 && get_time_series_item(count - 1, &time_series_item))
+        {
+            return time_series_item.packet_number;
+        }
+
+        return -1;        
     }
-    return -1;
+    // Use interval mechanism
+    else
+    {
+        int idx = timestamp * 1000 / interval_;
+        if (idx >= 0 && idx < (int)cur_idx_) {
+            switch (val_units_) {
+            case IOG_ITEM_UNIT_CALC_MAX:
+            case IOG_ITEM_UNIT_CALC_MIN:
+                return items_[idx].extreme_frame_in_invl;
+            default:
+                return items_[idx].last_frame_in_invl;
+            }
+        }
+        return -1;
+    }
 }
 
 void IOGraph::clearAllData()
 {
     cur_idx_ = -1;
     reset_io_graph_items(items_, max_io_items_);
+
+    for (int i = 0; i < time_series_.size(); ++i)
+    {
+        QVector<time_series_item_t> time_series_sub_list = time_series_.at(i);
+        time_series_sub_list.resize(0);
+    }
+    time_series_.resize(0);
+
     if (graph_) {
         graph_->data()->clear();
     }
@@ -1902,88 +1941,122 @@ void IOGraph::clearAllData()
 
 void IOGraph::recalcGraphData(capture_file *cap_file, bool enable_scaling)
 {
-    /* Moving average variables */
-    unsigned int mavg_in_average_count = 0, mavg_left = 0, mavg_right = 0;
-    unsigned int mavg_to_remove = 0, mavg_to_add = 0;
-    double mavg_cumulated = 0;
-    QCPAxis *x_axis = nullptr;
-
-    if (graph_) {
+    QCPAxis* x_axis = nullptr;
+    if (graph_)
+    {
         graph_->data()->clear();
         x_axis = graph_->keyAxis();
     }
-    if (bars_) {
+    if (bars_)
+    {
         bars_->data()->clear();
         x_axis = bars_->keyAxis();
     }
 
-    if (moving_avg_period_ > 0 && cur_idx_ >= 0) {
-        /* "Warm-up phase" - calculate average on some data not displayed;
-         * just to make sure average on leftmost and rightmost displayed
-         * values is as reliable as possible
-         */
-        guint64 warmup_interval = 0;
+    // Use time series mechanism
+    if (val_units_ == IOG_ITEM_UNIT_DIRECT)
+    {
+        // Add all items of time series to the graph
+        for (int i = 0; i < time_series_.size(); ++i)
+        {
+            QVector<time_series_item_t> time_series_sub_list = time_series_.at(i);
+            for (int k = 0; k < time_series_sub_list.size(); ++k)
+            {
+                time_series_item_t time_series_item = time_series_sub_list.at(k);
 
-//        for (; warmup_interval < first_interval; warmup_interval += interval_) {
-//            mavg_cumulated += get_it_value(io, i, (int)warmup_interval/interval_);
-//            mavg_in_average_count++;
-//            mavg_left++;
-//        }
-        mavg_cumulated += getItemValue((int)warmup_interval/interval_, cap_file);
-        mavg_in_average_count++;
-        for (warmup_interval = interval_;
-            ((warmup_interval < (0 + (moving_avg_period_ / 2) * (guint64)interval_)) &&
-             (warmup_interval <= (cur_idx_ * (guint64)interval_)));
-             warmup_interval += interval_) {
+                double timestamp = time_series_item.timestamp;
+                if (x_axis != NULL && qSharedPointerDynamicCast<QCPAxisTickerDateTime>(x_axis->ticker()))
+                {
+                    timestamp += start_time_;
+                }
+                double value = time_series_item.value * y_axis_factor_;
 
+                if (graph_) {
+                    graph_->addData(timestamp, value);
+                }
+                if (bars_) {
+                    bars_->addData(timestamp, value);
+                }
+            }
+        }
+    }
+    // Use interval mechanism
+    else
+    {
+        /* Moving average variables */
+        unsigned int mavg_in_average_count = 0, mavg_left = 0, mavg_right = 0;
+        unsigned int mavg_to_remove = 0, mavg_to_add = 0;
+        double mavg_cumulated = 0;
+
+        if (moving_avg_period_ > 0 && cur_idx_ >= 0) {
+            /* "Warm-up phase" - calculate average on some data not displayed;
+             * just to make sure average on leftmost and rightmost displayed
+             * values is as reliable as possible
+             */
+            guint64 warmup_interval = 0;
+
+            //        for (; warmup_interval < first_interval; warmup_interval += interval_) {
+            //            mavg_cumulated += get_it_value(io, i, (int)warmup_interval/interval_);
+            //            mavg_in_average_count++;
+            //            mavg_left++;
+            //        }
             mavg_cumulated += getItemValue((int)warmup_interval / interval_, cap_file);
             mavg_in_average_count++;
-            mavg_right++;
-        }
-        mavg_to_add = (unsigned int)warmup_interval;
-    }
+            for (warmup_interval = interval_;
+                ((warmup_interval < (0 + (moving_avg_period_ / 2) * (guint64)interval_)) &&
+                    (warmup_interval <= (cur_idx_ * (guint64)interval_)));
+                warmup_interval += interval_) {
 
-    for (int i = 0; i <= cur_idx_; i++) {
-        double ts = (double) i * interval_ / 1000;
-        if (x_axis && qSharedPointerDynamicCast<QCPAxisTickerDateTime>(x_axis->ticker())) {
-            ts += start_time_;
+                mavg_cumulated += getItemValue((int)warmup_interval / interval_, cap_file);
+                mavg_in_average_count++;
+                mavg_right++;
+            }
+            mavg_to_add = (unsigned int)warmup_interval;
         }
-        double val = getItemValue(i, cap_file);
 
-        if (moving_avg_period_ > 0) {
-            if (i != 0) {
-                mavg_left++;
-                if (mavg_left > moving_avg_period_ / 2) {
-                    mavg_left--;
-                    mavg_in_average_count--;
-                    mavg_cumulated -= getItemValue((int)mavg_to_remove / interval_, cap_file);
-                    mavg_to_remove += interval_;
+        for (int i = 0; i <= cur_idx_; i++) {
+            double ts = (double)i * interval_ / 1000;
+            if (x_axis && qSharedPointerDynamicCast<QCPAxisTickerDateTime>(x_axis->ticker())) {
+                ts += start_time_;
+            }
+            double val = getItemValue(i, cap_file);
+
+            if (moving_avg_period_ > 0) {
+                if (i != 0) {
+                    mavg_left++;
+                    if (mavg_left > moving_avg_period_ / 2) {
+                        mavg_left--;
+                        mavg_in_average_count--;
+                        mavg_cumulated -= getItemValue((int)mavg_to_remove / interval_, cap_file);
+                        mavg_to_remove += interval_;
+                    }
+                    if (mavg_to_add <= (unsigned int)cur_idx_ * interval_) {
+                        mavg_in_average_count++;
+                        mavg_cumulated += getItemValue((int)mavg_to_add / interval_, cap_file);
+                        mavg_to_add += interval_;
+                    }
+                    else {
+                        mavg_right--;
+                    }
                 }
-                if (mavg_to_add <= (unsigned int) cur_idx_ * interval_) {
-                    mavg_in_average_count++;
-                    mavg_cumulated += getItemValue((int)mavg_to_add / interval_, cap_file);
-                    mavg_to_add += interval_;
-                } else {
-                    mavg_right--;
+                if (mavg_in_average_count > 0) {
+                    val = mavg_cumulated / mavg_in_average_count;
                 }
             }
-            if (mavg_in_average_count > 0) {
-                val = mavg_cumulated / mavg_in_average_count;
-            }
-        }
 
-        val *= y_axis_factor_;
+            val *= y_axis_factor_;
 
-        if (hasItemToShow(i, val))
-        {
-            if (graph_) {
-                graph_->addData(ts, val);
+            if (hasItemToShow(i, val))
+            {
+                if (graph_) {
+                    graph_->addData(ts, val);
+                }
+                if (bars_) {
+                    bars_->addData(ts, val);
+                }
             }
-            if (bars_) {
-                bars_->addData(ts, val);
-            }
+            //        qDebug() << "=rgd i" << i << ts << val;
         }
-//        qDebug() << "=rgd i" << i << ts << val;
     }
 
     // attempt to rescale time values to specific units
@@ -2161,23 +2234,13 @@ void IOGraph::tapReset(void *iog_ptr)
 tap_packet_status IOGraph::tapPacket(void *iog_ptr, packet_info *pinfo, epan_dissect_t *edt, const void *)
 {
     IOGraph *iog = static_cast<IOGraph *>(iog_ptr);
-    if (!pinfo || !iog) {
+    if (pinfo == NULL)
+    {
         return TAP_PACKET_DONT_REDRAW;
     }
-
-    int idx = get_io_graph_index(pinfo, iog->interval_);
-    bool recalc = false;
-
-    /* some sanity checks */
-    if ((idx < 0) || (idx >= max_io_items_)) {
-        iog->cur_idx_ = max_io_items_ - 1;
+    if (iog == NULL)
+    {
         return TAP_PACKET_DONT_REDRAW;
-    }
-
-    /* update num_items */
-    if (idx > iog->cur_idx_) {
-        iog->cur_idx_ = (guint32) idx;
-        recalc = true;
     }
 
     /* set start time */
@@ -2188,18 +2251,126 @@ tap_packet_status IOGraph::tapPacket(void *iog_ptr, packet_info *pinfo, epan_dis
         iog->start_time_ = nstime_to_sec(&start_nstime);
     }
 
-    epan_dissect_t *adv_edt = NULL;
-    /* For ADVANCED mode we need to keep track of some more stuff than just frame and byte counts */
-    if (iog->val_units_ >= IOG_ITEM_UNIT_CALC_SUM) {
-        adv_edt = edt;
+    bool recalc = false;
+    // Use time series mechanism
+    if (iog->val_units_ == IOG_ITEM_UNIT_DIRECT)
+    {
+        if (edt == NULL)
+        {
+            return TAP_PACKET_DONT_REDRAW;
+        }
+        if (iog->hf_index_ <= 0)
+        {
+            return TAP_PACKET_DONT_REDRAW;
+        }
+
+        GPtrArray* field_info_pointers = proto_get_finfo_ptr_array(edt->tree, iog->hf_index_);
+        if (field_info_pointers == NULL)
+        {
+            return TAP_PACKET_REDRAW;
+        }
+
+        double timestamp = (double)pinfo->rel_ts.secs + (double)pinfo->rel_ts.nsecs / 1000000000.0;
+
+        for (guint i = 0; i < field_info_pointers->len; i++)
+        {
+            ftenum field_type = proto_registrar_get_ftype(iog->hf_index_);
+
+            time_series_item_t time_series_item = { };
+            time_series_item.timestamp = timestamp;
+            time_series_item.value = NAN;
+            time_series_item.packet_number = pinfo->num;
+
+            switch (field_type)
+            {
+            case FT_UINT8:
+            case FT_UINT16:
+            case FT_UINT24:
+            case FT_UINT32:
+                time_series_item.value = (double)fvalue_get_uinteger(&((field_info*)field_info_pointers->pdata[i])->value);
+                break;
+            case FT_UINT40:
+            case FT_UINT48:
+            case FT_UINT56:
+            case FT_UINT64:
+                time_series_item.value = (double)fvalue_get_uinteger64(&((field_info*)field_info_pointers->pdata[i])->value);
+                break;
+            case FT_INT8:
+            case FT_INT16:
+            case FT_INT24:
+            case FT_INT32:
+                time_series_item.value = (double)fvalue_get_sinteger(&((field_info*)field_info_pointers->pdata[i])->value);
+                break;
+            case FT_INT40:
+            case FT_INT48:
+            case FT_INT56:
+            case FT_INT64:
+                time_series_item.value = (double)fvalue_get_sinteger64(&((field_info*)field_info_pointers->pdata[i])->value);
+                break;
+            case FT_FLOAT:
+            case FT_DOUBLE:
+                time_series_item.value = (double)fvalue_get_floating(&((field_info*)field_info_pointers->pdata[i])->value);
+                break;
+            default:
+                break;
+            }
+
+            // NAN check for double is special.
+            // Becomes only true if value is NAN
+            if (time_series_item.value != time_series_item.value)
+            {
+                continue;
+            }
+
+            // Add at least one empty sub list if time series is completly empty
+            if (iog->time_series_.size() == 0)
+            {
+                QVector<time_series_item_t> time_series_sub_list = QVector<time_series_item_t>();
+                time_series_sub_list.reserve(max_time_series_items_per_sub_list_);
+                iog->time_series_.append(time_series_sub_list);
+            }
+            // Add a new empty sub list if the last sub list of time series is already full
+            if (iog->time_series_.last().size() >= max_time_series_items_per_sub_list_)
+            {
+                QVector<time_series_item_t> time_series_sub_list = QVector<time_series_item_t>();
+                time_series_sub_list.reserve(max_time_series_items_per_sub_list_);
+                iog->time_series_.append(time_series_sub_list);
+            }
+
+            // Add time series item to the time series at last position
+            iog->time_series_.last().append(time_series_item);
+        }
     }
+    // Use interval mechanism
+    else
+    {
+        int idx = get_io_graph_index(pinfo, iog->interval_);
 
-    if (!update_io_graph_item(iog->items_, idx, pinfo, adv_edt, iog->hf_index_, iog->val_units_, iog->interval_)) {
-        return TAP_PACKET_DONT_REDRAW;
+        /* some sanity checks */
+        if ((idx < 0) || (idx >= max_io_items_)) {
+            iog->cur_idx_ = max_io_items_ - 1;
+            return TAP_PACKET_DONT_REDRAW;
+        }
+
+        /* update num_items */
+        if (idx > iog->cur_idx_) {
+            iog->cur_idx_ = (guint32)idx;
+            recalc = true;
+        }
+
+        epan_dissect_t* adv_edt = NULL;
+        /* For ADVANCED mode we need to keep track of some more stuff than just frame and byte counts */
+        if (iog->val_units_ >= IOG_ITEM_UNIT_CALC_SUM) {
+            adv_edt = edt;
+        }
+
+        if (!update_io_graph_item(iog->items_, idx, pinfo, adv_edt, iog->hf_index_, iog->val_units_, iog->interval_)) {
+            return TAP_PACKET_DONT_REDRAW;
+        }
+
+        //    qDebug() << "=tapPacket" << iog->name_ << idx << iog->hf_index_ << iog->val_units_ << iog->num_items_;
     }
-
-//    qDebug() << "=tapPacket" << iog->name_ << idx << iog->hf_index_ << iog->val_units_ << iog->num_items_;
-
+    
     if (recalc) {
         emit iog->requestRecalc();
     }
@@ -2219,6 +2390,163 @@ void IOGraph::tapDraw(void *iog_ptr)
     if (iog->bars_) {
 //        qDebug() << "=tapDraw b" << iog->name_ << iog->bars_->data()->keys().size();
     }
+}
+
+int IOGraph::get_time_series_count()
+{
+    if (time_series_.size() == 0)
+    {
+        return 0;
+    }
+
+    return (time_series_.size() - 1) * max_time_series_items_per_sub_list_ + time_series_.last().size();
+}
+
+bool IOGraph::get_time_series_item(int index, time_series_item_t* time_series_item)
+{
+    if (time_series_item == NULL)
+    {
+        return false;
+    }
+
+    if (index < 0)
+    {
+        return false;
+    }
+    
+    time_series_item[0] = {};
+
+    int count = get_time_series_count();
+
+    if (count <= 0)
+    {
+        return false;
+    }
+
+    if (index >= count)
+    {
+        return false;
+    }
+
+    int time_series_sub_list_index = index / max_time_series_items_per_sub_list_;
+    int index_within_time_series_sub_list = index % max_time_series_items_per_sub_list_;
+
+    QVector<time_series_item_t> time_series_sub_list = time_series_.at(time_series_sub_list_index);
+    time_series_item[0] = time_series_sub_list.at(index_within_time_series_sub_list);
+
+    return true;
+}
+
+bool IOGraph::get_time_series_item_by_packet_number(guint32 packet_number, time_series_item_t* time_series_item)
+{
+    if (time_series_item == NULL)
+    {
+        return false;
+    }
+
+    time_series_item[0] = {};
+
+    int count = get_time_series_count();
+
+    if (count <= 0)
+    {
+        return false;
+    }
+
+    // Perform a binary search for better performance.
+    int left = 0;
+    int mid = 0;
+    int right = count - 1;
+    time_series_item_t current_time_series_item = {};
+
+    while (right >= left)
+    {
+        mid = (right + left) / 2;
+
+        if (!get_time_series_item(mid, &current_time_series_item))
+        {
+            return false;
+        }
+
+        if (packet_number < current_time_series_item.packet_number)
+        {
+            right = mid - 1;
+
+        }
+        else if (packet_number > current_time_series_item.packet_number)
+        {
+            left = mid + 1;
+        }
+        else
+        {
+            time_series_item[0] = current_time_series_item;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool IOGraph::get_time_series_item_with_next_greater_or_equal_timestamp(double timestamp, time_series_item_t* time_series_item)
+{
+    if (time_series_item == NULL)
+    {
+        return false;
+    }
+
+    time_series_item[0] = {};
+
+    int count = get_time_series_count();
+
+    if (count <= 0)
+    {
+        return false;
+    }
+
+    // Perform a binary search for better performance.
+    int left = 0;
+    int mid = 0;
+    int right = count - 1;
+    time_series_item_t current_time_series_item = {};
+
+    while (right >= left)
+    {
+        mid = (right + left) / 2;
+
+        if (!get_time_series_item(mid, &current_time_series_item))
+        {
+            return false;
+        }
+
+        if (left == mid && mid == right)
+        {
+            if (timestamp > current_time_series_item.timestamp)
+            {
+                return false;
+            }
+            else
+            {
+                time_series_item[0] = current_time_series_item;
+                return true;
+            }
+        }
+
+        if (timestamp < current_time_series_item.timestamp)
+        {
+            right = mid;
+        }
+        else if (timestamp > current_time_series_item.timestamp)
+        {
+            left = mid + 1;
+        }
+        else
+        {
+            time_series_item[0] = current_time_series_item;
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // Stat command + args
