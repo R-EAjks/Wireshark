@@ -15,6 +15,7 @@
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/reassemble.h>
+#include <epan/conversation.h>
 #include <epan/tvbuff-int.h>
 
 #include <wsutil/str_util.h>
@@ -282,6 +283,87 @@ addresses_ports_reassembly_table_functions = {
 	fragment_addresses_ports_persistent_key,
 	fragment_addresses_ports_free_temporary_key,
 	fragment_addresses_ports_free_persistent_key
+};
+
+/*
+ * Functions for reassembly tables where a conversation, a direction, and a
+ * fragment ID, are used as the key. The direction is taken from pinfo->p2p_dir
+ * and the conversation is passed in as the data field.
+ */
+typedef struct _fragment_conversation_key {
+	guint32 conv_index; /* Just use the unique index */
+	int     p2p_dir;
+	guint32 id;
+} fragment_conversation_key;
+
+static guint
+fragment_conversation_hash(gconstpointer k)
+{
+	const fragment_conversation_key* key = (const fragment_conversation_key*) k;
+	guint hash_val;
+
+	hash_val = 0;
+
+/*	In most captures there is only one conversation for a protocol
+	so we only use id as the hash as an optimization.
+
+	hash_val += (key->conv_index << 2) + key->p2p_dir;
+*/
+
+	hash_val ^= key->id;
+
+	return hash_val;
+}
+
+static gint
+fragment_conversation_equal(gconstpointer k1, gconstpointer k2)
+{
+	const fragment_conversation_key* key1 = (const fragment_conversation_key*) k1;
+	const fragment_conversation_key* key2 = (const fragment_conversation_key*) k2;
+
+	/*
+	 * key.id is the first item to compare since it's the item most
+	 * likely to differ between sessions
+	 */
+	return (key1->id == key2->id) &&
+	       (key1->p2p_dir == key2->p2p_dir) &&
+	       (key1->conv_index == key2->conv_index);
+}
+
+/*
+ * Create a fragment key for permanent use; we only are copying ints, so
+ * our temporary keys are the same the persistent ones.
+ */
+static gpointer
+fragment_conversation_persistent_key(const packet_info *pinfo, const guint32 id,
+				 const void *data)
+{
+	fragment_conversation_key *key = g_slice_new(fragment_conversation_key);
+	DISSECTOR_ASSERT(data);
+	conversation_t *conv = (conversation_t *)data;
+
+	key->conv_index = conv->conv_index;
+	key->p2p_dir = pinfo->p2p_dir;
+	key->id = id;
+
+	return (gpointer)key;
+}
+
+static void
+fragment_conversation_free_persistent_key(gpointer ptr)
+{
+	fragment_conversation_key *key = (fragment_conversation_key *)ptr;
+	g_slice_free(fragment_conversation_key, key);
+}
+
+const reassembly_table_functions
+conversation_reassembly_table_functions = {
+	fragment_conversation_hash,
+	fragment_conversation_equal,
+	fragment_conversation_persistent_key,
+	fragment_conversation_persistent_key,
+	fragment_conversation_free_persistent_key,
+	fragment_conversation_free_persistent_key
 };
 
 typedef struct _reassembled_key {

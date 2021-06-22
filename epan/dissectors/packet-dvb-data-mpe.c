@@ -137,6 +137,13 @@ dissect_dvb_data_mpe(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
 
     data_tvb = tvb_new_subset_remaining(tvb, offset);
 
+    /* We can reach here from DVB Base Band, which sets an endpoint, but since
+     * we're going back to L2/L3 protocols that set addresses, we want to clear
+     * use_endpoint so that find_or_create_conversation() etc. work as expected
+     * later in the stack.
+     */
+    pinfo->use_endpoint = FALSE;
+
     if (payload_scrambling) {
         call_data_dissector(data_tvb, pinfo, tree);
     } else if (llc_snap_flag) {
