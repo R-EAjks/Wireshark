@@ -603,7 +603,7 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 					}
 					else if (name_array[j].type == JSMN_PRIMITIVE && name_array[j].value_type == SHARKD_JSON_BOOLEAN)
 					{
-						if (!strcmp(attr_value, "true") && !strcmp(attr_value, "false"))
+						if (strcmp(attr_value, "true") && strcmp(attr_value, "false"))
 						{
 							sharkd_json_error(
 								rpcid, -32600, NULL,
@@ -4839,6 +4839,12 @@ sharkd_session_process(char *buf, const jsmntok_t *tokens, int count)
 
 		const char* tok_method = json_find_attr(buf, tokens, count, "method");
 
+		if (!tok_method) {
+			sharkd_json_error(
+				rpcid, -32601, NULL,
+				"No method found");
+			return;
+		}
 		if (!strcmp(tok_method, "load"))
 			sharkd_session_process_load(buf, tokens, count);
 		else if (!strcmp(tok_method, "status"))
