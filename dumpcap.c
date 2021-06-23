@@ -126,6 +126,7 @@ static gint64 pcap_queue_byte_limit = 0;
 static gint64 pcap_queue_packet_limit = 0;
 
 static gboolean capture_child = FALSE; /* FALSE: standalone call, TRUE: this is an Wireshark capture child */
+static const char *report_capture_filename = NULL; /* capture child file name */
 #ifdef _WIN32
 static gchar *sig_pipe_name = NULL;
 static HANDLE sig_pipe_handle = NULL;
@@ -5607,6 +5608,11 @@ report_packet_count(unsigned int packet_count)
     static unsigned int count = 0;
 
     if (capture_child) {
+        if (report_capture_filename) {
+            ws_debug("File: %s", report_capture_filename);
+            pipe_write_block(2, SP_FILE, report_capture_filename);
+            report_capture_filename = NULL;
+        }
         g_snprintf(count_str, sizeof(count_str), "%u", packet_count);
         ws_debug("Packets: %s", count_str);
         pipe_write_block(2, SP_PACKET_COUNT, count_str);
@@ -5622,8 +5628,8 @@ static void
 report_new_capture_file(const char *filename)
 {
     if (capture_child) {
-        ws_debug("File: %s", filename);
-        pipe_write_block(2, SP_FILE, filename);
+        /* Save the filename to report new capture file only after first packets are ready */
+        report_capture_filename = filename;
     } else {
 #ifdef SIGINFO
         /*
