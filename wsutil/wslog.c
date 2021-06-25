@@ -49,6 +49,11 @@
 #define DOMAIN_UNDEFED(domain)    ((domain) == NULL || *(domain) == '\0')
 #define DOMAIN_DEFINED(domain)    (!DOMAIN_UNDEFED(domain))
 
+#define VALID_FATAL_LEVEL(level) \
+        (level == LOG_LEVEL_ERROR || \
+            level == LOG_LEVEL_CRITICAL || \
+            level == LOG_LEVEL_WARNING)
+
 /*
  * Note: I didn't measure it but I assume using a string array is faster than
  * a GHashTable for small number N of domains.
@@ -60,6 +65,8 @@ typedef struct {
 } log_filter_t;
 
 
+/* If the module is not initialized by calling ws_log_init() all messages
+ * will be printed regardless of log level. This is a feature, not a bug. */
 static enum ws_log_level current_log_level = LOG_LEVEL_NONE;
 
 static gboolean color_enabled = FALSE;
@@ -89,6 +96,10 @@ static enum ws_log_level fatal_log_level = LOG_LEVEL_ERROR;
 static gboolean init_complete = FALSE;
 #endif
 
+
+static void print_err(void (*vcmdarg_err)(const char *, va_list ap),
+                        int exit_failure,
+                        const char *fmt, ...);
 
 static void ws_log_cleanup(void);
 
@@ -149,7 +160,8 @@ static inline const char *domain_to_string(const char *domain)
 }
 
 
-static inline gboolean filter_contains(log_filter_t *filter, const char *domain)
+static inline gboolean filter_contains(log_filter_t *filter,
+                                            const char *domain)
 {
     if (filter == NULL || DOMAIN_UNDEFED(domain))
         return FALSE;
@@ -201,6 +213,12 @@ gboolean ws_log_msg_is_active(const char *domain, enum ws_log_level level)
         return TRUE;
 
     /*
+     * Check if the level has been configured as fatal.
+     */
+    if (level >= fatal_log_level)
+        return TRUE;
+
+    /*
      * The debug/noisy filter overrides the other parameters.
      */
     if (DOMAIN_DEFINED(domain)) {
@@ -248,12 +266,12 @@ enum ws_log_level ws_log_get_level(void)
 }
 
 
-enum ws_log_level ws_log_set_level(enum ws_log_level log_level)
+void ws_log_set_level(enum ws_log_level level)
 {
-    if (log_level > LOG_LEVEL_NONE && log_level < _LOG_LEVEL_LAST)
-        current_log_level = log_level;
+    if (level <= LOG_LEVEL_NONE || level >= _LOG_LEVEL_LAST)
+        return;
 
-    return current_log_level;
+    current_log_level = level;
 }
 
 
@@ -278,20 +296,20 @@ static const char *opt_debug   = "--log-debug";
 static const char *opt_noisy   = "--log-noisy";
 
 
-static void print_err(void (*log_args_print_err)(const char *, va_list ap),
-                        int log_args_exit_failure,
+static void print_err(void (*vcmdarg_err)(const char *, va_list ap),
+                        int exit_failure,
                         const char *fmt, ...)
 {
     va_list ap;
 
-    if (log_args_print_err == NULL)
+    if (vcmdarg_err == NULL)
         return;
 
     va_start(ap, fmt);
-    log_args_print_err(fmt, ap);
+    vcmdarg_err(fmt, ap);
     va_end(ap);
-    if (log_args_exit_failure >= 0)
-        exit(log_args_exit_failure);
+    if (exit_failure != LOG_ARGS_NOEXIT)
+        exit(exit_failure);
 }
 
 
@@ -304,7 +322,12 @@ int ws_log_parse_args(int *argc_ptr, char *argv[],
     int ret = 0;
     size_t optlen;
     const char *option, *value;
-    int prune_extra;
+    int extra;
+
+    if (argc_ptr == NULL || argv == NULL)
+        return -1;
+
+    /* Configure from command line. */
 
     while (*ptr != NULL) {
         if (g_str_has_prefix(*ptr, opt_level)) {
@@ -346,7 +369,7 @@ int ws_log_parse_args(int *argc_ptr, char *argv[],
         if (value[0] == '\0') {
             /* value is separated with blank space */
             value = *(ptr + 1);
-            prune_extra = 1;
+            extra = 1;
 
             if (value == NULL || !*value || *value == '-') {
                 /* If the option value after the blank starts with '-' assume
@@ -354,14 +377,14 @@ int ws_log_parse_args(int *argc_ptr, char *argv[],
                 print_err(vcmdarg_err, exit_failure,
                             "Option \"%s\" requires a value.\n", *ptr);
                 option = NULL;
-                prune_extra = 0;
+                extra = 0;
                 ret += 1;
             }
         }
         else if (value[0] == '=') {
             /* value is after equals */
             value += 1;
-            prune_extra = 0;
+            extra = 0;
         }
         else {
             /* Option isn't known. */
@@ -417,10 +440,10 @@ int ws_log_parse_args(int *argc_ptr, char *argv[],
          * error further along in the initialization process.
          */
         /* Include the terminating NULL in the memmove. */
-        memmove(ptr, ptr + 1 + prune_extra, (count - prune_extra) * sizeof(*ptr));
+        memmove(ptr, ptr + 1 + extra, (count - extra) * sizeof(*ptr));
         /* No need to increment ptr here. */
-        count -= (1 + prune_extra);
-        *argc_ptr -= (1 + prune_extra);
+        count -= (1 + extra);
+        *argc_ptr -= (1 + extra);
     }
 
     return ret;
@@ -437,8 +460,9 @@ static void free_log_filter(log_filter_t **filter_ptr)
 }
 
 
-static void tokenize_filter_str(log_filter_t **filter_ptr, const char *str_filter,
-                            enum ws_log_level min_level)
+static void tokenize_filter_str(log_filter_t **filter_ptr,
+                                    const char *str_filter,
+                                    enum ws_log_level min_level)
 {
     char *tok, *str;
     const char *sep = ",;";
@@ -502,21 +526,25 @@ void ws_log_set_noisy_filter(const char *str_filter)
 }
 
 
-enum ws_log_level ws_log_set_fatal(enum ws_log_level log_level)
+void ws_log_set_fatal(enum ws_log_level level)
 {
-    /* Not possible to set lower priority than "warning" to fatal. */
-    if (log_level < LOG_LEVEL_WARNING)
-        return LOG_LEVEL_NONE;
+    if (!VALID_FATAL_LEVEL(level))
+        return;
 
-    fatal_log_level = log_level;
-    return fatal_log_level;
+    fatal_log_level = level;
 }
 
 
 enum ws_log_level ws_log_set_fatal_str(const char *str_level)
 {
-    enum ws_log_level level = string_to_log_level(str_level);
-    return ws_log_set_fatal(level);
+    enum ws_log_level level;
+
+    level = string_to_log_level(str_level);
+    if (!VALID_FATAL_LEVEL(level))
+        return LOG_LEVEL_NONE;
+
+    fatal_log_level = level;
+    return fatal_log_level;
 }
 
 
@@ -555,7 +583,8 @@ static void glib_log_handler(const char *domain, GLogLevelFlags flags,
  * to communicate with the parent and it will block. Any failures are
  * therefore ignored.
  */
-void ws_log_init(const char *progname, ws_log_writer_cb *writer)
+void ws_log_init(const char *progname,
+                            void (*vcmdarg_err)(const char *, va_list ap))
 {
     const char *env;
 
@@ -564,8 +593,7 @@ void ws_log_init(const char *progname, ws_log_writer_cb *writer)
         g_set_prgname(progname);
     }
 
-    if (writer)
-        registered_log_writer = writer;
+    current_log_level = DEFAULT_LOG_LEVEL;
 
 #if GLIB_CHECK_VERSION(2,50,0)
     color_enabled = g_log_writer_supports_color(fileno(stderr));
@@ -578,15 +606,35 @@ void ws_log_init(const char *progname, ws_log_writer_cb *writer)
     color_enabled = FALSE;
 #endif
 
-    current_log_level = DEFAULT_LOG_LEVEL;
+    /* Set the GLib log handler for the default domain. */
+    g_log_set_handler(NULL, G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL,
+                        glib_log_handler, NULL);
+
+    /* Set the GLib log handler for GLib itself. */
+    g_log_set_handler("GLib", G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL,
+                        glib_log_handler, NULL);
+
+    atexit(ws_log_cleanup);
+
+    /* Configure from environment. */
 
     env = g_getenv(ENV_VAR_LEVEL);
-    if (env != NULL)
-        ws_log_set_level_str(env);
+    if (env != NULL) {
+        if (ws_log_set_level_str(env) == LOG_LEVEL_NONE) {
+            print_err(vcmdarg_err, LOG_ARGS_NOEXIT,
+                        "Ignoring invalid environment value %s=\"%s\"",
+                        ENV_VAR_LEVEL, env);
+        }
+    }
 
     env = g_getenv(ENV_VAR_FATAL);
-    if (env != NULL)
-        ws_log_set_fatal_str(env);
+    if (env != NULL) {
+        if (ws_log_set_fatal_str(env) == LOG_LEVEL_NONE) {
+            print_err(vcmdarg_err, LOG_ARGS_NOEXIT,
+                        "Ignoring invalid environment value %s=\"%s\"",
+                        ENV_VAR_FATAL, env);
+        }
+    }
 
     env = g_getenv(ENV_VAR_DOMAINS);
     if (env != NULL)
@@ -600,29 +648,30 @@ void ws_log_init(const char *progname, ws_log_writer_cb *writer)
     if (env != NULL)
         ws_log_set_noisy_filter(env);
 
-    /* Set the GLib log handler for the default domain. */
-    g_log_set_handler(NULL, G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL,
-                        glib_log_handler, NULL);
-
-    /* Set the GLib log handler for GLib itself. */
-    g_log_set_handler("GLib", G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL,
-                        glib_log_handler, NULL);
-
-    atexit(ws_log_cleanup);
-
 #ifndef WS_DISABLE_DEBUG
     init_complete = TRUE;
 #endif
 }
 
 
-void ws_log_init_with_data(const char *progname, ws_log_writer_cb *writer,
+void ws_log_init_with_writer(const char *progname,
+                            ws_log_writer_cb *writer,
+                            void (*vcmdarg_err)(const char *, va_list ap))
+{
+    registered_log_writer = writer;
+    ws_log_init(progname, vcmdarg_err);
+}
+
+
+void ws_log_init_with_writer_and_data(const char *progname,
+                            ws_log_writer_cb *writer,
                             void *user_data,
-                            ws_log_writer_free_data_cb *free_user_data)
+                            ws_log_writer_free_data_cb *free_user_data,
+                            void (*vcmdarg_err)(const char *, va_list ap))
 {
     registered_log_writer_data = user_data;
     registered_log_writer_data_free = free_user_data;
-    ws_log_init(progname, writer);
+    ws_log_init_with_writer(progname, writer, vcmdarg_err);
 }
 
 
@@ -634,7 +683,8 @@ void ws_log_init_with_data(const char *progname, ws_log_writer_cb *writer,
 #define RED     "\033[31m"
 #define RESET   "\033[0m"
 
-static inline const char *msg_color_on(gboolean enable, enum ws_log_level level)
+static inline const char *msg_color_on(gboolean enable,
+                                        enum ws_log_level level)
 {
     if (!enable)
         return "";
@@ -658,7 +708,8 @@ static inline const char *color_off(gboolean enable)
     return enable ? RESET : "";
 }
 
-static void log_write_do_work(FILE *fp, gboolean use_color, const char *timestamp,
+static void log_write_do_work(FILE *fp, gboolean use_color,
+                                const char *timestamp,
                                 const char *domain,  enum ws_log_level level,
                                 const char *file, int line, const char *func,
                                 const char *user_format, va_list user_ap)
@@ -668,19 +719,16 @@ static void log_write_do_work(FILE *fp, gboolean use_color, const char *timestam
     gboolean doextra = (level != DEFAULT_LOG_LEVEL);
 
 #ifndef WS_DISABLE_DEBUG
-    if (!init_complete) {
-        fprintf(fp, " ** (noinit)");
-    }
+    if (!init_complete)
+        fputs(" ** (noinit)", fp);
 #endif
 
     /* Process name */
     fprintf(fp, " ** (%s:%ld) ", registered_progname, (long)getpid());
 
     /* Timestamp */
-    if (timestamp != NULL) {
-        fputs(timestamp, fp);
-        fputc(' ', fp);
-    }
+    if (timestamp != NULL)
+        fprintf(fp, "%s ", timestamp);
 
     /* Message priority (domain/level) */
     fprintf(fp, "[%s %s%s%s] ", domain_str,
@@ -736,8 +784,8 @@ static void log_write_dispatch(const char *domain, enum ws_log_level level,
                         user_format, user_ap, registered_log_writer_data);
     }
     else {
-        log_write_do_work(stderr, color_enabled, tstamp, domain, level, file, line, func,
-                        user_format, user_ap);
+        log_write_do_work(stderr, color_enabled, tstamp, domain, level,
+                        file, line, func, user_format, user_ap);
     }
 
     g_free(tstamp);
@@ -751,7 +799,6 @@ static void log_write_dispatch(const char *domain, enum ws_log_level level,
 void ws_logv(const char *domain, enum ws_log_level level,
                     const char *format, va_list ap)
 {
-
     if (ws_log_msg_is_active(domain, level) == FALSE)
         return;
 
@@ -773,10 +820,10 @@ void ws_logv_full(const char *domain, enum ws_log_level level,
 void ws_log(const char *domain, enum ws_log_level level,
                     const char *format, ...)
 {
-    va_list ap;
-
     if (ws_log_msg_is_active(domain, level) == FALSE)
         return;
+
+    va_list ap;
 
     va_start(ap, format);
     log_write_dispatch(domain, level, NULL, -1, NULL, format, ap);
@@ -788,10 +835,10 @@ void ws_log_full(const char *domain, enum ws_log_level level,
                     const char *file, int line, const char *func,
                     const char *format, ...)
 {
-    va_list ap;
-
     if (ws_log_msg_is_active(domain, level) == FALSE)
         return;
+
+    va_list ap;
 
     va_start(ap, format);
     log_write_dispatch(domain, level, file, line, func, format, ap);
@@ -805,7 +852,8 @@ void ws_log_default_writer(const char *domain, enum ws_log_level level,
                             const char *user_format, va_list user_ap,
                             void *user_data _U_)
 {
-    log_write_do_work(stderr, color_enabled, timestamp, domain, level, file, line, func, user_format, user_ap);
+    log_write_do_work(stderr, color_enabled, timestamp, domain, level,
+                                    file, line, func, user_format, user_ap);
 }
 
 
@@ -827,22 +875,38 @@ static void ws_log_cleanup(void)
 
 void ws_log_add_custom_file(FILE *fp)
 {
-        if (custom_log != NULL) {
-            fclose(custom_log);
-        }
-        custom_log = fp;
+    if (custom_log != NULL) {
+        fclose(custom_log);
+    }
+    custom_log = fp;
 }
 
+
+#define USAGE_LEVEL \
+    "sets the active log level (\"critical\", \"warning\", etc.)"
+
+#define USAGE_FATAL \
+    "sets level to abort the program (\"critical\" or \"warning\")"
+
+#define USAGE_DOMAINS \
+    "comma separated list of the active log domains"
+
+#define USAGE_DEBUG \
+    "comma separated list of domains with \"debug\" level"
+
+#define USAGE_NOISY \
+    "comma separated list of domains with \"noisy\" level"
+
+#define USAGE_FILE \
+    "file to output messages to (in addition to stderr)"
 
 void ws_log_print_usage(FILE *fp)
 {
     fprintf(fp, "Diagnostic output:\n");
-    fprintf(fp, "  --log-level <level>      one of \"critical\", \"warning\", \"message\", "
-                                            "\"info\", \"debug\" or \"noisy\"\n");
-    fprintf(fp, "  --log-fatal <level>      one of \"critical\" or \"warning\", causes level "
-                                            "to abort the program\n");
-    fprintf(fp, "  --log-domains <[!]list>  comma separated list of the active log domains\n");
-    fprintf(fp, "  --log-debug <[!]list>    comma separated list of domains with \"debug\" level\n");
-    fprintf(fp, "  --log-noisy <[!]list>    comma separated list of domains with \"noisy\" level\n");
-    fprintf(fp, "  --log-file <path>        path of file to output messages to (in addition to stderr)\n");
+    fprintf(fp, "  --log-level <level>      " USAGE_LEVEL "\n");
+    fprintf(fp, "  --log-fatal <level>      " USAGE_FATAL "\n");
+    fprintf(fp, "  --log-domains <[!]list>  " USAGE_DOMAINS "\n");
+    fprintf(fp, "  --log-debug <[!]list>    " USAGE_DEBUG "\n");
+    fprintf(fp, "  --log-noisy <[!]list>    " USAGE_NOISY "\n");
+    fprintf(fp, "  --log-file <path>        " USAGE_FILE "\n");
 }
