@@ -59,6 +59,7 @@
 #include <QMainWindow>
 #include <QPointer>
 #include <QSplitter>
+#include <QProcess>
 
 #ifdef _WIN32
 # include <QTimer>
@@ -291,6 +292,32 @@ private:
     void removeMenuActions(QList<QAction *> &actions, int menu_group);
     void goToConversationFrame(bool go_next);
     void colorizeWithFilter(QByteArray filter, int color_number = -1);
+
+    // wave file
+    static const char * const wave_extensions[];
+
+    static constexpr char gtkwave_matchword[4] = { 'D', 'U', 'A', 'L' };
+
+    struct gtkwave_dual_ipc_t {
+        char matchword[4];
+        gint64 left_margin_time;
+        gint64 marker, baseline;
+        gdouble zoom;
+        unsigned use_new_times : 1;
+        unsigned viewer_is_initialized : 1;
+    };
+
+    QProcess wave_process_;
+    int wave_shmid_;
+    struct gtkwave_dual_ipc_t *wave_dual_ctx_;
+
+    bool wave_getstart(guint64& start);
+    void wave_newcapturefile();
+    void wave_close();
+    void wave_open();
+    void wave_finished();
+    void wave_started();
+    void wave_framesel();
 
 signals:
     void setCaptureFile(capture_file *cf);
@@ -552,6 +579,7 @@ private slots:
     void on_actionContextShowLinkedPacketInNewWindow_triggered();
     void on_actionViewReload_triggered();
     void on_actionViewReload_as_File_Format_or_Capture_triggered();
+    void on_actionViewWaveFile_triggered();
 
     void on_actionGoGoToPacket_triggered();
     void on_actionGoGoToLinkedPacket_triggered();
@@ -725,6 +753,10 @@ private slots:
     void showExtcapOptionsDialog(QString & device_name);
 
     QString findRtpStreams(QVector<rtpstream_id_t *> *stream_ids, bool reverse);
+
+    void waveViewerFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void waveViewerStarted();
+    void waveViewerFramesSelected(QList<int>);
 
     friend WiresharkApplication;
 };

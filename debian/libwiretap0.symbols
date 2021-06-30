@@ -51,6 +51,7 @@ libwiretap.so.0 libwiretap0 #MINVER#
  wtap_block_get_uint32_option_value@Base 3.5.0
  wtap_block_get_uint64_option_value@Base 2.1.2
  wtap_block_get_uint8_option_value@Base 2.1.2
+ wtap_block_get_nth_custom_option_value@Base 3.5.0
  wtap_block_make_copy@Base 3.3.2
  wtap_block_option_get_value_size@Base 3.5.0
  wtap_block_ref@Base 3.5.0

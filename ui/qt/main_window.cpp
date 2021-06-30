@@ -92,6 +92,11 @@ DIAG_ON(frame-larger-than=)
 #include <QTreeWidget>
 #include <QUrl>
 
+#include <cmath>
+
+#include <sys/types.h>
+#include <sys/shm.h>
+
 //menu_recent_file_write_all
 
 // If we ever add support for multiple windows this will need to be replaced.
@@ -317,6 +322,12 @@ QMenu* MainWindow::findOrAddMenu(QMenu *parent_menu, QString& menu_text) {
     return parent_menu->addMenu(menu_text);
 }
 
+const char * const MainWindow::wave_extensions[4] = {
+    "vcd", "fst", "lxt", nullptr
+};
+
+constexpr char MainWindow::gtkwave_matchword[4];
+
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     main_ui_(new Ui::MainWindow),
@@ -347,6 +358,7 @@ MainWindow::MainWindow(QWidget *parent) :
 #if defined(Q_OS_MAC)
     , dock_menu_(NULL)
 #endif
+    , wave_process_(this), wave_shmid_(-1), wave_dual_ctx_(nullptr)
 {
     if (!gbl_cur_main_window_) {
         connect(wsApp, SIGNAL(openStatCommandDialog(QString, const char*, void*)),
@@ -700,6 +712,10 @@ MainWindow::MainWindow(QWidget *parent) :
     /* Register Interface Toolbar callbacks */
     iface_toolbar_register_cb(mainwindow_add_toolbar, mainwindow_remove_toolbar);
 
+    connect(&wave_process_, SIGNAL(finished(int, QProcess::ExitStatus)), this, SLOT(waveViewerFinished(int, QProcess::ExitStatus)));
+    connect(&wave_process_, SIGNAL(started()), this, SLOT(waveViewerStarted()));
+    connect(this, SIGNAL(framesSelected(QList<int>)), this, SLOT(waveViewerFramesSelected(QList<int>)));
+
     showWelcome();
 }
 
@@ -722,6 +738,7 @@ MainWindow::~MainWindow()
 
 #endif
     delete main_ui_;
+    wave_close();
 }
 
 QString MainWindow::getFilter()
@@ -1305,6 +1322,7 @@ void MainWindow::mergeCaptureFile()
         wsApp->setLastOpenDirFromFilename(tmpname);
         g_free(tmpname);
         main_ui_->statusBar->showExpert();
+        wave_newcapturefile();
         return;
     }
 
@@ -3020,6 +3038,184 @@ frame_data * MainWindow::frameDataForRow(int row) const
         return packet_list_->getFDataForRow(row);
 
     return Q_NULLPTR;
+}
+
+bool MainWindow::wave_getstart(guint64& start)
+{
+    static const guint optids[2] = { OPT_CUSTOM_BIN_COPY, OPT_CUSTOM_BIN_NO_COPY };
+    static constexpr guint32 expcustopt = 65536;
+    start = 0;
+    capture_file *cf = CaptureFile::globalCapFile();
+    if (!cf)
+        return false;
+    wtap_block_t shb = wtap_file_get_shb(cf->provider.wth, 0);
+    for (int id = 0; id < 2; ++id) {
+        for (guint idx = 0; idx < 256; ++idx) {
+            custom_opt_t *copt = nullptr;
+            if (wtap_block_get_nth_custom_option_value(shb, optids[id], idx, &copt) != WTAP_OPTTYPE_SUCCESS)
+                break;
+            if (!copt)
+                break;
+            guint32 custopt;
+            guint64 tstamp;
+            if (copt->pen != 24364 || copt->custom_data_len < sizeof(custopt) + sizeof(tstamp))
+                continue;
+            memcpy(&custopt, copt->custom_data, sizeof(custopt));
+            memcpy(&tstamp, copt->custom_data + sizeof(custopt), sizeof(tstamp));
+            if (GUINT32_SWAP_LE_BE(custopt) == expcustopt)
+                tstamp = GUINT64_SWAP_LE_BE(tstamp);
+            else if (custopt != expcustopt)
+                continue;
+            start = tstamp;
+            return true;
+        }
+    }
+    return false;
+}
+
+void MainWindow::wave_newcapturefile()
+{
+    capture_file *cf = CaptureFile::globalCapFile();
+    bool wave_file = false;
+    if (cf && cf->filename) {
+        QFileInfo cfinfo(cf->filename);
+        for (const char * const * ext = wave_extensions; *ext; ++ext) {
+            QFileInfo winfo(cfinfo.dir(), cfinfo.baseName() + "." + *ext);
+            if (!winfo.isReadable())
+                continue;
+            wave_file = true;
+            break;
+        }
+    }
+    guint64 wstart = 0;
+    bool sttime = wave_getstart(wstart);
+    main_ui_->actionViewWaveFile->setVisible(wave_file && sttime);
+}
+
+void MainWindow::wave_close()
+{
+    wave_process_.terminate();
+    
+}
+
+void MainWindow::wave_open()
+{
+    capture_file *cf = CaptureFile::globalCapFile();
+    if (!cf)
+        return;
+    QStringList args;
+    {
+        bool wave_file = false;
+        if (cf->filename) {
+            QFileInfo cfinfo(cf->filename);
+            for (const char * const * ext = wave_extensions; *ext; ++ext) {
+                QFileInfo winfo(cfinfo.dir(), cfinfo.baseName() + "." + *ext);
+                if (!winfo.isReadable())
+                    continue;
+                wave_file = true;
+                args.push_back(winfo.filePath());
+                break;
+            }
+            QFileInfo ginfo(cfinfo.dir(), cfinfo.baseName() + ".gtkw");
+            if (ginfo.isReadable())
+                args.push_back(ginfo.filePath());
+        }
+        if (!wave_file)
+            return;
+    }
+#ifdef _WIN32
+    wave_shmid_ = getpid();
+    HANDLE hmapfile;
+    {
+        char mapname[65];
+        snprintf(mapname, sizeof(mapname), "twinwave%d", wave_shmid_);
+        hmapfile = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, 2 * sizeof(struct gtkwave_dual_ipc_t), mapname);
+    }
+    if (!hmapfile) {
+        wave_shmid_ = -1;
+        return;
+    }
+    wave_dual_ctx_ = reinterpret_cast<gtkwave_dual_ipc_t *>(MapViewOfFile(hmapfile, FILE_MAP_ALL_ACCESS, 0, 0, 2 * sizeof(struct gtkwave_dual_ipc_t)));
+    CloseHandle(hmapfile);
+#else
+    wave_shmid_ = shmget(0, 2 * sizeof(struct gtkwave_dual_ipc_t), IPC_CREAT | 0600);
+    if (wave_shmid_ < 0)
+        return;
+    wave_dual_ctx_ = reinterpret_cast<gtkwave_dual_ipc_t *>(shmat(wave_shmid_, nullptr, 0));
+#endif
+    if (!wave_dual_ctx_) {
+        wave_shmid_ = -1;
+        return;
+    }
+    memset(wave_dual_ctx_, 0, 2 * sizeof(struct gtkwave_dual_ipc_t));
+    memcpy(&wave_dual_ctx_[0].matchword, gtkwave_matchword, 4);
+    memcpy(&wave_dual_ctx_[1].matchword, gtkwave_matchword, 4);
+    wave_dual_ctx_[1].viewer_is_initialized = 1;
+    {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "0+%08X", wave_shmid_);
+        args.push_front(buf);
+        args.push_front("-D");
+    }
+    QString prog("gtkwave");
+#ifdef _WIN32
+    prog += ".exe";
+#endif
+    wave_process_.start(prog, args);
+}
+
+void MainWindow::wave_finished()
+{
+#ifdef _WIN32
+    if (wave_dual_ctx_)
+        UnmapViewOfFile(wave_dual_ctx_);
+#else
+    if (wave_dual_ctx_)
+        shmdt(wave_dual_ctx_);
+    if (wave_shmid_ >= 0) {
+        struct shmid_ds ds;
+        shmctl(wave_shmid_, IPC_RMID, &ds);
+    }
+#endif
+    wave_dual_ctx_ = nullptr;
+    wave_shmid_ = -1;
+    main_ui_->actionViewWaveFile->setEnabled(true);
+}
+
+void MainWindow::wave_started()
+{
+    main_ui_->actionViewWaveFile->setEnabled(false);
+}
+
+void MainWindow::wave_framesel()
+{
+    capture_file *cf = CaptureFile::globalCapFile();
+    if (!cf || !cf->edt)
+        return;
+    nstime_t wstart;
+    {
+        guint64 wstartx = 0;
+        if (!wave_getstart(wstartx))
+            return;
+        guint64 wstartxs = wstartx / 1000000000;
+        wstart.secs = wstartxs;
+        wstart.nsecs = static_cast<int>(wstartx - wstartxs * 1000000000);
+    }
+    nstime_t wtime;
+    nstime_delta(&wtime, &cf->edt->pi.abs_ts, &wstart);
+    if (wave_dual_ctx_ && wtime.secs >= 0) {
+        guint64 marker = static_cast<guint64>(wtime.secs) * 1000000000 + wtime.nsecs;
+        // width of the waveform is approximately 2ns * 2^-zoom
+        guint64 offset = std::pow(2.0, -wave_dual_ctx_[0].zoom);
+        wave_dual_ctx_[1].marker = marker;
+        if (marker >= offset)
+            wave_dual_ctx_[1].left_margin_time = marker - offset;
+        else
+            wave_dual_ctx_[1].left_margin_time = wave_dual_ctx_[0].left_margin_time;
+        wave_dual_ctx_[1].baseline = wave_dual_ctx_[0].baseline;
+        wave_dual_ctx_[1].zoom = wave_dual_ctx_[0].zoom;        
+        wave_dual_ctx_[1].use_new_times = 1;
+    }
 }
 
 // Finds rtp id for selected stream and adds it to stream_ids

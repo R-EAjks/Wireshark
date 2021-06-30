@@ -695,6 +695,19 @@ wtap_block_get_string_option_value(wtap_block_t block, guint option_id, char** v
 WS_DLL_PUBLIC wtap_opttype_return_val
 wtap_block_get_nth_string_option_value(wtap_block_t block, guint option_id, guint idx, char** value) G_GNUC_WARN_UNUSED_RESULT;
 
+/** Get custom option value for the nth instance of a particular option
+ * in a block
+ *
+ * @param[in] block Block from which to get the option value
+ * @param[in] option_id Identifier value for option
+ * @param[in] idx Instance number of option with that ID
+ * @param[out] value Returned value of option
+ * @return wtap_opttype_return_val - WTAP_OPTTYPE_SUCCESS if successful,
+ * error code otherwise
+ */
+WS_DLL_PUBLIC wtap_opttype_return_val
+wtap_block_get_nth_custom_option_value(wtap_block_t block, guint option_id, guint idx, custom_opt_t** value) G_GNUC_WARN_UNUSED_RESULT;
+
 /** Add a bytes option to a block
  *
  * @param[in] block Block to which to add the option
