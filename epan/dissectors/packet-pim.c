@@ -742,7 +742,7 @@ dissect_pim_addr(proto_tree* tree, tvbuff_t *tvb, int offset, enum pimv2_addrtyp
                  const char* label, proto_item** ret_item, int hf_ip4, int hf_ip6, int *advance) {
     guint8 af, et, flags, mask_len, ja_af;
     ws_in6_addr ipv6;
-    guint32 ipv4;
+    guint32 ipv4 = 0;
     proto_item* ti = NULL;
     proto_tree* addr_tree = NULL;
     proto_item *rloc_tree = NULL;
