@@ -154,6 +154,7 @@ typedef struct {
 	enc_key_t *PA_FAST_ARMOR_AP_subkey;
 	enc_key_t *fast_armor_key;
 	enc_key_t *fast_strengthen_key;
+	tvbuff_t *enc_tkt_part;
 #endif
 } kerberos_private_data_t;
 
@@ -533,7 +534,7 @@ static int hf_kerberos_PAC_OPTIONS_FLAGS_forward_to_full_dc = -1;
 static int hf_kerberos_PAC_OPTIONS_FLAGS_resource_based_constrained_delegation = -1;
 
 /*--- End of included file: packet-kerberos-hf.c ---*/
-#line 295 "./asn1/kerberos/packet-kerberos-template.c"
+#line 296 "./asn1/kerberos/packet-kerberos-template.c"
 
 /* Initialize the subtree pointers */
 static gint ett_kerberos = -1;
@@ -650,7 +651,7 @@ static gint ett_kerberos_SPAKEResponse = -1;
 static gint ett_kerberos_PA_SPAKE = -1;
 
 /*--- End of included file: packet-kerberos-ett.c ---*/
-#line 322 "./asn1/kerberos/packet-kerberos-template.c"
+#line 323 "./asn1/kerberos/packet-kerberos-template.c"
 
 static expert_field ei_kerberos_missing_keytype = EI_INIT;
 static expert_field ei_kerberos_decrypted_keytype = EI_INIT;
@@ -781,7 +782,7 @@ typedef enum _KERBEROS_KRBFASTARMORTYPES_enum {
 } KERBEROS_KRBFASTARMORTYPES_enum;
 
 /*--- End of included file: packet-kerberos-val.h ---*/
-#line 336 "./asn1/kerberos/packet-kerberos-template.c"
+#line 337 "./asn1/kerberos/packet-kerberos-template.c"
 
 static void
 call_kerberos_callbacks(packet_info *pinfo, proto_tree *tree, tvbuff_t *tvb, int tag, kerberos_callbacks *cb)
@@ -2278,6 +2279,11 @@ struct verify_krb5_pac_state {
 	krb5_cksumtype kdc_checksum;
 	guint kdc_count;
 	enc_key_t *kdc_ek;
+	krb5_cksumtype kdc_ticket_checksum;
+	guint kdc_ticket_count;
+	enc_key_t *kdc_ticket_ek;
+	krb5_data enc_tkt_data;
+	krb5_data kdc_ticket_checksum_data;
 };
 
 static void
@@ -2329,6 +2335,151 @@ verify_krb5_pac_try_server_key(gpointer __key _U_, gpointer value, gpointer user
 	}
 }
 
+#if defined(HAVE_DECODE_KRB5_ENC_TKT_PART) && defined(HAVE_ENCODE_KRB5_ENC_TKT_PART)
+krb5_error_code
+encode_krb5_enc_tkt_part(const krb5_enc_tkt_part *rep, krb5_data **code);
+krb5_error_code
+decode_krb5_enc_tkt_part(const krb5_data *output, krb5_enc_tkt_part **rep);
+
+static krb5_error_code
+check_ticket_signature(struct verify_krb5_pac_state *state, krb5_keyblock *key)
+{
+	krb5_enc_tkt_part *enc_tkt_part;
+	krb5_data *scratch = NULL;
+	krb5_checksum checksum;
+	krb5_boolean valid;
+	krb5_authdata **authdata, *ad_if_relevant = NULL, *ad_pac = NULL, orig_pac;
+	krb5_authdata **decoded_container = NULL;
+	krb5_authdata **recoded_container = NULL;
+	int i = 0, j = 0;
+	krb5_error_code ret;
+	unsigned char single_zero = '\0';
+
+
+	ret = decode_krb5_enc_tkt_part(&state->enc_tkt_data, &enc_tkt_part);
+	if (ret != 0) {
+		goto done;
+	}
+
+	authdata = enc_tkt_part->authorization_data;
+
+	for (i = 0; authdata[i]; i++) {
+		if (authdata[i]->ad_type != KRB5_AUTHDATA_IF_RELEVANT) {
+			continue;
+		}
+		ad_if_relevant = authdata[i];
+
+		ret = krb5_decode_authdata_container(krb5_ctx, KRB5_AUTHDATA_IF_RELEVANT,
+						     ad_if_relevant, &decoded_container);
+		if (ret != 0) {
+			goto done;
+		}
+
+		for (j = 0; decoded_container[j]; j++) {
+			if (decoded_container[j]->ad_type != KRB5_AUTHDATA_WIN2K_PAC) {
+				continue;
+			}
+			ad_pac = decoded_container[j];
+		}
+		if (ad_pac != NULL) {
+			break;
+		}
+
+		krb5_free_authdata(krb5_ctx, decoded_container);
+		decoded_container = NULL;
+	}
+	if (ad_pac == NULL) {
+		ret = KRB5KRB_AP_ERR_INAPP_CKSUM;
+		goto done;
+	}
+
+	orig_pac = *ad_pac;
+	ad_pac->length = 1;
+	ad_pac->contents = &single_zero;
+	ret = krb5_encode_authdata_container(krb5_ctx, KRB5_AUTHDATA_IF_RELEVANT,
+					     decoded_container, &recoded_container);
+	*ad_pac = orig_pac;
+	if (ret != 0) {
+		goto done;
+	}
+
+	authdata[i] = recoded_container[0];
+	ret = encode_krb5_enc_tkt_part(enc_tkt_part, &scratch);
+	authdata[i] = ad_if_relevant;
+	if (ret != 0) {
+		goto done;
+	}
+
+	checksum.checksum_type = state->kdc_ticket_checksum;
+	checksum.length = state->kdc_ticket_checksum_data.length -4;
+	checksum.contents = state->kdc_ticket_checksum_data.data +4;
+	ret = krb5_c_verify_checksum(krb5_ctx, key, KRB5_KEYUSAGE_APP_DATA_CKSUM,
+				     scratch, &checksum, &valid);
+	if (valid == FALSE) {
+		ret = KRB5KRB_AP_ERR_BAD_INTEGRITY;
+	}
+
+done:
+	krb5_free_data(krb5_ctx, scratch);
+	krb5_free_authdata(krb5_ctx, decoded_container);
+	krb5_free_authdata(krb5_ctx, recoded_container);
+
+	return ret;
+}
+#else
+static krb5_error_code
+check_ticket_signature(struct verify_krb5_pac_state *state, krb5_keyblock *key _U_)
+{
+	state->kdc_ticket_checksum = 0;
+	return -1;
+}
+#endif
+
+static void
+verify_pac_ticket_signature(enc_key_t *ek, struct verify_krb5_pac_state *state)
+{
+	krb5_keyblock keyblock;
+	krb5_cksumtype checksumtype = 0;
+	krb5_error_code ret;
+
+	if (state->kdc_ticket_checksum == 0) {
+		/*
+		 * nothing more todo, stop traversing.
+		 */
+		return;
+	}
+
+	if (state->kdc_ticket_ek != NULL) {
+		/*
+		 * we're done.
+		 */
+		return;
+	}
+
+	ret = krb5int_c_mandatory_cksumtype(krb5_ctx, ek->keytype,
+					    &checksumtype);
+	if (ret != 0) {
+		/*
+		 * the key is not usable, keep traversing.
+		 * try the next key...
+		 */
+		return;
+	}
+
+	keyblock.magic = KV5M_KEYBLOCK;
+	keyblock.enctype = ek->keytype;
+	keyblock.length = ek->keylength;
+	keyblock.contents = (guint8 *)ek->keyvalue;
+
+	if (checksumtype == state->kdc_ticket_checksum) {
+		state->kdc_ticket_count += 1;
+		ret = check_ticket_signature(state, &keyblock);
+		if (ret == 0) {
+			state->kdc_ticket_ek = ek;
+		}
+	}
+}
+
 static void
 verify_krb5_pac_try_kdc_key(gpointer __key _U_, gpointer value, gpointer userdata)
 {
@@ -2338,6 +2489,8 @@ verify_krb5_pac_try_kdc_key(gpointer __key _U_, gpointer value, gpointer userdat
 	krb5_keyblock keyblock;
 	krb5_cksumtype checksumtype = 0;
 	krb5_error_code ret;
+
+	verify_pac_ticket_signature(ek, state);
 
 	if (state->kdc_checksum == 0) {
 		/*
@@ -2378,6 +2531,8 @@ verify_krb5_pac_try_kdc_key(gpointer __key _U_, gpointer value, gpointer userdat
 	}
 }
 
+#define discard_const(ptr) ((void *)((uintptr_t)(ptr)))
+
 static void
 verify_krb5_pac(proto_tree *tree _U_, asn1_ctx_t *actx, tvbuff_t *pactvb)
 {
@@ -2416,13 +2571,30 @@ verify_krb5_pac(proto_tree *tree _U_, asn1_ctx_t *actx, tvbuff_t *pactvb)
 	if (ret == 0) {
 		state.server_checksum = pletoh32(checksum_data.data);
 		krb5_free_data_contents(krb5_ctx, &checksum_data);
-	};
+	}
 	ret = krb5_pac_get_buffer(krb5_ctx, state.pac, KRB5_PAC_PRIVSVR_CHECKSUM,
 				  &checksum_data);
 	if (ret == 0) {
 		state.kdc_checksum = pletoh32(checksum_data.data);
 		krb5_free_data_contents(krb5_ctx, &checksum_data);
-	};
+	}
+	ret = krb5_pac_get_buffer(krb5_ctx, state.pac, 16, &checksum_data);
+	if (ret == 0) {
+		state.kdc_ticket_checksum = pletoh32(checksum_data.data);
+		state.kdc_ticket_checksum_data = checksum_data;
+	}
+
+	if (private_data->enc_tkt_part == NULL) {
+		proto_tree_add_expert_format(tree, actx->pinfo, &ei_kerberos_decrypted_keytype,
+					     pactvb, 0, 0,
+					     "Missing enc_tkt_part at pac_verify in frame %u",
+					     actx->pinfo->fd->num);
+		state.kdc_ticket_checksum = 0;
+	} else {
+		state.enc_tkt_data.length = tvb_captured_length(private_data->enc_tkt_part);
+		state.enc_tkt_data.data = discard_const(tvb_get_ptr(private_data->enc_tkt_part,
+							0, state.enc_tkt_data.length));
+	}
 
 	read_keytab_file_from_preferences();
 
@@ -2464,8 +2636,25 @@ verify_krb5_pac(proto_tree *tree _U_, asn1_ctx_t *actx, tvbuff_t *pactvb)
 				    wmem_map_size(kerberos_longterm_keys),
 				    state.kdc_count);
 	}
-
+	if (state.kdc_ticket_ek != NULL) {
+		used_signing_key(tree, actx->pinfo, private_data,
+				 state.kdc_ticket_ek, pactvb,
+				 state.kdc_ticket_checksum,
+				 "Verified KDC ticket-signature",
+				 "longterm_keys",
+				 wmem_map_size(kerberos_longterm_keys),
+				 state.kdc_ticket_count);
+	} else if (state.kdc_ticket_checksum != 0) {
+		int keytype = keytype_for_cksumtype(state.kdc_ticket_checksum);
+		missing_signing_key(tree, actx->pinfo, private_data,
+				    pactvb, state.kdc_ticket_checksum, keytype,
+				    "Missing KDC ticket-signature key",
+				    "longterm_keys",
+				    wmem_map_size(kerberos_longterm_keys),
+				    state.kdc_ticket_count);
+	}
 	krb5_pac_free(krb5_ctx, state.pac);
+	krb5_free_data_contents(krb5_ctx, &state.kdc_ticket_checksum_data);
 }
 #endif /* HAVE_KRB5_PAC_VERIFY */
 
@@ -3264,6 +3453,7 @@ static int
 dissect_krb5_decrypt_ticket_data (gboolean imp_tag _U_, tvbuff_t *tvb, int offset, asn1_ctx_t *actx,
 									proto_tree *tree, int hf_index _U_)
 {
+	kerberos_private_data_t *private_data = kerberos_get_private_data(actx);
 	guint8 *plaintext;
 	int length;
 	tvbuff_t *next_tvb;
@@ -3281,10 +3471,14 @@ dissect_krb5_decrypt_ticket_data (gboolean imp_tag _U_, tvbuff_t *tvb, int offse
 		tvbuff_t *child_tvb;
 		child_tvb = tvb_new_child_real_data(tvb, plaintext, length, length);
 
+		private_data->enc_tkt_part = child_tvb;
+
 		/* Add the decrypted data to the data source list. */
 		add_new_data_source(actx->pinfo, child_tvb, "Krb5 Ticket");
 
 		offset=dissect_kerberos_Applications(FALSE, child_tvb, 0, actx , tree, /* hf_index*/ -1);
+
+		private_data->enc_tkt_part = NULL;
 	}
 	return offset;
 }
@@ -7429,7 +7623,7 @@ dissect_kerberos_PA_SPAKE(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offs
 
 
 /*--- End of included file: packet-kerberos-fn.c ---*/
-#line 3902 "./asn1/kerberos/packet-kerberos-template.c"
+#line 4096 "./asn1/kerberos/packet-kerberos-template.c"
 
 #ifdef HAVE_KERBEROS
 static const ber_sequence_t PA_ENC_TS_ENC_sequence[] = {
@@ -9239,7 +9433,7 @@ void proto_register_kerberos(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-kerberos-hfarr.c ---*/
-#line 4795 "./asn1/kerberos/packet-kerberos-template.c"
+#line 4989 "./asn1/kerberos/packet-kerberos-template.c"
 	};
 
 	/* List of subtrees */
@@ -9358,7 +9552,7 @@ void proto_register_kerberos(void) {
     &ett_kerberos_PA_SPAKE,
 
 /*--- End of included file: packet-kerberos-ettarr.c ---*/
-#line 4824 "./asn1/kerberos/packet-kerberos-template.c"
+#line 5018 "./asn1/kerberos/packet-kerberos-template.c"
 	};
 
 	static ei_register_info ei[] = {
