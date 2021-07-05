@@ -966,9 +966,11 @@ dissect_pim_addr(proto_tree* tree, tvbuff_t *tvb, int offset, enum pimv2_addrtyp
         proto_tree_add_item(addr_tree, hf_pim_mask_len, tvb, offset+3, 1, ENC_NA);
         switch (af) {
         case AFNUM_INET:
+            ipv4 = tvb_get_ipv4(tvb, offset + 4);
             proto_tree_add_item(addr_tree, hf_pim_source_ip4, tvb, offset+4, 4, ENC_BIG_ENDIAN);
             break;
         case AFNUM_INET6:
+            tvb_get_ipv6(tvb, offset + 4, &ipv6);
             proto_tree_add_item(addr_tree, hf_pim_source_ip6, tvb, offset+4, 16, ENC_NA);
             break;
         }
