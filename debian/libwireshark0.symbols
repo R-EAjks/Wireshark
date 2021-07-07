@@ -1332,6 +1332,8 @@ libwireshark.so.0 libwireshark0 #MINVER#
  q932_PresentedNumberScreened_vals@Base 2.1.0
  q932_PresentedNumberUnscreened_vals@Base 2.1.0
  q932_ScreeningIndicator_vals@Base 2.5.0
+ quic_get_stream_id_le@Base 3.5.0
+ quic_get_stream_id_ge@Base 3.5.0
  qs_func_vals@Base 1.9.1
  qs_rate_vals_ext@Base 1.9.1
  raknet_add_udp_dissector@Base 2.3.0
@@ -1910,6 +1912,7 @@ libwireshark.so.0 libwireshark0 #MINVER#
  uat_update_record@Base 1.99.3
  udp_dissect_pdus@Base 1.99.3
  udp_port_to_display@Base 1.99.2
+ uint64_compare@Base 3.5.0
  uint_to_str_back@Base 2.1.0
  union_of_tap_listener_flags@Base 1.9.1
  unit_name_string_get_value@Base 2.3.0
