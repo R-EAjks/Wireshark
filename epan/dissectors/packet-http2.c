@@ -25,6 +25,7 @@
 */
 
 #include "config.h"
+#define WS_LOG_DOMAIN "packet-http2"
 
 #include <epan/packet.h>
 #include <epan/expert.h>
@@ -50,6 +51,7 @@
 #include "wsutil/pint.h"
 #include "wsutil/strtoi.h"
 #include "wsutil/str_util.h"
+#include <wsutil/wslog.h>
 
 #ifdef HAVE_NGHTTP2
 #define http2_header_repr_type_VALUE_STRING_LIST(XXX)                   \
@@ -1743,7 +1745,7 @@ fix_partial_header_dissection_support(nghttp2_hd_inflater *hd_inflater, gboolean
                                              dummy_header, dummy_header_size,
                                              i == 0);
         if (rv != dummy_header_size) {
-            g_log(G_LOG_DOMAIN, G_LOG_LEVEL_WARNING,
+            ws_log(WS_LOG_DOMAIN, LOG_LEVEL_WARNING,
                   "unexpected decompression state: %d != %d", rv,
                   dummy_header_size);
             break;
@@ -2058,7 +2060,7 @@ inflate_http2_header_block(tvbuff_t *tvb, packet_info *pinfo, guint offset, prot
 #endif
 
 static gchar*
-http2_follow_conv_filter(packet_info *pinfo, guint *stream, guint *sub_stream)
+http2_follow_conv_filter(epan_dissect_t *edt _U_, packet_info *pinfo, guint *stream, guint *sub_stream)
 {
     http2_session_t *h2session;
     struct tcp_analysis *tcpd;
@@ -3050,9 +3052,9 @@ dissect_http2_rst_stream(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *http
 /* Settings */
 static int
 #ifdef HAVE_NGHTTP2
-dissect_http2_settings(tvbuff_t *tvb, packet_info *pinfo _U_, http2_session_t* h2session, proto_tree *http2_tree, guint offset, guint8 flags)
+dissect_http2_settings(tvbuff_t* tvb, packet_info* pinfo _U_, http2_session_t* h2session, proto_tree* http2_tree, guint offset, guint8 flags)
 #else
-dissect_http2_settings(tvbuff_t *tvb, packet_info *pinfo _U_, http2_session_t* h2session _U_, proto_tree *http2_tree, guint offset, guint8 flags _U_)
+dissect_http2_settings(tvbuff_t* tvb, packet_info* pinfo _U_, http2_session_t* h2session _U_, proto_tree* http2_tree, guint offset, guint8 flags _U_)
 #endif
 {
     guint32 settingsid;
@@ -3116,7 +3118,7 @@ dissect_http2_settings(tvbuff_t *tvb, packet_info *pinfo _U_, http2_session_t* h
     }
 
 #ifdef HAVE_NGHTTP2
-    if(!PINFO_FD_VISITED(pinfo)) {
+    if(!PINFO_FD_VISITED(pinfo)&&(h2session != NULL)) {
 
         if(flags & HTTP2_FLAGS_ACK) {
             apply_and_pop_settings(pinfo, h2session);
@@ -3135,6 +3137,11 @@ dissect_http2_settings(tvbuff_t *tvb, packet_info *pinfo _U_, http2_session_t* h
 #endif
 
     return offset;
+}
+
+void
+dissect_http2_settings_ext(tvbuff_t* tvb, packet_info* pinfo _U_, proto_tree* http2_tree, guint offset) {
+    dissect_http2_settings(tvb, pinfo, NULL, http2_tree, offset, 0);
 }
 
 /* Push Promise */
@@ -3927,7 +3934,7 @@ proto_register_http2(void)
               "Must be zero", HFILL }
         },
         { &hf_http2_goaway_last_stream_id,
-            { "Promised-Stream-ID", "http2.goaway.last_stream_id",
+            { "Last-Stream-ID", "http2.goaway.last_stream_id",
                FT_UINT32, BASE_DEC, NULL, MASK_HTTP2_PRIORITY,
               "Contains the highest numbered stream identifier for which the sender of the GOAWAY frame has received frames on and might have taken some action on", HFILL }
         },
@@ -4133,7 +4140,8 @@ proto_reg_handoff_http2(void)
     media_type_dissector_table = find_dissector_table("media_type");
 #endif
 
-    dissector_add_for_decode_as_with_preference("tcp.port", http2_handle);
+    dissector_add_uint_range_with_preference("tcp.port", "", http2_handle);
+    dissector_add_for_decode_as("tcp.port", http2_handle);
 
     /*
      * SSL/TLS Application-Layer Protocol Negotiation (ALPN) protocol ID.

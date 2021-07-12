@@ -70,6 +70,7 @@
 
 #include <ui/clopts_common.h>
 #include <ui/cmdarg_err.h>
+#include <ui/exit_codes.h>
 #include <wsutil/filesystem.h>
 #include <wsutil/file_util.h>
 #include <wsutil/wsgcrypt.h>
@@ -79,21 +80,22 @@
 #include <wsutil/strnatcmp.h>
 #include <wsutil/str_util.h>
 #include <cli_main.h>
-#include <version_info.h>
+#include <ui/version_info.h>
 #include <wsutil/pint.h>
 #include <wsutil/strtoi.h>
+#include <wsutil/ws_assert.h>
+#include <wsutil/wslog.h>
 #include <wiretap/wtap_opttypes.h>
-#include <wiretap/pcapng.h>
 
 #include "ui/failure_message.h"
 
 #include "ringbuffer.h" /* For RINGBUFFER_MAX_NUM_FILES */
 
-#define INVALID_OPTION 1
-#define INVALID_FILE 2
+/* Additional exit codes */
 #define CANT_EXTRACT_PREFIX 2
-#define WRITE_ERROR 2
-#define DUMP_ERROR 2
+#define WRITE_ERROR         2
+#define DUMP_ERROR          2
+
 #define NANOSECS_PER_SEC 1000000000
 
 /*
@@ -970,11 +972,10 @@ framenum_compare(gconstpointer a, gconstpointer b, gpointer user_data _U_)
 }
 
 /*
- * General errors and warnings are reported with an console message
- * in editcap.
+ * Report an error in command-line arguments.
  */
 static void
-failure_warning_message(const char *msg_format, va_list ap)
+editcap_cmdarg_err(const char *msg_format, va_list ap)
 {
     fprintf(stderr, "editcap: ");
     vfprintf(stderr, msg_format, ap);
@@ -985,7 +986,7 @@ failure_warning_message(const char *msg_format, va_list ap)
  * Report additional information for an error in command-line arguments.
  */
 static void
-failure_message_cont(const char *msg_format, va_list ap)
+editcap_cmdarg_err_cont(const char *msg_format, va_list ap)
 {
     vfprintf(stderr, msg_format, ap);
     fprintf(stderr, "\n");
@@ -1078,6 +1079,18 @@ int
 main(int argc, char *argv[])
 {
     char         *init_progfile_dir_error;
+    static const struct report_message_routines editcap_report_routines = {
+        failure_message,
+        failure_message,
+        open_failure_message,
+        read_failure_message,
+        write_failure_message,
+        cfile_open_failure_message,
+        cfile_dump_open_failure_message,
+        cfile_read_failure_message,
+        cfile_write_failure_message,
+        cfile_close_failure_message
+    };
     wtap         *wth = NULL;
     int           i, j, read_err, write_err;
     gchar        *read_err_info, *write_err_info;
@@ -1141,7 +1154,13 @@ main(int argc, char *argv[])
     gboolean                     valid_seed = FALSE;
     unsigned int                 seed = 0;
 
-    cmdarg_err_init(failure_warning_message, failure_message_cont);
+    cmdarg_err_init(editcap_cmdarg_err, editcap_cmdarg_err_cont);
+
+    /* Initialize log handler early so we can have proper logging during startup. */
+    ws_log_init("editcap", vcmdarg_err);
+
+    /* Early logging command-line initialization. */
+    ws_log_parse_args(&argc, argv, vcmdarg_err, INVALID_OPTION);
 
 #ifdef _WIN32
     create_app_running_mutex();
@@ -1167,8 +1186,7 @@ main(int argc, char *argv[])
         g_free(init_progfile_dir_error);
     }
 
-    init_report_message(failure_warning_message, failure_warning_message,
-                        NULL, NULL, NULL);
+    init_report_message("editcap", &editcap_report_routines);
 
     wtap_init(TRUE);
 
@@ -1242,7 +1260,6 @@ main(int argc, char *argv[])
         case LONGOPT_CAPTURE_COMMENT:
         {
             /* pcapng supports multiple comments, so support them here too.
-             * Wireshark only sees the first capture comment though.
              */
             if (!capture_comments) {
                 capture_comments = g_ptr_array_new_with_free_func(g_free);
@@ -1546,8 +1563,7 @@ main(int argc, char *argv[])
     wth = wtap_open_offline(argv[optind], WTAP_TYPE_AUTO, &read_err, &read_err_info, FALSE);
 
     if (!wth) {
-        cfile_open_failure_message("editcap", argv[optind], read_err,
-                                   read_err_info);
+        cfile_open_failure_message(argv[optind], read_err, read_err_info);
         ret = INVALID_FILE;
         goto clean_exit;
     }
@@ -1722,7 +1738,7 @@ main(int argc, char *argv[])
             } else {
                 filename = g_strdup(argv[optind+1]);
             }
-            g_assert(filename);
+            ws_assert(filename);
 
             /* If we don't have an application name add one */
             if (wtap_block_get_string_option_value(g_array_index(params.shb_hdrs, wtap_block_t, 0), OPT_SHB_USERAPPL, &shb_user_appl) != WTAP_OPTTYPE_SUCCESS) {
@@ -1733,7 +1749,7 @@ main(int argc, char *argv[])
                                     &write_err_info);
 
             if (pdh == NULL) {
-                cfile_dump_open_failure_message("editcap", filename,
+                cfile_dump_open_failure_message(filename,
                                                 write_err, write_err_info,
                                                 out_file_type_subtype);
                 ret = INVALID_FILE;
@@ -1745,8 +1761,7 @@ main(int argc, char *argv[])
          * Process whatever IDBs we haven't seen yet.
          */
         if (!process_new_idbs(wth, pdh, idbs_seen, &write_err, &write_err_info)) {
-            cfile_write_failure_message("editcap", argv[optind],
-                                        filename,
+            cfile_write_failure_message(argv[optind], filename,
                                         write_err, write_err_info,
                                         read_count,
                                         out_file_type_subtype);
@@ -1777,7 +1792,7 @@ main(int argc, char *argv[])
                     nstime_add(&block_next, &secs_per_block); /* reset for next interval */
                     g_free(filename);
                     filename = fileset_get_filename_by_pattern(block_cnt++, rec, fprefix, fsuffix);
-                    g_assert(filename);
+                    ws_assert(filename);
 
                     if (verbose)
                         fprintf(stderr, "Continuing writing in file %s\n", filename);
@@ -1786,7 +1801,7 @@ main(int argc, char *argv[])
                                             &write_err, &write_err_info);
 
                     if (pdh == NULL) {
-                        cfile_dump_open_failure_message("editcap", filename,
+                        cfile_dump_open_failure_message(filename,
                                                         write_err,
                                                         write_err_info,
                                                         out_file_type_subtype);
@@ -1809,7 +1824,7 @@ main(int argc, char *argv[])
 
                 g_free(filename);
                 filename = fileset_get_filename_by_pattern(block_cnt++, rec, fprefix, fsuffix);
-                g_assert(filename);
+                ws_assert(filename);
 
                 if (verbose)
                     fprintf(stderr, "Continuing writing in file %s\n", filename);
@@ -1817,7 +1832,7 @@ main(int argc, char *argv[])
                 pdh = editcap_dump_open(filename, &params, idbs_seen,
                                         &write_err, &write_err_info);
                 if (pdh == NULL) {
-                    cfile_dump_open_failure_message("editcap", filename,
+                    cfile_dump_open_failure_message(filename,
                                                     write_err, write_err_info,
                                                     out_file_type_subtype);
                     ret = INVALID_FILE;
@@ -1957,14 +1972,14 @@ main(int argc, char *argv[])
                 if (snaplen != 0) {
                     /* Limit capture length to snaplen */
                     if (rec->rec_header.packet_header.caplen > snaplen) {
-                        /* Copy and change rather than modify returned wtap_rec */
+                        /* Copy and change rather than modify returned rec */
                         temp_rec = *rec;
                         temp_rec.rec_header.packet_header.caplen = snaplen;
                         rec = &temp_rec;
                     }
                     /* If -L, also set reported length to snaplen */
                     if (adjlen && rec->rec_header.packet_header.len > snaplen) {
-                        /* Copy and change rather than modify returned phdr */
+                        /* Copy and change rather than modify returned rec */
                         temp_rec = *rec;
                         temp_rec.rec_header.packet_header.len = snaplen;
                         rec = &temp_rec;
@@ -2089,8 +2104,8 @@ main(int argc, char *argv[])
                     do_mutation = TRUE;
                     break;
 
-                case REC_TYPE_SYSTEMD_JOURNAL:
-                    caplen = rec->rec_header.systemd_journal_header.record_len;
+                case REC_TYPE_SYSTEMD_JOURNAL_EXPORT:
+                    caplen = rec->rec_header.systemd_journal_export_header.record_len;
                     do_mutation = TRUE;
                     break;
                 }
@@ -2146,7 +2161,7 @@ main(int argc, char *argv[])
 
                         if (err_type < ERR_WT_FMT) {
                             if ((unsigned int)i < caplen - 2)
-                                g_strlcpy((char*) &buf[i], "%s", 2);
+                                (void) g_strlcpy((char*) &buf[i], "%s", 2);
                             err_type = ERR_WT_TOTAL;
                         } else {
                             err_type -= ERR_WT_FMT;
@@ -2170,13 +2185,13 @@ main(int argc, char *argv[])
                     /* Copy and change rather than modify returned rec */
                     temp_rec = *rec;
                     /* The comment is not modified by dumper, cast away. */
-                    temp_rec.opt_comment = (char *)comment;
-                    temp_rec.has_comment_changed = TRUE;
+                    wtap_block_add_string_option(rec->block, OPT_COMMENT, (char *)comment, strlen((char *)comment));
+                    temp_rec.block_was_modified = TRUE;
                     rec = &temp_rec;
                 } else {
                     /* Copy and change rather than modify returned rec */
                     temp_rec = *rec;
-                    temp_rec.has_comment_changed = FALSE;
+                    temp_rec.block_was_modified = FALSE;
                     rec = &temp_rec;
                 }
             }
@@ -2191,8 +2206,7 @@ main(int argc, char *argv[])
 
             /* Attempt to dump out current frame to the output file */
             if (!wtap_dump(pdh, rec, buf, &write_err, &write_err_info)) {
-                cfile_write_failure_message("editcap", argv[optind],
-                                            filename,
+                cfile_write_failure_message(argv[optind], filename,
                                             write_err, write_err_info,
                                             read_count,
                                             out_file_type_subtype);
@@ -2212,8 +2226,7 @@ main(int argc, char *argv[])
     if (read_err != 0) {
         /* Print a message noting that the read failed somewhere along the
          * line. */
-        cfile_read_failure_message("editcap", argv[optind], read_err,
-                                   read_err_info);
+        cfile_read_failure_message(argv[optind], read_err, read_err_info);
     }
 
     if (!pdh) {
@@ -2225,7 +2238,7 @@ main(int argc, char *argv[])
         pdh = editcap_dump_open(filename, &params, idbs_seen, &write_err,
                                 &write_err_info);
         if (pdh == NULL) {
-            cfile_dump_open_failure_message("editcap", filename,
+            cfile_dump_open_failure_message(filename,
                                             write_err, write_err_info,
                                             out_file_type_subtype);
             ret = INVALID_FILE;
@@ -2264,7 +2277,7 @@ clean_exit:
     if (idbs_seen != NULL) {
         for (guint b = 0; b < idbs_seen->len; b++) {
             wtap_block_t if_data = g_array_index(idbs_seen, wtap_block_t, b);
-            wtap_block_free(if_data);
+            wtap_block_unref(if_data);
         }
         g_array_free(idbs_seen, TRUE);
     }

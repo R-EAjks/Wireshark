@@ -17,6 +17,7 @@
 #include "epan/uat-int.h"
 
 #include <wsutil/utf8_entities.h>
+#include <wsutil/ws_assert.h>
 
 #include <ui/qt/utils/qt_ui_utils.h>
 
@@ -1517,8 +1518,7 @@ void IOGraphDialog::on_buttonBox_accepted()
         }
         // else error dialog?
         if (save_ok) {
-            path = QDir(file_name);
-            wsApp->setLastOpenDir(path.canonicalPath().toUtf8().constData());
+            wsApp->setLastOpenDirFromFilename(file_name);
         }
     }
 }
@@ -2096,7 +2096,7 @@ void IOGraph::reloadValueUnitField()
 // Check if a packet is available at the given interval (idx).
 bool IOGraph::hasItemToShow(int idx, double value) const
 {
-    g_assert(idx < max_io_items_);
+    ws_assert(idx < max_io_items_);
 
     bool result = false;
 
@@ -2142,7 +2142,7 @@ void IOGraph::setInterval(int interval)
 // Get the value at the given interval (idx) for the current value unit.
 double IOGraph::getItemValue(int idx, const capture_file *cap_file) const
 {
-    g_assert(idx < max_io_items_);
+    ws_assert(idx < max_io_items_);
 
     return get_io_graph_item(items_, val_units_, idx, hf_index_, cap_file, interval_, cur_idx_);
 }
@@ -2238,9 +2238,13 @@ static stat_tap_ui io_stat_ui = {
 };
 
 extern "C" {
+
+void register_tap_listener_qt_iostat(void);
+
 void
 register_tap_listener_qt_iostat(void)
 {
     register_stat_tap_ui(&io_stat_ui, NULL);
 }
+
 }

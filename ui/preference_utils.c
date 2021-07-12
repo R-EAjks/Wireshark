@@ -14,6 +14,7 @@
 
 #include <epan/column.h>
 #include <wsutil/filesystem.h>
+#include <wsutil/wslog.h>
 #include <epan/prefs.h>
 #include <epan/prefs-int.h>
 #include <epan/packet.h>
@@ -248,7 +249,7 @@ void save_migrated_uat(const char *uat_name, gboolean *old_pref)
     char *err = NULL;
 
     if (!uat_save(uat_get_table_by_name(uat_name), &err)) {
-        g_warning("Unable to save %s: %s", uat_name, err);
+        ws_warning("Unable to save %s: %s", uat_name, err);
         g_free(err);
         return;
     }
@@ -259,16 +260,3 @@ void save_migrated_uat(const char *uat_name, gboolean *old_pref)
         prefs_main_write();
     }
 }
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

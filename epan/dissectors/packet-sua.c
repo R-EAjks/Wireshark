@@ -454,7 +454,7 @@ sua_assoc(packet_info* pinfo, address* opc, address* dpc, guint src_rn, guint ds
                 assoc = new_assoc(opck, dpck);
                 wmem_tree_insert32_array(assocs,bw_key,assoc);
                 assoc->has_bw_key = TRUE;
-                /*g_warning("CORE dpck %u,opck %u,src_rn %u",dpck,opck,src_rn);*/
+                /*ws_warning("CORE dpck %u,opck %u,src_rn %u",dpck,opck,src_rn);*/
             }
             break;
 
@@ -489,7 +489,7 @@ sua_assoc(packet_info* pinfo, address* opc, address* dpc, guint src_rn, guint ds
 
             bw_key[3].length = 0;
             bw_key[3].key = NULL;
-                    /*g_warning("MESSAGE_TYPE_COAK dst_rn %u,src_rn %u ",dst_rn,src_rn);*/
+                    /*ws_warning("MESSAGE_TYPE_COAK dst_rn %u,src_rn %u ",dst_rn,src_rn);*/
                     if ( ( assoc = (sua_assoc_info_t *)wmem_tree_lookup32_array(assocs, bw_key) ) ) {
                             goto got_assoc;
                     }
@@ -1411,12 +1411,12 @@ dissect_global_title_parameter(tvbuff_t *parameter_tvb, proto_tree *parameter_tr
     even_signal = tvb_get_guint8(parameter_tvb, offset) & GT_EVEN_SIGNAL_MASK;
     even_signal >>= GT_EVEN_SIGNAL_SHIFT;
 
-    g_strlcat(gt_digits, val_to_str_const(odd_signal, sccp_address_signal_values,
+    (void) g_strlcat(gt_digits, val_to_str_const(odd_signal, sccp_address_signal_values,
                                           "Unknown"), GT_MAX_SIGNALS+1);
 
     /* If the last signal is NOT filler */
     if (offset != (GLOBAL_TITLE_OFFSET + global_title_length - 1) || even_length == TRUE)
-      g_strlcat(gt_digits, val_to_str_const(even_signal, sccp_address_signal_values,
+      (void) g_strlcat(gt_digits, val_to_str_const(even_signal, sccp_address_signal_values,
                                             "Unknown"), GT_MAX_SIGNALS+1);
 
     offset += GT_SIGNAL_LENGTH;

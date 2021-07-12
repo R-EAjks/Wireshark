@@ -12,6 +12,7 @@
 #include "wtap-int.h"
 #include "file_wrappers.h"
 #include "netscaler.h"
+#include <wsutil/ws_assert.h>
 
 /* Defines imported from netscaler code: nsperfrc.h */
 
@@ -734,6 +735,7 @@ wtap_open_return_val nstrace_open(wtap *wth, int *err, gchar **err_info)
     bytes_read = file_read(nstrace_buf, page_size, wth->fh);
     if (bytes_read < 0 || bytes_read != page_size) {
         *err = file_error(wth->fh, err_info);
+        g_free(nstrace_buf);
         if (*err == 0 && bytes_read > 0)
             return WTAP_OPEN_NOT_MINE;
         return WTAP_OPEN_ERROR;
@@ -2026,7 +2028,7 @@ typedef struct {
 
 /* Returns 0 if we could write the specified encapsulation type,
 ** an error indication otherwise. */
-int nstrace_10_dump_can_write_encap(int encap)
+static int nstrace_10_dump_can_write_encap(int encap)
 {
     if (encap == WTAP_ENCAP_NSTRACE_1_0)
         return 0;
@@ -2037,7 +2039,7 @@ int nstrace_10_dump_can_write_encap(int encap)
 
 /* Returns 0 if we could write the specified encapsulation type,
 ** an error indication otherwise. */
-int nstrace_20_dump_can_write_encap(int encap)
+static int nstrace_20_dump_can_write_encap(int encap)
 {
     if (encap == WTAP_ENCAP_NSTRACE_2_0)
         return 0;
@@ -2047,7 +2049,7 @@ int nstrace_20_dump_can_write_encap(int encap)
 
 /* Returns 0 if we could write the specified encapsulation type,
 ** an error indication otherwise. */
-int nstrace_30_dump_can_write_encap(int encap)
+static int nstrace_30_dump_can_write_encap(int encap)
 {
     if (encap == WTAP_ENCAP_NSTRACE_3_0)
         return 0;
@@ -2057,7 +2059,7 @@ int nstrace_30_dump_can_write_encap(int encap)
 
 /* Returns 0 if we could write the specified encapsulation type,
 ** an error indication otherwise. */
-int nstrace_35_dump_can_write_encap(int encap)
+static int nstrace_35_dump_can_write_encap(int encap)
 {
     if (encap == WTAP_ENCAP_NSTRACE_3_5)
         return 0;
@@ -2129,7 +2131,7 @@ static gboolean nstrace_add_signature(wtap_dumper *wdh, int *err)
         val16b = GUINT16_TO_LE(nspr_signature_v10_s);
         memcpy(sig10.phd.ph_RecordSize, &val16b, sizeof sig10.phd.ph_RecordSize);
         memset(sig10.sig_Signature, 0, NSPR_SIGSIZE_V10);
-        g_strlcpy(sig10.sig_Signature, NSPR_SIGSTR_V10, NSPR_SIGSIZE_V10);
+        (void) g_strlcpy(sig10.sig_Signature, NSPR_SIGSTR_V10, NSPR_SIGSIZE_V10);
 
         /* Write the record into the file */
         if (!wtap_dump_file_write(wdh, &sig10, nspr_signature_v10_s,
@@ -2187,7 +2189,7 @@ static gboolean nstrace_add_signature(wtap_dumper *wdh, int *err)
         nstrace->page_offset += (guint16) sig35.sig_RecordSize;
     } else
     {
-        g_assert_not_reached();
+        ws_assert_not_reached();
         return FALSE;
     }
 
@@ -2255,7 +2257,7 @@ nstrace_add_abstime(wtap_dumper *wdh, const wtap_rec *rec,
 
     } else
     {
-        g_assert_not_reached();
+        ws_assert_not_reached();
         return FALSE;
     }
 
@@ -2298,7 +2300,7 @@ static gboolean nstrace_dump(wtap_dumper *wdh, const wtap_rec *rec,
                 return FALSE;
         } else
         {
-            g_assert_not_reached();
+            ws_assert_not_reached();
             return FALSE;
         }
     }
@@ -2402,13 +2404,13 @@ static gboolean nstrace_dump(wtap_dumper *wdh, const wtap_rec *rec,
             nstrace->page_offset += (guint16) rec->rec_header.packet_header.caplen;
         } else
         {
-            g_assert_not_reached();
+            ws_assert_not_reached();
             return FALSE;
         }
         break;
 
     default:
-        g_assert_not_reached();
+        ws_assert_not_reached();
         return FALSE;
     }
 
@@ -2467,7 +2469,7 @@ static const struct file_type_subtype_info nstrace_3_5_info = {
     nstrace_35_dump_can_write_encap, nstrace_35_dump_open, NULL
 };
 
-void register_netscaler(void)
+void register_nstrace(void)
 {
     nstrace_1_0_file_type_subtype = wtap_register_file_type_subtype(&nstrace_1_0_info);
     nstrace_2_0_file_type_subtype = wtap_register_file_type_subtype(&nstrace_2_0_info);

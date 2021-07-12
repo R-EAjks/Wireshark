@@ -7,6 +7,7 @@
  */
 
 #include "config.h"
+#define WS_LOG_DOMAIN LOG_DOMAIN_WIRETAP
 
 #include <string.h>
 #include <stdlib.h>
@@ -18,6 +19,8 @@
 #ifdef HAVE_PLUGINS
 #include <wsutil/plugins.h>
 #endif
+#include <wsutil/ws_assert.h>
+#include <wsutil/wslog.h>
 
 #include "wtap-int.h"
 #include "wtap_modules.h"
@@ -53,7 +56,7 @@
 #include "logcat.h"
 #include "logcat_text.h"
 #include "json.h"
-#include "network_instruments.h"
+#include "observer.h"
 #include "k12.h"
 #include "ber.h"
 #include "catapult_dct2000.h"
@@ -76,7 +79,6 @@
 #include "camins.h"
 #include "stanag4607.h"
 #include "capsa.h"
-#include "pcap-encap.h"
 #include "nettrace_3gpp_32_423.h"
 #include "mplog.h"
 #include "dpa400.h"
@@ -138,14 +140,15 @@ static const struct file_extension_info file_type_extensions_base[] = {
 	{ "Endace ERF capture", TRUE, "erf" },
 	{ "EyeSDN USB S0/E1 ISDN trace format", TRUE, "trc" },
 	{ "HP-UX nettl trace", TRUE, "trc0;trc1" },
-	{ "Network Instruments Observer", TRUE, "bfr" },
+	{ "Viavi Observer", TRUE, "bfr" },
 	{ "Colasoft Capsa", TRUE, "cscpkt" },
 	{ "Novell LANalyzer", TRUE, "tr1" },
 	{ "Tektronix K12xx 32-bit .rf5 format", TRUE, "rf5" },
 	{ "Savvius *Peek", TRUE, "pkt;tpc;apc;wpz" },
 	{ "Catapult DCT2000 trace (.out format)", TRUE, "out" },
 	{ "Micropross mplog", TRUE, "mplog" },
-	{ "TamoSoft CommView", TRUE, "ncf" },
+	{ "TamoSoft CommView NCF", TRUE, "ncf" },
+	{ "TamoSoft CommView NCFX", TRUE, "ncfx" },
 	{ "Symbian OS btsnoop", TRUE, "log" },
 	{ "XML files (including Gammu DCT3 traces)", TRUE, "xml" },
 	{ "macOS PacketLogger", TRUE, "pklg" },
@@ -367,7 +370,7 @@ static const struct open_info open_info_base[] = {
 	{ "HP-UX nettl trace",                      OPEN_INFO_MAGIC,     nettl_open,               NULL,       NULL, NULL },
 	{ "Visual Networks traffic capture",        OPEN_INFO_MAGIC,     visual_open,              NULL,       NULL, NULL },
 	{ "InfoVista 5View capture",                OPEN_INFO_MAGIC,     _5views_open,             NULL,       NULL, NULL },
-	{ "Network Instruments Observer",           OPEN_INFO_MAGIC,     network_instruments_open, NULL,       NULL, NULL },
+	{ "Viavi Observer",                         OPEN_INFO_MAGIC,     observer_open, NULL,       NULL, NULL },
 	{ "Savvius tagged",                         OPEN_INFO_MAGIC,     peektagged_open,          NULL,       NULL, NULL },
 	{ "Colasoft Capsa",                         OPEN_INFO_MAGIC,     capsa_open,               NULL,       NULL, NULL },
 	{ "DBS Etherwatch (VMS)",                   OPEN_INFO_MAGIC,     dbs_etherwatch_open,      NULL,       NULL, NULL },
@@ -422,7 +425,8 @@ static const struct open_info open_info_base[] = {
 	{ "TCPIPtrace (VMS)",                       OPEN_INFO_HEURISTIC, vms_open,                 "txt",      NULL, NULL },
 	{ "CoSine IPSX L2 capture",                 OPEN_INFO_HEURISTIC, cosine_open,              "txt",      NULL, NULL },
 	{ "Bluetooth HCI dump",                     OPEN_INFO_HEURISTIC, hcidump_open,             NULL,       NULL, NULL },
-	{ "TamoSoft CommView",                      OPEN_INFO_HEURISTIC, commview_open,            "ncf",      NULL, NULL },
+	{ "TamoSoft CommView NCF",                  OPEN_INFO_HEURISTIC, commview_ncf_open,        "ncf",      NULL, NULL },
+	{ "TamoSoft CommView NCFX",                 OPEN_INFO_HEURISTIC, commview_ncfx_open,       "ncfx",      NULL, NULL },
 	{ "NetScaler",                              OPEN_INFO_HEURISTIC, nstrace_open,             "cap",      NULL, NULL },
 	{ "Android Logcat Binary format",           OPEN_INFO_HEURISTIC, logcat_open,              "logcat",   NULL, NULL },
 	{ "Android Logcat Text formats",            OPEN_INFO_HEURISTIC, logcat_text_open,         "txt",      NULL, NULL },
@@ -460,7 +464,7 @@ static void
 set_heuristic_routine(void)
 {
 	guint i;
-	g_assert(open_info_arr != NULL);
+	ws_assert(open_info_arr != NULL);
 
 	for (i = 0; i < open_info_arr->len; i++) {
 		if (open_routines[i].type == OPEN_INFO_HEURISTIC) {
@@ -468,10 +472,10 @@ set_heuristic_routine(void)
 			break;
 		}
 		/* sanity check */
-		g_assert(open_routines[i].type == OPEN_INFO_MAGIC);
+		ws_assert(open_routines[i].type == OPEN_INFO_MAGIC);
 	}
 
-	g_assert(heuristic_open_routine_idx > 0);
+	ws_assert(heuristic_open_routine_idx > 0);
 }
 
 void
@@ -508,13 +512,13 @@ void
 wtap_register_open_info(struct open_info *oi, const gboolean first_routine)
 {
 	if (!oi || !oi->name) {
-		g_error("No open_info name given to register");
+		ws_error("No open_info name given to register");
 		return;
 	}
 
 	/* verify name doesn't already exist */
 	if (wtap_has_open_info(oi->name)) {
-		g_error("Name given to register_open_info already exists");
+		ws_error("Name given to register_open_info already exists");
 		return;
 	}
 
@@ -546,7 +550,7 @@ wtap_deregister_open_info(const gchar *name)
 	guint i;
 
 	if (!name) {
-		g_error("Missing open_info name to de-register");
+		ws_error("Missing open_info name to de-register");
 		return;
 	}
 
@@ -559,7 +563,7 @@ wtap_deregister_open_info(const gchar *name)
 		}
 	}
 
-	g_error("deregister_open_info: name not found");
+	ws_error("deregister_open_info: name not found");
 }
 
 /* Determines if a open routine short name already exists
@@ -570,7 +574,7 @@ wtap_has_open_info(const gchar *name)
 	guint i;
 
 	if (!name) {
-		g_error("No name given to wtap_has_open_info!");
+		ws_error("No name given to wtap_has_open_info!");
 		return FALSE;
 	}
 
@@ -1241,6 +1245,12 @@ int pcap_nsec_file_type_subtype = -1;
 int pcapng_file_type_subtype = -1;
 
 /*
+ * Table for mapping old file type/subtype names to new ones for
+ * backwards compatibility.
+ */
+static GHashTable *type_subtype_name_map;
+
+/*
  * Initialize the table of file types/subtypes with all the builtin
  * types/subtypes.
  */
@@ -1248,7 +1258,7 @@ void
 wtap_init_file_type_subtypes(void)
 {
 	/* Don't do this twice. */
-	g_assert(file_type_subtype_table_arr == NULL);
+	ws_assert(file_type_subtype_table_arr == NULL);
 
 	/*
 	 * Estimate the number of file types/subtypes as twice the
@@ -1263,6 +1273,13 @@ wtap_init_file_type_subtypes(void)
 	file_type_subtype_table_arr = g_array_sized_new(FALSE, TRUE,
 	    sizeof(struct file_type_subtype_info), wtap_module_count*2 + 7);
 	file_type_subtype_table = (const struct file_type_subtype_info*)(void *)file_type_subtype_table_arr->data;
+
+	/*
+	 * Initialize the hash table for mapping old file type/subtype
+	 * names to the corresponding new names.
+	 */
+	type_subtype_name_map = g_hash_table_new_full(g_str_hash,
+	    g_str_equal, g_free, g_free);
 
 	/* No entries yet, so no builtin entries yet. */
 	wtap_num_builtin_file_types_subtypes = 0;
@@ -1300,7 +1317,7 @@ wtap_register_file_type_subtype(const struct file_type_subtype_info* fi)
 	 * Check for required fields (description and name).
 	 */
 	if (!fi || !fi->description || !fi->name) {
-		g_warning("no file type info");
+		ws_warning("no file type info");
 		return -1;
 	}
 
@@ -1309,7 +1326,7 @@ wtap_register_file_type_subtype(const struct file_type_subtype_info* fi)
 	 * type/subtype supports.
 	 */
 	if (fi->num_supported_blocks == 0 || fi->supported_blocks == NULL) {
-		g_warning("no blocks supported by file type \"%s\"", fi->name);
+		ws_warning("no blocks supported by file type \"%s\"", fi->name);
 		return -1;
 	}
 
@@ -1320,7 +1337,7 @@ wtap_register_file_type_subtype(const struct file_type_subtype_info* fi)
 		/*
 		 * Yes.  You don't get to replace an existing handler.
 		 */
-		g_warning("file type \"%s\" is already registered", fi->name);
+		ws_warning("file type \"%s\" is already registered", fi->name);
 		return -1;
 	}
 
@@ -1373,11 +1390,11 @@ wtap_deregister_file_type_subtype(const int subtype)
 	struct file_type_subtype_info* finfo;
 
 	if (subtype < 0 || subtype >= (int)file_type_subtype_table_arr->len) {
-		g_error("invalid file type to de-register");
+		ws_error("invalid file type to de-register");
 		return;
 	}
 	if ((guint)subtype >= wtap_num_builtin_file_types_subtypes) {
-		g_error("built-in file types cannot be de-registered");
+		ws_error("built-in file types cannot be de-registered");
 		return;
 	}
 
@@ -1420,24 +1437,25 @@ wtap_dump_file_encap_type(const GArray *file_encaps)
 	return encap;
 }
 
-static gboolean
-wtap_dump_can_write_encap(int filetype, int encap)
+gboolean
+wtap_dump_can_write_encap(int file_type_subtype, int encap)
 {
 	int result = 0;
 
-	if (filetype < 0 || filetype >= (int)file_type_subtype_table_arr->len ||
-	    file_type_subtype_table[filetype].can_write_encap == NULL)
+	if (file_type_subtype < 0 ||
+	    file_type_subtype >= (int)file_type_subtype_table_arr->len ||
+	    file_type_subtype_table[file_type_subtype].can_write_encap == NULL)
 		return FALSE;
 
-	result = (*file_type_subtype_table[filetype].can_write_encap)(encap);
+	result = (*file_type_subtype_table[file_type_subtype].can_write_encap)(encap);
 
 	if (result != 0) {
 		/* if the err said to check wslua's can_write_encap, try that */
 		if (result == WTAP_ERR_CHECK_WSLUA
-			&& file_type_subtype_table[filetype].wslua_info != NULL
-			&& file_type_subtype_table[filetype].wslua_info->wslua_can_write_encap != NULL) {
+			&& file_type_subtype_table[file_type_subtype].wslua_info != NULL
+			&& file_type_subtype_table[file_type_subtype].wslua_info->wslua_can_write_encap != NULL) {
 
-			result = (*file_type_subtype_table[filetype].wslua_info->wslua_can_write_encap)(encap, file_type_subtype_table[filetype].wslua_info->wslua_data);
+			result = (*file_type_subtype_table[file_type_subtype].wslua_info->wslua_can_write_encap)(encap, file_type_subtype_table[file_type_subtype].wslua_info->wslua_data);
 
 		}
 
@@ -1767,37 +1785,35 @@ wtap_file_type_subtype_name(int file_type_subtype)
 		return file_type_subtype_table[file_type_subtype].name;
 }
 
+/*
+ * Register a backwards-compatibility name.
+ */
+void
+wtap_register_compatibility_file_subtype_name(const char *old_name,
+    const char *new_name)
+{
+	g_hash_table_insert(type_subtype_name_map, g_strdup(old_name),
+	    g_strdup(new_name));
+}
+
 /* Translate a name to a capture file type/subtype. */
 int
 wtap_name_to_file_type_subtype(const char *name)
 {
+	char *new_name;
 	int file_type_subtype;
 
 	/*
-	 * We now call the libpcap file format just pcap, but we allow
-	 * the various variants of it to be specified using names
-	 * containing "libpcap" as well as "pcap", for backwards
-	 * compatibility.
+	 * Is this name a backwards-compatibility name?
 	 */
-	static const struct name_map {
-		const char *oldname;
-		const char *name;
-	} name_map[] = {
-		{ "libpcap", "pcap" },
-		{ "nseclibpcap", "nsecpcap" },
-		{ "aixlibpcap", "aixpcap" },
-		{ "modlibpcap", "modpcap" },
-		{ "nokialibpcap", "nokiapcap" },
-		{ "rh6_1libpcap", "rh6_1pcap" },
-		{ "suse6_3libpcap", "suse6_3pcap" }
-	};
-#define N_NAME_MAP_ENTRIES (sizeof name_map / sizeof name_map[0])
-
-	for (size_t i = 0; i < N_NAME_MAP_ENTRIES; i++) {
-		if (strcmp(name_map[i].oldname, name) == 0) {
-			name = name_map[i].name;
-			break;
-		}
+	new_name = (char *)g_hash_table_lookup(type_subtype_name_map,
+	    (gpointer)name);
+	if (new_name != NULL) {
+		/*
+		 * Yes, and new_name is the name to which it should
+		 * be mapped.
+		 */
+		name = new_name;
 	}
 	for (file_type_subtype = 0;
 	    file_type_subtype < (int)file_type_subtype_table_arr->len;
@@ -1820,7 +1836,7 @@ wtap_pcap_file_type_subtype(void)
 	 * Make sure pcap was registered as a file type/subtype;
 	 * it's one of our "native" formats.
 	 */
-	g_assert(pcap_file_type_subtype != -1);
+	ws_assert(pcap_file_type_subtype != -1);
 	return pcap_file_type_subtype;
 }
 
@@ -1834,7 +1850,7 @@ wtap_pcap_nsec_file_type_subtype(void)
 	 * Make sure nanosecond-resolution pcap was registered
 	 * as a file type/subtype; it's one of our "native" formats.
 	 */
-	g_assert(pcap_nsec_file_type_subtype != -1);
+	ws_assert(pcap_nsec_file_type_subtype != -1);
 	return pcap_nsec_file_type_subtype;
 }
 
@@ -1848,7 +1864,7 @@ wtap_pcapng_file_type_subtype(void)
 	 * Make sure pcapng was registered as a file type/subtype;
 	 * it's one of our "native" formats.
 	 */
-	g_assert(pcapng_file_type_subtype != -1);
+	ws_assert(pcapng_file_type_subtype != -1);
 	return pcapng_file_type_subtype;
 }
 
@@ -2381,7 +2397,7 @@ wtap_dump_open_tempfile(char **filenamep, const char *pfx,
 		ext = "tmp";
 	sfx[0] = '.';
 	sfx[1] = '\0';
-	g_strlcat(sfx, ext, 16);
+	(void) g_strlcat(sfx, ext, 16);
 
 	/* Choose a random name for the file */
 	fd = create_tempfile(filenamep, pfx, sfx, NULL);

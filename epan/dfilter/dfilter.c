@@ -7,6 +7,7 @@
  */
 
 #include "config.h"
+#define WS_LOG_DOMAIN "Dfilter"
 
 #include <stdio.h>
 #include <string.h>
@@ -20,7 +21,8 @@
 #include "dfilter.h"
 #include "dfilter-macro.h"
 #include "scanner_lex.h"
-#include <wsutil/ws_printf.h> /* ws_debug_printf */
+#include <wsutil/wslog.h>
+#include <wsutil/ws_assert.h>
 
 
 #define DFILTER_TOKEN_ID_OFFSET	1
@@ -53,7 +55,7 @@ void
 dfilter_init(void)
 {
 	if (ParserObj) {
-		g_message("I expected ParserObj to be NULL\n");
+		ws_message("I expected ParserObj to be NULL\n");
 		/* Free the Lemon Parser object */
 		DfilterFree(ParserObj, g_free);
 	}
@@ -211,7 +213,7 @@ dfilter_compile(const gchar *text, dfilter_t **dfp, gchar **err_msg)
 	/* XXX, GHashTable */
 	GPtrArray	*deprecated;
 
-	g_assert(dfp);
+	ws_assert(dfp);
 
 	if (!text) {
 		*dfp = NULL;
@@ -241,6 +243,7 @@ dfilter_compile(const gchar *text, dfilter_t **dfp, gchar **err_msg)
 	state.dfw = dfw;
 	state.quoted_string = NULL;
 	state.in_set = FALSE;
+	state.raw_string = FALSE;
 
 	df_set_extra(&state, scanner);
 
@@ -444,12 +447,12 @@ dfilter_dump(dfilter_t *df)
 	dfvm_dump(stdout, df);
 
 	if (df->deprecated && df->deprecated->len) {
-		ws_debug_printf("\nDeprecated tokens: ");
+		printf("\nDeprecated tokens: ");
 		for (i = 0; i < df->deprecated->len; i++) {
-			ws_debug_printf("%s\"%s\"", sep, (char *) g_ptr_array_index(df->deprecated, i));
+			printf("%s\"%s\"", sep, (char *) g_ptr_array_index(df->deprecated, i));
 			sep = ", ";
 		}
-		ws_debug_printf("\n");
+		printf("\n");
 	}
 }
 

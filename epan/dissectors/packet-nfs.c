@@ -401,6 +401,9 @@ static int hf_nfs4_aclsupport_deny_acl = -1;
 static int hf_nfs4_aclsupport_audit_acl = -1;
 static int hf_nfs4_aclsupport_alarm_acl = -1;
 static int hf_nfs4_fattr_lease_time = -1;
+static int hf_nfs4_fattr_fs_charset_cap = -1;
+static int hf_nfs4_fs_charset_cap_nonutf8 = -1;
+static int hf_nfs4_fs_charset_cap_utf8 = -1;
 static int hf_nfs4_fattr_fileid = -1;
 static int hf_nfs4_fattr_files_avail = -1;
 static int hf_nfs4_fattr_files_free = -1;
@@ -581,6 +584,8 @@ static int hf_nfs4_exchid_flags_upd_conf_rec_a = -1;
 static int hf_nfs4_exchid_flags_confirmed_r = -1;
 static int hf_nfs4_state_protect_window = -1;
 static int hf_nfs4_state_protect_num_gss_handles = -1;
+static int hf_nfs4_sp_parms_hash_algs = -1;
+static int hf_nfs4_sp_parms_encr_algs = -1;
 static int hf_nfs4_prot_info_spi_window = -1;
 static int hf_nfs4_prot_info_svv_length = -1;
 static int hf_nfs4_prot_info_encr_alg = -1;
@@ -828,6 +833,7 @@ static gint ett_nfs4_open_result_flags = -1;
 static gint ett_nfs4_secinfo_flavor_info = -1;
 static gint ett_nfs4_stateid = -1;
 static gint ett_nfs4_fattr_fh_expire_type = -1;
+static gint ett_nfs4_fattr_fs_charset_cap = -1;
 static gint ett_nfs4_fattr_aclsupport = -1;
 static gint ett_nfs4_aclflag = -1;
 static gint ett_nfs4_ace = -1;
@@ -1067,7 +1073,7 @@ store_nfs_file_handle(nfs_fhandle_data_t *nfs_fh)
 
 	fhlen = nfs_fh->len/4;
 	/* align the file handle data */
-	fhdata = (guint32 *)g_memdup(nfs_fh->fh, fhlen*4);
+	fhdata = (guint32 *)g_memdup2(nfs_fh->fh, fhlen*4);
 	fhkey[0].length = 1;
 	fhkey[0].key	= &fhlen;
 	fhkey[1].length = fhlen;
@@ -1347,7 +1353,7 @@ nfs_name_snoop_fh(packet_info *pinfo, proto_tree *tree, tvbuff_t *tvb, int fh_of
 
 			fhlen = nns->fh_length;
 			/* align it */
-			fhdata = (guint32 *)g_memdup(nns->fh, fhlen);
+			fhdata = (guint32 *)g_memdup2(nns->fh, fhlen);
 			fhkey[0].length = 1;
 			fhkey[0].key	= &fhlen;
 			fhkey[1].length = fhlen/4;
@@ -6998,6 +7004,25 @@ dissect_nfs4_fs_locations(tvbuff_t *tvb, packet_info *pinfo, int offset,
 	return offset;
 }
 
+/* RFC5661 - '14.4. UTF-8 Capabilities' */
+#define FSCHARSET_CAP4_CONTAINS_NON_UTF8	0x00000001
+#define FSCHARSET_CAP4_ALLOWS_ONLY_UTF8		0x00000002
+
+static int
+dissect_nfs4_fattr_fs_charset_cap(tvbuff_t *tvb, int offset, proto_tree *tree)
+{
+	int * const fs_charset_cap_fields[] = {
+		&hf_nfs4_fs_charset_cap_nonutf8,
+		&hf_nfs4_fs_charset_cap_utf8,
+		NULL
+	};
+
+	proto_tree_add_bitmask(tree, tvb, offset, hf_nfs4_fattr_fs_charset_cap,
+		ett_nfs4_fattr_fs_charset_cap, fs_charset_cap_fields, ENC_BIG_ENDIAN);
+	offset += 4;
+
+	return offset;
+}
 
 static int
 dissect_nfs4_mode(tvbuff_t *tvb, int offset, proto_tree *tree)
@@ -7484,6 +7509,10 @@ dissect_nfs4_fattr_value(tvbuff_t *tvb, int offset, packet_info *pinfo,
 		case FATTR4_OFFLINE:
 			offset = dissect_rpc_bool(tvb,
 				attr_tree, hf_nfs4_fattr_offline, offset);
+			break;
+
+		case FATTR4_FS_CHARSET_CAP:
+			offset = dissect_nfs4_fattr_fs_charset_cap(tvb, offset, attr_tree);
 			break;
 
 		default:
@@ -8277,13 +8306,19 @@ dissect_nfs4_state_protect_ops(tvbuff_t *tvb, int offset,
 
 
 static int
+dissect_nfs4_sec_oid(tvbuff_t *tvb, int offset, packet_info *pinfo,
+				proto_tree *tree, void *data _U_)
+{
+	return dissect_rpc_opaque_data(tvb, offset, tree, pinfo,
+				hf_nfs4_sec_oid, FALSE, 0, FALSE, NULL, NULL);
+}
+
+static int
 dissect_nfs4_ssv_sp_parms(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *tree)
 {
 	offset = dissect_nfs4_state_protect_ops(tvb, offset, pinfo, tree);
-	offset = dissect_rpc_opaque_data(tvb, offset, tree, NULL,
-				hf_nfs4_sec_oid, FALSE, 0, FALSE, NULL, NULL);
-	offset = dissect_rpc_opaque_data(tvb, offset, tree, NULL,
-				hf_nfs4_sec_oid, FALSE, 0, FALSE, NULL, NULL);
+	offset = dissect_rpc_array(tvb, pinfo, tree, offset, dissect_nfs4_sec_oid, hf_nfs4_sp_parms_hash_algs);
+	offset = dissect_rpc_array(tvb, pinfo, tree, offset, dissect_nfs4_sec_oid, hf_nfs4_sp_parms_encr_algs);
 	offset = dissect_rpc_uint32(tvb, tree, hf_nfs4_state_protect_window, offset);
 	offset = dissect_rpc_uint32(tvb, tree, hf_nfs4_state_protect_num_gss_handles, offset);
 	return offset;
@@ -8484,8 +8519,7 @@ dissect_nfs4_open_delegation(tvbuff_t *tvb, int offset, packet_info *pinfo,
 static int
 dissect_nfs_rpcsec_gss_info(tvbuff_t *tvb, int offset, proto_tree *tree)
 {
-	offset = dissect_rpc_opaque_data(tvb, offset, tree, NULL,
-		hf_nfs4_sec_oid, FALSE, 0, FALSE, NULL, NULL);
+	offset = dissect_nfs4_sec_oid(tvb, offset, NULL, tree, NULL);
 	offset = dissect_rpc_uint32(tvb, tree, hf_nfs4_qop, offset);
 	offset = dissect_rpc_uint32(tvb, tree,
 		hf_nfs4_secinfo_rpcsec_gss_info_service, offset);
@@ -12958,6 +12992,18 @@ proto_register_nfs(void)
 			"context", "nfs.fattr4.security_label.context", FT_STRING, BASE_NONE,
 			NULL, 0, NULL, HFILL }},
 
+		{ &hf_nfs4_fattr_fs_charset_cap, {
+			"fs_charset_cap", "nfs.fattr4.fs_charset_cap", FT_UINT32, BASE_HEX,
+			NULL, 0, NULL, HFILL }},
+
+		{ &hf_nfs4_fs_charset_cap_nonutf8, {
+			"CONTAINS_NON_UTF8", "nfs.fattr4.fs_charset_cap.nonutf8", FT_BOOLEAN, 32,
+			NULL, FSCHARSET_CAP4_CONTAINS_NON_UTF8, NULL, HFILL }},
+
+		{ &hf_nfs4_fs_charset_cap_utf8, {
+			"ALLOWS_ONLY_UTF8", "nfs.fattr4.fs_charset_cap.utf8", FT_BOOLEAN, 32,
+			NULL, FSCHARSET_CAP4_ALLOWS_ONLY_UTF8, NULL, HFILL }},
+
 		{ &hf_nfs4_verifier, {
 			"verifier", "nfs.verifier4", FT_UINT64, BASE_HEX,
 			NULL, 0, NULL, HFILL }},
@@ -13735,6 +13781,12 @@ proto_register_nfs(void)
 		{ &hf_nfs4_exchid_flags_confirmed_r, {
 			"EXCHGID4_FLAG_CONFIRMED_R", "nfs.exchange_id.flags.confirmed_r", FT_BOOLEAN, 32,
 			TFS(&tfs_set_notset), 0x80000000, NULL, HFILL}},
+		{ &hf_nfs4_sp_parms_hash_algs, {
+			"State Protect hash algorithms", "nfs.sp_parms4_hash_algs", FT_NONE, BASE_NONE,
+			NULL, 0, NULL, HFILL }},
+		{ &hf_nfs4_sp_parms_encr_algs, {
+			"State Protect encryption algorithms", "nfs.sp_parms4_encr_algs", FT_NONE, BASE_NONE,
+			NULL, 0, NULL, HFILL }},
 		{ &hf_nfs4_prot_info_hash_alg, {
 			"Prot Info hash algorithm", "nfs.prot_info4_hash_alg", FT_UINT32, BASE_HEX,
 			NULL, 0, NULL, HFILL }},
@@ -14417,6 +14469,7 @@ proto_register_nfs(void)
 		&ett_nfs4_stateid,
 		&ett_nfs4_fattr_fh_expire_type,
 		&ett_nfs4_fattr_aclsupport,
+		&ett_nfs4_fattr_fs_charset_cap,
 		&ett_nfs4_aclflag,
 		&ett_nfs4_ace,
 		&ett_nfs4_clientaddr,

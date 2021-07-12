@@ -181,6 +181,13 @@ the filesize is limited to a maximum value of 2 GiB.
 B<packets>:I<value> switch to the next file after it contains I<value>
 packets. Same as B<-c>E<lt>capture packet countE<gt>.
 
+=item -A  E<lt>userE<gt>:E<lt>passwordE<gt>
+
+Specify a user and a password when B<TShark> captures from a rpcap:// interface
+where authentication is required.
+
+This option is available with libpcap with enabled remote support.
+
 =item -b|--ring-buffer  E<lt>capture ring buffer optionE<gt>
 
 Cause B<TShark> to run in "multiple files" mode.  In "multiple files" mode,
@@ -617,8 +624,11 @@ names); the B<-N> option might override this one.
 Turn on name resolving only for particular types of addresses and port
 numbers, with name resolving for other types of addresses and port
 numbers turned off.  This option overrides B<-n> if both B<-N> and B<-n>
-are present.  If both B<-N> and B<-n> options are not present, all name
-resolutions are turned on.
+are present.  This option and B<-n> override the options from the preferences,
+including preferences set via the B<-o> option.  If both B<-N> and B<-n> options
+are not present, the values from the preferences are used, which default to
+B<d>, B<m>, and B<N> turned on and the other options turned off. (NB, B<N> does
+not actually do anything without B<n> enabled as well.)
 
 The argument is a string that may contain the letters:
 
@@ -629,7 +639,7 @@ B<m> to enable MAC address resolution
 B<n> to enable network address resolution
 
 B<N> to enable using external resolvers (e.g., DNS) for network address
-resolution
+resolution; no effect without B<n> also enabled
 
 B<t> to enable transport-layer port number resolution
 
@@ -865,10 +875,11 @@ B<hms> for hours, minutes and seconds
 
 =item -U E<lt>tap nameE<gt>
 
-PDUs export, exports PDUs from infile to outfile according to the tap name given.
-Use -Y to filter.
+PDUs export, exports PDUs from infile to outfile according to the tap
+name given. Use -Y to filter.
 
-Enter an empty tap name "" to get a list of available names.
+Enter an empty tap name "" or a tap name of ? to get a list of available
+names.
 
 =item -v|--version
 
@@ -1187,6 +1198,7 @@ I<mode> specifies the output mode.  It can be one of:
   ebcdic EBCDIC output with dots for non-printable characters
   hex    Hexadecimal and ASCII data with offsets
   raw    Hexadecimal data
+  yaml   YAML format
 
 Since the output in B<ascii> or B<ebcdic> mode may contain newlines, the length
 of each section of output plus a newline precedes each section of output.
@@ -1249,7 +1261,7 @@ stream on the first TCP session (index 0) with HTTP/2 Stream ID 1.
       0000002B  00 40 00 00 00 00 00 00  01 89 50 4e 47 0d 0a 1a  .@...... ..PNG...
 
 QUIC streams can be selected through B<-z "follow,quic,hex,3,0">, the first
-number indicates the UDP stream index whereas the second number selects the QUIC
+number indicates the QUIC connection number whereas the second number selects the QUIC
 Stream ID.
 
 =item B<-z> h225,counter[I<,filter>]
@@ -1383,7 +1395,7 @@ which only calculates the number of packets and bytes in each interval.
 B<io,stat> can also do much more statistics and calculate COUNT(), SUM(),
 MIN(), MAX(), AVG() and LOAD() using a slightly different filter syntax:
 
-=item -z io,stat,I<interval>,E<34>[COUNT|SUM|MIN|MAX|AVG|LOAD](I<field>)I<filter>E<34>
+=item -z io,stat,I<interval>,E<34>COUNT|SUM|MIN|MAX|AVG|LOAD(I<field>)I<filter>E<34>
 
 NOTE: One important thing to note here is that the filter is not optional
 and that the field that the calculation is based on MUST be part of the filter
@@ -2060,6 +2072,37 @@ inspection of the process, and, if you are not running it in a debugger,
 it will, on some OSes, assuming your environment is configured correctly,
 generate a core dump file.  This can be useful to developers attempting to
 troubleshoot a problem with a protocol dissector.
+
+=item WIRESHARK_LOG_LEVEL
+
+This environment variable controls the verbosity of diagnostic messages to
+the console. From less verbose to most verbose levels can be C<critical>,
+C<warning>, C<message>, C<info>, C<debug> or C<noisy>. Levels above the
+current level are also active. Levels C<critical> and C<error> are always
+active.
+
+=item WIRESHARK_LOG_FATAL
+
+Sets the fatal log level. Fatal log levels cause the progeam to abort.
+The fatal log level be set to C<critical> or C<warning>. C<Error> is
+always fatal. 
+
+=item WIRESHARK_LOG_DOMAINS
+
+This environment variable selects which log domains are active. The filter is
+given as a case-insensitive comma separated list. If set only the included
+domains will be enabled. The default domain is always considered to be enabled.
+Domain filter lists can be preceded by '!' to invert the sense of the match.
+
+=item WIRESHARK_LOG_DEBUG
+
+List of domains with C<debug> log level. This sets the level of the provided
+log domains and takes precedence over the active domains filter. If preceded
+by '!' this disables the C<debug> level instead.
+
+=item WIRESHARK_LOG_NOISY
+
+Same as above but for C<noisy> log level instead.
 
 =back
 

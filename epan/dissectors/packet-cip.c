@@ -1756,7 +1756,7 @@ static const value_string cip_vendor_vals[] = {
    {  245,   "Nihon Weidmuller Co., Ltd" },
    {  246,   "Brooks Instrument (Div. of Emerson)" },
    {  247,   "Reserved" },
-   {  248,   " Moeller GmbH" },
+   {  248,   "Moeller GmbH" },
    {  249,   "Varian Vacuum Products" },
    {  250,   "Yokogawa Electric Corporation" },
    {  251,   "Electrical Design Daiyu Co., Ltd" },
@@ -5549,7 +5549,7 @@ int dissect_cip_attribute(packet_info *pinfo, proto_tree *tree, proto_item *item
       if (date != NULL)
           strftime(date_str, 20, "%b %d, %Y", date);
       else
-          g_strlcpy(date_str, "Not representable", sizeof date_str);
+          (void) g_strlcpy(date_str, "Not representable", sizeof date_str);
       proto_tree_add_uint_format_value(tree, *(attr->phf), tvb, offset, 2, temp_data, "%s", date_str);
       consumed = 2;
       break;

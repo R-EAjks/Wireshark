@@ -66,6 +66,7 @@
 #include <wsutil/str_util.h>
 #include <wsutil/strtoi.h>
 #include <wsutil/rsa.h>
+#include <wsutil/ws_assert.h>
 #include "packet-tcp.h"
 #include "packet-x509af.h"
 #include "packet-tls.h"
@@ -463,6 +464,7 @@ ssl_follow_tap_listener(void *tapdata, packet_info *pinfo, epan_dissect_t *edt _
 
         follow_record->is_server = (from == FROM_SERVER);
         follow_record->packet_num = pinfo->num;
+        follow_record->abs_ts = pinfo->abs_ts;
 
         follow_record->data = g_byte_array_sized_new(appl_data->data_len);
         follow_record->data = g_byte_array_append(follow_record->data,
@@ -714,6 +716,7 @@ dissect_ssl(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
         case TLSV1_VERSION:
         case TLSV1DOT1_VERSION:
         case TLSV1DOT2_VERSION:
+        case GMTLSV1_VERSION:
             /* SSLv3/TLS record headers need at least 1+2+2 = 5 bytes. */
             if (tvb_reported_length_remaining(tvb, offset) < 5) {
                 if (tls_desegment && pinfo->can_desegment) {
@@ -904,7 +907,8 @@ is_sslv3_or_tls(tvbuff_t *tvb)
     if (protocol_version != SSLV3_VERSION &&
         protocol_version != TLSV1_VERSION &&
         protocol_version != TLSV1DOT1_VERSION &&
-        protocol_version != TLSV1DOT2_VERSION) {
+        protocol_version != TLSV1DOT2_VERSION &&
+        protocol_version != GMTLSV1_VERSION ) {
         return FALSE;
     }
 
@@ -1779,7 +1783,8 @@ dissect_ssl3_record(tvbuff_t *tvb, packet_info *pinfo,
     /* TLS 1.0/1.1 just ignores unknown records - RFC 2246 chapter 6. The TLS Record Protocol */
     if ((session->version==TLSV1_VERSION ||
          session->version==TLSV1DOT1_VERSION ||
-         session->version==TLSV1DOT2_VERSION) &&
+         session->version==TLSV1DOT2_VERSION ||
+         session->version==GMTLSV1_VERSION ) &&
         (available_bytes >=1 ) && !ssl_is_valid_content_type(tvb_get_guint8(tvb, offset))) {
         proto_tree_add_expert(tree, pinfo, &ei_tls_ignored_unknown_record, tvb, offset, available_bytes);
         col_append_sep_str(pinfo->cinfo, COL_INFO, NULL, "Ignored Unknown Record");
@@ -3489,6 +3494,7 @@ void ssl_set_master_secret(guint32 frame_num, address *addr_srv, address *addr_c
         case TLSV1_VERSION:
         case TLSV1DOT1_VERSION:
         case TLSV1DOT2_VERSION:
+        case GMTLSV1_VERSION:
             ssl->session.version = version;
             ssl->state |= SSL_VERSION;
             ssl_debug_printf("%s set version 0x%04X -> state 0x%02X\n", G_STRFUNC, ssl->session.version, ssl->state);
@@ -3671,6 +3677,7 @@ ssl_looks_like_sslv3(tvbuff_t *tvb, const guint32 offset)
     case TLSV1_VERSION:
     case TLSV1DOT1_VERSION:
     case TLSV1DOT2_VERSION:
+    case GMTLSV1_VERSION:
         return 1;
     }
     return 0;
@@ -3866,7 +3873,7 @@ tls13_get_quic_secret(packet_info *pinfo, gboolean is_from_server, int type, gui
         }
         break;
     default:
-        g_assert_not_reached();
+        ws_assert_not_reached();
     }
 
     StringInfo *secret = (StringInfo *)g_hash_table_lookup(key_map, &ssl->client_random);

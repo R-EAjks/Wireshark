@@ -8193,9 +8193,7 @@ dissect_IOCRBlockReq_block(tvbuff_t *tvb, int offset,
                 init_pnio_rtc1_station(station_info);
                 conversation_add_proto_data(conversation, current_aruuid, station_info);
             }
-            else {
-                station_info->ioDataObjectNr = u16NumberOfIODataObjects;
-            }
+            station_info->ioDataObjectNr += u16NumberOfIODataObjects;
 
             pn_find_dcp_station_info(station_info, conversation);
         }
@@ -9098,7 +9096,7 @@ dissect_ExpectedSubmoduleBlockReq_block(tvbuff_t *tvb, int offset,
     io_data_object = wmem_new0(wmem_file_scope(), ioDataObject);
     io_data_object->profisafeSupported = FALSE;
     io_data_object->moduleNameStr = (gchar*)wmem_alloc(wmem_file_scope(), MAX_NAMELENGTH);
-    g_strlcpy(io_data_object->moduleNameStr, "Unknown", MAX_NAMELENGTH);
+    (void) g_strlcpy(io_data_object->moduleNameStr, "Unknown", MAX_NAMELENGTH);
     vendorMatch = FALSE;
     deviceMatch = FALSE;
     gsdmlFoundFlag = FALSE;
@@ -9380,8 +9378,8 @@ dissect_ExpectedSubmoduleBlockReq_block(tvbuff_t *tvb, int offset,
                                                         }
                                                     }
                                                 }
+                                                break;    /* Found the PROFIsafe Module */
                                             }
-                                            break;    /* Found the PROFIsafe Module */
                                         }
                                     }
                                 }
@@ -11311,6 +11309,68 @@ dissect_IPNIO_Write_resp(tvbuff_t *tvb, int offset,
 }
 
 
+/* dissect any number of PN-RSI blocks */
+int
+dissect_rsi_blocks(tvbuff_t* tvb, int offset,
+    packet_info* pinfo, proto_tree* tree, guint8* drep, guint32 u32FOpnumOffsetOpnum, int type)
+{
+    pnio_ar_t* ar = NULL;
+    guint      recursion_count = 0;
+    guint16    u16Index = 0;
+    guint32    u32RecDataLen = 0;
+
+
+    switch (u32FOpnumOffsetOpnum) {
+    case(0x0): // Connect request or response
+        offset = dissect_blocks(tvb, offset, pinfo, tree, drep);
+        break;
+    case(0x2): // Read request or response
+        offset = dissect_RecordDataRead(tvb, offset, pinfo, tree, drep, u16Index, u32RecDataLen);
+        break;
+    case(0x3): // Write request or response
+        if (type == PDU_TYPE_REQ)
+            offset = dissect_IODWriteReq(tvb, offset, pinfo, tree, drep, &ar, recursion_count);
+        else if (type == PDU_TYPE_RSP)
+            offset = dissect_IODWriteRes(tvb, offset, pinfo, tree, drep);
+        break;
+    case(0x4): // Control request or response
+        offset = dissect_blocks(tvb, offset, pinfo, tree, drep);
+        break;
+    case(0x5): // ReadImplicit request or response
+        offset = dissect_RecordDataRead(tvb, offset, pinfo, tree, drep, u16Index, u32RecDataLen);
+        break;
+    case(0x6): // ReadConnectionless request or response
+        offset = dissect_RecordDataRead(tvb, offset, pinfo, tree, drep, u16Index, u32RecDataLen);
+        break;
+    case(0x7): // ReadNotification request or response
+        offset = dissect_RecordDataRead(tvb, offset, pinfo, tree, drep, u16Index, u32RecDataLen);
+        break;
+    case(0x8): // PrmWriteMore request or response
+        if (type == PDU_TYPE_REQ)
+            offset = dissect_IODWriteReq(tvb, offset, pinfo, tree, drep, &ar, recursion_count);
+        else if (type == PDU_TYPE_RSP)
+            offset = dissect_IODWriteRes(tvb, offset, pinfo, tree, drep);
+        break;
+    case(0x9): // PrmWriteEnd request or response
+        if (type == PDU_TYPE_REQ)
+            offset = dissect_IODWriteReq(tvb, offset, pinfo, tree, drep, &ar, recursion_count);
+        else if (type == PDU_TYPE_RSP)
+            offset = dissect_IODWriteRes(tvb, offset, pinfo, tree, drep);
+        break;
+    default:
+        col_append_str(pinfo->cinfo, COL_INFO, "Reserved");
+        offset = dissect_pn_undecoded(tvb, offset, pinfo, tree, tvb_captured_length(tvb));
+        break;
+    }
+
+    if (ar != NULL) {
+        pnio_ar_info(tvb, pinfo, tree, ar);
+    }
+
+    return offset;
+}
+
+
 /* dissect the IOxS (IOCS, IOPS) field */
 static int
 dissect_PNIO_IOxS(tvbuff_t *tvb, int offset,
@@ -11794,7 +11854,7 @@ proto_register_pn_io (void)
     },
     { &hf_pn_RedundancyInfo,
       { "RedundancyInfo.EndPoint", "pn_io.srl_data.redundancyInfo",
-        FT_UINT16, BASE_HEX, VALS(pn_io_RedundancyInfo), 0x0000003,
+        FT_UINT16, BASE_HEX, VALS(pn_io_RedundancyInfo), 0x0003,
         NULL, HFILL }
     },
     { &hf_pn_RedundancyInfo_reserved,
@@ -12010,22 +12070,22 @@ proto_register_pn_io (void)
     },
     { &hf_pn_io_SFIOCRProperties_reserved_2,
       { "SFIOCRProperties.reserved_2", "pn_io.SFIOCRProperties.reserved_2",
-        FT_UINT32, BASE_HEX, NULL, 0x010000000,
+        FT_UINT32, BASE_HEX, NULL, 0x10000000,
         NULL, HFILL }
     },
     { &hf_pn_io_SFIOCRProperties_DFPType,
       { "SFIOCRProperties.DFPType", "pn_io.SFIOCRProperties.DFPType",
-        FT_UINT32, BASE_HEX,  VALS(pn_io_SFIOCRProperties_DFPType_vals), 0x020000000,
+        FT_UINT32, BASE_HEX,  VALS(pn_io_SFIOCRProperties_DFPType_vals), 0x20000000,
         NULL, HFILL }
     },
     { &hf_pn_io_SFIOCRProperties_DFPRedundantPathLayout,
       { "SFIOCRProperties.DFPRedundantPathLayout", "pn_io.SFIOCRProperties.DFPRedundantPathLayout",
-        FT_UINT32, BASE_HEX, VALS(pn_io_DFPRedundantPathLayout_decode), 0x040000000,
+        FT_UINT32, BASE_HEX, VALS(pn_io_DFPRedundantPathLayout_decode), 0x40000000,
         NULL, HFILL }
     },
     { &hf_pn_io_SFIOCRProperties_SFCRC16,
       { "SFIOCRProperties.SFCRC16", "pn_io.SFIOCRProperties.SFCRC16",
-        FT_UINT32, BASE_HEX, VALS(pn_io_SFCRC16_Decode), 0x080000000,
+        FT_UINT32, BASE_HEX, VALS(pn_io_SFCRC16_Decode), 0x80000000,
         NULL, HFILL }
     },
     { &hf_pn_io_data_length,
@@ -14440,7 +14500,7 @@ proto_register_pn_io (void)
         NULL, HFILL }
     },
     { &hf_pn_io_mau_type_extension,
-    { "MAU Type Extension", "pn_io.mau_type_extension",
+    { "MAUTypeExtension", "pn_io.mau_type_extension",
         FT_UINT16, BASE_HEX | BASE_RANGE_STRING, RVALS(pn_io_mau_type_extension), 0x0,
         NULL, HFILL }
     },

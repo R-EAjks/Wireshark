@@ -8,7 +8,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * References: 3GPP TS 38.473 V16.4.0 (2021-01)
+ * References: 3GPP TS 38.473 V16.6.0 (2021-07)
  */
 
 #include "config.h"
@@ -20,6 +20,7 @@
 #include <epan/proto_data.h>
 
 #include "packet-per.h"
+#include "packet-f1ap.h"
 #include "packet-x2ap.h"
 #include "packet-nr-rrc.h"
 #include "packet-e212.h"
@@ -140,6 +141,7 @@ typedef struct {
   const char *obj_id;
   guint32 sib_type;
   guint32 srb_id;
+  e212_number_type_t number_type;
 } f1ap_private_data_t;
 
 typedef struct {

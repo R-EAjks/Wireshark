@@ -26,6 +26,8 @@
 #include <string.h>
 
 #include <wsutil/epochs.h>
+#include <wsutil/802_11-utils.h>
+#include <wsutil/ws_assert.h>
 
 #include "wtap-int.h"
 #include "file_wrappers.h"
@@ -171,7 +173,7 @@ wtap_open_return_val peekclassic_open(wtap *wth, int *err, gchar **err_info)
 	 *      is zero, and check some other fields; this isn't perfect,
 	 *	and we may have to add more checks at some point.
 	 */
-	g_assert(sizeof(ep_hdr.master) == PEEKCLASSIC_MASTER_HDR_SIZE);
+	ws_assert(sizeof(ep_hdr.master) == PEEKCLASSIC_MASTER_HDR_SIZE);
 	if (!wtap_read_bytes(wth->fh, &ep_hdr.master,
 	    (int)sizeof(ep_hdr.master), err, err_info)) {
 		if (*err != WTAP_ERR_SHORT_READ)
@@ -200,7 +202,7 @@ wtap_open_return_val peekclassic_open(wtap *wth, int *err, gchar **err_info)
 	case 6:
 	case 7:
 		/* get the secondary header */
-		g_assert(sizeof(ep_hdr.secondary.v567) ==
+		ws_assert(sizeof(ep_hdr.secondary.v567) ==
 		        PEEKCLASSIC_V567_HDR_SIZE);
 		if (!wtap_read_bytes(wth->fh, &ep_hdr.secondary.v567,
 		    (int)sizeof(ep_hdr.secondary.v567), err, err_info)) {
@@ -342,7 +344,7 @@ wtap_open_return_val peekclassic_open(wtap *wth, int *err, gchar **err_info)
 
 	default:
 		/* this is impossible */
-		g_assert_not_reached();
+		ws_assert_not_reached();
 	}
 
 	wth->snapshot_length   = 0; /* not available in header */
@@ -513,6 +515,28 @@ static int peekclassic_read_packet_v7(wtap *wth, FILE_T fh,
 
 		rec->rec_header.packet_header.pseudo_header.ieee_802_11.has_signal_percent = TRUE;
 		rec->rec_header.packet_header.pseudo_header.ieee_802_11.signal_percent = radio_info[2];
+
+		/*
+		 * We don't know they PHY, but we do have the data rate;
+		 * try to guess it based on the data rate and channel.
+		 */
+		if (RATE_IS_DSSS(rec->rec_header.packet_header.pseudo_header.ieee_802_11.data_rate)) {
+			/* 11b */
+			rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy = PHDR_802_11_PHY_11B;
+			rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy_info.info_11b.has_short_preamble = FALSE;
+		} else if (RATE_IS_OFDM(rec->rec_header.packet_header.pseudo_header.ieee_802_11.data_rate)) {
+			/* 11a or 11g, depending on the band. */
+			if (CHAN_IS_BG(rec->rec_header.packet_header.pseudo_header.ieee_802_11.channel)) {
+				/* 11g */
+				rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy = PHDR_802_11_PHY_11G;
+				rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy_info.info_11g.has_mode = FALSE;
+			} else {
+				/* 11a */
+				rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy = PHDR_802_11_PHY_11A;
+				rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy_info.info_11a.has_channel_type = FALSE;
+				rec->rec_header.packet_header.pseudo_header.ieee_802_11.phy_info.info_11a.has_turbo_type = FALSE;
+			}
+		}
 
 		/*
 		 * The last 4 bytes appear to be random data - the length

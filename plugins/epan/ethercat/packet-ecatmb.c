@@ -428,19 +428,19 @@ static void SoeFormatter(tvbuff_t *tvb, gint offset, char *szText, gint nMax, gu
          SoEIdToString(tmp, soe.anSoeHeaderDataUnion.IDN, sizeof(tmp)-1);
          elm[0] = '\0';
          if ( soe.anSoeHeaderControlUnion.v.DataState )
-            g_strlcat(elm, "D", 50);
+            (void) g_strlcat(elm, "D", 50);
          if ( soe.anSoeHeaderControlUnion.v.Name )
-            g_strlcat(elm, "N", 50);
+            (void) g_strlcat(elm, "N", 50);
          if ( soe.anSoeHeaderControlUnion.v.Attribute )
-            g_strlcat(elm, "A", 50);
+            (void) g_strlcat(elm, "A", 50);
          if ( soe.anSoeHeaderControlUnion.v.Unit )
-            g_strlcat(elm, "U", 50);
+            (void) g_strlcat(elm, "U", 50);
          if ( soe.anSoeHeaderControlUnion.v.Min )
-            g_strlcat(elm, "I", 50);
+            (void) g_strlcat(elm, "I", 50);
          if ( soe.anSoeHeaderControlUnion.v.Max )
-            g_strlcat(elm, "X", 50);
+            (void) g_strlcat(elm, "X", 50);
          if ( soe.anSoeHeaderControlUnion.v.Value )
-            g_strlcat(elm, "V", 50);
+            (void) g_strlcat(elm, "V", 50);
          switch ( soe.anSoeHeaderControlUnion.v.OpCode )
          {
          case ECAT_SOE_OPCODE_RRQ:
@@ -1855,11 +1855,11 @@ void proto_register_ecat_mailbox(void)
       },
       { &hf_ecat_mailbox_soe_header_opcode,
       { "SoE OpCode", "ecat_mailbox.soe_opcode",
-      FT_UINT16, BASE_DEC, VALS(SoeOpcode), 0x00000007, NULL, HFILL }
+      FT_UINT16, BASE_DEC, VALS(SoeOpcode), 0x0007, NULL, HFILL }
       },
       { &hf_ecat_mailbox_soe_header_incomplete,
       { "More Follows...", "ecat_mailbox.soe_header_incomplete",
-      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x00000008, NULL, HFILL }
+      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x0008, NULL, HFILL }
       },
       { &hf_ecat_mailbox_soe_header_error,
       { "Error", "ecat_mailbox.soe_header_error",
@@ -1868,7 +1868,7 @@ void proto_register_ecat_mailbox(void)
       },
       { &hf_ecat_mailbox_soe_header_driveno,
       { "Drive No", "ecat_mailbox.soe_header_driveno",
-      FT_UINT16, BASE_DEC, NULL, 0x000000e0, NULL, HFILL }
+      FT_UINT16, BASE_DEC, NULL, 0x00e0, NULL, HFILL }
       },
       { &hf_ecat_mailbox_soe_header_datastate,
       { "Datastate", "ecat_mailbox.soe_header_datastate",

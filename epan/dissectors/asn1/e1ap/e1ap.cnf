@@ -282,6 +282,9 @@ id-Extended-GNB-CU-CP-Name                      ProtocolIE-ID
 id-Extended-GNB-CU-UP-Name                      ProtocolIE-ID
 id-DataForwardingtoE-UTRANInformationList       ProtocolIE-ID
 id-QosMonitoringReportingFrequency              ProtocolIE-ID
+id-QoSMonitoringDisabled                        ProtocolIE-ID
+id-AdditionalHandoverInfo                       ProtocolIE-ID
+id-Extended-NR-CGI-Support-List                 ProtocolIE-ID
 #.END
 
 #.REGISTER
@@ -386,6 +389,7 @@ CHOInitiation                                N e1ap.ies id-CHOInitiation
 DRB-Measurement-Results-Information-List     N e1ap.ies id-DRB-Measurement-Results-Information-List
 Extended-GNB-CU-CP-Name                      N e1ap.ies id-Extended-GNB-CU-CP-Name
 Extended-GNB-CU-UP-Name                      N e1ap.ies id-Extended-GNB-CU-UP-Name
+AdditionalHandoverInfo                       N e1ap.ies id-AdditionalHandoverInfo
 
 #E1AP-PROTOCOL-EXTENSION
 SNSSAI                                       N e1ap.extension id-SNSSAI
@@ -422,6 +426,8 @@ GBR-QoSFlowInformation                       N e1ap.extension id-MCG-OfferedGBRQ
 Number-of-tunnels                            N e1ap.extension id-Number-of-tunnels
 DataForwardingtoE-UTRANInformationList       N e1ap.extension id-DataForwardingtoE-UTRANInformationList
 QosMonitoringReportingFrequency              N e1ap.extension id-QosMonitoringReportingFrequency
+QosMonitoringDisabled                        N e1ap.extension id-QoSMonitoringDisabled
+Extended-NR-CGI-Support-List                 N e1ap.extension id-Extended-NR-CGI-Support-List
 
 #E1AP-ELEMENTARY-PROCEDURE
 Reset                                    N e1ap.proc.imsg id-reset
@@ -502,11 +508,19 @@ EarlyForwardingSNTransfer                N e1ap.proc.imsg id-earlyForwardingSNTr
 
 #.FN_BODY PLMN-Identity  VAL_PTR = &param_tvb
   tvbuff_t *param_tvb = NULL;
+  e1ap_private_data_t *e1ap_data = e1ap_get_private_data(actx->pinfo);
+  e212_number_type_t number_type = e1ap_data->number_type;
+  e1ap_data->number_type = E212_NONE;
 %(DEFAULT_BODY)s
   if (param_tvb) {
     proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_e1ap_PLMN_Identity);
-    dissect_e212_mcc_mnc(param_tvb, actx->pinfo, subtree, 0, E212_NONE, FALSE);
+    dissect_e212_mcc_mnc(param_tvb, actx->pinfo, subtree, 0, number_type, FALSE);
   }
+
+#.FN_BODY NR-CGI
+  e1ap_private_data_t *e1ap_data = e1ap_get_private_data(actx->pinfo);
+  e1ap_data->number_type = E212_NRCGI;
+%(DEFAULT_BODY)s
 
 #.TYPE_ATTR
 PortNumber TYPE = FT_UINT16 DISPLAY = BASE_DEC

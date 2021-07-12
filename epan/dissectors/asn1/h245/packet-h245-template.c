@@ -335,7 +335,7 @@ static void h245_setup_channels(packet_info *pinfo, channel_info_t *upcoming_cha
 		dummy_srtp_info = wmem_new0(wmem_file_scope(), struct srtp_info);
 	}
 
-	/* DEBUG 	g_warning("h245_setup_channels media_addr.addr.type %u port %u",upcoming_channel_lcl->media_addr.addr.type, upcoming_channel_lcl->media_addr.port );
+	/* DEBUG 	ws_warning("h245_setup_channels media_addr.addr.type %u port %u",upcoming_channel_lcl->media_addr.addr.type, upcoming_channel_lcl->media_addr.port );
 	*/
 	if (upcoming_channel_lcl->media_addr.addr.type!=AT_NONE && upcoming_channel_lcl->media_addr.port!=0) {
 		srtp_add_address(pinfo, PT_UDP, &upcoming_channel_lcl->media_addr.addr,
@@ -447,7 +447,7 @@ dissect_h245_FastStart_OLC(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tr
 	  h245_pi->msg_type = H245_OpenLogChn;
 
   if (codec_str && codec_type){
-        g_strlcpy(codec_str, codec_type, 50);
+        (void) g_strlcpy(codec_str, codec_type, 50);
   }
 
 }

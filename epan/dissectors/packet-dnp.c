@@ -29,6 +29,7 @@
 #include <epan/crc16-tvb.h>
 #include <wsutil/crc16.h>
 #include <wsutil/str_util.h>
+#include "packet-tls.h"
 
 /*
  * See
@@ -67,6 +68,7 @@
 #define DNP_HDR_LEN     10
 #define TCP_PORT_DNP    20000
 #define UDP_PORT_DNP    20000
+#define TCP_PORT_DNP_TLS    19999
 
 /***************************************************************************/
 /* Datalink and Transport Layer Bit-Masks */
@@ -1371,6 +1373,9 @@ static int   hf_dnp3_fragment_reassembled_length = -1;
 static gint ett_dnp3_fragment  = -1;
 static gint ett_dnp3_fragments = -1;
 
+static dissector_handle_t dnp3_tcp_handle;
+static dissector_handle_t dnp3_udp_handle;
+
 static const fragment_items dnp3_frag_items = {
   &ett_dnp3_fragment,
   &ett_dnp3_fragments,
@@ -1713,6 +1718,13 @@ dnp3_al_process_object(tvbuff_t *tvb, packet_info *pinfo, int offset,
     if (try_val_to_str_ext(al_obj, &dnp3_al_obj_vals_ext) == NULL) {
       expert_add_info(pinfo, object_item, &ei_dnp3_unknown_group0_variation);
     }
+  }
+  else if ((AL_OBJ_GROUP(al_obj) == AL_OBJ_GROUP(AL_OBJ_OCT)) || (AL_OBJ_GROUP(al_obj) == AL_OBJ_GROUP(AL_OBJ_OCT_EVT))) {
+    /* For octet strings the variation is the length */
+    object_item = proto_tree_add_uint_format(robj_tree, hf_dnp3_al_obj, tvb, offset, 2, al_obj,
+                                             "Object(s): %s (0x%04x), Length: %d",
+                                             val_to_str_ext_const(al_obj, &dnp3_al_obj_vals_ext, "Unknown Object\\Variation"),
+                                             al_obj, al_oct_len);
   }
   else {
     object_item = proto_tree_add_uint_format(robj_tree, hf_dnp3_al_obj, tvb, offset, 2, al_obj,
@@ -3424,7 +3436,7 @@ dissect_dnp3_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
 
       if (frag_al)
       {
-        if (pinfo->num == frag_al->reassembled_in)
+        if (pinfo->num == frag_al->reassembled_in && pinfo->curr_layer_num == frag_al->reas_in_layer_num)
         {
           /* As a complete AL message will have cleared the info column,
              make sure source and dest are always in the info column */
@@ -3455,6 +3467,7 @@ dissect_dnp3_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
     else
     {
       /* CRC error - throw away the data. */
+      wmem_free(pinfo->pool, al_buffer);
       next_tvb = NULL;
     }
   }
@@ -4647,7 +4660,8 @@ proto_register_dnp3(void)
   proto_dnp3 = proto_register_protocol("Distributed Network Protocol 3.0", "DNP 3.0", "dnp3");
 
 /* Register the dissector so it may be used as a User DLT payload protocol */
-  register_dissector("dnp3.udp", dissect_dnp3_udp, proto_dnp3);
+  dnp3_tcp_handle = register_dissector("dnp3.tcp", dissect_dnp3_tcp, proto_dnp3);
+  dnp3_udp_handle = register_dissector("dnp3.udp", dissect_dnp3_udp, proto_dnp3);
 
 /* Required function calls to register the header fields and subtrees used */
   proto_register_field_array(proto_dnp3, hf, array_length(hf));
@@ -4667,18 +4681,15 @@ proto_register_dnp3(void)
 void
 proto_reg_handoff_dnp3(void)
 {
-  dissector_handle_t dnp3_tcp_handle;
-  dissector_handle_t dnp3_udp_handle;
-
   /* register as heuristic dissector for both TCP and UDP */
   heur_dissector_add("tcp", dissect_dnp3_tcp_heur, "DNP 3.0 over TCP", "dnp3_tcp", proto_dnp3, HEURISTIC_DISABLE);
   heur_dissector_add("udp", dissect_dnp3_udp_heur, "DNP 3.0 over UDP", "dnp3_udp", proto_dnp3, HEURISTIC_DISABLE);
 
-  dnp3_tcp_handle = create_dissector_handle(dissect_dnp3_tcp, proto_dnp3);
-  dnp3_udp_handle = create_dissector_handle(dissect_dnp3_udp, proto_dnp3);
   dissector_add_uint_with_preference("tcp.port", TCP_PORT_DNP, dnp3_tcp_handle);
   dissector_add_uint_with_preference("udp.port", UDP_PORT_DNP, dnp3_udp_handle);
   dissector_add_for_decode_as("rtacser.data", dnp3_udp_handle);
+
+  ssl_dissector_add(TCP_PORT_DNP_TLS, dnp3_tcp_handle);
 }
 
 /*

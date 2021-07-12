@@ -98,6 +98,7 @@ static dissector_handle_t nrup_handle;
 #define GTP_TPDU_AS_PDCP_NR 2
 #define GTP_TPDU_AS_SYNC 3
 #define GTP_TPDU_AS_ETHERNET 4
+#define GTP_TPDU_AS_CUSTOM 5
 
 static gboolean g_gtp_over_tcp = TRUE;
 gboolean g_gtp_session = FALSE;
@@ -219,8 +220,6 @@ static int hf_gtp_sai_sac = -1;
 static int hf_gtp_rai_rac = -1;
 static int hf_gtp_lac = -1;
 static int hf_gtp_tac = -1;
-static int hf_gtp_eci = -1;
-static int hf_gtp_ncgi_nrci = -1;
 static int hf_gtp_ranap_cause = -1;
 static int hf_gtp_recovery = -1;
 static int hf_gtp_reorder = -1;
@@ -885,6 +884,7 @@ static const enum_val_t gtp_decode_tpdu_as[] = {
     {"pdcp-nr", "PDCP-NR",   GTP_TPDU_AS_PDCP_NR },
     {"sync", "SYNC",   GTP_TPDU_AS_SYNC},
     {"eth", "ETHERNET",   GTP_TPDU_AS_ETHERNET},
+    {"custom", "Custom",   GTP_TPDU_AS_CUSTOM},
     {NULL, NULL, 0}
 };
 
@@ -2397,6 +2397,7 @@ static dissector_handle_t gtpv2_handle;
 static dissector_handle_t bssgp_handle;
 static dissector_handle_t pdcp_nr_handle;
 static dissector_handle_t pdcp_lte_handle;
+static dissector_handle_t gtp_tpdu_custom_handle;
 static dissector_table_t bssap_pdu_type_table;
 
 static int proto_pdcp_lte = -1;
@@ -5265,7 +5266,7 @@ decode_qos_umts(tvbuff_t * tvb, int offset, packet_info * pinfo, proto_tree * tr
         break;
     }
 
-    if ((type == 3) && (rel_ind == 8)) {
+    if ((type == 3) && (rel_ind >= 8)) {
         /* Release 8 or higher P-GW QoS profile */
         static int * const arp_flags[] = {
             &hf_gtp_qos_arp_pci,
@@ -6632,133 +6633,6 @@ decode_gtp_rat_type(tvbuff_t * tvb, int offset, packet_info * pinfo, proto_tree 
    proto_item_append_text(te, ": %s", val_to_str_const(tvb_get_guint8(tvb,offset), gtp_ext_rat_type_vals, "Unknown"));
 
    return 3 + length;
-}
-
-/* GPRS:        ?
- * UMTS:        29.060 v6.11.0, chapter 7.7.51
- * User Location Information
- * Type = 152 (Decimal)
- */
-
-static const
-gchar *dissect_radius_user_loc(proto_tree * tree, tvbuff_t * tvb, packet_info* pinfo)
-{
-
-    int     offset = 0;
-    guint8  geo_loc_type;
-    guint16 length = tvb_reported_length(tvb);
-    proto_item* ti;
-
-    /* Geographic Location Type */
-    geo_loc_type = tvb_get_guint8(tvb, offset);
-    ti = proto_tree_add_uint(tree, hf_gtp_uli_geo_loc_type, tvb, offset, 1, geo_loc_type);
-    offset++;
-
-    switch(geo_loc_type) {
-        case 0:
-            /* Geographic Location field included and it holds the Cell Global
-             * Identification (CGI) of where the user currently is registered.
-             * CGI is defined in sub-clause 4.3.1 of 3GPP TS 23.003 [2].
-             */
-            dissect_e212_mcc_mnc(tvb, pinfo, tree, offset, E212_CGI, TRUE);
-            offset+=3;
-            proto_tree_add_item(tree, hf_gtp_lac, tvb, offset, 2, ENC_BIG_ENDIAN);
-            offset+=2;
-            /* The CI is of fixed length with 2 octets and it can be coded using a full
-             * hexadecimal representation
-             */
-            proto_tree_add_item(tree, hf_gtp_cgi_ci, tvb, offset, 2, ENC_BIG_ENDIAN);
-            break;
-        case 1:
-            /* Geographic Location field included and it holds the Service
-             * Area Identity (SAI) of where the user currently is registered.
-             * SAI is defined in sub-clause 9.2.3.9 of 3GPP TS 25.413 [7].
-             */
-            /* PLMN identity    M   9.2.3.55
-             * 9.2.3.55 PLMN identity    M   OCTET STRING (SIZE (3))
-             */
-            dissect_e212_mcc_mnc(tvb, pinfo, tree, offset, E212_SAI, TRUE);
-            offset+=3;
-            /* LAC  M   OCTET STRING (SIZE(2))  0000 and FFFE not allowed.*/
-            proto_tree_add_item(tree, hf_gtp_lac, tvb, offset, 2, ENC_BIG_ENDIAN);
-            offset+=2;
-            /* SAC  M   OCTET STRING (SIZE(2)) */
-            proto_tree_add_item(tree, hf_gtp_sai_sac, tvb, offset, 2, ENC_BIG_ENDIAN);
-            break;
-        case 2:
-            /* Geographic Location field included and it holds the Routing
-             * Area Identification (RAI) of where the user currently is
-             * registered. RAI is defined in sub-clause 4.2 of 3GPP TS 23.003
-             * [2].
-             */
-            dissect_e212_mcc_mnc(tvb, pinfo, tree, offset, E212_RAI, TRUE);
-            offset+=3;
-            proto_tree_add_item(tree, hf_gtp_lac, tvb, offset, 2, ENC_BIG_ENDIAN);
-            offset+=2;
-            /* Routing Area Code (RAC) which is a fixed length code (of 1 octet)
-             * identifying a routing area within a location area.
-             */
-            proto_tree_add_item(tree, hf_gtp_rai_rac, tvb, offset, 1, ENC_BIG_ENDIAN);
-            break;
-        case 128:
-            /* Geographic Location field included and it holds the Tracking
-             * Area Identity (TAI) of where the user currently is registered.
-             * TAI is defined in sub-clause 8.21.4 of 3GPP TS 29.274.
-             */
-            dissect_e212_mcc_mnc(tvb, pinfo, tree, offset, E212_TAI, TRUE);
-            offset+=3;
-            proto_tree_add_item(tree, hf_gtp_tac, tvb, offset, 2, ENC_BIG_ENDIAN);
-            break;
-        case 129:
-            /* Geographic Location field included and it holds the E-UTRAN Cell
-             * Global Identifier (ECGI) of where the user currently is registered.
-             * ECGI is defined in sub-clause 8.21.5 of 3GPP TS 29.274.
-             */
-            dissect_e212_mcc_mnc(tvb, pinfo, tree, offset, E212_ECGI, TRUE);
-            offset+=3;
-            proto_tree_add_item(tree, hf_gtp_eci, tvb, offset, 4, ENC_BIG_ENDIAN);
-            break;
-        case 130:
-            /* Geographic Location field included and it holds the Tracking
-             * Area Identity (TAI) and E-UTRAN CellGlobal Identifier (ECGI)
-             * of where the user currently is registered.
-             * TAI is defined in sub-clause 8.21.4 of 3GPP TS 29.274.
-             * ECGI is defined in sub-clause 8.21.5 of 3GPP TS 29.274.
-             */
-            dissect_e212_mcc_mnc(tvb, pinfo, tree, offset, E212_TAI, TRUE);
-            offset+=3;
-            proto_tree_add_item(tree, hf_gtp_tac, tvb, offset, 2, ENC_BIG_ENDIAN);
-            offset += 2;
-            dissect_e212_mcc_mnc(tvb, pinfo, tree, offset, E212_ECGI, TRUE);
-            offset+=3;
-            proto_tree_add_item(tree, hf_gtp_eci, tvb, offset, 4, ENC_BIG_ENDIAN);
-            break;
-        case 135:
-            /* NCGI */
-            {
-                proto_tree_add_item(tree, hf_gtp_ncgi_nrci, tvb, offset, 5, ENC_BIG_ENDIAN);
-            }
-            break;
-        case 136:
-            /* 5GS TAI */
-            {
-                dissect_e212_mcc_mnc(tvb, pinfo, tree, offset, E212_TAI, TRUE);
-            }
-            break;
-        case 137:
-            /* 5GS TAI and NCGI */
-            {
-                dissect_e212_mcc_mnc(tvb, pinfo, tree, offset, E212_TAI, TRUE);
-                offset += 3;
-                proto_tree_add_item(tree, hf_gtp_ncgi_nrci, tvb, offset, 5, ENC_BIG_ENDIAN);
-            }
-            break;
-        default:
-            expert_add_info(pinfo, ti, &ei_gtp_ext_geo_loc_type);
-            break;
-    }
-
-    return tvb_bytes_to_str(wmem_packet_scope(), tvb, 0, length);
 }
 
 /*
@@ -10038,17 +9912,6 @@ dissect_gtp_common(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
                     tvbuff_t *pdcp_tvb;
                     struct pdcp_nr_info temp_data;
 
-                    /* Set the ROHC data */
-                    temp_data.rohc.rohc_compression = found_record->rohc_compression;
-                    temp_data.rohc.rohc_ip_version = 4; /* For now set it explicitly */
-                    temp_data.rohc.cid_inclusion_info = FALSE;
-                    temp_data.rohc.large_cid_present = FALSE;
-                    temp_data.rohc.mode = MODE_NOT_SET;
-                    temp_data.rohc.rnd = FALSE;
-                    temp_data.rohc.udp_checksum_present = FALSE;
-                    temp_data.rohc.profile = found_record->rohc_profile;
-
-
                     pdcp_tvb = tvb_new_subset_remaining(tvb, offset);
                     /* Fill in pdcp_nr_info */
 
@@ -10106,6 +9969,18 @@ dissect_gtp_common(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
             call_dissector(eth_handle, next_tvb, pinfo, tree);
             col_prepend_fstr(pinfo->cinfo, COL_PROTOCOL, "GTP <");
             col_append_str(pinfo->cinfo, COL_PROTOCOL, ">");
+            break;
+        case GTP_TPDU_AS_CUSTOM:
+            /* Call a custom dissector if available */
+            if (gtp_tpdu_custom_handle ||
+                 (gtp_tpdu_custom_handle = find_dissector("gtp_tpdu_custom"))) {
+                next_tvb = tvb_new_subset_remaining(tvb, offset);
+                call_dissector(gtp_tpdu_custom_handle, next_tvb, pinfo, tree);
+                col_prepend_fstr(pinfo->cinfo, COL_PROTOCOL, "GTP <");
+                col_append_str(pinfo->cinfo, COL_PROTOCOL, ">");
+            } else {
+                proto_tree_add_item(tree, hf_gtp_tpdu_data, tvb, offset, -1, ENC_NA);
+            }
             break;
         default:
             proto_tree_add_item(tree, hf_gtp_tpdu_data, tvb, offset, -1, ENC_NA);
@@ -10771,16 +10646,6 @@ proto_register_gtp(void)
           {"TAC", "gtp.tac",
            FT_UINT16, BASE_DEC, NULL, 0,
            NULL, HFILL}
-        },
-        { &hf_gtp_eci,
-          {"ECI", "gtp.eci",
-           FT_UINT32, BASE_DEC, NULL, 0x0FFFFFFF,
-           "E-UTRAN Cell Identifier", HFILL}
-        },
-        {&hf_gtp_ncgi_nrci,
-         {"NR Cell Identifier", "gtp.ncgi_nrci",
-          FT_UINT40, BASE_HEX, NULL, 0xfffffffff0,
-          NULL, HFILL}
         },
         {&hf_gtp_ranap_cause,
          { "RANAP cause", "gtp.ranap_cause",
@@ -11866,7 +11731,6 @@ proto_reg_handoff_gtp(void)
 
         radius_register_avp_dissector(VENDOR_THE3GPP, 5, dissect_radius_qos_umts);
         radius_register_avp_dissector(VENDOR_THE3GPP, 12, dissect_radius_selection_mode);
-        radius_register_avp_dissector(VENDOR_THE3GPP, 22, dissect_radius_user_loc);
 
 
 

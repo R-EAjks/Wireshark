@@ -116,6 +116,9 @@ my %APIs = (
                 'strtod',
                 'strcasecmp',
                 'strncasecmp',
+                # Deprecated in glib 2.68 in favor of g_memdup2
+                # We have our local implementation for older versions
+                'g_memdup',
                 'g_strcasecmp',
                 'g_strncasecmp',
                 'g_strup',
@@ -1176,11 +1179,6 @@ while ($_ = pop @filelist)
             $errorCount += check_hf_entries(\$fileContents, $filename);
         }
 
-        if ($fileContents =~ m{ __func__ }xo)
-        {
-                print STDERR "Error: Found __func__ (which is not portable, use G_STRFUNC) in " .$filename."\n";
-                $errorCount++;
-        }
         if ($fileContents =~ m{ %ll }xo)
         {
                 # use G_GINT64_MODIFIER instead of ll

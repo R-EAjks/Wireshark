@@ -13,11 +13,12 @@
 #ifndef __IO_GRAPH_ITEM_H__
 #define __IO_GRAPH_ITEM_H__
 
+#include "cfile.h"
+#include <wsutil/ws_assert.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
-
-#include "cfile.h"
 
 typedef enum {
     IOG_ITEM_UNIT_FIRST,
@@ -381,7 +382,7 @@ update_io_graph_item(io_graph_item_t *items, int idx, packet_info *pinfo, epan_d
                      * type is compatible" check in
                      * filter_callback().
                      */
-                    g_assert_not_reached();
+                    ws_assert_not_reached();
                 }
                 break;
             }
@@ -400,16 +401,3 @@ update_io_graph_item(io_graph_item_t *items, int idx, packet_info *pinfo, epan_d
 #endif /* __cplusplus */
 
 #endif /* __IO_GRAPH_ITEM_H__ */
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

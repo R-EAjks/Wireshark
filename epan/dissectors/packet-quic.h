@@ -10,13 +10,13 @@
 #ifndef __PACKET_QUIC_H__
 #define __PACKET_QUIC_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
-
 #include "ws_symbol_export.h"
 
 #include <wsutil/wsgcrypt.h>	/* needed to define HAVE_LIBGCRYPT_AEAD */
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 /**
  * Metadata for a STREAM frame.
@@ -79,6 +79,22 @@ void
 quic_add_loss_bits(packet_info *pinfo, guint64 value);
 void
 quic_proto_tree_add_version(tvbuff_t *tvb, proto_tree *tree, int hfindex, guint offset);
+
+/**
+ * Retrieves the QUIC Stream ID which is smaller than or equal to the provided
+ * ID. If available, sub_stream_id_out will be set and TRUE is returned.
+ */
+WS_DLL_PUBLIC gboolean
+quic_get_stream_id_le(guint streamid, guint sub_stream_id, guint *sub_stream_id_out);
+
+/**
+ * Retrieves the QUIC Stream ID which is greater than or equal to the provided
+ * ID. If available, sub_stream_id_out will be set and TRUE is returned.
+ */
+WS_DLL_PUBLIC gboolean
+quic_get_stream_id_ge(guint streamid, guint sub_stream_id, guint *sub_stream_id_out);
+
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

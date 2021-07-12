@@ -13,6 +13,8 @@
 
 #include "ws_symbol_export.h"
 
+#include "packet.h"			/* for conversation dissector type */
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
@@ -46,8 +48,6 @@ extern "C" {
 /* Flags to handle endpoints */
 #define USE_LAST_ENDPOINT 0x08		/* Use last endpoint created, regardless of type */
 
-#include "packet.h"			/* for conversation dissector type */
-
 /* Types of port numbers Wireshark knows about. */
 typedef enum {
 	ENDPOINT_NONE,			/* no endpoint */
@@ -77,7 +77,8 @@ typedef enum {
 	ENDPOINT_ISUP,			/* ISDN User Part CIC */
 	ENDPOINT_BICC,			/* BICC Circuit identifier */
 	ENDPOINT_GSMTAP,
-	ENDPOINT_IUUP
+	ENDPOINT_IUUP,
+	ENDPOINT_DVBBBF                 /* DVB Base Band Frame ISI/PLP_ID */
 } endpoint_type;
 
 /**

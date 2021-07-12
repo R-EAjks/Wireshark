@@ -62,6 +62,7 @@ wmem_simple_free(void *private_data, void *ptr)
             return;
         }
     }
+
     g_assert_not_reached();
 }
 
@@ -80,6 +81,7 @@ wmem_simple_realloc(void *private_data, void *ptr, const size_t size)
     }
 
     g_assert_not_reached();
+    /* not reached */
     return NULL;
 }
 

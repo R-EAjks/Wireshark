@@ -90,11 +90,16 @@ GlobalTWIF-ID/tWIF-ID globalTWIF-ID_tWIF-ID
 GlobalW-AGF-ID/w-AGF-ID globalW-AGF-ID_w-AGF-ID
 
 #.FIELD_ATTR
-GlobalGNB-ID/gNB-ID       ABBREV=globalGNB-ID.gNB-ID
-GlobalN3IWF-ID/n3IWF-ID   ABBREV=globalN3IWF-ID_n3IWF-ID
-GlobalTNGF-ID/tNGF-ID     ABBREV=globalTNGF-ID.tNGF-ID
-GlobalTWIF-ID/tWIF-ID     ABBREV=globalTWIF-ID.tWIF-ID
-GlobalW-AGF-ID/w-AGF-ID   ABBREV=globalW-AGF-ID.w-AGF-ID
+GlobalGNB-ID/gNB-ID       ABBREV=globalGNB_ID.gNB_ID
+GlobalN3IWF-ID/n3IWF-ID   ABBREV=globalN3IWF_ID_n3IWF_ID
+GlobalTNGF-ID/tNGF-ID     ABBREV=globalTNGF_ID.tNGF_ID
+GlobalTWIF-ID/tWIF-ID     ABBREV=globalTWIF_ID.tWIF_ID
+GlobalW-AGF-ID/w-AGF-ID   ABBREV=globalW_AGF_ID.w_AGF_ID
+UE-associatedLogicalNG-connectionItem/aMF-UE-NGAP-ID ABBREV=AMF_UE_NGAP_ID
+UE-associatedLogicalNG-connectionItem/rAN-UE-NGAP-ID ABBREV=RAN_UE_NGAP_ID
+UE-NGAP-ID-pair/aMF-UE-NGAP-ID ABBREV=AMF_UE_NGAP_ID
+UE-NGAP-ID-pair/rAN-UE-NGAP-ID ABBREV=RAN_UE_NGAP_ID
+UE-NGAP-IDs/aMF-UE-NGAP-ID ABBREV=AMF_UE_NGAP_ID
 
 #.FN_BODY ProtocolIE-ID VAL_PTR=&ngap_data->protocol_ie_id
   struct ngap_private_data *ngap_data = ngap_get_private_data(actx->pinfo);
@@ -286,20 +291,28 @@ GlobalW-AGF-ID/w-AGF-ID   ABBREV=globalW-AGF-ID.w-AGF-ID
     /* Don't want elements inside container to write to info column */
     col_set_writable(actx->pinfo->cinfo, COL_INFO, FALSE);
     subtree = proto_item_add_subtree(actx->created_item, ett_ngap_SourceToTarget_TransparentContainer);
-    switch(ngap_data->handover_type_value) {
-    case intra5gs:
-    case eps_to_5gs:
-      dissect_ngap_SourceNGRANNode_ToTargetNGRANNode_TransparentContainer_PDU(parameter_tvb, actx->pinfo, subtree, NULL);
-      break;
-    case fivegs_to_eps:
-      dissect_s1ap_SourceeNB_ToTargeteNB_TransparentContainer_PDU(parameter_tvb, actx->pinfo, subtree, NULL);
-      break;
-    case fivegs_to_utran:
-      dissect_rrc_ToTargetRNC_Container_PDU(parameter_tvb, actx->pinfo, subtree, NULL);
-      break;
-    default:
-      break;
+    TRY {
+
+        switch(ngap_data->handover_type_value) {
+        case intra5gs:
+        case eps_to_5gs:
+            dissect_ngap_SourceNGRANNode_ToTargetNGRANNode_TransparentContainer_PDU(parameter_tvb, actx->pinfo, subtree, NULL);
+            break;
+        case fivegs_to_eps:
+            dissect_s1ap_SourceeNB_ToTargeteNB_TransparentContainer_PDU(parameter_tvb, actx->pinfo, subtree, NULL);
+            break;
+        case fivegs_to_utran:
+            dissect_rrc_ToTargetRNC_Container_PDU(parameter_tvb, actx->pinfo, subtree, NULL);
+            break;
+        default:
+            break;
+        }
     }
+    CATCH_BOUNDS_ERRORS {
+          show_exception(tvb, actx->pinfo, tree, EXCEPT_CODE, GET_MESSAGE);
+    }
+    ENDTRY;
+
     /* Enable writing of the column again */
     col_set_writable(actx->pinfo->cinfo, COL_INFO, TRUE);
   }
@@ -330,11 +343,7 @@ GlobalW-AGF-ID/w-AGF-ID   ABBREV=globalW-AGF-ID.w-AGF-ID
         break;
       }
     } else {
-      if (ngap_dissect_target_ng_ran_container_as == NGAP_NG_RAN_CONTAINER_GNB) {
-        dissect_ngap_TargetNGRANNode_ToSourceNGRANNode_TransparentContainer_PDU(parameter_tvb, actx->pinfo, subtree, NULL);
-      } else if (ngap_dissect_target_ng_ran_container_as == NGAP_NG_RAN_CONTAINER_NG_ENB) {
-        dissect_s1ap_TargeteNB_ToSourceeNB_TransparentContainer_PDU(parameter_tvb, actx->pinfo, subtree, NULL);
-      }
+      dissect_ngap_TargetNGRANNode_ToSourceNGRANNode_TransparentContainer_PDU(parameter_tvb, actx->pinfo, subtree, NULL);
     }
     /* Enable writing of the column again */
     col_set_writable(actx->pinfo->cinfo, COL_INFO, TRUE);
@@ -421,6 +430,11 @@ RepetitionPeriod DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=&units_seconds
                                         hf_ngap_WarningMessageContents_nb_pages, hf_ngap_WarningMessageContents_decoded_page);
   }
 
+#.FN_BODY EPS-TAI
+  struct ngap_private_data *ngap_data = ngap_get_private_data(actx->pinfo);
+  ngap_data->number_type = E212_TAI;
+%(DEFAULT_BODY)s
+
 #.TYPE_ATTR
 EPS-TAC TYPE = FT_UINT16 DISPLAY = BASE_DEC_HEX
 #.FN_BODY EPS-TAC VAL_PTR = &parameter_tvb HF_INDEX = -1
@@ -432,7 +446,7 @@ EPS-TAC TYPE = FT_UINT16 DISPLAY = BASE_DEC_HEX
 
 #.FN_BODY TAI
   struct ngap_private_data *ngap_data = ngap_get_private_data(actx->pinfo);
-
+  ngap_data->number_type = E212_5GSTAI;
   ngap_data->tai = wmem_new0(wmem_packet_scope(), struct ngap_tai);
 %(DEFAULT_BODY)s
   if (!PINFO_FD_VISITED(actx->pinfo) && ngap_data->ngap_conv &&
@@ -474,10 +488,12 @@ TAC TYPE = FT_UINT24 DISPLAY = BASE_DEC_HEX
   tvbuff_t *parameter_tvb = NULL;
   proto_tree *subtree;
   struct ngap_private_data *ngap_data = ngap_get_private_data(actx->pinfo);
+  e212_number_type_t number_type = ngap_data->number_type;
+  ngap_data->number_type = E212_NONE;
 %(DEFAULT_BODY)s
   if (parameter_tvb) {
     subtree = proto_item_add_subtree(actx->created_item, ett_ngap_PLMNIdentity);
-    dissect_e212_mcc_mnc(parameter_tvb, actx->pinfo, subtree, 0, E212_NONE, FALSE);
+    dissect_e212_mcc_mnc(parameter_tvb, actx->pinfo, subtree, 0, number_type, FALSE);
     if (ngap_data->supported_ta) {
       guint32 plmn = tvb_get_ntoh24(parameter_tvb, 0);
       wmem_array_append_one(ngap_data->supported_ta->plmn, plmn);
@@ -485,6 +501,11 @@ TAC TYPE = FT_UINT24 DISPLAY = BASE_DEC_HEX
       ngap_data->tai->plmn = tvb_get_ntoh24(parameter_tvb, 0);
     }
   }
+
+#.FN_BODY GUAMI
+  struct ngap_private_data *ngap_data = ngap_get_private_data(actx->pinfo);
+  ngap_data->number_type = E212_GUAMI;
+%(DEFAULT_BODY)s
 
 #.FN_HDR SupportedTAItem
   struct ngap_private_data *ngap_data = ngap_get_private_data(actx->pinfo);
@@ -560,6 +581,11 @@ TAC TYPE = FT_UINT24 DISPLAY = BASE_DEC_HEX
   proto_tree_add_item(subtree, hf_ngap_NGRANTraceID_TraceID, parameter_tvb, 3, 3, ENC_BIG_ENDIAN);
   proto_tree_add_item(subtree, hf_ngap_NGRANTraceID_TraceRecordingSessionReference, parameter_tvb, 6, 2, ENC_BIG_ENDIAN);
 
+#.FN_BODY NR-CGI
+  struct ngap_private_data *ngap_data = ngap_get_private_data(actx->pinfo);
+  ngap_data->number_type = E212_NRCGI;
+%(DEFAULT_BODY)s
+
 #.FIELD_ATTR
 NR-CGI/nRCellIdentity ABBREV=NRCellIdentity TYPE=FT_UINT40 DISPLAY=BASE_HEX
 
@@ -570,6 +596,11 @@ NR-CGI/nRCellIdentity ABBREV=NRCellIdentity TYPE=FT_UINT40 DISPLAY=BASE_HEX
     guint64 cell_id = tvb_get_bits64(cell_id_tvb, 0, 36, ENC_BIG_ENDIAN);
     actx->created_item = proto_tree_add_uint64(tree, hf_index, cell_id_tvb, 0, 5, cell_id);
   }
+
+#.FN_BODY EUTRA-CGI
+  struct ngap_private_data *ngap_data = ngap_get_private_data(actx->pinfo);
+  ngap_data->number_type = E212_ECGI;
+%(DEFAULT_BODY)s
 
 #.FIELD_ATTR
 EUTRA-CGI/eUTRACellIdentity ABBREV=EUTRACellIdentity TYPE=FT_UINT32 DISPLAY=BASE_HEX
@@ -656,10 +687,12 @@ PortNumber TYPE = FT_UINT16 DISPLAY = BASE_DEC
     proto_tree *subtree;
     GlobalRANNodeID_enum ranmode_id;
 
-    if (ngap_data->transparent_container_type == SOURCE_TO_TARGET_TRANSPARENT_CONTAINER) {
-      ranmode_id = ngap_get_ranmode_id(&actx->pinfo->dst, actx->pinfo->destport, actx->pinfo);
-    } else if (ngap_data->transparent_container_type == TARGET_TO_SOURCE_TRANSPARENT_CONTAINER) {
-      ranmode_id = ngap_get_ranmode_id(&actx->pinfo->src, actx->pinfo->srcport, actx->pinfo);
+    if (ngap_data->transparent_container_type == SOURCE_TO_TARGET_TRANSPARENT_CONTAINER ||
+        ngap_data->transparent_container_type == TARGET_TO_SOURCE_TRANSPARENT_CONTAINER) {
+      if (actx->pinfo->destport == gbl_ngapSctpPort)
+        ranmode_id = ngap_get_ranmode_id(&actx->pinfo->src, actx->pinfo->srcport, actx->pinfo);
+      else
+        ranmode_id = ngap_get_ranmode_id(&actx->pinfo->dst, actx->pinfo->destport, actx->pinfo);
     } else {
       ranmode_id = (GlobalRANNodeID_enum)-1;
     }
@@ -725,18 +758,25 @@ RecommendedCellItem/timeStayedInCell DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=&
 
 %(DEFAULT_BODY)s
   if (parameter_tvb) {
+    proto_tree *subtree;
+    volatile dissector_handle_t handle;
+    subtree = proto_item_add_subtree(actx->created_item, ett_ngap_UERadioCapability);
     if (ngap_data->procedure_code == id_UERadioCapability_EUTRA_Format) {
-      if (lte_rrc_ue_radio_access_cap_info_handle) {
-        proto_tree *subtree;
-
-        subtree = proto_item_add_subtree(actx->created_item, ett_ngap_UERadioCapability);
-        call_dissector(lte_rrc_ue_radio_access_cap_info_handle, parameter_tvb, actx->pinfo, subtree);
+      handle = lte_rrc_ue_radio_access_cap_info_handle;
+    } else if ((ngap_is_nbiot_ue(actx->pinfo) && ngap_dissect_lte_container_as == NGAP_LTE_CONTAINER_AUTOMATIC) ||
+               (ngap_dissect_lte_container_as == NGAP_LTE_CONTAINER_NBIOT)) {
+      handle = lte_rrc_ue_radio_access_cap_info_nb_handle;
+    } else {
+      handle = nr_rrc_ue_radio_access_cap_info_handle;
+    }
+    if (handle) {
+      TRY {
+        call_dissector(handle, parameter_tvb, actx->pinfo, subtree);
       }
-    } else if (nr_rrc_ue_radio_access_cap_info_handle) {
-      proto_tree *subtree;
-
-      subtree = proto_item_add_subtree(actx->created_item, ett_ngap_UERadioCapability);
-      call_dissector(nr_rrc_ue_radio_access_cap_info_handle, parameter_tvb, actx->pinfo, subtree);
+      CATCH_BOUNDS_ERRORS {
+        show_exception(parameter_tvb, actx->pinfo, subtree, EXCEPT_CODE, GET_MESSAGE);
+      }
+      ENDTRY;
     }
   }
 
@@ -986,13 +1026,13 @@ ExtendedPacketDelayBudget DISPLAY=BASE_CUSTOM STRINGS=CF_FUNC(ngap_ExtendedPacke
 %(DEFAULT_BODY)s
   if (parameter_tvb) {
     static int * const fields[] = {
-      &hf_ngap_RATRestrictionInformation_e_UTRA,
-      &hf_ngap_RATRestrictionInformation_nR,
-      &hf_ngap_RATRestrictionInformation_nR_unlicensed,
-      &hf_ngap_RATRestrictionInformation_reserved,
+      &hf_ngap_primaryRATRestriction_e_UTRA,
+      &hf_ngap_primaryRATRestriction_nR,
+      &hf_ngap_primaryRATRestriction_nR_unlicensed,
+      &hf_ngap_primaryRATRestriction_reserved,
       NULL
     };
-    proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_ngap_RATRestrictionInformation);
+    proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_ngap_primaryRATRestriction);
     proto_tree_add_bitmask_list(subtree, parameter_tvb, 0, 1, fields, ENC_BIG_ENDIAN);
   }
 
@@ -1001,15 +1041,21 @@ ExtendedPacketDelayBudget DISPLAY=BASE_CUSTOM STRINGS=CF_FUNC(ngap_ExtendedPacke
 %(DEFAULT_BODY)s
   if (parameter_tvb) {
     static int * const fields[] = {
-      &hf_ngap_RATRestrictionInformation_e_UTRA,
-      &hf_ngap_RATRestrictionInformation_nR,
-      &hf_ngap_RATRestrictionInformation_nR_unlicensed,
-      &hf_ngap_RATRestrictionInformation_reserved,
+      &hf_ngap_secondaryRATRestriction_e_UTRA,
+      &hf_ngap_secondaryRATRestriction_nR,
+      &hf_ngap_secondaryRATRestriction_e_UTRA_unlicensed,
+      &hf_ngap_secondaryRATRestriction_nR_unlicensed,
+      &hf_ngap_secondaryRATRestriction_reserved,
       NULL
     };
-    proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_ngap_RATRestrictionInformation);
+    proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_ngap_secondaryRATRestriction);
     proto_tree_add_bitmask_list(subtree, parameter_tvb, 0, 1, fields, ENC_BIG_ENDIAN);
   }
+
+#.FN_BODY LAI
+  struct ngap_private_data *ngap_data = ngap_get_private_data(actx->pinfo);
+  ngap_data->number_type = E212_LAI;
+%(DEFAULT_BODY)s
 
 #.TYPE_ATTR
 LAC TYPE = FT_UINT16 DISPLAY = BASE_DEC_HEX
@@ -1126,6 +1172,33 @@ FiveG-TMSI TYPE = FT_UINT32 DISPLAY = BASE_DEC_HEX
 
 #.TYPE_ATTR
 QosMonitoringReportingFrequency DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=&units_seconds
+
+#.FN_BODY UpdateFeedback VAL_PTR=&parameter_tvb
+  tvbuff_t *parameter_tvb = NULL;
+%(DEFAULT_BODY)s
+  if (parameter_tvb) {
+    static int * const fields[] = {
+      &hf_ngap_UpdateFeedback_CN_PDB_DL,
+      &hf_ngap_UpdateFeedback_CN_PDB_UL,
+      &hf_ngap_UpdateFeedback_reserved,
+      NULL
+    };
+    proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_ngap_UpdateFeedback);
+    proto_tree_add_bitmask_list(subtree, parameter_tvb, 0, 1, fields, ENC_BIG_ENDIAN);
+  }
+
+#.FN_BODY PDUSessionResourceSetupRequestTransfer
+volatile guint32 _offset;
+  _offset = offset;
+        TRY {
+  _offset = dissect_per_sequence(tvb, _offset, actx, tree, hf_index,
+                                   ett_ngap_PDUSessionResourceSetupRequestTransfer, PDUSessionResourceSetupRequestTransfer_sequence);
+        }
+        CATCH_BOUNDS_ERRORS {
+          show_exception(tvb, actx->pinfo, tree, EXCEPT_CODE, GET_MESSAGE);
+        }
+        ENDTRY;
+  offset = _offset;
 
 #.ASSIGN_VALUE_TO_TYPE  # NGAP does not have constants assigned to types, they are pure INTEGER
 # ProcedureCode
@@ -1475,6 +1548,9 @@ id-Extended-AMFName                              ProtocolIE-ID
 id-GlobalCable-ID                                ProtocolIE-ID
 id-QosMonitoringReportingFrequency               ProtocolIE-ID
 id-QosFlowParametersList                         ProtocolIE-ID
+id-QosFlowFeedbackList                           ProtocolIE-ID
+id-BurstArrivalTimeDownlink                      ProtocolIE-ID
+id-ExtendedUEIdentityIndexValue                  ProtocolIE-ID
 #.END
 
 
@@ -1765,6 +1841,10 @@ ExtendedSliceSupportList                               N ngap.extension id-Exten
 ConfiguredTACIndication                                N ngap.extension id-ConfiguredTACIndication
 QosMonitoringReportingFrequency                        N ngap.extension id-QosMonitoringReportingFrequency
 QosFlowParametersList                                  N ngap.extension id-QosFlowParametersList
+QosFlowFeedbackList                                    N ngap.extension id-QosFlowFeedbackList
+BurstArrivalTime                                       N ngap.extension id-BurstArrivalTimeDownlink
+ExtendedUEIdentityIndexValue                           N ngap.extension id-ExtendedUEIdentityIndexValue
+UERadioCapabilityForPaging                             N ngap.extension id-UERadioCapabilityForPaging
 
 #NGAP-ELEMENTARY-PROCEDURE
 
@@ -1952,6 +2032,8 @@ HandoverCommandTransfer                        S ngap.n2_ie_type "HANDOVER_CMD"
 HandoverPreparationUnsuccessfulTransfer        S ngap.n2_ie_type "HANDOVER_PREP_FAIL"
 HandoverRequestAcknowledgeTransfer             S ngap.n2_ie_type "HANDOVER_REQ_ACK"
 HandoverResourceAllocationUnsuccessfulTransfer S ngap.n2_ie_type "HANDOVER_RES_ALLOC_FAIL"
+SecondaryRATDataUsageReportTransfer            S ngap.n2_ie_type "SECONDARY_RAT_USAGE"
+PDUSessionResourceModifyIndicationUnsuccessfulTransfer S ngap.n2_ie_type "PDU_RES_MOD_IND_FAIL"
 SourceToTarget-TransparentContainer            S ngap.n2_ie_type "SRC_TO_TAR_CONTAINER"
 TargetToSource-TransparentContainer            S ngap.n2_ie_type "TAR_TO_SRC_CONTAINER"
 RANStatusTransfer-TransparentContainer         S ngap.n2_ie_type "RAN_STATUS_TRANS_CONTAINER"

@@ -16,12 +16,12 @@
 #include <stdio.h>
 #include <glib.h>
 
+#include "wmem-int.h"
 #include "wmem_core.h"
 #include "wmem_tree-int.h"
 #include "wmem_strutl.h"
 #include "wmem_interval_tree.h"
 #include "wmem_user_cb.h"
-#include <wsutil/ws_printf.h> /* ws_debug_printf */
 
 
 static void
@@ -31,7 +31,7 @@ print_range(const void *value)
     if(!value) {
         return;
     }
-    ws_debug_printf("Range: low=%" G_GUINT64_FORMAT " high=%" G_GUINT64_FORMAT " max_edge=%" G_GUINT64_FORMAT "\n", range->low, range->high, range->max_edge);
+    printf("Range: low=%" G_GUINT64_FORMAT " high=%" G_GUINT64_FORMAT " max_edge=%" G_GUINT64_FORMAT "\n", range->low, range->high, range->max_edge);
 }
 
 /**
@@ -121,7 +121,7 @@ wmem_itree_insert(wmem_itree_t *tree, const guint64 low, const guint64 high, voi
     wmem_tree_node_t *node;
     wmem_range_t *range = (wmem_range_t *)wmem_new(tree->data_allocator, wmem_range_t);
 
-    g_assert(low <= high);
+    ASSERT(low <= high);
     range->low = low;
     range->high = high;
     range->max_edge = 0;

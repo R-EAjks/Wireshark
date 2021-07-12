@@ -54,7 +54,7 @@
 #ifdef HAVE_LIBPCAP
 #include "capture_opts.h"
 #endif
-#include <capchild/capture_session.h>
+#include <capture/capture_session.h>
 
 #include <QMainWindow>
 #include <QPointer>
@@ -77,6 +77,7 @@
 #include <ui/qt/models/pref_models.h>
 #include "rtp_stream_dialog.h"
 #include "voip_calls_dialog.h"
+#include "rtp_analysis_dialog.h"
 
 class AccordionFrame;
 class ByteViewTab;
@@ -246,12 +247,6 @@ private:
 
     QWidget* getLayoutWidget(layout_pane_content_e type);
 
-    QPointer<RtpStreamDialog> rtp_stream_dialog_;       // Singleton pattern used
-    QPointer<VoipCallsDialog> voip_calls_dialog_;       // Singleton pattern used
-    QPointer<VoipCallsDialog> sip_calls_dialog_;        // Singleton pattern used
-
-    void interconnectRtpStreamDialogToTelephonyCallsDialog(RtpStreamDialog *rtp_stream_dialog, VoipCallsDialog *dlg);
-
     void freeze();
     void thaw();
 
@@ -313,6 +308,8 @@ signals:
     void framesSelected(QList<int>);
 
     void captureActive(int);
+    void selectRtpStream(rtpstream_id_t *id);
+    void deselectRtpStream(rtpstream_id_t *id);
 
 public slots:
     // in main_window_slots.cpp
@@ -360,6 +357,15 @@ public slots:
 
     void on_actionViewFullScreen_triggered(bool checked);
 
+    void rtpPlayerDialogReplaceRtpStreams(QVector<rtpstream_id_t *> stream_ids);
+    void rtpPlayerDialogAddRtpStreams(QVector<rtpstream_id_t *> stream_ids);
+    void rtpPlayerDialogRemoveRtpStreams(QVector<rtpstream_id_t *> stream_ids);
+    void rtpAnalysisDialogReplaceRtpStreams(QVector<rtpstream_id_t *> stream_ids);
+    void rtpAnalysisDialogAddRtpStreams(QVector<rtpstream_id_t *> stream_ids);
+    void rtpAnalysisDialogRemoveRtpStreams(QVector<rtpstream_id_t *> stream_ids);
+    void rtpStreamsDialogSelectRtpStreams(QVector<rtpstream_id_t *> stream_ids);
+    void rtpStreamsDialogDeselectRtpStreams(QVector<rtpstream_id_t *> stream_ids);
+
 private slots:
 
     void captureEventHandler(CaptureEvent ev);
@@ -388,6 +394,10 @@ private slots:
     void mainStackChanged(int);
     void updateRecentCaptures();
     void recentActionTriggered();
+    void actionAddPacketComment();
+    void actionEditPacketComment();
+    void actionDeletePacketComment();
+    void setEditCommentsMenu();
     void setMenusForSelectedPacket();
     void setMenusForSelectedTreeRow(FieldInformation *fi = NULL);
     void interfaceSelectionChanged();
@@ -502,8 +512,8 @@ private slots:
     void on_actionEditPreviousTimeReference_triggered();
     void on_actionEditTimeShift_triggered();
     void editTimeShiftFinished(int);
-    void on_actionEditPacketComment_triggered();
-    void editPacketCommentFinished(PacketCommentDialog* pc_dialog, int result);
+    void addPacketCommentFinished(PacketCommentDialog* pc_dialog, int result);
+    void editPacketCommentFinished(PacketCommentDialog* pc_dialog, int result, guint nComment);
     void on_actionDeleteAllPacketComments_triggered();
     void deleteAllPacketCommentsFinished(int result);
     void on_actionEditConfigurationProfiles_triggered();
@@ -579,6 +589,7 @@ private slots:
     void on_actionAnalyzeFollowHTTPStream_triggered();
     void on_actionAnalyzeFollowHTTP2Stream_triggered();
     void on_actionAnalyzeFollowQUICStream_triggered();
+    void on_actionAnalyzeFollowSIPCall_triggered();
 
     void statCommandExpertInfo(const char *, void *);
     void on_actionAnalyzeExpertInfo_triggered();
@@ -672,7 +683,11 @@ private slots:
     void on_actionStatisticsHpfeeds_triggered();
     void on_actionStatisticsHTTP2_triggered();
 
-    void openTelephonyVoipCallsDialog(VoipCallsDialog *dlg);
+    RtpStreamDialog *openTelephonyRtpStreamsDialog();
+    RtpPlayerDialog *openTelephonyRtpPlayerDialog();
+    VoipCallsDialog *openTelephonyVoipCallsDialogVoip();
+    VoipCallsDialog *openTelephonyVoipCallsDialogSip();
+    RtpAnalysisDialog *openTelephonyRtpAnalysisDialog();
     void on_actionTelephonyVoipCalls_triggered();
     void on_actionTelephonyGsmMapSummary_triggered();
     void statCommandLteMacStatistics(const char *arg, void *);
@@ -684,8 +699,9 @@ private slots:
     void on_actionTelephonyISUPMessages_triggered();
     void on_actionTelephonyMtp3Summary_triggered();
     void on_actionTelephonyOsmuxPacketCounter_triggered();
-    void on_actionTelephonyRTPStreams_triggered();
-    void on_actionTelephonyRTPStreamAnalysis_triggered();
+    void on_actionTelephonyRtpStreams_triggered();
+    void on_actionTelephonyRtpStreamAnalysis_triggered();
+    void on_actionTelephonyRtpPlayer_triggered();
     void on_actionTelephonyRTSPPacketCounter_triggered();
     void on_actionTelephonySMPPOperations_triggered();
     void on_actionTelephonyUCPMessages_triggered();
@@ -707,6 +723,8 @@ private slots:
 
     void extcap_options_finished(int result);
     void showExtcapOptionsDialog(QString & device_name);
+
+    QString findRtpStreams(QVector<rtpstream_id_t *> *stream_ids, bool reverse);
 
     friend WiresharkApplication;
 };

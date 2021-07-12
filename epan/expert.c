@@ -11,6 +11,7 @@
  */
 
 #include "config.h"
+#define WS_LOG_DOMAIN LOG_DOMAIN_EPAN
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,6 +22,8 @@
 #include "prefs.h"
 #include "wmem/wmem.h"
 #include "tap.h"
+
+#include <wsutil/wslog.h>
 
 /* proto_expert cannot be static because it's referenced in the
  * print routines
@@ -173,7 +176,7 @@ static void uat_expert_post_update_cb(void)
 
 #define EXPERT_REGISTRAR_GET_NTH(eiindex, expinfo)                                               \
 	if((guint)eiindex >= gpa_expertinfo.len && wireshark_abort_on_dissector_bug)   \
-		g_error("Unregistered expert info! index=%d", eiindex);                          \
+		ws_error("Unregistered expert info! index=%d", eiindex);                          \
 	DISSECTOR_ASSERT_HINT((guint)eiindex < gpa_expertinfo.len, "Unregistered expert info!"); \
 	DISSECTOR_ASSERT_HINT(gpa_expertinfo.ei[eiindex] != NULL, "Unregistered expert info!");	\
 	expinfo = gpa_expertinfo.ei[eiindex];
@@ -557,7 +560,7 @@ expert_set_info_vformat(packet_info *pinfo, proto_item *pi, int group, int sever
 	if (use_vaformat) {
 		vsnprintf(formatted, ITEM_LABEL_LENGTH, format, ap);
 	} else {
-		g_strlcpy(formatted, format, ITEM_LABEL_LENGTH);
+		(void) g_strlcpy(formatted, format, ITEM_LABEL_LENGTH);
 	}
 
 	tree = expert_create_tree(pi, group, severity, formatted);

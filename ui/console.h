@@ -21,25 +21,19 @@
 extern "C" {
 #endif /* __cplusplus */
 
-/** Set the console log handler.
+#include <wsutil/wslog.h>
+
+/** The GUI log writer.
  */
-void set_console_log_handler(void);
+void
+console_log_writer(const char *domain, enum ws_log_level level,
+                                   ws_log_time_t timestamp,
+                                   const char *file, int line, const char *func,
+                                   const char *user_format, va_list user_ap,
+                                   void *user_data);
 
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
 
 #endif /* __CONSOLE_H__ */
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

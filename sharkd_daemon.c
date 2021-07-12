@@ -10,6 +10,7 @@
  */
 
 #include <config.h>
+#define WS_LOG_DOMAIN LOG_DOMAIN_MAIN
 
 #include <glib.h>
 
@@ -28,6 +29,7 @@
 #include <wsutil/socket.h>
 #include <wsutil/inet_addr.h>
 #include <wsutil/please_report_bug.h>
+#include <wsutil/wslog.h>
 /*
  * If we have getopt_long() in the system library, include <getopt.h>.
  * Otherwise, we're using our own getopt_long() (either because the
@@ -47,7 +49,7 @@
 #endif
 
 #include <wsutil/strtoi.h>
-#include <version_info.h>
+#include <ui/version_info.h>
 
 #include "sharkd.h"
 
@@ -70,9 +72,9 @@ socket_init(char *path)
 
 	err_msg = ws_init_sockets();
 	if (err_msg != NULL) {
-		g_warning("ERROR: %s", err_msg);
+		ws_warning("ERROR: %s", err_msg);
 		g_free(err_msg);
-		g_warning("%s", please_report_bug());
+		ws_warning("%s", please_report_bug());
 		return fd;
 	}
 
@@ -93,7 +95,7 @@ socket_init(char *path)
 
 		memset(&s_un, 0, sizeof(s_un));
 		s_un.sun_family = AF_UNIX;
-		g_strlcpy(s_un.sun_path, path, sizeof(s_un.sun_path));
+		(void) g_strlcpy(s_un.sun_path, path, sizeof(s_un.sun_path));
 
 		s_un_len = (socklen_t)(offsetof(struct sockaddr_un, sun_path) + strlen(s_un.sun_path));
 
@@ -432,15 +434,15 @@ sharkd_loop(int argc _U_, char* argv[])
 
 		if (mode <= SHARKD_MODE_CLASSIC_DAEMON)
 		{
-			g_strlcat(command_line, "sharkd.exe -", sizeof(command_line));
+			(void) g_strlcat(command_line, "sharkd.exe -", sizeof(command_line));
 		}
 		else
 		{
 			// The -m option used here is an internal-only option that notifies the child process that it should
 			// run in Gold Console mode
-			g_strlcat(command_line, "sharkd.exe -m", sizeof(command_line));
+			(void) g_strlcat(command_line, "sharkd.exe -m", sizeof(command_line));
 
-			for (size_t i = 1; i < argc; i++)
+			for (int i = 1; i < argc; i++)
 			{
 				if (
 					!g_ascii_strncasecmp(argv[i], "-a", (guint)strlen(argv[i]))
@@ -451,8 +453,8 @@ sharkd_loop(int argc _U_, char* argv[])
 				}
 				else
 				{
-					g_strlcat(command_line, " ", sizeof(command_line));
-					g_strlcat(command_line, argv[i], sizeof(command_line));
+					(void) g_strlcat(command_line, " ", sizeof(command_line));
+					(void) g_strlcat(command_line, argv[i], sizeof(command_line));
 				}
 			}
 		}

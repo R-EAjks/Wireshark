@@ -63,7 +63,7 @@ report_error(int *err, gchar **err_info, const char *fmt, ...)
         *err = WTAP_ERR_INTERNAL;
         *err_info = msg;
     } else {
-        g_warning("%s", msg);
+        ws_warning("%s", msg);
         g_free(msg);
     }
 }
@@ -121,7 +121,7 @@ report_error(int *err, gchar **err_info, const char *fmt, ...)
         report_error(err, err_info, "Error in garbage collector while calling FileHandler %s routine", name); \
         break; \
     default: \
-        g_assert_not_reached(); \
+        ws_assert_not_reached(); \
         break;
 
 /* some declarations */
@@ -185,7 +185,7 @@ wslua_filehandler_open(wtap *wth, int *err, gchar **err_info)
             wth->subtype_read = wslua_filehandler_read;
         }
         else {
-            g_warning("Lua file format module lacks a read routine");
+            ws_warning("Lua file format module lacks a read routine");
             return WTAP_OPEN_NOT_MINE;
         }
 
@@ -193,7 +193,7 @@ wslua_filehandler_open(wtap *wth, int *err, gchar **err_info)
             wth->subtype_seek_read = wslua_filehandler_seek_read;
         }
         else {
-            g_warning("Lua file format module lacks a seek-read routine");
+            ws_warning("Lua file format module lacks a seek-read routine");
             return WTAP_OPEN_NOT_MINE;
         }
 
@@ -258,8 +258,8 @@ wslua_filehandler_read(wtap *wth, wtap_rec *rec, Buffer *buf,
         *err = errno = 0;
     }
 
-    g_free(rec->opt_comment);
-    rec->opt_comment = NULL;
+    wtap_block_unref(rec->block);
+    rec->block = NULL;
 
     fp = push_File(L, wth->fh);
     fc = push_CaptureInfo(L, wth, FALSE);
@@ -316,8 +316,8 @@ wslua_filehandler_seek_read(wtap *wth, gint64 seek_off,
         *err = errno = 0;
     }
 
-    g_free(rec->opt_comment);
-    rec->opt_comment = NULL;
+    wtap_block_unref(rec->block);
+    rec->block = NULL;
 
     fp = push_File(L, wth->random_fh);
     fc = push_CaptureInfo(L, wth, FALSE);
@@ -506,7 +506,7 @@ wslua_filehandler_dump_open(wtap_dumper *wdh, int *err, gchar **err_info)
             wdh->subtype_write = wslua_filehandler_dump;
         }
         else {
-            g_warning("FileHandler was not set with a write function, even though write_open() returned true");
+            ws_warning("FileHandler was not set with a write function, even though write_open() returned true");
             return 0;
         }
 
@@ -666,7 +666,7 @@ WSLUA_CONSTRUCTOR FileHandler_new(lua_State* L) {
     fh->finfo.default_file_extension = NULL;
     fh->finfo.additional_file_extensions = NULL;
     fh->finfo.writing_must_seek = FALSE;
-    supported_blocks = (struct supported_block_type  *)g_memdup(&block_type_proto, sizeof block_type_proto);
+    supported_blocks = (struct supported_block_type  *)g_memdup2(&block_type_proto, sizeof block_type_proto);
     /*
      * Add a list of options to the seciton block, interface block, and
      * packet block, so the file handler can indicate comment support.
@@ -678,7 +678,7 @@ WSLUA_CONSTRUCTOR FileHandler_new(lua_State* L) {
         case WTAP_BLOCK_IF_ID_AND_INFO:
         case WTAP_BLOCK_PACKET:
             supported_blocks[i].num_supported_options = OPTION_TYPES_SUPPORTED(option_type_proto);
-            supported_blocks[i].supported_options = (struct supported_option_type *)g_memdup(&option_type_proto, sizeof option_type_proto);
+            supported_blocks[i].supported_options = (struct supported_option_type *)g_memdup2(&option_type_proto, sizeof option_type_proto);
             break;
 
         default:

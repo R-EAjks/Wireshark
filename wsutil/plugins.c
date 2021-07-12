@@ -9,6 +9,7 @@
  */
 
 #include "config.h"
+#define WS_LOG_DOMAIN LOG_DOMAIN_WSUTIL
 
 #include <time.h>
 
@@ -24,9 +25,10 @@
 #include <wsutil/privileges.h>
 #include <wsutil/file_util.h>
 #include <wsutil/report_message.h>
+#include <wsutil/wslog.h>
 
 #include <wsutil/plugins.h>
-#include <wsutil/ws_printf.h> /* ws_debug_printf */
+#include <wsutil/ws_assert.h>
 
 typedef struct _plugin {
     GModule        *handle;       /* handle returned by g_module_open */
@@ -58,10 +60,10 @@ type_to_dir(plugin_type_e type)
     case WS_PLUGIN_CODEC:
         return TYPE_DIR_CODECS;
     default:
-        g_error("Unknown plugin type: %u. Aborting.", (unsigned) type);
+        ws_error("Unknown plugin type: %u. Aborting.", (unsigned) type);
         break;
     }
-    g_assert_not_reached();
+    ws_assert_not_reached();
 }
 
 static inline const char *
@@ -75,10 +77,10 @@ type_to_name(plugin_type_e type)
     case WS_PLUGIN_CODEC:
         return TYPE_NAME_CODEC;
     default:
-        g_error("Unknown plugin type: %u. Aborting.", (unsigned) type);
+        ws_error("Unknown plugin type: %u. Aborting.", (unsigned) type);
         break;
     }
-    g_assert_not_reached();
+    ws_assert_not_reached();
 }
 
 static void
@@ -271,7 +273,7 @@ print_plugin_description(const char *name, const char *version,
                          const char *description, const char *filename,
                          void *user_data _U_)
 {
-    ws_debug_printf("%-16s\t%s\t%s\t%s\n", name, version, description, filename);
+    printf("%-16s\t%s\t%s\t%s\n", name, version, description, filename);
 }
 
 void

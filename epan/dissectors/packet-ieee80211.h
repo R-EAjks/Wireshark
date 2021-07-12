@@ -53,12 +53,21 @@ typedef struct ieee80211_tagged_field_data
   proto_item* item_tag_length;
 } ieee80211_tagged_field_data_t;
 
-
 int add_tagged_field(packet_info *pinfo, proto_tree *tree,
                             tvbuff_t *tvb, int offset, int ftype,
                             const guint8 *valid_element_ids,
                             guint valid_element_ids_count,
                             association_sanity_check_t *association_sanity_check);
+
+int add_tagged_field_with_validation(packet_info *pinfo, proto_tree *tree,
+                                      tvbuff_t *tvb, int offset, int ftype,
+                                      const guint8 *element_ids,
+                                      guint element_ids_count,
+                                      gboolean elements_ids_assume_invalid,
+                                      const guint8 *ext_element_ids,
+                                      guint ext_element_ids_count,
+                                      gboolean ext_element_ids_assume_invalid,
+                                      association_sanity_check_t *association_sanity_check);
 
 int dissect_wifi_dpp_config_proto(packet_info *pinfo, proto_tree *query,
                                   tvbuff_t *tvb, int offset);
@@ -338,6 +347,10 @@ typedef struct anqp_info_dissector_data {
 #define WFA_SUBTYPE_DPP                        26
 #define WFA_SUBTYPE_IEEE1905_MULTI_AP          27 /* ox1B */
 #define WFA_SUBTYPE_OWE_TRANSITION_MODE        28
+#define WFA_SUBTYPE_QOS_MGMT                   33 /* 0x21 */
+
+/* WFA Public Action Types */
+#define WFA_SUBTYPE_ACTION_QOS_MGMT          0x1A
 
 /* WFA vendor specific ANQP subtypes */
 #define WFA_ANQP_SUBTYPE_HS20                  17
@@ -515,7 +528,7 @@ typedef struct anqp_info_dissector_data {
 #define TAG_VHT_OPERATION            192  /* IEEE Std 802.11ac/D3.1 */
 #define TAG_EXT_BSS_LOAD             193  /* IEEE Std 802.11ac */
 #define TAG_WIDE_BW_CHANNEL_SWITCH   194  /* IEEE Std 802.11ac */
-#define TAG_VHT_TX_PWR_ENVELOPE      195  /* IEEE Std 802.11ac/D5.0 */
+#define TAG_TX_PWR_ENVELOPE          195  /* IEEE Std 802.11-2020 */
 #define TAG_CHANNEL_SWITCH_WRAPPER   196  /* IEEE Std 802.11ac */
 #define TAG_OPERATING_MODE_NOTIFICATION 199  /* IEEE Std 802.11ac */
 #define TAG_REDUCED_NEIGHBOR_REPORT  201

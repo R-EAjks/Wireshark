@@ -71,6 +71,7 @@ libwsutil.so.0 libwsutil0 #MINVER#
  find_last_pathname_separator@Base 1.12.0~rc1
  format_size@Base 1.10.0
  free_progdirs@Base 2.3.0
+ g_memdup2@Base 3.5.0
  get_basename@Base 1.12.0~rc1
  get_copyright_info@Base 1.99.0
  get_cur_groupname@Base 1.10.0
@@ -80,6 +81,7 @@ libwsutil.so.0 libwsutil0 #MINVER#
  get_datafile_path@Base 1.12.0~rc1
  get_dirname@Base 1.12.0~rc1
  get_extcap_dir@Base 1.99.0
+ get_friendly_program_name@Base 3.5.0
  get_global_profiles_dir@Base 1.12.0~rc1
  get_os_version_info@Base 1.99.0
  get_persconffile_path@Base 1.12.0~rc1
@@ -121,6 +123,9 @@ libwsutil.so.0 libwsutil0 #MINVER#
  json_dumper_value_string@Base 2.9.0
  json_dumper_value_va_list@Base 2.9.1
  json_dumper_write_base64@Base 2.9.1
+ json_get_array@Base 3.5.0
+ json_get_array_index@Base 3.5.0
+ json_get_array_len@Base 3.5.0
  json_get_double@Base 3.1.0
  json_get_object@Base 3.1.0
  json_get_string@Base 3.1.0
@@ -160,6 +165,11 @@ libwsutil.so.0 libwsutil0 #MINVER#
  register_codec@Base 3.1.0
  relinquish_special_privs_perm@Base 1.10.0
  rename_persconffile_profile@Base 1.12.0~rc1
+ report_cfile_close_failure@Base 3.5.0
+ report_cfile_dump_open_failure@Base 3.5.0
+ report_cfile_open_failure@Base 3.5.0
+ report_cfile_read_failure@Base 3.5.0
+ report_cfile_write_failure@Base 3.5.0
  report_failure@Base 1.12.0~rc1
  report_open_failure@Base 1.12.0~rc1
  report_read_failure@Base 1.12.0~rc1
@@ -189,9 +199,11 @@ libwsutil.so.0 libwsutil0 #MINVER#
  unix_epoch_to_nstime@Base 3.5.0
  update_adler32@Base 1.12.0~rc1
  update_crc10_by_bytes@Base 1.10.0
+ write_file_binary_mode@Base 3.5.0
  ws_add_crash_info@Base 1.10.0
  ws_ascii_strnatcasecmp@Base 1.99.1
  ws_ascii_strnatcmp@Base 1.99.1
+ ws_assert_failed@Base 3.5.0
  ws_base32_decode@Base 2.3.0
  ws_basestrtou16@Base 2.9.0
  ws_basestrtou32@Base 2.9.0
@@ -217,6 +229,27 @@ libwsutil.so.0 libwsutil0 #MINVER#
  ws_inet_pton4@Base 2.1.2
  ws_inet_pton6@Base 2.1.2
  ws_init_sockets@Base 3.1.0
+ ws_log@Base 3.5.0
+ ws_log_add_custom_file@Base 3.5.0
+ ws_log_default_writer@Base 3.5.0
+ ws_log_full@Base 3.5.0
+ ws_log_get_level@Base 3.5.0
+ ws_log_init@Base 3.5.0
+ ws_log_init_with_writer@Base 3.5.0
+ ws_log_init_with_writer_and_data@Base 3.5.0
+ ws_log_level_to_string@Base 3.5.0
+ ws_log_msg_is_active@Base 3.5.0
+ ws_log_parse_args@Base 3.5.0
+ ws_log_print_usage@Base 3.5.0
+ ws_log_set_debug_filter@Base 3.5.0
+ ws_log_set_domain_filter@Base 3.5.0
+ ws_log_set_noisy_filter@Base 3.5.0
+ ws_log_set_fatal@Base 3.5.0
+ ws_log_set_fatal_str@Base 3.5.0
+ ws_log_set_level@Base 3.5.0
+ ws_log_set_level_str@Base 3.5.0
+ ws_logv@Base 3.5.0
+ ws_logv_full@Base 3.5.0
  ws_mempbrk_compile@Base 1.99.4
  ws_mempbrk_exec@Base 1.99.4
  ws_pipe_close@Base 2.6.5

@@ -250,12 +250,15 @@ ProtocolExtensionID TYPE = FT_UINT8 DISPLAY = BASE_DEC|BASE_EXT_STRING STRINGS =
 #.FN_BODY PLMN-Identity  VAL_PTR = &parameter_tvb
   tvbuff_t *parameter_tvb = NULL;
   proto_tree *subtree;
+  struct xnap_private_data *xnap_data = xnap_get_private_data(actx->pinfo);
+  e212_number_type_t number_type = xnap_data->number_type;
+  xnap_data->number_type = E212_NONE;
 %(DEFAULT_BODY)s
   if (!parameter_tvb)
     return offset;
 
   subtree = proto_item_add_subtree(actx->created_item, ett_xnap_PLMN_Identity);
-  dissect_e212_mcc_mnc(parameter_tvb, actx->pinfo, subtree, 0, E212_NONE, FALSE);
+  dissect_e212_mcc_mnc(parameter_tvb, actx->pinfo, subtree, 0, number_type, FALSE);
 
 #.TYPE_ATTR
 PortNumber TYPE = FT_UINT16 DISPLAY = BASE_DEC
@@ -265,6 +268,21 @@ PortNumber TYPE = FT_UINT16 DISPLAY = BASE_DEC
   if (parameter_tvb) {
     actx->created_item = proto_tree_add_item(tree, hf_index, parameter_tvb, 0, 2, ENC_BIG_ENDIAN);
   }
+
+#.FN_BODY GUAMI
+  struct xnap_private_data *xnap_data = xnap_get_private_data(actx->pinfo);
+  xnap_data->number_type = E212_GUAMI;
+%(DEFAULT_BODY)s
+
+#.FN_BODY TAIsinAoI-Item
+  struct xnap_private_data *xnap_data = xnap_get_private_data(actx->pinfo);
+  xnap_data->number_type = E212_5GSTAI;
+%(DEFAULT_BODY)s
+
+#.FN_BODY TAIforMDT-Item
+  struct xnap_private_data *xnap_data = xnap_get_private_data(actx->pinfo);
+  xnap_data->number_type = E212_5GSTAI;
+%(DEFAULT_BODY)s
 
 #.TYPE_ATTR
 TAC TYPE = FT_UINT24 DISPLAY = BASE_DEC_HEX
@@ -276,16 +294,16 @@ TAC TYPE = FT_UINT24 DISPLAY = BASE_DEC_HEX
   }
 
 #.FIELD_ATTR
-BPLMN-ID-Info-NR-Item/nr-CI ABBREV=NR-Cell-Identity TYPE=FT_UINT40 DISPLAY=BASE_HEX
+BPLMN-ID-Info-NR-Item/nr-CI ABBREV=NR_Cell_Identity TYPE=FT_UINT40 DISPLAY=BASE_HEX
 
 #.FIELD_ATTR
-Cell-Type-Choice/ng-ran-nr ABBREV=NR-Cell-Identity TYPE=FT_UINT40 DISPLAY=BASE_HEX
+Cell-Type-Choice/ng-ran-nr ABBREV=NR_Cell_Identity TYPE=FT_UINT40 DISPLAY=BASE_HEX
 
 #.FIELD_ATTR
-NG-RAN-Cell-Identity/nr ABBREV=NR-Cell-Identity TYPE=FT_UINT40 DISPLAY=BASE_HEX
+NG-RAN-Cell-Identity/nr ABBREV=NR_Cell_Identity TYPE=FT_UINT40 DISPLAY=BASE_HEX
 
 #.FIELD_ATTR
-NR-CGI/nr-CI ABBREV=NR-Cell-Identity TYPE=FT_UINT40 DISPLAY=BASE_HEX
+NR-CGI/nr-CI ABBREV=NR_Cell_Identity TYPE=FT_UINT40 DISPLAY=BASE_HEX
 
 #.FN_BODY NR-Cell-Identity VAL_PTR = &cell_id_tvb HF_INDEX=-1
   tvbuff_t *cell_id_tvb = NULL;
@@ -296,19 +314,29 @@ NR-CGI/nr-CI ABBREV=NR-Cell-Identity TYPE=FT_UINT40 DISPLAY=BASE_HEX
   }
 
 #.FIELD_ATTR
-BPLMN-ID-Info-EUTRA-Item/e-utraCI ABBREV=E-UTRA-Cell-Identity TYPE=FT_UINT32 DISPLAY=BASE_HEX
+BPLMN-ID-Info-EUTRA-Item/e-utraCI ABBREV=E_UTRA_Cell_Identity TYPE=FT_UINT32 DISPLAY=BASE_HEX
 
 #.FIELD_ATTR
-Cell-Type-Choice/ng-ran-e-utra ABBREV=E-UTRA-Cell-Identity TYPE=FT_UINT32 DISPLAY=BASE_HEX
+Cell-Type-Choice/ng-ran-e-utra ABBREV=E_UTRA_Cell_Identity TYPE=FT_UINT32 DISPLAY=BASE_HEX
 
 #.FIELD_ATTR
-Cell-Type-Choice/e-utran ABBREV=E-UTRA-Cell-Identity TYPE=FT_UINT32 DISPLAY=BASE_HEX
+Cell-Type-Choice/e-utran ABBREV=E_UTRA_Cell_Identity TYPE=FT_UINT32 DISPLAY=BASE_HEX
 
 #.FIELD_ATTR
-E-UTRA-CGI/e-utra-CI ABBREV=E-UTRA-Cell-Identity TYPE=FT_UINT32 DISPLAY=BASE_HEX
+E-UTRA-CGI/e-utra-CI ABBREV=E_UTRA_Cell_Identity TYPE=FT_UINT32 DISPLAY=BASE_HEX
 
 #.FIELD_ATTR
-NG-RAN-Cell-Identity/e-utra ABBREV=E-UTRA-Cell-Identity TYPE=FT_UINT32 DISPLAY=BASE_HEX
+NG-RAN-Cell-Identity/e-utra ABBREV=E_UTRA_Cell_Identity TYPE=FT_UINT32 DISPLAY=BASE_HEX
+
+#.FN_BODY NR-CGI
+  struct xnap_private_data *xnap_data = xnap_get_private_data(actx->pinfo);
+  xnap_data->number_type = E212_NRCGI;
+%(DEFAULT_BODY)s
+
+#.FN_BODY E-UTRA-CGI
+  struct xnap_private_data *xnap_data = xnap_get_private_data(actx->pinfo);
+  xnap_data->number_type = E212_ECGI;
+%(DEFAULT_BODY)s
 
 #.FN_BODY E-UTRA-Cell-Identity VAL_PTR = &cell_id_tvb HF_INDEX=-1
   tvbuff_t *cell_id_tvb = NULL;
@@ -491,10 +519,10 @@ BluetoothName TYPE=FT_STRING DISPLAY = STR_UNICODE
 %(DEFAULT_BODY)s
   if (parameter_tvb) {
     static int * const fields[] = {
-      &hf_xnap_ExtendedRATRestrictionInformation_e_UTRA,
-      &hf_xnap_ExtendedRATRestrictionInformation_nR,
-      &hf_xnap_ExtendedRATRestrictionInformation_nR_unlicensed,
-      &hf_xnap_ExtendedRATRestrictionInformation_reserved,
+      &hf_xnap_primaryRATRestriction_e_UTRA,
+      &hf_xnap_primaryRATRestriction_nR,
+      &hf_xnap_primaryRATRestriction_nR_unlicensed,
+      &hf_xnap_primaryRATRestriction_reserved,
       NULL
     };
     proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_xnap_primaryRATRestriction);
@@ -506,10 +534,11 @@ BluetoothName TYPE=FT_STRING DISPLAY = STR_UNICODE
 %(DEFAULT_BODY)s
   if (parameter_tvb) {
     static int * const fields[] = {
-      &hf_xnap_ExtendedRATRestrictionInformation_e_UTRA,
-      &hf_xnap_ExtendedRATRestrictionInformation_nR,
-      &hf_xnap_ExtendedRATRestrictionInformation_nR_unlicensed,
-      &hf_xnap_ExtendedRATRestrictionInformation_reserved,
+      &hf_xnap_secondaryRATRestriction_e_UTRA,
+      &hf_xnap_secondaryRATRestriction_nR,
+      &hf_xnap_secondaryRATRestriction_e_UTRA_unlicensed,
+      &hf_xnap_secondaryRATRestriction_nR_unlicensed,
+      &hf_xnap_secondaryRATRestriction_reserved,
       NULL
     };
     proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_xnap_secondaryRATRestriction);
@@ -1180,6 +1209,13 @@ id-QosMonitoringReportingFrequency                ProtocolIE-ID
 id-QoSFlowsMappedtoDRB-SetupResponse-MNterminated ProtocolIE-ID
 id-DL-scheduling-PDCCH-CCE-usage                  ProtocolIE-ID
 id-UL-scheduling-PDCCH-CCE-usage                  ProtocolIE-ID
+id-SFN-Offset                                     ProtocolIE-ID
+id-QoSMonitoringDisabled                          ProtocolIE-ID
+id-ExtendedUEIdentityIndexValue                   ProtocolIE-ID
+id-PagingeDRXInformation                          ProtocolIE-ID
+id-CHO-MRDC-EarlyDataForwarding                   ProtocolIE-ID
+id-SCGIndicator                                   ProtocolIE-ID
+id-UESpecificDRX                                  ProtocolIE-ID
 
 #.REGISTER
 
@@ -1357,6 +1393,11 @@ MDTPLMNList                                       N xnap.ies id-MDTPLMNList
 UERadioCapabilityID                               N xnap.ies id-UERadioCapabilityID
 SNTriggered                                       N xnap.ies id-SNTriggered
 CellAssistanceInfo-EUTRA                          N xnap.ies id-cellAssistanceInfo-EUTRA
+ExtendedUEIdentityIndexValue                      N xnap.ies id-ExtendedUEIdentityIndexValue
+PagingeDRXInformation                             N xnap.ies id-PagingeDRXInformation
+CHO-MRDC-EarlyDataForwarding                      N xnap.ies id-CHO-MRDC-EarlyDataForwarding
+SCGIndicator                                      N xnap.ies id-SCGIndicator
+UESpecificDRX                                     N xnap.ies id-UESpecificDRX
 
 #XNAP-PROTOCOL-EXTENSION
 Additional-UL-NG-U-TNLatUPF-List                  N xnap.extension id-Additional-UL-NG-U-TNLatUPF-List
@@ -1430,6 +1471,8 @@ QosMonitoringReportingFrequency                   N xnap.extension id-QosMonitor
 QoSFlowsMappedtoDRB-SetupResponse-MNterminated    N xnap.extension id-QoSFlowsMappedtoDRB-SetupResponse-MNterminated
 DL-scheduling-PDCCH-CCE-usage                     N xnap.extension id-DL-scheduling-PDCCH-CCE-usage
 UL-scheduling-PDCCH-CCE-usage                     N xnap.extension id-UL-scheduling-PDCCH-CCE-usage
+SFN-Offset                                        N xnap.extension id-SFN-Offset
+QoSMonitoringDisabled                             N xnap.extension id-QoSMonitoringDisabled
 
 #XNAP-ELEMENTARY-PROCEDURE
 HandoverRequest                            N xnap.proc.imsg id-handoverPreparation

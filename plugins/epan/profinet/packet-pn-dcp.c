@@ -285,8 +285,8 @@ static const value_string pn_dcp_suboption_device[] = {
     { 0, NULL }
 };
 
-static const true_false_string pn_dcp_rsi_properties_value_bit[] =
-    { { "Available", "Not available" } };
+static const true_false_string pn_dcp_rsi_properties_value_bit =
+    { "Available", "Not available" };
 
 #define PNDCP_SUBOPTION_DHCP_CLIENT_ID  61
 #define PNDCP_SUBOPTION_DHCP_CONTROL_FOR_ADDRESS_RES  255
@@ -1090,67 +1090,73 @@ dissect_PNDCP_Suboption_Control(tvbuff_t *tvb, int offset, packet_info *pinfo,
     offset = dissect_pn_uint8(tvb, offset, pinfo, tree, hf_pn_dcp_suboption_control, &suboption);
     offset = dissect_pn_uint16(tvb, offset, pinfo, tree, hf_pn_dcp_block_length, &block_length);
 
-    switch (suboption) {
-    case PNDCP_SUBOPTION_CONTROL_START_TRANS:
-        pn_append_info(pinfo, dcp_item, ", Start-Trans");
-        proto_item_append_text(block_item, "Control/Start-Transaction");
-        offset = dissect_pn_uint16(tvb, offset, pinfo, tree, hf_pn_dcp_block_qualifier, &block_qualifier);
-        break;
-    case PNDCP_SUBOPTION_CONTROL_END_TRANS:
-        pn_append_info(pinfo, dcp_item, ", End-Trans");
-        proto_item_append_text(block_item, "Control/End-Transaction");
-        offset = dissect_pn_uint16(tvb, offset, pinfo, tree, hf_pn_dcp_block_qualifier, &block_qualifier);
-        break;
-    case PNDCP_SUBOPTION_CONTROL_SIGNAL:
-        pn_append_info(pinfo, dcp_item, ", Signal");
-        proto_item_append_text(block_item, "Control/Signal");
-        offset = dissect_pn_uint16(tvb, offset, pinfo, tree, hf_pn_dcp_block_qualifier, &block_qualifier);
-        block_length -= 2;
+    if (service_id == PNDCP_SERVICE_ID_SET && block_length == 0) {
+        pn_append_info(pinfo, dcp_item, ", Erroneous DCPSet block");
+        proto_item_append_text(block_item, "Control/Erroneous DCPSet block");
+    }
+    else {
+        switch (suboption) {
+        case PNDCP_SUBOPTION_CONTROL_START_TRANS:
+            pn_append_info(pinfo, dcp_item, ", Start-Trans");
+            proto_item_append_text(block_item, "Control/Start-Transaction");
+            offset = dissect_pn_uint16(tvb, offset, pinfo, tree, hf_pn_dcp_block_qualifier, &block_qualifier);
+            break;
+        case PNDCP_SUBOPTION_CONTROL_END_TRANS:
+            pn_append_info(pinfo, dcp_item, ", End-Trans");
+            proto_item_append_text(block_item, "Control/End-Transaction");
+            offset = dissect_pn_uint16(tvb, offset, pinfo, tree, hf_pn_dcp_block_qualifier, &block_qualifier);
+            break;
+        case PNDCP_SUBOPTION_CONTROL_SIGNAL:
+            pn_append_info(pinfo, dcp_item, ", Signal");
+            proto_item_append_text(block_item, "Control/Signal");
+            offset = dissect_pn_uint16(tvb, offset, pinfo, tree, hf_pn_dcp_block_qualifier, &block_qualifier);
+            block_length -= 2;
 
-        offset = dissect_pn_uint16(tvb, offset, pinfo, tree, hf_pn_dcp_suboption_control_signal_value, &u16SignalValue);
-        break;
-    case PNDCP_SUBOPTION_CONTROL_RESPONSE:
-        proto_item_append_text(block_item, "Control/Response");
-        offset = dissect_PNDCP_Option(tvb, offset, pinfo, tree, block_item, hf_pn_dcp_suboption_control_option,
-            FALSE /* append_col */);
-        block_error = tvb_get_guint8 (tvb, offset);
-        if (tree) {
-            item = proto_tree_add_uint(tree, hf_pn_dcp_block_error, tvb, offset, 1, block_error);
+            offset = dissect_pn_uint16(tvb, offset, pinfo, tree, hf_pn_dcp_suboption_control_signal_value, &u16SignalValue);
+            break;
+        case PNDCP_SUBOPTION_CONTROL_RESPONSE:
+            proto_item_append_text(block_item, "Control/Response");
+            offset = dissect_PNDCP_Option(tvb, offset, pinfo, tree, block_item, hf_pn_dcp_suboption_control_option,
+                FALSE /* append_col */);
+            block_error = tvb_get_guint8(tvb, offset);
+            if (tree) {
+                item = proto_tree_add_uint(tree, hf_pn_dcp_block_error, tvb, offset, 1, block_error);
+            }
+            offset += 1;
+            if (block_error != 0) {
+                expert_add_info_format(pinfo, item, &ei_pn_dcp_block_error_unknown, "%s",
+                    val_to_str(block_error, pn_dcp_block_error, "Unknown"));
+            }
+            info_str = wmem_strdup_printf(wmem_packet_scope(), ", Response(%s)",
+                val_to_str(block_error, pn_dcp_block_error, "Unknown"));
+            pn_append_info(pinfo, dcp_item, info_str);
+            proto_item_append_text(block_item, ", BlockError: %s",
+                val_to_str(block_error, pn_dcp_block_error, "Unknown"));
+
+            break;
+        case PNDCP_SUBOPTION_CONTROL_FACT_RESET:
+            pn_append_info(pinfo, dcp_item, ", Reset FactorySettings");
+            proto_item_append_text(block_item, "Control/Reset FactorySettings");
+            block_length -= 2;
+            offset = dissect_pn_uint16(tvb, offset, pinfo, tree, hf_pn_dcp_blockqualifier, &BlockQualifier);
+            proto_item_append_text(block_item, ", BlockQualifier: %s",
+                val_to_str(BlockQualifier, pn_dcp_suboption_other, "reserved"));
+            block_length -= 2;
+            break;
+
+        case PNDCP_SUBOPTION_CONTROL_RESET_TO_FACT:
+            pn_append_info(pinfo, dcp_item, ", Reset to Factory");
+            proto_item_append_text(block_item, "Reset to FactorySettings");
+
+            offset = dissect_pn_uint16(tvb, offset, pinfo, tree, hf_pn_dcp_blockqualifier_r2f, &BlockQualifier);
+            proto_item_append_text(block_item, ", BlockQualifier: %s",
+                val_to_str(BlockQualifier, pn_dcp_BlockQualifier, "reserved"));
+            block_length -= 2;
+
+            break;
+        default:
+            offset = dissect_pn_undecoded(tvb, offset, pinfo, tree, block_length);
         }
-        offset += 1;
-        if (block_error != 0) {
-            expert_add_info_format(pinfo, item, &ei_pn_dcp_block_error_unknown, "%s",
-                                    val_to_str(block_error, pn_dcp_block_error, "Unknown"));
-        }
-        info_str = wmem_strdup_printf(wmem_packet_scope(), ", Response(%s)",
-                                      val_to_str(block_error, pn_dcp_block_error, "Unknown"));
-        pn_append_info(pinfo, dcp_item, info_str);
-        proto_item_append_text(block_item, ", BlockError: %s",
-                                    val_to_str(block_error, pn_dcp_block_error, "Unknown"));
-
-        break;
-    case PNDCP_SUBOPTION_CONTROL_FACT_RESET:
-        pn_append_info(pinfo, dcp_item, ", Reset FactorySettings");
-        proto_item_append_text(block_item, "Control/Reset FactorySettings");
-        block_length -= 2;
-        offset = dissect_pn_uint16(tvb, offset, pinfo, tree, hf_pn_dcp_blockqualifier, &BlockQualifier);
-        proto_item_append_text(block_item, ", BlockQualifier: %s",
-            val_to_str(BlockQualifier, pn_dcp_suboption_other, "reserved"));
-        block_length -= 2;
-        break;
-
-    case PNDCP_SUBOPTION_CONTROL_RESET_TO_FACT:
-        pn_append_info(pinfo, dcp_item, ", Reset to Factory");
-        proto_item_append_text(block_item, "Reset to FactorySettings");
-
-        offset = dissect_pn_uint16(tvb, offset, pinfo, tree, hf_pn_dcp_blockqualifier_r2f, &BlockQualifier);
-        proto_item_append_text(block_item, ", BlockQualifier: %s",
-            val_to_str(BlockQualifier, pn_dcp_BlockQualifier, "reserved"));
-        block_length -= 2;
-
-        break;
-    default:
-        offset = dissect_pn_undecoded(tvb, offset, pinfo, tree, block_length);
     }
 
     return offset;
@@ -1259,6 +1265,8 @@ dissect_PNDCP_Block(tvbuff_t *tvb, int offset, packet_info *pinfo,
     proto_item *block_item;
     proto_tree *block_tree;
     int         ori_offset = offset;
+    guint8      suboption;
+    guint16     block_length;
 
     /* subtree for block */
     block_item = proto_tree_add_none_format(tree, hf_pn_dcp_block,
@@ -1300,6 +1308,9 @@ dissect_PNDCP_Block(tvbuff_t *tvb, int offset, packet_info *pinfo,
     {
         pn_append_info(pinfo, dcp_item, ", Reserved");
         proto_item_append_text(block_item, "Reserved");
+        offset = dissect_pn_uint8(tvb, offset, pinfo, block_tree, hf_pn_dcp_suboption_control, &suboption);
+        offset = dissect_pn_uint16(tvb, offset, pinfo, block_tree, hf_pn_dcp_block_length, &block_length);
+        offset = dissect_pn_undecoded(tvb, offset, pinfo, block_tree, block_length);
     }
 
     proto_item_set_len(block_item, offset-ori_offset);
@@ -1611,32 +1622,32 @@ proto_register_pn_dcp (void)
 
         { &hf_pn_dcp_rsi_properties_value_bit0,
           { "IP Stack", "pn_dcp.suboption_device_rsi_properties_value.bit0",
-            FT_BOOLEAN, 16, TFS(pn_dcp_rsi_properties_value_bit), 0x0001,
+            FT_BOOLEAN, 16, TFS(&pn_dcp_rsi_properties_value_bit), 0x0001,
             NULL, HFILL } },
 
         { &hf_pn_dcp_rsi_properties_value_bit1,
           { "CLRPC Interface", "pn_dcp.suboption_device_rsi_properties_value.bit1",
-            FT_BOOLEAN, 16, TFS(pn_dcp_rsi_properties_value_bit), 0x0002,
+            FT_BOOLEAN, 16, TFS(&pn_dcp_rsi_properties_value_bit), 0x0002,
             NULL, HFILL } },
 
         { &hf_pn_dcp_rsi_properties_value_bit2,
           { "RSI AR Interface", "pn_dcp.suboption_device_rsi_properties_value.bit2",
-            FT_BOOLEAN, 16, TFS(pn_dcp_rsi_properties_value_bit), 0x0004,
+            FT_BOOLEAN, 16, TFS(&pn_dcp_rsi_properties_value_bit), 0x0004,
             NULL, HFILL } },
 
         { &hf_pn_dcp_rsi_properties_value_bit3,
           { "RSI AR Read Implicit Interface", "pn_dcp.suboption_device_rsi_properties_value.bit3",
-            FT_BOOLEAN, 16, TFS(pn_dcp_rsi_properties_value_bit), 0x0008,
+            FT_BOOLEAN, 16, TFS(&pn_dcp_rsi_properties_value_bit), 0x0008,
             NULL, HFILL } },
 
         { &hf_pn_dcp_rsi_properties_value_bit4,
           { "RSI CIM Interface", "pn_dcp.suboption_device_rsi_properties_value.bit4",
-            FT_BOOLEAN, 16, TFS(pn_dcp_rsi_properties_value_bit), 0x0010,
+            FT_BOOLEAN, 16, TFS(&pn_dcp_rsi_properties_value_bit), 0x0010,
             NULL, HFILL } },
 
         { &hf_pn_dcp_rsi_properties_value_bit5,
           { "RSI CIM Read Implicit Interface", "pn_dcp.suboption_device_rsi_properties_value.bit5",
-            FT_BOOLEAN, 16, TFS(pn_dcp_rsi_properties_value_bit), 0x0020,
+            FT_BOOLEAN, 16, TFS(&pn_dcp_rsi_properties_value_bit), 0x0020,
             NULL, HFILL } },
 
         { &hf_pn_dcp_rsi_properties_value_otherbits,

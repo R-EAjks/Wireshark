@@ -25,6 +25,7 @@
 #include <epan/sctpppids.h>
 #include <epan/asn1.h>
 #include <epan/prefs.h>
+#include <epan/proto_data.h>
 
 #include "packet-per.h"
 #include "packet-e212.h"
@@ -100,7 +101,7 @@ typedef enum _ProtocolIE_ID_enum {
 } ProtocolIE_ID_enum;
 
 /*--- End of included file: packet-hnbap-val.h ---*/
-#line 38 "./asn1/hnbap/packet-hnbap-template.c"
+#line 39 "./asn1/hnbap/packet-hnbap-template.c"
 
 /* Initialize the protocol and registered fields */
 static int proto_hnbap = -1;
@@ -246,7 +247,7 @@ static int hf_hnbap_successfulOutcome_value = -1;  /* SuccessfulOutcome_value */
 static int hf_hnbap_unsuccessfulOutcome_value = -1;  /* UnsuccessfulOutcome_value */
 
 /*--- End of included file: packet-hnbap-hf.c ---*/
-#line 43 "./asn1/hnbap/packet-hnbap-template.c"
+#line 44 "./asn1/hnbap/packet-hnbap-template.c"
 
 /* Initialize the subtree pointers */
 static int ett_hnbap = -1;
@@ -320,7 +321,11 @@ static gint ett_hnbap_SuccessfulOutcome = -1;
 static gint ett_hnbap_UnsuccessfulOutcome = -1;
 
 /*--- End of included file: packet-hnbap-ett.c ---*/
-#line 48 "./asn1/hnbap/packet-hnbap-template.c"
+#line 49 "./asn1/hnbap/packet-hnbap-template.c"
+
+struct hnbap_private_data {
+  e212_number_type_t number_type;
+};
 
 /* Global variables */
 static guint32 ProcedureCode;
@@ -342,6 +347,17 @@ static int dissect_InitiatingMessageValue(tvbuff_t *tvb, packet_info *pinfo, pro
 static int dissect_SuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *);
 static int dissect_UnsuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *);
 void proto_reg_handoff_hnbap(void);
+
+static struct hnbap_private_data*
+hnbap_get_private_data(packet_info *pinfo)
+{
+  struct hnbap_private_data *hnbap_data = (struct hnbap_private_data*)p_get_proto_data(pinfo->pool, pinfo, proto_hnbap, 0);
+  if (!hnbap_data) {
+    hnbap_data = wmem_new0(pinfo->pool, struct hnbap_private_data);
+    p_add_proto_data(pinfo->pool, pinfo, proto_hnbap, 0, hnbap_data);
+  }
+  return hnbap_data;
+}
 
 
 /*--- Included file: packet-hnbap-fn.c ---*/
@@ -942,11 +958,14 @@ static int
 dissect_hnbap_PLMNidentity(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
 #line 166 "./asn1/hnbap/hnbap.cnf"
   tvbuff_t *parameter_tvb;
+  struct hnbap_private_data *hnbap_data = hnbap_get_private_data(actx->pinfo);
+  e212_number_type_t number_type = hnbap_data->number_type;
+  hnbap_data->number_type = E212_NONE;
   offset = dissect_per_octet_string(tvb, offset, actx, tree, hf_index,
                                        3, 3, FALSE, &parameter_tvb);
 
   if (parameter_tvb) {
-    dissect_e212_mcc_mnc(parameter_tvb, actx->pinfo, tree, 0, E212_NONE, FALSE);
+    dissect_e212_mcc_mnc(parameter_tvb, actx->pinfo, tree, 0, number_type, FALSE);
   }
 
 
@@ -957,8 +976,16 @@ dissect_hnbap_PLMNidentity(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _
 
 static int
 dissect_hnbap_LAC(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-  offset = dissect_per_octet_string(tvb, offset, actx, tree, hf_index,
-                                       2, 2, FALSE, NULL);
+#line 194 "./asn1/hnbap/hnbap.cnf"
+  tvbuff_t *parameter_tvb = NULL;
+  offset = dissect_per_octet_string(tvb, offset, actx, tree, -1,
+                                       2, 2, FALSE, &parameter_tvb);
+
+  if (parameter_tvb) {
+    actx->created_item = proto_tree_add_item(tree, hf_index, parameter_tvb, 0, 2, ENC_BIG_ENDIAN);
+  }
+
+
 
   return offset;
 }
@@ -984,8 +1011,14 @@ static const per_sequence_t CGI_sequence[] = {
 
 static int
 dissect_hnbap_CGI(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+#line 177 "./asn1/hnbap/hnbap.cnf"
+  struct hnbap_private_data *hnbap_data = hnbap_get_private_data(actx->pinfo);
+  hnbap_data->number_type = E212_CGI;
   offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
                                    ett_hnbap_CGI, CGI_sequence);
+
+
+
 
   return offset;
 }
@@ -1304,8 +1337,16 @@ dissect_hnbap_HNBConfigInfo(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx 
 
 static int
 dissect_hnbap_RAC(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-  offset = dissect_per_octet_string(tvb, offset, actx, tree, hf_index,
-                                       1, 1, FALSE, NULL);
+#line 208 "./asn1/hnbap/hnbap.cnf"
+  tvbuff_t *parameter_tvb = NULL;
+  offset = dissect_per_octet_string(tvb, offset, actx, tree, -1,
+                                       1, 1, FALSE, &parameter_tvb);
+
+  if (parameter_tvb) {
+    actx->created_item = proto_tree_add_item(tree, hf_index, parameter_tvb, 0, 1, ENC_BIG_ENDIAN);
+  }
+
+
 
   return offset;
 }
@@ -1469,8 +1510,19 @@ static const per_sequence_t LAI_sequence[] = {
 
 static int
 dissect_hnbap_LAI(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+#line 182 "./asn1/hnbap/hnbap.cnf"
+  struct hnbap_private_data *hnbap_data = hnbap_get_private_data(actx->pinfo);
+  /* The RAI is defined in the ASN.1 as the LAI plus the RAC; don't override
+   * the MNC/MCC field types in that case.
+   */
+  if (hnbap_data->number_type != E212_RAI) {
+    hnbap_data->number_type = E212_LAI;
+  }
   offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
                                    ett_hnbap_LAI, LAI_sequence);
+
+
+
 
   return offset;
 }
@@ -1547,8 +1599,14 @@ static const per_sequence_t RAI_sequence[] = {
 
 static int
 dissect_hnbap_RAI(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+#line 201 "./asn1/hnbap/hnbap.cnf"
+  struct hnbap_private_data *hnbap_data = hnbap_get_private_data(actx->pinfo);
+  hnbap_data->number_type = E212_RAI;
   offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
                                    ett_hnbap_RAI, RAI_sequence);
+
+
+
 
   return offset;
 }
@@ -1689,8 +1747,16 @@ dissect_hnbap_RNC_ID(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, pr
 
 static int
 dissect_hnbap_SAC(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-  offset = dissect_per_octet_string(tvb, offset, actx, tree, hf_index,
-                                       2, 2, FALSE, NULL);
+#line 217 "./asn1/hnbap/hnbap.cnf"
+  tvbuff_t *parameter_tvb = NULL;
+  offset = dissect_per_octet_string(tvb, offset, actx, tree, -1,
+                                       2, 2, FALSE, &parameter_tvb);
+
+  if (parameter_tvb) {
+    actx->created_item = proto_tree_add_item(tree, hf_index, parameter_tvb, 0, 2, ENC_BIG_ENDIAN);
+  }
+
+
 
   return offset;
 }
@@ -2595,7 +2661,7 @@ static int dissect_HNBAP_PDU_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, prot
 
 
 /*--- End of included file: packet-hnbap-fn.c ---*/
-#line 71 "./asn1/hnbap/packet-hnbap-template.c"
+#line 87 "./asn1/hnbap/packet-hnbap-template.c"
 
 static int dissect_ProtocolIEFieldValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
@@ -2714,7 +2780,7 @@ module_t *hnbap_module;
         NULL, HFILL }},
     { &hf_hnbap_LAC_PDU,
       { "LAC", "hnbap.LAC",
-        FT_BYTES, BASE_NONE, NULL, 0,
+        FT_UINT16, BASE_DEC_HEX, NULL, 0,
         NULL, HFILL }},
     { &hf_hnbap_MuxPortNumber_PDU,
       { "MuxPortNumber", "hnbap.MuxPortNumber",
@@ -2742,7 +2808,7 @@ module_t *hnbap_module;
         NULL, HFILL }},
     { &hf_hnbap_RAC_PDU,
       { "RAC", "hnbap.RAC",
-        FT_BYTES, BASE_NONE, NULL, 0,
+        FT_UINT8, BASE_DEC_HEX, NULL, 0,
         NULL, HFILL }},
     { &hf_hnbap_Registration_Cause_PDU,
       { "Registration-Cause", "hnbap.Registration_Cause",
@@ -2754,7 +2820,7 @@ module_t *hnbap_module;
         NULL, HFILL }},
     { &hf_hnbap_SAC_PDU,
       { "SAC", "hnbap.SAC",
-        FT_BYTES, BASE_NONE, NULL, 0,
+        FT_UINT16, BASE_DEC_HEX, NULL, 0,
         NULL, HFILL }},
     { &hf_hnbap_UE_Capabilities_PDU,
       { "UE-Capabilities", "hnbap.UE_Capabilities_element",
@@ -2954,7 +3020,7 @@ module_t *hnbap_module;
         NULL, HFILL }},
     { &hf_hnbap_lAC,
       { "lAC", "hnbap.lAC",
-        FT_BYTES, BASE_NONE, NULL, 0,
+        FT_UINT16, BASE_DEC_HEX, NULL, 0,
         NULL, HFILL }},
     { &hf_hnbap_cI,
       { "cI", "hnbap.cI",
@@ -3118,7 +3184,7 @@ module_t *hnbap_module;
         NULL, HFILL }},
     { &hf_hnbap_rAC,
       { "rAC", "hnbap.rAC",
-        FT_BYTES, BASE_NONE, NULL, 0,
+        FT_UINT8, BASE_DEC_HEX, NULL, 0,
         NULL, HFILL }},
     { &hf_hnbap_tMSI,
       { "tMSI", "hnbap.tMSI",
@@ -3214,7 +3280,7 @@ module_t *hnbap_module;
         "UnsuccessfulOutcome_value", HFILL }},
 
 /*--- End of included file: packet-hnbap-hfarr.c ---*/
-#line 141 "./asn1/hnbap/packet-hnbap-template.c"
+#line 157 "./asn1/hnbap/packet-hnbap-template.c"
   };
 
   /* List of subtrees */
@@ -3290,7 +3356,7 @@ module_t *hnbap_module;
     &ett_hnbap_UnsuccessfulOutcome,
 
 /*--- End of included file: packet-hnbap-ettarr.c ---*/
-#line 148 "./asn1/hnbap/packet-hnbap-template.c"
+#line 164 "./asn1/hnbap/packet-hnbap-template.c"
   };
 
 
@@ -3375,7 +3441,7 @@ proto_reg_handoff_hnbap(void)
 
 
 /*--- End of included file: packet-hnbap-dis-tab.c ---*/
-#line 183 "./asn1/hnbap/packet-hnbap-template.c"
+#line 199 "./asn1/hnbap/packet-hnbap-template.c"
 
         } else {
                 dissector_delete_uint("sctp.port", sctp_port, hnbap_handle);

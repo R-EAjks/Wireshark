@@ -101,8 +101,9 @@
 #include <string.h>
 #include <wsutil/file_util.h>
 #include <cli_main.h>
-#include <version_info.h>
+#include <ui/version_info.h>
 #include <wsutil/inet_addr.h>
+#include <wsutil/wslog.h>
 
 #ifdef _WIN32
 #include <io.h>     /* for _setmode */
@@ -940,12 +941,12 @@ append_to_preamble (char *str)
     if (toklen != 0) {
         if (packet_preamble_len + toklen > PACKET_PREAMBLE_MAX_LEN)
             return; /* no room to add the token to the preamble */
-        g_strlcpy(&packet_preamble[packet_preamble_len], str, PACKET_PREAMBLE_MAX_LEN);
+        (void) g_strlcpy(&packet_preamble[packet_preamble_len], str, PACKET_PREAMBLE_MAX_LEN);
         packet_preamble_len += (int) toklen;
         if (debug >= 2) {
             char *c;
             char xs[PACKET_PREAMBLE_MAX_LEN];
-            g_strlcpy(xs, packet_preamble, PACKET_PREAMBLE_MAX_LEN);
+            (void) g_strlcpy(xs, packet_preamble, PACKET_PREAMBLE_MAX_LEN);
             while ((c = strchr(xs, '\r')) != NULL) *c=' ';
             fprintf (stderr, "[[append_to_preamble: \"%s\"]]", xs);
         }
@@ -1859,10 +1860,23 @@ parse_options (int argc, char *argv[])
     return EXIT_SUCCESS;
 }
 
+void
+text2pcap_vcmdarg_err(const char *fmt, va_list ap)
+{
+    vfprintf(stderr, fmt, ap);
+    fputc('\n', stderr);
+}
+
 int
 main(int argc, char *argv[])
 {
     int ret = EXIT_SUCCESS;
+
+    /* Initialize log handler early so we can have proper logging during startup. */
+    ws_log_init("text2pcap", text2pcap_vcmdarg_err);
+
+    /* Early logging command-line initialization. */
+    ws_log_parse_args(&argc, argv, text2pcap_vcmdarg_err, 1);
 
 #ifdef _WIN32
     create_app_running_mutex();

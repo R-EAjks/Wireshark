@@ -1,4 +1,4 @@
--- 3GPP TS 38.473 V16.4.0 (2021-01)
+-- 3GPP TS 38.473 V16.6.0 (2021-07)
 -- 9.4.5	Information Element Definitions
 -- **************************************************************
 --
@@ -103,6 +103,10 @@ IMPORTS
 	id-E-CID-MeasurementQuantities-Item,
 	id-ConfiguredTACIndication,
 	id-NRCGI,
+	id-SFN-Offset,
+	id-TransmissionStopIndicator,
+	id-SrsFrequency,
+	id-EstimatedArrivalProbability,
 	maxNRARFCN,
 	maxnoofErrors,
 	maxnoofBPLMNs,
@@ -278,6 +282,7 @@ AdditionalPDCPDuplicationTNL-Item ::=SEQUENCE {
 }
 
 AdditionalPDCPDuplicationTNL-ItemExtIEs 	F1AP-PROTOCOL-EXTENSION ::= {
+{ ID id-BHInfo		CRITICALITY ignore	EXTENSION BHInfo		PRESENCE optional	},
 	...
 }
 
@@ -766,7 +771,8 @@ CauseRadioNetwork ::= ENUMERATED {
 	measurement-temporarily-not-available,
 	measurement-not-supported-for-the-object,
 	unknown-bh-address,
-	unknown-bap-routing-id
+	unknown-bap-routing-id,
+	insufficient-ue-capabilities
 
 }
 
@@ -1008,6 +1014,8 @@ CompositeAvailableCapacity-ExtIEs 	F1AP-PROTOCOL-EXTENSION ::= {
 	...
 }
 
+CHO-Probability ::= INTEGER (1..100)
+
 ConditionalInterDUMobilityInformation ::= SEQUENCE {
 	cho-trigger						CHOtrigger-InterDU,
 	targetgNB-DUUEF1APID			GNB-DU-UE-F1AP-ID							OPTIONAL
@@ -1017,6 +1025,7 @@ ConditionalInterDUMobilityInformation ::= SEQUENCE {
 }
 
 ConditionalInterDUMobilityInformation-ExtIEs F1AP-PROTOCOL-EXTENSION ::={
+	{ ID id-EstimatedArrivalProbability		CRITICALITY ignore		EXTENSION CHO-Probability		PRESENCE optional	},
 	...
 }
 
@@ -1029,6 +1038,7 @@ ConditionalIntraDUMobilityInformation ::= SEQUENCE {
 }
 
 ConditionalIntraDUMobilityInformation-ExtIEs F1AP-PROTOCOL-EXTENSION ::={
+	{ ID id-EstimatedArrivalProbability		CRITICALITY ignore		EXTENSION CHO-Probability		PRESENCE optional	},
 	...
 }
 
@@ -1405,7 +1415,8 @@ DRBs-ToBeModified-ItemExtIEs 	F1AP-PROTOCOL-EXTENSION ::= {
 	{ ID id-DC-Based-Duplication-Configured		CRITICALITY reject	EXTENSION DCBasedDuplicationConfigured					PRESENCE optional }|
 	{ ID id-DC-Based-Duplication-Activation		CRITICALITY reject	EXTENSION DuplicationActivation							PRESENCE optional }|
 	{ ID id-AdditionalPDCPDuplicationTNL-List	CRITICALITY ignore	EXTENSION AdditionalPDCPDuplicationTNL-List			PRESENCE optional }|
-	{ ID id-RLCDuplicationInformation			CRITICALITY ignore	EXTENSION RLCDuplicationInformation						PRESENCE optional},
+	{ ID id-RLCDuplicationInformation			CRITICALITY ignore	EXTENSION RLCDuplicationInformation						PRESENCE optional}|
+	{ ID id-TransmissionStopIndicator			CRITICALITY ignore	EXTENSION TransmissionStopIndicator						PRESENCE optional},
 	...
 }
 
@@ -2983,7 +2994,7 @@ NRPRACHConfigItem ::= SEQUENCE {
 	nRSCS					NRSCS,
 	prachFreqStartfromCarrier	INTEGER (0..maxnoofPhysicalResourceBlocks-1, ...),
 	msg1FDM						ENUMERATED {one, two, four, eight, ...},
-	parchConfigIndex			INTEGER (0..255, ...),
+	parchConfigIndex			INTEGER (0..255, ..., 256..262),
 	ssb-perRACH-Occasion		ENUMERATED {oneEighth, oneFourth, oneHalf, one, 
 											two, four, eight, sixteen, ...},
 	freqDomainLength			FreqDomainLength, 
@@ -3587,7 +3598,7 @@ QoSInformation-ExtIEs F1AP-PROTOCOL-IES ::= {
 	...
 }
 
-QosMonitoringRequest ::= ENUMERATED {ul, dl, both, ...}
+QosMonitoringRequest ::= ENUMERATED {ul, dl, both, ..., stop}
 
 QoSParaSetIndex ::= INTEGER (1..8, ...) 
 
@@ -3730,7 +3741,7 @@ Requested-PDCCH-BlindDetectionSCG ::= OCTET STRING
 
 RequestedSRSTransmissionCharacteristics ::= SEQUENCE {
 	numberOfTransmissions		INTEGER (0..500, ...)		OPTIONAL,
--- The IE shall be present if the Resource Type IE is set to ìperiodicî --
+-- The IE shall be present if the Resource Type IE is set to ‚Äúperiodic‚Äù --
 	resourceType				ENUMERATED  {periodic, semi-persistent, aperiodic,...},
 	bandwidthSRS				BandwidthSRS,
 	sRSResourceSetList 			SRSResourceSetList				OPTIONAL,
@@ -3739,6 +3750,7 @@ RequestedSRSTransmissionCharacteristics ::= SEQUENCE {
 }
 
 RequestedSRSTransmissionCharacteristics-ExtIEs F1AP-PROTOCOL-EXTENSION ::= {
+	{ ID id-SrsFrequency		CRITICALITY ignore EXTENSION SrsFrequency		PRESENCE optional },
 	...
 }
 
@@ -4066,6 +4078,8 @@ SCell-ToBeSetupMod-ItemExtIEs 	F1AP-PROTOCOL-EXTENSION ::= {
 
 SCellIndex ::=INTEGER (1..31, ...) 
 
+SCGIndicator	::=	ENUMERATED{released, ...}
+
 SCS-SpecificCarrier ::=            SEQUENCE {
     offsetToCarrier                     INTEGER (0..2199,...),
     subcarrierSpacing                   ENUMERATED {kHz15, kHz30, kHz60, kHz120,...},
@@ -4124,8 +4138,19 @@ Served-Cell-Information-ExtIEs F1AP-PROTOCOL-EXTENSION ::= {
 	{	ID id-VictimgNBSetID				CRITICALITY ignore	EXTENSION VictimgNBSetID				PRESENCE optional}|
 	{	ID id-IAB-Info-IAB-DU				CRITICALITY ignore	EXTENSION IAB-Info-IAB-DU				PRESENCE optional}|
 	{	ID id-SSB-PositionsInBurst			CRITICALITY ignore	EXTENSION SSB-PositionsInBurst			PRESENCE optional }|
-	{	ID id-NRPRACHConfig					CRITICALITY ignore	EXTENSION NRPRACHConfig					PRESENCE optional },
+	{	ID id-NRPRACHConfig					CRITICALITY ignore	EXTENSION NRPRACHConfig					PRESENCE optional }|
+	{	ID id-SFN-Offset					CRITICALITY ignore	EXTENSION SFN-Offset					PRESENCE optional },
 	...
+}
+
+SFN-Offset ::= SEQUENCE {
+	sFN-Time-Offset					BIT STRING (SIZE(24)),
+	iE-Extensions		ProtocolExtensionContainer { {SFN-Offset-ExtIEs} } OPTIONAL,
+	...
+}
+
+SFN-Offset-ExtIEs F1AP-PROTOCOL-EXTENSION ::= {
+		...
 }
 
 Served-Cells-To-Add-Item ::= SEQUENCE {
@@ -4190,7 +4215,7 @@ Service-Status-ExtIEs 	F1AP-PROTOCOL-EXTENSION ::= {
 }
 
 
-SFNInitialisationTime ::= 	BIT STRING (SIZE (64))
+RelativeTime1900 ::= 	BIT STRING (SIZE (64))
 
 ShortDRXCycleLength ::=  ENUMERATED {ms2, ms3, ms4, ms5, ms6, ms7, ms8, ms10, ms14, ms16, ms20, ms30, ms32, ms35, ms40, ms64, ms80, ms128, ms160, ms256, ms320, ms512, ms640, ...}
 
@@ -4612,7 +4637,7 @@ SRSCarrier-List-Item ::= SEQUENCE {
 	pointA							INTEGER (0..3279165),
 	uplinkChannelBW-PerSCS-List		UplinkChannelBW-PerSCS-List,
 	activeULBWP						ActiveULBWP,
-	pci								NRPCI,
+	pci								NRPCI		OPTIONAL,
 	iE-Extensions					ProtocolExtensionContainer { { SRSCarrier-List-Item-ExtIEs } } OPTIONAL
 }
 
@@ -4640,6 +4665,8 @@ SRSConfiguration ::= SEQUENCE {
 SRSConfiguration-ExtIEs F1AP-PROTOCOL-EXTENSION ::= {
 	...
 } 
+
+SrsFrequency ::= INTEGER (0..3279165)
 
 SRSPosResourceID ::= INTEGER (0..63)
 
@@ -4709,14 +4736,6 @@ SRSResourceTrigger-ExtIEs F1AP-PROTOCOL-EXTENSION ::= {
 	...
 }
 
-SRSSpatialRelation ::= SEQUENCE {
-	spatialRelationforResourceID				SpatialRelationforResourceID,
-	iE-Extensions		ProtocolExtensionContainer { {SRSSpatialRelation-ExtIEs} }	OPTIONAL
-}
-
-SRSSpatialRelation-ExtIEs F1AP-PROTOCOL-EXTENSION ::= {
-	...
-}
 
 SSB ::= SEQUENCE {
 	pCI-NR				NRPCI,
@@ -4820,7 +4839,7 @@ SSB-TF-Configuration ::= SEQUENCE {
 	sSB-half-frame-offset		INTEGER(0..1),
 	sSB-SFN-offset				INTEGER(0..15),
 	sSB-position-in-burst		SSB-PositionsInBurst		OPTIONAL,
-	sFNInitialisationTime		SFNInitialisationTime		OPTIONAL,
+	sFNInitialisationTime		RelativeTime1900		OPTIONAL,
 	iE-Extensions				ProtocolExtensionContainer { { SSB-TF-Configuration-ExtIEs} } OPTIONAL
 }
 
@@ -4935,7 +4954,7 @@ TimeInformationType ::= ENUMERATED {localClock}
 TimeStamp ::= SEQUENCE {
 	systemFrameNumber		SystemFrameNumber,
 	slotIndex				TimeStampSlotIndex,
-	measurementTime			SFNInitialisationTime	OPTIONAL,
+	measurementTime			RelativeTime1900	OPTIONAL,
 	iE-Extension			ProtocolExtensionContainer { { TimeStamp-ExtIEs} }	OPTIONAL
 }
 
@@ -5072,6 +5091,8 @@ TransmissionCombPos-ExtIEs F1AP-PROTOCOL-IES ::= {
 	...
 }
 
+TransmissionStopIndicator ::= ENUMERATED {true, ... }
+
 Transport-UP-Layer-Address-Info-To-Add-List	::= SEQUENCE (SIZE(1.. maxnoofTLAs)) OF Transport-UP-Layer-Address-Info-To-Add-Item
 
 Transport-UP-Layer-Address-Info-To-Add-Item ::= SEQUENCE {
@@ -5139,7 +5160,7 @@ TRPInformationTypeResponseItem ::= CHOICE {
 	nRARFCN								INTEGER (0..maxNRARFCN),
 	pRSConfiguration					PRSConfiguration,
 	sSBinformation						SSBInformation,
-	sFNInitialisationTime				SFNInitialisationTime,
+	sFNInitialisationTime				RelativeTime1900,
 	spatialDirectionInformation			SpatialDirectionInformation,
 	geographicalCoordinates				GeographicalCoordinates,
 	choice-extension					ProtocolIE-SingleContainer { { TRPInformationTypeResponseItem-ExtIEs} }

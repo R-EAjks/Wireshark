@@ -10,15 +10,15 @@
 #ifndef __PACKET_TCP_H__
 #define __PACKET_TCP_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
-
 #include "ws_symbol_export.h"
 
 #include <epan/conversation.h>
 #include <epan/wmem/wmem.h>
 #include <epan/wmem/wmem_interval_tree.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 /* TCP flags */
 #define TH_FIN  0x0001
@@ -54,6 +54,7 @@ struct mptcpheader {
 	gboolean mh_prio;        /* true if seen an MP_PRIO */
 	gboolean mh_fail;        /* true if seen an MP_FAIL */
 	gboolean mh_fastclose;   /* true if seen a fastclose */
+	gboolean mh_tcprst;      /* true if seen a MP_TCPRST */
 
 	guint8  mh_capable_flags; /* to get hmac version for instance */
 	guint8  mh_dss_flags; /* data sequence signal flag */
@@ -539,7 +540,7 @@ WS_DLL_PUBLIC guint32 get_tcp_stream_count(void);
 WS_DLL_PUBLIC guint32 get_mptcp_stream_count(void);
 
 /* Follow Stream functionality shared with HTTP (and SSL?) */
-extern gchar *tcp_follow_conv_filter(packet_info *pinfo, guint *stream, guint *sub_stream);
+extern gchar *tcp_follow_conv_filter(epan_dissect_t *edt, packet_info *pinfo, guint *stream, guint *sub_stream);
 extern gchar *tcp_follow_index_filter(guint stream, guint sub_stream);
 extern gchar *tcp_follow_address_filter(address *src_addr, address *dst_addr, int src_port, int dst_port);
 

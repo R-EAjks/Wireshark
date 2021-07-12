@@ -34,11 +34,16 @@ macro(ADD_PLUGIN_LIBRARY _plugin _subfolder)
 		${PLUGIN_RC_FILE}
 	)
 
+	target_include_directories(${_plugin} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
 	set_target_properties(${_plugin} PROPERTIES
 		PREFIX ""
 		LINK_FLAGS "${WS_LINK_FLAGS}"
 		FOLDER "Plugins"
 	)
+	if(MSVC)
+		set_target_properties(${_plugin} PROPERTIES LINK_FLAGS_DEBUG "${WS_MSVC_DEBUG_LINK_FLAGS}")
+	endif()
 
 	set_target_properties(${_plugin} PROPERTIES
 		LIBRARY_OUTPUT_DIRECTORY ${PLUGIN_DIR}/${_subfolder}

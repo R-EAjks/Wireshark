@@ -857,6 +857,12 @@ SetOutPath $INSTDIR
 ; Create the extcap directory
 CreateDirectory $INSTDIR\extcap
 
+;
+; install the protobuf .proto definitions in the protobuf subdirectory
+;
+SetOutPath $INSTDIR\protobuf
+File "${STAGING_DIR}\protobuf\*.proto"
+
 ; Install the TPNCP DAT file in the "tpncp" subdirectory
 ; of the installation directory.
 SetOutPath $INSTDIR\tpncp
@@ -1194,8 +1200,10 @@ SectionGroupEnd ; "Tools"
 !ifdef DOCBOOK_DIR
 Section "Documentation" SecDocumentation
 ;-------------------------------------------
+SetOutPath "$INSTDIR\Wireshark User's Guide"
+File /r "${DOCBOOK_DIR}\wsug_html_chunked\*.*"
+
 SetOutPath $INSTDIR
-File "${DOCBOOK_DIR}\user-guide.chm"
 File "${DOCBOOK_DIR}\faq.html"
 SectionEnd
 !endif

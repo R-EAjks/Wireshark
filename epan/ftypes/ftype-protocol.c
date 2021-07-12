@@ -12,8 +12,10 @@
 #include <epan/strutil.h>
 #include <epan/to_str-int.h>
 #include <string.h>
+#include <wsutil/glib-compat.h>
 
 #include <epan/exceptions.h>
+#include <wsutil/ws_assert.h>
 
 #define CMP_MATCHES cmp_matches
 
@@ -58,7 +60,7 @@ val_from_string(fvalue_t *fv, const char *s, gchar **err_msg _U_)
 
 	/* Make a tvbuff from the string. We can drop the
 	 * terminating NUL. */
-	private_data = (guint8 *)g_memdup(s, (guint)strlen(s));
+	private_data = (guint8 *)g_memdup2(s, (guint)strlen(s));
 	new_tvb = tvb_new_real_data(private_data,
 			(guint)strlen(s), (gint)strlen(s));
 
@@ -67,9 +69,11 @@ val_from_string(fvalue_t *fv, const char *s, gchar **err_msg _U_)
 
 	/* And let us know that we need to free the tvbuff */
 	fv->tvb_is_private = TRUE;
-	/* This "field" is a value, it has no protocol description. */
+	/* This "field" is a value, it has no protocol description, but
+	 * we might compare it to a protocol with NULL tvb.
+	 * (e.g., proto_expert) */
 	fv->value.protocol.tvb = new_tvb;
-	fv->value.protocol.proto_string = NULL;
+	fv->value.protocol.proto_string = g_strdup("");
 	return TRUE;
 }
 
@@ -98,6 +102,11 @@ val_from_unparsed(fvalue_t *fv, const char *s, gboolean allow_partial_value _U_,
 		/* And let us know that we need to free the tvbuff */
 		fv->tvb_is_private = TRUE;
 		fv->value.protocol.tvb = new_tvb;
+
+		/* This "field" is a value, it has no protocol description, but
+		 * we might compare it to a protocol with NULL tvb.
+		 * (e.g., proto_expert) */
+		fv->value.protocol.proto_string = g_strdup("");
 		return TRUE;
 	}
 
@@ -129,11 +138,11 @@ val_repr_len(fvalue_t *fv, ftrepr_t rtype, int field_display _U_)
 }
 
 static void
-val_to_repr(fvalue_t *fv, ftrepr_t rtype, int field_display _U_, char * volatile buf, unsigned int size _U_)
+val_to_repr(fvalue_t *fv, ftrepr_t rtype _U_, int field_display _U_, char * volatile buf, unsigned int size _U_)
 {
 	guint length;
 
-	g_assert(rtype == FTREPR_DFILTER);
+	ws_assert(rtype == FTREPR_DFILTER);
 
 	TRY {
 		length = tvb_captured_length(fv->value.protocol.tvb);
@@ -383,21 +392,13 @@ cmp_contains(const fvalue_t *fv_a, const fvalue_t *fv_b)
 }
 
 static gboolean
-cmp_matches(const fvalue_t *fv_a, const fvalue_t *fv_b)
+cmp_matches(const fvalue_t *fv, const GRegex *regex)
 {
-	const protocol_value_t *a = (const protocol_value_t *)&fv_a->value.protocol;
-	GRegex *regex = fv_b->value.re;
+	const protocol_value_t *a = (const protocol_value_t *)&fv->value.protocol;
 	volatile gboolean rc = FALSE;
 	const char *data = NULL; /* tvb data */
 	guint32 tvb_len; /* tvb length */
 
-	/* fv_b is always a FT_PCRE, otherwise the dfilter semcheck() would have
-	 * warned us. For the same reason (and because we're using g_malloc()),
-	 * fv_b->value.re is not NULL.
-	 */
-	if (strcmp(fv_b->ftype->name, "FT_PCRE") != 0) {
-		return FALSE;
-	}
 	if (! regex) {
 		return FALSE;
 	}

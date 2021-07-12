@@ -330,7 +330,7 @@ static const value_string rtp_ext_profile_vals[] =
 
 /* Payload type is the last 7 bits */
 #define RTP_PAYLOAD_TYPE(octet) ((octet) & 0x7F)
-/* http://www.iana.org/assignments/rtp-parameters */
+/* https://www.iana.org/assignments/rtp-parameters/ */
 
 #define FIRST_RTCP_CONFLICT_PAYLOAD_TYPE 64
 #define LAST_RTCP_CONFLICT_PAYLOAD_TYPE  95
@@ -416,7 +416,7 @@ static const value_string rtp_payload_type_vals[] =
 /* 74 */    { 74,               "Reserved for RTCP conflict avoidance" },
 /* 75 */    { 75,               "Reserved for RTCP conflict avoidance" },
 /* 76 */    { 76,               "Reserved for RTCP conflict avoidance" },
-/* 77-95     Unassigned      ? */
+/* 77-95     Unassigned, MAY be used if > 32 PT are used */
 /* 77 */    { 77,               "Unassigned" },
 /* 78 */    { 78,               "Unassigned" },
 /* 79 */    { 79,               "Unassigned" },
@@ -436,7 +436,7 @@ static const value_string rtp_payload_type_vals[] =
 /* 93 */    { 93,               "Unassigned" },
 /* 94 */    { 94,               "Unassigned" },
 /* 95 */    { 95,               "Unassigned" },
-        /* Added to support addtional RTP payload types
+        /* Added to support additional RTP payload types
          * See epan/rtp_pt.h */
         { PT_UNDF_96,   "DynamicRTP-Type-96" },
         { PT_UNDF_97,   "DynamicRTP-Type-97" },
@@ -557,7 +557,7 @@ static const value_string rtp_payload_type_short_vals[] =
     { 74,               "Reserved for RTCP conflict avoidance" },
     { 75,               "Reserved for RTCP conflict avoidance" },
     { 76,               "Reserved for RTCP conflict avoidance" },
-/* 77-95     Unassigned      ? */
+/* 77-95     Unassigned, MAY be used if > 32 PT are used */
     { 77,               "Unassigned" },
     { 78,               "Unassigned" },
     { 79,               "Unassigned" },
@@ -996,6 +996,7 @@ bluetooth_add_address(packet_info *pinfo, address *addr, guint32 stream_number,
          * first few packets being out of order (hence 0,65535,1,2,...)
          */
         p_conv_data->extended_seqno = 0x10000;
+        p_conv_data->extended_timestamp = 0x100000000;
         p_conv_data->rtp_conv_info = wmem_new(wmem_file_scope(), rtp_private_conv_info);
         p_conv_data->rtp_conv_info->multisegment_pdus = wmem_tree_new(wmem_file_scope());
         conversation_add_proto_data(p_conv, proto_rtp, p_conv_data);
@@ -1013,7 +1014,7 @@ bluetooth_add_address(packet_info *pinfo, address *addr, guint32 stream_number,
     /* Free the hash if already exists */
     rtp_dyn_payload_free(p_conv_data->rtp_dyn_payload);
 
-    g_strlcpy(p_conv_data->method, setup_method, MAX_RTP_SETUP_METHOD_SIZE+1);
+    (void) g_strlcpy(p_conv_data->method, setup_method, MAX_RTP_SETUP_METHOD_SIZE+1);
     p_conv_data->frame_number = setup_frame_number;
     p_conv_data->media_types = media_types;
     p_conv_data->rtp_dyn_payload = NULL;
@@ -1128,6 +1129,7 @@ srtp_add_address(packet_info *pinfo, const port_type ptype, address *addr, int p
          * first few packets being out of order (hence 0,65535,1,2,...)
          */
         p_conv_data->extended_seqno = 0x10000;
+        p_conv_data->extended_timestamp = 0x100000000;
         p_conv_data->rtp_conv_info = wmem_new(wmem_file_scope(), rtp_private_conv_info);
         p_conv_data->rtp_conv_info->multisegment_pdus = wmem_tree_new(wmem_file_scope());
         DINDENT();
@@ -1151,7 +1153,7 @@ srtp_add_address(packet_info *pinfo, const port_type ptype, address *addr, int p
         DPRINT(("passed-in rtp_dyn_payload is the same as in the conversation"));
     }
 
-    g_strlcpy(p_conv_data->method, setup_method, MAX_RTP_SETUP_METHOD_SIZE+1);
+    (void) g_strlcpy(p_conv_data->method, setup_method, MAX_RTP_SETUP_METHOD_SIZE+1);
     p_conv_data->frame_number = setup_frame_number;
     p_conv_data->media_types = media_types;
     p_conv_data->srtp_info = srtp_info;
@@ -1242,11 +1244,12 @@ dissect_rtp_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
             /* Create conversation data */
             p_conv_data = wmem_new0(wmem_file_scope(), struct _rtp_conversation_info);
             p_conv_data->extended_seqno = 0x10000;
+            p_conv_data->extended_timestamp = 0x100000000;
             p_conv_data->rtp_conv_info = wmem_new(wmem_file_scope(), rtp_private_conv_info);
             p_conv_data->rtp_conv_info->multisegment_pdus = wmem_tree_new(wmem_file_scope());
             conversation_add_proto_data(p_conv, proto_rtp, p_conv_data);
         }
-        g_strlcpy(p_conv_data->method, "HEUR RTP", MAX_RTP_SETUP_METHOD_SIZE+1);
+        (void) g_strlcpy(p_conv_data->method, "HEUR RTP", MAX_RTP_SETUP_METHOD_SIZE+1);
         p_conv_data->frame_number = pinfo->num;
         p_conv_data->media_types = 0;
         p_conv_data->srtp_info = NULL;
@@ -1414,7 +1417,7 @@ dissect_rtp_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     pinfo->desegment_len = 0;
 
 #ifdef DEBUG_FRAGMENTS
-    g_debug("%d: RTP Part of convo %d(%p); seqno %d",
+    ws_debug("%d: RTP Part of convo %d(%p); seqno %d",
         pinfo->num,
         p_conv_data->frame_number, p_conv_data,
         seqno
@@ -1429,7 +1432,7 @@ dissect_rtp_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         fragment_head *fd_head;
 
 #ifdef DEBUG_FRAGMENTS
-        g_debug("\tContinues fragment %d", fid);
+        ws_debug("\tContinues fragment %d", fid);
 #endif
 
         /* we always assume the datagram is complete; if this is the
@@ -1445,7 +1448,7 @@ dissect_rtp_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                           &rtp_fragment_items, NULL, tree);
 
 #ifdef DEBUG_FRAGMENTS
-        g_debug("\tFragment Coalesced; fd_head=%p, newtvb=%p (len %d)", fd_head, newtvb,
+        ws_debug("\tFragment Coalesced; fd_head=%p, newtvb=%p (len %d)", fd_head, newtvb,
             newtvb?tvb_reported_length(newtvb):0);
 #endif
 
@@ -1460,7 +1463,7 @@ dissect_rtp_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
             {
                 if (pinfo->desegment_offset == 0) {
 #ifdef DEBUG_FRAGMENTS
-                    g_debug("\tNo complete pdus in payload" );
+                    ws_debug("\tNo complete pdus in payload" );
 #endif
                     /* Mark the fragments as not complete yet */
                     fragment_set_partial_reassembly(&rtp_reassembly_table,
@@ -1487,7 +1490,7 @@ dissect_rtp_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
          * so process it as normal
          */
 #ifdef DEBUG_FRAGMENTS
-        g_debug("\tRTP non-fragment payload");
+        ws_debug("\tRTP non-fragment payload");
 #endif
         newtvb = tvb_new_subset_length_caplen( tvb, offset, data_len, data_reported_len );
 
@@ -1512,7 +1515,7 @@ dissect_rtp_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         fragment_head *fd_head;
 
 #ifdef DEBUG_FRAGMENTS
-        g_debug("\tRTP Must Desegment: tvb_len=%d ds_len=%d %d frag_len=%d ds_off=%d",
+        ws_debug("\tRTP Must Desegment: tvb_len=%d ds_len=%d %d frag_len=%d ds_off=%d",
             tvb_reported_length(newtvb),
             pinfo->desegment_len,
             pinfo->fd->visited,
@@ -1544,13 +1547,13 @@ dissect_rtp_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                                      fd_head->reassembled_in);
                 proto_item_set_generated(rtp_tree_item);
 #ifdef DEBUG_FRAGMENTS
-                g_debug("\tReassembled in %d", fd_head->reassembled_in);
+                ws_debug("\tReassembled in %d", fd_head->reassembled_in);
 #endif
             }
             else if (fd_head->reassembled_in == 0)
             {
 #ifdef DEBUG_FRAGMENTS
-                g_debug("\tUnfinished fragment");
+                ws_debug("\tUnfinished fragment");
 #endif
                 /* this fragment is never reassembled */
                 proto_tree_add_expert(tree, pinfo, &ei_rtp_fragment_unfinished, tvb, deseg_offset, -1);
@@ -1563,7 +1566,7 @@ dissect_rtp_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
              * frag_table; we don't yet know where it is reassembled
              */
 #ifdef DEBUG_FRAGMENTS
-            g_debug("\tnew pdu");
+            ws_debug("\tnew pdu");
 #endif
         }
 
@@ -1944,7 +1947,9 @@ dissect_rtp( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
     rtp_info->info_media_types = 0;
     rtp_info->info_payload_type = payload_type;
     rtp_info->info_seq_num = seq_num;
+    rtp_info->info_extended_seq_num = seq_num; /* initial with seq_number */
     rtp_info->info_timestamp = timestamp;
+    rtp_info->info_extended_timestamp = timestamp; /* initial with timestamp */
     rtp_info->info_sync_src = sync_src;
     rtp_info->info_is_srtp = FALSE;
     rtp_info->info_setup_frame_num = 0;
@@ -1989,8 +1994,11 @@ dissect_rtp( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
     /* Look for conv and add to the frame if found */
     p_conv_data = get_conv_info(pinfo, rtp_info);
 
-    if (p_conv_data)
+    if (p_conv_data) {
         rtp_info->info_media_types = p_conv_data->media_types;
+        rtp_info->info_extended_seq_num = p_conv_data->extended_seqno;
+        rtp_info->info_extended_timestamp = p_conv_data->extended_timestamp;
+    }
 
     if (p_conv_data && p_conv_data->srtp_info) is_srtp = TRUE;
     rtp_info->info_is_srtp = is_srtp;
@@ -2487,14 +2495,30 @@ static guint32
 calculate_extended_seqno(guint32 previous_seqno, guint16 raw_seqno)
 {
     guint32 seqno = (previous_seqno & 0xffff0000) | raw_seqno;
-    if(seqno + 0x8000 < previous_seqno) {
+    if (seqno + 0x8000 < previous_seqno) {
         seqno += 0x10000;
-    } else if(previous_seqno + 0x8000 < seqno) {
+    } else if (previous_seqno + 0x8000 < seqno) {
         /* we got an out-of-order packet which happened to go backwards over the
          * wrap boundary */
         seqno -= 0x10000;
     }
     return seqno;
+}
+
+/* calculate the extended sequence number - top 16 bits of the previous sequence number,
+ * plus our own; then correct for wrapping */
+static guint64
+calculate_extended_timestamp(guint64 previous_timestamp, guint32 raw_timestamp)
+{
+    guint64 timestamp = (previous_timestamp & 0xffffffff00000000) | raw_timestamp;
+    if (timestamp + 0x80000000 < previous_timestamp) {
+        timestamp += 0x100000000;
+    } else if (previous_timestamp + 0x80000000 < timestamp) {
+        /* we got an out-of-order packet which happened to go backwards over the
+         * wrap boundary */
+        timestamp -= 0x100000000;
+    }
+    return timestamp;
 }
 
 /* Look for conversation info */
@@ -2523,11 +2547,12 @@ get_conv_info(packet_info *pinfo, struct _rtp_info *rtp_info)
 
             if (p_conv_data) {
                 guint32 seqno;
+                guint64 timestamp;
 
                 /* Save this conversation info into packet info */
                 /* XXX: why is this file pool not pinfo->pool? */
                 p_conv_packet_data = wmem_new(wmem_file_scope(), struct _rtp_conversation_info);
-                g_strlcpy(p_conv_packet_data->method, p_conv_data->method, MAX_RTP_SETUP_METHOD_SIZE+1);
+                (void) g_strlcpy(p_conv_packet_data->method, p_conv_data->method, MAX_RTP_SETUP_METHOD_SIZE+1);
                 p_conv_packet_data->frame_number = p_conv_data->frame_number;
                 p_conv_packet_data->media_types = p_conv_data->media_types;
                 /* do not increment ref count for the rtp_dyn_payload */
@@ -2546,6 +2571,13 @@ get_conv_info(packet_info *pinfo, struct _rtp_info *rtp_info)
 
                 p_conv_packet_data->extended_seqno = seqno;
                 p_conv_data->extended_seqno = seqno;
+
+                /* calculate extended timestamp */
+                timestamp = calculate_extended_timestamp(p_conv_data->extended_timestamp,
+                                 rtp_info->info_timestamp);
+
+                p_conv_packet_data->extended_timestamp = timestamp;
+                p_conv_data->extended_timestamp = timestamp;
             }
         }
     }

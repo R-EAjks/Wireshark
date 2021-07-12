@@ -12,6 +12,7 @@
 
 #include "ws_symbol_export.h"
 
+#include <wsutil/inet_ipv4.h>
 #include <wsutil/inet_ipv6.h>
 
 #ifdef __cplusplus
@@ -23,96 +24,103 @@ extern "C" {
  */
 
 /* Options for all blocks */
-#define OPT_EOFOPT           0     /**< Appears in pcapng files, but not in blocks. */
-#define OPT_COMMENT          1     /**< A UTF-8 string containing a human-readable comment. */
+#define OPT_EOFOPT             0     /**< Appears in pcapng files, but not in blocks. */
+#define OPT_COMMENT            1     /**< A UTF-8 string containing a human-readable comment. */
+#define OPT_CUSTOM_STR_COPY    2988  /**< A custom option containing a UTF-8 string, copying allowed. */
+#define OPT_CUSTOM_BIN_COPY    2989  /**< A custom option containing binary data, copying allowed. */
+#define OPT_CUSTOM_STR_NO_COPY 19372 /**< A custom option containing a UTF-8 string, copying not allowed. */
+#define OPT_CUSTOM_BIN_NO_COPY 19373 /**< A custom option containing binary data, copying not allowed. */
 
 /* Section Header block (SHB) */
-#define OPT_SHB_HARDWARE     2     /**< A UTF-8 string containing the description of the
-                                     *     hardware used to create this section.
-                                     */
-#define OPT_SHB_OS           3     /**< A UTF-8 string containing the
-                                     *     name of the operating system used to create this section.
-                                     */
-#define OPT_SHB_USERAPPL     4     /**< A UTF-8 string containing the
-                                     *     name of the application used to create this section.
-                                     */
+#define OPT_SHB_HARDWARE       2     /**< A UTF-8 string containing the description of the
+                                       *     hardware used to create this section.
+                                       */
+#define OPT_SHB_OS             3     /**< A UTF-8 string containing the
+                                       *     name of the operating system used to create this section.
+                                       */
+#define OPT_SHB_USERAPPL       4     /**< A UTF-8 string containing the
+                                       *     name of the application used to create this section.
+                                       */
 
 /* Interface Description block (IDB) */
-#define OPT_IDB_NAME         2     /**< A UTF-8 string containing the name
-                                     *     of the device used to capture data.
-                                     *     "eth0" / "\Device\NPF_{AD1CE675-96D0-47C5-ADD0-2504B9126B68}"
-                                     */
-#define OPT_IDB_DESCR        3     /**< A UTF-8 string containing the description
-                                     *     of the device used to capture data.
-                                     *     "Wi-Fi" / "Local Area Connection" /
-                                     *     "Wireless Network Connection" /
-                                     *     "First Ethernet Interface"
-                                     */
-#define OPT_IDB_IP4ADDR      4     /**< XXX: if_IPv4addr Interface network address and netmask.
-                                     *     This option can be repeated multiple times within the same Interface Description Block
-                                     *     when multiple IPv4 addresses are assigned to the interface.
-                                     *     192 168 1 1 255 255 255 0
-                                     */
-#define OPT_IDB_IP6ADDR      5     /* XXX: if_IPv6addr Interface network address and prefix length (stored in the last byte).
-                                     *     This option can be repeated multiple times within the same Interface
-                                     *     Description Block when multiple IPv6 addresses are assigned to the interface.
-                                     *     2001:0db8:85a3:08d3:1319:8a2e:0370:7344/64 is written (in hex) as
-                                     *     "20 01 0d b8 85 a3 08 d3 13 19 8a 2e 03 70 73 44 40"*/
-#define OPT_IDB_MACADDR      6     /* XXX: if_MACaddr  Interface Hardware MAC address (48 bits).                             */
-#define OPT_IDB_EUIADDR      7     /* XXX: if_EUIaddr  Interface Hardware EUI address (64 bits)                              */
-#define OPT_IDB_SPEED        8     /**< Interface speed (in bps). 100000000 for 100Mbps
-                                     */
-#define OPT_IDB_TSRESOL      9     /**< Resolution of timestamps. If the Most Significant Bit is equal to zero,
-                                     *     the remaining bits indicates the resolution of the timestamp as as a
-                                     *     negative power of 10 (e.g. 6 means microsecond resolution, timestamps
-                                     *     are the number of microseconds since 1/1/1970). If the Most Significant Bit
-                                     *     is equal to one, the remaining bits indicates the resolution has a
-                                     *     negative power of 2 (e.g. 10 means 1/1024 of second).
-                                     *     If this option is not present, a resolution of 10^-6 is assumed
-                                     *     (i.e. timestamps have the same resolution of the standard 'libpcap' timestamps).
-                                     */
-#define OPT_IDB_TZONE        10    /* XXX: if_tzone    Time zone for GMT support (TODO: specify better). */
-#define OPT_IDB_FILTER       11    /**< The filter (e.g. "capture only TCP traffic") used to capture traffic.
-                                     *     The first byte of the Option Data keeps a code of the filter used
-                                     *     (e.g. if this is a libpcap string, or BPF bytecode, and more).
-                                     *     More details about this format will be presented in Appendix XXX (TODO).
-                                     *     (TODO: better use different options for different fields?
-                                     *     e.g. if_filter_pcap, if_filter_bpf, ...) 00 "tcp port 23 and host 10.0.0.5"
-                                     */
-#define OPT_IDB_OS           12    /**< A UTF-8 string containing the name of the operating system of the
-                                     *     machine in which this interface is installed.
-                                     *     This can be different from the same information that can be
-                                     *     contained by the Section Header Block
-                                     *     (Section 3.1 (Section Header Block (mandatory))) because
-                                     *     the capture can have been done on a remote machine.
-                                     *     "Windows XP SP2" / "openSUSE 10.2"
-                                     */
-#define OPT_IDB_FCSLEN       13    /**< An integer value that specified the length of the
-                                     *     Frame Check Sequence (in bits) for this interface.
-                                     *     For link layers whose FCS length can change during time,
-                                     *     the Packet Block Flags Word can be used (see Appendix A (Packet Block Flags Word))
-                                     */
-#define OPT_IDB_TSOFFSET     14    /**< XXX: A 64 bits integer value that specifies an offset (in seconds)
-                                     *     that must be added to the timestamp of each packet to obtain
-                                     *     the absolute timestamp of a packet. If the option is missing,
-                                     *     the timestamps stored in the packet must be considered absolute
-                                     *     timestamps. The time zone of the offset can be specified with the
-                                     *     option if_tzone. TODO: won't a if_tsoffset_low for fractional
-                                     *     second offsets be useful for highly synchronized capture systems?
-                                     */
-#define OPT_IDB_HARDWARE     15     /**< A UTF-8 string containing the description
-                                     *     of the hardware of the device used
-                                     *     to capture data.
-                                     *     "Broadcom NetXtreme" /
-                                     *     "Intel(R) PRO/1000 MT Network Connection" /
-                                     *     "NETGEAR WNA1000Mv2 N150 Wireless USB Micro Adapter"
-                                     */
+#define OPT_IDB_NAME           2     /**< A UTF-8 string containing the name
+                                       *     of the device used to capture data.
+                                       *     "eth0" / "\Device\NPF_{AD1CE675-96D0-47C5-ADD0-2504B9126B68}"
+                                       */
+#define OPT_IDB_DESCR          3     /**< A UTF-8 string containing the description
+                                       *     of the device used to capture data.
+                                       *     "Wi-Fi" / "Local Area Connection" /
+                                       *     "Wireless Network Connection" /
+                                       *     "First Ethernet Interface"
+                                       */
+#define OPT_IDB_IP4ADDR        4     /**< XXX: if_IPv4addr Interface network address and netmask.
+                                       *     This option can be repeated multiple times within the same Interface Description Block
+                                       *     when multiple IPv4 addresses are assigned to the interface.
+                                       *     192 168 1 1 255 255 255 0
+                                       */
+#define OPT_IDB_IP6ADDR        5     /**< XXX: if_IPv6addr Interface network address and prefix length (stored in the last byte).
+                                       *     This option can be repeated multiple times within the same Interface
+                                       *     Description Block when multiple IPv6 addresses are assigned to the interface.
+                                       *     2001:0db8:85a3:08d3:1319:8a2e:0370:7344/64 is written (in hex) as
+                                       *     "20 01 0d b8 85 a3 08 d3 13 19 8a 2e 03 70 73 44 40"
+                                       */
+#define OPT_IDB_MACADDR        6     /**< XXX: if_MACaddr  Interface Hardware MAC address (48 bits).                             */
+#define OPT_IDB_EUIADDR        7     /**< XXX: if_EUIaddr  Interface Hardware EUI address (64 bits)                              */
+#define OPT_IDB_SPEED          8     /**< Interface speed (in bps). 100000000 for 100Mbps
+                                       */
+#define OPT_IDB_TSRESOL        9     /**< Resolution of timestamps. If the Most Significant Bit is equal to zero,
+                                       *     the remaining bits indicates the resolution of the timestamp as as a
+                                       *     negative power of 10 (e.g. 6 means microsecond resolution, timestamps
+                                       *     are the number of microseconds since 1/1/1970). If the Most Significant Bit
+                                       *     is equal to one, the remaining bits indicates the resolution has a
+                                       *     negative power of 2 (e.g. 10 means 1/1024 of second).
+                                       *     If this option is not present, a resolution of 10^-6 is assumed
+                                       *     (i.e. timestamps have the same resolution of the standard 'libpcap' timestamps).
+                                       */
+#define OPT_IDB_TZONE          10    /**< XXX: if_tzone    Time zone for GMT support (TODO: specify better). */
+#define OPT_IDB_FILTER         11    /**< The filter (e.g. "capture only TCP traffic") used to capture traffic.
+                                       *     The first byte of the Option Data keeps a code of the filter used
+                                       *     (e.g. if this is a libpcap string, or BPF bytecode, and more).
+                                       *     More details about this format will be presented in Appendix XXX (TODO).
+                                       *     (TODO: better use different options for different fields?
+                                       *     e.g. if_filter_pcap, if_filter_bpf, ...) 00 "tcp port 23 and host 10.0.0.5"
+                                       */
+#define OPT_IDB_OS             12    /**< A UTF-8 string containing the name of the operating system of the
+                                       *     machine in which this interface is installed.
+                                       *     This can be different from the same information that can be
+                                       *     contained by the Section Header Block
+                                       *     (Section 3.1 (Section Header Block (mandatory))) because
+                                       *     the capture can have been done on a remote machine.
+                                       *     "Windows XP SP2" / "openSUSE 10.2"
+                                       */
+#define OPT_IDB_FCSLEN         13    /**< An integer value that specified the length of the
+                                       *     Frame Check Sequence (in bits) for this interface.
+                                       *     For link layers whose FCS length can change during time,
+                                       *     the Packet Block Flags Word can be used (see Appendix A (Packet Block Flags Word))
+                                       */
+#define OPT_IDB_TSOFFSET       14    /**< XXX: A 64 bits integer value that specifies an offset (in seconds)
+                                       *     that must be added to the timestamp of each packet to obtain
+                                       *     the absolute timestamp of a packet. If the option is missing,
+                                       *     the timestamps stored in the packet must be considered absolute
+                                       *     timestamps. The time zone of the offset can be specified with the
+                                       *     option if_tzone. TODO: won't a if_tsoffset_low for fractional
+                                       *     second offsets be useful for highly synchronized capture systems?
+                                       */
+#define OPT_IDB_HARDWARE       15    /**< A UTF-8 string containing the description
+                                       *     of the hardware of the device used
+                                       *     to capture data.
+                                       *     "Broadcom NetXtreme" /
+                                       *     "Intel(R) PRO/1000 MT Network Connection" /
+                                       *     "NETGEAR WNA1000Mv2 N150 Wireless USB Micro Adapter"
+                                       */
 
 
+/* Name Resolution Block (NRB) */
 #define OPT_NS_DNSNAME       2
 #define OPT_NS_DNSIP4ADDR    3
 #define OPT_NS_DNSIP6ADDR    4
 
+/* Interface Statistics Block (ISB) */
 #define OPT_ISB_STARTTIME    2
 #define OPT_ISB_ENDTIME      3
 #define OPT_ISB_IFRECV       4
@@ -120,6 +128,16 @@ extern "C" {
 #define OPT_ISB_FILTERACCEPT 6
 #define OPT_ISB_OSDROP       7
 #define OPT_ISB_USRDELIV     8
+
+/*
+ * These are the flags for an EPB, but we use them for all WTAP_BLOCK_PACKET
+ */
+#define OPT_PKT_FLAGS        2
+#define OPT_PKT_HASH         3
+#define OPT_PKT_DROPCOUNT    4
+#define OPT_PKT_PACKETID     5
+#define OPT_PKT_QUEUE        6
+#define OPT_PKT_VERDICT      7
 
 struct wtap_block;
 typedef struct wtap_block *wtap_block_t;
@@ -156,7 +174,7 @@ typedef struct wtap_block *wtap_block_t;
  * WTAP_BLOCK_PACKET (which corresponds to the Enhanced Packet Block,
  * the Simple Packet Block, and the deprecated Packet Block) is not
  * currently used; it's reserved for future use.  The same applies
- * to WTAP_BLOCK_SYSTEMD_JOURNAL.
+ * to WTAP_BLOCK_SYSTEMD_JOURNAL_EXPORT.
  */
 typedef enum {
     WTAP_BLOCK_SECTION = 0,
@@ -167,7 +185,9 @@ typedef enum {
     WTAP_BLOCK_PACKET,
     WTAP_BLOCK_FT_SPECIFIC_REPORT,
     WTAP_BLOCK_FT_SPECIFIC_EVENT,
-    WTAP_BLOCK_SYSTEMD_JOURNAL,
+    WTAP_BLOCK_SYSDIG_EVENT,
+    WTAP_BLOCK_SYSTEMD_JOURNAL_EXPORT,
+    WTAP_BLOCK_CUSTOM,
     MAX_WTAP_BLOCK_TYPE_VALUE
 } wtap_block_type_t;
 
@@ -183,7 +203,7 @@ typedef struct wtapng_section_mandatory_s {
                                          *     be invalid if anything changes, such as the other
                                          *     members of this struct, or the packets written.
                                          */
-} wtapng_mandatory_section_t;
+} wtapng_section_mandatory_t;
 
 /** struct holding the information to build an WTAP_BLOCK_IF_ID_AND_INFO.
  *  the interface_data array holds an array of wtap_block_t
@@ -227,6 +247,25 @@ typedef struct wtapng_dsb_mandatory_s {
 } wtapng_dsb_mandatory_t;
 
 /**
+ * Holds the required data from a WTAP_BLOCK_PACKET.
+ * This includes Enhanced Packet Block, Simple Packet Block, and the deprecated Packet Block.
+ * NB. I'm not including the packet data here since Wireshark handles it in other ways.
+ * If we were to add it we'd need to implement copy and free routines in wtap_opttypes.c
+ */
+#if 0
+/* Commented out for now, there's no mandatory data that isn't handled by
+ * Wireshark in other ways.
+ */
+typedef struct wtapng_packet_mandatory_s {
+    guint32  interface_id;
+    guint32  ts_high;
+    guint32  ts_low;
+    guint32  captured_len;
+    guint32  orig_len;
+} wtapng_packet_mandatory_t;
+#endif
+
+/**
  * Holds the required data from a WTAP_BLOCK_FT_SPECIFIC_REPORT.
  */
 typedef struct wtapng_ft_specific_mandatory_s {
@@ -236,11 +275,14 @@ typedef struct wtapng_ft_specific_mandatory_s {
 /* Currently supported option types */
 typedef enum {
     WTAP_OPTTYPE_UINT8,
+    WTAP_OPTTYPE_UINT32,
     WTAP_OPTTYPE_UINT64,
     WTAP_OPTTYPE_STRING,
+    WTAP_OPTTYPE_BYTES,
     WTAP_OPTTYPE_IPv4,
     WTAP_OPTTYPE_IPv6,
-    WTAP_OPTTYPE_IF_FILTER
+    WTAP_OPTTYPE_IF_FILTER,
+    WTAP_OPTTYPE_CUSTOM
 } wtap_opttype_e;
 
 typedef enum {
@@ -249,7 +291,8 @@ typedef enum {
     WTAP_OPTTYPE_NOT_FOUND = -2,
     WTAP_OPTTYPE_TYPE_MISMATCH = -3,
     WTAP_OPTTYPE_NUMBER_MISMATCH = -4,
-    WTAP_OPTTYPE_ALREADY_EXISTS = -5
+    WTAP_OPTTYPE_ALREADY_EXISTS = -5,
+    WTAP_OPTTYPE_BAD_BLOCK = -6,
 } wtap_opttype_return_val;
 
 /* Interface description data - if_filter option structure */
@@ -282,15 +325,28 @@ typedef struct if_filter_opt_s {
 } if_filter_opt_t;
 
 /*
+ * Structure describing a custom option.
+ */
+
+typedef struct custom_opt_s {
+    guint32 pen;
+    gsize custom_data_len;
+    gchar *custom_data;
+} custom_opt_t;
+
+/*
  * Structure describing a value of an option.
  */
 typedef union {
     guint8 uint8val;
+    guint32 uint32val;
     guint64 uint64val;
-    guint32 ipv4val;    /* network byte order */
+    ws_in4_addr ipv4val;    /* network byte order */
     ws_in6_addr ipv6val;
     char *stringval;
+    GBytes *byteval;
     if_filter_opt_t if_filterval;
+    custom_opt_t custom_opt;
 } wtap_optval_t;
 
 /*
@@ -324,13 +380,22 @@ WS_DLL_PUBLIC void wtap_opttypes_initialize(void);
  */
 WS_DLL_PUBLIC wtap_block_t wtap_block_create(wtap_block_type_t block_type);
 
-/** Free a block
+/** Increase reference count of a block
  *
- * Needs to be called to clean up any allocated block
+ * Call when taking a copy of a block
  *
- * @param[in] block Block to be freed
+ * @param[in] block Block add ref to
+ * @return The block
  */
-WS_DLL_PUBLIC void wtap_block_free(wtap_block_t block);
+WS_DLL_PUBLIC wtap_block_t wtap_block_ref(wtap_block_t block);
+
+/** Decrease reference count of a block
+ *
+ * Needs to be called on any block once you're done with it
+ *
+ * @param[in] block Block to be deref'd
+ */
+WS_DLL_PUBLIC void wtap_block_unref(wtap_block_t block);
 
 /** Free an array of blocks
  *
@@ -355,6 +420,15 @@ WS_DLL_PUBLIC wtap_block_type_t wtap_block_get_type(wtap_block_t block);
  * @return Block mandatory data.  Structure varies based on block type
  */
 WS_DLL_PUBLIC void* wtap_block_get_mandatory_data(wtap_block_t block);
+
+/** Count the number of times the given option appears in the block
+ *
+ * @param[in] block Block to which to add the option
+ * @param[in] option_id Identifier value for option
+ * @return guint - the number of times the option was found
+ */
+WS_DLL_PUBLIC guint
+wtap_block_count_option(wtap_block_t block, guint option_id);
 
 /** Add UINT8 option value to a block
  *
@@ -388,6 +462,39 @@ wtap_block_set_uint8_option_value(wtap_block_t block, guint option_id, guint8 va
  */
 WS_DLL_PUBLIC wtap_opttype_return_val
 wtap_block_get_uint8_option_value(wtap_block_t block, guint option_id, guint8* value) G_GNUC_WARN_UNUSED_RESULT;
+
+/** Add UINT32 option value to a block
+ *
+ * @param[in] block Block to which to add the option
+ * @param[in] option_id Identifier value for option
+ * @param[in] value Value of option
+ * @return wtap_opttype_return_val - WTAP_OPTTYPE_SUCCESS if successful,
+ * error code otherwise
+ */
+WS_DLL_PUBLIC wtap_opttype_return_val
+wtap_block_add_uint32_option(wtap_block_t block, guint option_id, guint32 value);
+
+/** Set UINT32 option value in a block
+ *
+ * @param[in] block Block in which to set the option value
+ * @param[in] option_id Identifier value for option
+ * @param[in] value New value of option
+ * @return wtap_opttype_return_val - WTAP_OPTTYPE_SUCCESS if successful,
+ * error code otherwise
+ */
+WS_DLL_PUBLIC wtap_opttype_return_val
+wtap_block_set_uint32_option_value(wtap_block_t block, guint option_id, guint32 value);
+
+/** Get UINT32 option value from a block
+ *
+ * @param[in] block Block from which to get the option value
+ * @param[in] option_id Identifier value for option
+ * @param[out] value Returned value of option
+ * @return wtap_opttype_return_val - WTAP_OPTTYPE_SUCCESS if successful,
+ * error code otherwise
+ */
+WS_DLL_PUBLIC wtap_opttype_return_val
+wtap_block_get_uint32_option_value(wtap_block_t block, guint option_id, guint32* value) G_GNUC_WARN_UNUSED_RESULT;
 
 /** Add UINT64 option value to a block
  *
@@ -524,7 +631,8 @@ wtap_block_add_string_option_format(wtap_block_t block, guint option_id, const c
 WS_DLL_PUBLIC wtap_opttype_return_val
 wtap_block_set_string_option_value(wtap_block_t block, guint option_id, const char* value, gsize value_length);
 
-/** Set string option value for nth instance of a particular option in a block
+/** Set string option value for the nth instance of a particular option
+ * in a block
  *
  * @param[in] block Block in which to set the option value
  * @param[in] option_id Identifier value for option
@@ -549,8 +657,8 @@ WS_DLL_PUBLIC wtap_opttype_return_val
 wtap_block_set_string_option_value_format(wtap_block_t block, guint option_id, const char *format, ...)
                                           G_GNUC_PRINTF(3,4);
 
-/** Set string option value for nth instance of a particular option in a block
- * to a printf-formatted string
+/** Set string option value for the nth instance of a particular option
+ * in a block to a printf-formatted string
  *
  * @param[in] block Block in which to set the option value
  * @param[in] option_id Identifier value for option
@@ -574,7 +682,8 @@ wtap_block_set_nth_string_option_value_format(wtap_block_t block, guint option_i
 WS_DLL_PUBLIC wtap_opttype_return_val
 wtap_block_get_string_option_value(wtap_block_t block, guint option_id, char** value) G_GNUC_WARN_UNUSED_RESULT;
 
-/** Get string option value for nth instance of a particular option in a block
+/** Get string option value for the nth instance of a particular option
+ * in a block
  *
  * @param[in] block Block from which to get the option value
  * @param[in] option_id Identifier value for option
@@ -585,6 +694,81 @@ wtap_block_get_string_option_value(wtap_block_t block, guint option_id, char** v
  */
 WS_DLL_PUBLIC wtap_opttype_return_val
 wtap_block_get_nth_string_option_value(wtap_block_t block, guint option_id, guint idx, char** value) G_GNUC_WARN_UNUSED_RESULT;
+
+/** Add a bytes option to a block
+ *
+ * @param[in] block Block to which to add the option
+ * @param[in] option_id Identifier value for option
+ * @param[in] value Value of option to copy
+ * @param[in] value_length Number of bytes to copy
+ * @return wtap_opttype_return_val - WTAP_OPTTYPE_SUCCESS if successful,
+ * error code otherwise
+ */
+WS_DLL_PUBLIC wtap_opttype_return_val
+wtap_block_add_bytes_option(wtap_block_t block, guint option_id, const guint8 *value, gsize value_length);
+
+/** Add a bytes option to a block, borrowing the value from a GBytes
+ *
+ * @param[in] block Block to which to add the option
+ * @param[in] option_id Identifier value for option
+ * @param[in] value Value of option as a GBytes
+ * @return wtap_opttype_return_val - WTAP_OPTTYPE_SUCCESS if successful,
+ * error code otherwise
+ */
+WS_DLL_PUBLIC wtap_opttype_return_val
+wtap_block_add_bytes_option_borrow(wtap_block_t block, guint option_id, GBytes *value);
+
+/** Set bytes option value in a block
+ *
+ * @param[in] block Block in which to set the option value
+ * @param[in] option_id Identifier value for option
+ * @param[in] value New value of option
+ * @param[in] value_length Number of bytes to copy.
+ * @return wtap_opttype_return_val - WTAP_OPTTYPE_SUCCESS if successful,
+ * error code otherwise
+ */
+WS_DLL_PUBLIC wtap_opttype_return_val
+wtap_block_set_bytes_option_value(wtap_block_t block, guint option_id, const guint8* value, gsize value_length);
+
+/** Set bytes option value for nth instance of a particular option in a block
+ *
+ * @param[in] block Block in which to set the option value
+ * @param[in] option_id Identifier value for option
+ * @param[in] idx Instance number of option with that ID
+ * @param[in] value New value of option
+ * @param[in] value_length Number of bytes to copy.
+ * @return wtap_opttype_return_val - WTAP_OPTTYPE_SUCCESS if successful,
+ * error code otherwise
+ */
+WS_DLL_PUBLIC wtap_opttype_return_val
+wtap_block_set_nth_bytes_option_value(wtap_block_t block, guint option_id, guint idx, GBytes* value);
+
+/** Get bytes option value from a block
+ *
+ * @param[in] block Block from which to get the option value
+ * @param[in] option_id Identifier value for option
+ * @param[out] value Returned value of option
+ * @return wtap_opttype_return_val - WTAP_OPTTYPE_SUCCESS if successful,
+ * error code otherwise
+ * @note You should call g_bytes_ref() on value if you plan to keep it around
+ * (and then g_bytes_unref() when you're done with it).
+ */
+WS_DLL_PUBLIC wtap_opttype_return_val
+wtap_block_get_bytes_option_value(wtap_block_t block, guint option_id, GBytes** value) G_GNUC_WARN_UNUSED_RESULT;
+
+/** Get bytes option value for nth instance of a particular option in a block
+ *
+ * @param[in] block Block from which to get the option value
+ * @param[in] option_id Identifier value for option
+ * @param[in] idx Instance number of option with that ID
+ * @param[out] value Returned value of option
+ * @return wtap_opttype_return_val - WTAP_OPTTYPE_SUCCESS if successful,
+ * error code otherwise
+ * @note You should call g_bytes_ref() on value if you plan to keep it around
+ * (and then g_bytes_unref() when you're done with it).
+ */
+WS_DLL_PUBLIC wtap_opttype_return_val
+wtap_block_get_nth_bytes_option_value(wtap_block_t block, guint option_id, guint idx, GBytes** value) G_GNUC_WARN_UNUSED_RESULT;
 
 /** Add an if_filter option value to a block
  *
@@ -619,6 +803,19 @@ wtap_block_set_if_filter_option_value(wtap_block_t block, guint option_id, if_fi
 WS_DLL_PUBLIC wtap_opttype_return_val
 wtap_block_get_if_filter_option_value(wtap_block_t block, guint option_id, if_filter_opt_t* value) G_GNUC_WARN_UNUSED_RESULT;
 
+/** Add an custom option to a block
+ *
+ * @param[in] block Block to which to add the option
+ * @param[in] option_id Identifier value for option
+ * @param[in] pen PEN
+ * @param[in] custom_data pointer to the data
+ * @param[in] custom_data_len length of custom_data
+ * @return wtap_opttype_return_val - WTAP_OPTTYPE_SUCCESS if successful,
+ * error code otherwise
+ */
+WS_DLL_PUBLIC wtap_opttype_return_val
+wtap_block_add_custom_option(wtap_block_t block, guint option_id, guint32 pen, const char *custom_data, gsize custom_data_len);
+
 /** Remove an option from a block
  *
  * @param[in] block Block from which to remove the option
@@ -641,6 +838,28 @@ WS_DLL_PUBLIC wtap_opttype_return_val
 wtap_block_remove_nth_option_instance(wtap_block_t block, guint option_id,
                                       guint idx);
 
+/**
+ * Get the original (unpadded) length of an option's value
+ *
+ * @param[in] option_type The `wtap_opttype_e` for this option
+ * @param[in] option The option's value to measure
+ * @return gsize - the number of bytes occupied by the option's value
+ */
+WS_DLL_PUBLIC gsize
+wtap_block_option_get_value_size(wtap_opttype_e option_type, wtap_optval_t *option);
+
+/** Get the padded length of all options in the block
+ *
+ * @param[in] block Block from which to remove the option instance
+ * @param[in] option_id Identifier value for option
+ * @param[in] idx Instance number of option with that ID
+ * @return gsize - size in bytes of all options, each padded to 32 bits
+ * @note The size of any options with values larger than can be held in an option
+ * is NOT included, because pcapng.c skips over such option values.
+ */
+WS_DLL_PUBLIC gsize
+wtap_block_get_options_size_padded(wtap_block_t block);
+
 /** Copy a block to another.
  *
  * Any options that are in the destination but not the source are not removed.
@@ -658,8 +877,8 @@ WS_DLL_PUBLIC void wtap_block_copy(wtap_block_t dest_block, wtap_block_t src_blo
  */
 WS_DLL_PUBLIC wtap_block_t wtap_block_make_copy(wtap_block_t block);
 
-typedef void (*wtap_block_foreach_func)(wtap_block_t block, guint option_id, wtap_opttype_e option_type, wtap_optval_t *option, void *user_data);
-WS_DLL_PUBLIC void wtap_block_foreach_option(wtap_block_t block, wtap_block_foreach_func func, void* user_data);
+typedef gboolean (*wtap_block_foreach_func)(wtap_block_t block, guint option_id, wtap_opttype_e option_type, wtap_optval_t *option, void *user_data);
+WS_DLL_PUBLIC gboolean wtap_block_foreach_option(wtap_block_t block, wtap_block_foreach_func func, void* user_data);
 
 /** Cleanup the internal structures
  */

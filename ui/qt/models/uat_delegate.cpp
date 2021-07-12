@@ -12,6 +12,7 @@
 
 #include <ui/qt/models/uat_delegate.h>
 #include "epan/value_string.h"
+#include <wsutil/ws_assert.h>
 #include <QComboBox>
 #include <QEvent>
 #include <QFileDialog>
@@ -128,7 +129,7 @@ QWidget *UatDelegate::createEditor(QWidget *parent, const QStyleOptionViewItem &
         break;
 
     default:
-        g_assert_not_reached();
+        ws_assert_not_reached();
         break;
     }
 
@@ -184,7 +185,7 @@ void UatDelegate::setModelData(QWidget *editor, QAbstractItemModel *model,
         if (qobject_cast<QColorDialog *>(editor))
         {
             QColor newColor = qobject_cast<QColorDialog *>(editor)->currentColor();
-            ((QAbstractItemModel *)index.model())->setData(index, newColor.name(), Qt::EditRole);
+            const_cast<QAbstractItemModel *>(index.model())->setData(index, newColor.name(), Qt::EditRole);
         }
         break;
 
@@ -197,6 +198,6 @@ void UatDelegate::applyFilename(const QModelIndex& index)
 {
     if (index.isValid()) {
         EditorFileDialog* fileDialog = static_cast<EditorFileDialog*>(sender());
-        ((QAbstractItemModel *)index.model())->setData(index, fileDialog->text(), Qt::EditRole);
+        const_cast<QAbstractItemModel *>(index.model())->setData(index, fileDialog->text(), Qt::EditRole);
     }
 }

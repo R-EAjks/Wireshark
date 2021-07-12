@@ -18,10 +18,13 @@
 #include <wsutil/filesystem.h>
 #include <wsutil/privileges.h>
 #include <wsutil/please_report_bug.h>
+#include <wsutil/wslog.h>
 
 #include <cli_main.h>
 #include <ui/cmdarg_err.h>
 #include "etl.h"
+
+#include <signal.h>
 
 /* extcap-interface has to be unique, or it may use wrong option output by a different extcapbin */
 #define ETW_EXTCAP_INTERFACE "etwdump"
@@ -34,7 +37,8 @@ enum {
     OPT_HELP,
     OPT_VERSION,
     OPT_INCLUDE_UNDECIDABLE_EVENT,
-    OPT_ETLFILE
+    OPT_ETLFILE,
+    OPT_PARAMS
 };
 
 static struct option longopts[] = {
@@ -43,10 +47,23 @@ static struct option longopts[] = {
     { "version", no_argument,       NULL, OPT_VERSION},
     { "iue",     optional_argument, NULL, OPT_INCLUDE_UNDECIDABLE_EVENT},
     { "etlfile", required_argument, NULL, OPT_ETLFILE},
+    { "params",  required_argument, NULL, OPT_PARAMS},
     { 0, 0, 0, 0 }
 };
 
 int g_include_undecidable_event = FALSE;
+
+void SignalHandler(_U_ int signal)
+{
+    SUPER_EVENT_TRACE_PROPERTIES super_trace_properties = { 0 };
+    super_trace_properties.prop.Wnode.BufferSize = sizeof(SUPER_EVENT_TRACE_PROPERTIES);
+    super_trace_properties.prop.Wnode.ClientContext = 2;
+    super_trace_properties.prop.Wnode.Flags = WNODE_FLAG_TRACED_GUID;
+    super_trace_properties.prop.LoggerNameOffset = sizeof(EVENT_TRACE_PROPERTIES);
+    super_trace_properties.prop.LogFileMode = EVENT_TRACE_REAL_TIME_MODE;
+    /* Close trace when press CONTROL+C when running this console alone */
+    ControlTrace((TRACEHANDLE)NULL, LOGGER_NAME, &super_trace_properties.prop, EVENT_TRACE_CONTROL_STOP);
+}
 
 static void help(extcap_parameters* extcap_conf)
 {
@@ -58,38 +75,34 @@ static int list_config(char* interface)
     unsigned inc = 0;
 
     if (!interface) {
-        g_warning("No interface specified.");
+        ws_warning("No interface specified.");
         return EXIT_FAILURE;
     }
 
     if (g_strcmp0(interface, ETW_EXTCAP_INTERFACE)) {
-        g_warning("Interface must be %s", ETW_EXTCAP_INTERFACE);
+        ws_warning("Interface must be %s", ETW_EXTCAP_INTERFACE);
         return EXIT_FAILURE;
     }
-    /* Saved for later live capture support */
-#if 0
-    printf("arg {number=%u}{call=--type}{display=Capture type}"
-            	"{type=selector}{tooltip=Choose the type of capture}{group=Capture}\n",
-            	inc);
-    printf("value {arg=%u}{value=etl}{display=From a etl file}\n", inc);
-    printf("value {arg=%u}{value=live}{display=From a live session}\n", inc);
-    inc++;
-#endif
+    /*
+     * required=true agu will be displayed before required=false on UI
+     *
+     * Empty etlfile and unempty params, read etw events from a live session with the params as the filter
+     * Unempty etlfile and empty params, read etw events from the etl file without filter
+     * Unempty etlfile and unemtpy params, read etw events from the etl file with the params as the filter
+     * Empty eltfile and empty params, invalid
+     */
+    printf("arg {number=%u}{call=--etlfile}{display=etl file}"
+        "{type=fileselect}{tooltip=Select etl file to display in Wireshark}{required=false}{group=Capture}\n",
+        inc++);
+    printf("arg {number=%u}{call=--params}{display=filter parmeters}"
+        "{type=string}{tooltip=Input providers, keyword and level filters for the etl file and live session}{group=Capture}\n",
+        inc++);
     /*
     * The undecidable events are those that either don't have sub-dissector or don't have anthing meaningful to display except for the EVENT_HEADER.
     */
     printf("arg {number=%u}{call=--iue}{display=Should undecidable events be included}"
         "{type=boolflag}{default=false}{tooltip=Choose if the undecidable event is included}{group=Capture}\n",
         inc++);
-    printf("arg {number=%u}{call=--etlfile}{display=etl file}"
-        "{type=fileselect}{tooltip=Select etl file to display in Wireshark}{required=true}{group=Capture}\n",
-        inc++);
-    /* Saved for later live capture support */
-#if 0
-    printf("arg {number=%u}{call=--session-params}{display=Live session parameters}"
-        "{type=string}{tooltip=providers, keyword and level}{group=Capture}\n",
-        inc++);
-#endif
 
     extcap_config_debug(&inc);
     return EXIT_SUCCESS;
@@ -103,10 +116,17 @@ int main(int argc, char* argv[])
     int ret = EXIT_FAILURE;
 
     char* etlfile = NULL;
+    char* params = NULL;
 
     extcap_parameters* extcap_conf = g_new0(extcap_parameters, 1);
     char* help_url;
     char* help_header = NULL;
+
+    /* Initialize log handler early so we can have proper logging during startup. */
+    ws_log_init("etwdump", NULL);
+
+    /* Early logging command-line initialization. */
+    ws_log_parse_args(&argc, argv, NULL, LOG_ARGS_NOEXIT);
 
     /*
      * Get credential information for later use.
@@ -119,7 +139,7 @@ int main(int argc, char* argv[])
      */
     err_msg = init_progfile_dir(argv[0]);
     if (err_msg != NULL) {
-        g_warning("Can't get pathname of directory containing the captype program: %s.",
+        ws_warning("Can't get pathname of directory containing the captype program: %s.",
             err_msg);
         g_free(err_msg);
     }
@@ -166,20 +186,25 @@ int main(int argc, char* argv[])
             etlfile = g_strdup(optarg);
             break;
 
+        case OPT_PARAMS:
+            /* Add params as the prefix since getopt_long will ignore the first argument always */
+            params = g_strdup_printf("params %s", optarg);
+            break;
+
         case OPT_INCLUDE_UNDECIDABLE_EVENT:
             g_include_undecidable_event = TRUE;
             break;
 
         case ':':
             /* missing option argument */
-            g_warning("Option '%s' requires an argument", argv[optind - 1]);
+            ws_warning("Option '%s' requires an argument", argv[optind - 1]);
             break;
 
         default:
             /* Handle extcap specific options */
             if (!extcap_base_parse_options(extcap_conf, result - EXTCAP_OPT_LIST_INTERFACES, optarg))
             {
-                g_warning("Invalid option: %s", argv[optind - 1]);
+                ws_warning("Invalid option: %s", argv[optind - 1]);
                 goto end;
             }
         }
@@ -200,34 +225,57 @@ int main(int argc, char* argv[])
     if (extcap_conf->capture) {
 
         if (g_strcmp0(extcap_conf->interface, ETW_EXTCAP_INTERFACE)) {
-            g_warning("ERROR: invalid interface");
+            ws_warning("ERROR: invalid interface");
+            goto end;
+        }
+
+        if (etlfile == NULL && params == NULL)
+        {
+            ws_warning("ERROR: Both --etlfile and --params arguments are empty");
             goto end;
         }
 
         wtap_init(FALSE);
 
-        switch(etw_dump(etlfile, extcap_conf->fifo, &ret, &err_msg))
+        signal(SIGINT, SignalHandler);
+
+        switch(etw_dump(etlfile, extcap_conf->fifo, params, &ret, &err_msg))
         {
         case WTAP_OPEN_ERROR:
             if (err_msg != NULL) {
-                g_warning("etw_dump failed: %s.",
+                ws_warning("etw_dump failed: %s.",
                     err_msg);
                 g_free(err_msg);
             }
             else
             {
-                g_warning("etw_dump failed");
+                ws_warning("etw_dump failed");
             }
             break;
         case WTAP_OPEN_NOT_MINE:
-            if (err_msg != NULL) {
-                g_warning("The file %s is not etl format. Error message: %s.",
-                    etlfile, err_msg);
-                g_free(err_msg);
+            if (etlfile == NULL)
+            {
+                if (err_msg != NULL) {
+                    ws_warning("The live session didn't caputre any event. Error message: %s.",
+                        err_msg);
+                    g_free(err_msg);
+                }
+                else
+                {
+                    ws_warning("The live session didn't caputre any event");
+                }
             }
             else
             {
-                g_warning("The file %s is not etl format");
+                if (err_msg != NULL) {
+                    ws_warning("The file %s is not etl format. Error message: %s.",
+                        etlfile, err_msg);
+                    g_free(err_msg);
+                }
+                else
+                {
+                    ws_warning("The file %s is not etl format", etlfile);
+                }
             }
             break;
         case WTAP_OPEN_MINE:
@@ -243,6 +291,10 @@ end:
     if (etlfile != NULL)
     {
         g_free(etlfile);
+    }
+    if (params != NULL)
+    {
+        g_free(params);
     }
 
     return ret;

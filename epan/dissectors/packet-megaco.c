@@ -801,7 +801,7 @@ dissect_megaco_text(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* d
     tokenlen = tvb_offset - tvb_previous_offset;
     token_index = find_megaco_messageBody_names(tvb, tvb_previous_offset, tokenlen);
     /* Debug code
-        g_warning("token_index %u",token_index);
+        ws_warning("token_index %u",token_index);
     */
 
     tvb_LBRKT  = tvb_find_guint8(tvb, tvb_offset, tvb_len, '{');
@@ -3586,7 +3586,7 @@ megaco_fmt_content( gchar *result, guint32 context )
     case CHOOSE_CONTEXT:
     case ALL_CONTEXTS:
     case NULL_CONTEXT:
-        g_strlcpy(result, val_to_str_const(context, megaco_context_vals, "Unknown"), ITEM_LABEL_LENGTH);
+        (void) g_strlcpy(result, val_to_str_const(context, megaco_context_vals, "Unknown"), ITEM_LABEL_LENGTH);
         break;
     default:
         g_snprintf( result, ITEM_LABEL_LENGTH, "%d", context);

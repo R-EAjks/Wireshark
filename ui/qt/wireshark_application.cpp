@@ -43,12 +43,11 @@
 #include "coloring_rules_dialog.h"
 
 #include "epan/color_filters.h"
-#include "log.h"
 #include "recent_file_status.h"
 
 #include "extcap.h"
 #ifdef HAVE_LIBPCAP
-#include <caputils/iface_monitor.h>
+#include <capture/iface_monitor.h>
 #endif
 
 #include "ui/filter_files.h"
@@ -282,8 +281,10 @@ QDir WiresharkApplication::lastOpenDir() {
     return QDir(last_open_dir);
 }
 
-void WiresharkApplication::setLastOpenDir(QString dir_str) {
-    setLastOpenDir(qUtf8Printable(dir_str));
+void WiresharkApplication::setLastOpenDirFromFilename(const QString file_name)
+{
+    QString directory = QFileInfo(file_name).absolutePath();
+    setLastOpenDir(qUtf8Printable(directory));
 }
 
 void WiresharkApplication::helpTopicAction(topic_action_e action)
@@ -649,6 +650,10 @@ WiresharkApplication::WiresharkApplication(int &argc,  char **argv) :
 #endif // Q_OS_WIN
 
     setAttribute(Qt::AA_UseHighDpiPixmaps);
+
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0) && defined(Q_OS_WIN)
+    setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
+#endif
 
 #if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
     setAttribute(Qt::AA_DisableWindowContextHelpButton);

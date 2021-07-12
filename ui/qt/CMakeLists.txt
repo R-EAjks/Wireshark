@@ -66,6 +66,7 @@ set(WIRESHARK_UTILS_HEADERS
 	utils/rtp_audio_routing.h
 	utils/rtp_audio_routing_filter.h
 	utils/rtp_audio_silence_generator.h
+	utils/rtp_audio_file.h
 	utils/stock_icon.h
 	utils/tango_colors.h
 	utils/variant_pointer.h
@@ -309,6 +310,7 @@ set(WIRESHARK_UTILS_SRCS
 	utils/rtp_audio_routing.cpp
 	utils/rtp_audio_routing_filter.cpp
 	utils/rtp_audio_silence_generator.cpp
+	utils/rtp_audio_file.cpp
 	utils/stock_icon.cpp
 	utils/wireshark_mime_data.cpp
 	utils/wireshark_zip_helper.cpp
@@ -630,10 +632,6 @@ set(WIRESHARK_QT_QRC
 	${CMAKE_CURRENT_BINARY_DIR}/i18n.qrc
 )
 
-set(CMAKE_AUTOMOC TRUE)
-set(CMAKE_AUTOUIC TRUE)
-set(CMAKE_AUTORCC TRUE)
-
 if(NOT Qt5Widgets_VERSION VERSION_LESS "5.9")
 	# Drop the file modification time of source files from generated files
 	# to help with reproducible builds. We do not use QFileInfo.lastModified
@@ -732,9 +730,16 @@ target_compile_definitions(qtui
 set_target_properties(qtui PROPERTIES
 	LINK_FLAGS "${WS_LINK_FLAGS}"
 	FOLDER "UI"
+	AUTOMOC ON
+	AUTOUIC ON
+	AUTORCC ON
 	# Ensure .qm files are generated before autogenerating i18n.qrc
 	AUTOGEN_TARGET_DEPENDS "${WIRESHARK_QT_QM}"
 )
+
+if(MSVC)
+	set_target_properties(qtui PROPERTIES LINK_FLAGS_DEBUG "${WS_MSVC_DEBUG_LINK_FLAGS}")
+endif()
 
 CHECKAPI(
 	NAME

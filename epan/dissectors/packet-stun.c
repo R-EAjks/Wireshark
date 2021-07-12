@@ -54,6 +54,7 @@
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include <epan/to_str.h>
+#include <wsutil/ws_roundup.h>
 #include "packet-tcp.h"
 
 void proto_register_stun(void);
@@ -779,7 +780,8 @@ dissect_stun_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboole
     const char *msg_method_str;
     guint16     att_type, att_type_display;
     guint16     att_length, att_length_pad, clear_port;
-    guint32     clear_ip;
+    guint32     clear_ip[4];
+    address     addr;
     guint       i;
     guint       offset;
     guint       magic_cookie_first_word;
@@ -1067,7 +1069,7 @@ dissect_stun_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboole
             att_type = tvb_get_ntohs(tvb, offset);     /* Attribute type field in attribute header */
             att_length = tvb_get_ntohs(tvb, offset+2); /* Attribute length field in attribute header */
             if (network_version >= NET_VER_5389)
-                att_length_pad = (att_length + 3) & ~3; /* Attribute length including padding */
+                att_length_pad = WS_ROUNDUP_4(att_length); /* Attribute length including padding */
             else
                 att_length_pad = att_length;
             att_type_display = att_type;
@@ -1104,6 +1106,9 @@ dissect_stun_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboole
             proto_tree_add_uint(att_tree, hf_stun_att_length, tvb,
                                 offset, 2, att_length);
             offset += 2;
+
+            /* Zero out address */
+            clear_address(&addr);
 
             switch (att_type_display) {
 
@@ -1154,7 +1159,7 @@ dissect_stun_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboole
             case MS_ALT_MAPPED_ADDRESS:
             case MS_ALTERNATE_SERVER:
             {
-                const gchar       *addr_str;
+                const gchar       *addr_str = NULL;
                 guint16            att_port;
 
                 if (att_length < 1)
@@ -1174,14 +1179,6 @@ dissect_stun_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboole
                         break;
                     addr_str = tvb_ip_to_str(tvb, offset + 4);
                     proto_tree_add_item(att_tree, hf_stun_att_ipv4, tvb, offset+4, 4, ENC_BIG_ENDIAN);
-                    proto_item_append_text(att_tree, ": %s:%d", addr_str, att_port);
-                    col_append_fstr(
-                        pinfo->cinfo, COL_INFO,
-                        " %s: %s:%d",
-                        attribute_name_str,
-                        addr_str,
-                        att_port
-                        );
                     break;
 
                 case 2:
@@ -1189,16 +1186,15 @@ dissect_stun_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboole
                         break;
                     addr_str = tvb_ip6_to_str(tvb, offset + 4);
                     proto_tree_add_item(att_tree, hf_stun_att_ipv6, tvb, offset+4, 16, ENC_NA);
-                    proto_item_append_text(att_tree, ": %s:%d", addr_str, att_port);
-                    col_append_fstr(
-                        pinfo->cinfo, COL_INFO,
-                        " %s: %s:%d",
-                        attribute_name_str,
-                        addr_str,
-                        att_port
-                        );
                     break;
                 }
+
+                if (addr_str != NULL) {
+                    proto_item_append_text(att_tree, ": %s:%d", addr_str, att_port);
+                    col_append_fstr(pinfo->cinfo, COL_INFO, " %s: %s:%d",
+                                    attribute_name_str, addr_str, att_port);
+                }
+
                 break;
             }
             case CHANGE_REQUEST:
@@ -1309,7 +1305,7 @@ dissect_stun_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboole
                        }
                    }
                    /* Hopefully, in case MS-TURN ever gets PASSWORD-ALGORITHM(S) support they will add it with padding */
-                   alg_param_len_pad = (alg_param_len + 3) & ~3;
+                   alg_param_len_pad = WS_ROUNDUP_4(alg_param_len);
 
                    if (alg_param_len < alg_param_len_pad)
                        proto_tree_add_uint(att_tree, hf_stun_att_padding, tvb, loopoffset+alg_param_len, alg_param_len_pad-alg_param_len, alg_param_len_pad-alg_param_len);
@@ -1353,6 +1349,7 @@ dissect_stun_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboole
 
                 if (att_length < 8)
                     break;
+
                 switch (tvb_get_guint8(tvb, offset+1)) {
                 case 1:
                     proto_tree_add_item(att_tree, hf_stun_att_xor_ipv4, tvb, offset+4, 4, ENC_NA);
@@ -1360,63 +1357,43 @@ dissect_stun_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboole
                     /* Show the address 'in the clear'.
                        XOR (host order) transid with (host order) xor-address.
                        Add in network order tree. */
-                    clear_ip = tvb_get_ipv4(tvb, offset+4) ^ g_htonl(magic_cookie_first_word);
-                    ti = proto_tree_add_ipv4(att_tree, hf_stun_att_ipv4, tvb, offset+4, 4, clear_ip);
+                    clear_ip[0] = tvb_get_ipv4(tvb, offset+4) ^ g_htonl(magic_cookie_first_word);
+                    ti = proto_tree_add_ipv4(att_tree, hf_stun_att_ipv4, tvb, offset+4, 4, clear_ip[0]);
                     proto_item_set_generated(ti);
 
-                    {
-                        const gchar *ipstr;
-                        address addr;
-                        guint32 ip;
-                        guint16 port;
-                        ip = tvb_get_ipv4(tvb, offset+4) ^ g_htonl(magic_cookie_first_word);
-                        set_address(&addr, AT_IPv4, 4, &ip);
-                        ipstr = address_to_str(wmem_packet_scope(), &addr);
-                        port = tvb_get_ntohs(tvb, offset+2) ^ (magic_cookie_first_word >> 16);
-                        proto_item_append_text(att_tree, ": %s:%d", ipstr, port);
-                        col_append_fstr(
-                            pinfo->cinfo, COL_INFO,
-                            " %s: %s:%d",
-                            attribute_name_str,
-                            ipstr,
-                            port
-                            );
-                    }
+                    set_address(&addr, AT_IPv4, 4, clear_ip);
                     break;
 
                 case 2:
                     if (att_length < 20)
                         break;
+
                     proto_tree_add_item(att_tree, hf_stun_att_xor_ipv6, tvb, offset+4, 16, ENC_NA);
-                    {
-                        const gchar *ipstr;
-                        address addr;
-                        guint32 IPv6[4];
-                        guint16 port;
-                        tvb_get_ipv6(tvb, offset+4, (ws_in6_addr *)IPv6);
-                        IPv6[0] = IPv6[0] ^ g_htonl(magic_cookie_first_word);
-                        IPv6[1] = IPv6[1] ^ g_htonl(transaction_id[0]);
-                        IPv6[2] = IPv6[2] ^ g_htonl(transaction_id[1]);
-                        IPv6[3] = IPv6[3] ^ g_htonl(transaction_id[2]);
-                        ti = proto_tree_add_ipv6(att_tree, hf_stun_att_ipv6, tvb, offset+4, 16,
-                                                 (const ws_in6_addr *)IPv6);
-                        proto_item_set_generated(ti);
 
-                        set_address(&addr, AT_IPv6, 16, &IPv6);
-                        ipstr = address_to_str(wmem_packet_scope(), &addr);
-                        port = tvb_get_ntohs(tvb, offset+2) ^ (magic_cookie_first_word >> 16);
-                        proto_item_append_text(att_tree, ": %s:%d", ipstr, port);
-                        col_append_fstr(
-                            pinfo->cinfo, COL_INFO,
-                            " %s: %s:%d",
-                            attribute_name_str,
-                            ipstr,
-                            port
-                            );
-                    }
+                    tvb_get_ipv6(tvb, offset+4, (ws_in6_addr *)clear_ip);
+                    clear_ip[0] ^= g_htonl(magic_cookie_first_word);
+                    clear_ip[1] ^= g_htonl(transaction_id[0]);
+                    clear_ip[2] ^= g_htonl(transaction_id[1]);
+                    clear_ip[3] ^= g_htonl(transaction_id[2]);
+                    ti = proto_tree_add_ipv6(att_tree, hf_stun_att_ipv6, tvb, offset+4, 16,
+                                             (const ws_in6_addr *)clear_ip);
+                    proto_item_set_generated(ti);
 
+                    set_address(&addr, AT_IPv6, 16, &clear_ip);
+                    break;
+
+                default:
+                    clear_address(&addr);
                     break;
                 }
+
+                if (addr.type != AT_NONE) {
+                    const gchar *ipstr = address_to_str(wmem_packet_scope(), &addr);
+                    proto_item_append_text(att_tree, ": %s:%d", ipstr, clear_port);
+                    col_append_fstr(pinfo->cinfo, COL_INFO, " %s: %s:%d",
+                                    attribute_name_str, ipstr, clear_port);
+                }
+
                 break;
 
             case REQUESTED_ADDRESS_FAMILY:
@@ -1875,7 +1852,7 @@ proto_register_stun(void)
             BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_stun_att_username_opaque,
-          { "Username", "stun.att.username", FT_BYTES,
+          { "Username", "stun.att.username.opaque", FT_BYTES,
             BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_stun_att_password,

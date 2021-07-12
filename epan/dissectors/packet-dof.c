@@ -8179,20 +8179,20 @@ static int dissect_oap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
         guint8 no_of_bits = 5;
         guint8 i;
         guint8 bit = 3;
-        g_strlcpy(str, "...", 20);
+        (void) g_strlcpy(str, "...", 20);
 
         /* read the bits for the int */
         for (i = 0; i < no_of_bits; i++)
         {
             if (bit && (!(bit % 4)))
-                g_strlcat(str, " ", 20);
+                (void) g_strlcat(str, " ", 20);
 
             bit++;
 
             if (opcode & mask)
-                g_strlcat(str, "1", 20);
+                (void) g_strlcat(str, "1", 20);
             else
-                g_strlcat(str, "0", 20);
+                (void) g_strlcat(str, "0", 20);
 
             mask = mask >> 1;
         }
@@ -9460,8 +9460,7 @@ static int dissect_tep(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
         /* Add a field to show the session key that has been learned. */
         if (rekey_data->key_data && rekey_data->key_data->session_key && tep_tree)
         {
-            const gchar *SID = bytestring_to_str(NULL, rekey_data->key_data->session_key, 32, ':');
-            ti = proto_tree_add_bytes_format_value(tree, hf_tep_session_key, tvb, 0, 0, rekey_data->key_data->session_key, "%s", SID);
+            ti = proto_tree_add_bytes_with_length(tree, hf_tep_session_key, tvb, 0, 0, rekey_data->key_data->session_key, 32);
             proto_item_set_generated(ti);
         }
 
@@ -11989,7 +11988,7 @@ static void dof_register_tep_128(void)
             { "Initial State", "dof.2008.4.tep1.2.2.1.initial_state", FT_NONE, BASE_NONE, NULL, 0x00, NULL, HFILL } },
 
         { &hf_tep_session_key,
-            { "Session Key", "dof.session_key", FT_BYTES, BASE_NONE, NULL, 0x00, NULL, HFILL } },
+            { "Session Key", "dof.session_key", FT_BYTES, SEP_COLON, NULL, 0x00, NULL, HFILL } },
     };
 
     static gint *ett[] =

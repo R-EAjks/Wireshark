@@ -32,6 +32,7 @@
 #include "wsutil/unicode-utils.h"
 #include "wsutil/nstime.h"
 #include "wsutil/time_util.h"
+#include <wsutil/ws_assert.h>
 #include "tvbuff.h"
 #include "tvbuff-int.h"
 #include "strutil.h"
@@ -70,7 +71,7 @@ tvb_new(const struct tvb_ops *ops)
 	tvbuff_t *tvb;
 	gsize     size = ops->tvb_size;
 
-	g_assert(size >= sizeof(*tvb));
+	ws_assert(size >= sizeof(*tvb));
 
 	tvb = (tvbuff_t *) g_slice_alloc(size);
 
@@ -539,9 +540,6 @@ tvb_ensure_captured_length_remaining(const tvbuff_t *tvb, const gint offset)
 	return rem_length;
 }
 
-
-
-
 /* Validates that 'length' bytes are available starting from
  * offset (pos/neg). Does not throw an exception. */
 gboolean
@@ -711,6 +709,24 @@ tvb_reported_length_remaining(const tvbuff_t *tvb, const gint offset)
 		return tvb->reported_length - abs_offset;
 	else
 		return 0;
+}
+
+guint
+tvb_ensure_reported_length_remaining(const tvbuff_t *tvb, const gint offset)
+{
+	guint abs_offset = 0;
+	int   exception;
+
+	DISSECTOR_ASSERT(tvb && tvb->initialized);
+
+	exception = compute_offset(tvb, offset, &abs_offset);
+	if (exception)
+		THROW(exception);
+
+	if (tvb->reported_length >= abs_offset)
+		return tvb->reported_length - abs_offset;
+	else
+		THROW(ReportedBoundsError);
 }
 
 /* Set the reported length of a tvbuff to a given value; used for protocols
@@ -1630,10 +1646,11 @@ validate_single_byte_ascii_encoding(const guint encoding)
 	    case ENC_KEYPAD_ABC_TBCD:
 	    case ENC_KEYPAD_BC_TBCD:
 	    case ENC_ETSI_TS_102_221_ANNEX_A:
-		REPORT_DISSECTOR_BUG("Invalid string encoding type passed to tvb_get_string_XXX");
-		break;
+	    case ENC_APN_STR:
+	    REPORT_DISSECTOR_BUG("Invalid string encoding type passed to tvb_get_string_XXX");
+	    break;
 	    default:
-		break;
+	    break;
 	}
 	/* make sure something valid was set */
 	if (enc == 0)
@@ -2861,6 +2878,73 @@ static const dgt_set_t Dgt_ansi_tbcd = {
 	}
 };
 
+static guint8 *
+tvb_get_apn_string(wmem_allocator_t *scope, tvbuff_t *tvb, const gint offset,
+			     gint length)
+{
+	wmem_strbuf_t *str;
+
+	/*
+	 * This is a domain name.
+	 *
+	 * 3GPP TS 23.003, section 19.4.2 "Fully Qualified Domain Names
+	 * (FQDNs)", subsection 19.4.2.1 "General", says:
+	 *
+	 *    The encoding of any identifier used as part of a Fully
+	 *    Qualifed Domain Name (FQDN) shall follow the Name Syntax
+	 *    defined in IETF RFC 2181 [18], IETF RFC 1035 [19] and
+	 *    IETF RFC 1123 [20].  An FQDN consists of one or more
+	 *    labels. Each label is coded as a one octet length field
+	 *    followed by that number of octets coded as 8 bit ASCII
+	 *    characters.
+	 *
+	 * so this does not appear to use full-blown DNS compression -
+	 * the upper 2 bits of the length don't indicate that it's a
+	 * pointer or an extended label (RFC 2673).
+	 */
+	str = wmem_strbuf_sized_new(scope, length + 1, 0);
+	if (length > 0) {
+		const guint8 *ptr;
+
+		ptr = ensure_contiguous(tvb, offset, length);
+
+		for (;;) {
+			guint label_len;
+
+			/*
+			 * Process this label.
+			 */
+			label_len = *ptr;
+			ptr++;
+			length--;
+
+			while (label_len != 0) {
+				guint8 ch;
+
+				if (length == 0)
+					goto end;
+
+				ch = *ptr;
+				if (ch < 0x80)
+					wmem_strbuf_append_c(str, ch);
+				else
+					wmem_strbuf_append_unichar(str, UNREPL);
+				ptr++;
+				label_len--;
+				length--;
+			}
+
+			if (length == 0)
+				goto end;
+
+			wmem_strbuf_append_c(str, '.');
+		}
+	}
+
+end:
+	return (guint8 *) wmem_strbuf_finalize(str);
+}
+
 /*
  * Given a tvbuff, an offset, a length, and an encoding, allocate a
  * buffer big enough to hold a non-null-terminated string of that length
@@ -3086,11 +3170,17 @@ tvb_get_string_enc(wmem_allocator_t *scope, tvbuff_t *tvb, const gint offset,
 	case ENC_ETSI_TS_102_221_ANNEX_A:
 		strptr = tvb_get_etsi_ts_102_221_annex_a_string(scope, tvb, offset, length);
 		break;
+
 	case ENC_GB18030:
 		strptr = tvb_get_gb18030_string(scope, tvb, offset, length);
 		break;
+
 	case ENC_EUC_KR:
 		strptr = tvb_get_euc_kr_string(scope, tvb, offset, length);
+		break;
+
+	case ENC_APN_STR:
+		strptr = tvb_get_apn_string(scope, tvb, offset, length);
 		break;
 	}
 	return strptr;
@@ -4239,6 +4329,7 @@ tvb_bcd_dig_to_wmem_packet_str_be(tvbuff_t *tvb, const gint offset, const gint l
 gchar *tvb_bytes_to_str(wmem_allocator_t *allocator, tvbuff_t *tvb,
     const gint offset, const gint len)
 {
+	DISSECTOR_ASSERT(len > 0);
 	return bytes_to_str(allocator, ensure_contiguous(tvb, offset, len), len);
 }
 
@@ -4344,7 +4435,7 @@ tvb_get_varint(tvbuff_t *tvb, guint offset, guint maxlen, guint64 *value, const 
 			*value = tvb_get_ntoh64(tvb, offset) & G_GUINT64_CONSTANT(0x3FFFFFFFFFFFFFFF);
 			return 8;
 		default: /* No Possible */
-			g_assert_not_reached();
+			ws_assert_not_reached();
 			break;
 		}
 

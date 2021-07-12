@@ -36,17 +36,19 @@
 
 #include <ui/clopts_common.h>
 #include <ui/cmdarg_err.h>
+#include <ui/exit_codes.h>
 #include <ui/urls.h>
 #include <wsutil/filesystem.h>
 #include <wsutil/privileges.h>
 #include <wsutil/socket.h>
+#include <wsutil/wslog.h>
 #ifdef HAVE_PLUGINS
 #include <wsutil/plugins.h>
 #endif
 #include <wsutil/report_message.h>
 #include <wsutil/please_report_bug.h>
 #include <wsutil/unicode-utils.h>
-#include <version_info.h>
+#include <ui/version_info.h>
 
 #include <epan/addr_resolv.h>
 #include <epan/ex-opt.h>
@@ -69,7 +71,6 @@
 /* general (not Qt specific) */
 #include "file.h"
 #include "epan/color_filters.h"
-#include "log.h"
 
 #include "epan/rtd_table.h"
 #include "epan/srt_table.h"
@@ -101,19 +102,19 @@
 #include <ui/qt/widgets/splash_overlay.h>
 #include "ui/qt/wireshark_application.h"
 
-#include "caputils/capture-pcap-util.h"
+#include "capture/capture-pcap-util.h"
 
 #include <QMessageBox>
 #include <QScreen>
 
 #ifdef _WIN32
-#  include "caputils/capture-wpcap.h"
+#  include "capture/capture-wpcap.h"
 #  include <wsutil/file_util.h>
 #endif /* _WIN32 */
 
 #ifdef HAVE_AIRPCAP
-#  include <caputils/airpcap.h>
-#  include <caputils/airpcap_loader.h>
+#  include <capture/airpcap.h>
+#  include <capture/airpcap_loader.h>
 //#  include "airpcap_dlg.h"
 //#  include "airpcap_gui_utils.h"
 #endif
@@ -127,25 +128,7 @@
 
 #include <ui/qt/utils/qt_ui_utils.h>
 
-#define INVALID_OPTION 1
-#define INIT_FAILED 2
-#define INVALID_CAPABILITY 2
-#define INVALID_LINK_TYPE 2
-
 //#define DEBUG_STARTUP_TIME 1
-/*
-# Log level
-# Console log level (for debugging)
-# A bitmask of log levels:
-# ERROR    = 4
-# CRITICAL = 8
-# WARNING  = 16
-# MESSAGE  = 32
-# INFO     = 64
-# DEBUG    = 128
-
-#define DEBUG_STARTUP_TIME_LOGLEVEL 252
-*/
 
 /* update the main window */
 void main_window_update(void)
@@ -172,7 +155,43 @@ void exit_application(int status) {
 
 /*
  * Report an error in command-line arguments.
- * Creates a console on Windows.
+ *
+ * On Windows, Wireshark is built for the Windows subsystem, and runs
+ * without a console, so we create a console on Windows to receive the
+ * output.
+ *
+ * See create_console(), in ui/win32/console_win32.c, for an example
+ * of code to check whether we need to create a console.
+ *
+ * On UN*Xes:
+ *
+ *  If Wireshark is run from the command line, its output either goes
+ *  to the terminal or to wherever the standard error was redirected.
+ *
+ *  If Wireshark is run by executing it as a remote command, e.g. with
+ *  ssh, its output either goes to whatever socket was set up for the
+ *  remote command's standard error or to wherever the standard error
+ *  was redirected.
+ *
+ *  If Wireshark was run from the GUI, e.g. by double-clicking on its
+ *  icon or on a file that it opens, there are no guarantees as to
+ *  where the standard error went.  It could be going to /dev/null
+ *  (current macOS), or to a socket to systemd for the journal, or
+ *  to a log file in the user's home directory, or to the "console
+ *  device" ("workstation console"), or....
+ *
+ *  Part of determining that, at least for locally-run Wireshark,
+ *  is to try to open /dev/tty to determine whether the process
+ *  has a controlling terminal.  (It fails, at a minimum, for
+ *  Wireshark launched from the GUI under macOS, Ubuntu with GNOME,
+ *  and Ubuntu with KDE; in all cases, an attempt to open /dev/tty
+ *  fails with ENXIO.)  If it does have a controlling terminal,
+ *  write to the standard error, otherwise assume that the standard
+ *  error might not go anywhere that the user will be able to see.
+ *  That doesn't handle the "run by ssh" case, however; that will
+ *  not have a controlling terminal.  (This means running it by
+ *  remote execution, not by remote login.)  Perhaps there's an
+ *  environment variable to check there.
  */
 // xxx copied from ../gtk/main.c
 static void
@@ -189,8 +208,6 @@ wireshark_cmdarg_err(const char *fmt, va_list ap)
 /*
  * Report additional information for an error in command-line arguments.
  * Creates a console on Windows.
- * XXX - pop this up in a window of some sort on UNIX+X11 if the controlling
- * terminal isn't the standard error?
  */
 // xxx copied from ../gtk/main.c
 static void
@@ -267,6 +284,22 @@ get_gui_compiled_info(GString *str)
 void
 get_wireshark_runtime_info(GString *str)
 {
+    g_string_append_printf(str, ", with Qt %s", qVersion());
+
+#ifdef HAVE_LIBPCAP
+    /* Capture libraries */
+    g_string_append(str, ", ");
+    get_runtime_caplibs_version(str);
+#endif
+
+    /* stuff used by libwireshark */
+    epan_get_runtime_version_info(str);
+
+#ifdef HAVE_AIRPCAP
+    g_string_append(str, ", ");
+    get_runtime_airpcap_version(str);
+#endif
+
     if (wsApp) {
         // Display information
         const char *display_mode = ColorUtils::themeIsDark() ? "dark" : "light";
@@ -286,46 +319,32 @@ get_wireshark_runtime_info(GString *str)
             g_string_append(str, ", without HiDPI");
         }
     }
-
-#ifdef HAVE_LIBPCAP
-    /* Capture libraries */
-    g_string_append(str, ", ");
-    get_runtime_caplibs_version(str);
-#endif
-
-    /* stuff used by libwireshark */
-    epan_get_runtime_version_info(str);
-
-#ifdef HAVE_AIRPCAP
-    g_string_append(str, ", ");
-    get_runtime_airpcap_version(str);
-#endif
 }
 
 static void
-g_log_message_handler(QtMsgType type, const QMessageLogContext &, const QString &msg)
+qt_log_message_handler(QtMsgType type, const QMessageLogContext &, const QString &msg)
 {
-    GLogLevelFlags log_level = G_LOG_LEVEL_DEBUG;
+    enum ws_log_level log_level = LOG_LEVEL_DEBUG;
 
     switch (type) {
     case QtInfoMsg:
-        log_level = G_LOG_LEVEL_INFO;
+        log_level = LOG_LEVEL_INFO;
         break;
     // We want qDebug() messages to show up at our default log level.
     case QtDebugMsg:
     case QtWarningMsg:
-        log_level = G_LOG_LEVEL_WARNING;
+        log_level = LOG_LEVEL_WARNING;
         break;
     case QtCriticalMsg:
-        log_level = G_LOG_LEVEL_CRITICAL;
+        log_level = LOG_LEVEL_CRITICAL;
         break;
     case QtFatalMsg:
-        log_level = G_LOG_FLAG_FATAL;
+        log_level = LOG_LEVEL_ERROR;
         break;
     default:
         break;
     }
-    g_log(LOG_DOMAIN_MAIN, log_level, "%s", qUtf8Printable(msg));
+    ws_log(LOG_DOMAIN_QTUI, log_level, "%s", qUtf8Printable(msg));
 }
 
 #ifdef HAVE_LIBPCAP
@@ -465,6 +484,18 @@ int main(int argc, char *qt_argv[])
 #endif
     /* Start time in microseconds */
     guint64 start_time = g_get_monotonic_time();
+    static const struct report_message_routines wireshark_report_routines = {
+        vfailure_alert_box,
+        vwarning_alert_box,
+        open_failure_alert_box,
+        read_failure_alert_box,
+        write_failure_alert_box,
+        cfile_open_failure_alert_box,
+        cfile_dump_open_failure_alert_box,
+        cfile_read_failure_alert_box,
+        cfile_write_failure_alert_box,
+        cfile_close_failure_alert_box
+    };
 
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
     /*
@@ -498,21 +529,20 @@ int main(int argc, char *qt_argv[])
     macos_enable_layer_backing();
 #endif
 
-    /* Enable destinations for logging earlier in startup */
-    set_console_log_handler();
-    qInstallMessageHandler(g_log_message_handler);
+    cmdarg_err_init(wireshark_cmdarg_err, wireshark_cmdarg_err_cont);
+
+    /* Initialize log handler early so we can have proper logging during startup. */
+    ws_log_init_with_writer("wireshark", console_log_writer, vcmdarg_err);
+
+    qInstallMessageHandler(qt_log_message_handler);
+
 #ifdef _WIN32
     restore_pipes();
 #endif
 
 #ifdef DEBUG_STARTUP_TIME
-    /* At least on Windows there is a problem with the logging as the preferences is taken
-     * into account and the preferences are loaded pretty late in the startup process.
-     */
-    prefs.console_log_level = DEBUG_STARTUP_TIME_LOGLEVEL;
     prefs.gui_console_open = console_open_always;
 #endif /* DEBUG_STARTUP_TIME */
-    cmdarg_err_init(wireshark_cmdarg_err, wireshark_cmdarg_err_cont);
 
 #if defined(Q_OS_MAC)
     /* Disable automatic addition of tab menu entries in view menu */
@@ -551,6 +581,9 @@ int main(int argc, char *qt_argv[])
     create_app_running_mutex();
 #endif /* _WIN32 */
 
+    /* Early logging command-line initialization. */
+    ws_log_parse_args(&argc, argv, vcmdarg_err, INVALID_OPTION);
+
     /*
      * Get credential information for later use, and drop privileges
      * before doing anything else.
@@ -564,7 +597,7 @@ int main(int argc, char *qt_argv[])
      * executable file.
      */
     /* init_progfile_dir_error = */ init_progfile_dir(argv[0]);
-    /* g_log(NULL, G_LOG_LEVEL_DEBUG, "progfile_dir: %s", get_progfile_dir()); */
+    /* ws_log(NULL, LOG_LEVEL_DEBUG, "progfile_dir: %s", get_progfile_dir()); */
 
 #ifdef _WIN32
     ws_init_dll_search_path();
@@ -697,7 +730,7 @@ int main(int argc, char *qt_argv[])
     read_language_prefs();
     wsApp->loadLanguage(language);
 
-    /* g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_DEBUG, "Translator %s", language); */
+    /* ws_log(LOG_DOMAIN_MAIN, LOG_LEVEL_DEBUG, "Translator %s", language); */
 
     // Init the main window (and splash)
     main_w = new(MainWindow);
@@ -719,7 +752,7 @@ int main(int argc, char *qt_argv[])
     }
 
 #ifdef DEBUG_STARTUP_TIME
-    g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_INFO, "set_console_log_handler, elapsed time %" G_GUINT64_FORMAT " us \n", g_get_monotonic_time() - start_time);
+    ws_log(LOG_DOMAIN_MAIN, LOG_LEVEL_INFO, "set_console_log_handler, elapsed time %" G_GUINT64_FORMAT " us \n", g_get_monotonic_time() - start_time);
 #endif
 
 #ifdef HAVE_LIBPCAP
@@ -728,9 +761,7 @@ int main(int argc, char *qt_argv[])
     capture_opts_init(&global_capture_opts);
 #endif
 
-    init_report_message(vfailure_alert_box, vwarning_alert_box,
-                        open_failure_alert_box, read_failure_alert_box,
-                        write_failure_alert_box);
+    init_report_message("Wireshark", &wireshark_report_routines);
 
     /*
      * Libwiretap must be initialized before libwireshark is, so that
@@ -741,7 +772,7 @@ int main(int argc, char *qt_argv[])
 
     splash_update(RA_DISSECTORS, NULL, NULL);
 #ifdef DEBUG_STARTUP_TIME
-    g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_INFO, "Calling epan init, elapsed time %" G_GUINT64_FORMAT " us \n", g_get_monotonic_time() - start_time);
+    ws_log(LOG_DOMAIN_MAIN, LOG_LEVEL_INFO, "Calling epan init, elapsed time %" G_GUINT64_FORMAT " us \n", g_get_monotonic_time() - start_time);
 #endif
     /* Register all dissectors; we must do this before checking for the
        "-G" flag, as the "-G" flag dumps information registered by the
@@ -754,9 +785,8 @@ int main(int argc, char *qt_argv[])
     }
 #ifdef DEBUG_STARTUP_TIME
     /* epan_init resets the preferences */
-    prefs.console_log_level = DEBUG_STARTUP_TIME_LOGLEVEL;
     prefs.gui_console_open = console_open_always;
-    g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_INFO, "epan done, elapsed time %" G_GUINT64_FORMAT " us \n", g_get_monotonic_time() - start_time);
+    ws_log(LOG_DOMAIN_MAIN, LOG_LEVEL_INFO, "epan done, elapsed time %" G_GUINT64_FORMAT " us \n", g_get_monotonic_time() - start_time);
 #endif
 
     /* Register all audio codecs. */
@@ -775,7 +805,7 @@ int main(int argc, char *qt_argv[])
 
     splash_update(RA_LISTENERS, NULL, NULL);
 #ifdef DEBUG_STARTUP_TIME
-    g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_INFO, "Register all tap listeners, elapsed time %" G_GUINT64_FORMAT " us \n", g_get_monotonic_time() - start_time);
+    ws_log(LOG_DOMAIN_MAIN, LOG_LEVEL_INFO, "Register all tap listeners, elapsed time %" G_GUINT64_FORMAT " us \n", g_get_monotonic_time() - start_time);
 #endif
     /* Register all tap listeners; we do this before we parse the arguments,
        as the "-z" argument can specify a registered tap. */
@@ -793,13 +823,13 @@ int main(int argc, char *qt_argv[])
     }
 
 #ifdef DEBUG_STARTUP_TIME
-    g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_INFO, "Calling extcap_register_preferences, elapsed time %" G_GUINT64_FORMAT " us \n", g_get_monotonic_time() - start_time);
+    ws_log(LOG_DOMAIN_MAIN, LOG_LEVEL_INFO, "Calling extcap_register_preferences, elapsed time %" G_GUINT64_FORMAT " us \n", g_get_monotonic_time() - start_time);
 #endif
     splash_update(RA_EXTCAP, NULL, NULL);
     extcap_register_preferences();
     splash_update(RA_PREFERENCES, NULL, NULL);
 #ifdef DEBUG_STARTUP_TIME
-    g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_INFO, "Calling module preferences, elapsed time %" G_GUINT64_FORMAT " us \n", g_get_monotonic_time() - start_time);
+    ws_log(LOG_DOMAIN_MAIN, LOG_LEVEL_INFO, "Calling module preferences, elapsed time %" G_GUINT64_FORMAT " us \n", g_get_monotonic_time() - start_time);
 #endif
 
     global_commandline_info.prefs_p = ws_app.readConfigurationFiles(false);
@@ -821,7 +851,7 @@ int main(int argc, char *qt_argv[])
 
 #ifdef HAVE_LIBPCAP
 #ifdef DEBUG_STARTUP_TIME
-    g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_INFO, "Calling fill_in_local_interfaces, elapsed time %" G_GUINT64_FORMAT " us \n", g_get_monotonic_time() - start_time);
+    ws_log(LOG_DOMAIN_MAIN, LOG_LEVEL_INFO, "Calling fill_in_local_interfaces, elapsed time %" G_GUINT64_FORMAT " us \n", g_get_monotonic_time() - start_time);
 #endif
     splash_update(RA_INTERFACES, NULL, NULL);
 
@@ -844,47 +874,49 @@ int main(int argc, char *qt_argv[])
         }
     }
 
+    /*
+     * If requested, list the link layer types and/or time stamp types
+     * and exit.
+     */
     if (caps_queries) {
-        /* Get the list of link-layer types for the capture devices. */
-        if_capabilities_t *caps;
         guint i;
-        interface_t *device;
-        for (i = 0; i < global_capture_opts.all_ifaces->len; i++) {
-            int if_caps_queries = caps_queries;
-            device = &g_array_index(global_capture_opts.all_ifaces, interface_t, i);
-            if (device->selected) {
-#if defined(HAVE_PCAP_CREATE)
-                caps = capture_get_if_capabilities(device->name, device->monitor_mode_supported, NULL, &err_str, &err_str_secondary, main_window_update);
-#else
-                caps = capture_get_if_capabilities(device->name, FALSE, NULL, &err_str, &err_str_secondary, main_window_update);
-#endif
-                if (caps == NULL) {
-                    cmdarg_err("%s%s%s", err_str, err_str_secondary ? "\n" : "", err_str_secondary ? err_str_secondary : "");
-                    g_free(err_str);
-                    g_free(err_str_secondary);
-                    ret_val = INVALID_CAPABILITY;
-                    goto clean_exit;
-                }
-            if (caps->data_link_types == NULL) {
-                cmdarg_err("The capture device \"%s\" has no data link types.", device->name);
-                ret_val = INVALID_LINK_TYPE;
-                goto clean_exit;
+
+#ifdef _WIN32
+        create_console();
+#endif /* _WIN32 */
+        /* Get the list of link-layer types for the capture devices. */
+        ret_val = EXIT_SUCCESS;
+        for (i = 0; i < global_capture_opts.ifaces->len; i++) {
+            interface_options *interface_opts;
+            if_capabilities_t *caps;
+            char *auth_str = NULL;
+
+            interface_opts = &g_array_index(global_capture_opts.ifaces, interface_options, i);
+#ifdef HAVE_PCAP_REMOTE
+            if (interface_opts->auth_type == CAPTURE_AUTH_PWD) {
+                auth_str = g_strdup_printf("%s:%s", interface_opts->auth_username, interface_opts->auth_password);
             }
-#ifdef _WIN32
-            create_console();
-#endif /* _WIN32 */
-#if defined(HAVE_PCAP_CREATE)
-            if (device->monitor_mode_supported)
-                if_caps_queries |= CAPS_MONITOR_MODE;
 #endif
-            capture_opts_print_if_capabilities(caps, device->name, if_caps_queries);
-#ifdef _WIN32
-            destroy_console();
-#endif /* _WIN32 */
+            caps = capture_get_if_capabilities(interface_opts->name, interface_opts->monitor_mode,
+                                               auth_str, &err_str, &err_str_secondary, NULL);
+            g_free(auth_str);
+            if (caps == NULL) {
+                cmdarg_err("%s%s%s", err_str, err_str_secondary ? "\n" : "", err_str_secondary ? err_str_secondary : "");
+                g_free(err_str);
+                g_free(err_str_secondary);
+                ret_val = INVALID_CAPABILITY;
+                break;
+            }
+            ret_val = capture_opts_print_if_capabilities(caps, interface_opts,
+                                                         caps_queries);
             free_if_capabilities(caps);
+            if (ret_val != EXIT_SUCCESS) {
+                break;
             }
         }
-        ret_val = EXIT_SUCCESS;
+#ifdef _WIN32
+        destroy_console();
+#endif /* _WIN32 */
         goto clean_exit;
     }
 
@@ -896,7 +928,7 @@ int main(int argc, char *qt_argv[])
        changed either from one of the preferences file or from the command
        line that their preferences have changed. */
 #ifdef DEBUG_STARTUP_TIME
-    g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_INFO, "Calling prefs_apply_all, elapsed time %" G_GUINT64_FORMAT " us \n", g_get_monotonic_time() - start_time);
+    ws_log(LOG_DOMAIN_MAIN, LOG_LEVEL_INFO, "Calling prefs_apply_all, elapsed time %" G_GUINT64_FORMAT " us \n", g_get_monotonic_time() - start_time);
 #endif
     prefs_apply_all();
     prefs_to_capture_opts();
@@ -942,7 +974,7 @@ int main(int argc, char *qt_argv[])
     }
 
     wsApp->allSystemsGo();
-    g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_INFO, "Wireshark is up and ready to go, elapsed time %.3fs\n", (float) (g_get_monotonic_time() - start_time) / 1000000);
+    ws_log(LOG_DOMAIN_MAIN, LOG_LEVEL_MESSAGE, "Wireshark is up and ready to go, elapsed time %.3fs", (float) (g_get_monotonic_time() - start_time) / 1000000);
     SimpleDialog::displayQueuedMessages(main_w);
 
     /* User could specify filename, or display filter, or both */

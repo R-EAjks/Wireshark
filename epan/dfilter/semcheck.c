@@ -21,9 +21,7 @@
 #include <epan/exceptions.h>
 #include <epan/packet.h>
 
-#ifdef DEBUG_dfilter
-#include <wsutil/ws_printf.h> /* ws_debug_printf */
-#endif
+#include <wsutil/ws_assert.h>
 
 #include <ftypes/ftypes-int.h>
 
@@ -33,8 +31,8 @@
 
 #ifdef DEBUG_dfilter
 #define DebugLog(x) \
-	ws_debug_printf("%s:%u: ", __FILE__, (unsigned int)__LINE__); \
-	ws_debug_printf x; \
+	printf("%s:%u: ", __FILE__, (unsigned int)__LINE__); \
+	printf x; \
 	fflush(stdout)
 #else
 #define DebugLog(x) ;
@@ -133,12 +131,11 @@ compatible_ftypes(ftenum_t a, ftenum_t b)
 					return FALSE;
 			}
 
-		case FT_PCRE:
 		case FT_NUM_TYPES:
-			g_assert_not_reached();
+			ws_assert_not_reached();
 	}
 
-	g_assert_not_reached();
+	ws_assert_not_reached();
 	return FALSE;
 }
 
@@ -219,7 +216,6 @@ mk_fvalue_from_val_string(dfwork_t *dfw, header_field_info *hfinfo, char *s)
 		case FT_STRINGZPAD:
 		case FT_STRINGZTRUNC:
 		case FT_EUI64:
-		case FT_PCRE:
 		case FT_GUID:
 		case FT_OID:
 		case FT_REL_OID:
@@ -248,7 +244,7 @@ mk_fvalue_from_val_string(dfwork_t *dfw, header_field_info *hfinfo, char *s)
 			break;
 
 		case FT_NUM_TYPES:
-			g_assert_not_reached();
+			ws_assert_not_reached();
 	}
 
 	/* TRUE/FALSE *always* exist for FT_BOOLEAN. */
@@ -383,16 +379,57 @@ is_bytes_type(enum ftenum type)
 		case FT_INT48:
 		case FT_INT56:
 		case FT_INT64:
-		case FT_PCRE:
 		case FT_EUI64:
 			return FALSE;
 
 		case FT_NUM_TYPES:
-			g_assert_not_reached();
+			ws_assert_not_reached();
 	}
 
-	g_assert_not_reached();
+	ws_assert_not_reached();
 	return FALSE;
+}
+
+/* Gets a GRegex from a string, and sets the error message on failure. */
+static GRegex*
+dfilter_g_regex_from_string(dfwork_t *dfw, const char *s)
+{
+	GError *regex_error = NULL;
+	GRegexCompileFlags cflags = (GRegexCompileFlags)(G_REGEX_CASELESS | G_REGEX_OPTIMIZE);
+	GRegex *pcre;
+
+	/*
+	 * As FT_BYTES and FT_PROTOCOL contain arbitrary binary data
+	 * and FT_STRING is not guaranteed to contain valid UTF-8,
+	 * we have to disable support for UTF-8 patterns and treat
+	 * every pattern and subject as raw bytes.
+	 *
+	 * Should support for UTF-8 patterns be necessary, then we
+	 * should compile a pattern without G_REGEX_RAW. Additionally,
+	 * we MUST use g_utf8_validate() before calling g_regex_match_full()
+	 * or risk crashes.
+	 */
+	cflags = (GRegexCompileFlags)(cflags | G_REGEX_RAW);
+
+	DebugLog(("Compile regex pattern: '%s'\n", s));
+
+	pcre = g_regex_new(
+			s,			/* pattern */
+			cflags,			/* Compile options */
+			(GRegexMatchFlags)0,	/* Match options */
+			&regex_error		/* Compile / study errors */
+			);
+
+	if (regex_error) {
+		if (dfw->error_message == NULL)
+			dfw->error_message = g_strdup(regex_error->message);
+		g_error_free(regex_error);
+		if (pcre) {
+			g_regex_unref(pcre);
+		}
+		return NULL;
+	}
+	return pcre;
 }
 
 /* Check the semantics of an existence test. */
@@ -439,8 +476,9 @@ check_exists(dfwork_t *dfw, stnode_t *st_arg1)
 		case STTYPE_INTEGER:
 		case STTYPE_FVALUE:
 		case STTYPE_SET:
+		case STTYPE_PCRE:
 		case STTYPE_NUM_TYPES:
-			g_assert_not_reached();
+			ws_assert_not_reached();
 	}
 }
 
@@ -535,7 +573,7 @@ check_drange_node_sanity(gpointer data, gpointer user_data)
 
 	case DRANGE_NODE_END_T_UNINITIALIZED:
 	default:
-		g_assert_not_reached();
+		ws_assert_not_reached();
 	}
 }
 
@@ -636,6 +674,7 @@ check_relation_LHS_FIELD(dfwork_t *dfw, const char *relation_string,
 	df_func_def_t		*funcdef;
 	ftenum_t		ftype1, ftype2;
 	fvalue_t		*fvalue;
+	GRegex			*pcre;
 	char			*s;
 
 	type2 = stnode_type_id(st_arg2);
@@ -677,11 +716,12 @@ check_relation_LHS_FIELD(dfwork_t *dfw, const char *relation_string,
 	         type2 == STTYPE_CHARCONST) {
 		s = (char *)stnode_data(st_arg2);
 		if (strcmp(relation_string, "matches") == 0) {
-			/* Convert to a FT_PCRE */
-			if (type2 == STTYPE_STRING)
-				fvalue = dfilter_fvalue_from_string(dfw, FT_PCRE, s);
-			else
-				fvalue = dfilter_fvalue_from_unparsed(dfw, FT_PCRE, s, FALSE);
+			/* Convert to a GRegex */
+			pcre = dfilter_g_regex_from_string(dfw, s);
+			if (!pcre) {
+				THROW(TypeError);
+			}
+			new_st = stnode_new(STTYPE_PCRE, pcre);
 		} else {
 			/* Skip incompatible fields */
 			while (hfinfo1->same_name_prev_id != -1 &&
@@ -720,13 +760,11 @@ check_relation_LHS_FIELD(dfwork_t *dfw, const char *relation_string,
 					dfw->error_message = NULL;
 				}
 			}
+			if (!fvalue) {
+				THROW(TypeError);
+			}
+			new_st = stnode_new(STTYPE_FVALUE, fvalue);
 		}
-
-		if (!fvalue) {
-			THROW(TypeError);
-		}
-
-		new_st = stnode_new(STTYPE_FVALUE, fvalue);
 		if (stnode_type_id(st_node) == STTYPE_TEST) {
 			sttype_test_set2_args(st_node, st_arg1, new_st);
 		} else {
@@ -774,7 +812,7 @@ check_relation_LHS_FIELD(dfwork_t *dfw, const char *relation_string,
 		GSList *nodelist;
 		/* A set should only ever appear on RHS of 'in' operation */
 		if (strcmp(relation_string, "in") != 0) {
-			g_assert_not_reached();
+			ws_assert_not_reached();
 		}
 		/* Attempt to interpret one element of the set at a time. Each
 		 * element is represented by two items in the list, the element
@@ -791,7 +829,7 @@ check_relation_LHS_FIELD(dfwork_t *dfw, const char *relation_string,
 			}
 
 			nodelist = g_slist_next(nodelist);
-			g_assert(nodelist);
+			ws_assert(nodelist);
 			stnode_t *node_right = (stnode_t *)nodelist->data;
 			if (node_right) {
 				/* range type, check if comparison is possible. */
@@ -813,7 +851,7 @@ check_relation_LHS_FIELD(dfwork_t *dfw, const char *relation_string,
 		}
 	}
 	else {
-		g_assert_not_reached();
+		ws_assert_not_reached();
 	}
 }
 
@@ -907,7 +945,7 @@ check_relation_LHS_STRING(dfwork_t *dfw, const char* relation_string,
 		THROW(TypeError);
 	}
 	else {
-		g_assert_not_reached();
+		ws_assert_not_reached();
 	}
 }
 
@@ -1001,7 +1039,7 @@ check_relation_LHS_UNPARSED(dfwork_t *dfw, const char* relation_string,
 		THROW(TypeError);
 	}
 	else {
-		g_assert_not_reached();
+		ws_assert_not_reached();
 	}
 }
 
@@ -1018,6 +1056,7 @@ check_relation_LHS_RANGE(dfwork_t *dfw, const char *relation_string,
 	header_field_info	*hfinfo1, *hfinfo2;
 	ftenum_t		ftype1, ftype2;
 	fvalue_t		*fvalue;
+	GRegex			*pcre;
 	char			*s;
 	int                     len_range;
 
@@ -1081,16 +1120,20 @@ check_relation_LHS_RANGE(dfwork_t *dfw, const char *relation_string,
 		DebugLog(("    5 check_relation_LHS_RANGE(type2 = STTYPE_STRING)\n"));
 		s = (char*)stnode_data(st_arg2);
 		if (strcmp(relation_string, "matches") == 0) {
-			/* Convert to a FT_PCRE */
-			fvalue = dfilter_fvalue_from_string(dfw, FT_PCRE, s);
+			/* Convert to a GRegex * */
+			pcre = dfilter_g_regex_from_string(dfw, s);
+			if (!pcre) {
+				THROW(TypeError);
+			}
+			new_st = stnode_new(STTYPE_PCRE, pcre);
 		} else {
 			fvalue = dfilter_fvalue_from_string(dfw, FT_BYTES, s);
+			if (!fvalue) {
+				DebugLog(("    5 check_relation_LHS_RANGE(type2 = STTYPE_STRING): Could not convert from string!\n"));
+				THROW(TypeError);
+			}
+			new_st = stnode_new(STTYPE_FVALUE, fvalue);
 		}
-		if (!fvalue) {
-			DebugLog(("    5 check_relation_LHS_RANGE(type2 = STTYPE_STRING): Could not convert from string!\n"));
-			THROW(TypeError);
-		}
-		new_st = stnode_new(STTYPE_FVALUE, fvalue);
 		sttype_test_set2_args(st_node, st_arg1, new_st);
 		stnode_free(st_arg2);
 	}
@@ -1099,36 +1142,51 @@ check_relation_LHS_RANGE(dfwork_t *dfw, const char *relation_string,
 		s = (char*)stnode_data(st_arg2);
 		len_range = drange_get_total_length(sttype_range_drange(st_arg1));
 		if (strcmp(relation_string, "matches") == 0) {
-			/* Convert to a FT_PCRE */
-			fvalue = dfilter_fvalue_from_unparsed(dfw, FT_PCRE, s, FALSE);
+			/* Convert to a GRegex */
+			pcre = dfilter_g_regex_from_string(dfw, s);
+			if (!pcre) {
+				THROW(TypeError);
+			}
+			new_st = stnode_new(STTYPE_PCRE, pcre);
+		} else {
+			/*
+			 * The RHS should be FT_BYTES. However, there is a
+			 * special case where the range slice on the LHS is
+			 * one byte long. In that case, it is natural
+			 * for the user to specify a normal hex integer
+			 * on the RHS, with the "0x" notation, as in
+			 * "slice[0] == 0x10". We can't allow this for any
+			 * slices that are longer than one byte, because
+			 * then we'd have to know which endianness the
+			 * byte string should be in.
+			 */
+			if (len_range == 1 && strlen(s) == 4 && strncmp(s, "0x", 2) == 0) {
+				/*
+				 * Even if the RHS string starts with "0x",
+				 * it still could fail to be an integer.
+				 * Try converting it here.
+				 */
+				fvalue = dfilter_fvalue_from_unparsed(dfw, FT_UINT8, s, allow_partial_value);
+				if (fvalue) {
+					FVALUE_FREE(fvalue);
+					/*
+					 * The value doees indeed fit into
+					 * 8 bits. Create a BYTE_STRING
+					 * from it. Since we know that
+					 * the last 2 characters are a valid
+					 * hex string, just use those directly.
+					 */
+					fvalue = dfilter_fvalue_from_unparsed(dfw, FT_BYTES, s+2, allow_partial_value);
+				}
+			} else {
+				fvalue = dfilter_fvalue_from_unparsed(dfw, FT_BYTES, s, allow_partial_value);
+			}
+			if (!fvalue) {
+				DebugLog(("    5 check_relation_LHS_RANGE(type2 = STTYPE_UNPARSED): Could not convert from string!\n"));
+				THROW(TypeError);
+			}
+			new_st = stnode_new(STTYPE_FVALUE, fvalue);
 		}
-
-		/* The RHS should be FT_BYTES. However, there is a special case where
-		 * the range slice on the LHS is one byte long. In that case, it is natural
-		 * for the user to specify a normal hex integer on the RHS, with the "0x"
-		 * notation, as in "slice[0] == 0x10". We can't allow this for any
-		 * slices that are longer than one byte, because then we'd have to know
-		 * which endianness the byte string should be in. */
-		else if (len_range == 1 && strlen(s) == 4 && strncmp(s, "0x", 2) == 0) {
-		    /* Even if the RHS string starts with "0x", it still could fail to
-		     * be an integer.  Try converting it here. */
-		    fvalue = dfilter_fvalue_from_unparsed(dfw, FT_UINT8, s, allow_partial_value);
-		    if (fvalue) {
-			FVALUE_FREE(fvalue);
-			/* The value doees indeed fit into 8 bits. Create a BYTE_STRING
-			 * from it. Since we know that the last 2 characters are a valid
-			 * hex string, just use those directly. */
-			fvalue = dfilter_fvalue_from_unparsed(dfw, FT_BYTES, s+2, allow_partial_value);
-		    }
-		}
-		else {
-		    fvalue = dfilter_fvalue_from_unparsed(dfw, FT_BYTES, s, allow_partial_value);
-		}
-		if (!fvalue) {
-			DebugLog(("    5 check_relation_LHS_RANGE(type2 = STTYPE_UNPARSED): Could not convert from string!\n"));
-			THROW(TypeError);
-		}
-		new_st = stnode_new(STTYPE_FVALUE, fvalue);
 		sttype_test_set2_args(st_node, st_arg1, new_st);
 		stnode_free(st_arg2);
 	}
@@ -1136,18 +1194,22 @@ check_relation_LHS_RANGE(dfwork_t *dfw, const char *relation_string,
 		DebugLog(("    5 check_relation_LHS_RANGE(type2 = STTYPE_CHARCONST)\n"));
 		s = (char*)stnode_data(st_arg2);
 		if (strcmp(relation_string, "matches") == 0) {
-			/* Convert to a FT_PCRE */
-			fvalue = dfilter_fvalue_from_unparsed(dfw, FT_PCRE, s, FALSE);
+			/* Convert to a GRegex */
+			pcre = dfilter_g_regex_from_string(dfw, s);
+			if (!pcre) {
+				THROW(TypeError);
+			}
+			new_st = stnode_new(STTYPE_PCRE, pcre);
 		} else {
 			/* The RHS should be FT_BYTES, but a character is just a
 			 * one-byte byte string. */
 			fvalue = dfilter_fvalue_from_charconst_string(dfw, FT_BYTES, s, allow_partial_value);
+			if (!fvalue) {
+				DebugLog(("    5 check_relation_LHS_RANGE(type2 = STTYPE_UNPARSED): Could not convert from string!\n"));
+				THROW(TypeError);
+			}
+			new_st = stnode_new(STTYPE_FVALUE, fvalue);
 		}
-		if (!fvalue) {
-			DebugLog(("    5 check_relation_LHS_RANGE(type2 = STTYPE_UNPARSED): Could not convert from string!\n"));
-			THROW(TypeError);
-		}
-		new_st = stnode_new(STTYPE_FVALUE, fvalue);
 		sttype_test_set2_args(st_node, st_arg1, new_st);
 		stnode_free(st_arg2);
 	}
@@ -1180,7 +1242,7 @@ check_relation_LHS_RANGE(dfwork_t *dfw, const char *relation_string,
 		THROW(TypeError);
 	}
 	else {
-		g_assert_not_reached();
+		ws_assert_not_reached();
 	}
 }
 
@@ -1222,9 +1284,10 @@ check_relation_LHS_FUNCTION(dfwork_t *dfw, const char *relation_string,
 	header_field_info	*hfinfo2;
 	ftenum_t		ftype1, ftype2;
 	fvalue_t		*fvalue;
+	GRegex			*pcre;
 	char			*s;
-	df_func_def_t   *funcdef;
-	df_func_def_t   *funcdef2;
+	df_func_def_t		*funcdef;
+	df_func_def_t		*funcdef2;
 	/* GSList          *params; */
 
 	check_function(dfw, st_arg1);
@@ -1264,32 +1327,38 @@ check_relation_LHS_FUNCTION(dfwork_t *dfw, const char *relation_string,
 	else if (type2 == STTYPE_STRING) {
 		s = (char*)stnode_data(st_arg2);
 		if (strcmp(relation_string, "matches") == 0) {
-			/* Convert to a FT_PCRE */
-			fvalue = dfilter_fvalue_from_string(dfw, FT_PCRE, s);
+			/* Convert to a GRegex */
+			pcre = dfilter_g_regex_from_string(dfw, s);
+			if (!pcre) {
+				THROW(TypeError);
+			}
+			new_st = stnode_new(STTYPE_PCRE, pcre);
 		} else {
 			fvalue = dfilter_fvalue_from_string(dfw, ftype1, s);
+			if (!fvalue) {
+				THROW(TypeError);
+			}
+			new_st = stnode_new(STTYPE_FVALUE, fvalue);
 		}
-		if (!fvalue) {
-			THROW(TypeError);
-		}
-
-		new_st = stnode_new(STTYPE_FVALUE, fvalue);
 		sttype_test_set2_args(st_node, st_arg1, new_st);
 		stnode_free(st_arg2);
 	}
 	else if (type2 == STTYPE_UNPARSED || type2 == STTYPE_CHARCONST) {
 		s = (char*)stnode_data(st_arg2);
 		if (strcmp(relation_string, "matches") == 0) {
-			/* Convert to a FT_PCRE */
-			fvalue = dfilter_fvalue_from_unparsed(dfw, FT_PCRE, s, FALSE);
+			/* Convert to a GRegex */
+			pcre = dfilter_g_regex_from_string(dfw, s);
+			if (!pcre) {
+				THROW(TypeError);
+			}
+			new_st = stnode_new(STTYPE_PCRE, pcre);
 		} else {
 			fvalue = dfilter_fvalue_from_unparsed(dfw, ftype1, s, allow_partial_value);
+			if (!fvalue) {
+				THROW(TypeError);
+			}
+			new_st = stnode_new(STTYPE_FVALUE, fvalue);
 		}
-		if (!fvalue) {
-			THROW(TypeError);
-		}
-
-		new_st = stnode_new(STTYPE_FVALUE, fvalue);
 		sttype_test_set2_args(st_node, st_arg1, new_st);
 		stnode_free(st_arg2);
 	}
@@ -1334,7 +1403,7 @@ check_relation_LHS_FUNCTION(dfwork_t *dfw, const char *relation_string,
 		THROW(TypeError);
 	}
 	else {
-		g_assert_not_reached();
+		ws_assert_not_reached();
 	}
 }
 
@@ -1396,7 +1465,7 @@ header_field_info   *hfinfo;
 		case STTYPE_FVALUE:
 		case STTYPE_SET:
 		default:
-			g_assert_not_reached();
+			ws_assert_not_reached();
 	}
 }
 
@@ -1416,7 +1485,7 @@ check_test(dfwork_t *dfw, stnode_t *st_node, GPtrArray *deprecated)
 
 	switch (st_op) {
 		case TEST_OP_UNINITIALIZED:
-			g_assert_not_reached();
+			ws_assert_not_reached();
 			break;
 
 		case TEST_OP_EXISTS:
@@ -1483,7 +1552,7 @@ check_test(dfwork_t *dfw, stnode_t *st_node, GPtrArray *deprecated)
 			break;
 
 		default:
-			g_assert_not_reached();
+			ws_assert_not_reached();
 	}
 	DebugLog(("  3 check_test(stnode_t *st_node = %p) [%u] - End\n", st_node, i++));
 }
@@ -1504,7 +1573,7 @@ semcheck(dfwork_t *dfw, stnode_t *st_node, GPtrArray *deprecated)
 			check_test(dfw, st_node, deprecated);
 			break;
 		default:
-			g_assert_not_reached();
+			ws_assert_not_reached();
 	}
 }
 

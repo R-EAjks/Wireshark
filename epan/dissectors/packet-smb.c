@@ -1145,7 +1145,7 @@ insert_chunk(active_file   *file, export_object_entry_t *entry, const smb_eo_t *
 			entry->payload_data = NULL;
 		} else {
 			entry->payload_data = (guint8 *)g_try_malloc((gsize)calculated_size);
-			entry->payload_len  = calculated_size;
+			entry->payload_len  = (size_t)calculated_size;
 		}
 		if (!entry->payload_data) {
 			/* Memory error */
@@ -1177,7 +1177,7 @@ insert_chunk(active_file   *file, export_object_entry_t *entry, const smb_eo_t *
 				entry->payload_len = 0;
 			} else {
 				entry->payload_data = (guint8 *)dest_memory_addr;
-				entry->payload_len = calculated_size;
+				entry->payload_len = (size_t)calculated_size;
 			}
 		}
 	}
@@ -1865,7 +1865,7 @@ get_unicode_or_ascii_string(tvbuff_t *tvb, int *offsetp,
 			cur[copylen] = '\0';
 
 			if (overflow)
-				g_strlcat(cur, "...",MAX_UNICODE_STR_LEN+3+1);
+				(void) g_strlcat(cur, "...",MAX_UNICODE_STR_LEN+3+1);
 
 			string_len = *len;
 			string = cur;
@@ -5941,7 +5941,7 @@ dissect_search_resume_key(tvbuff_t *tvb, packet_info *pinfo _U_,
 		TRUE, TRUE, bcp);
 	CHECK_STRING_SUBR(fn);
 	/* ensure that it's null-terminated */
-	g_strlcpy(fname, fn, 11+1);
+	(void) g_strlcpy(fname, fn, 11+1);
 	proto_tree_add_string(tree, hf_smb_file_name, tvb, offset, 11,
 		fname);
 	COUNT_BYTES_SUBR(fn_len);
@@ -6019,7 +6019,7 @@ dissect_search_dir_info(tvbuff_t *tvb, packet_info *pinfo,
 		TRUE, TRUE, bcp);
 	CHECK_STRING_SUBR(fn);
 	/* ensure that it's null-terminated */
-	g_strlcpy(fname, fn, 13+1);
+	(void) g_strlcpy(fname, fn, 13+1);
 	proto_tree_add_string(tree, hf_smb_file_name, tvb, offset, fn_len,
 		fname);
 	COUNT_BYTES_SUBR(fn_len);

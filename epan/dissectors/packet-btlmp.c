@@ -18,16 +18,7 @@
 #include <wiretap/wtap.h>
 
 #include "packet-bluetooth.h"
-
-struct _connection_info_t;
-
-extern struct _connection_info_t *
-btbredr_rf_add_esco_link(struct _connection_info_t *cinfo, packet_info *pinfo, guint8 handle, guint32 ltaddr, guint16 pktszms, guint16 pktszsm);
-
-extern void
-btbredr_rf_remove_esco_link(struct _connection_info_t *cinfo, packet_info *pinfo, guint8 handle);
-
-
+#include "packet-btbredr_rf.h"
 
 static int proto_btlmp = -1;
 
@@ -570,7 +561,7 @@ dissect_btlmp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
     proto_tree                *btlmp_tree;
     gint                       offset = 0;
     guint16                    opcode;
-    struct _connection_info_t *connection_info = (struct _connection_info_t *)data;
+    connection_info_t *connection_info = (connection_info_t *)data;
 
     btlmp_item = proto_tree_add_item(tree, proto_btlmp, tvb, offset, -1, ENC_NA);
     btlmp_tree = proto_item_add_subtree(btlmp_item, ett_btlmp);
@@ -2444,7 +2435,7 @@ proto_register_btlmp(void)
         &ett_btlmp
     };
 
-    proto_btlmp = proto_register_protocol("Bluetooth LMP Protocol", "BT LMP", "btlmp");
+    proto_btlmp = proto_register_protocol("Bluetooth Link Manager Protocol", "BT LMP", "btlmp");
     proto_register_field_array(proto_btlmp, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
     btlmp_handle = register_dissector("btlmp", dissect_btlmp, proto_btlmp);

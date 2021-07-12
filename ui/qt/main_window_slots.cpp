@@ -44,6 +44,8 @@ DIAG_ON(frame-larger-than=)
 
 #include "wsutil/file_util.h"
 #include "wsutil/filesystem.h"
+#include <wsutil/wslog.h>
+#include <wsutil/ws_assert.h>
 
 #include "epan/addr_resolv.h"
 #include "epan/column.h"
@@ -167,6 +169,7 @@ DIAG_ON(frame-larger-than=)
 #include <QToolBar>
 #include <QDesktopServices>
 #include <QUrl>
+#include <QMutex>
 
 // XXX You must uncomment QT_WINEXTRAS_LIB lines in CMakeList.txt and
 // cmakeconfig.h.in.
@@ -274,8 +277,7 @@ bool MainWindow::openCaptureFile(QString cf_path, QString read_filter, unsigned 
         break;
     }
 
-    // get_dirname overwrites its path.
-    wsApp->setLastOpenDir(get_dirname(cf_path.toUtf8().data()));
+    wsApp->setLastOpenDirFromFilename(cf_path);
 
     main_ui_->statusBar->showExpert();
 
@@ -462,7 +464,7 @@ void MainWindow::queuedFilterAction(QString action_filter, FilterAction::Action 
         }
         break;
     default:
-        g_assert_not_reached();
+        ws_assert_not_reached();
         break;
     }
 
@@ -491,7 +493,7 @@ void MainWindow::queuedFilterAction(QString action_filter, FilterAction::Action 
         break;
     }
     default:
-        g_assert_not_reached();
+        ws_assert_not_reached();
         break;
     }
 }
@@ -759,16 +761,12 @@ void MainWindow::captureFileReadStarted(const QString &action) {
 }
 
 void MainWindow::captureFileReadFinished() {
-    gchar *dir_path;
-
     if (!capture_file_.capFile()->is_tempfile && capture_file_.capFile()->filename) {
         /* Add this filename to the list of recent files in the "Recent Files" submenu */
         add_menu_recent_capture_file(capture_file_.capFile()->filename);
 
         /* Remember folder for next Open dialog and save it in recent */
-        dir_path = g_strdup(capture_file_.capFile()->filename);
-        wsApp->setLastOpenDir(get_dirname(dir_path));
-        g_free(dir_path);
+        wsApp->setLastOpenDirFromFilename(capture_file_.capFile()->filename);
     }
 
     /* Update the appropriate parts of the main window. */
@@ -931,8 +929,6 @@ void MainWindow::pipeTimeout() {
 
     /* try to read data from the pipe only 5 times, to avoid blocking */
     while (iterations < 5) {
-        /*g_log(NULL, G_LOG_LEVEL_DEBUG, "pipe_timer_cb: new iteration");*/
-
         /* Oddly enough although Named pipes don't work on win9x,
            PeekNamedPipe does !!! */
         handle = (HANDLE)_get_osfhandle(pipe_source_);
@@ -947,17 +943,14 @@ void MainWindow::pipeTimeout() {
            callback */
         if (!result || avail > 0 || childstatus != STILL_ACTIVE) {
 
-            /*g_log(NULL, G_LOG_LEVEL_DEBUG, "pipe_timer_cb: data avail");*/
-
             /* And call the real handler */
             if (!pipe_input_cb_(pipe_source_, pipe_user_data_)) {
-                g_log(NULL, G_LOG_LEVEL_DEBUG, "pipe_timer_cb: input pipe closed, iterations: %u", iterations);
+                ws_log(LOG_DOMAIN_MAIN, LOG_LEVEL_DEBUG, "pipe_timer_cb: input pipe closed, iterations: %u", iterations);
                 /* pipe closed, return false so that the old timer is not run again */
                 delete pipe_timer_;
                 return;
             }
         } else {
-            /*g_log(NULL, G_LOG_LEVEL_DEBUG, "pipe_timer_cb: no data avail");*/
             /* No data, stop now */
             break;
         }
@@ -968,10 +961,10 @@ void MainWindow::pipeTimeout() {
 }
 
 void MainWindow::pipeActivated(int source) {
-#ifdef _WIN32
     Q_UNUSED(source)
-#else
-    g_assert(source == pipe_source_);
+
+#ifndef _WIN32
+    ws_assert(source == pipe_source_);
 
     pipe_notifier_->setEnabled(false);
     if (pipe_input_cb_(pipe_source_, pipe_user_data_)) {
@@ -1121,10 +1114,49 @@ void MainWindow::recentActionTriggered() {
     }
 }
 
+void MainWindow::setEditCommentsMenu()
+{
+    main_ui_->menuPacketComment->clear();
+    main_ui_->menuPacketComment->addAction(tr("Add New Comment…"), this, SLOT(actionAddPacketComment()), QKeySequence(Qt::CTRL + Qt::ALT + Qt::Key_C));
+    if (selectedRows().count() == 1) {
+        const int thisRow = selectedRows().first();
+        frame_data * current_frame = frameDataForRow(thisRow);
+        wtap_block_t pkt_block = cf_get_packet_block(capture_file_.capFile(), current_frame);
+        guint nComments = wtap_block_count_option(pkt_block, OPT_COMMENT);
+        if (nComments > 0) {
+            QAction *aPtr;
+            main_ui_->menuPacketComment->addSeparator();
+            for (guint i = 0; i < nComments; i++) {
+                QString comment = packet_list_->getPacketComment(i).trimmed();
+                if (comment.size() > 40) {
+                    comment.truncate(40);
+                    comment += "…";
+                }
+                aPtr = main_ui_->menuPacketComment->addAction(tr("Edit \"%1\"", "edit packet comment").arg(comment),
+                        this, SLOT(actionEditPacketComment()));
+                aPtr->setData(i);
+            }
+
+            main_ui_->menuPacketComment->addSeparator();
+            for (guint i = 0; i < nComments; i++) {
+                QString comment = packet_list_->getPacketComment(i).trimmed();
+                if (comment.size() > 40) {
+                    comment.truncate(40);
+                    comment += "…";
+                }
+                aPtr = main_ui_->menuPacketComment->addAction(tr("Delete \"%1\"", "delete packet comment").arg(comment),
+                        this, SLOT(actionDeletePacketComment()));
+                aPtr->setData(i);
+            }
+        }
+        wtap_block_unref(pkt_block);
+    }
+}
+
 void MainWindow::setMenusForSelectedPacket()
 {
     gboolean is_ip = FALSE, is_tcp = FALSE, is_udp = FALSE, is_dccp = FALSE, is_sctp = FALSE, is_tls = FALSE, is_rtp = FALSE, is_lte_rlc = FALSE,
-             is_http = FALSE, is_http2 = FALSE, is_quic = FALSE;
+             is_http = FALSE, is_http2 = FALSE, is_quic = FALSE, is_sip = FALSE;
 
     /* Making the menu context-sensitive allows for easier selection of the
        desired item and has the added benefit, with large captures, of
@@ -1196,7 +1228,9 @@ void MainWindow::setMenusForSelectedPacket()
             is_dccp = proto_is_frame_protocol(capture_file_.capFile()->edt->pi.layers, "dccp");
             is_http = proto_is_frame_protocol(capture_file_.capFile()->edt->pi.layers, "http");
             is_http2 = proto_is_frame_protocol(capture_file_.capFile()->edt->pi.layers, "http2");
+            /* TODO: to follow a QUIC stream we need a *decrypted* QUIC connection, i.e. checking for "quic" in the protocol stack is not enough */
             is_quic = proto_is_frame_protocol(capture_file_.capFile()->edt->pi.layers, "quic");
+            is_sip = proto_is_frame_protocol(capture_file_.capFile()->edt->pi.layers, "sip");
         }
     }
 
@@ -1218,8 +1252,9 @@ void MainWindow::setMenusForSelectedPacket()
     if (capture_file_.capFile() && capture_file_.capFile()->linktypes)
         linkTypes = capture_file_.capFile()->linktypes;
 
-    main_ui_->actionEditPacketComment->setEnabled(frame_selected && linkTypes && wtap_dump_can_write(capture_file_.capFile()->linktypes, WTAP_COMMENT_PER_PACKET));
-    main_ui_->actionDeleteAllPacketComments->setEnabled(linkTypes && wtap_dump_can_write(capture_file_.capFile()->linktypes, WTAP_COMMENT_PER_PACKET));
+    bool enableEditComments = frame_selected && linkTypes && wtap_dump_can_write(capture_file_.capFile()->linktypes, WTAP_COMMENT_PER_PACKET);
+    main_ui_->menuPacketComment->setEnabled(enableEditComments);
+    main_ui_->actionDeleteAllPacketComments->setEnabled(enableEditComments);
 
     main_ui_->actionEditIgnorePacket->setEnabled(frame_selected || multi_selection);
     main_ui_->actionEditIgnoreAllDisplayed->setEnabled(have_filtered);
@@ -1243,6 +1278,7 @@ void MainWindow::setMenusForSelectedPacket()
     main_ui_->actionAnalyzeFollowHTTPStream->setEnabled(is_http);
     main_ui_->actionAnalyzeFollowHTTP2Stream->setEnabled(is_http2);
     main_ui_->actionAnalyzeFollowQUICStream->setEnabled(is_quic);
+    main_ui_->actionAnalyzeFollowSIPCall->setEnabled(is_sip);
 
     foreach(QAction *cc_action, cc_actions) {
         cc_action->setEnabled(frame_selected);
@@ -1271,7 +1307,8 @@ void MainWindow::setMenusForSelectedPacket()
     main_ui_->actionSCTPAnalyseThisAssociation->setEnabled(is_sctp);
     main_ui_->actionSCTPShowAllAssociations->setEnabled(is_sctp);
     main_ui_->actionSCTPFilterThisAssociation->setEnabled(is_sctp);
-    main_ui_->actionTelephonyRTPStreamAnalysis->setEnabled(is_rtp);
+    main_ui_->actionTelephonyRtpStreamAnalysis->setEnabled(is_rtp);
+    main_ui_->actionTelephonyRtpPlayer->setEnabled(is_rtp);
     main_ui_->actionTelephonyLteRlcGraph->setEnabled(is_lte_rlc);
 }
 
@@ -1792,27 +1829,13 @@ void MainWindow::on_actionFileExportPacketBytes_triggered()
 
     if (file_name.length() > 0) {
         const guint8 *data_p;
-        int fd;
 
         data_p = tvb_get_ptr(capture_file_.capFile()->finfo_selected->ds_tvb, 0, -1) +
                 capture_file_.capFile()->finfo_selected->start;
-        fd = ws_open(qUtf8Printable(file_name), O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, 0666);
-        if (fd == -1) {
-            open_failure_alert_box(qUtf8Printable(file_name), errno, TRUE);
-            return;
-        }
-        if (ws_write(fd, data_p, capture_file_.capFile()->finfo_selected->length) < 0) {
-            write_failure_alert_box(qUtf8Printable(file_name), errno);
-            ws_close(fd);
-            return;
-        }
-        if (ws_close(fd) < 0) {
-            write_failure_alert_box(qUtf8Printable(file_name), errno);
-            return;
-        }
+        write_file_binary_mode(qUtf8Printable(file_name), data_p, capture_file_.capFile()->finfo_selected->length);
 
         /* Save the directory name for future file dialogs. */
-        wsApp->setLastOpenDir(file_name);
+        wsApp->setLastOpenDirFromFilename(file_name);
     }
 }
 
@@ -1866,34 +1889,12 @@ void MainWindow::on_actionFileExportTLSSessionKeys_triggered()
                                             tr("TLS Session Keys (*.keys *.txt);;All Files (" ALL_FILES_WILDCARD ")")
                                             );
     if (file_name.length() > 0) {
-        gchar *keylist;
-        int fd;
-
-        keylist = ssl_export_sessions();
-        fd = ws_open(qUtf8Printable(file_name), O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, 0666);
-        if (fd == -1) {
-            open_failure_alert_box(qUtf8Printable(file_name), errno, TRUE);
-            g_free(keylist);
-            return;
-        }
-        /*
-         * Thanks, Microsoft, for not using size_t for the third argument to
-         * _write().  Presumably this string will be <= 4GiB long....
-         */
-        if (ws_write(fd, keylist, (unsigned int)strlen(keylist)) < 0) {
-            write_failure_alert_box(qUtf8Printable(file_name), errno);
-            ws_close(fd);
-            g_free(keylist);
-            return;
-        }
-        if (ws_close(fd) < 0) {
-            write_failure_alert_box(qUtf8Printable(file_name), errno);
-            g_free(keylist);
-            return;
-        }
+        gsize keylist_length;
+        gchar *keylist = ssl_export_sessions(&keylist_length);
+        write_file_binary_mode(qUtf8Printable(file_name), keylist, keylist_length);
 
         /* Save the directory name for future file dialogs. */
-        wsApp->setLastOpenDir(file_name);
+        wsApp->setLastOpenDirFromFilename(file_name);
         g_free(keylist);
     }
 }
@@ -2195,7 +2196,7 @@ void MainWindow::editTimeShiftFinished(int)
     }
 }
 
-void MainWindow::on_actionEditPacketComment_triggered()
+void MainWindow::actionAddPacketComment()
 {
     QList<int> rows = selectedRows();
     if (rows.count() != 1)
@@ -2206,19 +2207,55 @@ void MainWindow::on_actionEditPacketComment_triggered()
         return;
 
     PacketCommentDialog* pc_dialog;
-    pc_dialog = new PacketCommentDialog(fdata->num, this, packet_list_->packetComment());
-    connect(pc_dialog, &QDialog::finished, std::bind(&MainWindow::editPacketCommentFinished, this, pc_dialog, std::placeholders::_1));
+    pc_dialog = new PacketCommentDialog(fdata->num, this, NULL);
+    connect(pc_dialog, &QDialog::finished, std::bind(&MainWindow::addPacketCommentFinished, this, pc_dialog, std::placeholders::_1));
     pc_dialog->setWindowModality(Qt::ApplicationModal);
     pc_dialog->setAttribute(Qt::WA_DeleteOnClose);
     pc_dialog->show();
 }
 
-void MainWindow::editPacketCommentFinished(PacketCommentDialog* pc_dialog, int result)
+void MainWindow::addPacketCommentFinished(PacketCommentDialog* pc_dialog _U_, int result _U_)
 {
     if (result == QDialog::Accepted) {
-        packet_list_->setPacketComment(pc_dialog->text());
+        packet_list_->addPacketComment(pc_dialog->text());
         updateForUnsavedChanges();
     }
+}
+
+void MainWindow::actionEditPacketComment()
+{
+    QList<int> rows = selectedRows();
+    if (rows.count() != 1)
+        return;
+
+    frame_data * fdata = frameDataForRow(rows.at(0));
+    if (! fdata)
+        return;
+
+    QAction *ra = qobject_cast<QAction*>(sender());
+    guint nComment = ra->data().toUInt();
+    PacketCommentDialog* pc_dialog;
+    pc_dialog = new PacketCommentDialog(fdata->num, this, packet_list_->getPacketComment(nComment));
+    connect(pc_dialog, &QDialog::finished, std::bind(&MainWindow::editPacketCommentFinished, this, pc_dialog, std::placeholders::_1, nComment));
+    pc_dialog->setWindowModality(Qt::ApplicationModal);
+    pc_dialog->setAttribute(Qt::WA_DeleteOnClose);
+    pc_dialog->show();
+}
+
+void MainWindow::editPacketCommentFinished(PacketCommentDialog* pc_dialog _U_, int result _U_, guint nComment)
+{
+    if (result == QDialog::Accepted) {
+        packet_list_->setPacketComment(nComment, pc_dialog->text());
+        updateForUnsavedChanges();
+    }
+}
+
+void MainWindow::actionDeletePacketComment()
+{
+    QAction *ra = qobject_cast<QAction*>(sender());
+    guint nComment = ra->data().toUInt();
+    packet_list_->setPacketComment(nComment, QString(""));
+    updateForUnsavedChanges();
 }
 
 void MainWindow::on_actionDeleteAllPacketComments_triggered()
@@ -2907,6 +2944,11 @@ void MainWindow::on_actionAnalyzeFollowQUICStream_triggered()
     openFollowStreamDialogForType(FOLLOW_QUIC);
 }
 
+void MainWindow::on_actionAnalyzeFollowSIPCall_triggered()
+{
+    openFollowStreamDialogForType(FOLLOW_SIP);
+}
+
 void MainWindow::openSCTPAllAssocsDialog()
 {
     SCTPAllAssocsDialog *sctp_dialog = new SCTPAllAssocsDialog(this, capture_file_.capFile());
@@ -3297,36 +3339,54 @@ void MainWindow::on_actionStatisticsHTTP2_triggered()
 
 // Telephony Menu
 
-void MainWindow::interconnectRtpStreamDialogToTelephonyCallsDialog(RtpStreamDialog *rtp_stream_dialog, VoipCallsDialog *dlg)
+RtpPlayerDialog *MainWindow::openTelephonyRtpPlayerDialog()
 {
-    if (rtp_stream_dialog && dlg) {
-        // Connect signals between dialogs
-        connect(dlg, SIGNAL(selectRtpStreamPassOut(rtpstream_id_t *)), rtp_stream_dialog, SLOT(selectRtpStream(rtpstream_id_t *)));
-        connect(dlg, SIGNAL(deselectRtpStreamPassOut(rtpstream_id_t *)), rtp_stream_dialog, SLOT(deselectRtpStream(rtpstream_id_t *)));
-    }
+    RtpPlayerDialog *dialog;
+
+#ifdef HAVE_LIBPCAP
+    dialog = RtpPlayerDialog::openRtpPlayerDialog(*this, capture_file_, packet_list_, captureSession()->state != CAPTURE_STOPPED);
+#else
+    dialog = RtpPlayerDialog::openRtpPlayerDialog(*this, capture_file_, packet_list_, false);
+#endif
+
+    dialog->show();
+
+    return dialog;
 }
 
-void MainWindow::openTelephonyVoipCallsDialog(VoipCallsDialog *dlg)
+VoipCallsDialog *MainWindow::openTelephonyVoipCallsDialogVoip()
 {
-    connect(dlg, SIGNAL(goToPacket(int)),
-            packet_list_, SLOT(goToPacket(int)));
-    connect(dlg, SIGNAL(updateFilter(QString, bool)),
-            this, SLOT(filterPackets(QString, bool)));
-    connect(dlg, SIGNAL(openRtpStreamDialogPassOut()),
-            this, SLOT(on_actionTelephonyRTPStreams_triggered()));
-    connect(this, SIGNAL(displayFilterSuccess(bool)),
-            dlg, SLOT(displayFilterSuccess(bool)));
-    interconnectRtpStreamDialogToTelephonyCallsDialog(rtp_stream_dialog_, dlg);
-    dlg->show();
-    dlg->raise();
+    VoipCallsDialog *dialog;
+
+    dialog = VoipCallsDialog::openVoipCallsDialogVoip(*this, capture_file_, packet_list_);
+    dialog->show();
+
+    return dialog;
+}
+
+VoipCallsDialog *MainWindow::openTelephonyVoipCallsDialogSip()
+{
+    VoipCallsDialog *dialog;
+
+    dialog = VoipCallsDialog::openVoipCallsDialogSip(*this, capture_file_, packet_list_);
+    dialog->show();
+
+    return dialog;
+}
+
+RtpAnalysisDialog *MainWindow::openTelephonyRtpAnalysisDialog()
+{
+    RtpAnalysisDialog *dialog;
+
+    dialog = RtpAnalysisDialog::openRtpAnalysisDialog(*this, capture_file_, packet_list_);
+    dialog->show();
+
+    return dialog;
 }
 
 void MainWindow::on_actionTelephonyVoipCalls_triggered()
 {
-    if (!voip_calls_dialog_) {
-        voip_calls_dialog_ = new VoipCallsDialog(*this, capture_file_, false);
-    }
-    openTelephonyVoipCallsDialog(voip_calls_dialog_);
+    openTelephonyVoipCallsDialogVoip();
 }
 
 void MainWindow::on_actionTelephonyGsmMapSummary_triggered()
@@ -3411,31 +3471,63 @@ void MainWindow::on_actionTelephonyOsmuxPacketCounter_triggered()
     openStatisticsTreeDialog("osmux");
 }
 
-void MainWindow::on_actionTelephonyRTPStreams_triggered()
+RtpStreamDialog *MainWindow::openTelephonyRtpStreamsDialog()
 {
-    if (!rtp_stream_dialog_) {
-        rtp_stream_dialog_ = new RtpStreamDialog(*this, capture_file_);
-    }
-    connect(rtp_stream_dialog_, SIGNAL(packetsMarked()),
-            packet_list_, SLOT(redrawVisiblePackets()));
-    connect(rtp_stream_dialog_, SIGNAL(goToPacket(int)),
-            packet_list_, SLOT(goToPacket(int)));
-    connect(rtp_stream_dialog_, SIGNAL(updateFilter(QString, bool)),
-            this, SLOT(filterPackets(QString, bool)));
-    connect(this, SIGNAL(displayFilterSuccess(bool)),
-            rtp_stream_dialog_, SLOT(displayFilterSuccess(bool)));
-    interconnectRtpStreamDialogToTelephonyCallsDialog(rtp_stream_dialog_, voip_calls_dialog_);
-    interconnectRtpStreamDialogToTelephonyCallsDialog(rtp_stream_dialog_, sip_calls_dialog_);
-    rtp_stream_dialog_->show();
-    rtp_stream_dialog_->raise();
+    RtpStreamDialog *dialog;
+
+    dialog = RtpStreamDialog::openRtpStreamDialog(*this, capture_file_, packet_list_);
+    dialog->show();
+
+    return dialog;
 }
 
-void MainWindow::on_actionTelephonyRTPStreamAnalysis_triggered()
+void MainWindow::on_actionTelephonyRtpStreams_triggered()
 {
-    RtpAnalysisDialog *rtp_analysis_dialog = new  RtpAnalysisDialog(*this, capture_file_);
-    connect(rtp_analysis_dialog, SIGNAL(goToPacket(int)),
-            packet_list_, SLOT(goToPacket(int)));
-    rtp_analysis_dialog->show();
+    openTelephonyRtpStreamsDialog();
+}
+
+void MainWindow::on_actionTelephonyRtpStreamAnalysis_triggered()
+{
+    QVector<rtpstream_id_t *> stream_ids;
+    QString err;
+
+    if (QGuiApplication::keyboardModifiers().testFlag(Qt::ControlModifier)) {
+        err = findRtpStreams(&stream_ids, true);
+    } else {
+        err = findRtpStreams(&stream_ids, false);
+    }
+    if (err != NULL) {
+        QMessageBox::warning(this, tr("RTP packet search failed"),
+                             err,
+                             QMessageBox::Ok);
+    } else {
+        openTelephonyRtpAnalysisDialog()->addRtpStreams(stream_ids);
+    }
+    foreach(rtpstream_id_t *id, stream_ids) {
+        rtpstream_id_free(id);
+    }
+}
+
+void MainWindow::on_actionTelephonyRtpPlayer_triggered()
+{
+    QVector<rtpstream_id_t *> stream_ids;
+    QString err;
+
+    if (QGuiApplication::keyboardModifiers().testFlag(Qt::ControlModifier)) {
+        err = findRtpStreams(&stream_ids, true);
+    } else {
+        err = findRtpStreams(&stream_ids, false);
+    }
+    if (err != NULL) {
+        QMessageBox::warning(this, tr("RTP packet search failed"),
+                             err,
+                             QMessageBox::Ok);
+    } else {
+        openTelephonyRtpPlayerDialog()->addRtpStreams(stream_ids);
+    }
+    foreach(rtpstream_id_t *id, stream_ids) {
+        rtpstream_id_free(id);
+    }
 }
 
 void MainWindow::on_actionTelephonyRTSPPacketCounter_triggered()
@@ -3455,10 +3547,7 @@ void MainWindow::on_actionTelephonyUCPMessages_triggered()
 
 void MainWindow::on_actionTelephonySipFlows_triggered()
 {
-    if (!sip_calls_dialog_) {
-        sip_calls_dialog_ = new VoipCallsDialog(*this, capture_file_, true);
-    }
-    openTelephonyVoipCallsDialog(sip_calls_dialog_);
+    openTelephonyVoipCallsDialogSip();
 }
 
 // Wireless Menu
@@ -4010,6 +4099,46 @@ void MainWindow::activatePluginIFToolbar(bool)
             }
         }
     }
+}
+
+void MainWindow::rtpPlayerDialogReplaceRtpStreams(QVector<rtpstream_id_t *> stream_ids)
+{
+    openTelephonyRtpPlayerDialog()->replaceRtpStreams(stream_ids);
+}
+
+void MainWindow::rtpPlayerDialogAddRtpStreams(QVector<rtpstream_id_t *> stream_ids)
+{
+    openTelephonyRtpPlayerDialog()->addRtpStreams(stream_ids);
+}
+
+void MainWindow::rtpPlayerDialogRemoveRtpStreams(QVector<rtpstream_id_t *> stream_ids)
+{
+    openTelephonyRtpPlayerDialog()->removeRtpStreams(stream_ids);
+}
+
+void MainWindow::rtpAnalysisDialogReplaceRtpStreams(QVector<rtpstream_id_t *> stream_ids)
+{
+    openTelephonyRtpAnalysisDialog()->replaceRtpStreams(stream_ids);
+}
+
+void MainWindow::rtpAnalysisDialogAddRtpStreams(QVector<rtpstream_id_t *> stream_ids)
+{
+    openTelephonyRtpAnalysisDialog()->addRtpStreams(stream_ids);
+}
+
+void MainWindow::rtpAnalysisDialogRemoveRtpStreams(QVector<rtpstream_id_t *> stream_ids)
+{
+    openTelephonyRtpAnalysisDialog()->removeRtpStreams(stream_ids);
+}
+
+void MainWindow::rtpStreamsDialogSelectRtpStreams(QVector<rtpstream_id_t *> stream_ids)
+{
+    openTelephonyRtpStreamsDialog()->selectRtpStream(stream_ids);
+}
+
+void MainWindow::rtpStreamsDialogDeselectRtpStreams(QVector<rtpstream_id_t *> stream_ids)
+{
+    openTelephonyRtpStreamsDialog()->deselectRtpStream(stream_ids);
 }
 
 #ifdef _MSC_VER

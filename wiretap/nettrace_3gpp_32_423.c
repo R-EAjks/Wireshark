@@ -23,7 +23,6 @@
 
 #include "wtap-int.h"
 #include "file_wrappers.h"
-#include "pcap-encap.h"
 
 #include <epan/exported_pdu.h>
 #include <wsutil/buffer.h>
@@ -31,9 +30,9 @@
 #include "wsutil/os_version_info.h"
 #include "wsutil/str_util.h"
 #include <wsutil/inet_addr.h>
+#include <wsutil/ws_assert.h>
 
 
-#include "pcapng.h"
 #include "nettrace_3gpp_32_423.h"
 
 /* String constants sought in the XML data.
@@ -148,7 +147,7 @@ nettrace_parse_address(char* curr_pos, char* next_pos, gboolean is_src_addr, exp
 
 	curr_pos = skip_pos;
 
-	g_strlcpy(str, curr_pos, 3);
+	(void) g_strlcpy(str, curr_pos, 3);
 	/* If we find "" here we have no IP address */
 	if (strcmp(str, "\"\"") == 0) {
 		return next_pos;
@@ -170,7 +169,7 @@ nettrace_parse_address(char* curr_pos, char* next_pos, gboolean is_src_addr, exp
 	if (str_len > WS_INET6_ADDRSTRLEN) {
 		return next_pos;
 	}
-	g_strlcpy(ip_addr_str, curr_pos, str_len);
+	(void) g_strlcpy(ip_addr_str, curr_pos, str_len);
 	curr_pos = end_pos;
 	if (ws_inet_pton6(ip_addr_str, &ip6_addr)) {
 		if (is_src_addr) {
@@ -250,7 +249,7 @@ nettrace_msg_to_packet(nettrace_3gpp_32_423_file_info_t *file_info, wtap_rec *re
 	/* We should always and only be called with a <msg....</msg> payload */
 	if (0 != strncmp(input, c_s_msg, CLEN(c_s_msg))) {
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("Did not start with \"%s\"", c_s_msg);
+		*err_info = g_strdup_printf("nettrace_3gpp_32_423: Did not start with \"%s\"", c_s_msg);
 		return FALSE;
 	}
 	prev_pos = curr_pos = input + CLEN(c_s_msg);
@@ -287,7 +286,7 @@ nettrace_msg_to_packet(nettrace_3gpp_32_423_file_info_t *file_info, wtap_rec *re
 	if (!next_msg_pos) {
 		/* Something's wrong, bail out */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("Did not find \"%s\"", c_e_msg);
+		*err_info = g_strdup_printf("nettrace_3gpp_32_423: Did not find \"%s\"", c_e_msg);
 		status = FALSE;
 		goto end;
 	}
@@ -330,11 +329,11 @@ nettrace_msg_to_packet(nettrace_3gpp_32_423_file_info_t *file_info, wtap_rec *re
 		name_str_len = (int)(next_pos - curr_pos);
 		if (name_str_len > MAX_NAME_LEN) {
 			*err = WTAP_ERR_BAD_FILE;
-			*err_info = g_strdup_printf("name_str_len > %d", MAX_NAME_LEN);
+			*err_info = g_strdup_printf("nettrace_3gpp_32_423: name_str_len > %d", MAX_NAME_LEN);
 			goto end;
 		}
 
-		g_strlcpy(name_str, curr_pos, (gsize)name_str_len + 1);
+		(void) g_strlcpy(name_str, curr_pos, (gsize)name_str_len + 1);
 		ascii_strdown_inplace(name_str);
 
 	}
@@ -376,14 +375,14 @@ nettrace_msg_to_packet(nettrace_3gpp_32_423_file_info_t *file_info, wtap_rec *re
 	raw_msg_pos = STRNSTR(start_msg_tag_cont, c_s_rawmsg);
 	if (raw_msg_pos == NULL) {
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("Did not find \"%s\"", c_s_rawmsg);
+		*err_info = g_strdup_printf("nettrace_3gpp_32_423: Did not find \"%s\"", c_s_rawmsg);
 		status = FALSE;
 		goto end;
 	}
 	curr_pos = STRNSTR(raw_msg_pos, c_protocol);
 	if (curr_pos == NULL) {
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("Did not find \"%s\"", c_protocol);
+		*err_info = g_strdup_printf("nettrace_3gpp_32_423: Did not find \"%s\"", c_protocol);
 		status = FALSE;
 		goto end;
 	}
@@ -394,7 +393,7 @@ nettrace_msg_to_packet(nettrace_3gpp_32_423_file_info_t *file_info, wtap_rec *re
 		status = FALSE;
 		goto end;
 	}
-	g_strlcpy(proto_name_str, curr_pos, (gsize)proto_str_len+1);
+	(void) g_strlcpy(proto_name_str, curr_pos, (gsize)proto_str_len+1);
 	ascii_strdown_inplace(proto_name_str);
 
 	/* Do string matching and replace with Wiresharks protocol name */
@@ -406,7 +405,7 @@ nettrace_msg_to_packet(nettrace_3gpp_32_423_file_info_t *file_info, wtap_rec *re
 	/* XXX Do we need to check for function="S1"? */
 	if (strcmp(proto_name_str, "nas") == 0) {
 		/* Change to nas-eps_plain */
-		g_strlcpy(proto_name_str, c_nas_eps, sizeof(c_nas_eps));
+		(void) g_strlcpy(proto_name_str, c_nas_eps, sizeof(c_nas_eps));
 		proto_str_len = CLEN(c_nas_eps);
 	}
 	if (strcmp(proto_name_str, "map") == 0) {
@@ -417,14 +416,14 @@ nettrace_msg_to_packet(nettrace_3gpp_32_423_file_info_t *file_info, wtap_rec *re
 
 		if (strcmp(name_str, "sai_request") == 0) {
 			use_proto_table = TRUE;
-			g_strlcpy(dissector_table_str, c_sai_req, sizeof(c_sai_req));
+			(void) g_strlcpy(dissector_table_str, c_sai_req, sizeof(c_sai_req));
 			dissector_table_str_len = CLEN(c_sai_req);
 			dissector_table_val = 56;
 			exported_pdu_info.presence_flags |= EXP_PDU_TAG_COL_PROT_BIT;
 		}
 		else if (strcmp(name_str, "sai_response") == 0) {
 			use_proto_table = TRUE;
-			g_strlcpy(dissector_table_str, c_sai_rsp, sizeof(c_sai_rsp));
+			(void) g_strlcpy(dissector_table_str, c_sai_rsp, sizeof(c_sai_rsp));
 			dissector_table_str_len = CLEN(c_sai_rsp);
 			dissector_table_val = 56;
 			exported_pdu_info.presence_flags |= EXP_PDU_TAG_COL_PROT_BIT;
@@ -451,7 +450,7 @@ nettrace_msg_to_packet(nettrace_3gpp_32_423_file_info_t *file_info, wtap_rec *re
 
 	if (exported_pdu_info.presence_flags & EXP_PDU_TAG_COL_PROT_BIT) {
 		/* The assert prevents static code analyzers to raise warnings */
-		g_assert(exported_pdu_info.proto_col_str);
+		ws_assert(exported_pdu_info.proto_col_str);
 		exp_pdu_tags_len += 4 + (int)strlen(exported_pdu_info.proto_col_str);
 	}
 
@@ -619,7 +618,7 @@ nettrace_msg_to_packet(nettrace_3gpp_32_423_file_info_t *file_info, wtap_rec *re
 		}
 		else {
 			/* Something wrong, bail out */
-			*err_info = g_strdup_printf("Could not parse hex data, bufsize %u index %u %c%c",
+			*err_info = g_strdup_printf("nettrace_3gpp_32_423: Could not parse hex data, bufsize %u index %u %c%c",
 				(pkt_data_len + exp_pdu_tags_len),
 				i,
 				chr1,
@@ -688,7 +687,7 @@ nettrace_read(wtap *wth, wtap_rec *rec, Buffer *buf, int *err, gchar **err_info,
 	 */
 	msg_start = g_strrstr_len(buf_start, (guint)(msg_end - buf_start), c_s_msg);
 	if (msg_start == NULL || msg_start > msg_end) {
-		*err_info = g_strdup_printf("Found \"%s\" without matching \"%s\"", c_e_msg, c_s_msg);
+		*err_info = g_strdup_printf("nettrace_3gpp_32_423: Found \"%s\" without matching \"%s\"", c_e_msg, c_s_msg);
 		*err = WTAP_ERR_BAD_FILE;
 		goto end;
 	}

@@ -16,7 +16,7 @@
 #include <string.h>
 #include <epan/packet.h>
 #include <epan/timestamp.h>
-#include <epan/strutil.h>
+#include <wsutil/str_util.h>
 #include <ui/cmdarg_err.h>
 #include <ui/cli/tshark-tap.h>
 
@@ -58,6 +58,12 @@ iousers_draw(void *arg)
 		printf("%s                                               | Frames  Size  | | Frames  Size  | | Frames  Size  |     Start      |              |\n",
 			display_ports ? "            " : "");
 		break;
+	case TS_EPOCH:
+		printf("%s                                               |       <-      | |       ->      | |     Total     |       Relative       |   Duration   |\n",
+			display_ports ? "            " : "");
+		printf("%s                                               | Frames  Bytes | | Frames  Bytes | | Frames  Bytes |         Start        |              |\n",
+			display_ports ? "            " : "");
+		break;
 	case TS_RELATIVE:
 	case TS_NOT_SET:
 	default:
@@ -92,9 +98,9 @@ iousers_draw(void *arg)
 			if (tot_frames == last_frames) {
 				char *rx_bytes, *tx_bytes, *total_bytes;
 
-				rx_bytes = format_size_wmem(NULL, iui->rx_bytes, (format_size_flags_e)(format_size_unit_bytes|format_size_suffix_no_space));
-				tx_bytes = format_size_wmem(NULL, iui->tx_bytes, (format_size_flags_e)(format_size_unit_bytes|format_size_suffix_no_space));
-				total_bytes = format_size_wmem(NULL, iui->tx_bytes + iui->rx_bytes, (format_size_flags_e)(format_size_unit_bytes|format_size_suffix_no_space));
+				rx_bytes = format_size(iui->rx_bytes, format_size_unit_bytes);
+				tx_bytes = format_size(iui->tx_bytes, format_size_unit_bytes);
+				total_bytes = format_size(iui->tx_bytes + iui->rx_bytes, format_size_unit_bytes);
 
 				/* XXX - TODO: make name / port resolution configurable (through gbl_resolv_flags?) */
 				src_addr = get_conversation_address(NULL, &iui->src_address, TRUE);
@@ -206,6 +212,9 @@ iousers_draw(void *arg)
 							 tm_time->tm_sec);
 					} else
 						printf("XXXX/XXX XX:XX:XX");
+					break;
+				case TS_EPOCH:
+					printf("%20.9f", nstime_to_sec(&iui->start_abs_time));
 					break;
 				case TS_RELATIVE:
 				case TS_NOT_SET:

@@ -13,6 +13,7 @@
 #include "main_window.h"
 #include "wireshark_application.h"
 
+#include "frame_tvbuff.h"
 #include "epan/follow.h"
 #include "epan/dissectors/packet-tcp.h"
 #include "epan/dissectors/packet-udp.h"
@@ -28,10 +29,11 @@
 #include "ui/alert_box.h"
 #include "ui/simple_dialog.h"
 #include <wsutil/utf8_entities.h>
+#include <wsutil/ws_assert.h>
 
 #include "wsutil/file_util.h"
 #include "wsutil/str_util.h"
-#include "version_info.h"
+#include "ui/version_info.h"
 
 #include "ws_symbol_export.h"
 
@@ -106,8 +108,11 @@ FollowStreamDialog::FollowStreamDialog(QWidget &parent, CaptureFile &cf, follow_
     case FOLLOW_QUIC:
         follower_ = get_follow_by_name("QUIC");
         break;
+    case FOLLOW_SIP:
+        follower_ = get_follow_by_name("SIP");
+        break;
     default :
-        g_assert_not_reached();
+        ws_assert_not_reached();
     }
 
     memset(&follow_info_, 0, sizeof(follow_info_));
@@ -247,6 +252,9 @@ void FollowStreamDialog::updateWidgets(bool follow_in_progress)
     ui->cbDirections->setEnabled(enable);
     ui->cbCharset->setEnabled(enable);
     ui->streamNumberSpinBox->setEnabled(enable);
+    if (follow_type_ == FOLLOW_HTTP2 || follow_type_ == FOLLOW_QUIC) {
+        ui->subStreamNumberSpinBox->setEnabled(enable);
+    }
     ui->leFind->setEnabled(enable);
     ui->bFind->setEnabled(enable);
     b_filter_out_->setEnabled(enable);
@@ -394,12 +402,32 @@ void FollowStreamDialog::on_streamNumberSpinBox_valueChanged(int stream_num)
     sub_stream_num = ui->subStreamNumberSpinBox->value();
     ui->subStreamNumberSpinBox->blockSignals(false);
 
+    /* We need to find a suitable sub stream for the new stream */
+    guint sub_stream_num_new = static_cast<guint>(sub_stream_num);
+    gboolean ok;
     if (sub_stream_num < 0) {
-        sub_stream_num = 0;
+        // Stream ID 0 should always exist as it is used for control messages.
+        sub_stream_num_new = 0;
+        ok = TRUE;
+    } else if (follow_type_ == FOLLOW_HTTP2) {
+        ok = http2_get_stream_id_ge(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
+        if (!ok) {
+            ok = http2_get_stream_id_le(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
+        }
+    } else if (follow_type_ == FOLLOW_QUIC) {
+        ok = quic_get_stream_id_ge(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
+        if (!ok) {
+            ok = quic_get_stream_id_le(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
+        }
+    } else {
+        // Should not happen, this field is only visible for suitable protocols.
+        return;
     }
+    sub_stream_num = static_cast<gint>(sub_stream_num_new);
 
-    if (stream_num >= 0) {
+    if (stream_num >= 0 && ok) {
         follow(previous_filter_, true, stream_num, sub_stream_num);
+        previous_sub_stream_num_ = sub_stream_num;
     }
 }
 
@@ -427,8 +455,11 @@ void FollowStreamDialog::on_subStreamNumberSpinBox_valueChanged(int sub_stream_n
             ok = http2_get_stream_id_le(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
         }
     } else if (follow_type_ == FOLLOW_QUIC) {
-        // TODO clamp the stream IDs correctly for QUIC
-        ok = TRUE;
+        if (previous_sub_stream_num_ < sub_stream_num) {
+            ok = quic_get_stream_id_ge(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
+        } else {
+            ok = quic_get_stream_id_le(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
+        }
     } else {
         // Should not happen, this field is only visible for suitable protocols.
         return;
@@ -498,6 +529,8 @@ void FollowStreamDialog::resetStream()
         follow_info_.fragments[1] = Q_NULLPTR;
     }
 
+    free_address(&follow_info_.client_ip);
+    free_address(&follow_info_.server_ip);
     follow_info_.payload = Q_NULLPTR;
     follow_info_.client_port = 0;
 }
@@ -528,11 +561,12 @@ FollowStreamDialog::readStream()
     case FOLLOW_HTTP2:
     case FOLLOW_QUIC:
     case FOLLOW_TLS :
+    case FOLLOW_SIP :
         ret = readFollowStream();
         break;
 
     default :
-        g_assert_not_reached();
+        ws_assert_not_reached();
         ret = (frs_return_t)0;
         break;
     }
@@ -549,7 +583,7 @@ FollowStreamDialog::followStream()
 }
 
 const int FollowStreamDialog::max_document_length_ = 500 * 1000 * 1000; // Just a guess
-void FollowStreamDialog::addText(QString text, gboolean is_from_server, guint32 packet_num)
+void FollowStreamDialog::addText(QString text, gboolean is_from_server, guint32 packet_num, gboolean colorize)
 {
     if (truncated_) {
         return;
@@ -564,8 +598,12 @@ void FollowStreamDialog::addText(QString text, gboolean is_from_server, guint32 
     setUpdatesEnabled(false);
     int cur_pos = ui->teStreamContent->verticalScrollBar()->value();
     ui->teStreamContent->moveCursor(QTextCursor::End);
+
     QTextCharFormat tcf = ui->teStreamContent->currentCharFormat();
-    if (is_from_server) {
+    if (!colorize) {
+        tcf.setBackground(palette().window().color());
+        tcf.setForeground(palette().windowText().color());
+    } else if (is_from_server) {
         tcf.setForeground(ColorUtils::fromColorT(prefs.st_server_fg));
         tcf.setBackground(ColorUtils::fromColorT(prefs.st_server_bg));
     } else {
@@ -649,7 +687,7 @@ static inline void sanitize_buffer(char *buffer, size_t nchars) {
 
 frs_return_t
 FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_server, guint32 packet_num,
-                                guint32 *global_pos)
+                                nstime_t abs_ts, guint32 *global_pos)
 {
     gchar initbuf[256];
     guint32 current_pos;
@@ -790,17 +828,53 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
         const int base64_raw_len = 57; // Encodes to 76 bytes, common in RFCs
         current_pos = 0;
 
+        if (last_packet_ == 0) {
+            // Header with general info about peers
+            const char *hostname0 = address_to_name(&follow_info_.client_ip);
+            const char *hostname1 = address_to_name(&follow_info_.server_ip);
+
+            char *port0 = get_follow_port_to_display(follower_)(NULL, follow_info_.client_port);
+            char *port1 = get_follow_port_to_display(follower_)(NULL, follow_info_.server_port);
+
+            addText("peers:\n", false, 0, false);
+
+            addText(QString(
+                "  - peer: 0\n"
+                "    host: %1\n"
+                "    port: %2\n")
+                .arg(hostname0)
+                .arg(port0), false, 0);
+
+            addText(QString(
+                "  - peer: 1\n"
+                "    host: %1\n"
+                "    port: %2\n")
+                .arg(hostname1)
+                .arg(port1), true, 0);
+
+            wmem_free(NULL, port0);
+            wmem_free(NULL, port1);
+
+            addText("packets:\n", false, 0, false);
+        }
+
         if (packet_num != last_packet_) {
-            yaml_text.append(QString("# Packet %1\npeer%2_%3: !!binary |\n")
-                    .arg(packet_num)
-                    .arg(is_from_server ? 1 : 0)
+            yaml_text.append(QString("  - packet: %1\n")
+                    .arg(packet_num));
+            yaml_text.append(QString("    peer: %1\n")
+                    .arg(is_from_server ? 1 : 0));
+            yaml_text.append(QString("    index: %1\n")
                     .arg(is_from_server ? server_buffer_count_++ : client_buffer_count_++));
+            yaml_text.append(QString("    timestamp: %1.%2\n")
+                    .arg(abs_ts.secs)
+                    .arg(abs_ts.nsecs, 9, 10, QChar('0')));
+            yaml_text.append(QString("    data: !!binary |\n"));
         }
         while (current_pos < nchars) {
             int len = current_pos + base64_raw_len < nchars ? base64_raw_len : (int) nchars - current_pos;
             QByteArray base64_data(&buffer[current_pos], len);
 
-            yaml_text += "  " + base64_data.toBase64() + "\n";
+            yaml_text += "      " + base64_data.toBase64() + "\n";
 
             current_pos += len;
             (*global_pos) += len;
@@ -884,12 +958,18 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
     if (use_stream_index) {
         follow_filter = gchar_free_to_qstring(get_follow_index_func(follower_)(stream_num, sub_stream_num));
     } else {
-        follow_filter = gchar_free_to_qstring(get_follow_conv_func(follower_)(&cap_file_.capFile()->edt->pi, &stream_num, &sub_stream_num));
+        follow_filter = gchar_free_to_qstring(get_follow_conv_func(follower_)(cap_file_.capFile()->edt, &cap_file_.capFile()->edt->pi, &stream_num, &sub_stream_num));
     }
     if (follow_filter.isEmpty()) {
-        QMessageBox::warning(this,
-                             tr("Error creating filter for this stream."),
-                             tr("A transport or network layer header is needed."));
+        if (follow_type_ == FOLLOW_QUIC) {
+            QMessageBox::warning(this,
+                                 tr("Error creating filter for this stream."),
+                                 tr("QUIC streams not found on the selected packet."));
+        } else {
+            QMessageBox::warning(this,
+                                 tr("Error creating filter for this stream."),
+                                 tr("A transport or network layer header is needed."));
+        }
         return false;
     }
 
@@ -990,17 +1070,18 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
         ui->streamNumberSpinBox->setMaximum(stream_count-1);
         ui->streamNumberSpinBox->setValue(stream_num);
         ui->streamNumberSpinBox->blockSignals(false);
-        ui->streamNumberSpinBox->setToolTip(tr("%Ln total stream(s).", "", stream_count));
+        ui->streamNumberSpinBox->setToolTip(tr("Total number of QUIC connections: %Ln", "", stream_count));
         ui->streamNumberLabel->setToolTip(ui->streamNumberSpinBox->toolTip());
 
-        // TODO extract number of QUIC streams?
-        stream_count = G_MAXINT32;
+        guint substream_max_id = 0;
+        quic_get_stream_id_le(static_cast<guint>(stream_num), G_MAXINT32, &substream_max_id);
+        stream_count = static_cast<gint>(substream_max_id);
         ui->subStreamNumberSpinBox->blockSignals(true);
         ui->subStreamNumberSpinBox->setEnabled(true);
         ui->subStreamNumberSpinBox->setMaximum(stream_count);
         ui->subStreamNumberSpinBox->setValue(sub_stream_num);
         ui->subStreamNumberSpinBox->blockSignals(false);
-        ui->subStreamNumberSpinBox->setToolTip(tr("%Ln total sub stream(s).", "", stream_count));
+        ui->subStreamNumberSpinBox->setToolTip(tr("Max QUIC Stream ID for the selected connection: %Ln", "", stream_count));
         ui->subStreamNumberSpinBox->setToolTip(ui->subStreamNumberSpinBox->toolTip());
         ui->subStreamNumberSpinBox->setVisible(true);
         ui->subStreamNumberLabel->setVisible(true);
@@ -1011,6 +1092,19 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
     case FOLLOW_HTTP:
         /* No extra handling */
         break;
+    case FOLLOW_SIP:
+    {
+        /* There are no more streams */
+        ui->streamNumberSpinBox->setEnabled(false);
+        ui->streamNumberSpinBox->blockSignals(true);
+        ui->streamNumberSpinBox->setMaximum(0);
+        ui->streamNumberSpinBox->setValue(0);
+        ui->streamNumberSpinBox->blockSignals(false);
+        ui->streamNumberSpinBox->setToolTip(tr("No streams"));
+        ui->streamNumberLabel->setToolTip(ui->streamNumberSpinBox->toolTip());
+
+        break;
+    }
     }
 
     beginRetapPackets();
@@ -1142,6 +1236,7 @@ FollowStreamDialog::readFollowStream()
                         follow_record->data->len,
                         follow_record->is_server,
                         follow_record->packet_num,
+                        follow_record->abs_ts,
                         global_pos);
             if (frs_return == FRS_PRINT_ERROR)
                 return frs_return;

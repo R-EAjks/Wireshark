@@ -287,7 +287,7 @@ static void init_jf_to_hf_map(void) {
         { hf_sj_systemd_user_slice, "_SYSTEMD_USER_SLICE=" },
         { 0, NULL }
     };
-    jf_to_hf = (journal_field_hf_map*) g_memdup(jhmap, sizeof(jhmap));
+    jf_to_hf = (journal_field_hf_map*) g_memdup2(jhmap, sizeof(jhmap));
 }
 
 static void
@@ -855,7 +855,7 @@ proto_register_systemd_journal(void)
     /* Setup protocol expert items */
     static ei_register_info ei[] = {
         { &ei_unhandled_field_type,
-          { "systemd_journal.unhandled_field_type", PI_UNDECODED, PI_ERROR,
+          { "systemd_journal.unhandled_field_type.undecoded", PI_UNDECODED, PI_ERROR,
             "Unhandled field type", EXPFILL }
         },
         { &ei_nonbinary_field,
@@ -885,7 +885,7 @@ proto_register_systemd_journal(void)
     init_jf_to_hf_map();
 }
 
-#define BLOCK_TYPE_SYSTEMD_JOURNAL 0x0000009
+#define BLOCK_TYPE_SYSTEMD_JOURNAL_EXPORT 0x0000009
 void
 proto_reg_handoff_systemd_journal(void)
 {
@@ -894,7 +894,7 @@ proto_reg_handoff_systemd_journal(void)
     file_type_subtype_systemd_journal = wtap_name_to_file_type_subtype("systemd_journal");
     if (file_type_subtype_systemd_journal != -1)
         dissector_add_uint("wtap_fts_rec", file_type_subtype_systemd_journal, sje_handle);
-    dissector_add_uint("pcapng.block_type", BLOCK_TYPE_SYSTEMD_JOURNAL, sje_handle);
+    dissector_add_uint("pcapng.block_type", BLOCK_TYPE_SYSTEMD_JOURNAL_EXPORT, sje_handle);
     // It's possible to ship journal entries over HTTP/HTTPS using
     // systemd-journal-remote. Dissecting them on the wire isn't very
     // useful since it's easy to end up with a packet containing a

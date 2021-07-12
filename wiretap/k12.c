@@ -21,6 +21,7 @@
 #include "k12.h"
 
 #include <wsutil/str_util.h>
+#include <wsutil/glib-compat.h>
 
 /*
  * See
@@ -599,7 +600,7 @@ process_packet_data(wtap_rec *rec, Buffer *target, guint8 *buffer,
 
     ts = pntoh64(buffer + K12_PACKET_TIMESTAMP);
 
-    rec->ts.secs = (guint32) ((ts / 2000000) + 631152000);
+    rec->ts.secs = (time_t) ((ts / 2000000) + 631152000);
     rec->ts.nsecs = (guint32) ( (ts % 2000000) * 500 );
 
     rec->rec_header.packet_header.len = rec->rec_header.packet_header.caplen = length;
@@ -887,6 +888,7 @@ wtap_open_return_val k12_open(wtap *wth, int *err, gchar **err_info) {
                                         K12_FILE_HDR_RECORD_COUNT_1,
                                         pntoh32( header_buffer + K12_FILE_HDR_RECORD_COUNT_2 ),
                                         K12_FILE_HDR_RECORD_COUNT_2 );
+            destroy_k12_file_data(file_data);
             return WTAP_OPEN_ERROR;
         }
     }
@@ -923,8 +925,9 @@ wtap_open_return_val k12_open(wtap *wth, int *err, gchar **err_info) {
         if (rec_len < K12_RECORD_TYPE + 4) {
             /* Record isn't long enough to have a type field */
             *err = WTAP_ERR_BAD_FILE;
-            *err_info = g_strdup_printf("k12_open: record length %u < %u",
+            *err_info = g_strdup_printf("k12: record length %u < %u",
                                         rec_len, K12_RECORD_TYPE + 4);
+            destroy_k12_file_data(file_data);
             return WTAP_OPEN_ERROR;
         }
         type = pntoh32( read_buffer + K12_RECORD_TYPE );
@@ -954,7 +957,7 @@ wtap_open_return_val k12_open(wtap *wth, int *err, gchar **err_info) {
                  * of the source descriptor field.
                  */
                 *err = WTAP_ERR_BAD_FILE;
-                *err_info = g_strdup_printf("k12_open: source descriptor record length %u < %u",
+                *err_info = g_strdup_printf("k12: source descriptor record length %u < %u",
                                             rec_len, K12_SRCDESC_HWPART);
                 destroy_k12_file_data(file_data);
                 g_free(rec);
@@ -987,7 +990,7 @@ wtap_open_return_val k12_open(wtap *wth, int *err, gchar **err_info) {
                  * field, including the variable-length parts.
                  */
                 *err = WTAP_ERR_BAD_FILE;
-                *err_info = g_strdup_printf("k12_open: source descriptor record length %u < %u (%u + %u + %u + %u)",
+                *err_info = g_strdup_printf("k12: source descriptor record length %u < %u (%u + %u + %u + %u)",
                                             rec_len,
                                             K12_SRCDESC_HWPART + hwpart_len + name_len + stack_len,
                                             K12_SRCDESC_HWPART, hwpart_len, name_len, stack_len);
@@ -1000,7 +1003,7 @@ wtap_open_return_val k12_open(wtap *wth, int *err, gchar **err_info) {
                 if (hwpart_len < 4) {
                     /* Hardware part isn't long enough to have a type field */
                     *err = WTAP_ERR_BAD_FILE;
-                    *err_info = g_strdup_printf("k12_open: source descriptor hardware part length %u < 4",
+                    *err_info = g_strdup_printf("k12: source descriptor hardware part length %u < 4",
                                                 hwpart_len);
                     destroy_k12_file_data(file_data);
                     g_free(rec);
@@ -1020,7 +1023,7 @@ wtap_open_return_val k12_open(wtap *wth, int *err, gchar **err_info) {
                         if (hwpart_len < K12_SRCDESC_ATM_VCI + 2) {
                             /* Hardware part isn't long enough to have ATM information */
                             *err = WTAP_ERR_BAD_FILE;
-                            *err_info = g_strdup_printf("k12_open: source descriptor hardware part length %u < %u",
+                            *err_info = g_strdup_printf("k12: source descriptor hardware part length %u < %u",
                                                         hwpart_len,
                                                         K12_SRCDESC_ATM_VCI + 2);
                             destroy_k12_file_data(file_data);
@@ -1060,8 +1063,8 @@ wtap_open_return_val k12_open(wtap *wth, int *err, gchar **err_info) {
                 g_free(rec);
                 return WTAP_OPEN_ERROR;
             }
-            rec->input_name = (gchar *)g_memdup(read_buffer + K12_SRCDESC_HWPART + hwpart_len, name_len);
-            rec->stack_file = (gchar *)g_memdup(read_buffer + K12_SRCDESC_HWPART + hwpart_len + name_len, stack_len);
+            rec->input_name = (gchar *)g_memdup2(read_buffer + K12_SRCDESC_HWPART + hwpart_len, name_len);
+            rec->stack_file = (gchar *)g_memdup2(read_buffer + K12_SRCDESC_HWPART + hwpart_len + name_len, stack_len);
 
             ascii_strdown_inplace (rec->stack_file);
 

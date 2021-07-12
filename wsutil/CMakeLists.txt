@@ -65,12 +65,15 @@ set(WSUTIL_PUBLIC_HEADERS
 	type_util.h
 	unicode-utils.h
 	utf8_entities.h
+	ws_assert.h
 	ws_cpuid.h
+	glib-compat.h
 	ws_mempbrk.h
 	ws_mempbrk_int.h
 	ws_pipe.h
-	ws_printf.h
+	ws_roundup.h
 	wsjson.h
+	wslog.h
 	xtea.h
 )
 
@@ -118,10 +121,13 @@ set(WSUTIL_COMMON_FILES
 	time_util.c
 	type_util.c
 	unicode-utils.c
+	glib-compat.c
+	ws_assert.c
 	ws_mempbrk.c
 	ws_pipe.c
 	wsgcrypt.c
 	wsjson.c
+	wslog.c
 	xtea.c
 )
 
@@ -253,6 +259,9 @@ set_target_properties(wsutil PROPERTIES
 	FOLDER "DLLs"
 	INSTALL_RPATH "${LIBRARY_INSTALL_RPATH}"
 )
+if(MSVC)
+	set_target_properties(wsutil PROPERTIES LINK_FLAGS_DEBUG "${WS_MSVC_DEBUG_LINK_FLAGS}")
+endif()
 
 target_link_libraries(wsutil
 	PUBLIC
@@ -281,6 +290,17 @@ install(TARGETS wsutil
 	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+
+add_executable(test_wsutil EXCLUDE_FROM_ALL
+	test_wsutil.c
+)
+
+target_link_libraries(test_wsutil ${GLIB2_LIBRARIES} wsutil)
+
+set_target_properties(test_wsutil PROPERTIES
+	FOLDER "Tests"
+	EXCLUDE_FROM_DEFAULT_BUILD True
 )
 
 install(FILES ${WSUTIL_PUBLIC_HEADERS}

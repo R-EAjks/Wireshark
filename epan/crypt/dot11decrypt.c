@@ -16,6 +16,7 @@
 #include <wsutil/wsgcrypt.h>
 #include <wsutil/crc32.h>
 #include <wsutil/pint.h>
+#include <wsutil/glib-compat.h>
 
 #include <epan/proto.h> /* for DISSECTOR_ASSERT. */
 #include <epan/tvbuff.h>
@@ -199,6 +200,14 @@ static INT Dot11DecryptRsnaMicCheck(
     int akm)
     ;
 
+#if GCRYPT_VERSION_NUMBER >= 0x010600
+static gint
+Dot11DecryptFtMicCheck(
+    const PDOT11DECRYPT_ASSOC_PARSED assoc_parsed,
+    const guint8 *kck,
+    size_t kck_len);
+#endif
+
 static PDOT11DECRYPT_SEC_ASSOCIATION
 Dot11DecryptGetSa(
     PDOT11DECRYPT_CONTEXT ctx,
@@ -234,9 +243,11 @@ Dot11DecryptFtDerivePtk(
     const PDOT11DECRYPT_CONTEXT ctx,
     const DOT11DECRYPT_SEC_ASSOCIATION *sa,
     const PDOT11DECRYPT_KEY_ITEM key,
-    const PDOT11DECRYPT_EAPOL_PARSED eapol_parsed,
-    int akm,
-    int cipher,
+    const guint8 mdid[2],
+    const guint8 *snonce,
+    const guint8 *r0kh_id, size_t r0kh_id_len,
+    const guint8 *r1kh_id, size_t r1kh_id_len _U_,
+    int akm, int cipher,
     guint8 *ptk, size_t *ptk_len);
 
 /**
@@ -357,7 +368,7 @@ Dot11DecryptRc4KeyData(const guint8 *decryption_key, guint decryption_key_len,
         gcry_cipher_close(rc4_handle);
         return NULL;
     }
-    decrypted_key = (guint8 *)g_memdup(encrypted_keydata, encrypted_keydata_len);
+    decrypted_key = (guint8 *)g_memdup2(encrypted_keydata, encrypted_keydata_len);
     if (!decrypted_key) {
         gcry_cipher_close(rc4_handle);
         return NULL;
@@ -419,7 +430,7 @@ Dot11DecryptDecryptKeyData(PDOT11DECRYPT_CONTEXT ctx,
     memcpy(id.sta, sta, DOT11DECRYPT_MAC_LEN);
     sa = Dot11DecryptGetSa(ctx, &id);
     if (sa == NULL || !sa->validKey) {
-        DEBUG_PRINT_LINE("No valid SA for BSSID found", DEBUG_LEVEL_3);
+        ws_debug("No valid SA for BSSID found");
         return DOT11DECRYPT_RET_UNSUCCESS;
     }
 
@@ -463,9 +474,9 @@ Dot11DecryptDecryptKeyData(PDOT11DECRYPT_CONTEXT ctx,
     /* Encrypted key is in the information element field of the EAPOL key packet */
     key_data = eapol_parsed->key_data;
 
-    DEBUG_DUMP("Encrypted Broadcast key:", key_data, key_bytes_len);
-    DEBUG_DUMP("KeyIV:", eapol_parsed->key_iv, 16);
-    DEBUG_DUMP("decryption_key:", decryption_key, decryption_key_len);
+    DEBUG_DUMP("Encrypted Broadcast key", key_data, key_bytes_len, LOG_LEVEL_DEBUG);
+    DEBUG_DUMP("KeyIV", eapol_parsed->key_iv, 16, LOG_LEVEL_DEBUG);
+    DEBUG_DUMP("decryption_key", decryption_key, decryption_key_len, LOG_LEVEL_DEBUG);
 
     /* As we have no concept of the prior association request at this point, we need to deduce the     */
     /* group key cipher from the length of the key bytes. In WPA this is straightforward as the        */
@@ -488,7 +499,7 @@ Dot11DecryptDecryptKeyData(PDOT11DECRYPT_CONTEXT ctx,
         /* Build the full decryption key based on the IV and part of the pairwise key */
         memcpy(new_key, eapol_parsed->key_iv, 16);
         memcpy(new_key+16, decryption_key, 16);
-        DEBUG_DUMP("FullDecrKey:", new_key, 32);
+        DEBUG_DUMP("FullDecrKey", new_key, 32, LOG_LEVEL_DEBUG);
         data = Dot11DecryptRc4KeyData(new_key, 32, key_data, key_bytes_len);
         if (!data) {
             return DOT11DECRYPT_RET_UNSUCCESS;
@@ -563,7 +574,7 @@ Dot11DecryptAddSa(
     if (existing_sa != NULL) {
         sa = Dot11DecryptPrependSa(existing_sa, sa);
     } else {
-        void *key = g_memdup(id, sizeof(DOT11DECRYPT_SEC_ASSOCIATION_ID));
+        void *key = g_memdup2(id, sizeof(DOT11DECRYPT_SEC_ASSOCIATION_ID));
         g_hash_table_insert(ctx->sa_hash, key, sa);
     }
     return sa;
@@ -636,18 +647,18 @@ INT Dot11DecryptScanTdlsForKeys(
     const guint8 *initiator, *responder;
     guint8 action;
     guint status, offset_rsne = 0, offset_fte = 0, offset_link = 0, offset_timeout = 0;
-    DEBUG_PRINT_LINE("Authentication: TDLS Action Frame", DEBUG_LEVEL_3);
+    ws_debug("Authentication: TDLS Action Frame");
 
     /* TDLS payload contains a TDLS Action field (802.11-2016 9.6.13) */
 
     /* check if the packet is a TDLS response or confirm */
     if (tot_len_left < 1) {
-        DEBUG_PRINT_LINE("Not EAPOL-Key", DEBUG_LEVEL_3);
+        ws_debug("Not EAPOL-Key");
         return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
     }
     action = data[offset];
     if (action != 1 && action != 2) {
-        DEBUG_PRINT_LINE("Not Response nor confirm", DEBUG_LEVEL_3);
+        ws_debug("Not Response nor confirm");
         return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
     }
     offset++;
@@ -655,12 +666,12 @@ INT Dot11DecryptScanTdlsForKeys(
 
     /* Check for SUCCESS (0) or SUCCESS_POWER_SAVE_MODE (85) Status Code */
     if (tot_len_left < 5) {
-        DEBUG_PRINT_LINE("Not EAPOL-Key", DEBUG_LEVEL_3);
+        ws_debug("Not EAPOL-Key");
         return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
     }
     status=pntoh16(data + offset);
     if (status != 0 && status != 85) {
-        DEBUG_PRINT_LINE("TDLS setup not successful", DEBUG_LEVEL_3);
+        ws_debug("TDLS setup not successful");
         return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
     }
 
@@ -694,6 +705,7 @@ INT Dot11DecryptScanTdlsForKeys(
         }
 
         if (length < min_length || tot_len < offset + 2 + length) {
+            ws_debug("Invalid length reconds in IEs");
             return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
         }
         offset += 2 + length;
@@ -702,11 +714,11 @@ INT Dot11DecryptScanTdlsForKeys(
     if (offset_rsne == 0 || offset_fte == 0 ||
         offset_timeout == 0 || offset_link == 0)
     {
-        DEBUG_PRINT_LINE("Cannot Find all necessary IEs", DEBUG_LEVEL_3);
+        ws_debug("Cannot Find all necessary IEs");
         return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
     }
 
-    DEBUG_PRINT_LINE("Found RSNE/Fast BSS/Timeout Interval/Link IEs", DEBUG_LEVEL_3);
+    ws_debug("Found RSNE/Fast BSS/Timeout Interval/Link IEs");
 
     /* Will create a Security Association between 2 STA. Need to get both MAC address */
     initiator = &data[offset_link + 8];
@@ -735,6 +747,7 @@ INT Dot11DecryptScanTdlsForKeys(
     /* We are opening a new session with the same two STA (previous sa will be kept if any) */
     sa = Dot11DecryptNewSa(&id);
     if (sa == NULL) {
+        ws_warning("Failed to alloc new SA entry");
         return DOT11DECRYPT_RET_REQ_DATA;
     }
     if (Dot11DecryptTDLSDeriveKey(sa, data, offset_rsne, offset_fte,
@@ -749,25 +762,25 @@ INT Dot11DecryptScanTdlsForKeys(
 static INT
 Dot11DecryptCopyBroadcastKey(
     PDOT11DECRYPT_CONTEXT ctx,
-    const PDOT11DECRYPT_EAPOL_PARSED eapol_parsed,
+    const guint8 *gtk, size_t gtk_len,
     const DOT11DECRYPT_SEC_ASSOCIATION_ID *id)
 {
     DOT11DECRYPT_SEC_ASSOCIATION_ID broadcast_id;
     DOT11DECRYPT_SEC_ASSOCIATION *sa;
     DOT11DECRYPT_SEC_ASSOCIATION *broadcast_sa;
 
-    if (!eapol_parsed->gtk || eapol_parsed->gtk_len == 0) {
-        DEBUG_PRINT_LINE("No broadcast key found", DEBUG_LEVEL_3);
+    if (!gtk || gtk_len == 0) {
+        ws_debug("No broadcast key found");
         return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
     }
-    if (eapol_parsed->gtk_len > DOT11DECRYPT_WPA_PTK_MAX_LEN - 32) {
-        DEBUG_PRINT_LINE("Broadcast key too large", DEBUG_LEVEL_3);
+    if (gtk_len > DOT11DECRYPT_WPA_PTK_MAX_LEN - 32) {
+        ws_debug("Broadcast key too large");
         return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
     }
 
     sa = Dot11DecryptGetSa(ctx, id);
     if (sa == NULL) {
-        DEBUG_PRINT_LINE("No SA for BSSID found", DEBUG_LEVEL_3);
+        ws_debug("No SA for BSSID found");
         return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
     }
 
@@ -777,7 +790,7 @@ Dot11DecryptCopyBroadcastKey(
 
     broadcast_sa = Dot11DecryptNewSa(&broadcast_id);
     if (broadcast_sa == NULL) {
-        DEBUG_PRINT_LINE("Failed to alloc broadcast sa", DEBUG_LEVEL_3);
+        ws_warning("Failed to alloc broadcast sa");
         return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
     }
 
@@ -788,14 +801,14 @@ Dot11DecryptCopyBroadcastKey(
     broadcast_sa->wpa.cipher = sa->wpa.tmp_group_cipher;
     broadcast_sa->wpa.ptk_len = sa->wpa.ptk_len;
     broadcast_sa->validKey = TRUE;
-    DEBUG_DUMP("Broadcast key:", eapol_parsed->gtk, eapol_parsed->gtk_len);
+    DEBUG_DUMP("Broadcast key", gtk, gtk_len, LOG_LEVEL_DEBUG);
 
     /* Since this is a GTK and its size is only 32 bytes (vs. the 64 byte size of a PTK),
      * we fake it and put it in at a 32-byte offset so the Dot11DecryptRsnaMng() function
      * will extract the right piece of the GTK for decryption. (The first 16 bytes of the
      * GTK are used for decryption.) */
     memset(broadcast_sa->wpa.ptk, 0, sizeof(broadcast_sa->wpa.ptk));
-    memcpy(broadcast_sa->wpa.ptk + 32, eapol_parsed->gtk, eapol_parsed->gtk_len);
+    memcpy(broadcast_sa->wpa.ptk + 32, gtk, gtk_len);
     Dot11DecryptAddSa(ctx, &broadcast_id, broadcast_sa);
     return DOT11DECRYPT_RET_SUCCESS_HANDSHAKE;
 }
@@ -809,15 +822,14 @@ Dot11DecryptGroupHandshake(
 {
 
     if (GROUP_KEY_PAYLOAD_LEN_MIN > tot_len) {
-        DEBUG_PRINT_LINE("Message too short for Group Key", DEBUG_LEVEL_3);
+        ws_debug("Message too short for Group Key");
         return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
     }
     if (eapol_parsed->msg_type != DOT11DECRYPT_HS_MSG_TYPE_GHS_1){
-
-        DEBUG_PRINT_LINE("Not Group handshake message 1", DEBUG_LEVEL_3);
+        ws_warning("Not Group handshake message 1");
         return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
     }
-    return Dot11DecryptCopyBroadcastKey(ctx, eapol_parsed, id);
+    return Dot11DecryptCopyBroadcastKey(ctx, eapol_parsed->gtk, eapol_parsed->gtk_len, id);
 }
 
 INT Dot11DecryptScanEapolForKeys(
@@ -833,14 +845,14 @@ INT Dot11DecryptScanEapolForKeys(
     /* Callers provide these guarantees, so let's make them explicit. */
     DISSECTOR_ASSERT(tot_len <= DOT11DECRYPT_EAPOL_MAX_LEN);
 
-    DEBUG_PRINT_LINE("Authentication: EAPOL packet", DEBUG_LEVEL_3);
+    ws_debug("Authentication: EAPOL packet");
 
     /* check if the key descriptor type is valid (IEEE 802.1X-2004, pg. 27) */
     if (/*eapol_parsed->key_type != 0x1 &&*/ /* RC4 Key Descriptor Type (deprecated) */
         eapol_parsed->key_type != DOT11DECRYPT_RSN_WPA2_KEY_DESCRIPTOR &&  /* IEEE 802.11 Key Descriptor Type  (WPA2) */
         eapol_parsed->key_type != DOT11DECRYPT_RSN_WPA_KEY_DESCRIPTOR)     /* 254 = RSN_KEY_DESCRIPTOR - WPA,         */
     {
-        DEBUG_PRINT_LINE("Not valid key descriptor type", DEBUG_LEVEL_3);
+        ws_debug("Not valid key descriptor type");
         return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
     }
 
@@ -857,9 +869,11 @@ INT Dot11DecryptScanEapolForKeys(
                                                &id, tot_len);
         case DOT11DECRYPT_HS_MSG_TYPE_GHS_1:
             return Dot11DecryptGroupHandshake(ctx, eapol_parsed, &id, tot_len);
+        case DOT11DECRYPT_HS_MSG_TYPE_GHS_2:
+            break;
         case DOT11DECRYPT_HS_MSG_TYPE_INVALID:
         default:
-            DEBUG_PRINT_LINE("Invalid message type", DEBUG_LEVEL_3);
+            ws_warning("Invalid message type");
             break;
     }
     return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
@@ -964,38 +978,33 @@ INT Dot11DecryptDecryptPacket(
     DISSECTOR_ASSERT(decrypt_data);
     DISSECTOR_ASSERT(decrypt_len);
 
-#ifdef DOT11DECRYPT_DEBUG
-#define MSGBUF_LEN 255
-    CHAR msgbuf[MSGBUF_LEN];
-#endif
-
     if (decrypt_len) {
         *decrypt_len = 0;
     }
     if (ctx==NULL) {
-        DEBUG_PRINT_LINE("NULL context", DEBUG_LEVEL_5);
+        ws_warning("NULL context");
         return DOT11DECRYPT_RET_REQ_DATA;
     }
     if (data==NULL || tot_len==0) {
-        DEBUG_PRINT_LINE("NULL data or length=0", DEBUG_LEVEL_5);
+        ws_debug("NULL data or length=0");
         return DOT11DECRYPT_RET_REQ_DATA;
     }
 
     /* check correct packet size, to avoid wrong elaboration of encryption algorithms */
     if (tot_len < (UINT)(mac_header_len+DOT11DECRYPT_CRYPTED_DATA_MINLEN)) {
-        DEBUG_PRINT_LINE("minimum length violated", DEBUG_LEVEL_5);
+        ws_debug("minimum length violated");
         return DOT11DECRYPT_RET_WRONG_DATA_SIZE;
     }
 
     /* Assume that the decrypt_data field is no more than this size. */
     if (tot_len > DOT11DECRYPT_MAX_CAPLEN) {
-        DEBUG_PRINT_LINE("length too large", DEBUG_LEVEL_3);
+        ws_debug("length too large");
         return DOT11DECRYPT_RET_UNSUCCESS;
     }
 
     /* get STA/BSSID address */
     if (Dot11DecryptGetSaAddress((const DOT11DECRYPT_MAC_FRAME_ADDR4 *)(data), &id) != DOT11DECRYPT_RET_SUCCESS) {
-        DEBUG_PRINT_LINE("STA/BSSID not found", DEBUG_LEVEL_5);
+        ws_noisy("STA/BSSID not found");
         return DOT11DECRYPT_RET_REQ_DATA;
     }
 
@@ -1010,32 +1019,27 @@ INT Dot11DecryptDecryptPacket(
     memcpy(decrypt_data, data, *decrypt_len);
 
     /* encrypted data */
-    DEBUG_PRINT_LINE("Encrypted data", DEBUG_LEVEL_3);
+    ws_noisy("Encrypted data");
 
     /* check the Extension IV to distinguish between WEP encryption and WPA encryption */
     /* refer to IEEE 802.11i-2004, 8.2.1.2, pag.35 for WEP,    */
     /*          IEEE 802.11i-2004, 8.3.2.2, pag. 45 for TKIP,  */
     /*          IEEE 802.11i-2004, 8.3.3.2, pag. 57 for CCMP   */
     if (DOT11DECRYPT_EXTIV(data[mac_header_len + 3]) == 0) {
-        DEBUG_PRINT_LINE("WEP encryption", DEBUG_LEVEL_3);
+        ws_noisy("WEP encryption");
         return Dot11DecryptWepMng(ctx, decrypt_data, mac_header_len, decrypt_len, key, &id);
     } else {
-        DEBUG_PRINT_LINE("TKIP or CCMP encryption", DEBUG_LEVEL_3);
+        ws_noisy("TKIP or CCMP encryption");
 
         /* If the destination is a multicast address use the group key. This will not work if the AP is using
             more than one group key simultaneously.  I've not seen this in practice, however.
             Usually an AP will rotate between the two key index values of 1 and 2 whenever
             it needs to change the group key to be used. */
         if (((const DOT11DECRYPT_MAC_FRAME_ADDR4 *)(data))->addr1[0] & 0x01) {
-            DEBUG_PRINT_LINE("Broadcast/Multicast address. This is encrypted with a group key.", DEBUG_LEVEL_3);
+            ws_noisy("Broadcast/Multicast address. This is encrypted with a group key.");
 
             /* force STA address to broadcast MAC so we load the SA for the groupkey */
             memcpy(id.sta, broadcast_mac, DOT11DECRYPT_MAC_LEN);
-
-#ifdef DOT11DECRYPT_DEBUG
-            g_snprintf(msgbuf, MSGBUF_LEN, "ST_MAC: %2X.%2X.%2X.%2X.%2X.%2X\t", id.sta[0],id.sta[1],id.sta[2],id.sta[3],id.sta[4],id.sta[5]);
-            DEBUG_PRINT_LINE(msgbuf, DEBUG_LEVEL_3);
-#endif
         }
         /* search for a cached Security Association for current BSSID and STA/broadcast MAC */
         int ret = DOT11DECRYPT_RET_REQ_DATA;
@@ -1062,12 +1066,12 @@ INT Dot11DecryptSetKeys(
     INT success;
 
     if (ctx==NULL || keys==NULL) {
-        DEBUG_PRINT_LINE("NULL context or NULL keys array", DEBUG_LEVEL_3);
+        ws_warning("NULL context or NULL keys array");
         return 0;
     }
 
     if (keys_nr>DOT11DECRYPT_MAX_KEYS_NR) {
-        DEBUG_PRINT_LINE("Keys number greater than maximum", DEBUG_LEVEL_3);
+        ws_warning("Keys number greater than maximum");
         return 0;
     }
 
@@ -1078,19 +1082,9 @@ INT Dot11DecryptSetKeys(
     for (i=0, success=0; i<(INT)keys_nr; i++) {
         if (Dot11DecryptValidateKey(keys+i)==TRUE) {
             if (keys[i].KeyType==DOT11DECRYPT_KEY_TYPE_WPA_PWD) {
-                DEBUG_PRINT_LINE("Set a WPA-PWD key", DEBUG_LEVEL_4);
                 Dot11DecryptRsnaPwd2Psk(keys[i].UserPwd.Passphrase, keys[i].UserPwd.Ssid, keys[i].UserPwd.SsidLen, keys[i].KeyData.Wpa.Psk);
                 keys[i].KeyData.Wpa.PskLen = DOT11DECRYPT_WPA_PWD_PSK_LEN;
             }
-#ifdef DOT11DECRYPT_DEBUG
-            else if (keys[i].KeyType==DOT11DECRYPT_KEY_TYPE_WPA_PMK) {
-                DEBUG_PRINT_LINE("Set a WPA-PMK key", DEBUG_LEVEL_4);
-            } else if (keys[i].KeyType==DOT11DECRYPT_KEY_TYPE_WEP) {
-                DEBUG_PRINT_LINE("Set a WEP key", DEBUG_LEVEL_4);
-            } else {
-                DEBUG_PRINT_LINE("Set a key", DEBUG_LEVEL_4);
-            }
-#endif
             memcpy(&ctx->keys[success], &keys[i], sizeof(keys[i]));
             success++;
         }
@@ -1105,15 +1099,14 @@ Dot11DecryptCleanKeys(
     PDOT11DECRYPT_CONTEXT ctx)
 {
     if (ctx==NULL) {
-        DEBUG_PRINT_LINE("NULL context", DEBUG_LEVEL_5);
+        ws_warning("NULL context");
         return;
     }
 
     memset(ctx->keys, 0, sizeof(DOT11DECRYPT_KEY_ITEM) * DOT11DECRYPT_MAX_KEYS_NR);
 
     ctx->keys_nr=0;
-
-    DEBUG_PRINT_LINE("Keys collection cleaned!", DEBUG_LEVEL_5);
+    ws_debug("Keys collection cleaned!");
 }
 
 static void
@@ -1176,7 +1169,7 @@ INT Dot11DecryptInitContext(
     PDOT11DECRYPT_CONTEXT ctx)
 {
     if (ctx==NULL) {
-        DEBUG_PRINT_LINE("NULL context", DEBUG_LEVEL_5);
+        ws_warning("NULL context");
         return DOT11DECRYPT_RET_UNSUCCESS;
     }
 
@@ -1190,7 +1183,7 @@ INT Dot11DecryptInitContext(
         return DOT11DECRYPT_RET_UNSUCCESS;
     }
 
-    DEBUG_PRINT_LINE("Context initialized!", DEBUG_LEVEL_5);
+    ws_debug("Context initialized!");
     return DOT11DECRYPT_RET_SUCCESS;
 }
 
@@ -1198,14 +1191,14 @@ INT Dot11DecryptDestroyContext(
     PDOT11DECRYPT_CONTEXT ctx)
 {
     if (ctx==NULL) {
-        DEBUG_PRINT_LINE("NULL context", DEBUG_LEVEL_5);
+        ws_warning("NULL context");
         return DOT11DECRYPT_RET_UNSUCCESS;
     }
 
     Dot11DecryptCleanKeys(ctx);
     Dot11DecryptCleanSecAssoc(ctx);
 
-    DEBUG_PRINT_LINE("Context destroyed!", DEBUG_LEVEL_5);
+    ws_debug("Context destroyed!");
     return DOT11DECRYPT_RET_SUCCESS;
 }
 
@@ -1235,7 +1228,7 @@ Dot11DecryptRsnaMng(
     guint try_data_len = *decrypt_len;
 
     if (*decrypt_len == 0) {
-        DEBUG_PRINT_LINE("Invalid decryption length", DEBUG_LEVEL_3);
+        ws_debug("Invalid decryption length");
         return DOT11DECRYPT_RET_UNSUCCESS;
     }
 
@@ -1246,7 +1239,7 @@ Dot11DecryptRsnaMng(
     for(/* sa */; sa != NULL ;sa=sa->next) {
 
        if (sa->validKey==FALSE) {
-           DEBUG_PRINT_LINE("Key not yet valid", DEBUG_LEVEL_3);
+           ws_noisy("Key not yet valid");
            continue;
        }
 
@@ -1255,17 +1248,18 @@ Dot11DecryptRsnaMng(
 
        if (sa->wpa.key_ver==1) {
            /* CCMP -> HMAC-MD5 is the EAPOL-Key MIC, RC4 is the EAPOL-Key encryption algorithm */
-           DEBUG_PRINT_LINE("TKIP", DEBUG_LEVEL_3);
-           DEBUG_DUMP("ptk", sa->wpa.ptk, 64);
-           DEBUG_DUMP("ptk portion used", DOT11DECRYPT_GET_TK_TKIP(sa->wpa.ptk), 16);
+           ws_noisy("TKIP");
+           DEBUG_DUMP("ptk", sa->wpa.ptk, 64, LOG_LEVEL_NOISY);
+           DEBUG_DUMP("ptk portion used", DOT11DECRYPT_GET_TK_TKIP(sa->wpa.ptk),
+                      16, LOG_LEVEL_NOISY);
 
            if (*decrypt_len < (guint)mac_header_len) {
-               DEBUG_PRINT_LINE("Invalid decryption length", DEBUG_LEVEL_3);
+               ws_debug("Invalid decryption length");
                g_free(try_data);
                return DOT11DECRYPT_RET_UNSUCCESS;
            }
            if (*decrypt_len < DOT11DECRYPT_TKIP_MICLEN + DOT11DECRYPT_WEP_ICV) {
-               DEBUG_PRINT_LINE("Invalid decryption length", DEBUG_LEVEL_3);
+               ws_debug("Invalid decryption length");
                g_free(try_data);
                return DOT11DECRYPT_RET_UNSUCCESS;
            }
@@ -1274,19 +1268,19 @@ Dot11DecryptRsnaMng(
                                          try_data + DOT11DECRYPT_TA_OFFSET,
                                          DOT11DECRYPT_GET_TK_TKIP(sa->wpa.ptk));
            if (ret) {
-               DEBUG_PRINT_LINE("TKIP failed!", DEBUG_LEVEL_3);
+               ws_noisy("TKIP failed!");
                continue;
            }
 
-           DEBUG_PRINT_LINE("TKIP DECRYPTED!!!", DEBUG_LEVEL_3);
+           ws_noisy("TKIP DECRYPTED!!!");
            /* remove MIC and ICV from the end of packet */
            *decrypt_len -= DOT11DECRYPT_TKIP_MICLEN + DOT11DECRYPT_WEP_ICV;
            break;
        } else if (sa->wpa.cipher == 8 || sa->wpa.cipher == 9) {
-           DEBUG_PRINT_LINE("GCMP", DEBUG_LEVEL_3);
+           ws_noisy("GCMP");
 
            if (*decrypt_len < DOT11DECRYPT_GCMP_TRAILER) {
-               DEBUG_PRINT_LINE("Invalid decryption length", DEBUG_LEVEL_3);
+               ws_debug("Invalid decryption length");
                g_free(try_data);
                return DOT11DECRYPT_RET_UNSUCCESS;
            }
@@ -1296,17 +1290,17 @@ Dot11DecryptRsnaMng(
            if (ret) {
               continue;
            }
-           DEBUG_PRINT_LINE("GCMP DECRYPTED!!!", DEBUG_LEVEL_3);
+           ws_noisy("GCMP DECRYPTED!!!");
            /* remove MIC from the end of packet */
            *decrypt_len -= DOT11DECRYPT_GCMP_TRAILER;
            break;
        } else {
            /* AES-CCMP -> HMAC-SHA1-128 is the EAPOL-Key MIC, AES wep_key wrap is the EAPOL-Key encryption algorithm */
-           DEBUG_PRINT_LINE("CCMP", DEBUG_LEVEL_3);
+           ws_noisy("CCMP");
 
            guint trailer = sa->wpa.cipher != 10 ? DOT11DECRYPT_CCMP_TRAILER : DOT11DECRYPT_CCMP_256_TRAILER;
            if (*decrypt_len < trailer) {
-               DEBUG_PRINT_LINE("Invalid decryption length", DEBUG_LEVEL_3);
+               ws_debug("Invalid decryption length");
                g_free(try_data);
                return DOT11DECRYPT_RET_UNSUCCESS;
            }
@@ -1318,7 +1312,7 @@ Dot11DecryptRsnaMng(
            if (ret) {
               continue;
            }
-           DEBUG_PRINT_LINE("CCMP DECRYPTED!!!", DEBUG_LEVEL_3);
+           ws_noisy("CCMP DECRYPTED!!!");
            /* remove MIC from the end of packet */
            *decrypt_len -= trailer;
            break;
@@ -1333,7 +1327,7 @@ Dot11DecryptRsnaMng(
     }
 
     if (*decrypt_len > try_data_len || *decrypt_len < 8) {
-        DEBUG_PRINT_LINE("Invalid decryption length", DEBUG_LEVEL_3);
+        ws_debug("Invalid decryption length");
         g_free(try_data);
         return DOT11DECRYPT_RET_UNSUCCESS;
     }
@@ -1345,7 +1339,7 @@ Dot11DecryptRsnaMng(
     *decrypt_len-=8;
 
     if (*decrypt_len < mac_header_len) {
-        DEBUG_PRINT_LINE("Invalid decryption length < mac_header_len", DEBUG_LEVEL_3);
+        ws_debug("Invalid decryption length < mac_header_len");
         g_free(try_data);
         return DOT11DECRYPT_RET_UNSUCCESS;
     }
@@ -1397,17 +1391,17 @@ Dot11DecryptWepMng(
             tmp_key=&ctx->keys[key_index];
         } else {
             if (sa->key!=NULL && sa->key->KeyType==DOT11DECRYPT_KEY_TYPE_WEP) {
-                DEBUG_PRINT_LINE("Try cached WEP key...", DEBUG_LEVEL_3);
+                ws_noisy("Try cached WEP key...");
                 tmp_key=sa->key;
             } else {
-                DEBUG_PRINT_LINE("Cached key is not valid, try another WEP key...", DEBUG_LEVEL_3);
+                ws_noisy("Cached key is not valid, try another WEP key...");
                 tmp_key=&ctx->keys[key_index];
             }
         }
 
         /* obviously, try only WEP keys... */
         if (tmp_key->KeyType==DOT11DECRYPT_KEY_TYPE_WEP) {
-            DEBUG_PRINT_LINE("Try WEP key...", DEBUG_LEVEL_3);
+            ws_noisy("Try WEP key...");
 
             memset(wep_key, 0, sizeof(wep_key));
             memcpy(try_data, decrypt_data, *decrypt_len);
@@ -1433,7 +1427,7 @@ Dot11DecryptWepMng(
             if (sa == NULL) {
                 sa = Dot11DecryptNewSa(id);
                 if (sa == NULL) {
-                    DEBUG_PRINT_LINE("Failed to alloc sa for WEP", DEBUG_LEVEL_3);
+                    ws_warning("Failed to alloc sa for WEP");
                     ret_value = DOT11DECRYPT_RET_UNSUCCESS;
                     break;
                 }
@@ -1461,13 +1455,13 @@ Dot11DecryptWepMng(
     if (ret_value)
         return DOT11DECRYPT_RET_UNSUCCESS;
 
-    DEBUG_PRINT_LINE("WEP DECRYPTED!!!", DEBUG_LEVEL_3);
+    ws_noisy("WEP DECRYPTED!!!");
 
     /* remove ICV (4bytes) from the end of packet */
     *decrypt_len-=4;
 
     if (*decrypt_len < 4) {
-        DEBUG_PRINT_LINE("Decryption length too short", DEBUG_LEVEL_3);
+        ws_debug("Decryption length too short");
         return DOT11DECRYPT_RET_UNSUCCESS;
     }
 
@@ -1593,7 +1587,7 @@ Dot11DecryptRsna4WHandshake(
     if (eapol_parsed->len > DOT11DECRYPT_EAPOL_MAX_LEN ||
         eapol_parsed->key_len > DOT11DECRYPT_EAPOL_MAX_LEN ||
         eapol_parsed->key_data_len > DOT11DECRYPT_EAPOL_MAX_LEN) {
-        DEBUG_PRINT_LINE("Too large EAPOL frame and/or key data", DEBUG_LEVEL_5);
+        ws_debug("Too large EAPOL frame and/or key data");
         return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
     }
 
@@ -1603,13 +1597,13 @@ Dot11DecryptRsna4WHandshake(
 
     /* TODO considera Deauthentications */
 
-    DEBUG_PRINT_LINE("4-way handshake...", DEBUG_LEVEL_5);
+    ws_debug("4-way handshake...");
 
     /* manage 4-way handshake packets; this step completes the 802.1X authentication process (IEEE 802.11i-2004, pag. 85) */
 
     /* message 1: Authenticator->Supplicant (Sec=0, Mic=0, Ack=1, Inst=0, Key=1(pairwise), KeyRSC=0, Nonce=ANonce, MIC=0) */
     if (eapol_parsed->msg_type == DOT11DECRYPT_HS_MSG_TYPE_4WHS_1) {
-        DEBUG_PRINT_LINE("4-way handshake message 1", DEBUG_LEVEL_3);
+        ws_debug("4-way handshake message 1");
 
         /* On reception of Message 1, the Supplicant determines whether the Key Replay Counter field value has been        */
         /* used before with the current PMKSA. If the Key Replay Counter field value is less than or equal to the current  */
@@ -1618,7 +1612,7 @@ Dot11DecryptRsna4WHandshake(
 
         /* save ANonce (from authenticator) to derive the PTK with the SNonce (from the 2 message) */
         if (!eapol_parsed->nonce) {
-            DEBUG_PRINT_LINE("ANonce missing", DEBUG_LEVEL_5);
+            ws_debug("ANonce missing");
             return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
         }
 
@@ -1627,7 +1621,7 @@ Dot11DecryptRsna4WHandshake(
             /* Either no SA exists or one exists but we're reauthenticating */
             sa = Dot11DecryptNewSa(id);
             if (sa == NULL) {
-                DEBUG_PRINT_LINE("Failed to alloc broadcast sa", DEBUG_LEVEL_3);
+                ws_warning("Failed to alloc broadcast sa");
                 return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
             }
             sa = Dot11DecryptAddSa(ctx, id, sa);
@@ -1642,7 +1636,7 @@ Dot11DecryptRsna4WHandshake(
 
     /* message 2|4: Supplicant->Authenticator (Sec=0|1, Mic=1, Ack=0, Inst=0, Key=1(pairwise), KeyRSC=0, Nonce=SNonce|0, MIC=MIC(KCK,EAPOL)) */
     if (eapol_parsed->msg_type == DOT11DECRYPT_HS_MSG_TYPE_4WHS_2) {
-        DEBUG_PRINT_LINE("4-way handshake message 2", DEBUG_LEVEL_3);
+        ws_debug("4-way handshake message 2");
 
         /* On reception of Message 2, the Authenticator checks that the key replay counter corresponds to the */
         /* outstanding Message 1. If not, it silently discards the message.                                   */
@@ -1652,11 +1646,11 @@ Dot11DecryptRsna4WHandshake(
 
         sa = Dot11DecryptGetSa(ctx, id);
         if (sa == NULL) {
-            DEBUG_PRINT_LINE("No SA for BSSID found", DEBUG_LEVEL_3);
+            ws_debug("No SA for BSSID found");
             return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
         }
         if (!eapol_parsed->nonce) {
-            DEBUG_PRINT_LINE("SNonce missing", DEBUG_LEVEL_5);
+            ws_debug("SNonce missing");
             return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
         }
         if (sa->key != NULL) {
@@ -1673,12 +1667,12 @@ Dot11DecryptRsna4WHandshake(
         for (key_index=0; key_index<(INT)ctx->keys_nr || useCache; key_index++) {
             /* use the cached one, or try all keys */
             if (useCache && Dot11DecryptIsWpaKeyType(sa->key->KeyType)) {
-                DEBUG_PRINT_LINE("Try cached WPA key...", DEBUG_LEVEL_3);
+                ws_debug("Try cached WPA key...");
                 tmp_key = sa->key;
                 /* Step back loop counter as cached key is used instead */
                 key_index--;
             } else {
-                DEBUG_PRINT_LINE("Try WPA key...", DEBUG_LEVEL_3);
+                ws_debug("Try WPA key...");
                 tmp_key = &ctx->keys[key_index];
             }
             useCache = FALSE;
@@ -1716,7 +1710,7 @@ Dot11DecryptRsna4WHandshake(
                 cipher = 2;
                 group_cipher = 2;
             } else {
-                DEBUG_PRINT_LINE("EAPOL key_version not supported", DEBUG_LEVEL_3);
+                ws_info("EAPOL key_version not supported");
                 return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
             }
 
@@ -1727,7 +1721,13 @@ Dot11DecryptRsna4WHandshake(
             }
 
             if (Dot11DecryptIsFtAkm(akm)) {
-                ret = Dot11DecryptFtDerivePtk(ctx, sa, tmp_pkt_key, eapol_parsed,
+                ret = Dot11DecryptFtDerivePtk(ctx, sa, tmp_pkt_key,
+                                              eapol_parsed->mdid,
+                                              eapol_parsed->nonce,
+                                              eapol_parsed->fte.r0kh_id,
+                                              eapol_parsed->fte.r0kh_id_len,
+                                              eapol_parsed->fte.r1kh_id,
+                                              eapol_parsed->fte.r1kh_id_len,
                                               akm, cipher, ptk, &ptk_len);
             } else {
                 /* derive the PTK from the BSSID, STA MAC, PMK, SNonce, ANonce */
@@ -1742,7 +1742,8 @@ Dot11DecryptRsna4WHandshake(
                 /* Unsuccessful PTK derivation */
                 continue;
             }
-            DEBUG_DUMP("TK", DOT11DECRYPT_GET_TK(ptk, akm), Dot11DecryptGetTkLen(cipher) / 8);
+            DEBUG_DUMP("TK", DOT11DECRYPT_GET_TK(ptk, akm), Dot11DecryptGetTkLen(cipher) / 8,
+                       LOG_LEVEL_DEBUG);
 
             ret = Dot11DecryptRsnaMicCheck(eapol_parsed,
                                            eapol, /* eapol frame (header also) */
@@ -1764,7 +1765,7 @@ Dot11DecryptRsna4WHandshake(
         }
 
         if (ret) {
-            DEBUG_PRINT_LINE("handshake step failed", DEBUG_LEVEL_3);
+            ws_debug("handshake step failed");
             return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
         }
         sa->wpa.key_ver = eapol_parsed->key_version;
@@ -1781,7 +1782,7 @@ Dot11DecryptRsna4WHandshake(
 
     /* message 3: Authenticator->Supplicant (Sec=1, Mic=1, Ack=1, Inst=0/1, Key=1(pairwise), KeyRSC=???, Nonce=ANonce, MIC=1) */
     if (eapol_parsed->msg_type == DOT11DECRYPT_HS_MSG_TYPE_4WHS_3) {
-        DEBUG_PRINT_LINE("4-way handshake message 3", DEBUG_LEVEL_3);
+        ws_debug("4-way handshake message 3");
 
         /* On reception of Message 3, the Supplicant silently discards the message if the Key Replay Counter field     */
         /* value has already been used or if the ANonce value in Message 3 differs from the ANonce value in Message 1. */
@@ -1792,7 +1793,7 @@ Dot11DecryptRsna4WHandshake(
         /* If using WPA2 PSK, message 3 will contain an RSN for the group key (GTK KDE).
            In order to properly support decrypting WPA2-PSK packets, we need to parse this to get the group key. */
         if (eapol_parsed->key_type == DOT11DECRYPT_RSN_WPA2_KEY_DESCRIPTOR) {
-            return Dot11DecryptCopyBroadcastKey(ctx, eapol_parsed, id);
+            return Dot11DecryptCopyBroadcastKey(ctx, eapol_parsed->gtk, eapol_parsed->gtk_len, id);
        }
     }
 
@@ -1806,11 +1807,185 @@ Dot11DecryptRsna4WHandshake(
         /* If the calculated MIC does not match the MIC that the Supplicant included in the EAPOL-Key frame, the */
         /* Authenticator silently discards Message 4.                                                            */
 
-        DEBUG_PRINT_LINE("4-way handshake message 4", DEBUG_LEVEL_3);
+        ws_debug("4-way handshake message 4");
         return DOT11DECRYPT_RET_SUCCESS_HANDSHAKE;
     }
     return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
 }
+
+/* Refer to IEEE 802.11-2016 Chapeter 13.8 FT authentication sequence */
+#if GCRYPT_VERSION_NUMBER >= 0x010600
+gint
+Dot11DecryptScanFtAssocForKeys(
+    const PDOT11DECRYPT_CONTEXT ctx,
+    const PDOT11DECRYPT_ASSOC_PARSED assoc_parsed,
+    guint8 *decrypted_gtk, size_t *decrypted_len,
+    DOT11DECRYPT_KEY_ITEM* used_key)
+{
+    DOT11DECRYPT_SEC_ASSOCIATION_ID id;
+
+    ws_debug("(Re)Association packet");
+
+    if (!ctx || !assoc_parsed) {
+        ws_warning("Invalid input parameters");
+        return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
+    }
+    if (!Dot11DecryptIsFtAkm(assoc_parsed->akm)) {
+        return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
+    }
+    if (!assoc_parsed->fte.anonce || !assoc_parsed->fte.snonce) {
+        ws_debug("ANonce or SNonce missing");
+        return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
+    }
+
+    switch (assoc_parsed->frame_subtype) {
+        case DOT11DECRYPT_SUBTYPE_ASSOC_REQ:
+        case DOT11DECRYPT_SUBTYPE_REASSOC_REQ:
+            memcpy(id.sta, assoc_parsed->sa, DOT11DECRYPT_MAC_LEN);
+            break;
+        case DOT11DECRYPT_SUBTYPE_ASSOC_RESP:
+        case DOT11DECRYPT_SUBTYPE_REASSOC_RESP:
+            memcpy(id.sta, assoc_parsed->da, DOT11DECRYPT_MAC_LEN);
+            break;
+        default:
+            ws_warning("Invalid frame subtype");
+            return DOT11DECRYPT_RET_UNSUCCESS;
+    }
+    memcpy(id.bssid, assoc_parsed->bssid, DOT11DECRYPT_MAC_LEN);
+
+    DOT11DECRYPT_KEY_ITEM *tmp_key, *tmp_pkt_key, pkt_key;
+    DOT11DECRYPT_SEC_ASSOCIATION *sa;
+    size_t key_index;
+    guint ret = 1;
+    gboolean useCache = FALSE;
+
+    sa = Dot11DecryptNewSa(&id);
+    if (sa == NULL) {
+        ws_warning("Failed to alloc sa");
+        return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
+    }
+
+    memcpy(sa->wpa.nonce, assoc_parsed->fte.anonce, 32);
+
+    if (sa->key != NULL) {
+        useCache = TRUE;
+    }
+
+    guint8 ptk[DOT11DECRYPT_WPA_PTK_MAX_LEN];
+    size_t ptk_len;
+
+    /* now you can derive the PTK */
+    for (key_index = 0; key_index < ctx->keys_nr || useCache; key_index++) {
+        /* use the cached one, or try all keys */
+        if (useCache && Dot11DecryptIsWpaKeyType(sa->key->KeyType)) {
+            ws_debug("Try cached WPA key...");
+            tmp_key = sa->key;
+            /* Step back loop counter as cached key is used instead */
+            key_index--;
+        } else {
+            ws_debug("Try WPA key...");
+            tmp_key = &ctx->keys[key_index];
+        }
+        useCache = FALSE;
+
+        /* Try only WPA keys... */
+        if (!Dot11DecryptIsWpaKeyType(tmp_key->KeyType)) {
+            continue;
+        }
+        if (tmp_key->KeyType == DOT11DECRYPT_KEY_TYPE_WPA_PWD &&
+            Dot11DecryptIsPwdWildcardSsid(ctx, tmp_key))
+        {
+            /* We have a "wildcard" SSID.  Use the one from the packet. */
+            memcpy(&pkt_key, tmp_key, sizeof(pkt_key));
+            memcpy(&pkt_key.UserPwd.Ssid, ctx->pkt_ssid, ctx->pkt_ssid_len);
+            pkt_key.UserPwd.SsidLen = ctx->pkt_ssid_len;
+            Dot11DecryptRsnaPwd2Psk(pkt_key.UserPwd.Passphrase, pkt_key.UserPwd.Ssid,
+                pkt_key.UserPwd.SsidLen, pkt_key.KeyData.Wpa.Psk);
+            tmp_pkt_key = &pkt_key;
+        } else {
+            tmp_pkt_key = tmp_key;
+        }
+
+        if (tmp_pkt_key->KeyType == DOT11DECRYPT_KEY_TYPE_MSK) {
+            Dot11DecryptDerivePmkFromMsk(tmp_pkt_key->Msk.Msk, tmp_pkt_key->Msk.Len,
+                                         assoc_parsed->akm,
+                                         tmp_pkt_key->KeyData.Wpa.Psk,
+                                         &tmp_pkt_key->KeyData.Wpa.PskLen);
+        }
+
+        ret = Dot11DecryptFtDerivePtk(ctx, sa, tmp_pkt_key,
+                                      assoc_parsed->mdid,
+                                      assoc_parsed->fte.snonce,
+                                      assoc_parsed->fte.r0kh_id,
+                                      assoc_parsed->fte.r0kh_id_len,
+                                      assoc_parsed->fte.r1kh_id,
+                                      assoc_parsed->fte.r1kh_id_len,
+                                      assoc_parsed->akm, assoc_parsed->cipher,
+                                      ptk, &ptk_len);
+        if (ret != DOT11DECRYPT_RET_SUCCESS) {
+            continue;
+        }
+        DEBUG_DUMP("TK", DOT11DECRYPT_GET_TK(ptk, assoc_parsed->akm),
+                   Dot11DecryptGetTkLen(assoc_parsed->cipher) / 8,
+                   LOG_LEVEL_DEBUG);
+
+        ret = Dot11DecryptFtMicCheck(assoc_parsed,
+                                     DOT11DECRYPT_GET_KCK(ptk, assoc_parsed->akm),
+                                     Dot11DecryptGetKckLen(assoc_parsed->akm) / 8);
+        if (ret == DOT11DECRYPT_RET_SUCCESS) {
+            /* the key is the correct one, cache it in the Security Association */
+            sa->key = tmp_key;
+            break;
+        }
+    }
+
+    if (ret) {
+        ws_debug("handshake step failed");
+        g_free(sa);
+        return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
+    }
+    sa = Dot11DecryptAddSa(ctx, &id, sa);
+
+    sa->wpa.key_ver = 0; /* Determine key type from akms and cipher*/
+    sa->wpa.akm = assoc_parsed->akm;
+    sa->wpa.cipher = assoc_parsed->cipher;
+    sa->wpa.tmp_group_cipher = assoc_parsed->group_cipher;
+    memcpy(sa->wpa.ptk, ptk, ptk_len);
+    sa->wpa.ptk_len = (INT)ptk_len;
+    sa->validKey = TRUE;
+
+    if (assoc_parsed->gtk && assoc_parsed->gtk_len - 8 <= DOT11DECRYPT_WPA_PTK_MAX_LEN - 32) {
+        guint8 decrypted_key[DOT11DECRYPT_WPA_PTK_MAX_LEN - 32];
+        guint16 decrypted_key_len;
+        if (AES_unwrap(DOT11DECRYPT_GET_KEK(sa->wpa.ptk, sa->wpa.akm),
+                       Dot11DecryptGetKekLen(sa->wpa.akm) / 8,
+                       assoc_parsed->gtk, assoc_parsed->gtk_len,
+                       decrypted_key, &decrypted_key_len)) {
+            return DOT11DECRYPT_RET_UNSUCCESS;
+        }
+        if (decrypted_key_len != assoc_parsed->gtk_subelem_key_len) {
+            ws_debug("Unexpected GTK length");
+            return DOT11DECRYPT_RET_UNSUCCESS;
+        }
+        Dot11DecryptCopyBroadcastKey(ctx, decrypted_key, decrypted_key_len, &id);
+        *decrypted_len = decrypted_key_len;
+        memcpy(decrypted_gtk, decrypted_key, decrypted_key_len);
+    }
+    Dot11DecryptCopyKey(sa, used_key);
+    return DOT11DECRYPT_RET_SUCCESS_HANDSHAKE;
+}
+#else
+gint
+Dot11DecryptScanFtAssocForKeys(
+    const PDOT11DECRYPT_CONTEXT ctx _U_,
+    const PDOT11DECRYPT_ASSOC_PARSED assoc_parsed _U_,
+    guint8 *decrypted_gtk _U_, size_t *decrypted_len _U_,
+    DOT11DECRYPT_KEY_ITEM* used_item _U_)
+{
+    ws_info("Skipped Dot11DecryptScanFtAssocForKeys, libgcrypt >= 1.6");
+    return DOT11DECRYPT_RET_UNSUCCESS;
+}
+#endif
 
 /* From IEEE 802.11-2016 Table 12-8 Integrity and key-wrap algorithms */
 static int
@@ -1872,7 +2047,7 @@ Dot11DecryptRsnaMicCheck(
     gboolean hmac = TRUE;
 
     if (!mic || mic_len > DOT11DECRYPT_WPA_MICKEY_MAX_LEN) {
-        DEBUG_PRINT_LINE("Not a valid mic", DEBUG_LEVEL_3);
+        ws_debug("Not a valid mic");
         return DOT11DECRYPT_RET_UNSUCCESS;
     }
 
@@ -1890,27 +2065,124 @@ Dot11DecryptRsnaMicCheck(
     } else {
         /* Mic check algoritm determined by AKM type */
         if (Dot11DecryptGetIntegrityAlgoFromAkm(akm, &algo, &hmac)) {
-            DEBUG_PRINT_LINE("Unknown Mic check algo", DEBUG_LEVEL_3);
+            ws_warning("Unknown Mic check algo");
             return DOT11DECRYPT_RET_UNSUCCESS;
         };
     }
     if (hmac) {
         if (ws_hmac_buffer(algo, c_mic, eapol, eapol_len, KCK, kck_len)) {
-            DEBUG_PRINT_LINE("HMAC_BUFFER", DEBUG_LEVEL_3);
+            ws_debug("HMAC_BUFFER");
             return DOT11DECRYPT_RET_UNSUCCESS;
         }
     } else {
         if (ws_cmac_buffer(algo, c_mic, eapol, eapol_len, KCK, kck_len)) {
-            DEBUG_PRINT_LINE("HMAC_BUFFER", DEBUG_LEVEL_3);
+            ws_debug("HMAC_BUFFER");
             return DOT11DECRYPT_RET_UNSUCCESS;
         }
     }
 
     /* compare calculated MIC with the Key MIC and return result (0 means success) */
-    DEBUG_DUMP("mic",  mic, mic_len);
-    DEBUG_DUMP("c_mic", c_mic, mic_len);
+    DEBUG_DUMP("mic",  mic, mic_len, LOG_LEVEL_DEBUG);
+    DEBUG_DUMP("c_mic", c_mic, mic_len, LOG_LEVEL_DEBUG);
     return memcmp(mic, c_mic, mic_len);
 }
+
+/* IEEE 802.11-2016 Chapter 13.8.4 FT authentication sequence: contents of third message
+ * IEEE 802.11-2016 Chapter 13.8.5 FT authentication sequence: contents of fourth message
+ * The MIC shall be calculated on the concatenation of the following data, in the order given here:
+ * —
+ * — FTO’s MAC address (6 octets)
+ * — Target AP’s MAC address (6 octets)
+ * If third message:
+ * — Transaction sequence number (1 octet), which shall be set to the value 5 if this is a
+ *   Reassociation Request frame and, otherwise, set to the value 3
+ * If fourth message:
+ * — Transaction sequence number (1 octet), which shall be set to the value 6 if this is a
+ *   Reassociation Response frame or, otherwise, set to the value 4
+ *
+ * — RSNE
+ * — MDE
+ * — FTE, with the MIC field of the FTE set to 0
+ * — Contents of the RIC-Response (if present)
+ */
+#if GCRYPT_VERSION_NUMBER >= 0x010600
+static gint
+Dot11DecryptFtMicCheck(
+    const PDOT11DECRYPT_ASSOC_PARSED assoc_parsed,
+    const guint8 *kck,
+    size_t kck_len)
+{
+    guint8 *sta;
+    guint8 seq_num;
+    guint8 fte_len;
+    guint16 mic_len;
+    guint8 zeros[16] = { 0 };
+    gcry_mac_hd_t handle;
+
+    fte_len = assoc_parsed->fte_tag[1] + 2;
+    if (fte_len < 20) {
+        ws_debug("FTE too short");
+        return DOT11DECRYPT_RET_UNSUCCESS;
+    }
+
+    switch (assoc_parsed->frame_subtype) {
+        case DOT11DECRYPT_SUBTYPE_ASSOC_REQ:
+            sta = assoc_parsed->sa;
+            seq_num = 3;
+            break;
+        case DOT11DECRYPT_SUBTYPE_ASSOC_RESP:
+            sta = assoc_parsed->da;
+            seq_num = 4;
+            break;
+        case DOT11DECRYPT_SUBTYPE_REASSOC_REQ:
+            sta = assoc_parsed->sa;
+            seq_num = 5;
+            break;
+        case DOT11DECRYPT_SUBTYPE_REASSOC_RESP:
+            sta = assoc_parsed->da;
+            seq_num = 6;
+            break;
+        default:
+            return DOT11DECRYPT_RET_UNSUCCESS;
+    }
+
+    if (gcry_mac_open(&handle, GCRY_MAC_CMAC_AES, 0, NULL)) {
+        ws_warning("gcry_mac_open failed");
+        return DOT11DECRYPT_RET_UNSUCCESS;
+    }
+    if (gcry_mac_setkey(handle, kck, kck_len)) {
+        ws_warning("gcry_mac_setkey failed");
+        gcry_mac_close(handle);
+        return DOT11DECRYPT_RET_UNSUCCESS;
+    }
+    gcry_mac_write(handle, sta, DOT11DECRYPT_MAC_LEN);
+    gcry_mac_write(handle, assoc_parsed->bssid, DOT11DECRYPT_MAC_LEN);
+
+    gcry_mac_write(handle, &seq_num, 1);
+
+    gcry_mac_write(handle, assoc_parsed->rsne_tag, assoc_parsed->rsne_tag[1] + 2);
+    gcry_mac_write(handle, assoc_parsed->mde_tag, assoc_parsed->mde_tag[1] + 2);
+
+    mic_len = assoc_parsed->fte.mic_len;
+    gcry_mac_write(handle, assoc_parsed->fte_tag, 4);
+    gcry_mac_write(handle, zeros, mic_len); /* MIC zeroed */
+    gcry_mac_write(handle, assoc_parsed->fte_tag + 4 + mic_len, fte_len - 4 - mic_len);
+
+    if (assoc_parsed->rde_tag) {
+        gcry_mac_write(handle, assoc_parsed->rde_tag, assoc_parsed->rde_tag[1] + 2);
+    }
+
+    if (gcry_mac_verify(handle, assoc_parsed->fte.mic, mic_len) != 0) {
+        DEBUG_DUMP("MIC", assoc_parsed->fte.mic, mic_len, LOG_LEVEL_DEBUG);
+        ws_debug("MIC verification failed");
+        gcry_mac_close(handle);
+        return DOT11DECRYPT_RET_UNSUCCESS;
+    }
+    DEBUG_DUMP("MIC", assoc_parsed->fte.mic, mic_len, LOG_LEVEL_DEBUG);
+    gcry_mac_close(handle);
+    return DOT11DECRYPT_RET_SUCCESS;
+}
+#endif
 
 static INT
 Dot11DecryptValidateKey(
@@ -1920,7 +2192,7 @@ Dot11DecryptValidateKey(
     UCHAR ret=TRUE;
 
     if (key==NULL) {
-        DEBUG_PRINT_LINE("NULL key", DEBUG_LEVEL_5);
+        ws_warning("NULL key");
         return FALSE;
     }
 
@@ -1929,7 +2201,7 @@ Dot11DecryptValidateKey(
             /* check key size limits */
             len=key->KeyData.Wep.WepKeyLen;
             if (len<DOT11DECRYPT_WEP_KEY_MINLEN || len>DOT11DECRYPT_WEP_KEY_MAXLEN) {
-                DEBUG_PRINT_LINE("WEP key: key length not accepted", DEBUG_LEVEL_5);
+                ws_info("WEP key: key length not accepted");
                 ret=FALSE;
             }
             break;
@@ -1950,13 +2222,13 @@ Dot11DecryptValidateKey(
             /* check passphrase and SSID size limits */
             len=strlen(key->UserPwd.Passphrase);
             if (len<DOT11DECRYPT_WPA_PASSPHRASE_MIN_LEN || len>DOT11DECRYPT_WPA_PASSPHRASE_MAX_LEN) {
-                DEBUG_PRINT_LINE("WPA-PWD key: passphrase length not accepted", DEBUG_LEVEL_5);
+                ws_info("WPA-PWD key: passphrase length not accepted");
                 ret=FALSE;
             }
 
             len=key->UserPwd.SsidLen;
             if (len>DOT11DECRYPT_WPA_SSID_MAX_LEN) {
-                DEBUG_PRINT_LINE("WPA-PWD key: ssid length not accepted", DEBUG_LEVEL_5);
+                ws_info("WPA-PWD key: ssid length not accepted");
                 ret=FALSE;
             }
 
@@ -1982,11 +2254,6 @@ Dot11DecryptGetSaAddress(
     const DOT11DECRYPT_MAC_FRAME_ADDR4 *frame,
     DOT11DECRYPT_SEC_ASSOCIATION_ID *id)
 {
-#ifdef DOT11DECRYPT_DEBUG
-#define MSGBUF_LEN 255
-    CHAR msgbuf[MSGBUF_LEN];
-#endif
-
     if ((DOT11DECRYPT_TYPE(frame->fc[0])==DOT11DECRYPT_TYPE_DATA) &&
         (DOT11DECRYPT_DS_BITS(frame->fc[1]) == 0) &&
         (memcmp(frame->addr2, frame->addr3, DOT11DECRYPT_MAC_LEN) != 0) &&
@@ -2016,15 +2283,10 @@ Dot11DecryptGetSaAddress(
             return DOT11DECRYPT_RET_UNSUCCESS;
         }
     }
-
-#ifdef DOT11DECRYPT_DEBUG
-    g_snprintf(msgbuf, MSGBUF_LEN, "BSSID_MAC: %02X.%02X.%02X.%02X.%02X.%02X\t",
-               id->bssid[0],id->bssid[1],id->bssid[2],id->bssid[3],id->bssid[4],id->bssid[5]);
-    DEBUG_PRINT_LINE(msgbuf, DEBUG_LEVEL_3);
-    g_snprintf(msgbuf, MSGBUF_LEN, "STA_MAC: %02X.%02X.%02X.%02X.%02X.%02X\t",
-               id->sta[0],id->sta[1],id->sta[2],id->sta[3],id->sta[4],id->sta[5]);
-    DEBUG_PRINT_LINE(msgbuf, DEBUG_LEVEL_3);
-#endif
+    ws_noisy("BSSID_MAC: %02X.%02X.%02X.%02X.%02X.%02X\t",
+             id->bssid[0],id->bssid[1],id->bssid[2],id->bssid[3],id->bssid[4],id->bssid[5]);
+    ws_noisy("STA_MAC: %02X.%02X.%02X.%02X.%02X.%02X\t",
+             id->sta[0],id->sta[1],id->sta[2],id->sta[3],id->sta[4],id->sta[5]);
 
     return DOT11DECRYPT_RET_SUCCESS;
 }
@@ -2107,7 +2369,7 @@ static int Dot11DecryptGetTkLen(int cipher)
         case 12: return 256; /* BIP-GMAC-256 */
         case 13: return 256; /* BIP-CMAC-256 */
         default:
-            DEBUG_PRINT_LINE("Unknown cipher", DEBUG_LEVEL_3);
+            ws_warning("Unknown cipher");
             return -1;
     }
 }
@@ -2130,7 +2392,7 @@ static int Dot11DecryptGetKckLen(int akm)
         case 18: return 128;
         default:
             /* Unknown / Not supported */
-            DEBUG_PRINT_LINE("Unknown akm", DEBUG_LEVEL_3);
+            ws_warning("Unknown akm");
             return -1;
     }
 }
@@ -2153,7 +2415,7 @@ static int Dot11DecryptGetKekLen(int akm)
         case 18: return 128;
         default:
             /* Unknown / Not supported */
-            DEBUG_PRINT_LINE("Unknown akm", DEBUG_LEVEL_3);
+            ws_warning("Unknown akm");
             return -1;
     }
 }
@@ -2167,7 +2429,7 @@ static int Dot11DecryptGetPtkLen(int akm, int cipher)
     int tk_len = Dot11DecryptGetTkLen(cipher);
 
     if (kck_len == -1 || kek_len == -1 || tk_len == -1) {
-        DEBUG_PRINT_LINE("Invalid PTK len", DEBUG_LEVEL_3);
+        ws_warning("Invalid PTK len");
         return -1;
     }
     return kck_len + kek_len + tk_len;
@@ -2254,16 +2516,12 @@ Dot11DecryptDerivePtk(
     int cipher,
     guint8 *ptk, size_t *ptk_len)
 {
-#ifdef DOT11DECRYPT_DEBUG
-#define MSGBUF_LEN 255
-    CHAR msgbuf[MSGBUF_LEN];
-#endif
     int algo = -1;
     int ptk_len_bits = -1;
     int derive_func;
 
     if (!sa || !pmk || !snonce || !ptk || !ptk_len) {
-        DEBUG_PRINT_LINE("Invalid input for PTK derivation", DEBUG_LEVEL_3);
+        ws_warning("Invalid input for PTK derivation");
         return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
     }
 
@@ -2277,11 +2535,7 @@ Dot11DecryptDerivePtk(
         ptk_len_bits = Dot11DecryptGetPtkLen(akm, cipher);
         algo = Dot11DecryptGetHashAlgoFromAkm(akm);
         derive_func = Dot11DecryptGetDeriveFuncFromAkm(akm);
-
-#ifdef DOT11DECRYPT_DEBUG
-        g_snprintf(msgbuf, MSGBUF_LEN, "ptk_len_bits: %d, algo: %d, cipher: %d", ptk_len_bits, algo, cipher);
-        DEBUG_PRINT_LINE(msgbuf, DEBUG_LEVEL_3);
-#endif /* DOT11DECRYPT_DEBUG */
+        ws_debug("ptk_len_bits: %d, algo: %d, cipher: %d", ptk_len_bits, algo, cipher);
     }
 
     if (ptk_len_bits == -1 || algo == -1) {
@@ -2331,7 +2585,7 @@ Dot11DecryptDerivePtk(
         dot11decrypt_kdf(pmk, pmk_len, label, context, offset, algo,
                          ptk, *ptk_len);
     }
-    DEBUG_DUMP("PTK", ptk, *ptk_len);
+    DEBUG_DUMP("PTK", ptk, *ptk_len, LOG_LEVEL_DEBUG);
     return DOT11DECRYPT_RET_SUCCESS;
 }
 
@@ -2345,7 +2599,10 @@ Dot11DecryptFtDerivePtk(
     const PDOT11DECRYPT_CONTEXT ctx,
     const DOT11DECRYPT_SEC_ASSOCIATION *sa,
     const PDOT11DECRYPT_KEY_ITEM key,
-    const PDOT11DECRYPT_EAPOL_PARSED eapol_parsed,
+    const guint8 mdid[2],
+    const guint8 *snonce,
+    const guint8 *r0kh_id, size_t r0kh_id_len,
+    const guint8 *r1kh_id, size_t r1kh_id_len _U_,
     int akm, int cipher,
     guint8 *ptk, size_t *ptk_len)
 {
@@ -2361,17 +2618,13 @@ Dot11DecryptFtDerivePtk(
     size_t xxkey_len;
     int ptk_len_bits;
 
-    if (!sa || !key || !eapol_parsed || !ptk || !ptk_len) {
-        DEBUG_PRINT_LINE("Invalid input for FT PTK derivation", DEBUG_LEVEL_3);
-        return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
-    }
-    if (!eapol_parsed->mdid || !eapol_parsed->r0kh_id || !eapol_parsed->r1kh_id) {
-        DEBUG_PRINT_LINE("Fields missing for FT", DEBUG_LEVEL_3);
+    if (!sa || !key || !mdid || !snonce || !r0kh_id || !r1kh_id || !ptk || !ptk_len) {
+        ws_warning("Invalid input for FT PTK derivation");
         return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
     }
     ptk_len_bits = Dot11DecryptGetPtkLen(akm, cipher);
     if (ptk_len_bits == -1) {
-        DEBUG_PRINT_LINE("Invalid akm or cipher", DEBUG_LEVEL_3);
+        ws_warning("Invalid akm or cipher");
         return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
     }
     *ptk_len = ptk_len_bits / 8;
@@ -2387,29 +2640,29 @@ Dot11DecryptFtDerivePtk(
         xxkey_len = key->KeyData.Wpa.PskLen;
     }
     if (!xxkey) {
-        DEBUG_PRINT_LINE("no xxkey. Skipping", DEBUG_LEVEL_3);
+        ws_debug("no xxkey. Skipping");
         return DOT11DECRYPT_RET_NO_VALID_HANDSHAKE;
     }
     dot11decrypt_derive_pmk_r0(xxkey, xxkey_len,
                                ctx->pkt_ssid, ctx->pkt_ssid_len,
-                               eapol_parsed->mdid,
-                               eapol_parsed->r0kh_id, eapol_parsed->r0kh_id_len,
+                               mdid,
+                               r0kh_id, r0kh_id_len,
                                sa->saId.sta, hash_algo,
                                pmk_r0, &pmk_r0_len, pmk_r0_name);
-    DEBUG_DUMP("PMK-R0", pmk_r0, pmk_r0_len);
-    DEBUG_DUMP("PMKR0Name", pmk_r0_name, 16);
+    DEBUG_DUMP("PMK-R0", pmk_r0, pmk_r0_len, LOG_LEVEL_DEBUG);
+    DEBUG_DUMP("PMKR0Name", pmk_r0_name, 16, LOG_LEVEL_DEBUG);
 
     dot11decrypt_derive_pmk_r1(pmk_r0, pmk_r0_len, pmk_r0_name,
-                               eapol_parsed->r1kh_id, sa->saId.sta, hash_algo,
+                               r1kh_id, sa->saId.sta, hash_algo,
                                pmk_r1, &pmk_r1_len, pmk_r1_name);
-    DEBUG_DUMP("PMK-R1", pmk_r1, pmk_r1_len);
-    DEBUG_DUMP("PMKR1Name", pmk_r1_name, 16);
+    DEBUG_DUMP("PMK-R1", pmk_r1, pmk_r1_len, LOG_LEVEL_DEBUG);
+    DEBUG_DUMP("PMKR1Name", pmk_r1_name, 16, LOG_LEVEL_DEBUG);
 
     dot11decrypt_derive_ft_ptk(pmk_r1, pmk_r1_len, pmk_r1_name,
-                               eapol_parsed->nonce, sa->wpa.nonce,
+                               snonce, sa->wpa.nonce,
                                sa->saId.bssid, sa->saId.sta, hash_algo,
                                ptk, *ptk_len, ptk_name);
-    DEBUG_DUMP("PTK", ptk, *ptk_len);
+    DEBUG_DUMP("PTK", ptk, *ptk_len, LOG_LEVEL_DEBUG);
     return DOT11DECRYPT_RET_SUCCESS;
 }
 
@@ -2825,24 +3078,24 @@ Dot11DecryptTDLSDeriveKey(
     gcry_mac_write(cmac_handle, zeros, 16);
     cmac_write_len = data[offset_fte + 1] + 2;
     if (cmac_write_len < 20) {
-        DEBUG_PRINT_LINE("Bad MAC len", DEBUG_LEVEL_3);
+        ws_warning("Bad MAC len");
         gcry_mac_close(cmac_handle);
         return DOT11DECRYPT_RET_UNSUCCESS;
     }
     gcry_mac_write(cmac_handle, &data[offset_fte + 20], cmac_write_len - 20);
     if (gcry_mac_read(cmac_handle, mic, &cmac_len) != GPG_ERR_NO_ERROR) {
-        DEBUG_PRINT_LINE("MAC read error", DEBUG_LEVEL_3);
+        ws_warning("MAC read error");
         gcry_mac_close(cmac_handle);
         return DOT11DECRYPT_RET_UNSUCCESS;
     }
     if (memcmp(mic, &data[offset_fte + 4], 16)) {
-        DEBUG_PRINT_LINE("MIC verification failed", DEBUG_LEVEL_3);
+        ws_debug("MIC verification failed");
         gcry_mac_close(cmac_handle);
         return DOT11DECRYPT_RET_UNSUCCESS;
     }
     gcry_mac_close(cmac_handle);
 #else
-    DEBUG_PRINT_LINE("MIC verification failed, need libgcrypt >= 1.6", DEBUG_LEVEL_3);
+    ws_info("MIC verification failed, need libgcrypt >= 1.6");
     return DOT11DECRYPT_RET_UNSUCCESS;
 #endif
     /* TODO support other akm and ciphers? */
@@ -2854,7 +3107,7 @@ Dot11DecryptTDLSDeriveKey(
     memcpy(sa->wpa.nonce, snonce, DOT11DECRYPT_WPA_NONCE_LEN);
     sa->validKey = TRUE;
     sa->wpa.key_ver = DOT11DECRYPT_WPA_KEY_VER_AES_CCMP;
-    DEBUG_PRINT_LINE("MIC verified", DEBUG_LEVEL_3);
+    ws_debug("MIC verified");
     return  DOT11DECRYPT_RET_SUCCESS;
 }
 

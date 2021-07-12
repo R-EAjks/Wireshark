@@ -13,7 +13,6 @@
 #include "credentials_model.h"
 
 #include <file.h>
-#include <log.h>
 #include <ui/qt/utils/qt_ui_utils.h>
 
 CredentialsModel::CredentialsModel(QObject *parent)
@@ -99,7 +98,7 @@ QVariant CredentialsModel::data(const QModelIndex &index, int role) const
     return QVariant();
 }
 
-void CredentialsModel::addRecord(tap_credential_t* auth)
+void CredentialsModel::addRecord(const tap_credential_t* auth)
 {
     emit beginInsertRows(QModelIndex(), rowCount(), rowCount() + 1);
 

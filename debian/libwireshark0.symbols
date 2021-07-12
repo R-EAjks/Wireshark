@@ -340,6 +340,7 @@ libwireshark.so.0 libwireshark0 #MINVER#
  dissect_h225_RasMessage@Base 1.9.1
  dissect_h225_ReleaseCompleteReason@Base 1.9.1
  dissect_h245_H223Capability@Base 1.9.1
+ dissect_http2_settings_ext@Base 3.5.0
  dissect_isup_called_party_number_parameter@Base 1.9.1
  dissect_isup_calling_geodetic_location_parameter@Base 3.1.0
  dissect_isup_calling_party_number_parameter@Base 1.9.1
@@ -557,8 +558,8 @@ libwireshark.so.0 libwireshark0 #MINVER#
  epan_get_compiled_version_info@Base 1.9.1
  epan_get_interface_description@Base 2.3.0
  epan_get_interface_name@Base 1.99.2
+ epan_get_modified_block@Base 3.5.0
  epan_get_runtime_version_info@Base 1.9.1
- epan_get_user_comment@Base 1.99.2
  epan_get_version@Base 1.9.1
  epan_get_version_number@Base 2.5.0
  epan_init@Base 2.9.0
@@ -652,7 +653,7 @@ libwireshark.so.0 libwireshark0 #MINVER#
  find_or_create_conversation_by_id@Base 2.6.3
  find_protocol_by_id@Base 1.9.1
  find_sid_name@Base 1.9.1
- find_stream_circ@Base 1.9.1
+ find_stream@Base 3.5.0
  find_tap_id@Base 1.9.1
  follow_get_stat_tap_string@Base 2.1.0
  follow_info_free@Base 2.3.0
@@ -943,6 +944,7 @@ libwireshark.so.0 libwireshark0 #MINVER#
  maxmind_db_get_paths@Base 2.5.1
  maxmind_db_lookup_ipv4@Base 2.5.1
  maxmind_db_lookup_ipv6@Base 2.5.1
+ maxmind_db_set_synchrony@Base 3.5.0
  mbim_register_uuid_ext@Base 1.12.0~rc1
  memory_usage_component_register@Base 1.12.0~rc1
  memory_usage_gc@Base 1.12.0~rc1
@@ -1330,6 +1332,8 @@ libwireshark.so.0 libwireshark0 #MINVER#
  q932_PresentedNumberScreened_vals@Base 2.1.0
  q932_PresentedNumberUnscreened_vals@Base 2.1.0
  q932_ScreeningIndicator_vals@Base 2.5.0
+ quic_get_stream_id_le@Base 3.5.0
+ quic_get_stream_id_ge@Base 3.5.0
  qs_func_vals@Base 1.9.1
  qs_rate_vals_ext@Base 1.9.1
  raknet_add_udp_dissector@Base 2.3.0
@@ -1567,7 +1571,7 @@ libwireshark.so.0 libwireshark0 #MINVER#
  str_to_val_idx@Base 1.9.1
  stream_add_frag@Base 1.9.1
  stream_find_frag@Base 1.9.1
- stream_new_circ@Base 1.9.1
+ stream_new@Base 3.5.0
  stream_process_reassembled@Base 1.9.1
  string_or_null@Base 1.9.1
  string_replace@Base 1.9.1
@@ -1728,6 +1732,7 @@ libwireshark.so.0 libwireshark0 #MINVER#
  tvb_ensure_bytes_exist@Base 1.9.1
  tvb_ensure_bytes_exist64@Base 1.99.0
  tvb_ensure_captured_length_remaining@Base 1.12.0~rc1
+ tvb_ensure_reported_length_remaining@Base 3.5.0
  tvb_get_etsi_ts_102_221_annex_a_string@Base 3.3.1
  tvb_find_guint8@Base 1.9.1
  tvb_find_guint16@Base 2.3.0
@@ -1907,6 +1912,7 @@ libwireshark.so.0 libwireshark0 #MINVER#
  uat_update_record@Base 1.99.3
  udp_dissect_pdus@Base 1.99.3
  udp_port_to_display@Base 1.99.2
+ uint64_compare@Base 3.5.0
  uint_to_str_back@Base 2.1.0
  union_of_tap_listener_flags@Base 1.9.1
  unit_name_string_get_value@Base 2.3.0

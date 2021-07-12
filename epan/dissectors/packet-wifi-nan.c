@@ -35,7 +35,7 @@ static dissector_table_t ie_handle_table;
 #define NAN_DEVICE_CAP_LENGTH 9
 #define NAN_NDP_MIN_LENGTH 11
 #define NAN_NDPE_MIN_LENGTH 11
-#define NAN_AVAILABILITY_MIN_LENGTH 10
+#define NAN_AVAILABILITY_MIN_LENGTH 8
 #define NAN_NDC_MIN_LENGTH 11
 #define NAN_NDL_MIN_LENGTH 4
 #define NAN_NDL_QOS_LENGTH 3
@@ -1422,7 +1422,7 @@ dissect_attr_ndpe(proto_tree* attr_tree, tvbuff_t* tvb, gint offset, guint16 att
     offset += 4;
     dissected_len += 4;
     guint8 bits_type = tvb_get_bits8(tvb, offset * 8 + 4, 4);
-    guint8 bit_offset = (offset * 8) + 4;
+    guint32 bit_offset = (offset * 8) + 4;
     guint8 bits_status = tvb_get_bits8(tvb, bit_offset, 4);
 
     proto_tree_add_item(attr_tree, hf_nan_reason_code, tvb, offset + 1, 1, ENC_BIG_ENDIAN);

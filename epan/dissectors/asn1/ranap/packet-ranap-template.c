@@ -83,6 +83,7 @@ typedef struct ranap_private_data_t
 {
   guint32 transportLayerAddress_ipv4;
   guint16 binding_id_port;
+  e212_number_type_t number_type;
 } ranap_private_data_t;
 
 
@@ -462,6 +463,8 @@ proto_reg_handoff_ranap(void)
     rrc_t_to_srnc_handle = find_dissector_add_dependency("rrc.t_to_srnc_cont", proto_ranap);
     rrc_ho_to_utran_cmd = find_dissector_add_dependency("rrc.irat.ho_to_utran_cmd", proto_ranap);
     bssgp_handle = find_dissector("bssgp");
+    heur_dissector_add("sccp", dissect_sccp_ranap_heur, "RANAP over SCCP", "ranap_sccp", proto_ranap, HEURISTIC_ENABLE);
+    heur_dissector_add("sua", dissect_sccp_ranap_heur, "RANAP over SUA", "ranap_sua", proto_ranap, HEURISTIC_ENABLE);
     initialized = TRUE;
 #include "packet-ranap-dis-tab.c"
   } else {
@@ -470,9 +473,6 @@ proto_reg_handoff_ranap(void)
 
   dissector_add_uint("sccp.ssn", global_ranap_sccp_ssn, ranap_handle);
   local_ranap_sccp_ssn = global_ranap_sccp_ssn;
-
-  heur_dissector_add("sccp", dissect_sccp_ranap_heur, "RANAP over SCCP", "ranap_sccp", proto_ranap, HEURISTIC_ENABLE);
-  heur_dissector_add("sua", dissect_sccp_ranap_heur, "RANAP over SUA", "ranap_sua", proto_ranap, HEURISTIC_ENABLE);
 }
 
 /*

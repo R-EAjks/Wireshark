@@ -8,7 +8,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * References: 3GPP TS 38.413 v16.4.0 (2021-01)
+ * References: 3GPP TS 38.413 v16.6.0 (2021-07)
  */
 
 #include "config.h"
@@ -58,6 +58,7 @@ static dissector_handle_t nr_rrc_ue_radio_access_cap_info_handle;
 static dissector_handle_t lte_rrc_ue_radio_paging_info_handle;
 static dissector_handle_t lte_rrc_ue_radio_access_cap_info_handle;
 static dissector_handle_t lte_rrc_ue_radio_paging_info_nb_handle;
+static dissector_handle_t lte_rrc_ue_radio_access_cap_info_nb_handle;
 static dissector_handle_t nrppa_handle;
 
 static int proto_json = -1;
@@ -88,6 +89,15 @@ static int hf_ngap_RATRestrictionInformation_e_UTRA = -1;
 static int hf_ngap_RATRestrictionInformation_nR = -1;
 static int hf_ngap_RATRestrictionInformation_nR_unlicensed = -1;
 static int hf_ngap_RATRestrictionInformation_reserved = -1;
+static int hf_ngap_primaryRATRestriction_e_UTRA = -1;
+static int hf_ngap_primaryRATRestriction_nR = -1;
+static int hf_ngap_primaryRATRestriction_nR_unlicensed = -1;
+static int hf_ngap_primaryRATRestriction_reserved = -1;
+static int hf_ngap_secondaryRATRestriction_e_UTRA = -1;
+static int hf_ngap_secondaryRATRestriction_nR = -1;
+static int hf_ngap_secondaryRATRestriction_e_UTRA_unlicensed = -1;
+static int hf_ngap_secondaryRATRestriction_nR_unlicensed = -1;
+static int hf_ngap_secondaryRATRestriction_reserved = -1;
 static int hf_ngap_NrencryptionAlgorithms_nea1 = -1;
 static int hf_ngap_NrencryptionAlgorithms_nea2 = -1;
 static int hf_ngap_NrencryptionAlgorithms_nea3 = -1;
@@ -115,6 +125,9 @@ static int hf_ngap_MeasurementsToActivate_reserved = -1;
 static int hf_ngap_MDT_Location_Information_GNSS = -1;
 static int hf_ngap_MDT_Location_Information_reserved = -1;
 static int hf_ngap_GlobalCable_ID_str = -1;
+static int hf_ngap_UpdateFeedback_CN_PDB_DL = -1;
+static int hf_ngap_UpdateFeedback_CN_PDB_UL = -1;
+static int hf_ngap_UpdateFeedback_reserved = -1;
 #include "packet-ngap-hf.c"
 
 /* Initialize the subtree pointers */
@@ -132,6 +145,8 @@ static gint ett_ngap_SourceToTarget_TransparentContainer = -1;
 static gint ett_ngap_TargetToSource_TransparentContainer = -1;
 static gint ett_ngap_RRCContainer = -1;
 static gint ett_ngap_RATRestrictionInformation = -1;
+static gint ett_ngap_primaryRATRestriction = -1;
+static gint ett_ngap_secondaryRATRestriction = -1;
 static gint ett_ngap_NrencryptionAlgorithms = -1;
 static gint ett_ngap_NrintegrityProtectionAlgorithms = -1;
 static gint ett_ngap_EUTRAencryptionAlgorithms = -1;
@@ -157,6 +172,7 @@ static gint ett_ngap_NRUERLFReportContainer = -1;
 static gint ett_ngap_TargettoSource_Failure_TransparentContainer = -1;
 static gint ett_ngap_UERadioCapabilityForPagingOfNB_IoT = -1;
 static gint ett_ngap_GlobalCable_ID = -1;
+static gint ett_ngap_UpdateFeedback = -1;
 #include "packet-ngap-ett.c"
 
 static expert_field ei_ngap_number_pages_le15 = EI_INIT;
@@ -212,6 +228,7 @@ struct ngap_private_data {
   struct ngap_supported_ta *supported_ta;
   struct ngap_tai *tai;
   guint32 ran_ue_ngap_id;
+  e212_number_type_t number_type;
 };
 
 enum {
@@ -289,6 +306,8 @@ static int dissect_PathSwitchRequestTransfer_PDU(tvbuff_t *tvb _U_, packet_info 
 static int dissect_HandoverPreparationUnsuccessfulTransfer_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_);
 static int dissect_PDUSessionResourceReleaseCommandTransfer_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_);
 static int dissect_TargetNGRANNode_ToSourceNGRANNode_FailureTransparentContainer_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_);
+static int dissect_SecondaryRATDataUsageReportTransfer_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_);
+static int dissect_PDUSessionResourceModifyIndicationUnsuccessfulTransfer_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_);
 
 const value_string ngap_serialNumber_gs_vals[] = {
   { 0, "Display mode immediate, cell wide"},
@@ -460,6 +479,11 @@ ngap_is_nbiot_ue(packet_info *pinfo)
   return FALSE;
 }
 
+const true_false_string ngap_not_updated_updated = {
+    "Not updated",
+    "Updated"
+};
+
 #include "packet-ngap-fn.c"
 
 static int dissect_ProtocolIEFieldValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
@@ -565,15 +589,42 @@ dissect_ngap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
   return dissect_NGAP_PDU_PDU(tvb, pinfo, ngap_tree, NULL);
 }
 
+static gboolean
+find_n2_info_content(char *json_data, jsmntok_t *token, const char *n2_info_content,
+                     const char *content_id, dissector_handle_t *subdissector)
+{
+  jsmntok_t *n2_info_content_token, *ngap_data_token;
+  char *str;
+  gdouble ngap_msg_type;
+
+  n2_info_content_token = json_get_object(json_data, token, n2_info_content);
+  if (!n2_info_content_token)
+    return FALSE;
+  ngap_data_token = json_get_object(json_data, n2_info_content_token, "ngapData");
+  if (!ngap_data_token)
+    return FALSE;
+  str = json_get_string(json_data, ngap_data_token, "contentId");
+  if (!str || strcmp(str, content_id))
+    return FALSE;
+  str = json_get_string(json_data, n2_info_content_token, "ngapIeType");
+  if (str)
+    *subdissector = dissector_get_string_handle(ngap_n2_ie_type_dissector_table, str);
+  else if (json_get_double(json_data, n2_info_content_token, "ngapMessageType", &ngap_msg_type))
+    *subdissector = ngap_handle;
+  else
+    *subdissector = NULL;
+  return TRUE;
+}
+
 /* 3GPP TS 29.502 chapter 6.1.6.4.3 and 29.518 chapter 6.1.6.4.3 */
 static int
 dissect_ngap_media_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 {
   int ret;
   char *json_data;
-  const char *n2_info_class, *str, *content_id_str;
-  jsmntok_t *tokens, *cur_tok, *n2_info_content_tok;
-  dissector_handle_t subdissector;
+  const char *n2_info_class;
+  jsmntok_t *tokens, *cur_tok;
+  dissector_handle_t subdissector = NULL;
   tvbuff_t* json_tvb = (tvbuff_t*)p_get_proto_data(pinfo->pool, pinfo, proto_json, 0);
   http_message_info_t *message_info = (http_message_info_t *)data;
 
@@ -594,81 +645,85 @@ dissect_ngap_media_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
   }
   if (cur_tok) {
     n2_info_class = json_get_string(json_data, cur_tok, "n2InformationClass");
-    if (!n2_info_class)
-      return 0;
-    if (!strcmp(n2_info_class, "SM")) {
-      cur_tok = json_get_object(json_data, cur_tok, "smInfo");
-      if (!cur_tok)
-        return 0;
-      n2_info_content_tok = json_get_object(json_data, cur_tok, "n2InfoContent");
-      if (!n2_info_content_tok)
-        return 0;
-      str = json_get_string(json_data, n2_info_content_tok, "ngapIeType");
-      if (!str)
-        return 0;
-      subdissector = dissector_get_string_handle(ngap_n2_ie_type_dissector_table, str);
-    } else if (!strcmp(n2_info_class, "RAN")) {
-      cur_tok = json_get_object(json_data, cur_tok, "ranInfo");
-      if (!cur_tok)
-        return 0;
-      n2_info_content_tok = json_get_object(json_data, cur_tok, "n2InfoContent");
-      if (!n2_info_content_tok)
-        return 0;
-      str = json_get_string(json_data, n2_info_content_tok, "ngapIeType");
-      if (!str)
-        return 0;
-      subdissector = dissector_get_string_handle(ngap_n2_ie_type_dissector_table, str);
-    } else if (!strcmp(n2_info_class, "NRPPa")) {
-      cur_tok = json_get_object(json_data, cur_tok, "nrppaInfo");
-      if (!cur_tok)
-        return 0;
-      n2_info_content_tok = json_get_object(json_data, cur_tok, "nrppaPdu");
-      if (!n2_info_content_tok)
-        return 0;
-      str = json_get_string(json_data, n2_info_content_tok, "ngapIeType");
-      if (!str)
-        return 0;
-      subdissector = dissector_get_string_handle(ngap_n2_ie_type_dissector_table, str);
-    } else if (!strcmp(n2_info_class, "PWS") ||
-               !strcmp(n2_info_class, "PWS-BCAL") ||
-               !strcmp(n2_info_class, "PWS-RF")) {
-      cur_tok = json_get_object(json_data, cur_tok, "pwsInfo");
-      if (!cur_tok)
-        return 0;
-      n2_info_content_tok = json_get_object(json_data, cur_tok, "pwsContainer");
-      if (!n2_info_content_tok)
-        return 0;
-      subdissector = ngap_handle;
-    } else {
-      return 0;
-    }
-    cur_tok = json_get_object(json_data, n2_info_content_tok, "ngapData");
-    if (!cur_tok)
-      return 0;
-    content_id_str = json_get_string(json_data, cur_tok, "contentId");
-  } else {
-    cur_tok = json_get_object(json_data, tokens, "n2SmInfo");
-    if (cur_tok) {
-      content_id_str = json_get_string(json_data, cur_tok, "contentId");
-      str = json_get_string(json_data, tokens, "n2SmInfoType");
-      if (!str)
-        return 0;
-      subdissector = dissector_get_string_handle(ngap_n2_ie_type_dissector_table, str);
-    } else {
-      return 0;
+    if (n2_info_class) {
+      if (!strcmp(n2_info_class, "SM")) {
+        cur_tok = json_get_object(json_data, cur_tok, "smInfo");
+        if (cur_tok && find_n2_info_content(json_data, cur_tok, "n2InfoContent",
+                                            message_info->content_id, &subdissector))
+          goto found;
+      }
+      if (!strcmp(n2_info_class, "RAN")) {
+        cur_tok = json_get_object(json_data, cur_tok, "ranInfo");
+        if (cur_tok && find_n2_info_content(json_data, cur_tok, "n2InfoContent",
+                                            message_info->content_id, &subdissector))
+          goto found;
+      }
+      if (!strcmp(n2_info_class, "NRPPa")) {
+        cur_tok = json_get_object(json_data, cur_tok, "nrppaInfo");
+        if (cur_tok && find_n2_info_content(json_data, cur_tok, "nrppaPdu",
+                                            message_info->content_id, &subdissector))
+          goto found;
+      }
+      if (!strcmp(n2_info_class, "PWS") ||
+          !strcmp(n2_info_class, "PWS-BCAL") ||
+          !strcmp(n2_info_class, "PWS-RF")) {
+        cur_tok = json_get_object(json_data, cur_tok, "pwsInfo");
+        if (cur_tok && find_n2_info_content(json_data, cur_tok, "pwsContainer",
+                                            message_info->content_id, &subdissector))
+          goto found;
+      }
     }
   }
+  cur_tok = json_get_object(json_data, tokens, "n2SmInfo");
+  if (cur_tok) {
+    const char *content_id_str = json_get_string(json_data, cur_tok, "contentId");
+    if (content_id_str && !strcmp(content_id_str, message_info->content_id)) {
+      const char *str = json_get_string(json_data, tokens, "n2SmInfoType");
+      if (str)
+        subdissector = dissector_get_string_handle(ngap_n2_ie_type_dissector_table, str);
+      else
+        subdissector = NULL;
+      goto found;
+    }
+  }
+  cur_tok = json_get_array(json_data, tokens, "pduSessionList");
+  if (cur_tok) {
+    int i, count;
+    count = json_get_array_len(cur_tok);
+    for (i = 0; i < count; i++) {
+      jsmntok_t *array_tok = json_get_array_index(cur_tok, i);
+      if (find_n2_info_content(json_data, array_tok, "n2InfoContent",
+                               message_info->content_id, &subdissector))
+        goto found;
+    }
+  }
+  if (find_n2_info_content(json_data, tokens, "sourceToTargetData",
+                           message_info->content_id, &subdissector))
+    goto found;
+  if (find_n2_info_content(json_data, tokens, "targetToSourceData",
+                           message_info->content_id, &subdissector))
+    goto found;
+  if (find_n2_info_content(json_data, tokens, "targetToSourceFailureData",
+                           message_info->content_id, &subdissector))
+    goto found;
+  if (find_n2_info_content(json_data, tokens, "ueRadioCapability",
+                           message_info->content_id, &subdissector))
+    goto found;
 
+found:
   if (subdissector) {
     proto_item *ngap_item;
     proto_tree *ngap_tree;
+    gboolean save_writable;
 
-    if (!content_id_str || strcmp(content_id_str, message_info->content_id))
-      return 0;
     col_append_sep_str(pinfo->cinfo, COL_PROTOCOL, "/", "NGAP");
-    ngap_item = proto_tree_add_item(tree, proto_ngap, tvb, 0, -1, ENC_NA);
-    ngap_tree = proto_item_add_subtree(ngap_item, ett_ngap);
-    gboolean save_writable = col_get_writable(pinfo->cinfo, COL_PROTOCOL);
+    if (subdissector != ngap_handle) {
+        ngap_item = proto_tree_add_item(tree, proto_ngap, tvb, 0, -1, ENC_NA);
+        ngap_tree = proto_item_add_subtree(ngap_item, ett_ngap);
+    } else {
+        ngap_tree = tree;
+    }
+    save_writable = col_get_writable(pinfo->cinfo, COL_PROTOCOL);
     col_set_writable(pinfo->cinfo, COL_PROTOCOL, FALSE);
     call_dissector_with_data(subdissector, tvb, pinfo, ngap_tree, NULL);
     col_set_writable(pinfo->cinfo, COL_PROTOCOL, save_writable);
@@ -692,6 +747,7 @@ proto_reg_handoff_ngap(void)
     lte_rrc_ue_radio_paging_info_handle = find_dissector_add_dependency("lte-rrc.ue_radio_paging_info", proto_ngap);
     lte_rrc_ue_radio_access_cap_info_handle = find_dissector_add_dependency("lte-rrc.ue_radio_access_cap_info", proto_ngap);
     lte_rrc_ue_radio_paging_info_nb_handle = find_dissector_add_dependency("lte-rrc.ue_radio_paging_info.nb", proto_ngap);
+    lte_rrc_ue_radio_access_cap_info_nb_handle = find_dissector_add_dependency("lte-rrc.ue_radio_access_cap_info.nb", proto_ngap);
     dissector_add_for_decode_as("sctp.port", ngap_handle);
     dissector_add_uint("sctp.ppi", NGAP_PROTOCOL_ID,   ngap_handle);
     Initialized=TRUE;
@@ -807,6 +863,42 @@ void proto_register_ngap(void) {
       { "reserved", "ngap.RATRestrictionInformation.reserved",
         FT_UINT8, BASE_HEX, NULL, 0x1f,
         NULL, HFILL }},
+    { &hf_ngap_primaryRATRestriction_e_UTRA,
+      { "e-UTRA", "ngap.primaryRATRestriction.e_UTRA",
+        FT_BOOLEAN, 8, TFS(&tfs_restricted_not_restricted), 0x80,
+        NULL, HFILL }},
+    { &hf_ngap_primaryRATRestriction_nR,
+      { "nR", "ngap.primaryRATRestriction.nR",
+        FT_BOOLEAN, 8, TFS(&tfs_restricted_not_restricted), 0x40,
+        NULL, HFILL }},
+    { &hf_ngap_primaryRATRestriction_nR_unlicensed,
+      { "nR-unlicensed", "ngap.primaryRATRestriction.nR_unlicensed",
+        FT_BOOLEAN, 8, TFS(&tfs_restricted_not_restricted), 0x20,
+        NULL, HFILL }},
+    { &hf_ngap_primaryRATRestriction_reserved,
+      { "reserved", "ngap.primaryRATRestriction.reserved",
+        FT_UINT8, BASE_HEX, NULL, 0x1f,
+        NULL, HFILL }},
+    { &hf_ngap_secondaryRATRestriction_e_UTRA,
+      { "e-UTRA", "ngap.secondaryRATRestriction.e_UTRA",
+        FT_BOOLEAN, 8, TFS(&tfs_restricted_not_restricted), 0x80,
+        NULL, HFILL }},
+    { &hf_ngap_secondaryRATRestriction_nR,
+      { "nR", "ngap.secondaryRATRestriction.nR",
+        FT_BOOLEAN, 8, TFS(&tfs_restricted_not_restricted), 0x40,
+        NULL, HFILL }},
+    { &hf_ngap_secondaryRATRestriction_e_UTRA_unlicensed,
+      { "e-UTRA-unlicensed", "ngap.secondaryRATRestriction.e_UTRA_unlicensed",
+        FT_BOOLEAN, 8, TFS(&tfs_restricted_not_restricted), 0x20,
+        NULL, HFILL }},
+    { &hf_ngap_secondaryRATRestriction_nR_unlicensed,
+      { "nR-unlicensed", "ngap.secondaryRATRestriction.nR_unlicensed",
+        FT_BOOLEAN, 8, TFS(&tfs_restricted_not_restricted), 0x10,
+        NULL, HFILL }},
+    { &hf_ngap_secondaryRATRestriction_reserved,
+      { "reserved", "ngap.secondaryRATRestriction.reserved",
+        FT_UINT8, BASE_HEX, NULL, 0x0f,
+        NULL, HFILL }},
 	{ &hf_ngap_NrencryptionAlgorithms_nea1,
 	  { "128-NEA1", "ngap.NrencryptionAlgorithms.nea1",
         FT_BOOLEAN, 16, TFS(&tfs_supported_not_supported), 0x8000,
@@ -915,6 +1007,18 @@ void proto_register_ngap(void) {
       { "GlobalCable-ID", "ngap.GlobalCable_ID.str",
         FT_STRING, BASE_NONE, NULL, 0,
         NULL, HFILL }},
+    { &hf_ngap_UpdateFeedback_CN_PDB_DL,
+      { "CN PDB DL", "ngap.UpdateFeedback.CN_PDB_DL",
+        FT_BOOLEAN, 8, TFS(&ngap_not_updated_updated), 0x80,
+        NULL, HFILL }},
+    { &hf_ngap_UpdateFeedback_CN_PDB_UL,
+      { "CN PDB UL", "ngap.UpdateFeedback.CN_PDB_UL",
+        FT_BOOLEAN, 8, TFS(&ngap_not_updated_updated), 0x40,
+        NULL, HFILL }},
+    { &hf_ngap_UpdateFeedback_reserved,
+      { "Reserved", "ngap.UpdateFeedback.reserved",
+        FT_UINT8, BASE_HEX, NULL, 0x3f,
+        NULL, HFILL }},
 #include "packet-ngap-hfarr.c"
   };
 
@@ -934,6 +1038,8 @@ void proto_register_ngap(void) {
     &ett_ngap_TargetToSource_TransparentContainer,
     &ett_ngap_RRCContainer,
     &ett_ngap_RATRestrictionInformation,
+    &ett_ngap_primaryRATRestriction,
+    &ett_ngap_secondaryRATRestriction,
     &ett_ngap_NrencryptionAlgorithms,
     &ett_ngap_NrintegrityProtectionAlgorithms,
     &ett_ngap_EUTRAencryptionAlgorithms,
@@ -959,6 +1065,7 @@ void proto_register_ngap(void) {
     &ett_ngap_TargettoSource_Failure_TransparentContainer,
     &ett_ngap_UERadioCapabilityForPagingOfNB_IoT,
     &ett_ngap_GlobalCable_ID,
+    &ett_ngap_UpdateFeedback,
 #include "packet-ngap-ettarr.c"
   };
 

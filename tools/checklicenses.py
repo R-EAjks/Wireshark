@@ -100,9 +100,6 @@ PATH_SPECIFIC_ALLOWED_LICENSES = {
     'epan/except.h': [
         'UNKNOWN',
     ],
-    'cmake/TestFileOffsetBits.c': [
-        'UNKNOWN',
-    ],
     # Generated header files by lex/lemon/whatever
     'epan/dtd_grammar.h': [
         'UNKNOWN',
@@ -123,7 +120,7 @@ PATH_SPECIFIC_ALLOWED_LICENSES = {
     'plugins/mate/mate_grammar.h': [
         'UNKNOWN',
     ],
-    'version.h': [
+    'vcs_version.h': [
         'UNKNOWN',
     ],
     # Special IDL license that appears to be compatible as far as I (not a

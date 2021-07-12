@@ -601,10 +601,9 @@ dissect_diameter_mip6_feature_vector(tvbuff_t *tvb, packet_info *pinfo _U_, prot
 
 	guint32 application_id = 0;
 	diam_sub_dis_t *diam_sub_dis_inf = (diam_sub_dis_t*)data;
+	DISSECTOR_ASSERT(diam_sub_dis_inf);
 
-	if(diam_sub_dis_inf) {
-		application_id = diam_sub_dis_inf->application_id;
-	}
+	application_id = diam_sub_dis_inf->application_id;
 
 	/* Hide the item created in packet-diameter.c and only show the one created here */
 	proto_item_set_hidden(diam_sub_dis_inf->item);
@@ -703,12 +702,20 @@ dissect_diameter_user_equipment_info_value(tvbuff_t *tvb, packet_info *pinfo, pr
 	case USER_EQUIPMENT_INFO_TYPE_IMEISV:
 		/* RFC 8506 section 8.53, 3GPP TS 23.003 */
 		len = tvb_reported_length(tvb);
-		proto_tree_add_item(tree, hf_diameter_user_equipment_info_imeisv, tvb, 0, len, ENC_ASCII|ENC_NA);
-		return len;
+		/* IMEISV is 16 digits, but often transmitted BCD coded in 8 octets. */
+		if (len == 8) {
+			proto_tree_add_item(tree, hf_diameter_user_equipment_info_imeisv, tvb, 0, len, ENC_BCD_DIGITS_0_9|ENC_NA);
+			return len;
+		} else if (len == 16) {
+			proto_tree_add_item(tree, hf_diameter_user_equipment_info_imeisv, tvb, 0, len, ENC_ASCII|ENC_NA);
+			return len;
+		}
+		proto_tree_add_expert(tree, pinfo, &ei_diameter_invalid_user_equipment_info_value_len, tvb, 0, len);
+		break;
 	case USER_EQUIPMENT_INFO_TYPE_MAC:
 		/* RFC 8506 section 8.54, RFC 5777 section 4.1.7.8 */
 		len = tvb_reported_length(tvb);
-		if (len == 6) {
+		if (len == FT_ETHER_LEN) {
 			proto_tree_add_item(tree, hf_diameter_user_equipment_info_mac, tvb, 0, len, ENC_NA);
 			return len;
 		}
@@ -717,7 +724,7 @@ dissect_diameter_user_equipment_info_value(tvbuff_t *tvb, packet_info *pinfo, pr
 	case USER_EQUIPMENT_INFO_TYPE_EUI64:
 		/* RFC 8506 section 8.55 */
 		len = tvb_reported_length(tvb);
-		if (len == 8) {
+		if (len == FT_EUI64_LEN) {
 			proto_tree_add_item(tree, hf_diameter_user_equipment_info_eui64, tvb, 0, len, ENC_BIG_ENDIAN);
 			return len;
 		}
@@ -726,8 +733,8 @@ dissect_diameter_user_equipment_info_value(tvbuff_t *tvb, packet_info *pinfo, pr
 	case USER_EQUIPMENT_INFO_TYPE_MODIFIED_EUI64:
 		/* RFC 8506 section 8.56, RFC 4291 */
 		len = tvb_reported_length(tvb);
-		if (len == 16) {
-			proto_tree_add_item(tree, hf_diameter_user_equipment_info_modified_eui64, tvb, 0, len,  ENC_NA);
+		if (len == FT_EUI64_LEN) {
+			proto_tree_add_item(tree, hf_diameter_user_equipment_info_modified_eui64, tvb, 0, len,  ENC_BIG_ENDIAN);
 			return len;
 		}
 		proto_tree_add_expert(tree, pinfo, &ei_diameter_invalid_user_equipment_info_value_len, tvb, 0, len);
@@ -831,7 +838,7 @@ dissect_diameter_avp(diam_ctx_t *c, tvbuff_t *tvb, int offset, diam_sub_dis_t *d
 			value_string *vendor_avp_vs = VALUE_STRING_EXT_VS_P(vendor->vs_avps_ext);
 			gint i = 0;
 			while (vendor_avp_vs[i].strptr != NULL) {
-				g_warning("%u %s", vendor_avp_vs[i].value, vendor_avp_vs[i].strptr);
+				ws_warning("%u %s", vendor_avp_vs[i].value, vendor_avp_vs[i].strptr);
 				i++;
 			}
 		}
@@ -2492,7 +2499,7 @@ real_register_diameter_fields(void)
 	{ &hf_diameter_user_equipment_info_eui64,
 		{ "EUI64","diameter.user_equipment_info.eui64", FT_EUI64, BASE_NONE, NULL, 0x0, NULL, HFILL }},
 	{ &hf_diameter_user_equipment_info_modified_eui64,
-		{ "Modified EUI64","diameter.user_equipment_info.modified_eui64", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }}
+		{ "Modified EUI64","diameter.user_equipment_info.modified_eui64", FT_EUI64, BASE_NONE, NULL, 0x0, NULL, HFILL }}
 	};
 
 	gint *ett_base[] = {

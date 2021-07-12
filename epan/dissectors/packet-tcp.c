@@ -34,6 +34,7 @@
 #include <wsutil/str_util.h>
 #include <wsutil/wsgcrypt.h>
 #include <wsutil/pint.h>
+#include <wsutil/ws_assert.h>
 
 #include "packet-tcp.h"
 #include "packet-ip.h"
@@ -103,6 +104,22 @@ enum mptcp_dsn_conversion {
     DSN_CONV_32_TO_64,
     DSN_CONV_NONE
 } ;
+
+#define MPTCP_TCPRST_FLAG_T_PRESENT     0x1
+#define MPTCP_TCPRST_FLAG_W_PRESENT     0x2
+#define MPTCP_TCPRST_FLAG_V_PRESENT     0x4
+#define MPTCP_TCPRST_FLAG_U_PRESENT     0x8
+
+static const value_string mp_tcprst_reasons[] = {
+        { 0x0, "Unspecified error" },
+        { 0x1, "MPTCP-specific error" },
+        { 0x2, "Lack of resources" },
+        { 0x3, "Administratively prohibited" },
+        { 0x4, "Too much outstanding data" },
+        { 0x5, "Unacceptable performance" },
+        { 0x6, "Middlebox interference" },
+        { 0, NULL },
+};
 
 static gint tcp_default_window_scaling = (gint)WindowScaling_NotKnown;
 
@@ -261,6 +278,11 @@ static int hf_tcp_option_mptcp_m_flag = -1;
 static int hf_tcp_option_mptcp_M_flag = -1;
 static int hf_tcp_option_mptcp_a_flag = -1;
 static int hf_tcp_option_mptcp_A_flag = -1;
+static int hf_tcp_option_mptcp_U_flag = -1;
+static int hf_tcp_option_mptcp_V_flag = -1;
+static int hf_tcp_option_mptcp_W_flag = -1;
+static int hf_tcp_option_mptcp_T_flag = -1;
+static int hf_tcp_option_mptcp_tcprst_reason = -1;
 static int hf_tcp_option_mptcp_reserved_flag = -1;
 static int hf_tcp_option_mptcp_subtype = -1;
 static int hf_tcp_option_mptcp_version = -1;
@@ -441,6 +463,15 @@ static gboolean tcp_no_subdissector_on_error = TRUE;
  */
 static gboolean tcp_exp_options_with_magic = TRUE;
 
+/*
+ * This flag indicates which of Fast Retransmission or Out-of-Order
+ * interpretation should supersede when analyzing an ambiguous packet as
+ * things are not always clear. The user is authorized to change this
+ * behavior.
+ * When set, we keep the historical interpretation (Fast RT > OOO)
+ */
+static gboolean tcp_fastrt_precedence = TRUE;
+
 /* Process info, currently discovered via IPFIX */
 static gboolean tcp_display_process_info = FALSE;
 
@@ -512,6 +543,7 @@ static gboolean tcp_display_process_info = FALSE;
 #define TCPOPT_MPTCP_MP_PRIO       0x5    /* Multipath TCP Change Subflow Priority */
 #define TCPOPT_MPTCP_MP_FAIL       0x6    /* Multipath TCP Fallback */
 #define TCPOPT_MPTCP_MP_FASTCLOSE  0x7    /* Multipath TCP Fast Close */
+#define TCPOPT_MPTCP_MP_TCPRST     0x8    /* Multipath TCP Reset */
 
 /*
  *     Conversation Completeness values
@@ -598,6 +630,7 @@ static const value_string mptcp_subtype_vs[] = {
     { TCPOPT_MPTCP_MP_PRIO, "Change Subflow Priority" },
     { TCPOPT_MPTCP_MP_FAIL, "TCP Fallback" },
     { TCPOPT_MPTCP_MP_FASTCLOSE, "Fast Close" },
+    { TCPOPT_MPTCP_MP_TCPRST, "TCP Reset" },
     { 0, NULL }
 };
 
@@ -646,6 +679,14 @@ static int * const tcp_option_mptcp_dss_flags[] = {
   &hf_tcp_option_mptcp_M_flag,
   &hf_tcp_option_mptcp_a_flag,
   &hf_tcp_option_mptcp_A_flag,
+  NULL
+};
+
+static int * const tcp_option_mptcp_tcprst_flags[] = {
+  &hf_tcp_option_mptcp_U_flag,
+  &hf_tcp_option_mptcp_V_flag,
+  &hf_tcp_option_mptcp_W_flag,
+  &hf_tcp_option_mptcp_T_flag,
   NULL
 };
 
@@ -938,7 +979,7 @@ tcp_seq_analysis_packet( void *ptr, packet_info *pinfo, epan_dissect_t *edt _U_,
 }
 
 
-gchar *tcp_follow_conv_filter(packet_info *pinfo, guint *stream, guint *sub_stream _U_)
+gchar *tcp_follow_conv_filter(epan_dissect_t *edt _U_, packet_info *pinfo, guint *stream, guint *sub_stream _U_)
 {
     conversation_t *conv;
     struct tcp_analysis *tcpd;
@@ -1049,6 +1090,7 @@ check_follow_fragments(follow_info_t *follow_info, gboolean is_server, guint32 a
 
                     follow_record->is_server = is_server;
                     follow_record->packet_num = fragment->packet_num;
+                    follow_record->abs_ts = fragment->abs_ts;
                     follow_record->seq = follow_info->seq[is_server] + new_frag_size;
 
                     follow_record->data = g_byte_array_append(g_byte_array_new(),
@@ -1182,6 +1224,7 @@ follow_tcp_tap_listener(void *tapdata, packet_info *pinfo,
     follow_record = g_new0(follow_record_t, 1);
     follow_record->is_server = is_server;
     follow_record->packet_num = pinfo->fd->num;
+    follow_record->abs_ts = pinfo->fd->abs_ts;
     follow_record->seq = sequence;  /* start of fragment, used by check_follow_fragments. */
     follow_record->data = g_byte_array_append(g_byte_array_new(),
                                               tvb_get_ptr(follow_data->tvb, data_offset, data_length),
@@ -1420,6 +1463,7 @@ static void conversation_completeness_fill(gchar *buf, guint32 value)
 static gboolean tcp_analyze_seq           = TRUE;
 static gboolean tcp_relative_seq          = TRUE;
 static gboolean tcp_track_bytes_in_flight = TRUE;
+static gboolean tcp_bif_seq_based         = FALSE;
 static gboolean tcp_calculate_ts          = TRUE;
 
 static gboolean tcp_analyze_mptcp                   = TRUE;
@@ -1843,7 +1887,7 @@ pdu_store_sequencenumber_of_next_pdu(packet_info *pinfo, guint32 seq, guint32 nx
     msp->last_frame_time=pinfo->abs_ts;
     msp->flags=0;
     wmem_tree_insert32(multisegment_pdus, seq, (void *)msp);
-    /*g_warning("pdu_store_sequencenumber_of_next_pdu: seq %u", seq);*/
+    /*ws_warning("pdu_store_sequencenumber_of_next_pdu: seq %u", seq);*/
     return msp;
 }
 
@@ -2234,48 +2278,6 @@ finished_fwd:
             seq_not_advanced = FALSE;
         }
 
-        /* If there were >=2 duplicate ACKs in the reverse direction
-         * (there might be duplicate acks missing from the trace)
-         * and if this sequence number matches those ACKs
-         * and if the packet occurs within 20ms of the last
-         * duplicate ack
-         * then this is a fast retransmission
-         */
-        t=(pinfo->abs_ts.secs-tcpd->rev->tcp_analyze_seq_info->lastacktime.secs)*1000000000;
-        t=t+(pinfo->abs_ts.nsecs)-tcpd->rev->tcp_analyze_seq_info->lastacktime.nsecs;
-        if( seq_not_advanced
-        &&  tcpd->rev->tcp_analyze_seq_info->dupacknum>=2
-        &&  tcpd->rev->tcp_analyze_seq_info->lastack==seq
-        &&  t<20000000 ) {
-            if(!tcpd->ta) {
-                tcp_analyze_get_acked_struct(pinfo->num, seq, ack, TRUE, tcpd);
-            }
-            tcpd->ta->flags|=TCP_A_FAST_RETRANSMISSION;
-            goto finished_checking_retransmission_type;
-        }
-
-        /* If the segment came relatively close since the segment with the highest
-         * seen sequence number and it doesn't look like a retransmission
-         * then it is an OUT-OF-ORDER segment.
-         */
-        t=(pinfo->abs_ts.secs-tcpd->fwd->tcp_analyze_seq_info->nextseqtime.secs)*1000000000;
-        t=t+(pinfo->abs_ts.nsecs)-tcpd->fwd->tcp_analyze_seq_info->nextseqtime.nsecs;
-        if (tcpd->ts_first_rtt.nsecs == 0 && tcpd->ts_first_rtt.secs == 0) {
-            ooo_thres = 3000000;
-        } else {
-            ooo_thres = tcpd->ts_first_rtt.nsecs + tcpd->ts_first_rtt.secs*1000000000;
-        }
-
-        if( seq_not_advanced // XXX is this neccessary?
-        && t < ooo_thres
-        && tcpd->fwd->tcp_analyze_seq_info->nextseq >= seq + seglen ) {
-            if(!tcpd->ta) {
-                tcp_analyze_get_acked_struct(pinfo->num, seq, ack, TRUE, tcpd);
-            }
-            tcpd->ta->flags|=TCP_A_OUT_OF_ORDER;
-            goto finished_checking_retransmission_type;
-        }
-
         /* Check for spurious retransmission. If the current seq + segment length
          * is less than or equal to the current lastack, the packet contains
          * duplicate data and may be considered spurious.
@@ -2290,14 +2292,84 @@ finished_fwd:
             goto finished_checking_retransmission_type;
         }
 
+        gboolean precedence_count = tcp_fastrt_precedence;
+        do {
+            switch(precedence_count) {
+                case TRUE:
+                    /* If there were >=2 duplicate ACKs in the reverse direction
+                     * (there might be duplicate acks missing from the trace)
+                     * and if this sequence number matches those ACKs
+                     * and if the packet occurs within 20ms of the last
+                     * duplicate ack
+                     * then this is a fast retransmission
+                     */
+                    t=(pinfo->abs_ts.secs-tcpd->rev->tcp_analyze_seq_info->lastacktime.secs)*1000000000;
+                    t=t+(pinfo->abs_ts.nsecs)-tcpd->rev->tcp_analyze_seq_info->lastacktime.nsecs;
+                    if( seq_not_advanced
+                    &&  tcpd->rev->tcp_analyze_seq_info->dupacknum>=2
+                    &&  tcpd->rev->tcp_analyze_seq_info->lastack==seq
+                    &&  t<20000000 ) {
+                        if(!tcpd->ta) {
+                            tcp_analyze_get_acked_struct(pinfo->num, seq, ack, TRUE, tcpd);
+                        }
+                        tcpd->ta->flags|=TCP_A_FAST_RETRANSMISSION;
+                        goto finished_checking_retransmission_type;
+                    }
+                    precedence_count=!precedence_count;
+                    break;
+
+                case FALSE:
+                    /* If the segment came relatively close since the segment with the highest
+                     * seen sequence number and it doesn't look like a retransmission
+                     * then it is an OUT-OF-ORDER segment.
+                     */
+                    t=(pinfo->abs_ts.secs-tcpd->fwd->tcp_analyze_seq_info->nextseqtime.secs)*1000000000;
+                    t=t+(pinfo->abs_ts.nsecs)-tcpd->fwd->tcp_analyze_seq_info->nextseqtime.nsecs;
+                    if (tcpd->ts_first_rtt.nsecs == 0 && tcpd->ts_first_rtt.secs == 0) {
+                        ooo_thres = 3000000;
+                    } else {
+                        ooo_thres = tcpd->ts_first_rtt.nsecs + tcpd->ts_first_rtt.secs*1000000000;
+                    }
+
+                    if( seq_not_advanced // XXX is this neccessary?
+                    && t < ooo_thres
+                    && tcpd->fwd->tcp_analyze_seq_info->nextseq >= seq + seglen ) {
+                        if(!tcpd->ta) {
+                            tcp_analyze_get_acked_struct(pinfo->num, seq, ack, TRUE, tcpd);
+                        }
+                        tcpd->ta->flags|=TCP_A_OUT_OF_ORDER;
+                        goto finished_checking_retransmission_type;
+                    }
+                    precedence_count=!precedence_count;
+                    break;
+            }
+        } while (precedence_count!=tcp_fastrt_precedence) ;
+
         if (seq_not_advanced) {
             /* Then it has to be a generic retransmission */
             if(!tcpd->ta) {
                 tcp_analyze_get_acked_struct(pinfo->num, seq, ack, TRUE, tcpd);
             }
             tcpd->ta->flags|=TCP_A_RETRANSMISSION;
+
+            /*
+             * worst case scenario: if we don't have better than a recent packet,
+             * use it as the reference for RTO
+             */
             nstime_delta(&tcpd->ta->rto_ts, &pinfo->abs_ts, &tcpd->fwd->tcp_analyze_seq_info->nextseqtime);
             tcpd->ta->rto_frame=tcpd->fwd->tcp_analyze_seq_info->nextseqframe;
+
+            /*
+             * better case scenario: if we have a list of the previous unacked packets,
+             * go back to the eldest one, which in theory is likely to be the one retransmitted here.
+             * It's not always the perfect match, particularly when original captured packet used LSO
+             */
+            ual = tcpd->fwd->tcp_analyze_seq_info->segments;
+            while(ual) {
+                nstime_delta(&tcpd->ta->rto_ts, &pinfo->abs_ts, &ual->ts );
+                tcpd->ta->rto_frame=ual->frame;
+                ual=ual->next;
+            }
         }
     }
 
@@ -2418,64 +2490,94 @@ finished_checking_retransmission_type:
 
     /* how many bytes of data are there in flight after this frame
      * was sent
+     * The historical evaluation is done from the payload seen in the
+     * segments captured. Another method deduced from the SEQ numbers
+     * is introduced with issue 7703, but not used by default now. The
+     * method is chosen by the user preference tcp_bif_seq_based.
      */
-    ual=tcpd->fwd->tcp_analyze_seq_info->segments;
-    if (tcp_track_bytes_in_flight && seglen!=0 && ual && tcpd->fwd->valid_bif) {
-        guint32 first_seq, last_seq, in_flight;
-        guint32 delivered = 0;
+    if(tcp_track_bytes_in_flight) {
+        guint32 in_flight, delivered = 0;
+        /*
+         * "don't repeat yourself" boolean, for the shared part
+         * between both methods
+         */
+        gboolean dry_bif_handling = FALSE;
 
-        first_seq = ual->seq - tcpd->fwd->base_seq;
-        last_seq = ual->nextseq - tcpd->fwd->base_seq;
-        while (ual) {
-            if ((ual->nextseq-tcpd->fwd->base_seq)>last_seq) {
-                last_seq = ual->nextseq-tcpd->fwd->base_seq;
+        /*
+         * historical calculation method based on payloads, which is
+         * by now still the default.
+         */
+        if(!tcp_bif_seq_based) {
+            ual=tcpd->fwd->tcp_analyze_seq_info->segments;
+
+            if (seglen!=0 && ual && tcpd->fwd->valid_bif) {
+                guint32 first_seq, last_seq;
+
+                dry_bif_handling = TRUE;
+
+                first_seq = ual->seq - tcpd->fwd->base_seq;
+                last_seq = ual->nextseq - tcpd->fwd->base_seq;
+                while (ual) {
+                    if ((ual->nextseq-tcpd->fwd->base_seq)>last_seq) {
+                        last_seq = ual->nextseq-tcpd->fwd->base_seq;
+                    }
+                    if ((ual->seq-tcpd->fwd->base_seq)<first_seq) {
+                        first_seq = ual->seq-tcpd->fwd->base_seq;
+                    }
+                    ual = ual->next;
+                }
+                in_flight = last_seq-first_seq;
             }
-            if ((ual->seq-tcpd->fwd->base_seq)<first_seq) {
-                first_seq = ual->seq-tcpd->fwd->base_seq;
+        } else { /* calculation based on SEQ numbers (see issue 7703) */
+            if (seglen!=0 && tcpd->fwd->tcp_analyze_seq_info && tcpd->fwd->valid_bif) {
+
+                dry_bif_handling = TRUE;
+
+                in_flight = tcpd->fwd->tcp_analyze_seq_info->nextseq
+                          - tcpd->rev->tcp_analyze_seq_info->lastack;
             }
-            ual = ual->next;
         }
-        in_flight = last_seq-first_seq;
-
-        /* subtract any SACK block */
-        if(tcpd->rev->tcp_analyze_seq_info->num_sack_ranges > 0) {
-            int i;
-            for(i = 0; i<tcpd->rev->tcp_analyze_seq_info->num_sack_ranges; i++) {
-                delivered += (tcpd->rev->tcp_analyze_seq_info->sack_right_edge[i+1] -
-                              tcpd->rev->tcp_analyze_seq_info->sack_left_edge[i+1]);
+        if(dry_bif_handling) {
+            /* subtract any SACK block */
+            if(tcpd->rev->tcp_analyze_seq_info->num_sack_ranges > 0) {
+                int i;
+                for(i = 0; i<tcpd->rev->tcp_analyze_seq_info->num_sack_ranges; i++) {
+                    delivered += (tcpd->rev->tcp_analyze_seq_info->sack_right_edge[i+1] -
+                                  tcpd->rev->tcp_analyze_seq_info->sack_left_edge[i+1]);
+                }
+                in_flight -= delivered;
             }
-            in_flight -= delivered;
-        }
 
-        if (in_flight>0 && in_flight<2000000000) {
+            if (in_flight>0 && in_flight<2000000000) {
+                if(!tcpd->ta) {
+                    tcp_analyze_get_acked_struct(pinfo->num, seq, ack, TRUE, tcpd);
+                }
+                tcpd->ta->bytes_in_flight = in_flight;
+                /* Decrement in_flight bytes by one when we have a SYN or FIN bit
+                 * flag set as it is only virtual.
+                 */
+                if (flags&(TH_SYN|TH_FIN))  {
+                    tcpd->ta->bytes_in_flight -= 1;
+		    }
+            }
+
+            if((flags & TH_PUSH) && !tcpd->fwd->push_set_last) {
+              tcpd->fwd->push_bytes_sent += seglen;
+              tcpd->fwd->push_set_last = TRUE;
+            } else if ((flags & TH_PUSH) && tcpd->fwd->push_set_last) {
+              tcpd->fwd->push_bytes_sent = seglen;
+              tcpd->fwd->push_set_last = TRUE;
+            } else if (tcpd->fwd->push_set_last) {
+              tcpd->fwd->push_bytes_sent = seglen;
+              tcpd->fwd->push_set_last = FALSE;
+            } else {
+              tcpd->fwd->push_bytes_sent += seglen;
+            }
             if(!tcpd->ta) {
-                tcp_analyze_get_acked_struct(pinfo->num, seq, ack, TRUE, tcpd);
+              tcp_analyze_get_acked_struct(pinfo->fd->num, seq, ack, TRUE, tcpd);
             }
-            tcpd->ta->bytes_in_flight = in_flight;
-            /* Decrement in_flight bytes by one when we have a SYN or FIN bit
-             * flag set as it is only virtual.
-             */
-            if (flags&(TH_SYN|TH_FIN))  {
-                tcpd->ta->bytes_in_flight -= 1;
-		}
+            tcpd->ta->push_bytes_sent = tcpd->fwd->push_bytes_sent;
         }
-
-        if((flags & TH_PUSH) && !tcpd->fwd->push_set_last) {
-          tcpd->fwd->push_bytes_sent += seglen;
-          tcpd->fwd->push_set_last = TRUE;
-        } else if ((flags & TH_PUSH) && tcpd->fwd->push_set_last) {
-          tcpd->fwd->push_bytes_sent = seglen;
-          tcpd->fwd->push_set_last = TRUE;
-        } else if (tcpd->fwd->push_set_last) {
-          tcpd->fwd->push_bytes_sent = seglen;
-          tcpd->fwd->push_set_last = FALSE;
-        } else {
-          tcpd->fwd->push_bytes_sent += seglen;
-        }
-        if(!tcpd->ta) {
-          tcp_analyze_get_acked_struct(pinfo->fd->num, seq, ack, TRUE, tcpd);
-        }
-        tcpd->ta->push_bytes_sent = tcpd->fwd->push_bytes_sent;
     }
 
 }
@@ -3221,7 +3323,7 @@ desegment_tcp(tvbuff_t *tvb, packet_info *pinfo, int offset,
     proto_item *item;
     struct tcp_multisegment_pdu *msp;
     gboolean cleared_writable = col_get_writable(pinfo->cinfo, COL_PROTOCOL);
-    const gboolean reassemble_ooo = tcp_desegment && tcp_reassemble_out_of_order;
+    const gboolean reassemble_ooo = tcp_analyze_seq && tcp_desegment && tcp_reassemble_out_of_order;
 
 again:
     ipfd_head = NULL;
@@ -3342,16 +3444,22 @@ again:
          * and random access dissection). Retransmitted segments that are part
          * of a MSP should already be passed only once to subdissectors due to
          * the "reassembled_in" check below.
-         * The following should also check for TCP_A_SPURIOUS_RETRANSMISSION to
-         * address bug 10289.
          */
-        if((tcpd->ta) && ((tcpd->ta->flags&TCP_A_RETRANSMISSION) == TCP_A_RETRANSMISSION)){
-            const char* str = "Retransmitted ";
-            nbytes = tvb_reported_length_remaining(tvb, offset);
-            proto_tree_add_bytes_format(tcp_tree, hf_tcp_segment_data, tvb, offset,
-                nbytes, NULL, "%sTCP segment data (%u byte%s)", str, nbytes,
-                plurality(nbytes, "", "s"));
-            return;
+        if(tcpd->ta) {
+            /* Spurious Retransmission is the most obvious case to handle, just ignore it.
+             * See issue 10289
+             */
+            if((tcpd->ta->flags&TCP_A_SPURIOUS_RETRANSMISSION) == TCP_A_SPURIOUS_RETRANSMISSION) {
+                return;
+            }
+            if((tcpd->ta->flags&TCP_A_RETRANSMISSION) == TCP_A_RETRANSMISSION) {
+                const char* str = "Retransmitted ";
+                nbytes = tvb_reported_length_remaining(tvb, offset);
+                proto_tree_add_bytes_format(tcp_tree, hf_tcp_segment_data, tvb, offset,
+                    nbytes, NULL, "%sTCP segment data (%u byte%s)", str, nbytes,
+                    plurality(nbytes, "", "s"));
+                return;
+            }
         }
         /* Else, find the most previous PDU starting before this sequence number */
         if (!msp) {
@@ -3416,7 +3524,7 @@ again:
         }
     }
 
-    if (msp && msp->seq <= seq && msp->nxtpdu > seq) {
+    if (msp && LE_SEQ(msp->seq, seq) && GT_SEQ(msp->nxtpdu, seq)) {
         int len;
 
         if (!PINFO_FD_VISITED(pinfo)) {
@@ -3431,7 +3539,10 @@ again:
             /* The dissector asked for the entire segment */
             len = tvb_captured_length_remaining(tvb, offset);
         } else {
-            len = MIN(nxtseq, msp->nxtpdu) - seq;
+            /* Wraparound is possible, so subtraction does not
+             * distribute across MIN(x, y)
+             */
+            len = MIN(nxtseq - seq, msp->nxtpdu - seq);
         }
         last_fragment_len = len;
 
@@ -3624,6 +3735,17 @@ again:
                     msp->flags |= MSP_FLAGS_REASSEMBLE_ENTIRE_SEGMENT;
                 } else if (pinfo->desegment_len == DESEGMENT_UNTIL_FIN) {
                     tcpd->fwd->flags |= TCP_FLOW_REASSEMBLE_UNTIL_FIN;
+                    /* This is not the first segment, and we thought the
+                     * reassembly would be done now, but now know we must
+                     * desgment until FIN. (E.g., HTTP Response with headers
+                     * split across segments, and no Content-Length or
+                     * Transfer-Encoding (RFC 7230, Section 3.3.3, case 7.)
+                     * For the same reasons as below when we encounter
+                     * DESEGMENT_UNTIL_FIN on the first segment, give
+                     * msp->nxtpdu a big (but not too big) offset so reassembly
+                     * will pick up the segments later.
+                     */
+                    msp->nxtpdu = msp->seq + 0x40000000;
                 } else {
                     if (seq + last_fragment_len >= msp->nxtpdu) {
                         /* This is the segment (overlapping) the end of the MSP. */
@@ -4408,7 +4530,7 @@ dissect_tcpopt_sack(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* d
      * (1) A D-SACK block is only used to report a duplicate contiguous sequence of data received by
      *     the receiver in the most recent packet.
      */
-    if (GE_SEQ(tcph->sack_right_edge[0], tcph->th_ack) ||
+    if (LE_SEQ(tcph->sack_right_edge[0], tcph->th_ack) ||
          (tcph->num_sack_ranges > 1 &&
           LT_SEQ(tcph->sack_left_edge[1], tcph->sack_right_edge[0]) &&
           GE_SEQ(tcph->sack_right_edge[1], tcph->sack_right_edge[0]))
@@ -5064,6 +5186,16 @@ dissect_tcpopt_mptcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
             proto_tree_add_item(mptcp_tree,
                     hf_tcp_option_mptcp_recv_key, tvb, offset, 8, ENC_BIG_ENDIAN);
             mph->mh_key = tvb_get_ntoh64(tvb,offset);
+            break;
+
+        case TCPOPT_MPTCP_MP_TCPRST:
+            mph->mh_tcprst = TRUE;
+            proto_tree_add_bitmask(mptcp_tree, tvb, offset, hf_tcp_option_mptcp_flags,
+                                   ett_tcp_option_mptcp, tcp_option_mptcp_tcprst_flags,
+                                   ENC_BIG_ENDIAN);
+            offset += 1;
+            proto_tree_add_item(mptcp_tree, hf_tcp_option_mptcp_tcprst_reason, tvb,  offset, 1,
+                                ENC_BIG_ENDIAN);
             break;
 
         default:
@@ -5957,7 +6089,7 @@ tcp_dissect_options(tvbuff_t *tvb, int offset, guint length, int eol,
                     nop_count = 0;
                 }
             } else {
-                g_assert_not_reached();
+                DISSECTOR_ASSERT_NOT_REACHED();
             }
 
             field_item = proto_tree_add_item(opt_tree, local_proto, tvb, offset, 1, ENC_NA);
@@ -7598,6 +7730,26 @@ proto_register_tcp(void)
           { "Reserved", "tcp.options.mptcp.reserved.flag", FT_UINT8,
             BASE_HEX, NULL, 0x3E, NULL, HFILL}},
 
+        { &hf_tcp_option_mptcp_U_flag,
+          { "Flag U", "tcp.options.mptcp.flag_U.flag", FT_BOOLEAN,
+            4, TFS(&tfs_set_notset), MPTCP_TCPRST_FLAG_U_PRESENT, NULL, HFILL}},
+
+        { &hf_tcp_option_mptcp_V_flag,
+          { "Flag V", "tcp.options.mptcp.flag_V.flag", FT_BOOLEAN,
+            4, TFS(&tfs_set_notset), MPTCP_TCPRST_FLAG_V_PRESENT, NULL, HFILL}},
+
+        { &hf_tcp_option_mptcp_W_flag,
+          { "Flag W", "tcp.options.mptcp.flag_W.flag", FT_BOOLEAN,
+            4, TFS(&tfs_set_notset), MPTCP_TCPRST_FLAG_W_PRESENT, NULL, HFILL}},
+
+        { &hf_tcp_option_mptcp_T_flag,
+          { "Transient", "tcp.options.mptcp.flag_T.flag", FT_BOOLEAN,
+            4, TFS(&tfs_set_notset), MPTCP_TCPRST_FLAG_T_PRESENT, NULL, HFILL}},
+
+        { &hf_tcp_option_mptcp_tcprst_reason,
+          { "TCPRST Reason", "tcp.options.mptcp.rst_reason", FT_UINT8,
+            BASE_HEX, VALS(mp_tcprst_reasons), 0x0, "Multipath TCPRST Reason Code", HFILL}},
+
         { &hf_tcp_option_mptcp_address_id,
           { "Address ID", "tcp.options.mptcp.addrid", FT_UINT8,
             BASE_DEC, NULL, 0x0, NULL, HFILL}},
@@ -8275,6 +8427,11 @@ proto_register_tcp(void)
         "To use this option you must also enable \"Analyze TCP sequence numbers\". "
         "This takes a lot of memory but allows you to track how much data are in flight at a time and graphing it in io-graphs",
         &tcp_track_bytes_in_flight);
+    prefs_register_bool_preference(tcp_module, "bif_seq_based",
+        "Evaluate bytes in flight based on sequence numbers",
+        "Evaluate BiF on actual sequence numbers or use the historical method based on payloads (default). "
+        "This option has no effect if not used with \"Track number of bytes in flight\". ",
+        &tcp_bif_seq_based);
     prefs_register_bool_preference(tcp_module, "calculate_timestamps",
         "Calculate conversation timestamps",
         "Calculate timestamps relative to the first frame and the previous frame in the tcp conversation",
@@ -8287,6 +8444,10 @@ proto_register_tcp(void)
         "Ignore TCP Timestamps in summary",
         "Do not place the TCP Timestamps in the summary line",
         &tcp_ignore_timestamps);
+    prefs_register_bool_preference(tcp_module, "fastrt_supersedes_ooo",
+        "Fast Retransmission supersedes Out-of-Order interpretation",
+        "When interpreting ambiguous packets, give precedence to Fast Retransmission or OOO ",
+        &tcp_fastrt_precedence);
 
     prefs_register_bool_preference(tcp_module, "no_subdissector_on_error",
         "Do not call subdissectors for error packets",

@@ -176,7 +176,7 @@ de_sgsap_ecgi(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offse
 
     curr_offset = offset;
 
-    dissect_e212_mcc_mnc(tvb, pinfo, tree, offset, E212_NONE, TRUE);
+    dissect_e212_mcc_mnc(tvb, pinfo, tree, offset, E212_ECGI, TRUE);
     curr_offset += 3;
 
     proto_tree_add_item(tree, hf_sgsap_eci, tvb, curr_offset, 4, ENC_BIG_ENDIAN);
@@ -1674,7 +1674,7 @@ void proto_register_sgsap(void) {
         NULL, HFILL }
     },
     { &hf_sgsap_sel_cs_dmn_op,
-        { "Selected CS domain operato", "sgsap.sel_cs_dmn_op",
+        { "Selected CS domain operator", "sgsap.sel_cs_dmn_op",
         FT_BYTES, BASE_NONE, NULL, 0x0,
         NULL, HFILL }
     },

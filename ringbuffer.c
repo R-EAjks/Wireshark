@@ -231,7 +231,7 @@ static int ringbuf_open_file(rb_file *rfile, int *err)
   if (tm != NULL)
     strftime(timestr, sizeof(timestr), "%Y%m%d%H%M%S", tm);
   else
-    g_strlcpy(timestr, "196912312359", sizeof(timestr)); /* second before the Epoch */
+    (void) g_strlcpy(timestr, "196912312359", sizeof(timestr)); /* second before the Epoch */
   rfile->name = g_strconcat(rb_data.fprefix, "_", filenum, "_", timestr,
                             rb_data.fsuffix, NULL);
 
@@ -382,7 +382,6 @@ gboolean ringbuf_is_initialized(void)
 
 const gchar *ringbuf_current_filename(void)
 {
-  /* g_assert(ringbuf_is_initialized()); */
   return rb_data.files[rb_data.curr_file_num % rb_data.num_files].name;
 }
 

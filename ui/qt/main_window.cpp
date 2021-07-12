@@ -21,17 +21,20 @@ DIAG_ON(frame-larger-than=)
 #include "epan/conversation_filter.h"
 #include <epan/epan_dissect.h>
 #include <wsutil/filesystem.h>
-#include <version_info.h>
+#include <wsutil/wslog.h>
+#include <wsutil/ws_assert.h>
+#include <ui/version_info.h>
 #include <epan/prefs.h>
 #include <epan/stats_tree_priv.h>
 #include <epan/plugin_if.h>
 #include <epan/export_object.h>
+#include <frame_tvbuff.h>
 
 #include "ui/iface_toolbar.h"
 
 #ifdef HAVE_LIBPCAP
 #include "ui/capture.h"
-#include <capchild/capture_session.h>
+#include <capture/capture_session.h>
 #endif
 
 #include "ui/alert_box.h"
@@ -119,9 +122,10 @@ static void plugin_if_mainwindow_preference(GHashTable * data_set)
     const char * pref_name;
     const char * pref_value;
 
-    if (g_hash_table_lookup_extended(data_set, "pref_module", NULL, (void**)&module_name) &&
-        g_hash_table_lookup_extended(data_set, "pref_key", NULL, (void**)&pref_name) &&
-        g_hash_table_lookup_extended(data_set, "pref_value", NULL, (void**)&pref_value))
+DIAG_OFF_CAST_AWAY_CONST
+    if (g_hash_table_lookup_extended(data_set, "pref_module", NULL, (gpointer *)&module_name) &&
+        g_hash_table_lookup_extended(data_set, "pref_key", NULL, (gpointer *)&pref_name) &&
+        g_hash_table_lookup_extended(data_set, "pref_value", NULL, (gpointer *)&pref_value))
     {
         unsigned int changed_flags = prefs_store_ext(module_name, pref_name, pref_value);
         if (changed_flags) {
@@ -129,6 +133,7 @@ static void plugin_if_mainwindow_preference(GHashTable * data_set)
             wsApp->emitAppSignal(WiresharkApplication::PreferencesChanged);
         }
     }
+DIAG_ON_CAST_AWAY_CONST
 }
 
 static void plugin_if_mainwindow_gotoframe(GHashTable * data_set)
@@ -505,6 +510,8 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(packet_list_, SIGNAL(framesSelected(QList<int>)), this, SLOT(setMenusForSelectedPacket()));
     connect(packet_list_, SIGNAL(framesSelected(QList<int>)), this, SIGNAL(framesSelected(QList<int>)));
 
+    connect(main_ui_->menuPacketComment, SIGNAL(aboutToShow()), this, SLOT(setEditCommentsMenu()));
+
     proto_tree_ = new ProtoTree(&master_split_);
     proto_tree_->installEventFilter(this);
 
@@ -840,7 +847,7 @@ void MainWindow::setPipeInputHandler(gint source, gpointer user_data, ws_process
        this but doesn't seem to work over processes.  Attempt to do
        something similar here, start a timer and check for data on every
        timeout. */
-       /*g_log(NULL, G_LOG_LEVEL_DEBUG, "pipe_input_set_handler: new");*/
+       /*ws_log(NULL, LOG_LEVEL_DEBUG, "pipe_input_set_handler: new");*/
 
     if (pipe_timer_) {
         disconnect(pipe_timer_, SIGNAL(timeout()), this, SLOT(pipeTimeout()));
@@ -1294,10 +1301,8 @@ void MainWindow::mergeCaptureFile()
             return;
         }
 
-        /* Save the name of the containing directory specified in the path name,
-           if any; we can write over cf_merged_name, which is a good thing, given that
-           "get_dirname()" does write over its argument. */
-        wsApp->setLastOpenDir(get_dirname(tmpname));
+        /* Save the name of the containing directory specified in the path name. */
+        wsApp->setLastOpenDirFromFilename(tmpname);
         g_free(tmpname);
         main_ui_->statusBar->showExpert();
         return;
@@ -1378,7 +1383,7 @@ bool MainWindow::saveCaptureFile(capture_file *cf, bool dont_reopen) {
             default:
                 /* Squelch warnings that discard_comments is being used
                    uninitialized. */
-                g_assert_not_reached();
+                ws_assert_not_reached();
                 return false;
             }
 
@@ -1806,7 +1811,7 @@ bool MainWindow::testCaptureFileClose(QString before_what, FileCloseContext cont
          * callers should be modified to check this condition and act
          * accordingly (ignore action or queue it up), so print a warning.
          */
-        g_warning("Refusing to close \"%s\" which is being read.", capture_file_.capFile()->filename);
+        ws_warning("Refusing to close \"%s\" which is being read.", capture_file_.capFile()->filename);
         return false;
     }
 
@@ -2641,6 +2646,7 @@ static QList<register_stat_group_t> menu_groups = QList<register_stat_group_t>()
             << REGISTER_STAT_GROUP_CONVERSATION_LIST
             << REGISTER_STAT_GROUP_ENDPOINT_LIST
             << REGISTER_STAT_GROUP_RESPONSE_TIME
+            << REGISTER_STAT_GROUP_RSERPOOL
             << REGISTER_STAT_GROUP_TELEPHONY
             << REGISTER_STAT_GROUP_TELEPHONY_ANSI
             << REGISTER_STAT_GROUP_TELEPHONY_GSM
@@ -2661,6 +2667,9 @@ void MainWindow::addMenuActions(QList<QAction *> &actions, int menu_group)
             break;
         case REGISTER_STAT_GROUP_RESPONSE_TIME:
             main_ui_->menuServiceResponseTime->addAction(action);
+            break;
+        case REGISTER_STAT_GROUP_RSERPOOL:
+            main_ui_->menuRSerPool->addAction(action);
             break;
         case REGISTER_STAT_GROUP_TELEPHONY:
             main_ui_->menuTelephony->addAction(action);
@@ -2724,6 +2733,9 @@ void MainWindow::removeMenuActions(QList<QAction *> &actions, int menu_group)
             break;
         case REGISTER_STAT_GROUP_RESPONSE_TIME:
             main_ui_->menuServiceResponseTime->removeAction(action);
+            break;
+        case REGISTER_STAT_GROUP_RSERPOOL:
+            main_ui_->menuRSerPool->removeAction(action);
             break;
         case REGISTER_STAT_GROUP_TELEPHONY:
             main_ui_->menuTelephony->removeAction(action);
@@ -3009,3 +3021,130 @@ frame_data * MainWindow::frameDataForRow(int row) const
 
     return Q_NULLPTR;
 }
+
+// Finds rtp id for selected stream and adds it to stream_ids
+// If reverse is set, tries to find reverse stream too
+// Return error string if error happens
+//
+// Note: Caller must free each returned rtpstream_info_t
+QString MainWindow::findRtpStreams(QVector<rtpstream_id_t *> *stream_ids, bool reverse)
+{
+    rtpstream_tapinfo_t tapinfo;
+    rtpstream_id_t *fwd_id, *rev_id;
+    bool fwd_id_used, rev_id_used;
+    const gchar filter_text[] = "rtp && rtp.version == 2 && rtp.ssrc && (ip || ipv6)";
+    dfilter_t *sfcode;
+    gchar *err_msg;
+
+    /* Try to get the hfid for "rtp.ssrc". */
+    int hfid_rtp_ssrc = proto_registrar_get_id_byname("rtp.ssrc");
+    if (hfid_rtp_ssrc == -1) {
+        return tr("There is no \"rtp.ssrc\" field in this version of Wireshark.");
+    }
+
+    /* Try to compile the filter. */
+    if (!dfilter_compile(filter_text, &sfcode, &err_msg)) {
+        QString err = QString(err_msg);
+        g_free(err_msg);
+        return err;
+    }
+
+    if (!capture_file_.capFile() || !capture_file_.capFile()->current_frame) close();
+
+    if (!cf_read_current_record(capture_file_.capFile())) close();
+
+    frame_data *fdata = capture_file_.capFile()->current_frame;
+
+    epan_dissect_t edt;
+
+    epan_dissect_init(&edt, capture_file_.capFile()->epan, true, false);
+    epan_dissect_prime_with_dfilter(&edt, sfcode);
+    epan_dissect_prime_with_hfid(&edt, hfid_rtp_ssrc);
+    epan_dissect_run(&edt, capture_file_.capFile()->cd_t,
+                     &capture_file_.capFile()->rec,
+                     frame_tvbuff_new_buffer(
+                         &capture_file_.capFile()->provider, fdata,
+                         &capture_file_.capFile()->buf),
+                     fdata, NULL);
+
+    /*
+     * Packet must be an RTPv2 packet with an SSRC; we use the filter to
+     * check.
+     */
+    if (!dfilter_apply_edt(sfcode, &edt)) {
+        epan_dissect_cleanup(&edt);
+        dfilter_free(sfcode);
+        return tr("Please select an RTPv2 packet with an SSRC value");
+    }
+
+    dfilter_free(sfcode);
+
+    /* We need the SSRC value of the current frame; try to get it. */
+    GPtrArray *gp = proto_get_finfo_ptr_array(edt.tree, hfid_rtp_ssrc);
+    if (gp == NULL || gp->len == 0) {
+        /* XXX - should not happen, as the filter includes rtp.ssrc */
+        epan_dissect_cleanup(&edt);
+        return tr("SSRC value not found.");
+    }
+
+    /*
+     * OK, we have the SSRC value, so we can proceed.
+     * Allocate RTP stream ID structures.
+     */
+    fwd_id = g_new0(rtpstream_id_t, 1);
+    fwd_id_used = false;
+    rev_id = g_new0(rtpstream_id_t, 1);
+    rev_id_used = false;
+
+    /* Get the IP and port values for the forward direction. */
+    rtpstream_id_copy_pinfo(&(edt.pi), fwd_id, false);
+
+    /* assume the inverse ip/port combination for the reverse direction */
+    rtpstream_id_copy_pinfo(&(edt.pi), rev_id, true);
+
+    /* Save the SSRC value for the forward direction. */
+    fwd_id->ssrc = fvalue_get_uinteger(&((field_info *)gp->pdata[0])->value);
+
+    epan_dissect_cleanup(&edt);
+
+    /* Register the tap listener */
+    memset(&tapinfo, 0, sizeof(rtpstream_tapinfo_t));
+    tapinfo.tap_data = this;
+    tapinfo.mode = TAP_ANALYSE;
+
+    /* Scan for RTP streams (redissect all packets) */
+    rtpstream_scan(&tapinfo, capture_file_.capFile(), Q_NULLPTR);
+
+    for (GList *strinfo_list = g_list_first(tapinfo.strinfo_list); strinfo_list; strinfo_list = gxx_list_next(strinfo_list)) {
+        rtpstream_info_t * strinfo = gxx_list_data(rtpstream_info_t*, strinfo_list);
+        if (rtpstream_id_equal(&(strinfo->id), fwd_id,RTPSTREAM_ID_EQUAL_NONE))
+        {
+            *stream_ids << fwd_id;
+            fwd_id_used = true;
+        }
+
+        if (rtpstream_id_equal(&(strinfo->id), rev_id,RTPSTREAM_ID_EQUAL_NONE))
+        {
+            if (rev_id->ssrc == 0) {
+                rev_id->ssrc = strinfo->id.ssrc;
+            }
+            if (reverse) {
+                *stream_ids << rev_id;
+                rev_id_used = true;
+            }
+        }
+    }
+
+    //
+    // XXX - is it guaranteed that fwd_id and rev_id were both added to
+    // *stream_ids?  If so, this isn't necessary.
+    //
+    if (!fwd_id_used) {
+        rtpstream_id_free(fwd_id);
+    }
+    if (!rev_id_used) {
+        rtpstream_id_free(rev_id);
+    }
+    return NULL;
+}
+

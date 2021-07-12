@@ -62,6 +62,7 @@
 #include <epan/in_cksum.h>
 #include <epan/expert.h>
 #include <epan/addr_resolv.h>
+#include <wsutil/ws_roundup.h>
 #include "packet-rsvp.h"
 
 void proto_register_ospf(void);
@@ -257,8 +258,8 @@ static const value_string grace_tlv_type_vals[] = {
 #define OPAQUE_TLV_NAT              10
 #define OPAQUE_TLV_SBD              11
 #define OPAQUE_TLV_NODE_MSD         12
-#define OPAQUE_TLV_SRLB             13
-#define OPAQUE_TLV_SRMS_PREF        14
+#define OPAQUE_TLV_SRLB             14
+#define OPAQUE_TLV_SRMS_PREF        15
 
 /* The Opaque RI LSA TLV types definitions. */
 static const value_string ri_tlv_type_vals[] = {
@@ -270,7 +271,7 @@ static const value_string ri_tlv_type_vals[] = {
     {OPAQUE_TLV_PCED,               "PCED"                               },
     {OPAQUE_TLV_DH,                 "OSPF Dynamic Hostname"              },
     {OPAQUE_TLV_SA,                 "SR-Algorithm "                      },
-    {OPAQUE_TLV_SLR,                "SID/Label Range "                   },
+    {OPAQUE_TLV_SLR,                "SID/Label Range"                    },
     {OPAQUE_TLV_NAT,                "Node Admin Tag "                    },
     {OPAQUE_TLV_SBD,                "S-BFD Discriminator"                },
     {OPAQUE_TLV_NODE_MSD,           "Node MSD"                           },
@@ -999,6 +1000,7 @@ static expert_field ei_ospf_lsa_constraint_missing = EI_INIT;
 static expert_field ei_ospf_lsa_bc_error = EI_INIT;
 static expert_field ei_ospf_lsa_unknown_type = EI_INIT;
 static expert_field ei_ospf_unknown_link_subtype = EI_INIT;
+static expert_field ei_ospf_stlv_length_invalid = EI_INIT;
 
 static gint ospf_msg_type_to_filter (guint8 msg_type)
 {
@@ -1226,7 +1228,7 @@ ospf_has_at_block(tvbuff_t *tvb, int offset, guint8 packet_type, guint8 version)
 {
     guint32 v3flags;
 
-    /* AT (Authentication Trailer) block can be found only in OSPFv3 HELLO packets */
+    /* AT (Authentication Trailer) block can be found in OSPFv3 HELLO and DD packets */
     switch (packet_type) {
     case OSPF_HELLO:
         switch (version) {
@@ -1235,6 +1237,15 @@ ospf_has_at_block(tvbuff_t *tvb, int offset, guint8 packet_type, guint8 version)
             v3flags = v3flags >> 8;
             return v3flags & OSPF_V3_OPTIONS_AT;
         }
+        break;
+    case OSPF_DB_DESC:
+        switch (version) {
+        case OSPF_VERSION_3:
+            v3flags = tvb_get_ntohl(tvb, offset + 1);
+            v3flags = v3flags >> 8;
+            return v3flags & OSPF_V3_OPTIONS_AT;
+        }
+        break;
     }
 
     return 0;
@@ -2541,6 +2552,13 @@ dissect_ospf_lsa_mpls(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree 
             while (stlv_offset < tlv_end_offset) {
                 stlv_type = tvb_get_ntohs(tvb, stlv_offset);
                 stlv_len = tvb_get_ntohs(tvb, stlv_offset + 2);
+
+                if (stlv_len < 4) {
+                  proto_tree_add_expert_format(tlv_tree, pinfo, &ei_ospf_stlv_length_invalid, tvb, stlv_offset + 2, 2,
+                                        "Invalid sub-TLV lentgh: %u", stlv_len);
+                  break;
+                }
+
                 stlv_name = val_to_str_const(stlv_type, oif_stlv_str, "Unknown sub-TLV");
                 switch (stlv_type) {
 
@@ -2811,7 +2829,7 @@ dissect_ospf_lsa_opaque_ri(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_
                     proto_tree_add_item(stlv_tree, hf_ospf_tlv_value, tvb, stlv_offset + 4, stlv_length, ENC_NA);
                     break;
                 }
-                stlv_offset += 4 + ((stlv_length + 3) & ~3);
+                stlv_offset += 4 + WS_ROUNDUP_4(stlv_length);
             }
             break;
 
@@ -2848,7 +2866,9 @@ dissect_ospf_lsa_opaque_ri(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_
                 return;
             }
             tlv_tree = proto_tree_add_subtree_format(ri_tree, tvb, offset, tlv_length+4,
-                                    ett_ospf_lsa_unknown_tlv, NULL, "%s", val_to_str_const(tlv_type, ri_tlv_type_vals, "Unknown Opaque RI LSA TLV"));
+                                    ett_ospf_lsa_unknown_tlv, NULL, "%s  (t=%u, l=%u)",
+                                    val_to_str_const(tlv_type, ri_tlv_type_vals, "Unknown Opaque RI LSA TLV"),
+                                    tlv_type, tlv_length);
 
             proto_tree_add_item(tlv_tree, hf_ospf_tlv_type_opaque, tvb, offset, 2, ENC_BIG_ENDIAN);
 
@@ -2863,7 +2883,7 @@ dissect_ospf_lsa_opaque_ri(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_
          * RFC 7770, section 2.3: 4-octet aligned, but type, length and padding
          * is not included in the length.
          * */
-        offset += 4 + ((tlv_length + 3) & ~3);
+        offset += 4 + WS_ROUNDUP_4(tlv_length);
     }
 }
 
@@ -3013,7 +3033,7 @@ dissect_ospf_lsa_ext_prefix(tvbuff_t *tvb, packet_info *pinfo, int offset, proto
                     proto_tree_add_item(stlv_tree, hf_ospf_tlv_value, tvb, stlv_offset + 4, stlv_length, ENC_NA);
                     break;
                 }
-                stlv_offset += 4 + ((stlv_length + 3) & ~3);
+                stlv_offset += 4 + WS_ROUNDUP_4(stlv_length);
             }
         }
 
@@ -3021,7 +3041,7 @@ dissect_ospf_lsa_ext_prefix(tvbuff_t *tvb, packet_info *pinfo, int offset, proto
          * RFC 7770, section 2.3: 4-octet aligned, but type, length and padding
          * is not included in the length.
          * */
-        offset += 4 + ((tlv_length + 3) & ~3);
+        offset += 4 + WS_ROUNDUP_4(tlv_length);
     }
 }
 
@@ -3180,7 +3200,7 @@ dissect_ospf_lsa_ext_link(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_t
                     proto_tree_add_item(stlv_tree, hf_ospf_tlv_value, tvb, stlv_offset + 4, stlv_length, ENC_NA);
                     break;
                 }
-                stlv_offset += 4 + ((stlv_length + 3) & ~3);
+                stlv_offset += 4 + WS_ROUNDUP_4(stlv_length);
             }
             break;
 
@@ -3203,7 +3223,7 @@ dissect_ospf_lsa_ext_link(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_t
          * RFC 7770, section 2.3: 4-octet aligned, but type, length and padding
          * is not included in the length.
          * */
-        offset += 4 + ((tlv_length + 3) & ~3);
+        offset += 4 + WS_ROUNDUP_4(tlv_length);
     }
 }
 
@@ -4748,6 +4768,7 @@ proto_register_ospf(void)
         { &ei_ospf_lsa_bc_error, { "ospf.lsa.bc_error", PI_PROTOCOL, PI_WARN, "BC error", EXPFILL }},
         { &ei_ospf_lsa_unknown_type, { "ospf.lsa.unknown_type", PI_PROTOCOL, PI_WARN, "Unknown LSA Type", EXPFILL }},
         { &ei_ospf_unknown_link_subtype, { "ospf.unknown_link_subtype", PI_PROTOCOL, PI_WARN, "Unknown Link sub-TLV", EXPFILL }},
+        { &ei_ospf_stlv_length_invalid, { "ospf.stlv.invalid_length", PI_PROTOCOL, PI_WARN, "Invalid sub-TLV length", EXPFILL }},
     };
 
     expert_module_t* expert_ospf;

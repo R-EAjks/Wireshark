@@ -9,6 +9,7 @@
  */
 
 #include "config.h"
+#define WS_LOG_DOMAIN LOG_DOMAIN_EPAN
 
 #include <stdio.h>
 #include <string.h>
@@ -21,6 +22,8 @@
 #include <wsutil/sign_ext.h>
 #include <wsutil/utf8_entities.h>
 #include <wsutil/json_dumper.h>
+#include <wsutil/wslog.h>
+#include <wsutil/ws_assert.h>
 
 #include <ftypes/ftypes-int.h>
 
@@ -45,7 +48,6 @@
 #include "in_cksum.h"
 #include "register-int.h"
 
-#include <wsutil/ws_printf.h> /* ws_debug_printf */
 #include <wsutil/crash_info.h>
 #include <wsutil/epochs.h>
 
@@ -110,7 +112,7 @@ struct ptvcursor {
 	if (PTREE_DATA(tree)->count > prefs.gui_max_tree_items) {			\
 		free_block;						\
 		if (wireshark_abort_on_too_many_items) \
-			g_error("Adding %s would put more than %d items in the tree -- possible infinite loop (max number of items can be increased in advanced preferences)", \
+			ws_error("Adding %s would put more than %d items in the tree -- possible infinite loop (max number of items can be increased in advanced preferences)", \
 			    hfinfo->abbrev, prefs.gui_max_tree_items);	\
 		/* Let the exception handler add items to the tree */	\
 		PTREE_DATA(tree)->count = 0;				\
@@ -143,7 +145,7 @@ struct ptvcursor {
 /** See inlined comments.
  @param pi the created protocol item we're about to return */
 #define TRY_TO_FAKE_THIS_REPR(pi)	\
-	g_assert(pi);			\
+	ws_assert(pi);			\
 	if (!(PTREE_DATA(pi)->visible)) { \
 		/* If the tree (GUI) isn't visible it's pointless for us to generate the protocol \
 		 * items string representation */ \
@@ -183,7 +185,7 @@ struct ptvcursor {
 			   so only report if different... */ \
 			if ((start_values[m].value == current->value) && \
 			    (strcmp(start_values[m].strptr, current->strptr) != 0)) { \
-				g_warning("Field '%s' (%s) has a conflicting entry in its" \
+				ws_warning("Field '%s' (%s) has a conflicting entry in its" \
 					  " value_string: %" modifier "u is at indices %u (%s) and %u (%s)", \
 					  hfinfo->name, hfinfo->abbrev, \
 					  current->value, m, start_values[m].strptr, n, current->strptr); \
@@ -326,7 +328,7 @@ static void register_type_length_mismatch(void);
 static int proto_number_string_decoding_error = -1;
 static expert_field ei_number_string_decoding_failed_error = EI_INIT;
 static expert_field ei_number_string_decoding_erange_error = EI_INIT;
-static void register_number_string_decoding_error(void);
+static void register_number_string_decodinws_error(void);
 
 /* Handle string errors expert info */
 static int proto_string_errors = -1;
@@ -389,7 +391,7 @@ static GHashTable* prefixes = NULL;
 
 #define PROTO_REGISTRAR_GET_NTH(hfindex, hfinfo)						\
 	if((guint)hfindex >= gpa_hfinfo.len && wireshark_abort_on_dissector_bug)	\
-		g_error("Unregistered hf! index=%d", hfindex);					\
+		ws_error("Unregistered hf! index=%d", hfindex);					\
 	DISSECTOR_ASSERT_HINT((guint)hfindex < gpa_hfinfo.len, "Unregistered hf!");	\
 	DISSECTOR_ASSERT_HINT(gpa_hfinfo.hfi[hfindex] != NULL, "Unregistered hf!");	\
 	hfinfo = gpa_hfinfo.hfi[hfindex];
@@ -456,7 +458,7 @@ proto_register_plugin(const proto_plugin *plug)
 void
 proto_register_plugin(const proto_plugin *plug _U_)
 {
-	g_warning("proto_register_plugin: built without support for binary plugins");
+	ws_warning("proto_register_plugin: built without support for binary plugins");
 }
 #endif /* HAVE_PLUGINS */
 
@@ -515,7 +517,7 @@ proto_init(GSList *register_all_plugin_protocols_list,
 	/* Register the pseudo-protocols used for exceptions. */
 	register_show_exception();
 	register_type_length_mismatch();
-	register_number_string_decoding_error();
+	register_number_string_decodinws_error();
 	register_string_errors();
 
 	/* Have each built-in dissector register its protocols, fields,
@@ -1117,10 +1119,8 @@ ptvcursor_new_subtree_levels(ptvcursor_t *ptvc)
 	DISSECTOR_ASSERT(ptvc->pushed_tree_max <= SUBTREE_MAX_LEVELS-SUBTREE_ONCE_ALLOCATION_NUMBER);
 	ptvc->pushed_tree_max += SUBTREE_ONCE_ALLOCATION_NUMBER;
 
-	pushed_tree = (subtree_lvl *)wmem_alloc(wmem_packet_scope(), sizeof(subtree_lvl) * ptvc->pushed_tree_max);
+	pushed_tree = (subtree_lvl *)wmem_realloc(wmem_packet_scope(), (void *)ptvc->pushed_tree, sizeof(subtree_lvl) * ptvc->pushed_tree_max);
 	DISSECTOR_ASSERT(pushed_tree != NULL);
-	if (ptvc->pushed_tree)
-		memcpy(pushed_tree, ptvc->pushed_tree, ptvc->pushed_tree_max - SUBTREE_ONCE_ALLOCATION_NUMBER);
 	ptvc->pushed_tree = pushed_tree;
 }
 
@@ -1420,7 +1420,7 @@ proto_tree_add_debug_text(proto_tree *tree, const char *format, ...)
 	va_start(ap, format);
 	vprintf(format, ap);
 	va_end(ap);
-	ws_debug_printf("\n");
+	printf("\n");
 
 	return pi;
 }
@@ -3708,7 +3708,7 @@ proto_tree_add_item_ret_string_and_length(proto_tree *tree, int hfindex,
 		break;
 
 	default:
-		g_assert_not_reached();
+		ws_assert_not_reached();
 	}
 
 	return pi;
@@ -3803,7 +3803,7 @@ proto_tree_add_item_ret_display_string_and_length(proto_tree *tree, int hfindex,
 		break;
 
 	default:
-		g_assert_not_reached();
+		ws_assert_not_reached();
 	}
 
 	new_fi->flags |= (encoding & ENC_LITTLE_ENDIAN) ? FI_LITTLE_ENDIAN : FI_BIG_ENDIAN;
@@ -3827,7 +3827,7 @@ proto_tree_add_item_ret_display_string_and_length(proto_tree *tree, int hfindex,
 		break;
 
 	default:
-		g_assert_not_reached();
+		ws_assert_not_reached();
 	}
 
 	return pi;
@@ -3884,7 +3884,7 @@ proto_tree_add_item_ret_time_string(proto_tree *tree, int hfindex,
 		proto_tree_set_time(new_fi, &time_stamp);
 		break;
 	default:
-		g_assert_not_reached();
+		ws_assert_not_reached();
 	}
 
 	new_fi->flags |= (encoding & ENC_LITTLE_ENDIAN) ? FI_LITTLE_ENDIAN : FI_BIG_ENDIAN;
@@ -6245,7 +6245,7 @@ new_field_info(proto_tree *tree, header_field_info *hfinfo, tvbuff_t *tvb,
 static void
 proto_tree_set_representation_value(proto_item *pi, const char *format, va_list ap)
 {
-	g_assert(pi);
+	ws_assert(pi);
 
 	/* If the tree (GUI) or item isn't visible it's pointless for us to generate the protocol
 	 * items string representation */
@@ -6670,7 +6670,7 @@ proto_custom_set(proto_tree* tree, GSList *field_ids, gint occurrence,
 	int field_id;
 	int ii = 0;
 
-	g_assert(field_ids != NULL);
+	ws_assert(field_ids != NULL);
 	while ((field_idx = (int *) g_slist_nth_data(field_ids, ii++))) {
 		field_id = *field_idx;
 		PROTO_REGISTRAR_GET_NTH((guint)field_id, hfinfo);
@@ -6765,7 +6765,7 @@ proto_custom_set(proto_tree* tree, GSList *field_ids, gint occurrence,
 						} else {
 							number_out = hfinfo_char_value_format(hfinfo, number_buf, number);
 
-							g_strlcpy(expr+offset_e, number_out, size-offset_e);
+							(void) g_strlcpy(expr+offset_e, number_out, size-offset_e);
 						}
 
 						offset_e = (int)strlen(expr);
@@ -6799,7 +6799,7 @@ proto_custom_set(proto_tree* tree, GSList *field_ids, gint occurrence,
 						} else {
 							number_out = hfinfo_numeric_value_format(hfinfo, number_buf, number);
 
-							g_strlcpy(expr+offset_e, number_out, size-offset_e);
+							(void) g_strlcpy(expr+offset_e, number_out, size-offset_e);
 						}
 
 						offset_e = (int)strlen(expr);
@@ -6829,7 +6829,7 @@ proto_custom_set(proto_tree* tree, GSList *field_ids, gint occurrence,
 						} else {
 							number_out = hfinfo_numeric_value_format64(hfinfo, number_buf, number64);
 
-							g_strlcpy(expr+offset_e, number_out, size-offset_e);
+							(void) g_strlcpy(expr+offset_e, number_out, size-offset_e);
 						}
 
 						offset_e = (int)strlen(expr);
@@ -6897,7 +6897,7 @@ proto_custom_set(proto_tree* tree, GSList *field_ids, gint occurrence,
 
 				default:
 					/* for all others, just copy "result" to "expr" */
-					g_strlcpy(expr, result, size);
+					(void) g_strlcpy(expr, result, size);
 					break;
 			}
 
@@ -7001,13 +7001,13 @@ proto_item_prepend_text(proto_item *pi, const char *format, ...)
 			ITEM_LABEL_NEW(PNODE_POOL(pi), fi->rep);
 			proto_item_fill_label(fi, representation);
 		} else
-			g_strlcpy(representation, fi->rep->representation, ITEM_LABEL_LENGTH);
+			(void) g_strlcpy(representation, fi->rep->representation, ITEM_LABEL_LENGTH);
 
 		va_start(ap, format);
 		g_vsnprintf(fi->rep->representation,
 			ITEM_LABEL_LENGTH, format, ap);
 		va_end(ap);
-		g_strlcat(fi->rep->representation, representation, ITEM_LABEL_LENGTH);
+		(void) g_strlcat(fi->rep->representation, representation, ITEM_LABEL_LENGTH);
 	}
 }
 
@@ -7330,7 +7330,7 @@ check_valid_filter_name_or_fail(const char *filter_name)
 	}
 
 	if (found_invalid) {
-		g_error("Protocol filter name \"%s\" has one or more invalid characters."
+		ws_error("Protocol filter name \"%s\" has one or more invalid characters."
 			" Allowed are lower characters, digits, '-', '_' and non-repeating '.'."
 			" This might be caused by an inappropriate plugin or a development error.", filter_name);
 	}
@@ -7352,20 +7352,20 @@ proto_register_protocol(const char *name, const char *short_name,
 	 */
 
 	if (g_hash_table_lookup(proto_names, name)) {
-		/* g_error will terminate the program */
-		g_error("Duplicate protocol name \"%s\"!"
+		/* ws_error will terminate the program */
+		ws_error("Duplicate protocol name \"%s\"!"
 			" This might be caused by an inappropriate plugin or a development error.", name);
 	}
 
 	if (g_hash_table_lookup(proto_short_names, short_name)) {
-		g_error("Duplicate protocol short_name \"%s\"!"
+		ws_error("Duplicate protocol short_name \"%s\"!"
 			" This might be caused by an inappropriate plugin or a development error.", short_name);
 	}
 
 	check_valid_filter_name_or_fail(filter_name);
 
 	if (g_hash_table_lookup(proto_filter_names, filter_name)) {
-		g_error("Duplicate protocol filter_name \"%s\"!"
+		ws_error("Duplicate protocol filter_name \"%s\"!"
 			" This might be caused by an inappropriate plugin or a development error.", filter_name);
 	}
 
@@ -7417,11 +7417,11 @@ proto_register_protocol_in_name_only(const char *name, const char *short_name, c
 	 * Just register it in a list and make a hf_ field from it
 	 */
 	if ((field_type != FT_PROTOCOL) && (field_type != FT_BYTES)) {
-		g_error("Pino \"%s\" must be of type FT_PROTOCOL or FT_BYTES.", name);
+		ws_error("Pino \"%s\" must be of type FT_PROTOCOL or FT_BYTES.", name);
 	}
 
 	if (parent_proto < 0) {
-		g_error("Must have a valid parent protocol for helper protocol \"%s\"!"
+		ws_error("Must have a valid parent protocol for helper protocol \"%s\"!"
 			" This might be caused by an inappropriate plugin or a development error.", name);
 	}
 
@@ -8224,16 +8224,16 @@ tmp_fld_check_assert(header_field_info *hfinfo)
 	if (!hfinfo->name || !hfinfo->name[0]) {
 		if (hfinfo->abbrev)
 			/* Try to identify the field */
-			g_error("Field (abbrev='%s') does not have a name\n",
+			ws_error("Field (abbrev='%s') does not have a name\n",
 				hfinfo->abbrev);
 		else
 			/* Hum, no luck */
-			g_error("Field does not have a name (nor an abbreviation)\n");
+			ws_error("Field does not have a name (nor an abbreviation)\n");
 	}
 
 	/* fields with an empty string for an abbreviation aren't filterable */
 	if (!hfinfo->abbrev || !hfinfo->abbrev[0])
-		g_error("Field '%s' does not have an abbreviation\n", hfinfo->name);
+		ws_error("Field '%s' does not have an abbreviation\n", hfinfo->name);
 
 	/*  These types of fields are allowed to have value_strings,
 	 *  true_false_strings or a protocol_t struct
@@ -8275,7 +8275,7 @@ tmp_fld_check_assert(header_field_info *hfinfo)
 
 			//fallthrough
 		default:
-			g_error("Field '%s' (%s) has a 'strings' value but is of type %s"
+			ws_error("Field '%s' (%s) has a 'strings' value but is of type %s"
 				" (which is not allowed to have strings)\n",
 				hfinfo->name, hfinfo->abbrev, ftype_name(hfinfo->type));
 		}
@@ -8321,7 +8321,7 @@ tmp_fld_check_assert(header_field_info *hfinfo)
 		const true_false_string *tfs = (const true_false_string*)hfinfo->strings;
 		if (tfs) {
 			if (strcmp(tfs->false_string, tfs->true_string) == 0) {
-				g_warning("Field '%s' (%s) has identical true and false strings (\"%s\", \"%s\")",
+				ws_warning("Field '%s' (%s) has identical true and false strings (\"%s\", \"%s\")",
 						   hfinfo->name, hfinfo->abbrev,
 						   tfs->false_string, tfs->true_string);
 			}
@@ -8335,7 +8335,7 @@ tmp_fld_check_assert(header_field_info *hfinfo)
 
 			do {
 				if (this_it->value_max < this_it->value_min) {
-					g_warning("value_range_string error:  %s (%s) entry for \"%s\" - max(%u 0x%x) is less than min(%u 0x%x)",
+					ws_warning("value_range_string error:  %s (%s) entry for \"%s\" - max(%u 0x%x) is less than min(%u 0x%x)",
 							  hfinfo->name, hfinfo->abbrev,
 							  this_it->strptr,
 							  this_it->value_max, this_it->value_max,
@@ -8347,7 +8347,7 @@ tmp_fld_check_assert(header_field_info *hfinfo)
 				for (const range_string *prev_it=rs; prev_it < this_it; ++prev_it) {
 					/* Not OK if this one is completely hidden by an earlier one! */
 					if ((prev_it->value_min <= this_it->value_min) && (prev_it->value_max >= this_it->value_max)) {
-						g_warning("value_range_string error:  %s (%s) hidden by earlier entry "
+						ws_warning("value_range_string error:  %s (%s) hidden by earlier entry "
 								  "(prev=\"%s\":  %u 0x%x -> %u 0x%x)  (this=\"%s\":  %u 0x%x -> %u 0x%x)",
 								  hfinfo->name, hfinfo->abbrev,
 								  prev_it->strptr, prev_it->value_min, prev_it->value_min,
@@ -8381,7 +8381,7 @@ tmp_fld_check_assert(header_field_info *hfinfo)
 					break;
 				case BASE_NONE:
 					if (hfinfo->strings == NULL)
-						g_error("Field '%s' (%s) is an integral value (%s)"
+						ws_error("Field '%s' (%s) is an integral value (%s)"
 							" but is being displayed as BASE_NONE but"
 							" without a strings conversion",
 							hfinfo->name, hfinfo->abbrev,
@@ -8389,14 +8389,14 @@ tmp_fld_check_assert(header_field_info *hfinfo)
 					break;
 				default:
 					tmp_str = val_to_str_wmem(NULL, hfinfo->display, hf_display, "(Unknown: 0x%x)");
-					g_error("Field '%s' (%s) is a character value (%s)"
+					ws_error("Field '%s' (%s) is a character value (%s)"
 						" but is being displayed as %s\n",
 						hfinfo->name, hfinfo->abbrev,
 						ftype_name(hfinfo->type), tmp_str);
 					wmem_free(NULL, tmp_str);
 			}
 			if (hfinfo->display & BASE_UNIT_STRING) {
-				g_error("Field '%s' (%s) is a character value (%s) but has a unit string\n",
+				ws_error("Field '%s' (%s) is a character value (%s) but has a unit string\n",
 					hfinfo->name, hfinfo->abbrev,
 					ftype_name(hfinfo->type));
 			}
@@ -8420,7 +8420,7 @@ tmp_fld_check_assert(header_field_info *hfinfo)
 				case BASE_DEC_HEX:
 				case BASE_HEX_DEC:
 					tmp_str = val_to_str_wmem(NULL, hfinfo->display, hf_display, "(Bit count: %d)");
-					g_error("Field '%s' (%s) is signed (%s) but is being displayed unsigned (%s)\n",
+					ws_error("Field '%s' (%s) is signed (%s) but is being displayed unsigned (%s)\n",
 						hfinfo->name, hfinfo->abbrev,
 						ftype_name(hfinfo->type), tmp_str);
 					wmem_free(NULL, tmp_str);
@@ -8437,17 +8437,17 @@ tmp_fld_check_assert(header_field_info *hfinfo)
 			if (IS_BASE_PORT(hfinfo->display)) {
 				tmp_str = val_to_str_wmem(NULL, hfinfo->display, hf_display, "(Unknown: 0x%x)");
 				if (hfinfo->type != FT_UINT16) {
-					g_error("Field '%s' (%s) has 'display' value %s but it can only be used with FT_UINT16, not %s\n",
+					ws_error("Field '%s' (%s) has 'display' value %s but it can only be used with FT_UINT16, not %s\n",
 						hfinfo->name, hfinfo->abbrev,
 						tmp_str, ftype_name(hfinfo->type));
 				}
 				if (hfinfo->strings != NULL) {
-					g_error("Field '%s' (%s) is an %s (%s) but has a strings value\n",
+					ws_error("Field '%s' (%s) is an %s (%s) but has a strings value\n",
 						hfinfo->name, hfinfo->abbrev,
 						ftype_name(hfinfo->type), tmp_str);
 				}
 				if (hfinfo->bitmask != 0) {
-					g_error("Field '%s' (%s) is an %s (%s) but has a bitmask\n",
+					ws_error("Field '%s' (%s) is an %s (%s) but has a bitmask\n",
 						hfinfo->name, hfinfo->abbrev,
 						ftype_name(hfinfo->type), tmp_str);
 				}
@@ -8458,17 +8458,17 @@ tmp_fld_check_assert(header_field_info *hfinfo)
 			if (hfinfo->display == BASE_OUI) {
 				tmp_str = val_to_str_wmem(NULL, hfinfo->display, hf_display, "(Unknown: 0x%x)");
 				if (hfinfo->type != FT_UINT24) {
-					g_error("Field '%s' (%s) has 'display' value %s but it can only be used with FT_UINT24, not %s\n",
+					ws_error("Field '%s' (%s) has 'display' value %s but it can only be used with FT_UINT24, not %s\n",
 						hfinfo->name, hfinfo->abbrev,
 						tmp_str, ftype_name(hfinfo->type));
 				}
 				if (hfinfo->strings != NULL) {
-					g_error("Field '%s' (%s) is an %s (%s) but has a strings value\n",
+					ws_error("Field '%s' (%s) is an %s (%s) but has a strings value\n",
 						hfinfo->name, hfinfo->abbrev,
 						ftype_name(hfinfo->type), tmp_str);
 				}
 				if (hfinfo->bitmask != 0) {
-					g_error("Field '%s' (%s) is an %s (%s) but has a bitmask\n",
+					ws_error("Field '%s' (%s) is an %s (%s) but has a bitmask\n",
 						hfinfo->name, hfinfo->abbrev,
 						ftype_name(hfinfo->type), tmp_str);
 				}
@@ -8496,14 +8496,14 @@ tmp_fld_check_assert(header_field_info *hfinfo)
 					break;
 				case BASE_NONE:
 					if (hfinfo->strings == NULL) {
-						g_error("Field '%s' (%s) is an integral value (%s)"
+						ws_error("Field '%s' (%s) is an integral value (%s)"
 							" but is being displayed as BASE_NONE but"
 							" without a strings conversion",
 							hfinfo->name, hfinfo->abbrev,
 							ftype_name(hfinfo->type));
 					}
 					if (hfinfo->display & BASE_SPECIAL_VALS) {
-						g_error("Field '%s' (%s) is an integral value (%s)"
+						ws_error("Field '%s' (%s) is an integral value (%s)"
 							" that is being displayed as BASE_NONE but"
 							" with BASE_SPECIAL_VALS",
 							hfinfo->name, hfinfo->abbrev,
@@ -8513,7 +8513,7 @@ tmp_fld_check_assert(header_field_info *hfinfo)
 
 				default:
 					tmp_str = val_to_str_wmem(NULL, hfinfo->display, hf_display, "(Unknown: 0x%x)");
-					g_error("Field '%s' (%s) is an integral value (%s)"
+					ws_error("Field '%s' (%s) is an integral value (%s)"
 						" but is being displayed as %s\n",
 						hfinfo->name, hfinfo->abbrev,
 						ftype_name(hfinfo->type), tmp_str);
@@ -8534,17 +8534,17 @@ tmp_fld_check_assert(header_field_info *hfinfo)
 					break;
 				default:
 					tmp_str = val_to_str_wmem(NULL, hfinfo->display, hf_display, "(Bit count: %d)");
-					g_error("Field '%s' (%s) is an byte array but is being displayed as %s instead of BASE_NONE, SEP_DOT, SEP_DASH, SEP_COLON, or SEP_SPACE\n",
+					ws_error("Field '%s' (%s) is an byte array but is being displayed as %s instead of BASE_NONE, SEP_DOT, SEP_DASH, SEP_COLON, or SEP_SPACE\n",
 						hfinfo->name, hfinfo->abbrev, tmp_str);
 					wmem_free(NULL, tmp_str);
 			}
 			if (hfinfo->bitmask != 0)
-				g_error("Field '%s' (%s) is an %s but has a bitmask\n",
+				ws_error("Field '%s' (%s) is an %s but has a bitmask\n",
 					hfinfo->name, hfinfo->abbrev,
 					ftype_name(hfinfo->type));
 			//allowed to support string if its a protocol (for pinos)
 			if ((hfinfo->strings != NULL) && (!(hfinfo->display & BASE_PROTOCOL_INFO)))
-				g_error("Field '%s' (%s) is an %s but has a strings value\n",
+				ws_error("Field '%s' (%s) is an %s but has a strings value\n",
 					hfinfo->name, hfinfo->abbrev,
 					ftype_name(hfinfo->type));
 			break;
@@ -8553,13 +8553,13 @@ tmp_fld_check_assert(header_field_info *hfinfo)
 		case FT_FRAMENUM:
 			if (hfinfo->display != BASE_NONE) {
 				tmp_str = val_to_str_wmem(NULL, hfinfo->display, hf_display, "(Bit count: %d)");
-				g_error("Field '%s' (%s) is an %s but is being displayed as %s instead of BASE_NONE\n",
+				ws_error("Field '%s' (%s) is an %s but is being displayed as %s instead of BASE_NONE\n",
 					hfinfo->name, hfinfo->abbrev,
 					ftype_name(hfinfo->type), tmp_str);
 				wmem_free(NULL, tmp_str);
 			}
 			if (hfinfo->bitmask != 0)
-				g_error("Field '%s' (%s) is an %s but has a bitmask\n",
+				ws_error("Field '%s' (%s) is an %s but has a bitmask\n",
 					hfinfo->name, hfinfo->abbrev,
 					ftype_name(hfinfo->type));
 			break;
@@ -8573,12 +8573,12 @@ tmp_fld_check_assert(header_field_info *hfinfo)
 			      hfinfo->display == ABSOLUTE_TIME_NTP_UTC   ||
 			      hfinfo->display == ABSOLUTE_TIME_DOY_UTC)) {
 				tmp_str = val_to_str_wmem(NULL, hfinfo->display, hf_display, "(Bit count: %d)");
-				g_error("Field '%s' (%s) is a %s but is being displayed as %s instead of as a time\n",
+				ws_error("Field '%s' (%s) is a %s but is being displayed as %s instead of as a time\n",
 					hfinfo->name, hfinfo->abbrev, ftype_name(hfinfo->type), tmp_str);
 				wmem_free(NULL, tmp_str);
 			}
 			if (hfinfo->bitmask != 0)
-				g_error("Field '%s' (%s) is an %s but has a bitmask\n",
+				ws_error("Field '%s' (%s) is an %s but has a bitmask\n",
 					hfinfo->name, hfinfo->abbrev,
 					ftype_name(hfinfo->type));
 			break;
@@ -8595,7 +8595,7 @@ tmp_fld_check_assert(header_field_info *hfinfo)
 
 				default:
 					tmp_str = val_to_str_wmem(NULL, hfinfo->display, hf_display, "(Unknown: 0x%x)");
-					g_error("Field '%s' (%s) is an string value (%s)"
+					ws_error("Field '%s' (%s) is an string value (%s)"
 						" but is being displayed as %s\n",
 						hfinfo->name, hfinfo->abbrev,
 						ftype_name(hfinfo->type), tmp_str);
@@ -8603,11 +8603,11 @@ tmp_fld_check_assert(header_field_info *hfinfo)
 			}
 
 			if (hfinfo->bitmask != 0)
-				g_error("Field '%s' (%s) is an %s but has a bitmask\n",
+				ws_error("Field '%s' (%s) is an %s but has a bitmask\n",
 					hfinfo->name, hfinfo->abbrev,
 					ftype_name(hfinfo->type));
 			if (hfinfo->strings != NULL)
-				g_error("Field '%s' (%s) is an %s but has a strings value\n",
+				ws_error("Field '%s' (%s) is an %s but has a strings value\n",
 					hfinfo->name, hfinfo->abbrev,
 					ftype_name(hfinfo->type));
 			break;
@@ -8620,7 +8620,7 @@ tmp_fld_check_assert(header_field_info *hfinfo)
 
 				default:
 					tmp_str = val_to_str_wmem(NULL, hfinfo->display, hf_display, "(Unknown: 0x%x)");
-					g_error("Field '%s' (%s) is an IPv4 value (%s)"
+					ws_error("Field '%s' (%s) is an IPv4 value (%s)"
 						" but is being displayed as %s\n",
 						hfinfo->name, hfinfo->abbrev,
 						ftype_name(hfinfo->type), tmp_str);
@@ -8632,36 +8632,36 @@ tmp_fld_check_assert(header_field_info *hfinfo)
 		case FT_DOUBLE:
 			if (FIELD_DISPLAY(hfinfo->display) != BASE_NONE) {
 				tmp_str = val_to_str_wmem(NULL, hfinfo->display, hf_display, "(Bit count: %d)");
-				g_error("Field '%s' (%s) is an %s but is being displayed as %s instead of BASE_NONE\n",
+				ws_error("Field '%s' (%s) is an %s but is being displayed as %s instead of BASE_NONE\n",
 					hfinfo->name, hfinfo->abbrev,
 					ftype_name(hfinfo->type),
 					tmp_str);
 				wmem_free(NULL, tmp_str);
 			}
 			if (hfinfo->bitmask != 0)
-				g_error("Field '%s' (%s) is an %s but has a bitmask\n",
+				ws_error("Field '%s' (%s) is an %s but has a bitmask\n",
 					hfinfo->name, hfinfo->abbrev,
 					ftype_name(hfinfo->type));
 			if ((hfinfo->strings != NULL) && (!(hfinfo->display & BASE_UNIT_STRING)))
-				g_error("Field '%s' (%s) is an %s but has a strings value\n",
+				ws_error("Field '%s' (%s) is an %s but has a strings value\n",
 					hfinfo->name, hfinfo->abbrev,
 					ftype_name(hfinfo->type));
 			break;
 		default:
 			if (hfinfo->display != BASE_NONE) {
 				tmp_str = val_to_str_wmem(NULL, hfinfo->display, hf_display, "(Bit count: %d)");
-				g_error("Field '%s' (%s) is an %s but is being displayed as %s instead of BASE_NONE\n",
+				ws_error("Field '%s' (%s) is an %s but is being displayed as %s instead of BASE_NONE\n",
 					hfinfo->name, hfinfo->abbrev,
 					ftype_name(hfinfo->type),
 					tmp_str);
 				wmem_free(NULL, tmp_str);
 			}
 			if (hfinfo->bitmask != 0)
-				g_error("Field '%s' (%s) is an %s but has a bitmask\n",
+				ws_error("Field '%s' (%s) is an %s but has a bitmask\n",
 					hfinfo->name, hfinfo->abbrev,
 					ftype_name(hfinfo->type));
 			if (hfinfo->strings != NULL)
-				g_error("Field '%s' (%s) is an %s but has a strings value\n",
+				ws_error("Field '%s' (%s) is an %s but has a strings value\n",
 					hfinfo->name, hfinfo->abbrev,
 					ftype_name(hfinfo->type));
 			break;
@@ -8738,7 +8738,7 @@ register_type_length_mismatch(void)
 }
 
 static void
-register_number_string_decoding_error(void)
+register_number_string_decodinws_error(void)
 {
 	static ei_register_info ei[] = {
 		{ &ei_number_string_decoding_failed_error,
@@ -8790,7 +8790,7 @@ register_string_errors(void)
 	proto_set_cant_toggle(proto_string_errors);
 }
 
-#define PROTO_PRE_ALLOC_HF_FIELDS_MEM (230000+PRE_ALLOC_EXPERT_FIELDS_MEM)
+#define PROTO_PRE_ALLOC_HF_FIELDS_MEM (235000+PRE_ALLOC_EXPERT_FIELDS_MEM)
 static int
 proto_register_field_init(header_field_info *hfinfo, const int parent)
 {
@@ -8810,7 +8810,7 @@ proto_register_field_init(header_field_info *hfinfo, const int parent)
 			gpa_hfinfo.allocated_len += 1000;
 			gpa_hfinfo.hfi = (header_field_info **)g_realloc(gpa_hfinfo.hfi,
 						   sizeof(header_field_info *)*gpa_hfinfo.allocated_len);
-			/*g_warning("gpa_hfinfo.allocated_len %u", gpa_hfinfo.allocated_len);*/
+			/*ws_warning("gpa_hfinfo.allocated_len %u", gpa_hfinfo.allocated_len);*/
 		}
 	}
 	gpa_hfinfo.hfi[gpa_hfinfo.len] = hfinfo;
@@ -8872,7 +8872,7 @@ proto_register_field_init(header_field_info *hfinfo, const int parent)
 #ifdef ENABLE_CHECK_FILTER
 			while (same_name_hfinfo) {
 				if (_ftype_common(hfinfo->type) != _ftype_common(same_name_hfinfo->type))
-					g_warning("'%s' exists multiple times with incompatible types: %s and %s", hfinfo->abbrev, ftype_name(hfinfo->type), ftype_name(same_name_hfinfo->type));
+					ws_warning("'%s' exists multiple times with incompatible types: %s and %s", hfinfo->abbrev, ftype_name(hfinfo->type), ftype_name(same_name_hfinfo->type));
 				same_name_hfinfo = same_name_hfinfo->same_name_next;
 			}
 #endif
@@ -8916,8 +8916,8 @@ proto_register_subtree_array(gint * const *indices, const int num_indices)
 	 */
 	for (i = 0; i < num_indices; i++, ptr++, num_tree_types++) {
 		if (**ptr != -1) {
-			/* g_error will terminate the program */
-			g_error("register_subtree_array: subtree item type (ett_...) not -1 !"
+			/* ws_error will terminate the program */
+			ws_error("register_subtree_array: subtree item type (ett_...) not -1 !"
 				" This is a development error:"
 				" Either the subtree item type has already been assigned or"
 				" was not initialized to -1.");
@@ -8967,7 +8967,7 @@ label_mark_truncated(char *label_str, gsize name_pos)
 		*last_char = '\0';
 
 	} else if (name_pos < ITEM_LABEL_LENGTH)
-		g_strlcpy(label_str + name_pos, trunc_str, ITEM_LABEL_LENGTH - name_pos);
+		(void) g_strlcpy(label_str + name_pos, trunc_str, ITEM_LABEL_LENGTH - name_pos);
 }
 
 static gsize
@@ -9044,7 +9044,7 @@ proto_item_fill_label(field_info *fi, gchar *label_str)
 	switch (hfinfo->type) {
 		case FT_NONE:
 		case FT_PROTOCOL:
-			g_strlcpy(label_str, hfinfo->name, ITEM_LABEL_LENGTH);
+			(void) g_strlcpy(label_str, hfinfo->name, ITEM_LABEL_LENGTH);
 			break;
 
 		case FT_BOOLEAN:
@@ -10191,7 +10191,7 @@ hfinfo_number_value_format(const header_field_info *hfinfo, char buf[32], guint3
 }
 
 static const char *
-hfinfo_number_value_format64(const header_field_info *hfinfo, char buf[64], guint64 value)
+hfinfo_number_value_format64(const header_field_info *hfinfo, char buf[48], guint64 value)
 {
 	int display = hfinfo->display;
 
@@ -10252,7 +10252,7 @@ hfinfo_numeric_value_format(const header_field_info *hfinfo, char buf[32], guint
 }
 
 static const char *
-hfinfo_numeric_value_format64(const header_field_info *hfinfo, char buf[64], guint64 value)
+hfinfo_numeric_value_format64(const header_field_info *hfinfo, char buf[48], guint64 value)
 {
 	/* Get the underlying BASE_ value */
 	int display = FIELD_DISPLAY(hfinfo->display);
@@ -10309,7 +10309,7 @@ hfinfo_number_vals_format(const header_field_info *hfinfo, char buf[32], guint32
 }
 
 static const char *
-hfinfo_number_vals_format64(const header_field_info *hfinfo, char buf[64], guint64 value)
+hfinfo_number_vals_format64(const header_field_info *hfinfo, char buf[48], guint64 value)
 {
 	/* Get the underlying BASE_ value */
 	int display = FIELD_DISPLAY(hfinfo->display);
@@ -10638,7 +10638,7 @@ proto_registrar_dump_protocols(void)
 	i = proto_get_first_protocol(&cookie);
 	while (i != -1) {
 		protocol = find_protocol_by_id(i);
-		ws_debug_printf("%s\t%s\t%s\n", protocol->name, protocol->short_name,
+		printf("%s\t%s\t%s\n", protocol->name, protocol->short_name,
 			protocol->filter_name);
 		i = proto_get_next_protocol(&cookie);
 	}
@@ -10783,11 +10783,11 @@ proto_registrar_dump_values(void)
 				if (hfinfo->display & BASE_VAL64_STRING) {
 					val64_string_ext *vse_p = (val64_string_ext *)hfinfo->strings;
 					if (!val64_string_ext_validate(vse_p)) {
-						g_warning("Invalid val64_string_ext ptr for: %s", hfinfo->abbrev);
+						ws_warning("Invalid val64_string_ext ptr for: %s", hfinfo->abbrev);
 						continue;
 					}
 					try_val64_to_str_ext(0, vse_p); /* "prime" the extended val64_string */
-					ws_debug_printf("E\t%s\t%u\t%s\t%s\n",
+					printf("E\t%s\t%u\t%s\t%s\n",
 					       hfinfo->abbrev,
 					       VAL64_STRING_EXT_VS_NUM_ENTRIES(vse_p),
 					       VAL64_STRING_EXT_VS_NAME(vse_p),
@@ -10795,11 +10795,11 @@ proto_registrar_dump_values(void)
 				} else {
 					value_string_ext *vse_p = (value_string_ext *)hfinfo->strings;
 					if (!value_string_ext_validate(vse_p)) {
-						g_warning("Invalid value_string_ext ptr for: %s", hfinfo->abbrev);
+						ws_warning("Invalid value_string_ext ptr for: %s", hfinfo->abbrev);
 						continue;
 					}
 					try_val_to_str_ext(0, vse_p); /* "prime" the extended value_string */
-					ws_debug_printf("E\t%s\t%u\t%s\t%s\n",
+					printf("E\t%s\t%u\t%s\t%s\n",
 					       hfinfo->abbrev,
 					       VALUE_STRING_EXT_VS_NUM_ENTRIES(vse_p),
 					       VALUE_STRING_EXT_VS_NAME(vse_p),
@@ -10811,19 +10811,19 @@ proto_registrar_dump_values(void)
 				/* Print in the proper base */
 				if (hfinfo->type == FT_CHAR) {
 					if (g_ascii_isprint(vals[vi].value)) {
-						ws_debug_printf("V\t%s\t'%c'\t%s\n",
+						printf("V\t%s\t'%c'\t%s\n",
 						       hfinfo->abbrev,
 						       vals[vi].value,
 						       vals[vi].strptr);
 					} else {
 						if (hfinfo->display == BASE_HEX) {
-							ws_debug_printf("V\t%s\t'\\x%02x'\t%s\n",
+							printf("V\t%s\t'\\x%02x'\t%s\n",
 							       hfinfo->abbrev,
 							       vals[vi].value,
 							       vals[vi].strptr);
 						}
 						else {
-							ws_debug_printf("V\t%s\t'\\%03o'\t%s\n",
+							printf("V\t%s\t'\\%03o'\t%s\n",
 							       hfinfo->abbrev,
 							       vals[vi].value,
 							       vals[vi].strptr);
@@ -10831,13 +10831,13 @@ proto_registrar_dump_values(void)
 					}
 				} else {
 					if (hfinfo->display == BASE_HEX) {
-						ws_debug_printf("V\t%s\t0x%x\t%s\n",
+						printf("V\t%s\t0x%x\t%s\n",
 						       hfinfo->abbrev,
 						       vals[vi].value,
 						       vals[vi].strptr);
 					}
 					else {
-						ws_debug_printf("V\t%s\t%u\t%s\n",
+						printf("V\t%s\t%u\t%s\n",
 						       hfinfo->abbrev,
 						       vals[vi].value,
 						       vals[vi].strptr);
@@ -10849,7 +10849,7 @@ proto_registrar_dump_values(void)
 		else if (vals64) {
 			vi = 0;
 			while (vals64[vi].strptr) {
-				ws_debug_printf("V64\t%s\t%" G_GINT64_MODIFIER "u\t%s\n",
+				printf("V64\t%s\t%" G_GINT64_MODIFIER "u\t%s\n",
 				       hfinfo->abbrev,
 				       vals64[vi].value,
 				       vals64[vi].strptr);
@@ -10863,14 +10863,14 @@ proto_registrar_dump_values(void)
 			while (range[vi].strptr) {
 				/* Print in the proper base */
 				if (FIELD_DISPLAY(hfinfo->display) == BASE_HEX) {
-					ws_debug_printf("R\t%s\t0x%x\t0x%x\t%s\n",
+					printf("R\t%s\t0x%x\t0x%x\t%s\n",
 					       hfinfo->abbrev,
 					       range[vi].value_min,
 					       range[vi].value_max,
 					       range[vi].strptr);
 				}
 				else {
-					ws_debug_printf("R\t%s\t%u\t%u\t%s\n",
+					printf("R\t%s\t%u\t%u\t%s\n",
 					       hfinfo->abbrev,
 					       range[vi].value_min,
 					       range[vi].value_max,
@@ -10882,12 +10882,12 @@ proto_registrar_dump_values(void)
 
 		/* Print true/false strings? */
 		else if (tfs) {
-			ws_debug_printf("T\t%s\t%s\t%s\n", hfinfo->abbrev,
+			printf("T\t%s\t%s\t%s\n", hfinfo->abbrev,
 			       tfs->true_string, tfs->false_string);
 		}
 		/* Print unit strings? */
 		else if (units) {
-			ws_debug_printf("U\t%s\t%s\t%s\n", hfinfo->abbrev,
+			printf("U\t%s\t%s\t%s\n", hfinfo->abbrev,
 			       units->singular, units->plural ? units->plural : "(no plural)");
 		}
 	}
@@ -10924,21 +10924,21 @@ proto_registrar_dump_fieldcount(void)
 			same_name_count++;
 	}
 
-	ws_debug_printf("There are %u header fields registered, of which:\n"
+	printf("There are %u header fields registered, of which:\n"
 		"\t%u are deregistered\n"
 		"\t%u are protocols\n"
 		"\t%u have the same name as another field\n\n",
 		gpa_hfinfo.len, deregistered_count, protocol_count,
 		same_name_count);
 
-	ws_debug_printf("%d fields were pre-allocated.\n%s", PROTO_PRE_ALLOC_HF_FIELDS_MEM,
+	printf("%d fields were pre-allocated.\n%s", PROTO_PRE_ALLOC_HF_FIELDS_MEM,
 		(gpa_hfinfo.allocated_len > PROTO_PRE_ALLOC_HF_FIELDS_MEM) ?
 		    "* * Please increase PROTO_PRE_ALLOC_HF_FIELDS_MEM (in epan/proto.c)! * *\n\n" :
 		    "\n");
 
-	ws_debug_printf("The header field table consumes %u KiB of memory.\n",
+	printf("The header field table consumes %u KiB of memory.\n",
 		(unsigned int)(gpa_hfinfo.allocated_len * sizeof(header_field_info *) / 1024));
-	ws_debug_printf("The fields themselves consume %u KiB of memory.\n",
+	printf("The fields themselves consume %u KiB of memory.\n",
 		(unsigned int)(gpa_hfinfo.len * sizeof(header_field_info) / 1024));
 
 	return (gpa_hfinfo.allocated_len > PROTO_PRE_ALLOC_HF_FIELDS_MEM);
@@ -11196,7 +11196,7 @@ proto_registrar_dump_fields(void)
 
 		/* format for protocols */
 		if (proto_registrar_is_protocol(i)) {
-			ws_debug_printf("P\t%s\t%s\n", hfinfo->name, hfinfo->abbrev);
+			printf("P\t%s\t%s\n", hfinfo->name, hfinfo->abbrev);
 		}
 		/* format for header fields */
 		else {
@@ -11269,7 +11269,7 @@ proto_registrar_dump_fields(void)
 			else if (strlen(blurb) == 0)
 				blurb = "\"\"";
 
-			ws_debug_printf("F\t%s\t%s\t%s\t%s\t%s\t0x%" G_GINT64_MODIFIER "x\t%s\n",
+			printf("F\t%s\t%s\t%s\t%s\t%s\t0x%" G_GINT64_MODIFIER "x\t%s\n",
 				hfinfo->name, hfinfo->abbrev, enum_name,
 				parent_hfinfo->abbrev, base_name,
 				hfinfo->bitmask, blurb);
@@ -11292,7 +11292,7 @@ proto_registrar_dump_ftypes(void)
 	int fte;
 
 	for (fte = 0; fte < FT_NUM_TYPES; fte++) {
-		ws_debug_printf("%s\t%s\n", ftype_name((ftenum_t)fte), ftype_pretty_name((ftenum_t)fte));
+		printf("%s\t%s\n", ftype_name((ftenum_t)fte), ftype_pretty_name((ftenum_t)fte));
 	}
 }
 
@@ -11520,12 +11520,6 @@ construct_match_selected_string(field_info *finfo, epan_dissect_t *edt,
 					}
 				}
 			}
-			break;
-
-		case FT_PCRE:
-			/* FT_PCRE never appears as a type for a registered field. It is
-			 * only used internally. */
-			DISSECTOR_ASSERT_NOT_REACHED();
 			break;
 
 		/* By default, use the fvalue's "to_string_repr" method. */
@@ -12617,8 +12611,8 @@ _proto_tree_add_bits_format_value(proto_tree *tree, const int hfindex,
 
 	str = decode_bits_in_field(bit_offset, no_of_bits, value);
 
-	g_strlcat(str, " = ", 256+64);
-	g_strlcat(str, hf_field->name, 256+64);
+	(void) g_strlcat(str, " = ", 256+64);
+	(void) g_strlcat(str, hf_field->name, 256+64);
 
 	/*
 	 * This function does not receive an actual value but a dimensionless pointer to that value.
@@ -13097,14 +13091,14 @@ tree_expanded(int tree_type)
 	if (tree_type == -1) {
 		return FALSE;
 	}
-	g_assert(tree_type >= 0 && tree_type < num_tree_types);
+	ws_assert(tree_type >= 0 && tree_type < num_tree_types);
 	return tree_is_expanded[tree_type >> 5] & (1U << (tree_type & 31));
 }
 
 void
 tree_expanded_set(int tree_type, gboolean value)
 {
-	g_assert(tree_type >= 0 && tree_type < num_tree_types);
+	ws_assert(tree_type >= 0 && tree_type < num_tree_types);
 
 	if (value)
 		tree_is_expanded[tree_type >> 5] |= (1U << (tree_type & 31));

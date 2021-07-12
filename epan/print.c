@@ -29,8 +29,8 @@
 #include <epan/charsets.h>
 #include <wsutil/json_dumper.h>
 #include <wsutil/filesystem.h>
-#include <version_info.h>
 #include <wsutil/utf8_entities.h>
+#include <wsutil/ws_assert.h>
 #include <ftypes/ftypes-int.h>
 
 #define PDML_VERSION "0"
@@ -112,6 +112,7 @@ static void write_json_proto_node_value_list(GSList *node_values_head,
                                              write_json_data *data);
 static void write_json_proto_node_filtered(proto_node *node, write_json_data *data);
 static void write_json_proto_node_hex_dump(proto_node *node, write_json_data *data);
+static void write_json_proto_node_dynamic(proto_node *node, write_json_data *data);
 static void write_json_proto_node_children(proto_node *node, write_json_data *data);
 static void write_json_proto_node_value(proto_node *node, write_json_data *data);
 static void write_json_proto_node_no_value(proto_node *node, write_json_data *data);
@@ -167,7 +168,7 @@ proto_tree_print_node(proto_node *node, gpointer data)
     gchar        *label_ptr;
 
     /* dissection with an invisible proto tree? */
-    g_assert(fi);
+    ws_assert(fi);
 
     /* Don't print invisible entries. */
     if (proto_item_is_hidden(node) && (prefs.display_hidden_proto_items == FALSE))
@@ -232,7 +233,7 @@ proto_tree_print_node(proto_node *node, gpointer data)
     /* If we're printing all levels, or if this node is one with a
        subtree and its subtree is expanded, recurse into the subtree,
        if it exists. */
-    g_assert((fi->tree_type >= -1) && (fi->tree_type < num_tree_types));
+    ws_assert((fi->tree_type >= -1) && (fi->tree_type < num_tree_types));
     if ((pdata->print_dissections == print_dissections_expanded) ||
         ((pdata->print_dissections == print_dissections_as_displayed) &&
          (fi->tree_type >= 0) && tree_expanded(fi->tree_type))) {
@@ -303,8 +304,8 @@ write_pdml_proto_tree(output_fields_t* fields, gchar **protocolfilter, pf_flags 
     write_pdml_data data;
     const color_filter_t *cfp;
 
-    g_assert(edt);
-    g_assert(fh);
+    ws_assert(edt);
+    ws_assert(fh);
 
     cfp = edt->pi.fd->color_filter;
 
@@ -346,8 +347,8 @@ write_ek_proto_tree(output_fields_t* fields,
                     column_info *cinfo,
                     FILE *fh)
 {
-    g_assert(edt);
-    g_assert(fh);
+    ws_assert(edt);
+    ws_assert(fh);
 
     write_json_data data;
 
@@ -401,8 +402,8 @@ write_ek_proto_tree(output_fields_t* fields,
 void
 write_fields_proto_tree(output_fields_t* fields, epan_dissect_t *edt, column_info *cinfo, FILE *fh)
 {
-    g_assert(edt);
-    g_assert(fh);
+    ws_assert(edt);
+    ws_assert(fh);
 
     /* Create the output */
     write_specified_fields(FORMAT_CSV, fields, edt, cinfo, fh, NULL);
@@ -444,7 +445,7 @@ proto_tree_write_node_pdml(proto_node *node, gpointer data)
     gboolean         wrap_in_fake_protocol;
 
     /* dissection with an invisible proto tree? */
-    g_assert(fi);
+    ws_assert(fi);
 
     /* Will wrap up top-level field items inside a fake protocol wrapper to
        preserve the PDML schema */
@@ -607,7 +608,7 @@ proto_tree_write_node_pdml(proto_node *node, gpointer data)
                             fprintf(pdata->fh, "%" G_GINT64_MODIFIER "X", fvalue_get_uinteger64(&fi->value));
                             break;
                         default:
-                            g_assert_not_reached();
+                            ws_assert_not_reached();
                     }
                     fputs("\" unmaskedvalue=\"", pdata->fh);
                     pdml_write_field_hex_value(pdata, fi);
@@ -712,7 +713,7 @@ write_json_index(json_dumper *dumper, epan_dissect_t *edt)
     if (timeinfo != NULL) {
         strftime(ts, sizeof(ts), "%Y-%m-%d", timeinfo);
     } else {
-        g_strlcpy(ts, "XXXX-XX-XX", sizeof(ts)); /* XXX - better way of saying "Not representable"? */
+        (void) g_strlcpy(ts, "XXXX-XX-XX", sizeof(ts)); /* XXX - better way of saying "Not representable"? */
     }
     json_dumper_set_member_name(dumper, "_index");
     str = g_strdup_printf("packets-%s", ts);
@@ -765,6 +766,23 @@ write_json_proto_tree(output_fields_t* fields,
 }
 
 /**
+ * Returns a boolean telling us whether that node list contains any node which has children
+ */
+static gboolean
+any_has_children(GSList *node_values_list)
+{
+    GSList *current_node = node_values_list;
+    while (current_node != NULL) {
+        proto_node *current_value = (proto_node *) current_node->data;
+        if (current_value->first_child != NULL) {
+            return TRUE;
+        }
+        current_node = current_node->next;
+    }
+    return FALSE;
+}
+
+/**
  * Write a json object containing a list of key:value pairs where each key:value pair corresponds to a different json
  * key and its associated nodes in the proto_tree.
  * @param proto_node_list_head A 2-dimensional list containing a list of values for each different node json key. The
@@ -792,11 +810,11 @@ write_json_proto_node_list(GSList *proto_node_list_head, write_json_data *pdata)
 
         field_info *fi = first_value->finfo;
         char *value_string_repr = fvalue_to_string_repr(NULL, &fi->value, FTREPR_DISPLAY, fi->hfinfo->display);
+        gboolean has_children = any_has_children(node_values_list);
 
         // We assume all values of a json key have roughly the same layout. Thus we can use the first value to derive
         // attributes of all the values.
         gboolean has_value = value_string_repr != NULL;
-        gboolean has_children = first_value->first_child != NULL;
         gboolean is_pseudo_text_field = fi->hfinfo->id == 0;
 
         wmem_free(NULL, value_string_repr); // fvalue_to_string_repr returns allocated buffer
@@ -831,7 +849,9 @@ write_json_proto_node_list(GSList *proto_node_list_head, write_json_data *pdata)
                     pdata->filter = NULL;
                 }
 
-                write_json_proto_node(node_values_list, suffix, write_json_proto_node_children, pdata);
+                // has_children is TRUE if any of the nodes have children. So we're not 100% sure whether this
+                // particular node has children or not => use the 'dynamic' version of 'write_json_proto_node'
+                write_json_proto_node(node_values_list, suffix, write_json_proto_node_dynamic, pdata);
 
                 // Put protocol filter back
                 if ((pdata->filter_flags&PF_INCLUDE_CHILDREN) == PF_INCLUDE_CHILDREN) {
@@ -951,7 +971,7 @@ write_json_proto_node_hex_dump(proto_node *node, write_json_data *pdata)
                 json_dumper_value_anyf(pdata->dumper, "\"%" G_GINT64_MODIFIER "X\"", fvalue_get_uinteger64(&fi->value));
                 break;
             default:
-                g_assert_not_reached();
+                ws_assert_not_reached();
         }
     } else {
         json_write_field_hex_value(pdata, fi);
@@ -964,6 +984,20 @@ write_json_proto_node_hex_dump(proto_node *node, write_json_data *pdata)
     json_dumper_value_anyf(pdata->dumper, "%" G_GINT32_MODIFIER "d", (gint32)fi->value.ftype->ftype);
 
     json_dumper_end_array(pdata->dumper);
+}
+
+/**
+ * Writes the value of a node, which may be a simple node with no value and no children,
+ * or a node with children -- this will be determined dynamically
+ */
+static void
+write_json_proto_node_dynamic(proto_node *node, write_json_data *data)
+{
+    if (node->first_child == NULL) {
+        write_json_proto_node_no_value(node, data);
+    } else {
+        write_json_proto_node_children(node, data);
+    }
 }
 
 /**
@@ -1160,7 +1194,7 @@ ek_fill_attr(proto_node *node, GSList **attr_list, GHashTable *attr_table, write
         fi_parent = PNODE_FINFO(current_node->parent);
 
         /* dissection with an invisible proto tree? */
-        g_assert(fi);
+        ws_assert(fi);
 
         if (fi_parent == NULL) {
             node_name = g_strdup(fi->hfinfo->abbrev);
@@ -1260,7 +1294,7 @@ ek_write_hex(field_info *fi, write_json_data *pdata)
                 json_dumper_value_anyf(pdata->dumper, "\"%" G_GINT64_MODIFIER "X\"", fvalue_get_uinteger64(&fi->value));
                 break;
             default:
-                g_assert_not_reached();
+                ws_assert_not_reached();
         }
     } else {
         json_write_field_hex_value(pdata, fi);
@@ -1332,7 +1366,7 @@ ek_write_field_value(field_info *fi, write_json_data* pdata)
 #endif
             if (tm != NULL) {
                 strftime(time_string, sizeof(time_string), "%FT%T", tm);
-                json_dumper_value_anyf(pdata->dumper, "\"%s.%uZ\"", time_string, t->nsecs);
+                json_dumper_value_anyf(pdata->dumper, "\"%s.%09uZ\"", time_string, t->nsecs);
             } else {
                 json_dumper_value_anyf(pdata->dumper, "\"Not representable\"");
             }
@@ -1778,26 +1812,26 @@ print_escaped_xml(FILE *fh, const char *unescaped_string)
         return;
     }
 
-    for (p = unescaped_string; *p != '\0'; p++) {
+    for (p = unescaped_string; *p != '\0' && (offset<(ESCAPED_BUFFER_MAX-1)); p++) {
         switch (*p) {
         case '&':
-            g_strlcpy(&temp_buffer[offset], "&amp;", ESCAPED_BUFFER_MAX-offset);
+            (void) g_strlcpy(&temp_buffer[offset], "&amp;", ESCAPED_BUFFER_MAX-offset);
             offset += 5;
             break;
         case '<':
-            g_strlcpy(&temp_buffer[offset], "&lt;", ESCAPED_BUFFER_MAX-offset);
+            (void) g_strlcpy(&temp_buffer[offset], "&lt;", ESCAPED_BUFFER_MAX-offset);
             offset += 4;
             break;
         case '>':
-            g_strlcpy(&temp_buffer[offset], "&gt;", ESCAPED_BUFFER_MAX-offset);
+            (void) g_strlcpy(&temp_buffer[offset], "&gt;", ESCAPED_BUFFER_MAX-offset);
             offset += 4;
             break;
         case '"':
-            g_strlcpy(&temp_buffer[offset], "&quot;", ESCAPED_BUFFER_MAX-offset);
+            (void) g_strlcpy(&temp_buffer[offset], "&quot;", ESCAPED_BUFFER_MAX-offset);
             offset += 6;
             break;
         case '\'':
-            g_strlcpy(&temp_buffer[offset], "&#x27;", ESCAPED_BUFFER_MAX-offset);
+            (void) g_strlcpy(&temp_buffer[offset], "&#x27;", ESCAPED_BUFFER_MAX-offset);
             offset += 6;
             break;
         default:
@@ -2069,7 +2103,7 @@ print_hex_data_buffer(print_stream_t *stream, const guchar *cp,
 
 gsize output_fields_num_fields(output_fields_t* fields)
 {
-    g_assert(fields);
+    ws_assert(fields);
 
     if (NULL == fields->fields) {
         return 0;
@@ -2080,7 +2114,7 @@ gsize output_fields_num_fields(output_fields_t* fields)
 
 void output_fields_free(output_fields_t* fields)
 {
-    g_assert(fields);
+    ws_assert(fields);
 
     if (NULL != fields->fields) {
         gsize i;
@@ -2112,8 +2146,8 @@ void output_fields_add(output_fields_t *fields, const gchar *field)
 {
     gchar *field_copy;
 
-    g_assert(fields);
-    g_assert(field);
+    ws_assert(fields);
+    ws_assert(field);
 
 
     if (NULL == fields->fields) {
@@ -2163,8 +2197,8 @@ gboolean output_fields_set_option(output_fields_t *info, gchar *option)
     const gchar *option_name;
     const gchar *option_value;
 
-    g_assert(info);
-    g_assert(option);
+    ws_assert(info);
+    ws_assert(option);
 
     if ('\0' == *option) {
         return FALSE; /* this happens if we're called from tshark -E '' */
@@ -2287,7 +2321,7 @@ void output_fields_list_options(FILE *fh)
 
 gboolean output_fields_has_cols(output_fields_t* fields)
 {
-    g_assert(fields);
+    ws_assert(fields);
     return fields->includes_col_fields;
 }
 
@@ -2295,9 +2329,9 @@ void write_fields_preamble(output_fields_t* fields, FILE *fh)
 {
     gsize i;
 
-    g_assert(fields);
-    g_assert(fh);
-    g_assert(fields->fields);
+    ws_assert(fields);
+    ws_assert(fh);
+    ws_assert(fields->fields);
 
     if (fields->print_bom) {
         fputs(UTF8_BOM, fh);
@@ -2375,7 +2409,7 @@ static void format_field_values(output_fields_t* fields, gpointer field_index, g
         }
         break;
     default:
-        g_assert_not_reached();
+        ws_assert_not_reached();
         break;
     }
 
@@ -2392,7 +2426,7 @@ static void proto_tree_get_node_field_values(proto_node *node, gpointer data)
     fi = PNODE_FINFO(node);
 
     /* dissection with an invisible proto tree? */
-    g_assert(fi);
+    ws_assert(fi);
 
     field_index = g_hash_table_lookup(call_data->fields->field_indicies, fi->hfinfo->abbrev);
     if (NULL != field_index) {
@@ -2417,14 +2451,14 @@ static void write_specified_fields(fields_format format, output_fields_t *fields
 
     write_field_data_t data;
 
-    g_assert(fields);
-    g_assert(fields->fields);
-    g_assert(edt);
+    ws_assert(fields);
+    ws_assert(fields->fields);
+    ws_assert(edt);
     /* JSON formats must go through json_dumper */
     if (format == FORMAT_JSON || format == FORMAT_EK) {
-        g_assert(!fh && dumper);
+        ws_assert(!fh && dumper);
     } else {
-        g_assert(fh && !dumper);
+        ws_assert(fh && !dumper);
     }
 
     data.fields = fields;
@@ -2586,7 +2620,7 @@ static void write_specified_fields(fields_format format, output_fields_t *fields
 
     default:
         fprintf(stderr, "Unknown fields format %d\n", format);
-        g_assert_not_reached();
+        ws_assert_not_reached();
         break;
     }
 }

@@ -935,7 +935,7 @@ void srtcp_add_address( packet_info *pinfo,
      * Update the conversation data.
      */
     p_conv_data->setup_method_set = TRUE;
-    g_strlcpy(p_conv_data->setup_method, setup_method, MAX_RTCP_SETUP_METHOD_SIZE);
+    (void) g_strlcpy(p_conv_data->setup_method, setup_method, MAX_RTCP_SETUP_METHOD_SIZE);
     p_conv_data->setup_frame_number = setup_frame_number;
     p_conv_data->srtcp_info = srtcp_info;
 }
@@ -7712,7 +7712,7 @@ proto_register_rtcp(void)
         },
         { &hf_rtcp_mcptt_ssrc,
             { "SSRC", "rtcp.app_data.mcptt.rtcp",
-            FT_UINT48, BASE_DEC, NULL, 0xffffffff00000,
+            FT_UINT32, BASE_DEC, NULL, 0x0,
             NULL, HFILL }
         },
         { &hf_rtcp_mcptt_num_users,

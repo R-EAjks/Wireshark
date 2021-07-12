@@ -101,14 +101,14 @@ static tap_packet_status lua_tap_packet(void *tapdata, packet_info *pinfo, epan_
             /* XXX - TAP_PACKET_FAILED? */
             break;
         case LUA_ERRMEM:
-            g_warning("Memory alloc error while calling listener tap callback packet");
+            ws_warning("Memory alloc error while calling listener tap callback packet");
             /* XXX - TAP_PACKET_FAILED? */
             break;
         case LUA_ERRERR:
-            g_warning("Error while running the error handler function for listener tap callback");
+            ws_warning("Error while running the error handler function for listener tap callback");
             break;
         default:
-            g_assert_not_reached();
+            ws_assert_not_reached();
             break;
     }
 
@@ -141,16 +141,16 @@ static void lua_tap_reset(void *tapdata) {
         case 0:
             break;
         case LUA_ERRRUN:
-            g_warning("Runtime error while calling a listener's init()");
+            ws_warning("Runtime error while calling a listener's init()");
             break;
         case LUA_ERRMEM:
-            g_warning("Memory alloc error while calling a listener's init()");
+            ws_warning("Memory alloc error while calling a listener's init()");
             break;
         case LUA_ERRERR:
-            g_warning("Error while running the error handler function for a listener's init()");
+            ws_warning("Error while running the error handler function for a listener's init()");
             break;
         default:
-            g_assert_not_reached();
+            ws_assert_not_reached();
             break;
     }
 }
@@ -176,16 +176,16 @@ static void lua_tap_draw(void *tapdata) {
             break;
         case LUA_ERRRUN:
             error = lua_tostring(tap->L,-1);
-            g_warning("Runtime error while calling a listener's draw(): %s",error);
+            ws_warning("Runtime error while calling a listener's draw(): %s",error);
             break;
         case LUA_ERRMEM:
-            g_warning("Memory alloc error while calling a listener's draw()");
+            ws_warning("Memory alloc error while calling a listener's draw()");
             break;
         case LUA_ERRERR:
-            g_warning("Error while running the error handler function for a listener's draw()");
+            ws_warning("Error while running the error handler function for a listener's draw()");
             break;
         default:
-            g_assert_not_reached();
+            ws_assert_not_reached();
             break;
     }
 }

@@ -8,7 +8,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * References: 3GPP TS 38.463 V16.4.0 (2021-01)
+ * References: 3GPP TS 38.463 V16.6.0 (2021-07)
  */
 
 #include "config.h"
@@ -80,6 +80,7 @@ typedef struct {
   guint32 procedure_code;
   guint32 protocol_ie_id;
   const char *obj_id;
+  e212_number_type_t number_type;
 } e1ap_private_data_t;
 
 /* Global variables */

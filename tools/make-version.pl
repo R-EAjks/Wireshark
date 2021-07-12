@@ -12,10 +12,10 @@
 #
 # If run with the "-r" or "--set-release" argument the VERSION macro in
 # CMakeLists.txt will have the version_extra template appended to the
-# version number. version.h will _not_ be generated if either argument is
+# version number. vcs_version.h will _not_ be generated if either argument is
 # present.
 #
-# make-version.pl is called during the build to update version.h in the build
+# make-version.pl is called during the build to update vcs_version.h in the build
 # directory. To set a fixed version, use something like:
 #
 #   cmake -DVCSVERSION_OVERRIDE="Git v3.1.0 packaged as 3.1.0-1"
@@ -42,7 +42,7 @@ my $tagged_version_extra = "";
 my $untagged_version_extra = "-{vcsinfo}";
 my $force_extra = undef;
 my $package_string = "";
-my $version_file = 'version.h';
+my $version_file = 'vcs_version.h';
 my $vcs_name = "Git";
 my $tortoise_file = "tortoise_template";
 my $last_change = 0;
@@ -135,7 +135,7 @@ sub read_repo_info {
 		return;
 	}
 
-	# Check whether to include VCS version information in version.h
+	# Check whether to include VCS version information in vcs_version.h
 	if ($is_git_repo) {
 		chomp($git_cdir = qx{git --git-dir="$src_dir/.git" rev-parse --git-common-dir 2> $devnull});
 		if ($git_cdir && -f "$git_cdir/wireshark-disable-versioning") {
@@ -516,12 +516,13 @@ sub update_debian_changelog
 
 	open(CHANGELOG, "< $filepath") || die "Can't read $filepath!";
 	while ($line = <CHANGELOG>) {
-		if ($set_version && CHANGELOG->input_line_number() == 1) {
+		if (CHANGELOG->input_line_number() == 1) {
 			$line =~ /^.*?([\r\n]+)$/;
-			$line = sprintf("wireshark (%d.%d.%d) unstable; urgency=low$1",
+			$line = sprintf("wireshark (%d.%d.%d%s) unstable; urgency=low$1",
 					$version_major,
 					$version_minor,
 					$version_micro,
+					$package_string,
 					);
 		}
 		$contents .= $line
@@ -571,10 +572,10 @@ sub update_versioned_files
 		$version_minor, $version_micro,
 		$package_string;
 	&update_cmakelists_txt;
+	&update_debian_changelog;
 	if ($set_version) {
 		&update_attributes_asciidoc;
 		&update_docinfo_asciidoc;
-		&update_debian_changelog;
 		&update_cmake_lib_releases;
 	}
 }
@@ -613,7 +614,7 @@ sub new_version_h
 # Don't change the file if it is not needed.
 #
 # XXX - We might want to add VCSVERSION to CMakeLists.txt so that it can
-# generate version.h independently.
+# generate vcs_version.h independently.
 sub print_VCS_REVISION
 {
 	my $VCS_REVISION;
@@ -723,7 +724,9 @@ sub get_config {
 
 &get_config();
 
-&read_repo_info();
+if (! $set_version) {
+	&read_repo_info();
+}
 
 &print_VCS_REVISION;
 

@@ -11,6 +11,7 @@
 #include "dfvm.h"
 
 #include <ftypes/ftypes-int.h>
+#include <wsutil/ws_assert.h>
 
 dfvm_insn_t*
 dfvm_insn_new(dfvm_opcode_t op)
@@ -35,6 +36,9 @@ dfvm_value_free(dfvm_value_t *v)
 			break;
 		case DRANGE:
 			drange_free(v->value.drange);
+			break;
+		case PCRE:
+			g_regex_unref(v->value.pcre);
 			break;
 		default:
 			/* nothing */
@@ -105,6 +109,12 @@ dfvm_dump(FILE *f, dfilter_t *df)
 					arg2->value.numeric);
 				wmem_free(NULL, value_str);
 				break;
+			case PUT_PCRE:
+				fprintf(f, "%05d PUT_PCRE\t%s -> reg#%u\n",
+					id,
+					g_regex_get_pattern(arg1->value.pcre),
+					arg2->value.numeric);
+				break;
 			case CHECK_EXISTS:
 			case READ_TREE:
 			case CALL_FUNCTION:
@@ -124,7 +134,7 @@ dfvm_dump(FILE *f, dfilter_t *df)
 			case IF_TRUE_GOTO:
 			case IF_FALSE_GOTO:
 			default:
-				g_assert_not_reached();
+				ws_assert_not_reached();
 				break;
 		}
 	}
@@ -165,6 +175,11 @@ dfvm_dump(FILE *f, dfilter_t *df)
 				break;
 
 			case PUT_FVALUE:
+				/* We already dumped these */
+				ws_assert_not_reached();
+				break;
+
+			case PUT_PCRE:
 				/* We already dumped these */
 				g_assert_not_reached();
 				break;
@@ -278,7 +293,7 @@ dfvm_dump(FILE *f, dfilter_t *df)
 				break;
 
 			default:
-				g_assert_not_reached();
+				ws_assert_not_reached();
 				break;
 		}
 	}
@@ -347,6 +362,16 @@ put_fvalue(dfilter_t *df, fvalue_t *fv, int reg)
 	return TRUE;
 }
 
+/* Put a constant PCRE in a register. These will not be cleared by
+ * free_register_overhead. */
+static gboolean
+put_pcre(dfilter_t *df, GRegex *pcre, int reg)
+{
+	df->registers[reg] = g_list_append(NULL, pcre);
+	df->owns_memory[reg] = FALSE;
+	return TRUE;
+}
+
 typedef gboolean (*FvalueCmpFunc)(const fvalue_t*, const fvalue_t*);
 
 static gboolean
@@ -360,6 +385,26 @@ any_test(dfilter_t *df, FvalueCmpFunc cmp, int reg1, int reg2)
 		list_b = df->registers[reg2];
 		while (list_b) {
 			if (cmp((fvalue_t *)list_a->data, (fvalue_t *)list_b->data)) {
+				return TRUE;
+			}
+			list_b = g_list_next(list_b);
+		}
+		list_a = g_list_next(list_a);
+	}
+	return FALSE;
+}
+
+static gboolean
+any_matches(dfilter_t *df, int reg1, int reg2)
+{
+	GList	*list_a, *list_b;
+
+	list_a = df->registers[reg1];
+
+	while (list_a) {
+		list_b = df->registers[reg2];
+		while (list_b) {
+			if (fvalue_matches((fvalue_t *)list_a->data, (GRegex *)list_b->data)) {
 				return TRUE;
 			}
 			list_b = g_list_next(list_b);
@@ -385,8 +430,8 @@ any_in_range(dfilter_t *df, int reg1, int reg2, int reg3)
 	 * the list length MUST be one. This should have been enforced by
 	 * grammar.lemon.
 	 */
-	g_assert(list_low && !g_list_next(list_low));
-	g_assert(list_high && !g_list_next(list_high));
+	ws_assert(list_low && !g_list_next(list_low));
+	ws_assert(list_high && !g_list_next(list_high));
 	low = (fvalue_t *)list_low->data;
 	high = (fvalue_t *)list_high->data;
 
@@ -446,7 +491,7 @@ mk_range(dfilter_t *df, int from_reg, int to_reg, drange_t *d_range)
 		/* Assert here because semcheck.c should have
 		 * already caught the cases in which a slice
 		 * cannot be made. */
-		g_assert(new_fv);
+		ws_assert(new_fv);
 		to_list = g_list_append(to_list, new_fv);
 
 		from_list = g_list_next(from_list);
@@ -472,7 +517,7 @@ dfvm_apply(dfilter_t *df, proto_tree *tree)
 	GList		*param1;
 	GList		*param2;
 
-	g_assert(tree);
+	ws_assert(tree);
 
 	length = df->insns->len;
 
@@ -568,7 +613,7 @@ dfvm_apply(dfilter_t *df, proto_tree *tree)
 				break;
 
 			case ANY_MATCHES:
-				accum = any_test(df, fvalue_matches,
+				accum = any_matches(df,
 						arg1->value.numeric, arg2->value.numeric);
 				break;
 
@@ -609,13 +654,21 @@ dfvm_apply(dfilter_t *df, proto_tree *tree)
 				break;
 #endif
 
+			case PUT_PCRE:
+#if 0
+				/* These were handled in the constants initialization */
+				accum = put_pcre(df,
+						arg1->value.pcre, arg2->value.numeric);
+				break;
+#endif
+
 			default:
-				g_assert_not_reached();
+				ws_assert_not_reached();
 				break;
 		}
 	}
 
-	g_assert_not_reached();
+	ws_assert_not_reached();
 	return FALSE; /* to appease the compiler */
 }
 
@@ -640,6 +693,10 @@ dfvm_init_const(dfilter_t *df)
 				put_fvalue(df,
 						arg1->value.fvalue, arg2->value.numeric);
 				break;
+			case PUT_PCRE:
+				put_pcre(df,
+						arg1->value.pcre, arg2->value.numeric);
+				break;
 			case CHECK_EXISTS:
 			case READ_TREE:
 			case CALL_FUNCTION:
@@ -659,7 +716,7 @@ dfvm_init_const(dfilter_t *df)
 			case IF_TRUE_GOTO:
 			case IF_FALSE_GOTO:
 			default:
-				g_assert_not_reached();
+				ws_assert_not_reached();
 				break;
 		}
 	}

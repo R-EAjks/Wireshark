@@ -992,13 +992,13 @@ dissect_ipopt_cipso(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void * 
                 while (cat_str_len < (strlen(cat_str) + 2 + USHRT_MAX_STRLEN))
                   cat_str_len += cat_str_len;
                 cat_str_new = (char *)wmem_alloc(wmem_packet_scope(), cat_str_len);
-                g_strlcpy(cat_str_new, cat_str, cat_str_len);
+                (void) g_strlcpy(cat_str_new, cat_str, cat_str_len);
                 cat_str_new[cat_str_len - 1] = '\0';
                 cat_str = cat_str_new;
               }
               if (cat_str[0] != '\0')
-                g_strlcat(cat_str, ",", cat_str_len);
-              g_strlcat(cat_str, cat_str_tmp, cat_str_len);
+                (void) g_strlcat(cat_str, ",", cat_str_len);
+              (void) g_strlcat(cat_str, cat_str_tmp, cat_str_len);
             }
             bit_spot++;
             bitmask >>= 1;
@@ -1038,8 +1038,8 @@ dissect_ipopt_cipso(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void * 
                      tvb_get_ntohs(tvb, offset));
           offset += 2;
           if (cat_str[0] != '\0')
-            g_strlcat(cat_str, ",", USHRT_MAX_STRLEN * 15);
-          g_strlcat(cat_str, cat_str_tmp, USHRT_MAX_STRLEN * 15);
+            (void) g_strlcat(cat_str, ",", USHRT_MAX_STRLEN * 15);
+          (void) g_strlcat(cat_str, cat_str_tmp, USHRT_MAX_STRLEN * 15);
         }
 
         proto_tree_add_string(field_tree, hf_ip_cipso_categories, tvb, offset - taglen + 4, taglen - 4, cat_str);
@@ -1082,8 +1082,8 @@ dissect_ipopt_cipso(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void * 
             g_snprintf(cat_str_tmp, USHRT_MAX_STRLEN * 2, "%u", cat_high);
 
           if (cat_str[0] != '\0')
-            g_strlcat(cat_str, ",", USHRT_MAX_STRLEN * 16);
-          g_strlcat(cat_str, cat_str_tmp, USHRT_MAX_STRLEN * 16);
+            (void) g_strlcat(cat_str, ",", USHRT_MAX_STRLEN * 16);
+          (void) g_strlcat(cat_str, cat_str_tmp, USHRT_MAX_STRLEN * 16);
         }
 
         proto_tree_add_string(field_tree, hf_ip_cipso_categories, tvb, offset - taglen + 4, taglen - 4, cat_str);
@@ -2230,9 +2230,20 @@ dissect_ip_v4(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* 
       iph->ip_len > hlen &&
       tvb_bytes_exist(tvb, offset, iph->ip_len - hlen) &&
       ipsum == 0) {
+    guint32 frag_id;
+    frag_id = iph->ip_proto ^ iph->ip_id ^ src32 ^ dst32;
+    /* XXX: Should there be a way to force the VLAN ID not to
+     * be taken into account for reassembly even with non publicly
+     * routable IP addresses?
+     */
+    if (in4_addr_is_private(dst32) || in4_addr_is_private(src32) ||
+        in4_addr_is_link_local(dst32) || in4_addr_is_link_local(src32) ||
+        prefs.strict_conversation_tracking_heuristics) {
+      frag_id ^= pinfo->vlan_id;
+    }
     ipfd_head = fragment_add_check(&ip_reassembly_table, tvb, offset,
                                    pinfo,
-                                   iph->ip_proto ^ iph->ip_id ^ src32 ^ dst32 ^ pinfo->vlan_id,
+                                   frag_id,
                                    NULL,
                                    (iph->ip_off & IP_OFFSET) * 8,
                                    iph->ip_len - hlen,

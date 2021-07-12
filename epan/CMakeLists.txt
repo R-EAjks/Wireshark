@@ -296,7 +296,6 @@ add_library(epan
 	$<TARGET_OBJECTS:dissectors>
 	$<TARGET_OBJECTS:dissectors-corba>
 	$<TARGET_OBJECTS:ftypes>
-	$<TARGET_OBJECTS:version_info>
 	$<TARGET_OBJECTS:wmem>
 	$<$<BOOL:${LUA_FOUND}>:$<TARGET_OBJECTS:wslua>>
 	${CMAKE_BINARY_DIR}/image/libwireshark.rc
@@ -313,20 +312,24 @@ set_target_properties(epan PROPERTIES
 	PREFIX "lib"
 	FOLDER "DLLs"
 )
+if(MSVC)
+	set_target_properties(epan PROPERTIES LINK_FLAGS_DEBUG "${WS_MSVC_DEBUG_LINK_FLAGS}")
+endif()
 
 target_link_libraries(epan
 	PUBLIC
 		wiretap
 		wsutil
-		${GLIB2_LIBRARIES}
 	PRIVATE
 		${BROTLI_LIBRARIES}
 		${CARES_LIBRARIES}
 		${GCRYPT_LIBRARIES}
 		${GIO2_LIBRARIES}
-		${GTHREAD2_LIBRARIES}
+		${GLIB2_LIBRARIES}
 		${GNUTLS_LIBRARIES}
+		${GTHREAD2_LIBRARIES}
 		${KERBEROS_LIBRARIES}
+		${LIBXML2_LIBRARIES}
 		${LUA_LIBRARIES}
 		${LZ4_LIBRARIES}
 		${M_LIBRARIES}
@@ -334,7 +337,6 @@ target_link_libraries(epan
 		${SMI_LIBRARIES}
 		${SNAPPY_LIBRARIES}
 		${WIN_PSAPI_LIBRARY}
-		${LIBXML2_LIBRARIES}
 		${ZLIB_LIBRARIES}
 		${ZSTD_LIBRARIES}
 )
@@ -346,11 +348,6 @@ target_include_directories(epan
 )
 
 target_include_directories(epan
-	SYSTEM PUBLIC
-		${GLIB2_INCLUDE_DIRS}
-)
-
-target_include_directories(epan
 	SYSTEM PRIVATE
 		${BROTLI_INCLUDE_DIRS}
 		${CARES_INCLUDE_DIRS}
@@ -359,9 +356,11 @@ target_include_directories(epan
 		${GTHREAD2_INCLUDE_DIRS}
 		${LIBXML2_INCLUDE_DIRS}
 		${LUA_INCLUDE_DIRS}
+		${LZ4_INCLUDE_DIRS}
 		${NGHTTP2_INCLUDE_DIRS}
 		${SMI_INCLUDE_DIRS}
 		${ZLIB_INCLUDE_DIRS}
+		${ZSTD_INCLUDE_DIRS}
 	PRIVATE
 		${CMAKE_CURRENT_BINARY_DIR}
 		${CMAKE_CURRENT_SOURCE_DIR}
@@ -381,7 +380,7 @@ install(FILES ${LIBWIRESHARK_PUBLIC_HEADERS}
 )
 
 add_executable(exntest EXCLUDE_FROM_ALL exntest.c except.c)
-target_link_libraries(exntest ${GLIB2_LIBRARIES})
+target_link_libraries(exntest epan)
 set_target_properties(exntest PROPERTIES
 	FOLDER "Tests"
 	EXCLUDE_FROM_DEFAULT_BUILD True

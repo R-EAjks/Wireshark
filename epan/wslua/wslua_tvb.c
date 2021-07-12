@@ -52,7 +52,7 @@ WSLUA_CLASS_DEFINE(Tvb,FAIL_ON_NULL_OR_EXPIRED("Tvb"));
    and can be used to extract information (via <<lua_class_TvbRange,`TvbRange`>>) from the packet's data.
 
    To create a <<lua_class_TvbRange,`TvbRange`>> the <<lua_class_Tvb,`Tvb`>> must be called with offset and length as optional arguments;
-   the offset defaults to 0 and the length to `tvb:len()`.
+   the offset defaults to 0 and the length to `tvb:captured_len()`.
 
    [WARNING]
    ====
@@ -132,15 +132,24 @@ static int Tvb__gc(lua_State* L) {
 }
 
 WSLUA_METHOD Tvb_reported_len(lua_State* L) {
-    /* Obtain the reported (not captured) length of a <<lua_class_Tvb,`Tvb`>>. */
+    /* Obtain the reported length (length on the network) of a <<lua_class_Tvb,`Tvb`>>. */
     Tvb tvb = checkTvb(L,1);
 
     lua_pushnumber(L,tvb_reported_length(tvb->ws_tvb));
     WSLUA_RETURN(1); /* The reported length of the <<lua_class_Tvb,`Tvb`>>. */
 }
 
+WSLUA_METHOD Tvb_captured_len(lua_State* L) {
+    /* Obtain the captured length (amount saved in the capture process) of a <<lua_class_Tvb,`Tvb`>>. */
+    Tvb tvb = checkTvb(L,1);
+
+    lua_pushnumber(L,tvb_captured_length(tvb->ws_tvb));
+    WSLUA_RETURN(1); /* The captured length of the <<lua_class_Tvb,`Tvb`>>. */
+}
+
 WSLUA_METHOD Tvb_len(lua_State* L) {
-    /* Obtain the actual (captured) length of a <<lua_class_Tvb,`Tvb`>>. */
+    /* Obtain the captured length (amount saved in the capture process) of a <<lua_class_Tvb,`Tvb`>>.
+       Same as captured_len; kept only for backwards compatibility */
     Tvb tvb = checkTvb(L,1);
 
     lua_pushnumber(L,tvb_captured_length(tvb->ws_tvb));
@@ -148,7 +157,7 @@ WSLUA_METHOD Tvb_len(lua_State* L) {
 }
 
 WSLUA_METHOD Tvb_reported_length_remaining(lua_State* L) {
-    /* Obtain the reported (not captured) length of packet data to end of a <<lua_class_Tvb,`Tvb`>> or -1 if the
+    /* Obtain the reported (not captured) length of packet data to end of a <<lua_class_Tvb,`Tvb`>> or 0 if the
        offset is beyond the end of the <<lua_class_Tvb,`Tvb`>>. */
 #define Tvb_reported_length_remaining_OFFSET 2 /* offset */
     Tvb tvb = checkTvb(L,1);
@@ -299,10 +308,11 @@ WSLUA_METAMETHOD Tvb__eq(lua_State* L) {
 WSLUA_METHODS Tvb_methods[] = {
     WSLUA_CLASS_FNREG(Tvb,bytes),
     WSLUA_CLASS_FNREG(Tvb,range),
-    WSLUA_CLASS_FNREG(Tvb,len),
     WSLUA_CLASS_FNREG(Tvb,offset),
     WSLUA_CLASS_FNREG(Tvb,reported_len),
     WSLUA_CLASS_FNREG(Tvb,reported_length_remaining),
+    WSLUA_CLASS_FNREG(Tvb,captured_len),
+    WSLUA_CLASS_FNREG(Tvb,len),
     WSLUA_CLASS_FNREG(Tvb,raw),
     { NULL, NULL }
 };
@@ -399,8 +409,7 @@ WSLUA_METHOD TvbRange_tvb(lua_State *L) {
         tvb = (Tvb)g_malloc(sizeof(struct _wslua_tvb));
         tvb->expired = FALSE;
         tvb->need_free = FALSE;
-        // -1 means recalculate the reported_len based on the new offset
-        tvb->ws_tvb = tvb_new_subset_length_caplen(tvbr->tvb->ws_tvb,tvbr->offset,tvbr->len,-1);
+        tvb->ws_tvb = tvb_new_subset_length(tvbr->tvb->ws_tvb,tvbr->offset,tvbr->len);
         return push_wsluaTvb(L, tvb);
     } else {
         luaL_error(L,"Out Of Bounds");

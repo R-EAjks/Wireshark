@@ -1,4 +1,4 @@
--- 3GPP TS 38.423 V16.4.0 (2021-01)
+-- 3GPP TS 38.423 V16.6.0 (2021-07)﻿
 -- 9.3.5	Information Element definitions
 -- **************************************************************
 --
@@ -53,6 +53,7 @@ IMPORTS
 	id-NRUESidelinkAggregateMaximumBitRate,
 	id-ExtendedRATRestrictionInformation,
 	id-QoSMonitoringRequest,
+	id-QoSMonitoringDisabled,
 	id-QosMonitoringReportingFrequency,
 	id-DAPSRequestInfo,
 	id-OffsetOfNbiotChannelNumberToDL-EARFCN,
@@ -86,6 +87,7 @@ IMPORTS
 	id-QoSFlowsMappedtoDRB-SetupResponse-MNterminated,
 	id-DL-scheduling-PDCCH-CCE-usage,
 	id-UL-scheduling-PDCCH-CCE-usage,
+	id-SFN-Offset,
 	maxEARFCN,
 	maxnoofAllowedAreas,
 	maxnoofAMFRegions,
@@ -565,7 +567,9 @@ CauseRadioNetworkLayer ::= ENUMERATED {
 	measurement-temporarily-not-available,
 	measurement-not-supported-for-the-object,
 	ue-power-saving,
-	unknown-NG-RAN-node2-Measurement-ID
+	unknown-NG-RAN-node2-Measurement-ID,
+	insufficient-ue-capabilities,
+	normal-release
 }
 
 CauseTransportLayer ::= ENUMERATED {
@@ -693,8 +697,8 @@ CellToReport ::= SEQUENCE (SIZE(1..maxnoofCellsinNG-RANnode)) OF CellToReport-It
 
 CellToReport-Item	::= SEQUENCE {
 	cell-ID									GlobalNG-RANCell-ID,
-sSBToReport-List                        SSBToReport-List,
-sliceToReport-List                      SliceToReport-List,
+sSBToReport-List                        SSBToReport-List			OPTIONAL,
+sliceToReport-List                      SliceToReport-List			OPTIONAL,
 	iE-Extensions						ProtocolExtensionContainer { { CellToReport-Item-ExtIEs} }	OPTIONAL,
 	...
 }
@@ -730,7 +734,7 @@ CompositeAvailableCapacityGroup-ExtIEs XNAP-PROTOCOL-EXTENSION ::= {
 
 CompositeAvailableCapacity ::= SEQUENCE {
 	cellCapacityClassValue	CellCapacityClassValue             OPTIONAL,
-	capacityValueInfo	     	CapacityValueInfo, -- this IE represents the IE “CapacityValue” in 9.2.2.a, it’s used to distinguish the “CapacityValue”  in 9.2.2.c
+	capacityValueInfo	     	CapacityValueInfo, -- this IE represents the IE "CapacityValue" in 9.2.2.a, it’s used to distinguish the "CapacityValue"  in 9.2.2.c
 	iE-Extensions				ProtocolExtensionContainer { { CompositeAvailableCapacity-ExtIEs} }OPTIONAL,
 	...
 }
@@ -738,6 +742,8 @@ CompositeAvailableCapacity ::= SEQUENCE {
 CompositeAvailableCapacity-ExtIEs XNAP-PROTOCOL-EXTENSION ::= {
 	...
 }
+
+CHO-MRDC-EarlyDataForwarding ::= ENUMERATED {stop, ...}
 
 CHO-MRDC-Indicator ::= ENUMERATED {true, ...}
 
@@ -1226,7 +1232,7 @@ E-UTRAPRACHConfiguration ::= SEQUENCE {
 	highSpeedFlag							ENUMERATED {true, false, ...},
 	prach-FreqOffset						INTEGER (0..94),
 	prach-ConfigIndex						INTEGER (0..63)								OPTIONAL,
--- C-ifTDD: This IE shall be present if the EUTRA-Mode-Info IE in the Served Cell Information IE is set to the value “TDD” --
+-- C-ifTDD: This IE shall be present if the EUTRA-Mode-Info IE in the Served Cell Information IE is set to the value "TDD" --
 	iE-Extensions							ProtocolExtensionContainer { {E-UTRAPRACHConfiguration-ExtIEs} }	OPTIONAL,
 	...
 }
@@ -1369,6 +1375,8 @@ ExtendedRATRestrictionInformation-ExtIEs XNAP-PROTOCOL-EXTENSION ::= {
 ExtendedPacketDelayBudget ::= INTEGER (0..65535, ...)
 
 ExtendedSliceSupportList	::= SEQUENCE (SIZE(1..maxnoofExtSliceItems)) OF S-NSSAI
+
+ExtendedUEIdentityIndexValue ::= BIT STRING (SIZE(16))
 
 ExtTLAs ::= SEQUENCE (SIZE(1..maxnoofExtTLAs)) OF ExtTLA-Item
 
@@ -2780,6 +2788,33 @@ PagingDRX	::= ENUMERATED {
 	}
 
 
+PagingeDRXInformation ::= SEQUENCE {
+	paging-eDRX-Cycle		Paging-eDRX-Cycle,
+	paging-Time-Window		Paging-Time-Window											OPTIONAL,
+	iE-Extensions			ProtocolExtensionContainer { {PagingeDRXInformation-ExtIEs} }	OPTIONAL,
+	...
+}
+
+PagingeDRXInformation-ExtIEs XNAP-PROTOCOL-EXTENSION ::= {
+	...
+}
+
+Paging-eDRX-Cycle ::= ENUMERATED {
+	hfhalf, hf1, hf2, hf4, hf6,
+	hf8, hf10, hf12, hf14, hf16,
+	hf32, hf64, hf128, hf256,
+	...
+}
+
+
+Paging-Time-Window ::= ENUMERATED {
+	s1, s2, s3, s4, s5,
+	s6, s7, s8, s9, s10,
+	s11, s12, s13, s14, s15, s16,
+	...
+}
+
+
 PagingPriority ::= ENUMERATED {
 	priolevel1,
 	priolevel2,
@@ -3845,7 +3880,8 @@ QoSFlowLevelQoSParameters ::= SEQUENCE {
 
 QoSFlowLevelQoSParameters-ExtIEs XNAP-PROTOCOL-EXTENSION ::= {
 	{ID id-QoSMonitoringRequest				CRITICALITY ignore	EXTENSION QosMonitoringRequest					PRESENCE optional}|
-	{ID id-QosMonitoringReportingFrequency	CRITICALITY ignore	EXTENSION QosMonitoringReportingFrequency	PRESENCE optional},
+	{ID id-QosMonitoringReportingFrequency	CRITICALITY ignore	EXTENSION QosMonitoringReportingFrequency	PRESENCE optional}|
+	{ID id-QoSMonitoringDisabled				CRITICALITY ignore	EXTENSION QoSMonitoringDisabled					PRESENCE optional},
 	...
 }
 
@@ -3948,6 +3984,7 @@ QoSFlowsUsageReport-Item-ExtIEs XNAP-PROTOCOL-EXTENSION ::= {
 }
 
 QosMonitoringRequest ::= ENUMERATED {ul, dl, both}
+QoSMonitoringDisabled ::= ENUMERATED {true, ...}
 QosMonitoringReportingFrequency ::= INTEGER (1..1800, ...)
 
 -- R
@@ -4353,6 +4390,8 @@ SecondarydataForwardingInfoFromTarget-List ::= SEQUENCE (SIZE(1..maxnoofMultiCon
 
 SCGConfigurationQuery	::= ENUMERATED {true, ...}
 
+SCGIndicator	::=	ENUMERATED{released, ...}
+
 SecondaryRATUsageInformation ::= SEQUENCE {
 	pDUSessionUsageReport		PDUSessionUsageReport				OPTIONAL,
 	qosFlowsUsageReportList		QoSFlowsUsageReportList				OPTIONAL,
@@ -4510,7 +4549,8 @@ ServedCells-E-UTRA-Item ::= SEQUENCE {
 }
 
 ServedCells-E-UTRA-Item-ExtIEs XNAP-PROTOCOL-EXTENSION ::= {
-	...
+	{ ID id-SFN-Offset				CRITICALITY ignore EXTENSION SFN-Offset					PRESENCE optional },
+...
 }
 
 
@@ -4566,8 +4606,19 @@ ServedCellInformation-NR-ExtIEs XNAP-PROTOCOL-EXTENSION ::= {
 	{ ID id-SSB-PositionsInBurst			CRITICALITY ignore	EXTENSION SSB-PositionsInBurst					PRESENCE optional }|
 	{ ID id-NRCellPRACHConfig				CRITICALITY ignore	EXTENSION NRCellPRACHConfig						PRESENCE optional }|
 	{ ID id-NPN-Broadcast-Information		CRITICALITY reject	EXTENSION NPN-Broadcast-Information			PRESENCE optional }|
-	{ ID id-CSI-RSTransmissionIndication	CRITICALITY ignore	EXTENSION CSI-RSTransmissionIndication		PRESENCE optional },
+	{ ID id-CSI-RSTransmissionIndication	CRITICALITY ignore	EXTENSION CSI-RSTransmissionIndication		PRESENCE optional } |
+	{ ID id-SFN-Offset						CRITICALITY ignore	EXTENSION SFN-Offset							PRESENCE optional },
 	...
+}
+
+SFN-Offset ::= SEQUENCE {
+	sFN-Time-Offset					BIT STRING (SIZE(24)),
+
+	iE-Extensions		ProtocolExtensionContainer { {SFN-Offset-ExtIEs} } OPTIONAL,
+	...
+}
+SFN-Offset-ExtIEs XNAP-PROTOCOL-EXTENSION ::= {
+		...
 }
 
 
@@ -5363,6 +5414,13 @@ UESecurityCapabilities-ExtIEs XNAP-PROTOCOL-EXTENSION ::= {
 	...
 }
 
+UESpecificDRX ::= ENUMERATED {
+	v32,
+	v64,
+	v128,
+	v256,
+	...
+}
 
 ULConfiguration::= SEQUENCE {
 	uL-PDCP							UL-UE-Configuration,

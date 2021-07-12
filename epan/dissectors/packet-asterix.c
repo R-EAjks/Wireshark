@@ -3434,7 +3434,7 @@ static const FieldPart I004_060_IIA = { 1, 1.0, FIELD_PART_UINT, &hf_004_060_IIA
 static const FieldPart I004_060_SQW = { 1, 1.0, FIELD_PART_UINT, &hf_004_060_SQW, NULL };
 static const FieldPart I004_060_CUW = { 1, 1.0, FIELD_PART_UINT, &hf_004_060_CUW, NULL };
 static const FieldPart *I004_060_PARTS[] = { &I004_060_MRVA, &I004_060_RAMLD, &I004_060_RAMHD, &I004_060_MSAW, &I004_060_APW, &I004_060_CLAM, &I004_060_STCA, &IXXX_FX,
-                                             &I004_060_AFDA, &I004_060_RIMCA, &I004_060_ACASRA, &I004_060_NTCA, &I004_060_DG, &I004_060_OF, &I004_060_OL, &IXXX_FX, 
+                                             &I004_060_AFDA, &I004_060_RIMCA, &I004_060_ACASRA, &I004_060_NTCA, &I004_060_DG, &I004_060_OF, &I004_060_OL, &IXXX_FX,
                                              &I004_060_AIW, &I004_060_PAIW, &I004_060_OCAT, &I004_060_SAM, &I004_060_VCD, &I004_060_CHAM, &I004_060_DSAM, &IXXX_FX,
                                              &I004_060_DBPSMARR, &I004_060_DBPSMDEP, &I004_060_DBPSMTL, &I004_060_VRAMCRM, &I004_060_VRAMVTM, &I004_060_VRAMVRM, &I004_060_HAMHD, &IXXX_FX,
                                              &I004_060_HAMRD, &I004_060_HAMVD, &I004_060_HVI, &I004_060_LTW, &I004_060_VPM, &I004_060_TTA, &I004_060_CRA, &IXXX_FX,
@@ -4712,8 +4712,8 @@ static const FieldPart I010_041_LON = { 32, 180.0/2147483648.0, FIELD_PART_FLOAT
 static const FieldPart *I010_041_PARTS[] = { &I010_041_LAT, &I010_041_LON, NULL };
 
 /* Position in Cartesian Coordinates */
-static const FieldPart I010_042_X = { 24, 1.0, FIELD_PART_FLOAT, &hf_010_042_X, NULL };
-static const FieldPart I010_042_Y = { 24, 1.0, FIELD_PART_FLOAT, &hf_010_042_Y, NULL };
+static const FieldPart I010_042_X = { 16, 1.0, FIELD_PART_FLOAT, &hf_010_042_X, NULL };
+static const FieldPart I010_042_Y = { 16, 1.0, FIELD_PART_FLOAT, &hf_010_042_Y, NULL };
 static const FieldPart *I010_042_PARTS[] = { &I010_042_X, &I010_042_Y, NULL };
 
 /* Mode-3/A Code in Octal Representation */
@@ -13680,7 +13680,7 @@ void proto_register_asterix (void)
         { &hf_010_090_V, { "V", "asterix.010_090_V", FT_UINT16, BASE_DEC, VALS(valstr_010_090_V), 0x8000, NULL, HFILL } },
         { &hf_010_090_G, { "G", "asterix.010_090_G", FT_UINT16, BASE_DEC, VALS(valstr_010_090_G), 0x4000, NULL, HFILL } },
         { &hf_010_090_FL, { "FL", "asterix.010_090_FL", FT_DOUBLE, BASE_NONE, NULL, 0x0, NULL, HFILL } },
-        { &hf_010_091, { "110, Measured Height", "asterix.010_091", FT_NONE, BASE_NONE, NULL, 0x0, NULL, HFILL } },
+        { &hf_010_091, { "091, Measured Height", "asterix.010_091", FT_NONE, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         { &hf_010_091_MH, { "MH [ft]", "asterix.010_091_MH", FT_DOUBLE, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         { &hf_010_131, { "131, Amplitude of Primary Plot", "asterix.010_131", FT_NONE, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         { &hf_010_131_PAM, { "PAM [dBm]", "asterix.010_131_PAM", FT_INT8, BASE_DEC, NULL, 0x0, NULL, HFILL } },
@@ -13703,7 +13703,7 @@ void proto_register_asterix (void)
         { &hf_010_200_TA, { "Track Angle [deg]", "asterix.010_200_TA", FT_DOUBLE, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         { &hf_010_202, { "202, Calculated Track Velocity in Cartesian Coordinates", "asterix.010_202", FT_NONE, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         { &hf_010_202_VX, { "VX [m/s]", "asterix.010_202_VX", FT_DOUBLE, BASE_NONE, NULL, 0x0, NULL, HFILL } },
-        { &hf_010_202_VY, { "VX [m/s]", "asterix.010_202_VY", FT_DOUBLE, BASE_NONE, NULL, 0x0, NULL, HFILL } },
+        { &hf_010_202_VY, { "VY [m/s]", "asterix.010_202_VY", FT_DOUBLE, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         { &hf_010_210, { "210, Calculated Acceleration", "asterix.010_210", FT_NONE, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         { &hf_010_210_AX, { "AX [m/s^2]", "asterix.010_210_AX", FT_DOUBLE, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         { &hf_010_210_AY, { "AY [m/s^2]", "asterix.010_210_AY", FT_DOUBLE, BASE_NONE, NULL, 0x0, NULL, HFILL } },

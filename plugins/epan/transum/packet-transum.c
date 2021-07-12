@@ -14,15 +14,17 @@
 /* ToDo: Rework the Summarizer code (future release) */
 
 #include "config.h"
+#define WS_LOG_DOMAIN "transum"
 
 #include <epan/proto.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
-#include <wsutil/ws_printf.h>
+#include <epan/ws_printf.h>
 #include "packet-transum.h"
 #include "preferences.h"
 #include "extractors.h"
 #include "decoders.h"
+#include <wsutil/wslog.h>
 
 void proto_register_transum(void);
 void proto_reg_handoff_transum(void);
@@ -772,7 +774,7 @@ static void init_globals(void)
         if (hf_of_interest[i].hf != -1)
             g_array_append_val(wanted_fields, hf_of_interest[i].hf);
         else
-            g_warning("TRANSUM: unknown field %s", hf_of_interest[i].proto_name);
+            ws_warning("TRANSUM: unknown field %s", hf_of_interest[i].proto_name);
     }
     set_postdissector_wanted_hfids(transum_handle, wanted_fields);
 
