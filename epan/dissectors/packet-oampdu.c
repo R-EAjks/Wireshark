@@ -1707,7 +1707,7 @@ dissect_oampdu_vendor_specific(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tr
                             if (leaf_branch == DPOE_LB_USER_PORT_OBJ) {
                                 proto_tree_add_item(dpoe_opcode_request_tree, hf_oam_dpoe_user_port_object, tvb, offset, 1, ENC_BIG_ENDIAN);
                             } else {
-                                proto_tree_add_item(dpoe_opcode_request_tree, hf_oampdu_variable_value, tvb, offset, 1, ENC_BIG_ENDIAN);
+                                proto_tree_add_item(dpoe_opcode_request_tree, hf_oampdu_variable_value, tvb, offset, 1, ENC_NA);
                             }
                         }
                     }
