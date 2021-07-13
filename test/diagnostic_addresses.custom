@@ -1,0 +1,3 @@
+# Custom diagnostic addresses
+# Matches addresses in doip.pcap
+4098	ECU-custom

@@ -32,7 +32,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 #ifndef MAXNAMELEN
-#define MAXNAMELEN  	64	/* max name length (hostname and port name) */
+#define MAXNAMELEN  	64	/* max name length (hostname, port name, and diagnostic addresses) */
 #endif
 
 #ifndef MAXVLANNAMELEN
@@ -54,6 +54,7 @@ typedef struct _e_addr_resolve {
   gboolean load_hosts_file_from_profile_only; /**< Whether to only load the hosts in the current profile, not hosts files */
   gboolean vlan_name;                         /**< Whether to resolve VLAN IDs to names */
   gboolean ss7pc_name;                        /**< Whether to resolve SS7 Point Codes to names */
+  gboolean diag_addr_name;                    /**< Whether to resolve Diagnostic Addresses to names */
 } e_addr_resolve;
 
 #define ADDR_RESOLV_MACADDR(at) \
@@ -262,6 +263,10 @@ extern gchar *get_ipxnet_name(wmem_allocator_t *allocator, const guint32 addr);
 /* get_vlan_name returns the logical name if found in a vlans file,
  * or the VLAN ID itself as a string if not found*/
 extern gchar *get_vlan_name(wmem_allocator_t *allocator, const guint16 id);
+
+/* get_diag_addr_name returns the logical name if found in a diagnotic_addresses file,
+ * or the ID itself as a string if not found*/
+extern gchar *get_diag_address_name(wmem_allocator_t *allocator, const guint16 id);
 
 WS_DLL_PUBLIC guint get_hash_ether_status(hashether_t* ether);
 WS_DLL_PUBLIC char* get_hash_ether_hexaddr(hashether_t* ether);

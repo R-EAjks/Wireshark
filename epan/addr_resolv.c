@@ -105,6 +105,7 @@
 #define ENAME_VLANS     "vlans"
 #define ENAME_SS7PCS    "ss7pcs"
 #define ENAME_ENTERPRISES "enterprises.tsv"
+#define ENAME_DIAGADDRS "diagnostic_addresses"
 
 #define HASHETHSIZE      2048
 #define HASHHOSTSIZE     2048
@@ -149,6 +150,12 @@ typedef struct hashvlan {
 /*    struct hashvlan     *next; */
     gchar               name[MAXVLANNAMELEN];
 } hashvlan_t;
+
+typedef struct hashdiagaddr {
+    guint               id;
+    /*    struct hashdiagaddr     *next; */
+    gchar               name[MAXNAMELEN];
+} hashdiagaddr_t;
 
 typedef struct ss7pc {
     guint32             id; /* 1st byte NI, 3 following bytes: Point Code */
@@ -198,6 +205,13 @@ typedef struct _vlan
     char              name[MAXVLANNAMELEN];
 } vlan_t;
 
+/* internal diagnostic address type */
+typedef struct _diag_addr
+{
+    guint             id;
+    char              name[MAXNAMELEN];
+} diag_addr_t;
+
 // Maps guint -> hashipxnet_t*
 static wmem_map_t *ipxnet_hash_table = NULL;
 static wmem_map_t *ipv4_hash_table = NULL;
@@ -205,6 +219,7 @@ static wmem_map_t *ipv6_hash_table = NULL;
 // Maps guint -> hashvlan_t*
 static wmem_map_t *vlan_hash_table = NULL;
 static wmem_map_t *ss7pc_hash_table = NULL;
+static wmem_map_t *diag_addr_hash_table = NULL;
 
 // Maps IP address -> manually set hostname.
 static wmem_map_t *manually_resolved_ipv4_list = NULL;
@@ -281,7 +296,8 @@ e_addr_resolve gbl_resolv_flags = {
     TRUE,   /* use_external_net_name_resolver */
     FALSE,  /* load_hosts_file_from_profile_only */
     FALSE,  /* vlan_name */
-    FALSE   /* ss7 point code names */
+    FALSE,  /* ss7 point code names */
+    FALSE   /* diagnostic address names */
 };
 static guint name_resolve_concurrency = 500;
 static gboolean resolve_synchronously = FALSE;
@@ -305,6 +321,7 @@ gchar *g_ss7pcs_path    = NULL;     /* personal ss7pcs file   */
 gchar *g_enterprises_path = NULL;   /* global enterprises file   */
 gchar *g_penterprises_path = NULL;  /* personal enterprises file */
                                     /* first resolving call   */
+gchar* g_pdiagaddr_path = NULL;     /* personal diag addr file */
 
 /*
  * Submitted asynchronous queries trigger a callback (c_ares_ghba_cb()).
@@ -2796,6 +2813,149 @@ ss7pc_name_lookup_init(void)
 
 /* SS7PC Name Resolution End*/
 
+/* DIAGNOSTIC ADDRESSES (AUTOMOTIVE) */
+static int
+parse_diag_addr_line(char* line, diag_addr_t* diag_addr)
+{
+    gchar* cp;
+    guint16   id;
+
+    if ((cp = strchr(line, '#')))
+        *cp = '\0';
+
+    if ((cp = strtok(line, " \t\n")) == NULL)
+        return -1;
+
+    if (sscanf(cp, "%" G_GUINT16_FORMAT, &id) == 1) {
+        diag_addr->id = id;
+    } else {
+        return -1;
+    }
+
+    if ((cp = strtok(NULL, "\t\n")) == NULL)
+        return -1;
+
+    (void)g_strlcpy(diag_addr->name, cp, MAXVLANNAMELEN);
+
+    return 0;
+
+}
+
+static FILE* diag_addr_p = NULL;
+
+static void
+set_diag_addr_ent(char* path)
+{
+    if (diag_addr_p)
+        rewind(diag_addr_p);
+    else
+        diag_addr_p = ws_fopen(path, "r");
+}
+
+static void
+end_diag_addr_ent(void)
+{
+    if (diag_addr_p) {
+        fclose(diag_addr_p);
+        diag_addr_p = NULL;
+    }
+}
+
+static diag_addr_t*
+get_diag_addr_ent(void)
+{
+
+    static diag_addr_t diag_addr;
+    char    buf[MAX_LINELEN];
+
+    if (diag_addr_p == NULL)
+        return NULL;
+
+    while (fgetline(buf, sizeof(buf), diag_addr_p) >= 0) {
+        if (parse_diag_addr_line(buf, &diag_addr) == 0) {
+            return &diag_addr;
+        }
+    }
+
+    return NULL;
+
+}
+
+static diag_addr_t*
+get_diagaddrnamebyid(guint16 id)
+{
+    diag_addr_t* diag_addr;
+
+    set_diag_addr_ent(g_pdiagaddr_path);
+
+    while (((diag_addr = get_diag_addr_ent()) != NULL) && (id != diag_addr->id));
+
+    if (diag_addr == NULL) {
+        end_diag_addr_ent();
+    }
+
+    return diag_addr;
+
+}
+
+static void
+initialize_diag_addr(void)
+{
+    g_assert(diag_addr_hash_table == NULL);
+    diag_addr_hash_table = wmem_map_new(wmem_epan_scope(), g_direct_hash, g_direct_equal);
+
+    /* Set g_pdiagaddr_path here, but don't actually do anything
+     * with it. It's used in get_diagaddrnamebyid()
+     */
+    if (g_pdiagaddr_path == NULL) {
+        /* Check profile directory before personal configuration */
+        g_pdiagaddr_path = get_persconffile_path(ENAME_DIAGADDRS, TRUE);
+        if (!file_exists(g_pdiagaddr_path)) {
+            g_free(g_pdiagaddr_path);
+            g_pdiagaddr_path = get_persconffile_path(ENAME_DIAGADDRS, FALSE);
+        }
+    }
+}
+
+static void
+diag_addr_name_lookup_cleanup(void)
+{
+    diag_addr_hash_table = NULL;
+    g_free(g_pdiagaddr_path);
+    g_pdiagaddr_path = NULL;
+}
+
+static const gchar*
+diag_addr_name_lookup(const guint id)
+{
+    hashdiagaddr_t* tp;
+    diag_addr_t* diag_addr;
+
+    tp = (hashdiagaddr_t*)wmem_map_lookup(diag_addr_hash_table, GUINT_TO_POINTER(id));
+    if (tp == NULL) {
+        tp = wmem_new(wmem_epan_scope(), hashdiagaddr_t);
+        wmem_map_insert(diag_addr_hash_table, GUINT_TO_POINTER(id), tp);
+    } else {
+        return tp->name;
+    }
+
+    /* fill in a new entry */
+
+    tp->id = id;
+
+    if ((diag_addr = get_diagaddrnamebyid(id)) == NULL) {
+        /* unknown name */
+        g_snprintf(tp->name, MAXNAMELEN, "<%u>", id);
+
+    } else {
+        (void)g_strlcpy(tp->name, diag_addr->name, MAXNAMELEN);
+    }
+
+    return tp->name;
+
+}
+/* DIAG ADDR END */
+
 
 /*
  *  External Functions
@@ -2896,6 +3056,12 @@ addr_resolve_pref_init(module_t *nameres)
             " One line per Point Code, e.g.: 2-1234 MyPointCode1",
             &gbl_resolv_flags.ss7pc_name);
 
+    prefs_register_bool_preference(nameres, "diag_addr_name",
+            "Resolve Diagnostic Addresses",
+            "Resolve Diagnostic Addresses to names from the preferences \"diagnostic_addresses\" file."
+            " Format of the file is: \"ID<Tab>Name\"."
+            " One line per Diagnostic Address, e.g.: 1234 Tester",
+            &gbl_resolv_flags.diag_addr_name);
 }
 
 void addr_resolve_pref_apply(void)
@@ -2912,6 +3078,7 @@ disable_name_resolution(void) {
     gbl_resolv_flags.use_external_net_name_resolver     = FALSE;
     gbl_resolv_flags.vlan_name                          = FALSE;
     gbl_resolv_flags.ss7pc_name                         = FALSE;
+    gbl_resolv_flags.diag_addr_name                     = FALSE;
 }
 
 gboolean
@@ -3207,6 +3374,8 @@ void host_name_lookup_reset(void)
     initialize_ipxnets();
     enterprises_cleanup();
     initialize_enterprises();
+    diag_addr_name_lookup_cleanup();
+    initialize_diag_addr();
 }
 
 gchar *
@@ -3386,6 +3555,18 @@ get_vlan_name(wmem_allocator_t *allocator, const guint16 id)
     return wmem_strdup(allocator, vlan_name_lookup(id));
 
 } /* get_vlan_name */
+
+gchar*
+get_diag_address_name(wmem_allocator_t *allocator, const guint16 id)
+{
+
+    if (!gbl_resolv_flags.diag_addr_name) {
+        return NULL;
+    }
+
+    return wmem_strdup(allocator, diag_addr_name_lookup(id));
+
+}
 
 const gchar *
 get_manuf_name(const guint8 *addr)
@@ -3658,6 +3839,13 @@ get_ipv6_hash_table(void)
 {
         return ipv6_hash_table;
 }
+
+wmem_map_t*
+get_diag_addr_hash_table(void)
+{
+    return diag_addr_hash_table;
+}
+
 /* Initialize all the address resolution subsystems in this file */
 void
 addr_resolv_init(void)
@@ -3668,6 +3856,7 @@ addr_resolv_init(void)
     initialize_vlans();
     initialize_enterprises();
     host_name_lookup_init();
+    initialize_diag_addr();
 }
 
 /* Clean up all the address resolution subsystems in this file */
@@ -3680,6 +3869,7 @@ addr_resolv_cleanup(void)
     ipx_name_lookup_cleanup();
     enterprises_cleanup();
     host_name_lookup_cleanup();
+    diag_addr_name_lookup_cleanup();
 }
 
 gboolean

@@ -24,6 +24,7 @@
 #include <epan/packet.h>
 #include <epan/uat.h>
 #include <epan/dissectors/packet-tcp.h>
+#include <epan/addr_resolv.h>
 
 void proto_register_doip(void);
 void proto_reg_handoff_doip(void);
@@ -420,7 +421,20 @@ static dissector_handle_t doip_handle;
 static dissector_handle_t uds_handle;
 static gint proto_doip    = -1;
 
+static proto_item *
+doip_prototree_add_with_resolv(proto_tree* doip_tree, int hfindex, tvbuff_t* tvb, const gint start, gint length, const guint encoding) {
+    guint diag_addr;
+    proto_item* ti;
+    gchar* name;
 
+    ti = proto_tree_add_item_ret_uint(doip_tree, hfindex, tvb, start, length, encoding, &diag_addr);
+    name = get_diag_address_name(wmem_packet_scope(), diag_addr);
+    if (name != NULL) {
+        proto_item_append_text(ti, " (%s)", name);
+    }
+
+    return ti;
+}
 
 /*
  * UATs
@@ -689,8 +703,8 @@ add_diagnostic_message_ack_fields(proto_tree *doip_tree, tvbuff_t *tvb)
 static void
 add_diagnostic_message_nack_fields(proto_tree *doip_tree, tvbuff_t *tvb)
 {
-    proto_tree_add_item(doip_tree, hf_source_address, tvb, DOIP_DIAG_COMMON_SOURCE_OFFSET, DOIP_DIAG_COMMON_SOURCE_LEN, ENC_BIG_ENDIAN);
-    proto_tree_add_item(doip_tree, hf_target_address, tvb, DOIP_DIAG_COMMON_TARGET_OFFSET, DOIP_DIAG_COMMON_TARGET_LEN, ENC_BIG_ENDIAN);
+    doip_prototree_add_with_resolv(doip_tree, hf_source_address, tvb, DOIP_DIAG_COMMON_SOURCE_OFFSET, DOIP_DIAG_COMMON_SOURCE_LEN, ENC_BIG_ENDIAN);
+    doip_prototree_add_with_resolv(doip_tree, hf_target_address, tvb, DOIP_DIAG_COMMON_TARGET_OFFSET, DOIP_DIAG_COMMON_TARGET_LEN, ENC_BIG_ENDIAN);
     proto_tree_add_item(doip_tree, hf_nack_code, tvb, DOIP_DIAG_MESSAGE_NACK_CODE_OFFSET, DOIP_DIAG_MESSAGE_NACK_CODE_LEN, ENC_NA);
 
     if (tvb_captured_length_remaining(tvb, DOIP_DIAG_MESSAGE_NACK_PREVIOUS_OFFSET) > 0) {
