@@ -156,7 +156,9 @@ if(WIN32)
 	# on Windows can be slow.
 	set(HAVE_FCNTL_H TRUE)
 	set(HAVE_FLOORL TRUE)
-endif(WIN32)
+elseif(APPLE)
+    include(UseAppleSilicon)
+endif()
 
 include(UseCustomIncludes)
 ADD_CUSTOM_CMAKE_INCLUDE()
