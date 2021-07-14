@@ -236,7 +236,7 @@ static const value_string activation_codes[] = {
     { 0x04, "Routing activation denied due to missing authentication." },
     { 0x05, "Routing activation denied due to rejected confirmation." },
     { 0x06, "Routing activation denied due to unsupported routing activation type." },
-    { 0x07, "Routing actication denied due to request for encrypted connection via TLS." },
+    { 0x07, "Routing activation denied due to request for encrypted connection via TLS." },
     { 0x08, "Reserved by ISO 13400." },
     { 0x09, "Reserved by ISO 13400." },
     { 0x0A, "Reserved by ISO 13400." },
