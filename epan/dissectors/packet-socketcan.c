@@ -346,7 +346,7 @@ dissect_socketcan_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gu
 		}
 		else
 		{
-			col_append_str(pinfo->cinfo, COL_INFO, tvb_bytes_to_str_punct(wmem_packet_scope(), tvb, CAN_DATA_OFFSET, can_info.len, ' '));
+			col_append_str(pinfo->cinfo, COL_INFO, tvb_bytes_to_str_punct(pinfo->pool, tvb, CAN_DATA_OFFSET, can_info.len, ' '));
 		}
 
 		next_tvb = tvb_new_subset_length(tvb, CAN_DATA_OFFSET, can_info.len);
@@ -422,7 +422,7 @@ dissect_socketcanfd_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
 	col_add_fstr(pinfo->cinfo, COL_INFO, "%s: 0x%08x   %s",
 		     val_to_str(frame_type, frame_type_vals, "Unknown (0x%02x)"), (can_info.id & ~CAN_FLAG_MASK),
-		     tvb_bytes_to_str_punct(wmem_packet_scope(), tvb, CAN_DATA_OFFSET, can_info.len, ' '));
+		     tvb_bytes_to_str_punct(pinfo->pool, tvb, CAN_DATA_OFFSET, can_info.len, ' '));
 
 	ti = proto_tree_add_item(tree, proto_canfd, tvb, 0, -1, ENC_NA);
 	can_tree = proto_item_add_subtree(ti, ett_can_fd);
