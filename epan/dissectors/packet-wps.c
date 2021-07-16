@@ -1644,7 +1644,7 @@ dissect_wps_tlvs(proto_tree *eap_tree, tvbuff_t *tvb, int offset,
           break;
         case FT_STRING:
           fmt    = ": %s";
-          valuep = tvb_get_string_enc(wmem_packet_scope(), tvb, offset+4, tlv_len, ENC_ASCII);
+          valuep = tvb_get_string_enc(pinfo->pool, tvb, offset+4, tlv_len, ENC_ASCII);
           break;
         default:
           /* make compiler happy */
