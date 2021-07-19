@@ -338,6 +338,7 @@ dissect_frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* 
 	proto_item  *volatile ti = NULL;
 	guint	     cap_len = 0, frame_len = 0;
 	guint32      pack_flags = 0;
+	guint32      interface_queue = 0;
 	guint64      drop_count = 0;
 	guint64      packet_id = 0;
 	proto_tree  *volatile tree;
@@ -619,10 +620,9 @@ dissect_frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* 
 			}
 		}
 
-		if (pinfo->rec->presence_flags & WTAP_HAS_INT_QUEUE)
-			proto_tree_add_uint(fh_tree, hf_frame_interface_queue, tvb, 0, 0,
-					    pinfo->rec->rec_header.packet_header.interface_queue);
-
+		if (WTAP_OPTTYPE_SUCCESS == wtap_block_get_uint32_option_value(fr_data->pkt_block, OPT_PKT_QUEUE, &interface_queue)) {
+			proto_tree_add_uint(fh_tree, hf_frame_interface_queue, tvb, 0, 0, interface_queue);
+		}
 		if (WTAP_OPTTYPE_SUCCESS == wtap_block_get_uint32_option_value(fr_data->pkt_block, OPT_PKT_FLAGS, &pack_flags)) {
 			proto_tree *flags_tree;
 			proto_item *flags_item;
