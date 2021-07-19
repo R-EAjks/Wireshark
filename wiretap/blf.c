@@ -627,7 +627,6 @@ blf_init_rec(blf_params_t *params, guint64 object_timestamp, int pkt_encap, guin
 
     params->rec->rec_header.packet_header.pkt_encap = pkt_encap;
     params->rec->rec_header.packet_header.interface_id = channel;
-    params->rec->rec_header.packet_header.packet_id = 0;
     params->rec->rec_header.packet_header.interface_queue = 0;
 
     /* TODO: before we had to remove comments and verdict here to not leak memory but APIs have changed ... */

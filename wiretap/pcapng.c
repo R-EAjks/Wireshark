@@ -1475,16 +1475,7 @@ pcapng_process_packet_block_option(wtapng_block_t *wblock,
                 /* XXX - free anything? */
                 return FALSE;
             }
-            /*  Don't cast a guint8 * into a guint64 *--the
-             *  guint8 * may not point to something that's
-             *  aligned correctly.
-             */
-            memcpy(&tmp64, option_content, sizeof(guint64));
-            if (section_info->byte_swapped)
-                tmp64 = GUINT64_SWAP_LE_BE(tmp64);
-            wblock->rec->presence_flags |= WTAP_HAS_PACKET_ID;
-            wblock->rec->rec_header.packet_header.packet_id = tmp64;
-            ws_debug("packet_id %" G_GINT64_MODIFIER "u", tmp64);
+            pcapng_process_uint64_option(wblock, section_info, option_code, option_length, option_content);
             break;
         case(OPT_EPB_QUEUE):
             if (option_length != 4) {
@@ -1764,7 +1755,6 @@ pcapng_read_packet_block(FILE_T fh, pcapng_block_header_t *bh,
     }
 
     /* Option defaults */
-    wblock->rec->rec_header.packet_header.packet_id  = 0;
     wblock->rec->rec_header.packet_header.interface_queue  = 0;
 
     /* FCS length default */
@@ -1918,7 +1908,6 @@ pcapng_read_simple_packet_block(FILE_T fh, pcapng_block_header_t *bh,
     wblock->rec->ts.secs = 0;
     wblock->rec->ts.nsecs = 0;
     wblock->rec->rec_header.packet_header.interface_id = 0;
-    wblock->rec->rec_header.packet_header.packet_id = 0;
     wblock->rec->rec_header.packet_header.interface_queue = 0;
 
     memset((void *)&wblock->rec->rec_header.packet_header.pseudo_header, 0, sizeof(union wtap_pseudo_header));
@@ -4258,7 +4247,7 @@ pcapng_write_enhanced_packet_block(wtap_dumper *wdh, const wtap_rec *rec,
     }
     if (rec->block != NULL) {
         // Current options expected to be here:
-        // comments, flags, drop counts, verdicts, custom.
+        // comments, flags, drop counts, packet id, verdicts, custom.
         // Remember to also add newly-supported option types to packet_block_options_supported
         // below.
         options_len = wtap_block_get_options_size_padded(rec->block);
@@ -4268,10 +4257,6 @@ pcapng_write_enhanced_packet_block(wtap_dumper *wdh, const wtap_rec *rec,
         }
     }
 
-    if (rec->presence_flags & WTAP_HAS_PACKET_ID) {
-        have_options = TRUE;
-        options_total_length = options_total_length + 12;
-    }
     if (rec->presence_flags & WTAP_HAS_INT_QUEUE) {
         have_options = TRUE;
         options_total_length = options_total_length + 8;
@@ -4411,18 +4396,6 @@ pcapng_write_enhanced_packet_block(wtap_dumper *wdh, const wtap_rec *rec,
      */
     if (!wtap_block_foreach_option(rec->block, pcapng_write_option_cb, &block_data)) {
         return FALSE;
-    }
-    if (rec->presence_flags & WTAP_HAS_PACKET_ID) {
-        option_hdr.type         = OPT_EPB_PACKETID;
-        option_hdr.value_length = 8;
-        if (!wtap_dump_file_write(wdh, &option_hdr, 4, err))
-            return FALSE;
-        wdh->bytes_dumped += 4;
-        if (!wtap_dump_file_write(wdh, &rec->rec_header.packet_header.packet_id, 8, err))
-            return FALSE;
-        wdh->bytes_dumped += 8;
-        ws_debug("Wrote Options packet id: %" G_GINT64_MODIFIER "u",
-                 rec->rec_header.packet_header.packet_id);
     }
     if (rec->presence_flags & WTAP_HAS_INT_QUEUE) {
         option_hdr.type         = OPT_EPB_QUEUE;
@@ -5671,6 +5644,7 @@ static const struct supported_option_type packet_block_options_supported[] = {
     { OPT_COMMENT, MULTIPLE_OPTIONS_SUPPORTED },
     { OPT_PKT_FLAGS, ONE_OPTION_SUPPORTED },
     { OPT_PKT_DROPCOUNT, ONE_OPTION_SUPPORTED },
+    { OPT_PKT_PACKETID, ONE_OPTION_SUPPORTED },
     { OPT_EPB_VERDICT, MULTIPLE_OPTIONS_SUPPORTED },
     { OPT_CUSTOM_STR_COPY, MULTIPLE_OPTIONS_SUPPORTED },
     { OPT_CUSTOM_BIN_COPY, MULTIPLE_OPTIONS_SUPPORTED },

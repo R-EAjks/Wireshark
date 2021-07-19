@@ -339,6 +339,7 @@ dissect_frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* 
 	guint	     cap_len = 0, frame_len = 0;
 	guint32      pack_flags = 0;
 	guint64      drop_count = 0;
+	guint64      packet_id = 0;
 	proto_tree  *volatile tree;
 	proto_tree  *comments_tree;
 	proto_tree  *volatile fh_tree = NULL;
@@ -646,9 +647,9 @@ dissect_frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* 
 			proto_tree_add_bitmask_list_value(flags_tree, tvb, 0, 0, flags, pack_flags);
 		}
 
-		if (pinfo->rec->presence_flags & WTAP_HAS_PACKET_ID)
-			proto_tree_add_uint64(fh_tree, hf_frame_packet_id, tvb, 0, 0,
-					      pinfo->rec->rec_header.packet_header.packet_id);
+		if (WTAP_OPTTYPE_SUCCESS == wtap_block_get_uint64_option_value(fr_data->pkt_block, OPT_PKT_PACKETID, &packet_id)) {
+			proto_tree_add_uint64(fh_tree, hf_frame_packet_id, tvb, 0, 0, packet_id);
+		}
 
 		if (wtap_block_count_option(fr_data->pkt_block, OPT_PKT_VERDICT) > 0) {
 			proto_tree *verdict_tree;
