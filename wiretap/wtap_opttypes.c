@@ -1625,15 +1625,12 @@ void wtap_opttypes_initialize(void)
         WTAP_OPTTYPE_UINT32,
         0
     };
-#if 0
-    // We handle these options via a different mechanism
     static const wtap_opttype_t pkt_hash = {
         "hash",
         "Hash of packet data",
-        WTAP_OPTTYPE_BYTES,  // TODO: replace with a pkt_filter_opt_t
+        WTAP_OPTTYPE_BYTES,  // TODO: replace with a pkt_hash_opt_t
         WTAP_OPTTYPE_FLAG_MULTIPLE_ALLOWED
     };
-#endif
     static const wtap_opttype_t pkt_verdict = {
         "verdict",
         "Packet Verdict",
@@ -1699,10 +1696,7 @@ void wtap_opttypes_initialize(void)
     wtap_opttype_option_register(&pkt_block, OPT_PKT_DROPCOUNT, &pkt_dropcount);
     wtap_opttype_option_register(&pkt_block, OPT_PKT_PACKETID, &pkt_id);
     wtap_opttype_option_register(&pkt_block, OPT_PKT_QUEUE, &pkt_queue);
-#if 0
-    // We handle these options via a different mechanism
     wtap_opttype_option_register(&pkt_block, OPT_PKT_HASH, &pkt_hash);
-#endif
     wtap_opttype_option_register(&pkt_block, OPT_PKT_VERDICT, &pkt_verdict);
 
 #ifdef DEBUG_COUNT_REFS

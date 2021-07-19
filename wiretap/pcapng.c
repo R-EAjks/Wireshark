@@ -4240,8 +4240,6 @@ pcapng_write_enhanced_packet_block(wtap_dumper *wdh, const wtap_rec *rec,
         pad_len = 0;
     }
     if (rec->block != NULL) {
-        // Current options expected to be here:
-        // comments, flags, drop counts, packet id, queue, verdicts, custom.
         // Remember to also add newly-supported option types to packet_block_options_supported
         // below.
         options_len = wtap_block_get_options_size_padded(rec->block);
@@ -5624,7 +5622,8 @@ static const struct supported_option_type packet_block_options_supported[] = {
     { OPT_PKT_DROPCOUNT, ONE_OPTION_SUPPORTED },
     { OPT_PKT_PACKETID, ONE_OPTION_SUPPORTED },
     { OPT_PKT_QUEUE, ONE_OPTION_SUPPORTED },
-    { OPT_EPB_VERDICT, MULTIPLE_OPTIONS_SUPPORTED },
+    { OPT_PKT_HASH, MULTIPLE_OPTIONS_SUPPORTED },
+    { OPT_PKT_VERDICT, MULTIPLE_OPTIONS_SUPPORTED },
     { OPT_CUSTOM_STR_COPY, MULTIPLE_OPTIONS_SUPPORTED },
     { OPT_CUSTOM_BIN_COPY, MULTIPLE_OPTIONS_SUPPORTED },
     { OPT_CUSTOM_STR_NO_COPY, MULTIPLE_OPTIONS_SUPPORTED },
