@@ -735,7 +735,6 @@ wtap_block_set_bytes_option_value(wtap_block_t block, guint option_id, const gui
  * @param[in] option_id Identifier value for option
  * @param[in] idx Instance number of option with that ID
  * @param[in] value New value of option
- * @param[in] value_length Number of bytes to copy.
  * @return wtap_opttype_return_val - WTAP_OPTTYPE_SUCCESS if successful,
  * error code otherwise
  */
@@ -850,8 +849,6 @@ wtap_block_option_get_value_size(wtap_opttype_e option_type, wtap_optval_t *opti
 /** Get the padded length of all options in the block
  *
  * @param[in] block Block from which to remove the option instance
- * @param[in] option_id Identifier value for option
- * @param[in] idx Instance number of option with that ID
  * @return gsize - size in bytes of all options, each padded to 32 bits
  * @note The size of any options with values larger than can be held in an option
  * is NOT included, because pcapng.c skips over such option values.
