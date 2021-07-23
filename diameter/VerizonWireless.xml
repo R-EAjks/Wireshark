@@ -78,7 +78,7 @@
     <type type-name="Unsigned32"/>
   </avp>
 
-  <avp name="Self-Activation-Status" code="8105" vendor-id="VerizonWireless" >
+  <avp name="Online-Response-Required" code="8105" vendor-id="VerizonWireless" >
     <type type-name="Enumerated"/>
     <enum name="Wait" code="0"/>
     <enum name="Don't Wait" code="1"/>
