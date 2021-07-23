@@ -78,5 +78,14 @@
     <type type-name="Unsigned32"/>
   </avp>
 
+  <avp name="Self-Activation-Status" code="8105" vendor-id="VerizonWireless" >
+    <type type-name="Enumerated"/>
+    <enum name="Wait" code="0"/>
+    <enum name="Don't Wait" code="1"/>
+    <enum name="Spare2" code="2"/>
+    <enum name="Spare3" code="3"/>
+    <enum name="Spare4" code="4"/>
+  </avp>
+
 </vendor>
 
