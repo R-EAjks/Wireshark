@@ -79,6 +79,7 @@ static int hf_woww_opcode_field = -1;
 #define WOWW_SESSION_KEY_LENGTH 40
 
 static gint ett_woww = -1;
+static gint ett_message = -1;
 
 // Packets that do not have at least a u16 size field and a u16 opcode field are not valid.
 #define WOWW_MIN_LENGTH 4
@@ -92,6 +93,10 @@ typedef struct WowwParticipant {
     guint8 idx;
     // The first header is unencrypted. Tracks if that header has been encountered.
     gboolean unencrypted_packet_encountered;
+    // If a server message is unable to be fully decrypted we stop decrypting any
+    // any more, since it's impossible to know if the PDU contains multiple messages
+    // and thus how many times the session key index should be incremented.
+    guint64 stopped_at;
 } WowwParticipant_t;
 
 typedef struct WowwConversation {
@@ -101,10 +106,10 @@ typedef struct WowwConversation {
     bool known_indices[WOWW_SESSION_KEY_LENGTH];
     // Cache headers that have already been decrypted to save time
     // as well as reduce headaches from out of order packets.
-    wmem_tree_t* decrypted_headers;
+    wmem_map_t* decrypted_headers;
     // Packets that are not fully decryptable when received will need
     // to be decrypted later.
-    wmem_tree_t* headers_need_decryption;
+    wmem_map_t* headers_need_decryption;
     // The client and server will have different indices/last values
     // because they send different amounts of packets and with different
     // header lengths.
@@ -117,6 +122,11 @@ typedef struct {
     guint8 idx;
     guint8 last_encrypted_value;
 } WowwPreviousValues_t;
+
+typedef struct {
+    guint8 size[2];
+    guint8 opcode[];
+} WowwDecryptedHeader_t;
 
 // All existing opcodes for 1.12.x
 typedef enum
@@ -1942,18 +1952,19 @@ static const value_string world_packet_strings[] = {
 /*! Decrypts the header after the session key has been deducted as described in the top level comment. */
 static guint8*
 get_decrypted_header(const guint8 session_key[WOWW_SESSION_KEY_LENGTH],
-                     WowwParticipant_t* participant,
+                     guint8* idx,
+                     guint8* last_encrypted_value,
                      const guint8* header,
                      guint8 header_size) {
-    guint8* decrypted_header = wmem_alloc0(wmem_file_scope(), 8);
+    guint8* decrypted_header = wmem_alloc0(wmem_file_scope(), WOWW_HEADER_ARRAY_ALLOC_SIZE);
 
     for (guint8 i = 0; i < header_size; i++) {
 
         // x = (E - L) ^ S as described in top level comment
-        decrypted_header[i] = (header[i] - participant->last_encrypted_value) ^ session_key[participant->idx];
+        decrypted_header[i] = (header[i] - *last_encrypted_value) ^ session_key[*idx];
 
-        participant->last_encrypted_value = header[i];
-        participant->idx = (participant->idx + 1) % WOWW_SESSION_KEY_LENGTH;
+        *last_encrypted_value = header[i];
+        *idx = (*idx + 1) % WOWW_SESSION_KEY_LENGTH;
     }
 
     return decrypted_header;
@@ -1997,24 +2008,34 @@ session_key_is_fully_deduced(const bool known_indices[WOWW_SESSION_KEY_LENGTH],
 }
 
 /*! Returns either a pointer to a valid decrypted header, or NULL if no such header exists yet. */
-static guint8*
+static WowwDecryptedHeader_t*
 handle_packet_header(packet_info* pinfo,
                      tvbuff_t* tvb,
                      WowwParticipant_t* participant,
                      WowwConversation_t* wowwConversation,
-                     guint8 headerSize) {
+                     guint8 headerSize,
+                     guint8 index_in_pdu,
+                     gint tvb_offset) {
+    guint64 key = ((guint64)index_in_pdu << 32) | pinfo->num;
 
-    guint8* decrypted_header = wmem_tree_lookup32(wowwConversation->decrypted_headers, pinfo->num);
+    guint8* decrypted_header = wmem_map_lookup(wowwConversation->decrypted_headers, &key);
 
     if (decrypted_header) {
         // Header has already been decrypted
-        return decrypted_header;
+        return (WowwDecryptedHeader_t*)decrypted_header;
+    }
+
+    if (participant->stopped_at != 0 && participant->stopped_at != key) {
+        // We can't continue decrypt further server messages since we
+        // don't know the status of the session key index for any message
+        // except the last one we couldn't decrypt.
+        return NULL;
     }
 
     // First time we see this header, we need to decrypt it
     guint8* header = wmem_alloc0(wmem_packet_scope(), WOWW_HEADER_ARRAY_ALLOC_SIZE);
     for (int i = 0; i < headerSize; i++) {
-        header[i] = tvb_get_guint8(tvb, i);
+        header[i] = tvb_get_guint8(tvb, tvb_offset + i);
     }
 
     // If we're seeing the first header
@@ -2027,71 +2048,142 @@ handle_packet_header(packet_info* pinfo,
         decrypted_header = wmem_alloc0(wmem_file_scope(), WOWW_HEADER_ARRAY_ALLOC_SIZE);
         memcpy(decrypted_header, header, headerSize);
 
-        wmem_tree_insert32(wowwConversation->decrypted_headers, pinfo->num, decrypted_header);
+        guint64* allocated_key = wmem_alloc0(wmem_file_scope(), sizeof(guint64));
+        *allocated_key = key;
 
-        return decrypted_header;
+        wmem_map_insert(wowwConversation->decrypted_headers, allocated_key, decrypted_header);
+
+        return (WowwDecryptedHeader_t*)decrypted_header;
     }
 
-    WowwPreviousValues_t * original_header_values = wmem_tree_lookup32(wowwConversation->headers_need_decryption, pinfo->num);
+    WowwPreviousValues_t * original_header_values = wmem_map_lookup(wowwConversation->headers_need_decryption, &key);
 
-    if (original_header_values) {
-        // Header has been seen before
-
-        // Original value will need to be used for deduction
-        if (!session_key_is_fully_deduced(wowwConversation->known_indices, headerSize, original_header_values->idx)) {
-            // Not ready yet
-            return NULL;
-        }
-
-        // Header can be decrypted and added to map
-    }
-    else {
-        // Header has not been seen before
-        if (!session_key_is_fully_deduced(wowwConversation->known_indices, headerSize, participant->idx)) {
-            // Packet isn't decryptable, make sure to do it later
-            WowwPreviousValues_t* array_index = wmem_alloc(wmem_file_scope(), 2);
-            array_index->idx = participant->idx;
-            array_index->last_encrypted_value = participant->last_encrypted_value;
-            wmem_tree_insert32(wowwConversation->headers_need_decryption, pinfo->num, array_index);
-
-            if (WOWW_CLIENT_TO_SERVER) {
-                deduce_header(wowwConversation->session_key, wowwConversation->known_indices, header, participant);
-            } else {
-                // Skip the packet, but remember to acknowledge that values changed
-                participant->idx = (participant->idx + headerSize) % WOWW_SESSION_KEY_LENGTH;
-                participant->last_encrypted_value = header[headerSize - 1];
-            }
-
-            return NULL;
-        }
-        else {
-            // Header can be decrypted and added to map
-        }
+    if (original_header_values && !session_key_is_fully_deduced(wowwConversation->known_indices, headerSize, original_header_values->idx)) {
+        // If we have seen the header before AND
+        // we still can't decrypt it
+        // there's nothing to do but wait until we get more information
+        return NULL;
     }
 
-    guint8 new_index = participant->idx;
-    guint8 new_last_encrypted = participant->last_encrypted_value;
+    if (!original_header_values && !session_key_is_fully_deduced(wowwConversation->known_indices, headerSize, participant->idx)) {
+        // If we haven't seen the header before AND
+        // we can't decrypt it now
+        // we make sure it gets decrypted later
+        WowwPreviousValues_t* array_index = wmem_alloc0(wmem_file_scope(), sizeof(WowwPreviousValues_t));
+        array_index->idx = participant->idx;
+        array_index->last_encrypted_value = participant->last_encrypted_value;
+
+        guint64* allocated_key = wmem_alloc0(wmem_file_scope(), sizeof(guint64));
+        *allocated_key = key;
+
+        wmem_map_insert(wowwConversation->headers_need_decryption, allocated_key, array_index);
+
+        // If it's a server header we can use it to deduce the session key
+        if (WOWW_CLIENT_TO_SERVER) {
+            deduce_header(wowwConversation->session_key, wowwConversation->known_indices, header, participant);
+        } else {
+            // We don't know if this PDU contains several messages or just one, so we need
+            // to stop parsing server messages until we have fully decrypted this one.
+            participant->stopped_at = key;
+            // Skip the packet, but remember to acknowledge that values changed
+            participant->idx = (participant->idx + headerSize) % WOWW_SESSION_KEY_LENGTH;
+            participant->last_encrypted_value = header[headerSize - 1];
+        }
+
+        return NULL;
+    }
+
+    guint8* idx = &participant->idx;
+    guint8* last_encrypted_value = &participant->last_encrypted_value;
 
     // If this is an out of order packet we must use the original state
     if (original_header_values) {
-        participant->idx = original_header_values->idx;
-        participant->last_encrypted_value = original_header_values->last_encrypted_value;
+        // We can now (as best as possible) assume that decryption
+        // is in the right place.
+        participant->stopped_at = 0;
+        // We do not care about how these values are mutated since
+        // they are never going to be used again.
+        idx = &original_header_values->idx;
+        last_encrypted_value = &original_header_values->last_encrypted_value;
+
+        // No need to decrypt it again
+        wmem_map_remove(wowwConversation->headers_need_decryption, &key);
     }
 
-    decrypted_header = get_decrypted_header(wowwConversation->session_key, participant, header, headerSize);
+    decrypted_header = get_decrypted_header(wowwConversation->session_key,
+                                            idx,
+                                            last_encrypted_value,
+                                            header,
+                                            headerSize);
 
-    // Restore original state
-    if (original_header_values) {
-        participant->idx = new_index;
-        participant->last_encrypted_value = new_last_encrypted;
-
-        wmem_tree_remove32(wowwConversation->headers_need_decryption, pinfo->num);
-    }
+    guint64* allocated_key = wmem_alloc0(wmem_file_scope(), sizeof(guint64));
+    *allocated_key = key;
 
     // The header has been fully decrypted, cache it for future use
-    wmem_tree_insert32(wowwConversation->decrypted_headers, pinfo->num, decrypted_header);
+    wmem_map_insert(wowwConversation->decrypted_headers, allocated_key, decrypted_header);
 
-    return decrypted_header;
+    return (WowwDecryptedHeader_t*)decrypted_header;
+}
+
+static gint
+add_header_to_tree(WowwDecryptedHeader_t* decrypted_header,
+                   proto_tree* tree,
+                   tvbuff_t* tvb,
+                   packet_info* pinfo,
+                   guint8 headerSize,
+                   gint start_offset)
+{
+    const guint16 size_field_width = 2;
+    // Size field does not count in the reported size, so we need to add it.
+    const guint16 packet_size = (decrypted_header->size[0] << 8 | decrypted_header->size[1]) + size_field_width;
+
+    proto_tree* ti = proto_tree_add_item(tree, proto_woww, tvb, start_offset, packet_size, ENC_NA);
+
+    proto_tree* woww_tree = proto_item_add_subtree(ti, ett_message);
+
+    // Add to tree
+    tvbuff_t *next_tvb = tvb_new_child_real_data(tvb, (guint8*)decrypted_header, headerSize, headerSize);
+    add_new_data_source(pinfo, next_tvb, "Decrypted Header");
+
+    // We're indexing into another tvb
+    gint offset = 0;
+    gint len = size_field_width;
+    proto_tree_add_item(woww_tree, hf_woww_size_field, next_tvb,
+                        offset, len, ENC_BIG_ENDIAN);
+    offset += len;
+
+    guint32 opcode = 0;
+    if (WOWW_SERVER_TO_CLIENT) {
+        len = 2;
+        opcode = tvb_get_guint16(next_tvb, offset, ENC_LITTLE_ENDIAN);
+    } else if (WOWW_CLIENT_TO_SERVER) {
+        len = 4;
+        opcode = tvb_get_guint32(next_tvb, offset, ENC_LITTLE_ENDIAN);
+    }
+
+    proto_tree_add_item(woww_tree, hf_woww_opcode_field, next_tvb,
+                        offset, len, ENC_LITTLE_ENDIAN);
+
+    if (start_offset == 0) {
+        // First message
+        col_set_str(pinfo->cinfo, COL_INFO, val_to_str_const(opcode,
+                                                             world_packet_strings,
+                                                             "Encrypted Header"));
+    }
+    else {
+        col_append_str(pinfo->cinfo, COL_INFO, " | ");
+        col_append_str(pinfo->cinfo, COL_INFO, val_to_str_const(opcode,
+                                                                world_packet_strings,
+                                                                "Encrypted Header"));
+    }
+
+    proto_item_set_text(woww_tree, "%s", val_to_str_const(opcode,
+                                                    world_packet_strings,
+                                                    "Encrypted Header"));
+
+    // Remember to go back to original tvb
+
+    return start_offset + (gint)packet_size;
 }
 
 static int
@@ -2108,12 +2200,7 @@ dissect_woww(tvbuff_t *tvb,
 
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "WOWW");
 
-    col_clear(pinfo->cinfo, COL_INFO);
     col_set_str(pinfo->cinfo, COL_INFO, "Session Key Not Known Yet");
-
-    proto_tree* ti = proto_tree_add_item(tree, proto_woww, tvb, 0, -1, ENC_NA);
-
-    proto_tree* woww_tree = proto_item_add_subtree(ti, ett_woww);
 
     // Get conversation data
     conversation_t* conv = find_or_create_conversation(pinfo);
@@ -2123,8 +2210,8 @@ dissect_woww(tvbuff_t *tvb,
         // Assume that file scope means for the lifetime of the dissection
         wowwConversation = (WowwConversation_t*) wmem_new0(wmem_file_scope(), WowwConversation_t);
         conversation_add_proto_data(conv, proto_woww, wowwConversation);
-        wowwConversation->decrypted_headers = wmem_tree_new(wmem_file_scope());
-        wowwConversation->headers_need_decryption = wmem_tree_new(wmem_file_scope());
+        wowwConversation->decrypted_headers = wmem_map_new(wmem_file_scope(), g_int64_hash, g_int64_equal);
+        wowwConversation->headers_need_decryption = wmem_map_new(wmem_file_scope(), g_int64_hash, g_int64_equal);
     }
 
     // Isolate session key for packet
@@ -2139,39 +2226,23 @@ dissect_woww(tvbuff_t *tvb,
         headerSize = 6;
     }
 
-    guint8* decrypted_header = handle_packet_header(pinfo, tvb, participant, wowwConversation, headerSize);
-    if (!decrypted_header) {
-        return tvb_captured_length(tvb);
-    }
+    proto_tree* ti = proto_tree_add_item(tree, proto_woww, tvb, 0, -1, ENC_NA);
 
-    // Add to tree
-    tvbuff_t *next_tvb = tvb_new_child_real_data(tvb, decrypted_header, headerSize, headerSize);
-    add_new_data_source(pinfo, next_tvb, "Decrypted Header");
+    proto_tree* woww_tree = proto_item_add_subtree(ti, ett_woww);
 
-    // We're indexing into another tvb
-    gint offset = 0;
-    gint len = 2;
-    proto_tree_add_item(woww_tree, hf_woww_size_field, next_tvb,
-            offset, len, ENC_BIG_ENDIAN);
-    offset += len;
+    gint pdu_offset = 0;
+    gint reported_length = (gint)tvb_reported_length(tvb);
+    guint8 header_index = 0;
+    do {
+        WowwDecryptedHeader_t* decrypted_header = handle_packet_header(pinfo, tvb, participant, wowwConversation, headerSize, header_index, pdu_offset);
+        if (!decrypted_header) {
+            return tvb_captured_length(tvb);
+        }
 
-    guint32 opcode = 0;
-    if (WOWW_SERVER_TO_CLIENT) {
-        len = 2;
-        opcode = tvb_get_guint16(next_tvb, offset, ENC_LITTLE_ENDIAN);
-    } else if (WOWW_CLIENT_TO_SERVER) {
-        len = 4;
-        opcode = tvb_get_guint32(next_tvb, offset, ENC_LITTLE_ENDIAN);
-    }
+        pdu_offset = add_header_to_tree(decrypted_header, woww_tree, tvb, pinfo, headerSize, pdu_offset);
 
-    proto_tree_add_item(woww_tree, hf_woww_opcode_field, next_tvb,
-                        offset, len, ENC_LITTLE_ENDIAN);
-
-    col_set_str(pinfo->cinfo, COL_INFO, val_to_str_const(opcode,
-                                                         world_packet_strings,
-                                                         "Encrypted Header"));
-
-    // Remember to go back to original tvb
+        header_index++;
+    } while (pdu_offset < reported_length);
 
     return tvb_captured_length(tvb);
 }
@@ -2193,7 +2264,8 @@ proto_register_woww(void)
     };
 
     static gint *ett[] = {
-        &ett_woww
+        &ett_woww,
+        &ett_message
     };
 
     proto_woww = proto_register_protocol("World of Warcraft World",
