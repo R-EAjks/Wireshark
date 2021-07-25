@@ -130,9 +130,10 @@ set_target_properties(wsluaauxiliary PROPERTIES FOLDER "Auxiliary")
 
 install(
 	FILES
-		console.lua
-		dtd_gen.lua
 		${CMAKE_CURRENT_BINARY_DIR}/init.lua
+		console.lua
+		browser_sslkeylog.lua
+		dtd_gen.lua
 	DESTINATION
 		${CMAKE_INSTALL_DATADIR}
 )
