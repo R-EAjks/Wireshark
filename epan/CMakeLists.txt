@@ -22,7 +22,6 @@ add_subdirectory(crypt)
 add_subdirectory(dfilter)
 add_subdirectory(dissectors)
 add_subdirectory(ftypes)
-add_subdirectory(wmem)
 
 if(LUA_FOUND)
 	add_subdirectory(wslua)
@@ -161,6 +160,7 @@ set(LIBWIRESHARK_PUBLIC_HEADERS
 	uat-int.h
 	unit_strings.h
 	value_string.h
+	wmem_scopes.h
 	x264_prt_id.h
 	xdlc.h
 )
@@ -258,6 +258,7 @@ set(LIBWIRESHARK_NONGENERATED_FILES
 	uat.c
 	value_string.c
 	unit_strings.c
+	wmem_scopes.c
 	xdlc.c
 	protobuf-helper.c
 	protobuf_lang_tree.c
@@ -296,7 +297,6 @@ add_library(epan
 	$<TARGET_OBJECTS:dissectors>
 	$<TARGET_OBJECTS:dissectors-corba>
 	$<TARGET_OBJECTS:ftypes>
-	$<TARGET_OBJECTS:wmem>
 	$<$<BOOL:${LUA_FOUND}>:$<TARGET_OBJECTS:wslua>>
 	${CMAKE_BINARY_DIR}/image/libwireshark.rc
 )
