@@ -1283,7 +1283,7 @@ smpp_handle_time(proto_tree *tree, tvbuff_t *tvb,
     gint      len;
     nstime_t  tmptime;
 
-    strval = (char *) tvb_get_stringz_enc(wmem_packet_scope(), tvb, *offset, &len, ENC_ASCII);
+    strval = (char *) tvb_get_stringz_enc(NULL, tvb, *offset, &len, ENC_ASCII);
     if (*strval)
     {
         if (len >= 16)
@@ -1299,6 +1299,7 @@ smpp_handle_time(proto_tree *tree, tvbuff_t *tvb,
             tmptime.nsecs = 0;
             proto_tree_add_time_format_value(tree, field_R, tvb, *offset, len, &tmptime, "%s", strval);
         }
+        wmem_free(NULL, strval);
     }
     *offset += len;
 }
@@ -1765,8 +1766,12 @@ smpp_handle_tlv(proto_tree *tree, tvbuff_t *tvb, int *offset)
                                         *offset, length, ENC_NA);
                 }
 
-                if (length > 0)
-                    proto_item_append_text(sub_tree,": %s", tvb_bytes_to_str(wmem_packet_scope(), tvb,*offset,length));
+                if (length > 0) {
+                    char *str;
+                    str = tvb_bytes_to_str(NULL, tvb,*offset,length);
+                    proto_item_append_text(sub_tree,": %s", str);
+                    wmem_free(NULL, str);
+                }
 
                 (*offset) += length;
                 break;
@@ -2588,7 +2593,7 @@ dissect_smpp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
     }
 
     /* Queue packet for Tap */
-    tap_rec = wmem_new0(wmem_packet_scope(), smpp_tap_rec_t);
+    tap_rec = wmem_new0(pinfo->pool, smpp_tap_rec_t);
     tap_rec->command_id = command_id;
     tap_rec->command_status = command_status;
     tap_queue_packet(smpp_tap, pinfo, tap_rec);

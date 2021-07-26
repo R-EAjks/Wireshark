@@ -317,7 +317,7 @@ dissect_cdp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
     if (data_length & 1) {
         guint8 *padded_buffer;
         /* Allocate new buffer */
-        padded_buffer = (guint8 *)wmem_alloc(wmem_packet_scope(), data_length+1);
+        padded_buffer = (guint8 *)wmem_alloc(pinfo->pool, data_length+1);
         tvb_memcpy(tvb, padded_buffer, 0, data_length);
         /* Swap bytes in last word */
         padded_buffer[data_length] = padded_buffer[data_length-1];
@@ -1148,8 +1148,11 @@ dissect_address_tlv(tvbuff_t *tvb, int offset, int length, proto_tree *tree)
 
     if (hf_addr == -1)
     {
+        char *str;
+        str = tvb_bytes_to_str(NULL, tvb, offset, address_length);
         proto_tree_add_item(address_tree, hf_cdp_address, tvb, offset, address_length, ENC_NA);
-        proto_item_set_text(ti, "Address: %s", tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, address_length));
+        proto_item_set_text(ti, "Address: %s", str);
+        wmem_free(NULL, str);
     }
 
     return 2 + protocol_length + 2 + address_length;

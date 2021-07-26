@@ -196,17 +196,19 @@ dissect_UDPExtStatus(tvbuff_t *tvb, proto_tree *adwin_tree)
 	/* add the processor type raw values to the tree, to allow filtering */
 	proto_tree_add_item(adwin_tree, hf_adwin_config_processor_type_raw, tvb, 64, 2, ENC_ASCII|ENC_NA);
 	/* add the processor type as a pretty printed string */
-	processor_type = tvb_get_string_enc(wmem_packet_scope(), tvb, 64, 2, ENC_ASCII|ENC_NA);
+	processor_type = tvb_get_string_enc(NULL, tvb, 64, 2, ENC_ASCII|ENC_NA);
 	processor_type = str_to_str(processor_type, processor_type_mapping, "Unknown (%s)");
 	proto_tree_add_string(adwin_tree, hf_adwin_config_processor_type, tvb, 64, 2, processor_type);
 
 	/* add system type as raw value and pretty printed string */
 	proto_tree_add_item(adwin_tree, hf_adwin_config_system_type_raw, tvb, 66, 2, ENC_ASCII|ENC_NA);
-	system_type = tvb_get_string_enc(wmem_packet_scope(), tvb, 66, 2, ENC_ASCII|ENC_NA);
+	system_type = tvb_get_string_enc(NULL, tvb, 66, 2, ENC_ASCII|ENC_NA);
 	system_type = str_to_str(system_type, system_type_mapping, "Unknown (%s)");
 	proto_tree_add_string(adwin_tree, hf_adwin_config_system_type, tvb, 66, 2, system_type);
 
 	proto_tree_add_item(adwin_tree, hf_adwin_config_unused, tvb, 68, 364, ENC_NA);
+	wmem_free(NULL, (gchar *)processor_type);
+	wmem_free(NULL, (gchar *)system_type);
 }
 
 static void
@@ -239,15 +241,18 @@ dissect_UDPMessage(tvbuff_t *tvb, proto_tree *adwin_tree)
 	/* add the processor type raw values to the tree, to allow filtering */
 	proto_tree_add_item(adwin_tree, hf_adwin_config_processor_type_raw, tvb, 96,  2, ENC_ASCII|ENC_NA);
 	/* add the processor type as a pretty printed string */
-	processor_type = tvb_get_string_enc(wmem_packet_scope(), tvb, 96, 2, ENC_ASCII|ENC_NA);
+	processor_type = tvb_get_string_enc(NULL, tvb, 96, 2, ENC_ASCII|ENC_NA);
 	processor_type = str_to_str(processor_type, processor_type_mapping, "Unknown");
 	proto_tree_add_string(adwin_tree, hf_adwin_config_processor_type, tvb, 96, 2, processor_type);
 
 	/* add system type as raw value and pretty printed string */
 	proto_tree_add_item(adwin_tree, hf_adwin_config_system_type_raw, tvb, 98,  2, ENC_ASCII|ENC_NA);
-	system_type = tvb_get_string_enc(wmem_packet_scope(), tvb, 98, 2, ENC_ASCII|ENC_NA);
+	system_type = tvb_get_string_enc(NULL, tvb, 98, 2, ENC_ASCII|ENC_NA);
 	system_type = str_to_str(system_type, system_type_mapping, "Unknown");
 	proto_tree_add_string(adwin_tree, hf_adwin_config_system_type, tvb, 98, 2, system_type);
+
+	wmem_free(NULL, (gchar *)processor_type);
+	wmem_free(NULL, (gchar *)system_type);
 }
 
 static void

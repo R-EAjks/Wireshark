@@ -955,7 +955,7 @@ zdp_parse_complex_desc(proto_tree *tree, gint ettindex, tvbuff_t *tvb, guint *of
 
     proto_tree  *field_tree;
 
-    gchar   *complex = (gchar *)wmem_alloc(wmem_packet_scope(), max_len);
+    gchar   *complex = (gchar *)wmem_alloc(NULL, max_len);
     guint8  tag;
 
     if ((tree) && (ettindex != -1)) {
@@ -986,7 +986,7 @@ zdp_parse_complex_desc(proto_tree *tree, gint ettindex, tvbuff_t *tvb, guint *of
     else {
         gchar *str;
 
-        str = (gchar *) tvb_get_string_enc(wmem_packet_scope(), tvb, *offset+1, length-1, ENC_ASCII|ENC_NA);
+        str = (gchar *) tvb_get_string_enc(NULL, tvb, *offset+1, length-1, ENC_ASCII|ENC_NA);
         /* Handles all string type XML tags. */
         if (tag <= tag_icon_url) {
             g_snprintf(complex, max_len, "<%s>%s</%s>", tag_name[tag], str, tag_name[tag]);
@@ -994,11 +994,13 @@ zdp_parse_complex_desc(proto_tree *tree, gint ettindex, tvbuff_t *tvb, guint *of
         else {
             g_snprintf(complex, max_len, "<%s>%s</%s>", tag_name[0], str, tag_name[0]);
         }
+        wmem_free(NULL, str);
     }
     if (tree) {
         proto_tree_add_string(field_tree, hf_zbee_zdp_complex, tvb, *offset, length, complex);
     }
     *offset += (length);
+    wmem_free(NULL, complex);
 } /* zdp_parse_complex_desc */
 
 /**

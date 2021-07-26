@@ -1729,7 +1729,7 @@ static guint32 calculate_digest(pdu_security_settings_t *pdu_security_settings, 
                 /* SNOW3G */
                 guint8  *mac;
                 gint message_length = tvb_captured_length_remaining(tvb, offset) - 4;
-                guint8 *message_data = (guint8 *)wmem_alloc0(wmem_packet_scope(), message_length+5);
+                guint8 *message_data = (guint8 *)wmem_alloc0(NULL, message_length+5);
 
                 /* TS 33.401 B.2.2 */
 
@@ -1747,6 +1747,7 @@ static guint32 calculate_digest(pdu_security_settings_t *pdu_security_settings, 
                                      (message_length+1)*8);
 
                 *calculated = TRUE;
+                wmem_free(NULL, message_data);
                 return ((mac[0] << 24) | (mac[1] << 16) | (mac[2] << 8) | mac[3]);
             }
 #endif
@@ -1779,7 +1780,7 @@ static guint32 calculate_digest(pdu_security_settings_t *pdu_security_settings, 
 
                 /* Extract the encrypted data into a buffer */
                 message_length = tvb_captured_length_remaining(tvb, offset) - 4;
-                message_data = (guint8 *)wmem_alloc0(wmem_packet_scope(), message_length+9);
+                message_data = (guint8 *)wmem_alloc0(NULL, message_length+9);
                 message_data[0] = (pdu_security_settings->count & 0xff000000) >> 24;
                 message_data[1] = (pdu_security_settings->count & 0x00ff0000) >> 16;
                 message_data[2] = (pdu_security_settings->count & 0x0000ff00) >> 8;
@@ -1793,6 +1794,7 @@ static guint32 calculate_digest(pdu_security_settings_t *pdu_security_settings, 
 
                 /* Pass in the message */
                 gcrypt_err = gcry_mac_write(mac_hd, message_data, message_length+9);
+                wmem_free(NULL, message_data);
                 if (gcrypt_err != 0) {
                     gcry_mac_close(mac_hd);
                     return 0;
@@ -1818,7 +1820,7 @@ static guint32 calculate_digest(pdu_security_settings_t *pdu_security_settings, 
                 /* ZUC */
                 guint32  mac;
                 gint message_length = tvb_captured_length_remaining(tvb, offset) - 4;
-                guint8 *message_data = (guint8 *)wmem_alloc0(wmem_packet_scope(), message_length+5);
+                guint8 *message_data = (guint8 *)wmem_alloc0(NULL, message_length+5);
 
                 /* Data is header byte */
                 message_data[0] = header;
@@ -1834,6 +1836,7 @@ static guint32 calculate_digest(pdu_security_settings_t *pdu_security_settings, 
                        &mac);
 
                 *calculated = TRUE;
+                wmem_free(NULL, message_data);
                 return mac;
             }
 #endif
@@ -2154,7 +2157,7 @@ static int dissect_pdcp_lte(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                                                                 offset, -1, ENC_NA);
                                 bitmap_tree = proto_item_add_subtree(bitmap_ti, ett_pdcp_report_bitmap);
 
-                                buff = (gchar *)wmem_alloc(wmem_packet_scope(), BUFF_SIZE);
+                                buff = (gchar *)wmem_alloc(pinfo->pool, BUFF_SIZE);
                                 len = tvb_reported_length_remaining(tvb, offset);
                                 bit_offset = offset<<3;
 

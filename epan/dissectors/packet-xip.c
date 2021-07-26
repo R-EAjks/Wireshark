@@ -412,7 +412,7 @@ construct_dag(tvbuff_t *tvb, proto_tree *xip_tree,
 	ti = proto_tree_add_item(xip_tree, hf, tvb, offset,
 		num_nodes * XIA_NODE_SIZE, ENC_BIG_ENDIAN);
 
-	buf = wmem_strbuf_sized_new(wmem_packet_scope(),
+	buf = wmem_strbuf_sized_new(NULL,
 		XIA_MAX_STRADDR_SIZE, XIA_MAX_STRADDR_SIZE);
 
 	dag_tree = proto_item_add_subtree(ti, ett);
@@ -441,6 +441,7 @@ construct_dag(tvbuff_t *tvb, proto_tree *xip_tree,
 	dag_str = wmem_strbuf_get_str(buf);
 	proto_tree_add_string_format(dag_tree, hf_entry, tvb, dag_offset,
 		XIA_NODE_SIZE * num_nodes, dag_str, "%s", dag_str);
+	wmem_free(NULL, buf);
 }
 
 static gint

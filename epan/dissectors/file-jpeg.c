@@ -520,7 +520,7 @@ process_app0_segment(proto_tree *tree, tvbuff_t *tvb, guint32 len,
 
     proto_tree_add_item(subtree, hf_len, tvb, 2, 2, ENC_BIG_ENDIAN);
 
-    str = (char *)tvb_get_stringz_enc(wmem_packet_scope(), tvb, 4, &str_size, ENC_ASCII);
+    str = (char *)tvb_get_stringz_enc(NULL, tvb, 4, &str_size, ENC_ASCII);
     ti = proto_tree_add_item(subtree, hf_identifier, tvb, 4, str_size, ENC_ASCII|ENC_NA);
     if (strcmp(str, "JFIF") == 0) {
         /* Version */
@@ -570,6 +570,7 @@ process_app0_segment(proto_tree *tree, tvbuff_t *tvb, guint32 len,
 
         proto_tree_add_bytes_format_value(subtree, hf_remain_seg_data, tvb, offset, -1, NULL, "%u bytes", len - 2 - str_size);
     }
+    wmem_free(NULL, str);
     return offset;
 }
 
@@ -599,7 +600,7 @@ process_app1_segment(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, guint3
     proto_tree_add_item(subtree, hf_len, tvb, offset, 2, ENC_BIG_ENDIAN);
     offset += 2;
 
-    str = (char*)tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &str_size, ENC_ASCII);
+    str = (char*)tvb_get_stringz_enc(NULL, tvb, offset, &str_size, ENC_ASCII);
     ti = proto_tree_add_item(subtree, hf_identifier, tvb, offset, str_size, ENC_ASCII|ENC_NA);
     offset += str_size;
 
@@ -695,6 +696,7 @@ process_app1_segment(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, guint3
         proto_tree_add_bytes_format_value(subtree, hf_remain_seg_data, tvb, offset, -1, NULL, "%u bytes", len - 2 - str_size);
         proto_item_append_text(ti, " (Unknown identifier)");
     }
+    wmem_free(NULL, str);
     return offset;
 }
 
@@ -723,7 +725,7 @@ process_app2_segment(proto_tree *tree, tvbuff_t *tvb, guint32 len,
 
     proto_tree_add_item(subtree, hf_len, tvb, 2, 2, ENC_BIG_ENDIAN);
 
-    str = (char*)tvb_get_stringz_enc(wmem_packet_scope(), tvb, 4, &str_size, ENC_ASCII);
+    str = (char*)tvb_get_stringz_enc(NULL, tvb, 4, &str_size, ENC_ASCII);
     ti = proto_tree_add_item(subtree, hf_identifier, tvb, 4, str_size, ENC_ASCII|ENC_NA);
     if (strcmp(str, "FPXR") == 0) {
         proto_tree_add_item(tree, hf_exif_flashpix_marker, tvb, 0, -1, ENC_NA);
@@ -731,6 +733,7 @@ process_app2_segment(proto_tree *tree, tvbuff_t *tvb, guint32 len,
         proto_tree_add_bytes_format_value(subtree, hf_remain_seg_data, tvb, 4 + str_size, -1, NULL, "%u bytes", len - 2 - str_size);
         proto_item_append_text(ti, " (Unknown identifier)");
     }
+    wmem_free(NULL, str);
 }
 
 static gint

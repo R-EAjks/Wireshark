@@ -496,10 +496,11 @@ static guint32 get_uint_parameter(guint8 *parameter_stream, gint parameter_lengt
     guint32      value;
     gchar       *val;
 
-    val = (gchar*) wmem_alloc(wmem_packet_scope(), parameter_length + 1);
+    val = (gchar*) wmem_alloc(NULL, parameter_length + 1);
     memcpy(val, parameter_stream, parameter_length);
     val[parameter_length] = '\0';
     value = (guint32) g_ascii_strtoull(val, NULL, 10);
+    wmem_free(NULL, val);
 
     return value;
 }
@@ -957,7 +958,7 @@ dissect_ciev_parameter(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     case 0:
         value = get_uint_parameter(parameter_stream, parameter_length);
         proto_tree_add_uint(tree, hf_ciev_indicator_index, tvb, offset, parameter_length, value);
-        *data = wmem_alloc(wmem_packet_scope(), sizeof(guint));
+        *data = wmem_alloc(pinfo->pool, sizeof(guint));
         *((guint *) *data) = value;
         break;
     case 1:
@@ -1387,7 +1388,7 @@ dissect_cpin_parameter(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
             proto_item_append_text(pitem, " (MT is not pending for any password)");
         }
         else {
-            pin_type = wmem_strndup(wmem_packet_scope(), parameter_stream, parameter_length);
+            pin_type = wmem_strndup(pinfo->pool, parameter_stream, parameter_length);
             proto_item_append_text(pitem, " (MT is waiting %s to be given)", pin_type);
         }
         return TRUE;
@@ -1778,7 +1779,7 @@ dissect_at_command(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         proto_tree_add_item(tree, hf_data, tvb, offset, length, ENC_NA | ENC_ASCII);
     }
 
-    at_stream = (guint8 *) wmem_alloc(wmem_packet_scope(), length + 1);
+    at_stream = (guint8 *) wmem_alloc(pinfo->pool, length + 1);
     tvb_memcpy(tvb, at_stream, offset, length);
     at_stream[length] = '\0';
 
@@ -1873,7 +1874,7 @@ dissect_at_command(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         if (i_at_cmd && i_at_cmd->name == NULL) {
             char *name;
 
-            name = (char *) wmem_alloc(wmem_packet_scope(), i_char + 2);
+            name = (char *) wmem_alloc(pinfo->pool, i_char + 2);
             (void) g_strlcpy(name, at_command, i_char + 1);
             name[i_char + 1] = '\0';
             proto_item_append_text(command_item, ": %s (Unknown)", name);
@@ -2038,7 +2039,7 @@ static int dissect_at(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void*
     gint        len;
     guint32         cmd_indx;
 
-    string = tvb_format_text_wsp(wmem_packet_scope(), tvb, 0, tvb_captured_length(tvb));
+    string = tvb_format_text_wsp(pinfo->pool, tvb, 0, tvb_captured_length(tvb));
     col_append_sep_str(pinfo->cinfo, COL_PROTOCOL, "/", "AT");
     switch (pinfo->p2p_dir) {
         case P2P_DIR_SENT:
