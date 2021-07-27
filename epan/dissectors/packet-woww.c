@@ -56,6 +56,7 @@
 #include <epan/packet.h>
 #include <epan/conversation.h>
 #include <epan/wmem_scopes.h>
+#include <ptvcursor.h>
 
 void proto_reg_handoff_woww(void);
 void proto_register_woww(void);
@@ -63,8 +64,62 @@ void proto_register_woww(void);
 static int proto_woww = -1;
 
 /* Fields that all packets have */
-static int hf_woww_size_field = -1;
-static int hf_woww_opcode_field = -1;
+static int hf_woww_size = -1;
+static int hf_woww_opcode = -1;
+
+/* SMSG_AUTH_CHALLENGE */
+static int hf_woww_challenge_seed = -1;
+
+/* CMSG_AUTH_SESSION */
+static int hf_woww_build = -1;
+static int hf_woww_server_id = -1;
+static int hf_woww_account_name = -1;
+static int hf_woww_client_proof = -1;
+static int hf_woww_decompressed_addon_size = -1;
+static int hf_woww_addon_info = -1;
+
+/* SMSG_CHAR_ENUM */
+static int hf_woww_amount_of_characters = -1;
+static int hf_woww_character_zone = -1;
+static int hf_woww_character_map = -1;
+static int hf_woww_character_guild_id = -1;
+static int hf_woww_character_flags = -1;
+static int hf_woww_character_first_login = -1;
+static int hf_woww_character_pet_display_id = -1;
+static int hf_woww_character_pet_level = -1;
+static int hf_woww_character_pet_family = -1;
+static int hf_woww_character_equipment_display_id = -1;
+static int hf_woww_character_equipment_inventory_type = -1;
+
+/* SMSG_TUTORIAL_FLAGS */
+static int hf_woww_tutorial_flag = -1;
+
+/* CMSG_PING */
+static int hf_woww_latency = -1;
+/* CMSG_PING and SMSG_PONG */
+static int hf_woww_sequence_id = -1;
+
+/* CMSG_CHAR_CREATE */
+static int hf_woww_starting_outfit = -1;
+
+/* Multiple */
+static int hf_woww_character_level = -1;
+static int hf_woww_character_position_x = -1;
+static int hf_woww_character_position_y = -1;
+static int hf_woww_character_position_z = -1;
+static int hf_woww_character_orientation = -1;
+static int hf_woww_result = -1;
+static int hf_woww_character_name = -1;
+static int hf_woww_realm_name = -1;
+static int hf_woww_character_race = -1;
+static int hf_woww_character_class = -1;
+static int hf_woww_character_gender = -1;
+static int hf_woww_character_guid = -1;
+static int hf_woww_character_skin = -1;
+static int hf_woww_character_face = -1;
+static int hf_woww_character_hairstyle = -1;
+static int hf_woww_character_haircolor = -1;
+static int hf_woww_character_facialhair = -1;
 
 #define WOWW_TCP_PORT 8085
 
@@ -80,6 +135,7 @@ static int hf_woww_opcode_field = -1;
 
 static gint ett_woww = -1;
 static gint ett_message = -1;
+static gint ett_character = -1;
 
 // Packets that do not have at least a u16 size field and a u16 opcode field are not valid.
 #define WOWW_MIN_LENGTH 4
@@ -127,6 +183,238 @@ typedef struct {
     guint8 size[2];
     guint8 opcode[];
 } WowwDecryptedHeader_t;
+
+typedef enum {
+    HUMAN = 1,
+    ORC = 2,
+    DWARF = 3,
+    NIGHT_ELF = 4,
+    UNDEAD = 5,
+    TAUREN = 6,
+    GNOME = 7,
+    TROLL = 8,
+    GOBLIN = 9,
+} races;
+
+static const value_string races_strings[] = {
+    { HUMAN, "Human" },
+    { ORC, "Orc" },
+    { DWARF, "Dwarf" },
+    { NIGHT_ELF, "Night Elf" },
+    { UNDEAD, "Undead" },
+    { TAUREN, "Tauren" },
+    { GNOME, "Gnome" },
+    { TROLL, "Troll" },
+    { GOBLIN, "Goblin" },
+    { 0, NULL }
+};
+
+typedef enum {
+    WARRIOR = 1,
+    PALADIN = 2,
+    HUNTER = 3,
+    ROGUE = 4,
+    PRIEST = 5,
+    SHAMAN = 6,
+    MAGE = 7,
+    WARLOCK = 8,
+    DRUID = 9,
+} classes;
+
+static const value_string classes_strings[] = {
+        { WARRIOR, "Warrior" },
+        { PALADIN, "Paladin" },
+        { HUNTER, "Hunter" },
+        { ROGUE, "Rogue" },
+        { PRIEST, "Priest" },
+        { SHAMAN, "Shaman" },
+        { MAGE, "Mage" },
+        { WARLOCK, "Warlock" },
+        { DRUID, "Druid" },
+        { 0, NULL }
+};
+
+typedef enum {
+    MALE = 0,
+    FEMALE = 1,
+} genders;
+
+static const value_string genders_strings[] = {
+        { MALE, "Male" },
+        { FEMALE, "Female" },
+        { 0, NULL }
+};
+
+typedef enum {
+    RESPONSE_SUCCESS = 0x00,
+    RESPONSE_FAILURE = 0x01,
+    RESPONSE_CANCELLED = 0x02,
+    RESPONSE_DISCONNECTED = 0x03,
+    RESPONSE_FAILED_TO_CONNECT = 0x04,
+    RESPONSE_CONNECTED = 0x05,
+    RESPONSE_VERSION_MISMATCH = 0x06,
+    CSTATUS_CONNECTING = 0x07,
+    CSTATUS_NEGOTIATING_SECURITY = 0x08,
+    CSTATUS_NEGOTIATION_COMPLETE = 0x09,
+    CSTATUS_NEGOTIATION_FAILED = 0x0A,
+    CSTATUS_AUTHENTICATING = 0x0B,
+    AUTH_OK = 0x0C,
+    AUTH_FAILED = 0x0D,
+    AUTH_REJECT = 0x0E,
+    AUTH_BAD_SERVER_PROOF = 0x0F,
+    AUTH_UNAVAILABLE = 0x10,
+    AUTH_SYSTEM_ERROR = 0x11,
+    AUTH_BILLING_ERROR = 0x12,
+    AUTH_BILLING_EXPIRED = 0x13,
+    AUTH_VERSION_MISMATCH = 0x14,
+    AUTH_UNKNOWN_ACCOUNT = 0x15,
+    AUTH_INCORRECT_PASSWORD = 0x16,
+    AUTH_SESSION_EXPIRED = 0x17,
+    AUTH_SERVER_SHUTTING_DOWN = 0x18,
+    AUTH_ALREADY_LOGGING_IN = 0x19,
+    AUTH_LOGIN_SERVER_NOT_FOUND = 0x1A,
+    AUTH_WAIT_QUEUE = 0x1B,
+    AUTH_BANNED = 0x1C,
+    AUTH_ALREADY_ONLINE = 0x1D,
+    AUTH_NO_TIME = 0x1E,
+    AUTH_DB_BUSY = 0x1F,
+    AUTH_SUSPENDED = 0x20,
+    AUTH_PARENTAL_CONTROL = 0x21,
+    REALM_LIST_IN_PROGRESS = 0x22,
+    REALM_LIST_SUCCESS = 0x23,
+    REALM_LIST_FAILED = 0x24,
+    REALM_LIST_INVALID = 0x25,
+    REALM_LIST_REALM_NOT_FOUND = 0x26,
+    ACCOUNT_CREATE_IN_PROGRESS = 0x27,
+    ACCOUNT_CREATE_SUCCESS = 0x28,
+    ACCOUNT_CREATE_FAILED = 0x29,
+    CHAR_LIST_RETRIEVING = 0x2A,
+    CHAR_LIST_RETRIEVED = 0x2B,
+    CHAR_LIST_FAILED = 0x2C,
+    CHAR_CREATE_IN_PROGRESS = 0x2D,
+    CHAR_CREATE_SUCCESS = 0x2E,
+    CHAR_CREATE_ERROR = 0x2F,
+    CHAR_CREATE_FAILED = 0x30,
+    CHAR_CREATE_NAME_IN_USE = 0x31,
+    CHAR_CREATE_DISABLED = 0x32,
+    CHAR_CREATE_PVP_TEAMS_VIOLATION = 0x33,
+    CHAR_CREATE_SERVER_LIMIT = 0x34,
+    CHAR_CREATE_ACCOUNT_LIMIT = 0x35,
+    CHAR_CREATE_SERVER_QUEUE = 0x36,
+    CHAR_CREATE_ONLY_EXISTING = 0x37,
+    CHAR_DELETE_IN_PROGRESS = 0x38,
+    CHAR_DELETE_SUCCESS = 0x39,
+    CHAR_DELETE_FAILED = 0x3A,
+    CHAR_DELETE_FAILED_LOCKED_FOR_TRANSFER = 0x3B,
+    CHAR_LOGIN_IN_PROGRESS = 0x3C,
+    CHAR_LOGIN_SUCCESS = 0x3D,
+    CHAR_LOGIN_NO_WORLD = 0x3E,
+    CHAR_LOGIN_DUPLICATE_CHARACTER = 0x3F,
+    CHAR_LOGIN_NO_INSTANCES = 0x40,
+    CHAR_LOGIN_FAILED = 0x41,
+    CHAR_LOGIN_DISABLED = 0x42,
+    CHAR_LOGIN_NO_CHARACTER = 0x43,
+    CHAR_LOGIN_LOCKED_FOR_TRANSFER = 0x44,
+    CHAR_NAME_NO_NAME = 0x45,
+    CHAR_NAME_TOO_SHORT = 0x46,
+    CHAR_NAME_TOO_LONG = 0x47,
+    CHAR_NAME_ONLY_LETTERS = 0x48,
+    CHAR_NAME_MIXED_LANGUAGES = 0x49,
+    CHAR_NAME_PROFANE = 0x4A,
+    CHAR_NAME_RESERVED = 0x4B,
+    CHAR_NAME_INVALID_APOSTROPHE = 0x4C,
+    CHAR_NAME_MULTIPLE_APOSTROPHES = 0x4D,
+    CHAR_NAME_THREE_CONSECUTIVE = 0x4E,
+    CHAR_NAME_INVALID_SPACE = 0x4F,
+    CHAR_NAME_SUCCESS = 0x50,
+    CHAR_NAME_FAILURE = 0x51
+} account_result_values;
+
+static const value_string account_result_strings[] = {
+    { RESPONSE_SUCCESS, "RESPONSE_SUCCESS" },
+    { RESPONSE_FAILURE, "RESPONSE_FAILURE" },
+    { RESPONSE_CANCELLED, "RESPONSE_CANCELLED" },
+    { RESPONSE_DISCONNECTED, "RESPONSE_DISCONNECTED" },
+    { RESPONSE_FAILED_TO_CONNECT, "RESPONSE_FAILED_TO_CONNECT" },
+    { RESPONSE_CONNECTED, "RESPONSE_CONNECTED" },
+    { RESPONSE_VERSION_MISMATCH, "RESPONSE_VERSION_MISMATCH" },
+    { CSTATUS_CONNECTING, "CSTATUS_CONNECTING" },
+    { CSTATUS_NEGOTIATING_SECURITY, "CSTATUS_NEGOTIATING_SECURITY" },
+    { CSTATUS_NEGOTIATION_COMPLETE, "CSTATUS_NEGOTIATION_COMPLETE" },
+    { CSTATUS_NEGOTIATION_FAILED, "CSTATUS_NEGOTIATION_FAILED" },
+    { CSTATUS_AUTHENTICATING, "CSTATUS_AUTHENTICATING" },
+    { AUTH_OK, "AUTH_OK" },
+    { AUTH_FAILED, "AUTH_FAILED" },
+    { AUTH_REJECT, "AUTH_REJECT" },
+    { AUTH_BAD_SERVER_PROOF, "AUTH_BAD_SERVER_PROOF" },
+    { AUTH_UNAVAILABLE, "AUTH_UNAVAILABLE" },
+    { AUTH_SYSTEM_ERROR, "AUTH_SYSTEM_ERROR" },
+    { AUTH_BILLING_ERROR, "AUTH_BILLING_ERROR" },
+    { AUTH_BILLING_EXPIRED, "AUTH_BILLING_EXPIRED" },
+    { AUTH_VERSION_MISMATCH, "AUTH_VERSION_MISMATCH" },
+    { AUTH_UNKNOWN_ACCOUNT, "AUTH_UNKNOWN_ACCOUNT" },
+    { AUTH_INCORRECT_PASSWORD, "AUTH_INCORRECT_PASSWORD" },
+    { AUTH_SESSION_EXPIRED, "AUTH_SESSION_EXPIRED" },
+    { AUTH_SERVER_SHUTTING_DOWN, "AUTH_SERVER_SHUTTING_DOWN" },
+    { AUTH_ALREADY_LOGGING_IN, "AUTH_ALREADY_LOGGING_IN" },
+    { AUTH_LOGIN_SERVER_NOT_FOUND, "AUTH_LOGIN_SERVER_NOT_FOUND" },
+    { AUTH_WAIT_QUEUE, "AUTH_WAIT_QUEUE" },
+    { AUTH_BANNED, "AUTH_BANNED" },
+    { AUTH_ALREADY_ONLINE, "AUTH_ALREADY_ONLINE" },
+    { AUTH_NO_TIME, "AUTH_NO_TIME" },
+    { AUTH_DB_BUSY, "AUTH_DB_BUSY" },
+    { AUTH_SUSPENDED, "AUTH_SUSPENDED" },
+    { AUTH_PARENTAL_CONTROL, "AUTH_PARENTAL_CONTROL" },
+    { REALM_LIST_IN_PROGRESS, "REALM_LIST_IN_PROGRESS" },
+    { REALM_LIST_SUCCESS, "REALM_LIST_SUCCESS" },
+    { REALM_LIST_FAILED, "REALM_LIST_FAILED" },
+    { REALM_LIST_INVALID, "REALM_LIST_INVALID" },
+    { REALM_LIST_REALM_NOT_FOUND, "REALM_LIST_REALM_NOT_FOUND" },
+    { ACCOUNT_CREATE_IN_PROGRESS, "ACCOUNT_CREATE_IN_PROGRESS" },
+    { ACCOUNT_CREATE_SUCCESS, "ACCOUNT_CREATE_SUCCESS" },
+    { ACCOUNT_CREATE_FAILED, "ACCOUNT_CREATE_FAILED" },
+    { CHAR_LIST_RETRIEVING, "CHAR_LIST_RETRIEVING" },
+    { CHAR_LIST_RETRIEVED, "CHAR_LIST_RETRIEVED" },
+    { CHAR_LIST_FAILED, "CHAR_LIST_FAILED" },
+    { CHAR_CREATE_IN_PROGRESS, "CHAR_CREATE_IN_PROGRESS" },
+    { CHAR_CREATE_SUCCESS, "CHAR_CREATE_SUCCESS" },
+    { CHAR_CREATE_ERROR, "CHAR_CREATE_ERROR" },
+    { CHAR_CREATE_FAILED, "CHAR_CREATE_FAILED" },
+    { CHAR_CREATE_NAME_IN_USE, "CHAR_CREATE_NAME_IN_USE" },
+    { CHAR_CREATE_DISABLED, "CHAR_CREATE_DISABLED" },
+    { CHAR_CREATE_PVP_TEAMS_VIOLATION, "CHAR_CREATE_PVP_TEAMS_VIOLATION" },
+    { CHAR_CREATE_SERVER_LIMIT, "CHAR_CREATE_SERVER_LIMIT" },
+    { CHAR_CREATE_ACCOUNT_LIMIT, "CHAR_CREATE_ACCOUNT_LIMIT" },
+    { CHAR_CREATE_SERVER_QUEUE, "CHAR_CREATE_SERVER_QUEUE" },
+    { CHAR_CREATE_ONLY_EXISTING, "CHAR_CREATE_ONLY_EXISTING" },
+    { CHAR_DELETE_IN_PROGRESS, "CHAR_DELETE_IN_PROGRESS" },
+    { CHAR_DELETE_SUCCESS, "CHAR_DELETE_SUCCESS" },
+    { CHAR_DELETE_FAILED, "CHAR_DELETE_FAILED" },
+    { CHAR_DELETE_FAILED_LOCKED_FOR_TRANSFER, "CHAR_DELETE_FAILED_LOCKED_FOR_TRANSFER" },
+    { CHAR_LOGIN_IN_PROGRESS, "CHAR_LOGIN_IN_PROGRESS" },
+    { CHAR_LOGIN_SUCCESS, "CHAR_LOGIN_SUCCESS" },
+    { CHAR_LOGIN_NO_WORLD, "CHAR_LOGIN_NO_WORLD" },
+    { CHAR_LOGIN_DUPLICATE_CHARACTER, "CHAR_LOGIN_DUPLICATE_CHARACTER" },
+    { CHAR_LOGIN_NO_INSTANCES, "CHAR_LOGIN_NO_INSTANCES" },
+    { CHAR_LOGIN_FAILED, "CHAR_LOGIN_FAILED" },
+    { CHAR_LOGIN_DISABLED, "CHAR_LOGIN_DISABLED" },
+    { CHAR_LOGIN_NO_CHARACTER, "CHAR_LOGIN_NO_CHARACTER" },
+    { CHAR_LOGIN_LOCKED_FOR_TRANSFER, "CHAR_LOGIN_LOCKED_FOR_TRANSFER" },
+    { CHAR_NAME_NO_NAME, "CHAR_NAME_NO_NAME" },
+    { CHAR_NAME_TOO_SHORT, "CHAR_NAME_TOO_SHORT" },
+    { CHAR_NAME_TOO_LONG, "CHAR_NAME_TOO_LONG" },
+    { CHAR_NAME_ONLY_LETTERS, "CHAR_NAME_ONLY_LETTERS" },
+    { CHAR_NAME_MIXED_LANGUAGES, "CHAR_NAME_MIXED_LANGUAGES" },
+    { CHAR_NAME_PROFANE, "CHAR_NAME_PROFANE" },
+    { CHAR_NAME_RESERVED, "CHAR_NAME_RESERVED" },
+    { CHAR_NAME_INVALID_APOSTROPHE, "CHAR_NAME_INVALID_APOSTROPHE" },
+    { CHAR_NAME_MULTIPLE_APOSTROPHES, "CHAR_NAME_MULTIPLE_APOSTROPHES" },
+    { CHAR_NAME_THREE_CONSECUTIVE, "CHAR_NAME_THREE_CONSECUTIVE" },
+    { CHAR_NAME_INVALID_SPACE, "CHAR_NAME_INVALID_SPACE" },
+    { CHAR_NAME_SUCCESS, "CHAR_NAME_SUCCESS" },
+    { CHAR_NAME_FAILURE, "CHAR_NAME_FAILURE" },
+    { 0, NULL }
+};
 
 // All existing opcodes for 1.12.x
 typedef enum
@@ -2125,6 +2413,221 @@ handle_packet_header(packet_info* pinfo,
     return (WowwDecryptedHeader_t*)decrypted_header;
 }
 
+static gint32
+get_null_terminated_string_length( tvbuff_t* tvb,
+                                   gint32 offset)
+{
+    const gint32 maximum_length = 255;
+    for (gint32 length = 0; length < maximum_length; length++) {
+        guint8 character = tvb_get_guint8(tvb, offset + length);
+        if (character == 0) {
+            // Include the null character in the length
+            return length + 1;
+        }
+    }
+
+    return 0;
+}
+
+static void
+parse_SMSG_CHAR_ENUM(proto_tree* tree,
+                     tvbuff_t* tvb,
+                     gint32 offset)
+{
+    ptvcursor_t* ptv = ptvcursor_new(tree, tvb, offset);
+
+    guint32 amount_of_characters = 0;
+    ptvcursor_add_ret_uint(ptv, hf_woww_amount_of_characters, 1, ENC_NA, &amount_of_characters);
+    for (guint32 i = 0; i < amount_of_characters; i++) {
+        proto_tree* char_tree = ptvcursor_add_text_with_subtree(ptv, SUBTREE_UNDEFINED_LENGTH,
+                                                                ett_character, "Character");
+
+        ptvcursor_add(ptv, hf_woww_character_guid, 8, ENC_LITTLE_ENDIAN);
+
+        gint32 character_name_length = 0;
+
+        // Use the character_name later for the tree text
+        guint8* character_name = tvb_get_stringz_enc(wmem_packet_scope(), tvb,
+                                                     ptvcursor_current_offset(ptv),
+                                                     &character_name_length, ENC_UTF_8);
+
+        ptvcursor_add(ptv, hf_woww_character_name, character_name_length, ENC_UTF_8|ENC_NA);
+
+        guint32 race = 0;
+        ptvcursor_add_ret_uint(ptv, hf_woww_character_race, 1, ENC_NA, &race);
+        guint32 class = 0;
+        ptvcursor_add_ret_uint(ptv, hf_woww_character_class, 1, ENC_NA, &class);
+        ptvcursor_add(ptv, hf_woww_character_gender, 1, ENC_NA);
+        ptvcursor_add(ptv, hf_woww_character_skin, 1, ENC_NA);
+        ptvcursor_add(ptv, hf_woww_character_face, 1, ENC_NA);
+        ptvcursor_add(ptv, hf_woww_character_hairstyle, 1, ENC_NA);
+        ptvcursor_add(ptv, hf_woww_character_haircolor, 1, ENC_NA);
+        ptvcursor_add(ptv, hf_woww_character_facialhair, 1, ENC_NA);
+
+        guint32 level = 0;
+        ptvcursor_add_ret_uint(ptv, hf_woww_character_level, 1, ENC_NA, &level);
+
+        proto_item_set_text(char_tree,
+                               "%s (%i %s %s)",
+                               character_name,
+                               level,
+                               val_to_str_const(race, races_strings, "Unknown"),
+                               val_to_str_const(class, classes_strings, "Unknown"));
+
+        ptvcursor_add(ptv, hf_woww_character_zone, 4, ENC_LITTLE_ENDIAN);
+        ptvcursor_add(ptv, hf_woww_character_map, 4, ENC_LITTLE_ENDIAN);
+
+        ptvcursor_add(ptv, hf_woww_character_position_x, 4, ENC_LITTLE_ENDIAN);
+        ptvcursor_add(ptv, hf_woww_character_position_y, 4, ENC_LITTLE_ENDIAN);
+        ptvcursor_add(ptv, hf_woww_character_position_z, 4, ENC_LITTLE_ENDIAN);
+
+        ptvcursor_add(ptv, hf_woww_character_guild_id, 4, ENC_LITTLE_ENDIAN);
+
+        ptvcursor_add(ptv, hf_woww_character_flags, 4, ENC_LITTLE_ENDIAN);
+
+        ptvcursor_add(ptv, hf_woww_character_first_login, 1, ENC_NA);
+
+        ptvcursor_add(ptv, hf_woww_character_pet_display_id, 4, ENC_LITTLE_ENDIAN);
+        ptvcursor_add(ptv, hf_woww_character_pet_level, 4, ENC_LITTLE_ENDIAN);
+        ptvcursor_add(ptv, hf_woww_character_pet_family, 4, ENC_LITTLE_ENDIAN);
+
+        ptvcursor_add_text_with_subtree(ptv, SUBTREE_UNDEFINED_LENGTH, ett_character, "Equipment");
+
+        for (gint equipment_slot = 0; equipment_slot < 20; equipment_slot++) {
+            ptvcursor_add(ptv, hf_woww_character_equipment_display_id, 4, ENC_LITTLE_ENDIAN);
+            ptvcursor_add(ptv, hf_woww_character_equipment_inventory_type, 1, ENC_NA);
+        }
+
+        ptvcursor_pop_subtree(ptv); // Equipment subtree
+        ptvcursor_pop_subtree(ptv); // Character subtree
+    }
+}
+
+static void
+add_body_fields(guint32 opcode,
+                proto_tree* tree,
+                tvbuff_t* tvb,
+                gint32 offset,
+                gint32 offset_packet_end)
+{
+    gint32 len = 0;
+    ptvcursor_t* ptv = ptvcursor_new(tree, tvb, offset);
+    switch (opcode) {
+        case SMSG_AUTH_CHALLENGE:
+            ptvcursor_add(ptv, hf_woww_challenge_seed, 4, ENC_LITTLE_ENDIAN);
+            break;
+
+        case CMSG_AUTH_SESSION:
+            ptvcursor_add(ptv, hf_woww_build, 4, ENC_LITTLE_ENDIAN);
+            ptvcursor_add(ptv, hf_woww_server_id, 4, ENC_LITTLE_ENDIAN);
+
+            len = get_null_terminated_string_length(tvb, ptvcursor_current_offset(ptv));
+            ptvcursor_add(ptv, hf_woww_account_name, len, ENC_UTF_8|ENC_NA);
+
+            ptvcursor_add(ptv, hf_woww_challenge_seed, 4, ENC_LITTLE_ENDIAN);
+            ptvcursor_add(ptv, hf_woww_client_proof, 20, ENC_NA);
+            ptvcursor_add(ptv, hf_woww_decompressed_addon_size, 4, ENC_LITTLE_ENDIAN);
+
+            len = offset_packet_end - ptvcursor_current_offset(ptv);
+            ptvcursor_add(ptv, hf_woww_addon_info, len, ENC_NA);
+            break;
+
+        case SMSG_AUTH_RESPONSE:
+            ptvcursor_add(ptv, hf_woww_result, 4, ENC_LITTLE_ENDIAN);
+            // There might more fields depending on the value in login_result.
+            // Not implemented currently because they aren't that important.
+            break;
+
+        case SMSG_CHAR_ENUM:
+            parse_SMSG_CHAR_ENUM(tree, tvb, offset);
+            break;
+
+        case CMSG_SET_SELECTION:
+            /* Fallthrough */
+        case CMSG_CHAR_DELETE:
+            /* Fallthrough */
+        case CMSG_SET_ACTIVE_MOVER:
+            /* Fallthrough */
+        case CMSG_NAME_QUERY:
+            /* Fallthrough */
+        case CMSG_PLAYER_LOGIN:
+            ptvcursor_add(ptv, hf_woww_character_guid, 8, ENC_LITTLE_ENDIAN);
+            break;
+
+        case SMSG_LOGIN_VERIFY_WORLD:
+            ptvcursor_add(ptv, hf_woww_character_map, 4, ENC_LITTLE_ENDIAN);
+            ptvcursor_add(ptv, hf_woww_character_position_x, 4, ENC_LITTLE_ENDIAN);
+            ptvcursor_add(ptv, hf_woww_character_position_y, 4, ENC_LITTLE_ENDIAN);
+            ptvcursor_add(ptv, hf_woww_character_position_z, 4, ENC_LITTLE_ENDIAN);
+            ptvcursor_add(ptv, hf_woww_character_orientation, 4, ENC_LITTLE_ENDIAN);
+            break;
+
+        case SMSG_TUTORIAL_FLAGS:
+            for (gint i = 0; i < 8; i++) {
+                ptvcursor_add(ptv, hf_woww_tutorial_flag, 4, ENC_LITTLE_ENDIAN);
+            }
+            break;
+
+        case CMSG_PING:
+            ptvcursor_add(ptv, hf_woww_sequence_id, 4, ENC_LITTLE_ENDIAN);
+            ptvcursor_add(ptv, hf_woww_latency, 4, ENC_LITTLE_ENDIAN);
+            break;
+
+        case SMSG_PONG:
+            ptvcursor_add(ptv, hf_woww_sequence_id, 4, ENC_LITTLE_ENDIAN);
+            break;
+
+        case SMSG_CHARACTER_LOGIN_FAILED:
+            /* Fallthrough */
+        case SMSG_CHAR_DELETE:
+            /* Fallthrough */
+        case SMSG_CHAR_CREATE:
+            ptvcursor_add(ptv, hf_woww_result, 1, ENC_NA);
+            break;
+
+        case SMSG_NAME_QUERY_RESPONSE:
+            ptvcursor_add(ptv, hf_woww_character_guid, 8, ENC_LITTLE_ENDIAN);
+
+            len = get_null_terminated_string_length(tvb, ptvcursor_current_offset(ptv));
+            ptvcursor_add(ptv, hf_woww_character_name, len, ENC_UTF_8|ENC_NA);
+
+            len = get_null_terminated_string_length(tvb, ptvcursor_current_offset(ptv));
+            ptvcursor_add(ptv, hf_woww_realm_name, len, ENC_UTF_8|ENC_NA);
+
+            ptvcursor_add(ptv, hf_woww_character_race, 4, ENC_LITTLE_ENDIAN);
+            ptvcursor_add(ptv, hf_woww_character_gender, 4, ENC_LITTLE_ENDIAN);
+            ptvcursor_add(ptv, hf_woww_character_class, 4, ENC_LITTLE_ENDIAN);
+            break;
+
+        case CMSG_CHAR_RENAME:
+            ptvcursor_add(ptv, hf_woww_character_guid, 8, ENC_LITTLE_ENDIAN);
+
+            len = get_null_terminated_string_length(tvb, ptvcursor_current_offset(ptv));
+            ptvcursor_add(ptv, hf_woww_character_name, len, ENC_UTF_8|ENC_NA);
+            break;
+
+        case CMSG_CHAR_CREATE:
+            len = get_null_terminated_string_length(tvb, ptvcursor_current_offset(ptv));
+            ptvcursor_add(ptv, hf_woww_character_name, len, ENC_UTF_8|ENC_NA);
+
+            ptvcursor_add(ptv, hf_woww_character_race, 1, ENC_NA);
+            ptvcursor_add(ptv, hf_woww_character_class, 1, ENC_NA);
+            ptvcursor_add(ptv, hf_woww_character_gender, 1, ENC_NA);
+            ptvcursor_add(ptv, hf_woww_character_skin, 1, ENC_NA);
+            ptvcursor_add(ptv, hf_woww_character_face, 1, ENC_NA);
+            ptvcursor_add(ptv, hf_woww_character_hairstyle, 1, ENC_NA);
+            ptvcursor_add(ptv, hf_woww_character_haircolor, 1, ENC_NA);
+            ptvcursor_add(ptv, hf_woww_character_facialhair, 1, ENC_NA);
+            ptvcursor_add(ptv, hf_woww_starting_outfit, 1, ENC_NA);
+            break;
+
+        default:
+            break;
+    }
+
+    ptvcursor_free(ptv);
+}
+
 static gint
 add_header_to_tree(WowwDecryptedHeader_t* decrypted_header,
                    proto_tree* tree,
@@ -2148,7 +2651,7 @@ add_header_to_tree(WowwDecryptedHeader_t* decrypted_header,
     // We're indexing into another tvb
     gint offset = 0;
     gint len = size_field_width;
-    proto_tree_add_item(woww_tree, hf_woww_size_field, next_tvb,
+    proto_tree_add_item(woww_tree, hf_woww_size, next_tvb,
                         offset, len, ENC_BIG_ENDIAN);
     offset += len;
 
@@ -2161,8 +2664,9 @@ add_header_to_tree(WowwDecryptedHeader_t* decrypted_header,
         opcode = tvb_get_guint32(next_tvb, offset, ENC_LITTLE_ENDIAN);
     }
 
-    proto_tree_add_item(woww_tree, hf_woww_opcode_field, next_tvb,
+    proto_tree_add_item(woww_tree, hf_woww_opcode, next_tvb,
                         offset, len, ENC_LITTLE_ENDIAN);
+    offset += len;
 
     if (start_offset == 0) {
         // First message
@@ -2181,9 +2685,12 @@ add_header_to_tree(WowwDecryptedHeader_t* decrypted_header,
                                                     world_packet_strings,
                                                     "Encrypted Header"));
 
-    // Remember to go back to original tvb
+    gint offset_packet_end = start_offset + (gint)packet_size;
 
-    return start_offset + (gint)packet_size;
+    // Remember to go back to original tvb
+    add_body_fields(opcode, woww_tree, tvb, start_offset + headerSize, offset_packet_end);
+
+    return offset_packet_end;
 }
 
 static int
@@ -2251,21 +2758,217 @@ void
 proto_register_woww(void)
 {
     static hf_register_info hf[] = {
-        { &hf_woww_size_field,
+        { &hf_woww_size,
           { "Size", "woww.size",
             FT_UINT16, BASE_HEX_DEC, NULL, 0,
             "Size of the packet including opcode field but not including size field", HFILL }
         },
-	{ &hf_woww_opcode_field,
-	  { "Opcode", "woww.opcode",
-	    FT_UINT32, BASE_HEX, VALS(world_packet_strings), 0,
-	    "Opcode of the packet", HFILL }
-	}
+        { &hf_woww_opcode,
+          { "Opcode", "woww.opcode",
+            FT_UINT32, BASE_HEX, VALS(world_packet_strings), 0,
+            "Opcode of the packet", HFILL }
+        },
+        { &hf_woww_challenge_seed,
+          { "Challenge Seed", "woww.challenge_seed",
+            FT_UINT32, BASE_HEX, NULL, 0,
+            "Seed used to verify session key", HFILL }
+        },
+        { &hf_woww_server_id,
+          { "Server Id", "woww.server.id",
+            FT_UINT32, BASE_DEC, NULL, 0,
+            "Id of the server the client is connecting to", HFILL }
+        },
+        { &hf_woww_build,
+          { "Client Build", "woww.build",
+            FT_UINT32, BASE_DEC, NULL, 0,
+            "Client build/revision", HFILL }
+        },
+        { &hf_woww_client_proof,
+          { "Client Proof", "woww.client_proof",
+            FT_BYTES, BASE_NONE, NULL, 0,
+            "Client proof calculated using seeds and session key", HFILL }
+        },
+        { &hf_woww_decompressed_addon_size,
+          { "Decompressed Addon Size", "woww.decompressed_addon_size",
+            FT_UINT32, BASE_DEC, NULL, 0,
+            "Size of the Addon Info after decompression", HFILL }
+        },
+        { &hf_woww_addon_info,
+          { "Compressed Addon Info", "woww.addon_info",
+            FT_BYTES, BASE_NONE, NULL, 0,
+            NULL, HFILL }
+        },
+        { &hf_woww_account_name,
+          { "Account Name", "woww.account.name",
+            FT_STRINGZ, BASE_NONE, NULL, 0,
+            NULL, HFILL }
+        },
+        { &hf_woww_result,
+          { "Result", "woww.result",
+            FT_UINT32, BASE_HEX, VALS(account_result_strings), 0,
+            NULL, HFILL }
+        },
+        { &hf_woww_amount_of_characters,
+          { "Amount of Characters", "woww.amount_of_characters",
+            FT_UINT8, BASE_DEC, NULL, 0,
+            NULL, HFILL }
+        },
+        { &hf_woww_character_guid,
+            { "Character GUID", "woww.character.guid",
+              FT_UINT64, BASE_HEX_DEC, NULL, 0,
+              "Globally Unique Identifier of character", HFILL }
+        },
+        { &hf_woww_character_name,
+            { "Character Name", "woww.character.name",
+              FT_STRINGZ, BASE_NONE, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_realm_name,
+            { "Realm Name", "woww.realm.name",
+              FT_STRINGZ, BASE_NONE, NULL, 0,
+              "Optional realm name shown after the character name", HFILL }
+        },
+        { &hf_woww_character_race,
+            { "Race", "woww.character.race",
+              FT_UINT8, BASE_HEX, VALS(races_strings), 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_class,
+            { "Class", "woww.character.class",
+              FT_UINT8, BASE_HEX, VALS(classes_strings), 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_gender,
+            { "Gender", "woww.character.gender",
+              FT_UINT8, BASE_HEX, VALS(genders_strings), 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_skin,
+            { "Skin Color", "woww.character.skin",
+              FT_UINT8, BASE_HEX, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_face,
+            { "Face", "woww.character.face",
+              FT_UINT8, BASE_HEX, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_hairstyle,
+            { "Hair Style", "woww.character.hairstyle",
+              FT_UINT8, BASE_HEX, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_haircolor,
+            { "Hair Color", "woww.character.haircolor",
+              FT_UINT8, BASE_HEX, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_facialhair,
+            { "Facial Hair/Accessory", "woww.character.facialhair",
+              FT_UINT8, BASE_HEX, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_level,
+            { "Level", "woww.character.level",
+              FT_UINT8, BASE_DEC_HEX, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_zone,
+            { "Zone", "woww.character.zone",
+              FT_UINT32, BASE_DEC_HEX, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_map,
+            { "Map", "woww.character.map",
+              FT_UINT32, BASE_DEC_HEX, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_position_x,
+            { "Position X", "woww.character.position.x",
+              FT_FLOAT, BASE_FLOAT, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_position_y,
+            { "Position Y", "woww.character.position.y",
+              FT_FLOAT, BASE_FLOAT, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_position_z,
+            { "Position Z", "woww.character.position.z",
+              FT_FLOAT, BASE_FLOAT, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_orientation,
+            { "Orientation", "woww.character.orientation",
+              FT_FLOAT, BASE_FLOAT, NULL, 0,
+              "Heading in degrees, with 0 being north", HFILL }
+        },
+        { &hf_woww_character_guild_id,
+            { "Guild ID", "woww.character.guild.id",
+              FT_UINT32, BASE_HEX_DEC, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_flags,
+            { "Character Flags", "woww.character.flags",
+              FT_UINT32, BASE_HEX_DEC, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_first_login,
+            { "First Login", "woww.character.first_login",
+              FT_UINT32, BASE_HEX_DEC, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_pet_display_id,
+            { "Pet Display Id", "woww.character.pet.display_id",
+              FT_UINT32, BASE_HEX_DEC, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_pet_level,
+            { "Pet Level", "woww.character.pet.level",
+              FT_UINT32, BASE_HEX_DEC, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_pet_family,
+            { "Pet Family", "woww.character.pet.family",
+              FT_UINT32, BASE_HEX_DEC, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_equipment_display_id,
+            { "Display ID", "woww.character.equipment.display_id",
+              FT_UINT32, BASE_HEX_DEC, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_character_equipment_inventory_type,
+            { "Inventory Type", "woww.character.equipment.inventory_type",
+              FT_UINT8, BASE_HEX_DEC, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_tutorial_flag,
+            { "Tutorial Flag", "woww.tutorial_flag",
+              FT_UINT32, BASE_HEX_DEC, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_sequence_id,
+            { "Sequence Id", "woww.sequence_id",
+              FT_UINT32, BASE_HEX_DEC, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_woww_latency,
+            { "Latency", "woww.latency",
+              FT_UINT32, BASE_HEX_DEC, NULL, 0,
+              "Round time in milliseconds", HFILL }
+        },
+        { &hf_woww_starting_outfit,
+            { "Starting Outfit", "woww.starting_outfit",
+              FT_UINT8, BASE_HEX_DEC, NULL, 0,
+              NULL, HFILL }
+        },
     };
 
     static gint *ett[] = {
         &ett_woww,
-        &ett_message
+        &ett_message,
+        &ett_character
     };
 
     proto_woww = proto_register_protocol("World of Warcraft World",
