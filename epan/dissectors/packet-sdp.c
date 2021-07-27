@@ -371,13 +371,10 @@ static void sdp_dump_transport_info(const transport_info_t* info) {
         DPRINT2(("rtp channels:"));
         DINDENT();
             for (i=0; i < count; i++) {
-                gchar *addr;
                 media_description_t *media_desc = (media_description_t *)wmem_array_index(info->media_descriptions, i);
                 DPRINT2(("channel #%d:",i));
                 DINDENT();
-                    addr = address_to_str(NULL, &(media_desc->conn_addr))
-                    DPRINT2(("conn_addr=%s", addr));
-                    wmem_free(NULL, addr);
+                    DPRINT2(("conn_addr=%s", address_to_str(pinfo->pool, &(media_desc->conn_addr))));
                     DPRINT2(("media_port=%d", media_desc->media_port));
                     DPRINT2(("proto=%d", media_desc->proto));
                     sdp_dump_transport_media(&(media_desc->media));
@@ -2388,7 +2385,7 @@ setup_sdp_transport(tvbuff_t *tvb, packet_info *pinfo, enum sdp_exchange_type ex
 #ifdef DEBUG_CONVERSATION
     else {
         DPRINT(("found previous transport_info:"));
-        sdp_dump_transport_info(transport_info);
+        sdp_dump_transport_info(pinfo, transport_info);
     }
 #endif
 
@@ -2489,7 +2486,7 @@ setup_sdp_transport(tvbuff_t *tvb, packet_info *pinfo, enum sdp_exchange_type ex
     complete_descriptions(transport_info, start_transport_info_count);
 
 #ifdef DEBUG_CONVERSATION
-    sdp_dump_transport_info(transport_info);
+    sdp_dump_transport_info(pinfo, transport_info);
 #endif
 
     /* We have a successful negotiation, apply data to their respective protocols */
@@ -2575,7 +2572,7 @@ dissect_sdp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 #ifdef DEBUG_CONVERSATION
     else {
         DPRINT(("found previous transport_info:"));
-        sdp_dump_transport_info(transport_info);
+        sdp_dump_transport_info(pinfo, transport_info);
     }
 #endif
 
@@ -2754,13 +2751,13 @@ dissect_sdp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
         complete_descriptions(transport_info, 0);
         DENDENT();
 #ifdef DEBUG_CONVERSATION
-        sdp_dump_transport_info(transport_info);
+        sdp_dump_transport_info(pinfo, transport_info);
 #endif
     }
 #ifdef DEBUG_CONVERSATION
     else {
         DPRINT(("not overwriting previous transport_info, local_transport_info contents:"));
-        sdp_dump_transport_info(&local_transport_info);
+        sdp_dump_transport_info(pinfo, &local_transport_info);
     }
 #endif
 

@@ -2634,7 +2634,7 @@ dissect_ospf_lsa_mpls(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree 
 /*
  * Dissect the TLVs within a Grace-LSA as defined by RFC 3623
  */
-static void dissect_ospf_lsa_grace_tlv (tvbuff_t *tvb, int offset,
+static void dissect_ospf_lsa_grace_tlv (tvbuff_t *tvb, packet_info *pinfo, int offset,
                                         proto_tree *tree, guint32 length)
 {
     guint16 tlv_type;
@@ -2646,7 +2646,6 @@ static void dissect_ospf_lsa_grace_tlv (tvbuff_t *tvb, int offset,
     proto_tree *tlv_tree;
     proto_item *tree_item;
     proto_item *grace_tree_item;
-    gchar *addr_str;
 
     if (!tree) { return; }
 
@@ -2685,9 +2684,8 @@ static void dissect_ospf_lsa_grace_tlv (tvbuff_t *tvb, int offset,
         case GRACE_TLV_IP:
             proto_tree_add_item(tlv_tree, hf_ospf_v2_grace_ip, tvb, offset + 4,
                                 tlv_length, ENC_BIG_ENDIAN);
-            addr_str = tvb_address_with_resolution_to_str(NULL, tvb, AT_IPv4, offset + 4);
-            proto_item_set_text(tree_item, "Restart IP: %s", addr_str);
-            wmem_free(NULL, addr_str);
+
+            proto_item_set_text(tree_item, "Restart IP: %s", tvb_address_with_resolution_to_str(pinfo->pool, tvb, AT_IPv4, offset + 4));
             break;
         default:
             proto_item_set_text(tree_item, "Unknown grace-LSA TLV");
@@ -3245,7 +3243,7 @@ dissect_ospf_lsa_opaque(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tre
         dissect_ospf_lsa_opaque_ri(tvb, pinfo, offset, tree, length);
         break;
     case OSPF_LSA_GRACE:
-        dissect_ospf_lsa_grace_tlv(tvb, offset, tree, length);
+        dissect_ospf_lsa_grace_tlv(tvb, pinfo, offset, tree, length);
         break;
     case OSPF_LSA_EXT_PREFIX:
         dissect_ospf_lsa_ext_prefix(tvb, pinfo, offset, tree, length);

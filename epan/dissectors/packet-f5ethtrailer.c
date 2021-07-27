@@ -3142,45 +3142,35 @@ f5eth_bytes_to_hexstrnz(wmem_allocator_t *scope, const guchar *ba, gint ba_len)
  * @return             Null terminated keylog record wmem allocated with file scope
  */
 static gchar *
-f5eth_add_tls_keylog(keylog_t keylog_type, f5tls_element_t *xxxx, f5tls_element_t *yyyy)
+f5eth_add_tls_keylog(packet_info *pinfo, keylog_t keylog_type, f5tls_element_t *xxxx, f5tls_element_t *yyyy)
 {
     gchar *xxxx_hex;
     gchar *yyyy_hex;
-    gchar *ret = NULL;
 
-    xxxx_hex = f5eth_bytes_to_hexstrnz(NULL, xxxx->data, xxxx->len);
-    yyyy_hex = f5eth_bytes_to_hexstrnz(NULL, yyyy->data, yyyy->len);
+    xxxx_hex = f5eth_bytes_to_hexstrnz(pinfo->pool, xxxx->data, xxxx->len);
+    yyyy_hex = f5eth_bytes_to_hexstrnz(pinfo->pool, yyyy->data, yyyy->len);
 
     switch (keylog_type) {
     case CLIENT_RANDOM:
-        ret = wmem_strdup_printf(wmem_file_scope(), "CLIENT_RANDOM %s %s", xxxx_hex, yyyy_hex);
-        break;
+        return wmem_strdup_printf(wmem_file_scope(), "CLIENT_RANDOM %s %s", xxxx_hex, yyyy_hex);
     case CLIENT_TRAFFIC_SECRET_0:
-        ret = wmem_strdup_printf(
+        return wmem_strdup_printf(
             wmem_file_scope(), "CLIENT_TRAFFIC_SECRET_0 %s %s", xxxx_hex, yyyy_hex);
-        break;
     case SERVER_TRAFFIC_SECRET_0:
-        ret = wmem_strdup_printf(
+        return wmem_strdup_printf(
             wmem_file_scope(), "SERVER_TRAFFIC_SECRET_0 %s %s", xxxx_hex, yyyy_hex);
-        break;
     case CLIENT_HANDSHAKE_TRAFFIC_SECRET:
-        ret = wmem_strdup_printf(
+        return wmem_strdup_printf(
             wmem_file_scope(), "CLIENT_HANDSHAKE_TRAFFIC_SECRET %s %s", xxxx_hex, yyyy_hex);
-        break;
     case SERVER_HANDSHAKE_TRAFFIC_SECRET:
-        ret = wmem_strdup_printf(
+        return wmem_strdup_printf(
             wmem_file_scope(), "SERVER_HANDSHAKE_TRAFFIC_SECRET %s %s", xxxx_hex, yyyy_hex);
-        break;
     case EARLY_TRAFFIC_SECRET:
-        ret = wmem_strdup_printf(
+        return wmem_strdup_printf(
             wmem_file_scope(), "CLIENT_EARLY_TRAFFIC_SECRET %s %s", xxxx_hex, yyyy_hex);
-        break;
     default:
         DISSECTOR_ASSERT_NOT_REACHED();
     }
-    wmem_free(NULL, xxxx_hex);
-    wmem_free(NULL, yyyy_hex);
-    return ret;
 } /* f5eth_add_tls_keylog() */
 
 /*-----------------------------------------------------------------------------------------------*/
@@ -3275,7 +3265,7 @@ dissect_dpt_trailer_tls_type0(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
                 F5_DPT_V1_TLV_HDR_LEN + F5TLS_SECRET_LEN, F5TLS_RANDOM_LEN);
 
             if (conv_data->client_random.len != 0 && ms_changed) {
-                pdata->cr_ms = f5eth_add_tls_keylog(
+                pdata->cr_ms = f5eth_add_tls_keylog(pinfo,
                     CLIENT_RANDOM, &conv_data->client_random, &conv_data->master_secret);
             }
         }
@@ -3397,23 +3387,23 @@ dissect_dpt_trailer_tls_type2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 
             if (conv_data->client_random.len != 0) {
                 if (ver == 1 && ets_changed) {
-                    pdata->cr_erly_traff = f5eth_add_tls_keylog(EARLY_TRAFFIC_SECRET,
+                    pdata->cr_erly_traff = f5eth_add_tls_keylog(pinfo, EARLY_TRAFFIC_SECRET,
                         &conv_data->client_random, &conv_data->erly_traf_sec);
                 }
                 if (cap_changed) {
-                    pdata->cr_clnt_app = f5eth_add_tls_keylog(CLIENT_TRAFFIC_SECRET_0,
+                    pdata->cr_clnt_app = f5eth_add_tls_keylog(pinfo, CLIENT_TRAFFIC_SECRET_0,
                         &conv_data->client_random, &conv_data->clnt_ap_sec);
                 }
                 if (sap_changed) {
-                    pdata->cr_srvr_app = f5eth_add_tls_keylog(SERVER_TRAFFIC_SECRET_0,
+                    pdata->cr_srvr_app = f5eth_add_tls_keylog(pinfo, SERVER_TRAFFIC_SECRET_0,
                         &conv_data->client_random, &conv_data->srvr_ap_sec);
                 }
                 if (chs_changed) {
-                    pdata->cr_clnt_hs = f5eth_add_tls_keylog(CLIENT_HANDSHAKE_TRAFFIC_SECRET,
+                    pdata->cr_clnt_hs = f5eth_add_tls_keylog(pinfo, CLIENT_HANDSHAKE_TRAFFIC_SECRET,
                         &conv_data->client_random, &conv_data->clnt_hs_sec);
                 }
                 if (shs_changed) {
-                    pdata->cr_srvr_hs = f5eth_add_tls_keylog(SERVER_HANDSHAKE_TRAFFIC_SECRET,
+                    pdata->cr_srvr_hs = f5eth_add_tls_keylog(pinfo, SERVER_HANDSHAKE_TRAFFIC_SECRET,
                         &conv_data->client_random, &conv_data->srvr_hs_sec);
                 }
             }

@@ -383,33 +383,27 @@ get_xmcp_attr_max_len(guint16 xmcp_attr) {
 }
 
 static void
-add_xmcp_port_name (void)
+add_xmcp_port_name (packet_info *pinfo)
 {
-  gchar *display_str = NULL;
   if (!xmcp_it_service_port || xmcp_service_port == -1)
     return;
 
   switch(xmcp_service_protocol) {
   case IP_PROTO_TCP:
-    display_str = tcp_port_to_display(NULL, xmcp_service_port);
-    proto_item_append_text(xmcp_it_service_port, " (TCP: %s)", display_str);
+    proto_item_append_text(xmcp_it_service_port, " (TCP: %s)", tcp_port_to_display(pinfo->pool, xmcp_service_port));
     break;
   case IP_PROTO_UDP:
-    display_str = udp_port_to_display(NULL, xmcp_service_port);
-    proto_item_append_text(xmcp_it_service_port, " (UDP: %s)", display_str);
+    proto_item_append_text(xmcp_it_service_port, " (UDP: %s)", udp_port_to_display(pinfo->pool, xmcp_service_port));
     break;
   case IP_PROTO_DCCP:
-    display_str = dccp_port_to_display(NULL, xmcp_service_port);
-    proto_item_append_text(xmcp_it_service_port, " (DCCP: %s)", display_str);
+    proto_item_append_text(xmcp_it_service_port, " (DCCP: %s)", dccp_port_to_display(pinfo->pool, xmcp_service_port));
     break;
   case IP_PROTO_SCTP:
-    display_str = sctp_port_to_display(NULL, xmcp_service_port);
-    proto_item_append_text(xmcp_it_service_port, " (SCTP: %s)", display_str);
+    proto_item_append_text(xmcp_it_service_port, " (SCTP: %s)", sctp_port_to_display(pinfo->pool, xmcp_service_port));
     break;
   default:
     break;
   }
-  wmem_free(NULL, display_str);
 }
 
 static void
@@ -619,7 +613,7 @@ decode_xmcp_attr_value (proto_tree *attr_tree, guint16 attr_type,
                                                tvb, (offset+2), 2, ENC_BIG_ENDIAN);
     /* If we now know both port and protocol number, fill in the port name */
     if (xmcp_service_protocol != -1) {
-      add_xmcp_port_name();
+      add_xmcp_port_name(pinfo);
     }
     switch (tvb_get_guint8(tvb, (offset+1))) {
     case 0x01: /* IPv4 */
@@ -660,7 +654,7 @@ decode_xmcp_attr_value (proto_tree *attr_tree, guint16 attr_type,
                                                 &ipproto_val_ext, "Unknown"));
     /* If we now know both port and protocol number, fill in the port name */
     if (xmcp_service_port != -1 && xmcp_it_service_port != NULL) {
-      add_xmcp_port_name();
+      add_xmcp_port_name(pinfo);
     }
     break;
   case XMCP_FLAGS:

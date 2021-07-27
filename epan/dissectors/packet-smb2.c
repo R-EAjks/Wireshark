@@ -1590,12 +1590,7 @@ static gchar *policy_hnd_to_file_id(wmem_allocator_t *pool, const e_ctx_hnd *hnd
 	return guid_to_str(pool, &hnd->uuid);
 }
 static guint smb2_eo_files_hash(gconstpointer k) {
-	gchar *file_id;
-	guint hash;
-	file_id = policy_hnd_to_file_id(NULL, (const e_ctx_hnd *)k);
-	hash = g_str_hash(file_id);
-	wmem_free(NULL, file_id);
-	return hash;
+	return g_str_hash(policy_hnd_to_file_id(wmem_packet_scope(), (const e_ctx_hnd *)k));
 }
 static gint smb2_eo_files_equal(gconstpointer k1, gconstpointer k2) {
 int	are_equal;
