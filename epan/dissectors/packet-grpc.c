@@ -114,6 +114,7 @@ static int ett_grpc_message = -1;
 static int ett_grpc_encoded_entity = -1;
 
 static dissector_handle_t grpc_handle;
+static dissector_handle_t http2_dissector_handle;
 
 /* GRPC message type dissector table list.
 * Dissectors can register themselves in this table as grpc message data dissectors.
@@ -284,6 +285,11 @@ dissect_grpc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
     gboolean is_request;
     guint tvb_len = tvb_reported_length(tvb);
 
+    if (!proto_is_frame_protocol(pinfo->layers, "http2")) {
+        /* If previous protocol is not HTTP2, it must be called by "decode as". */
+        return call_dissector(http2_dissector_handle, tvb, pinfo, tree);
+    }
+
     if (!grpc_embedded_under_http2 && proto_tree_get_parent_tree(tree)) {
         tree = proto_tree_get_parent_tree(tree);
     }
@@ -391,7 +397,7 @@ proto_register_grpc(void)
     proto_register_field_array(proto_grpc, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
 
-    grpc_module = prefs_register_protocol(proto_grpc, proto_reg_handoff_grpc);
+    grpc_module = prefs_register_protocol(proto_grpc, NULL);
 
     prefs_register_bool_preference(grpc_module, "detect_json_automatically",
         "Always check whether the message is JSON regardless of content-type.",
@@ -442,6 +448,9 @@ proto_reg_handoff_grpc(void)
         dissector_add_string("streaming_content_type", content_types[i], grpc_handle);
         dissector_add_string("media_type", content_types[i], grpc_handle);
     }
+
+    http2_dissector_handle = find_dissector("http2");
+    dissector_add_for_decode_as_with_preference("tcp.port", grpc_handle);
 }
 
 /*
