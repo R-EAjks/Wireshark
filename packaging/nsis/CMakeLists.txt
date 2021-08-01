@@ -156,7 +156,7 @@ foreach(_dll ${CARES_DLL} ${GCRYPT_DLLS}
 	)
 	set(_all_manifest_contents "${_all_manifest_contents}File \"\${STAGING_DIR}\\${_dll}\"\n")
 endforeach()
-foreach(_script "init.lua" "console.lua" "dtd_gen.lua")
+foreach(_script "init.lua" "console.lua" "browser_sslkeylog.lua" "dtd_gen.lua")
 	set(_all_manifest_contents "${_all_manifest_contents}File \"\${STAGING_DIR}\\${_script}\"\n")
 endforeach()
 file(WRITE "${_all_manifest}" "${_all_manifest_contents}")
