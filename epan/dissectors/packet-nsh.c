@@ -37,16 +37,15 @@ void proto_reg_handoff_nsh(void);
 void proto_register_nsh(void);
 
 static const value_string nsh_next_protocols[] = {
-
-    { NSH_NONE, "None"},
-	{ NSH_IPV4, "IPv4" },
-	{ NSH_IPV6, "IPv6" },
-	{ NSH_ETHERNET, "Ethernet" },
-	{ NSH_NSH, "NSH" },
-	{ NSH_MPLS, "MPLS" },
-	{ NSH_EXPERIMENT_1, "Experiment 1" },
-	{ NSH_EXPERIMENT_2, "Experiment 2" },
-	{ 0, NULL }
+		{ NSH_NONE, "None"},
+		{ NSH_IPV4, "IPv4" },
+		{ NSH_IPV6, "IPv6" },
+		{ NSH_ETHERNET, "Ethernet" },
+		{ NSH_NSH, "NSH" },
+		{ NSH_MPLS, "MPLS" },
+		{ NSH_EXPERIMENT_1, "Experiment 1" },
+		{ NSH_EXPERIMENT_2, "Experiment 2" },
+		{ 0, NULL }
 };
 
 
