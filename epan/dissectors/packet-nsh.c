@@ -12,8 +12,7 @@
  * (c) Copyright 2016, Sumit Kumar Jha <sjha3@ncsu.edu>
  * Support for VXLAN GPE encapsulation
  *
- * (c) Copyright 2021, Atul Sharma <asharm37@ncsu.edu>
- * Support for NSH next protocol to None (RFC 8393)
+ * Copyright 2021, Atul Sharma <asharm37@ncsu.edu>
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>

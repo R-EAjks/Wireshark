@@ -7,8 +7,7 @@
  * By Gerald Combs <gerald@wireshark.org>
  * Copyright 1998 Gerald Combs
  *
- * (c) Copyright 2021, Atul Sharma <asharm37@ncsu.edu>
- * Support for NSH next protocol to None (RFC 8393)
+ * Copyright 2021, Atul Sharma <asharm37@ncsu.edu>
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
