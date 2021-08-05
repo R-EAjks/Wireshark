@@ -12,6 +12,9 @@
  * (c) Copyright 2016, Sumit Kumar Jha <sjha3@ncsu.edu>
  * Support for VXLAN GPE encapsulation
  *
+ * (c) Copyright 2021, Atul Sharma <asharm37@ncsu.edu>
+ * Support for NSH next protocol to None (RFC 8393)
+ *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
  * Copyright 1998 Gerald Combs
@@ -34,6 +37,7 @@ void proto_reg_handoff_nsh(void);
 void proto_register_nsh(void);
 
 static const value_string nsh_next_protocols[] = {
+	{ NSH_NONE, "None"},
 	{ NSH_IPV4, "IPv4" },
 	{ NSH_IPV6, "IPv6" },
 	{ NSH_ETHERNET, "Ethernet" },
