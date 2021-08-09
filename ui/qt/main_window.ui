@@ -175,6 +175,7 @@
      <addaction name="separator"/>
      <addaction name="actionFileExportAsPSML"/>
      <addaction name="actionFileExportAsPDML"/>
+     <addaction name="actionFileExportAsSQLite"/>
      <addaction name="actionFileExportAsJSON"/>
     </widget>
     <widget class="QMenu" name="menuFileExportObjects">
@@ -1309,6 +1310,11 @@
    <property name="text">
     <string>As P&amp;DML XML…</string>
    </property>
+  </action>
+  <action name="actionFileExportAsSQLite">
+    <property name="text">
+      <string>As SQLite...</string>
+    </property>
   </action>
   <action name="actionFileExportAsJSON">
    <property name="text">

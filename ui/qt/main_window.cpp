@@ -2452,6 +2452,7 @@ void MainWindow::setMenusForCaptureFile(bool force_disable)
     main_ui_->actionFileExportAsCArrays->setEnabled(enable);
     main_ui_->actionFileExportAsCSV->setEnabled(enable);
     main_ui_->actionFileExportAsPDML->setEnabled(enable);
+    main_ui_->actionFileExportAsSQLite->setEnabled(enable);
     main_ui_->actionFileExportAsPlainText->setEnabled(enable);
     main_ui_->actionFileExportAsPSML->setEnabled(enable);
     main_ui_->actionFileExportAsJSON->setEnabled(enable);
@@ -2482,6 +2483,7 @@ void MainWindow::setMenusForCaptureInProgress(bool capture_in_progress) {
     main_ui_->actionFileExportAsCArrays->setEnabled(capture_in_progress);
     main_ui_->actionFileExportAsCSV->setEnabled(capture_in_progress);
     main_ui_->actionFileExportAsPDML->setEnabled(capture_in_progress);
+    main_ui_->actionFileExportAsSQLite->setEnabled(capture_in_progress);
     main_ui_->actionFileExportAsPlainText->setEnabled(capture_in_progress);
     main_ui_->actionFileExportAsPSML->setEnabled(capture_in_progress);
     main_ui_->actionFileExportAsJSON->setEnabled(capture_in_progress);

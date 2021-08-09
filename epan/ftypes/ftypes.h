@@ -71,6 +71,57 @@ enum ftenum {
 	FT_NUM_TYPES /* last item number plus one */
 };
 
+static const char* ft_strings[] =
+{
+	"FT_NONE",
+	"FT_PROTOCOL",
+	"FT_BOOLEAN",
+	"FT_CHAR",
+	"FT_UINT8",
+	"FT_UINT16",
+	"FT_UINT24",
+	"FT_UINT32",
+	"FT_UINT40",
+	"FT_UINT48",
+	"FT_UINT56",
+	"FT_UINT64",
+	"FT_INT8",
+	"FT_INT16",
+	"FT_INT24",
+	"FT_INT32",
+	"FT_INT40",
+	"FT_INT48",
+	"FT_INT56",
+	"FT_INT64",
+	"FT_IEEE_11073_SFLOAT",
+	"FT_IEEE_11073_FLOAT",
+	"FT_FLOAT",
+	"FT_DOUBLE",
+	"FT_ABSOLUTE_TIME",
+	"FT_RELATIVE_TIME",
+	"FT_STRING",
+	"FT_STRINGZ",
+	"FT_UINT_STRING",
+	"FT_ETHER",
+	"FT_BYTES",
+	"FT_UINT_BYTES",
+	"FT_IPv4",
+	"FT_IPv6",
+	"FT_IPXNET",
+	"FT_FRAMENUM",
+	"FT_GUID",
+	"FT_OID",
+	"FT_EUI64",
+	"FT_AX25",
+	"FT_VINES",
+	"FT_REL_OID",
+	"FT_SYSTEM_ID",
+	"FT_STRINGZPAD",
+	"FT_FCWWN",
+	"FT_STRINGZTRUNC",
+	"FT_NUM_TYPES"
+};
+
 #define IS_FT_INT32(ft) \
 	((ft) == FT_INT8 ||  \
 	 (ft) == FT_INT16 || \

@@ -128,7 +128,8 @@ static frame_data prev_cap_frame;
  */
 typedef enum {
     WRITE_TEXT, /* summary or detail text */
-    WRITE_XML   /* PDML or PSML */
+    WRITE_XML,   /* PDML or PSML */
+    WRITE_SQLITE
     /* Add CSV and the like here */
 } output_action_e;
 

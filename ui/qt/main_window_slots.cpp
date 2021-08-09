@@ -1820,6 +1820,11 @@ void MainWindow::on_actionFileExportAsPDML_triggered()
     exportDissections(export_type_pdml);
 }
 
+void MainWindow::on_actionFileExportAsSQLite_triggered()
+{
+    exportDissections(export_type_sqlite);
+}
+
 void MainWindow::on_actionFileExportAsJSON_triggered()
 {
     exportDissections(export_type_json);

@@ -44,6 +44,7 @@
 #include <epan/addr_resolv.h>
 #include <epan/color_filters.h>
 #include <epan/secrets.h>
+#include <epan/wsqlite.h>
 
 #include "cfile.h"
 #include "file.h"
@@ -2755,6 +2756,154 @@ cf_write_pdml_packets(capture_file *cf, print_args_t *print_args)
   fclose(fh);
 
   return CF_PRINT_OK;
+}
+
+
+cf_print_status_t cf_write_sqlite_packets(capture_file* capture_file, print_args_t* print_args)
+{
+  wsqlite_write_packet_callback_args_t callback_args;
+
+  sqlite3* wsqlite_database = wsqlite_database_open(print_args->file);
+
+  if (wsqlite_database == NULL)
+  {
+    return CF_PRINT_OPEN_ERROR;
+  }
+
+  gboolean wsqlite_result = wsqlite_database_set_cache_size(wsqlite_database, WSQLITE_CACHE_SIZE);
+
+  if(wsqlite_result == FALSE)
+  {
+    wsqlite_database_close(wsqlite_database);
+    return CF_PRINT_WRITE_ERROR;
+  }
+
+  wsqlite_result = wsqlite_database_enable_performance_mode(wsqlite_database);
+
+  if(wsqlite_result == FALSE)
+  {
+    wsqlite_database_close(wsqlite_database);
+    return CF_PRINT_WRITE_ERROR;
+  }
+
+  wsqlite_result = wsqlite_database_create_tables(wsqlite_database);
+
+  if(wsqlite_result == FALSE)
+  {
+    wsqlite_database_close(wsqlite_database);
+    return CF_PRINT_WRITE_ERROR;
+  }
+
+  wsqlite_result = wsqlite_write_field_types(wsqlite_database);
+
+  if(wsqlite_result == FALSE)
+  {
+    wsqlite_database_close(wsqlite_database);
+    return CF_PRINT_WRITE_ERROR;
+  }
+  
+  epan_dissect_t epan_dissect;
+  gint64 last_buffer_id = 0;
+  gint64 last_dissection_details_id = 0;
+
+  callback_args.wsqlite_database = wsqlite_database;
+  callback_args.epan_dissect = &epan_dissect;
+  callback_args.command_queue = g_ptr_array_new();
+  callback_args.seen_fields = g_hash_table_new(g_direct_hash, g_direct_equal);
+  callback_args.last_buffer_id = &last_buffer_id;
+  callback_args.last_dissection_details_id = &last_dissection_details_id;
+
+  epan_dissect_init(callback_args.epan_dissect, capture_file->epan, TRUE, TRUE);
+
+  /* Iterate through the list of packets, printing the packets we were told to print. */
+  psp_return_t psp_return_code = process_specified_records(capture_file, &print_args->range, "Writing SQLite", "selected packets",
+                                                          TRUE, write_sqlite_packet, &callback_args, TRUE);
+
+  epan_dissect_cleanup(callback_args.epan_dissect);
+
+  if (psp_return_code == PSP_FAILED)
+  {
+    g_ptr_array_free(callback_args.command_queue, TRUE);
+    g_hash_table_destroy(callback_args.seen_fields);
+
+    wsqlite_database_close(wsqlite_database);
+
+    return CF_PRINT_WRITE_ERROR;
+  }
+
+  guint command_queue_length = g_ptr_array_len(callback_args.command_queue);
+
+  if(command_queue_length > 0)
+  {
+    gboolean wsqlite_result = wsqlite_commit_command_queue(callback_args.wsqlite_database, callback_args.command_queue);
+
+    if(wsqlite_result == FALSE)
+    {
+      for (guint i = 0; i < command_queue_length; i++)
+      {
+        g_free(g_ptr_array_index(callback_args.command_queue, i));
+      }
+      g_ptr_array_free(callback_args.command_queue, TRUE);
+      g_hash_table_destroy(callback_args.seen_fields);
+
+      wsqlite_database_close(wsqlite_database);
+
+      return CF_PRINT_WRITE_ERROR;
+    }
+  }
+
+  wsqlite_result = wsqlite_database_create_indexes(wsqlite_database);
+
+  if(wsqlite_result == FALSE)
+  {
+    wsqlite_database_close(wsqlite_database);
+    return CF_PRINT_WRITE_ERROR;
+  }
+
+  wsqlite_database_vacuum(wsqlite_database);
+
+  g_ptr_array_free(callback_args.command_queue, TRUE);
+  g_hash_table_destroy(callback_args.seen_fields);
+
+  wsqlite_database_close(wsqlite_database);
+
+  return CF_PRINT_OK;
+}
+
+gboolean
+write_sqlite_packet(capture_file* capture_file, frame_data* fdata, wtap_rec* rec, Buffer* buffer, void* argsp)
+{
+  wsqlite_write_packet_callback_args_t* callback_args = (wsqlite_write_packet_callback_args_t*)argsp;
+
+  tvbuff_t* tvb = frame_tvbuff_new_buffer(&capture_file->provider, fdata, buffer);
+  /* Create the protocol tree, but don't fill in the column information. */
+  epan_dissect_run(callback_args->epan_dissect, capture_file->cd_t, rec, tvb, fdata, NULL);
+
+  wsqlite_add_packet_dissection_sql_to_command_queue(callback_args->epan_dissect, callback_args->command_queue, callback_args->seen_fields, callback_args->last_buffer_id, callback_args->last_dissection_details_id);
+  
+  epan_dissect_reset(callback_args->epan_dissect);
+
+  guint command_queue_length = g_ptr_array_len(callback_args->command_queue);
+
+  if(command_queue_length >= WSQLITE_WRITE_THRESHOLD)
+  {
+    gboolean wsqlite_result = wsqlite_commit_command_queue(callback_args->wsqlite_database, callback_args->command_queue);
+
+    if(wsqlite_result == FALSE)
+    {
+      return FALSE;
+    }
+
+    for (guint i = 0; i < command_queue_length; i++)
+    {
+      g_free(g_ptr_array_index(callback_args->command_queue, i));
+    }
+
+    g_ptr_array_free(callback_args->command_queue, TRUE);
+    callback_args->command_queue = g_ptr_array_new();
+  }
+
+  return TRUE;
 }
 
 static gboolean
