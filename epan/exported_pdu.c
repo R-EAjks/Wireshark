@@ -116,6 +116,8 @@ static guint exp_pdu_new_to_old_port_type(port_type pt)
 		return OLD_PT_IBQP;
 	case PT_BLUETOOTH:
 		return OLD_PT_BLUETOOTH;
+	case PT_IWARP_MPA:
+		return OLD_PT_IWARP_MPA;
 	}
 
 	DISSECTOR_ASSERT(FALSE);
