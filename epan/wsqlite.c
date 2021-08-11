@@ -12,6 +12,177 @@
 
 #include <epan/wsqlite.h>
 
+gboolean
+wsqlite_init_callback_args(wsqlite_callback_args_t* callback_args, guint32 parallel_count, gchar* base_file_path)
+{
+    if(callback_args == NULL)
+    {
+        return FALSE;
+    }
+    // At least 1 thread is required
+    if(parallel_count == 0)
+    {
+        parallel_count = 1;
+    }
+
+    callback_args->parallel_count = parallel_count;
+    callback_args->epan_dissect = g_malloc0(sizeof(epan_dissect_t));
+    callback_args->thread_items = g_malloc0_n((gsize)parallel_count, sizeof(wsqlite_thread_item_t));
+
+    for(guint32 i = 0; i < parallel_count; i++)
+    {
+        gchar* file_path = g_strdup_printf("%s_%u.wsqlite", base_file_path, i);
+        callback_args->thread_items[i].database = wsqlite_database_open(file_path);
+        g_free(file_path);
+
+        if(callback_args->thread_items[i].database == NULL)
+        {
+            wsqlite_cleanup_callback_args(callback_args);
+            return FALSE;
+        }
+
+        const gchar* insert_string_command = "INSERT OR IGNORE INTO strings(string) VALUES (?);";
+        int return_code = sqlite3_prepare_v2(callback_args->thread_items[i].database, insert_string_command, -1, &callback_args->thread_items[i].sql_statements.insert_string_statement, NULL);
+        if (return_code != SQLITE_OK)
+        {
+            wsqlite_cleanup_callback_args(callback_args);
+            return FALSE;
+        }
+
+        const gchar* insert_packet_command = "INSERT INTO packets(id, timestamp, length, captured_length, interface_id) VALUES (?, ?, ?, ?, ?);";
+        return_code = sqlite3_prepare_v2(callback_args->thread_items[i].database, insert_packet_command, -1, &callback_args->thread_items[i].sql_statements.insert_packet_statement, NULL);
+        if (return_code != SQLITE_OK)
+        {
+            wsqlite_cleanup_callback_args(callback_args);
+            return FALSE;
+        }
+
+        const gchar* insert_buffer_command = "INSERT INTO buffers(id, packet_id, buffer) VALUES (?, ?, ?);";
+        return_code = sqlite3_prepare_v2(callback_args->thread_items[i].database, insert_buffer_command, -1, &callback_args->thread_items[i].sql_statements.insert_buffer_statement, NULL);
+        if (return_code != SQLITE_OK)
+        {
+            wsqlite_cleanup_callback_args(callback_args);
+            return FALSE;
+        }
+
+        const gchar* insert_field_command = "INSERT OR IGNORE INTO fields(id, name, display_name, field_type_id) VALUES (?, ?, ?, ?);";
+        return_code = sqlite3_prepare_v2(callback_args->thread_items[i].database, insert_field_command, -1, &callback_args->thread_items[i].sql_statements.insert_field_statement, NULL);
+        if (return_code != SQLITE_OK)
+        {
+            wsqlite_cleanup_callback_args(callback_args);
+            return FALSE;
+        }
+
+        const gchar* insert_dissection_details_command = "INSERT INTO dissection_details(id, parent_id, field_id, buffer_id, position, length, integer_value, double_value, string_value_id, representation_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT id FROM strings WHERE string = ?), (SELECT id FROM strings WHERE string = ?));";
+        return_code = sqlite3_prepare_v2(callback_args->thread_items[i].database, insert_dissection_details_command, -1, &callback_args->thread_items[i].sql_statements.insert_dissection_details_statement, NULL);
+        if (return_code != SQLITE_OK)
+        {
+            wsqlite_cleanup_callback_args(callback_args);
+            return FALSE;
+        }
+
+        callback_args->thread_items[i].command_queue.collect_queue = g_array_new(FALSE, FALSE, sizeof(wsqlite_command_t));
+        callback_args->thread_items[i].command_queue.commit_queue = g_array_new(FALSE, FALSE, sizeof(wsqlite_command_t));
+
+        
+        g_mutex_init(&callback_args->thread_items[i].command_queue.lock);
+        callback_args->thread_items[i].command_queue.commit_is_busy = TRUE;        
+
+        callback_args->thread_items[i].ids.seen_field_ids = g_hash_table_new(g_direct_hash, g_direct_equal);
+    }
+    for (guint32 i = 0; i < parallel_count; i++)
+    {
+        callback_args->thread_items[i].cancel_thread = FALSE;
+        callback_args->thread_items[i].commit_thread = g_thread_new("Commit Thread", wsqlite_commit_thread_function, (void*)&(callback_args->thread_items[i]));
+
+        if (callback_args->thread_items[i].commit_thread == NULL)
+        {
+            wsqlite_cleanup_callback_args(callback_args);
+            return FALSE;
+        }
+    }
+
+    return TRUE;
+}
+
+void
+wsqlite_cleanup_callback_args(wsqlite_callback_args_t* callback_args)
+{
+    if(callback_args == NULL)
+    {
+        return;
+    }
+
+    for (guint32 i = 0; i < callback_args->parallel_count; i++)
+    {
+        callback_args->thread_items[i].cancel_thread = TRUE;
+    }    
+
+    for(guint32 i = 0; i < callback_args->parallel_count; i++)
+    {
+        sqlite3_finalize(callback_args->thread_items[i].sql_statements.insert_string_statement);
+        sqlite3_finalize(callback_args->thread_items[i].sql_statements.insert_packet_statement);
+        sqlite3_finalize(callback_args->thread_items[i].sql_statements.insert_buffer_statement);
+        sqlite3_finalize(callback_args->thread_items[i].sql_statements.insert_field_statement);
+        sqlite3_finalize(callback_args->thread_items[i].sql_statements.insert_dissection_details_statement);
+
+        if (callback_args->thread_items[i].database != NULL)
+        {
+            wsqlite_database_close(callback_args->thread_items[i].database);
+        }
+
+        wsqlite_cleanup_queue(callback_args->thread_items[i].command_queue.collect_queue);
+        wsqlite_cleanup_queue(callback_args->thread_items[i].command_queue.commit_queue);
+
+        g_mutex_clear(&callback_args->thread_items[i].command_queue.lock);
+
+        g_hash_table_destroy(callback_args->thread_items[i].ids.seen_field_ids);
+    }
+
+    g_free(callback_args->epan_dissect);
+    g_free(callback_args->thread_items);
+
+    return;
+}
+
+void wsqlite_cleanup_queue(GArray* queue)
+{
+    if(queue == NULL)
+    {
+        return;
+    }
+
+    for(guint32 i = 0; i < queue->len; i++)
+    {
+        wsqlite_command_t command = g_array_index(queue, wsqlite_command_t, i);
+        if(command.data.data == NULL)
+        {
+            continue;
+        }
+        
+        if(command.command_type == WSQLITE_CT_BUFFER)
+        {
+            g_free(command.data.buffer_data->buffer);
+        }
+        else if (command.command_type == WSQLITE_CT_FIELD)
+        {
+            g_free(command.data.field_data->name);
+            g_free(command.data.field_data->display_name);
+        }
+        else if(command.command_type == WSQLITE_CT_DISSECTION_DETAILS)
+        {
+            g_free(command.data.dissection_details_data->string_value);
+            g_free(command.data.dissection_details_data->representation);
+        }
+
+        g_free(command.data.data);
+    }
+
+    g_array_free(queue, TRUE);
+
+    return;
+}
+
 sqlite3*
 wsqlite_database_open(const gchar* file_name)
 {
@@ -159,18 +330,22 @@ wsqlite_database_create_indexes(sqlite3* wsqlite_database)
 }
 
 gboolean
-wsqlite_write_packet_dissection(sqlite3* wsqlite_database, epan_dissect_t* epan_dissect, GHashTable* seen_fields, guint64* last_buffer_id, gint64* last_dissection_details_id )
+wsqlite_database_vacuum(sqlite3* wsqlite_database)
 {
-    if(wsqlite_database == NULL)
+    int sqlite_return_code = 0;
+    char* error_message = NULL;
+
+    gchar* command = "VACUUM;";
+
+    sqlite_return_code = sqlite3_exec(wsqlite_database, command, 0, 0, &error_message);
+
+    if (sqlite_return_code != SQLITE_OK)
     {
+        sqlite3_free(error_message);
         return FALSE;
     }
 
-    gchar* command = wsqlite_get_packet_dissection_sql(epan_dissect, seen_fields, last_buffer_id, last_dissection_details_id);
-
-    gboolean wsqlite_result = wsqlite_execute_command(wsqlite_database, command);
-
-    return wsqlite_result;
+    return TRUE;
 }
 
 gboolean
@@ -199,16 +374,6 @@ wsqlite_execute_command_transaction(sqlite3* wsqlite_database, gchar* command, g
 {
     int sqlite_return_code = 0;
     char* error_message = NULL;
-
-#ifdef WSQLITE_DEBUG
-
-    gboolean wsqlite_result = wsqlite_debug_log_command(wsqlite_database, command);
-    if (wsqlite_result == FALSE)
-    {
-        return FALSE;
-    }
-
-#endif // WSQLITE_DEBUG
 
     if (use_transaction == TRUE)
     {
@@ -248,103 +413,317 @@ wsqlite_execute_command_transaction(sqlite3* wsqlite_database, gchar* command, g
 }
 
 gboolean
-wsqlite_debug_log_command(sqlite3* wsqlite_database, gchar* command)
+wsqlite_commit_command_queue(wsqlite_thread_item_t* thread_item, guint32 threshold, gboolean wait)
 {
-    int sqlite_return_code = 0;
-    char* error_message = NULL;
-
-    gchar** split = g_strsplit(command, "'", -1);
-    gchar* filtered_command = g_strjoinv(" ", split);
-    g_strfreev(split);
-
-    gchar* debug_command = NULL;
-    debug_command = g_strdup_printf("CREATE TABLE IF NOT EXISTS debug(id INTEGER PRIMARY KEY AUTOINCREMENT, command TEXT NUT NULL);"
-        "INSERT INTO debug(command) VALUES "
-        "('%s');", filtered_command);
-
-    g_free(filtered_command);
-
-    sqlite_return_code = sqlite3_exec(wsqlite_database, debug_command, 0, 0, &error_message);
-
-    if (sqlite_return_code != SQLITE_OK)
-    {
-        g_free(debug_command);
-        sqlite3_free(error_message);
-        return FALSE;
-    }
-
-    g_free(debug_command);
-
-
-    return TRUE;
-}
-
-gboolean
-wsqlite_database_vacuum(sqlite3* wsqlite_database)
-{
-    int sqlite_return_code = 0;
-    char* error_message = NULL;
-
-    gchar* command = "VACUUM;";
-
-#ifdef WSQLITE_DEBUG
-
-    gboolean wsqlite_result = wsqlite_debug_log_command(wsqlite_database, command);
-    if (wsqlite_result == FALSE)
+    if(thread_item == NULL)
     {
         return FALSE;
     }
 
-#endif // WSQLITE_DEBUG
-
-    sqlite_return_code = sqlite3_exec(wsqlite_database, command, 0, 0, &error_message);
-
-    if (sqlite_return_code != SQLITE_OK)
+    if (thread_item->command_queue.collect_queue->len >= threshold)
     {
-        sqlite3_free(error_message);
-        return FALSE;
+        // Wait until commit queue get available
+        while (wait == TRUE && thread_item->command_queue.commit_is_busy == TRUE) { }
+
+        if (thread_item->command_queue.commit_is_busy == FALSE)
+        {
+            g_mutex_lock(&thread_item->command_queue.lock);
+
+            GArray* temp = thread_item->command_queue.commit_queue;
+            thread_item->command_queue.commit_queue = thread_item->command_queue.collect_queue;
+            thread_item->command_queue.collect_queue = temp;
+
+            thread_item->command_queue.commit_is_busy = TRUE;
+
+            g_mutex_unlock(&thread_item->command_queue.lock);
+        }
     }
 
     return TRUE;
 }
 
-gboolean
-wsqlite_commit_command_queue(sqlite3* wsqlite_database, GPtrArray* command_queue)
+void*
+wsqlite_commit_thread_function(void* data)
 {
-    if(wsqlite_database == NULL)
+    wsqlite_thread_item_t* thread_item = (wsqlite_thread_item_t*)data;
+
+    while (thread_item->cancel_thread == FALSE)
     {
-        return FALSE;
+        if (thread_item->command_queue.commit_is_busy == FALSE)
+        {
+            continue;
+        }
+
+        int return_code = 0;
+
+        return_code = sqlite3_exec(thread_item->database, "BEGIN TRANSACTION;", 0, 0, NULL);
+
+        if (return_code != SQLITE_OK)
+        {
+            return FALSE;
+        }
+
+        for (guint32 i = 0; i < thread_item->command_queue.commit_queue->len; i++)
+        {
+            wsqlite_command_t command = g_array_index(thread_item->command_queue.commit_queue, wsqlite_command_t, i);
+            if (command.data.data == NULL)
+            {
+                continue;
+            }
+
+            if (command.command_type == WSQLITE_CT_PACKET)
+            {
+                sqlite3_stmt* insert_packet_statement = thread_item->sql_statements.insert_packet_statement;
+
+                return_code = sqlite3_reset(insert_packet_statement);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+                
+                return_code = sqlite3_bind_int64(insert_packet_statement, 1, (sqlite3_int64)command.data.packet_data->id);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_double(insert_packet_statement, 2, (double)command.data.packet_data->timestamp);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_int64(insert_packet_statement, 3, (sqlite3_int64)command.data.packet_data->length);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_int64(insert_packet_statement, 4, (sqlite3_int64)command.data.packet_data->captured_length);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_int64(insert_packet_statement, 5, (sqlite3_int64)command.data.packet_data->interface_id);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_step(insert_packet_statement);
+                if (return_code != SQLITE_DONE)
+                {
+                    continue;
+                }
+            }
+            else if (command.command_type == WSQLITE_CT_BUFFER)
+            {
+                sqlite3_stmt* insert_buffer_statement = thread_item->sql_statements.insert_buffer_statement;                
+
+                return_code = sqlite3_reset(insert_buffer_statement);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_int64(insert_buffer_statement, 1, (sqlite3_int64)command.data.buffer_data->id);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_int64(insert_buffer_statement, 2, (sqlite3_int64)command.data.buffer_data->packet_id);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_blob64(insert_buffer_statement, 3, command.data.buffer_data->buffer, (sqlite3_int64)command.data.buffer_data->length, SQLITE_STATIC);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_step(insert_buffer_statement);
+                if (return_code != SQLITE_DONE)
+                {
+                    continue;
+                }
+            }
+            else if (command.command_type == WSQLITE_CT_FIELD)
+            {
+                sqlite3_stmt* insert_field_statement = thread_item->sql_statements.insert_field_statement;                
+
+                return_code = sqlite3_reset(insert_field_statement);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_int64(insert_field_statement, 1, (sqlite3_int64)command.data.field_data->id);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_text(insert_field_statement, 2, command.data.field_data->name, -1, SQLITE_STATIC);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_text(insert_field_statement, 3, command.data.field_data->display_name, -1, SQLITE_STATIC);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_int64(insert_field_statement, 4, (sqlite3_int64)command.data.field_data->field_type_id);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_step(insert_field_statement);
+                if (return_code != SQLITE_DONE)
+                {
+                    continue;
+                }
+            }
+            else if (command.command_type == WSQLITE_CT_DISSECTION_DETAILS)
+            {
+                sqlite3_stmt* insert_string_statement = thread_item->sql_statements.insert_string_statement;                
+
+                return_code = sqlite3_reset(insert_string_statement);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_text(insert_string_statement, 1, command.data.dissection_details_data->string_value, -1, SQLITE_STATIC);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_step(insert_string_statement);
+                if (return_code != SQLITE_DONE)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_reset(insert_string_statement);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_text(insert_string_statement, 1, command.data.dissection_details_data->representation, -1, SQLITE_STATIC);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_step(insert_string_statement);
+                if (return_code != SQLITE_DONE)
+                {
+                    continue;
+                }
+
+                sqlite3_stmt* insert_dissection_details_statement = thread_item->sql_statements.insert_dissection_details_statement;
+
+                return_code = sqlite3_reset(insert_dissection_details_statement);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_int64(insert_dissection_details_statement, 1, (sqlite3_int64)command.data.dissection_details_data->id);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_int64(insert_dissection_details_statement, 2, (sqlite3_int64)command.data.dissection_details_data->parent_id);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_int64(insert_dissection_details_statement, 3, (sqlite3_int64)command.data.dissection_details_data->field_id);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_int64(insert_dissection_details_statement, 4, (sqlite3_int64)command.data.dissection_details_data->buffer_id);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_int64(insert_dissection_details_statement, 5, (sqlite3_int64)command.data.dissection_details_data->position);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_int64(insert_dissection_details_statement, 6, (sqlite3_int64)command.data.dissection_details_data->length);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_int64(insert_dissection_details_statement, 7, (sqlite3_int64)command.data.dissection_details_data->integer_value);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_double(insert_dissection_details_statement, 8, (double)command.data.dissection_details_data->double_value);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_text(insert_dissection_details_statement, 9, command.data.dissection_details_data->string_value, -1, SQLITE_STATIC);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_bind_text(insert_dissection_details_statement, 10, command.data.dissection_details_data->representation, -1, SQLITE_STATIC);
+                if (return_code != SQLITE_OK)
+                {
+                    continue;
+                }
+
+                return_code = sqlite3_step(insert_dissection_details_statement);
+                if (return_code != SQLITE_DONE)
+                {
+                    continue;
+                }
+            }
+        }
+
+        return_code = sqlite3_exec(thread_item->database, "COMMIT TRANSACTION;", 0, 0, NULL);
+
+        if (return_code != SQLITE_OK)
+        {
+            return FALSE;
+        }
+
+        wsqlite_cleanup_queue(thread_item->command_queue.commit_queue);
+        thread_item->command_queue.commit_queue = g_array_new(FALSE, FALSE, sizeof(wsqlite_command_t));
+
+        g_mutex_lock(&thread_item->command_queue.lock);
+        thread_item->command_queue.commit_is_busy = FALSE;
+        g_mutex_unlock(&thread_item->command_queue.lock);
     }
-    if(command_queue == NULL)
-    {
-        return FALSE;
-    }
 
-    guint command_queue_length = g_ptr_array_len(command_queue);
-
-    if(command_queue_length == 0)
-    {
-        return TRUE;
-    }
-
-    gchar* command = wsqlite_join_strings_from_queue(command_queue);
-
-    if(command == NULL)
-    {
-        return FALSE;
-    }
-
-    gboolean wsqlite_result = wsqlite_execute_command(wsqlite_database, command);
-
-    if(wsqlite_result == FALSE)
-    {
-        g_free(command);
-        return FALSE;
-    }
-
-    g_free(command);
-    
-    return TRUE;
+    g_thread_exit(NULL);
+    return NULL;
 }
 
 gchar*
@@ -404,155 +783,116 @@ wsqlite_get_create_indexes_sql()
 gchar*
 wsqlite_get_field_types_sql()
 {
-    GPtrArray* command_queue = g_ptr_array_new();
+    gchar* result = g_strdup("");
 
     for (gint i = 0; i < FT_NUM_TYPES; i++)
     {
         gint field_type_id = i;
         const gchar* field_type = ft_strings[i];
 
-        gchar* field_type_command = NULL;
-        field_type_command = g_strdup_printf("INSERT INTO field_types(id, type) VALUES "
-            "(%i, \"%s\");", field_type_id, field_type);
+        gchar* new_result = g_strdup_printf("%s\nINSERT INTO field_types(id, type) VALUES "
+            "(%i, \"%s\");", result, field_type_id, field_type);
 
-        g_ptr_array_add(command_queue, field_type_command);
+        g_free(result);
+        result = new_result;
     }
-
-    gchar* result = wsqlite_join_strings_from_queue(command_queue);
-
-    g_ptr_array_free(command_queue, TRUE);
-
-    return result;
-}
-
-gchar*
-wsqlite_get_field_sql(header_field_info* header_field_info)
-{
-    if(header_field_info == NULL)
-    {
-        return NULL;
-    }
-
-    gint id = header_field_info->id;
-    const gchar* name = header_field_info->abbrev;
-
-    gchar* display_name = wsqlite_repair_string((gchar*)header_field_info->name);
-
-    gint field_type_id = (gint)header_field_info->type;
-
-    gchar* field_command = NULL;
-    field_command = g_strdup_printf("INSERT INTO fields(id, name, display_name, field_type_id) VALUES "
-                                    "(%i, \"%s\", \"%s\", %i);", id, name, display_name, field_type_id);
-    
-    return field_command;
-}
-
-
-gchar*
-wsqlite_get_packet_dissection_sql(epan_dissect_t* epan_dissect, GHashTable* seen_fields, gint64* last_buffer_id, gint64* last_dissection_details_id)
-{
-    if(epan_dissect == NULL)
-    {
-        return NULL;
-    }
-
-    GPtrArray* command_queue = g_ptr_array_new();
-
-    gboolean wsqlite_result = wsqlite_add_packet_dissection_sql_to_command_queue(epan_dissect, command_queue, seen_fields, last_buffer_id, last_dissection_details_id);
-    if(wsqlite_result == FALSE)
-    {
-        return NULL;
-    }
-
-    gchar* result = wsqlite_join_strings_from_queue(command_queue);
-
-    g_ptr_array_free(command_queue, TRUE);
-
     return result;
 }
 
 gboolean
-wsqlite_add_packet_dissection_sql_to_command_queue(epan_dissect_t* epan_dissect, GPtrArray* command_queue, GHashTable* seen_fields, gint64* last_buffer_id, gint64* last_dissection_details_id)
-{
-    if(epan_dissect == NULL)
+wsqlite_add_packet_dissection_sql_to_command_queue(wsqlite_callback_args_t* callback_args)
+{    
+    if(callback_args->epan_dissect == NULL)
     {
         return FALSE;
     }
+
+    epan_dissect_t* epan_dissect = callback_args->epan_dissect;
 
     if(epan_dissect->tvb == NULL)
     {
         return FALSE;
     }
 
-    if(command_queue == NULL)
+    if(callback_args->thread_items == NULL)
     {
         return FALSE;
     }
 
-    // Build packet command
-    guint32 packet_id = epan_dissect->pi.num;
-    gdouble packet_timestamp = (gdouble)epan_dissect->pi.abs_ts.secs + (gdouble)epan_dissect->pi.abs_ts.nsecs / 1000000000.0;
-    guint32 packet_length = epan_dissect->pi.fd->pkt_len;
-    guint32 packet_captured_length = tvb_captured_length(epan_dissect->tvb);
-    guint32 packet_interface_id = 0;
-    if (epan_dissect->pi.rec->presence_flags & WTAP_HAS_INTERFACE_ID)
+    wsqlite_thread_item_t* current_thread_item = NULL;
+
+    while (TRUE)
     {
-        packet_interface_id = (guint32)(epan_dissect->pi.rec->rec_header.packet_header.interface_id);
+        // Make the next queue the active one
+        callback_args->current_index = (callback_args->current_index + 1) % callback_args->parallel_count;
+
+        current_thread_item = &callback_args->thread_items[callback_args->current_index];
+
+        // There is space in the queue
+        if (current_thread_item->command_queue.collect_queue->len < WSQLITE_COMMIT_THRESHOLD)
+        {
+            break;
+        }
+        // We can commit the queue
+        else if(current_thread_item->command_queue.commit_is_busy == FALSE)
+        {
+            gboolean wsqlite_result = wsqlite_commit_command_queue(current_thread_item, WSQLITE_COMMIT_THRESHOLD, FALSE);
+            if (wsqlite_result == FALSE)
+            {
+                return FALSE;
+            }
+        }
     }
 
-    gchar packet_timestamp_string_buffer[64];
-    g_ascii_dtostr(packet_timestamp_string_buffer, 64, packet_timestamp);
+    current_thread_item = &callback_args->thread_items[callback_args->current_index];
 
-    gchar* packet_command = NULL;
-    packet_command = g_strdup_printf("INSERT INTO packets(id, timestamp, length, captured_length, interface_id) VALUES "
-                                    "(%u, %s, %u, %u, %u);", packet_id, packet_timestamp_string_buffer, packet_length, packet_captured_length, packet_interface_id);
-    
-    g_ptr_array_add(command_queue, packet_command);
+    // Build packet command
+    wsqlite_packet_data_t* packet_data = g_malloc(sizeof(wsqlite_packet_data_t));
+    packet_data->id = epan_dissect->pi.num;
+    packet_data->timestamp = (gdouble)epan_dissect->pi.abs_ts.secs + (gdouble)epan_dissect->pi.abs_ts.nsecs / 1000000000.0;
+    packet_data->length = epan_dissect->pi.fd->pkt_len;
+    packet_data->captured_length = tvb_captured_length(epan_dissect->tvb);
+    packet_data->interface_id = (epan_dissect->pi.rec->presence_flags & WTAP_HAS_INTERFACE_ID) ? (guint32)epan_dissect->pi.rec->rec_header.packet_header.interface_id : 0;
 
-    // Build buffer command
-    gchar* buffer_string = g_malloc(packet_captured_length * 2 + 1);
-    for (guint32 i = 0; i < packet_captured_length; i++)
+    wsqlite_command_t packet_command;
+    packet_command.command_type = WSQLITE_CT_PACKET;
+    packet_command.data.packet_data = packet_data;
+
+    g_array_append_val(current_thread_item->command_queue.collect_queue, packet_command);
+
+    wsqlite_buffer_data_t* buffer_data = g_malloc(sizeof(wsqlite_buffer_data_t));
+
+    gchar* buffer = g_malloc(packet_data->captured_length);
+    for (guint32 i = 0; i < packet_data->captured_length; i++)
     {
         if (!tvb_offset_exists(epan_dissect->tvb, i))
         {
-            buffer_string[i] = '\0';
-            continue;
+            break;
         }
-        guint8 current_byte = tvb_get_guint8(epan_dissect->tvb, i);
-        guint8 upper_nibble = (current_byte & 0xF0) >> 4;
-        guint8 lower_nibble = current_byte & 0x0F;
-
-        buffer_string[2*i] = upper_nibble >= 0x0A ? upper_nibble + 0x41 - 10: upper_nibble + 0x30;
-        buffer_string[2*i + 1] = lower_nibble >= 0x0A ? lower_nibble + 0x41 - 10: lower_nibble + 0x30;
+        buffer[i] = tvb_get_guint8(epan_dissect->tvb, i);
     }
-    buffer_string[packet_captured_length * 2] = '\0';
 
-    last_buffer_id[0]++;
+    // Get the next buffer id
+    current_thread_item->ids.buffer_id++;
 
-    gchar* buffer_command = NULL;
-    buffer_command = g_strdup_printf("INSERT INTO buffers(id, packet_id, buffer) VALUES "
-                                    "(%i, %u, X'%s');", last_buffer_id[0], packet_id, buffer_string);
+    buffer_data->id = current_thread_item->ids.buffer_id;
+    buffer_data->packet_id = packet_data->id;
+    buffer_data->buffer = buffer;
+    buffer_data->length = packet_data->captured_length;
 
-    g_free(buffer_string);
+    wsqlite_command_t buffer_command;
+    buffer_command.command_type = WSQLITE_CT_BUFFER;
+    buffer_command.data.buffer_data = buffer_data;
 
-    g_ptr_array_add(command_queue, buffer_command);
+    g_array_append_val(current_thread_item->command_queue.collect_queue, buffer_command);
 
     if(epan_dissect->tree == NULL)
     {
         return TRUE;
     }
 
-    gint64 parent_id = 0;
-
     // Build tree commands
-    wsqlite_get_tree_node_sql_callback_args_t callback_args;
-    callback_args.command_queue = command_queue;
-    callback_args.seen_fields = seen_fields;
-    callback_args.parent_id = &parent_id;
-    callback_args.buffer_id = last_buffer_id;
-    callback_args.last_dissection_details_id = last_dissection_details_id;
-
-    proto_tree_children_foreach(epan_dissect->tree, wsqlite_add_tree_node_sql_to_command_queue, &callback_args);
+    proto_tree_children_foreach(epan_dissect->tree, wsqlite_add_tree_node_sql_to_command_queue, callback_args);
 
     return TRUE;
 }
@@ -560,32 +900,63 @@ wsqlite_add_packet_dissection_sql_to_command_queue(epan_dissect_t* epan_dissect,
 void
 wsqlite_add_tree_node_sql_to_command_queue(proto_node* node, gpointer data)
 {
-    wsqlite_get_tree_node_sql_callback_args_t* callback_args = (wsqlite_get_tree_node_sql_callback_args_t*)data;
-    
-    header_field_info* header_field_info = node->finfo->hfinfo;
-    enum ftenum field_type = header_field_info->type;
-    gchar* representation = wsqlite_repair_string(node->finfo->rep->representation);
-    gint32 position = (guint32)node->finfo->start;
-    gint32 length = (guint32)node->finfo->length;
-
-    gboolean field_is_seen = g_hash_table_contains(callback_args->seen_fields, GINT_TO_POINTER(header_field_info->id));
-
-    if(field_is_seen == FALSE)
+    if (data == NULL)
     {
-        // build field command
-        gchar* field_command = wsqlite_get_field_sql(header_field_info);
-
-        if(field_command == NULL)
-        {
-            return;
-        }
-
-        g_ptr_array_add(callback_args->command_queue, field_command);
-
-        g_hash_table_add(callback_args->seen_fields, GINT_TO_POINTER(header_field_info->id));
+        return;
     }
-    
-    callback_args->last_dissection_details_id[0]++;
+
+    wsqlite_callback_args_t* callback_args = (wsqlite_callback_args_t*)data;
+
+    if (callback_args->thread_items == NULL)
+    {
+        return;
+    }
+
+    wsqlite_thread_item_t* current_thread_item = &callback_args->thread_items[callback_args->current_index];
+
+    header_field_info* header_field_info = node->finfo->hfinfo;
+    enum ftypes field_type = header_field_info->type;
+
+    if (current_thread_item->ids.seen_field_ids == NULL)
+    {
+        return;
+    }
+    gboolean field_is_seen = g_hash_table_contains(current_thread_item->ids.seen_field_ids, GINT_TO_POINTER(header_field_info->id));
+
+    if (field_is_seen == FALSE)
+    {
+        // Build field command
+        wsqlite_field_data_t* field_data = g_malloc(sizeof(wsqlite_field_data_t));
+        field_data->id = header_field_info->id;
+        field_data->name = g_strdup((gchar*)header_field_info->abbrev);
+        field_data->display_name = g_strdup((gchar*)header_field_info->name);
+        field_data->field_type_id = (guint32)field_type;
+
+        wsqlite_command_t field_command;
+        field_command.command_type = WSQLITE_CT_FIELD;
+        field_command.data.field_data = field_data;
+
+        g_array_append_val(current_thread_item->command_queue.collect_queue, field_command);
+
+        g_hash_table_add(current_thread_item->ids.seen_field_ids, GINT_TO_POINTER(header_field_info->id));
+    }    
+
+    // Build dissection details command
+    wsqlite_dissection_details_data_t* dissection_details_data = g_malloc0(sizeof(wsqlite_dissection_details_data_t));
+
+    // Get the next dissection details id
+    current_thread_item->ids.dissection_details_id++;
+
+    dissection_details_data->id = current_thread_item->ids.dissection_details_id;
+    dissection_details_data->field_id = header_field_info->id;
+    dissection_details_data->parent_id = current_thread_item->ids.parent_id;
+    dissection_details_data->type = field_type;
+    if(node->finfo->rep->representation != NULL)
+    {
+        dissection_details_data->representation = g_strdup(node->finfo->rep->representation);
+    }
+    dissection_details_data->position = (guint32)node->finfo->start;
+    dissection_details_data->length = (guint32)node->finfo->length;
 
     if(field_type == FT_INT8
         || field_type == FT_INT16
@@ -593,12 +964,7 @@ wsqlite_add_tree_node_sql_to_command_queue(proto_node* node, gpointer data)
         || field_type == FT_INT32)
     {
         gint32 value = fvalue_get_sinteger(&node->finfo->value);
-        gchar* command = NULL;
-        command = g_strdup_printf("INSERT INTO dissection_details(id, parent_id, field_id, buffer_id, position, length, integer_value) VALUES "
-                                    "(%i, %i, %i, %i, %i, %i, %i);",
-                                    callback_args->last_dissection_details_id[0], callback_args->parent_id[0], header_field_info->id, callback_args->buffer_id[0], position, length, value);
-
-        g_ptr_array_add(callback_args->command_queue, command);
+        dissection_details_data->integer_value = (gint64)value;        
     }
     else if (field_type == FT_CHAR
         || field_type == FT_UINT8
@@ -611,13 +977,8 @@ wsqlite_add_tree_node_sql_to_command_queue(proto_node* node, gpointer data)
         || field_type == FT_IEEE_11073_SFLOAT
         || field_type == FT_IEEE_11073_FLOAT)
     {
-        guint value = fvalue_get_uinteger(&node->finfo->value);
-        gchar* command = NULL;
-        command = g_strdup_printf("INSERT INTO dissection_details(id, parent_id, field_id, buffer_id, position, length, integer_value, double_value) VALUES "
-            "(%i, %i, %i, %i, %i, %i, %u, 0.0);",
-            callback_args->last_dissection_details_id[0], callback_args->parent_id[0], header_field_info->id, callback_args->buffer_id[0], position, length, value);
-
-        g_ptr_array_add(callback_args->command_queue, command);
+        guint32 value = fvalue_get_uinteger(&node->finfo->value);
+        dissection_details_data->integer_value = (gint64)value;        
     }
     else if (field_type == FT_INT40
         || field_type == FT_INT48
@@ -625,12 +986,7 @@ wsqlite_add_tree_node_sql_to_command_queue(proto_node* node, gpointer data)
         || field_type == FT_INT64)
     {
         gint64 value = fvalue_get_sinteger64(&node->finfo->value);
-        gchar* command = NULL;
-        command = g_strdup_printf("INSERT INTO dissection_details(id, parent_id, field_id, buffer_id, position, length, integer_value) VALUES "
-            "(%i, %i, %i, %i, %i, %i, %i);",
-            callback_args->last_dissection_details_id[0], callback_args->parent_id[0], header_field_info->id, callback_args->buffer_id[0], position, length, value);
-
-        g_ptr_array_add(callback_args->command_queue, command);
+        dissection_details_data->integer_value = value;
     }    
     else if(field_type == FT_UINT40
         || field_type == FT_UINT48
@@ -640,51 +996,25 @@ wsqlite_add_tree_node_sql_to_command_queue(proto_node* node, gpointer data)
         || field_type == FT_EUI64)
     {
         guint64 value = fvalue_get_uinteger64(&node->finfo->value);
-        gdouble sign = (value & 0x8000000000000000) > 0 ? 1.0 : 0.0;
+        gdouble msb = (value & 0x8000000000000000) > 0 ? 1.0 : 0.0;
         value = value & 0x7FFFFFFFFFFFFFFF;
 
-        gchar* command = NULL;
-        command = g_strdup_printf("INSERT INTO dissection_details(id, parent_id, field_id, buffer_id, position, length, integer_value, double_value) VALUES "
-                                    "(%i, %i, %i, %i, %i, %i, %u, %.0f);",
-                                    callback_args->last_dissection_details_id[0], callback_args->parent_id[0], header_field_info->id, callback_args->buffer_id[0], position, length, value, sign);
-
-        g_ptr_array_add(callback_args->command_queue, command);
+        dissection_details_data->integer_value = (gint64)value;
+        dissection_details_data->double_value = msb;
     }
     else if (field_type == FT_FLOAT
         || field_type == FT_DOUBLE)
     {
         gdouble value = fvalue_get_floating(&node->finfo->value);
-
-        gchar value_string_buffer[64];
-        g_ascii_dtostr(value_string_buffer, 64, value);
-
-        gchar* command = NULL;
-        command = g_strdup_printf("INSERT INTO dissection_details(id, parent_id, field_id, buffer_id, position, length, double_value) VALUES "
-            "(%i, %i, %i, %i, %i, %i, %s);",
-            callback_args->last_dissection_details_id[0], callback_args->parent_id[0], header_field_info->id, callback_args->buffer_id[0], position, length, value_string_buffer);
-
-        g_ptr_array_add(callback_args->command_queue, command);
+        dissection_details_data->double_value = value;
     }
     else if(field_type == FT_STRING
         || field_type == FT_STRINGZ
         || field_type == FT_STRINGZPAD
         || field_type == FT_STRINGZTRUNC)
     {
-        gchar* value = wsqlite_repair_string(node->finfo->value.value.string);
-
-        gchar* string_command = NULL;
-        string_command = g_strdup_printf("INSERT OR IGNORE INTO strings(string) VALUES (\"%s\");",
-            value);
-
-        g_ptr_array_add(callback_args->command_queue, string_command);
-
-        gchar* command = NULL;
-        command = g_strdup_printf("INSERT INTO dissection_details(id, parent_id, field_id, buffer_id, position, length, string_value_id) VALUES "
-                                    "(%i, %i, %i, %i, %i, %i, (SELECT id FROM strings WHERE string = \"%s\"));",
-                                    callback_args->last_dissection_details_id[0], callback_args->parent_id[0], header_field_info->id, callback_args->buffer_id[0], position, length, value);
-
-        g_free(value);
-        g_ptr_array_add(callback_args->command_queue, command);
+        gchar* value = g_strdup(node->finfo->value.value.string);
+        dissection_details_data->string_value = value;
     }
     else if(field_type == FT_BYTES
         || field_type == FT_ETHER
@@ -717,53 +1047,18 @@ wsqlite_add_tree_node_sql_to_command_queue(proto_node* node, gpointer data)
         }
         value[buffer_length * 2] = '\0';
 
-        gchar* string_command = NULL;
-        string_command = g_strdup_printf("INSERT OR IGNORE INTO strings(string) VALUES (\"%s\");",
-            value);
-
-        g_ptr_array_add(callback_args->command_queue, string_command);
-
-        gchar* command = NULL;
-        command = g_strdup_printf("INSERT INTO dissection_details(id, parent_id, field_id, buffer_id, position, length, string_value_id) VALUES "
-                                    "(%i, %i, %i, %i, %i, %i, (SELECT id FROM strings WHERE string = \"%s\"));",
-                                    callback_args->last_dissection_details_id[0], callback_args->parent_id[0], header_field_info->id, callback_args->buffer_id[0], position, length, value);
-
-        g_free(value);
-        g_ptr_array_add(callback_args->command_queue, command);
+        dissection_details_data->string_value = value;
     }
     else if (field_type == FT_PROTOCOL)
     {
-        gchar* value = wsqlite_repair_string(node->finfo->value.value.protocol.proto_string);
-
-        gchar* string_command = NULL;
-        string_command = g_strdup_printf("INSERT OR IGNORE INTO strings(string) VALUES (\"%s\");",
-            value);
-
-        g_ptr_array_add(callback_args->command_queue, string_command);
-
-        gchar* command = NULL;
-        command = g_strdup_printf("INSERT INTO dissection_details(id, parent_id, field_id, buffer_id, position, length, string_value_id) VALUES "
-            "(%i, %i, %i, %i, %i, %i, (SELECT id FROM strings WHERE string = \"%s\"));",
-            callback_args->last_dissection_details_id[0], callback_args->parent_id[0], header_field_info->id, callback_args->buffer_id[0], position, length, value);
-
-        g_free(value);
-        g_ptr_array_add(callback_args->command_queue, command);
+        gchar* value = g_strdup(node->finfo->value.value.protocol.proto_string);
+        dissection_details_data->string_value = value;
     }
     else if (field_type == FT_ABSOLUTE_TIME
         || field_type == FT_RELATIVE_TIME)
     {
         gdouble value = (gdouble)node->finfo->value.value.time.secs + (gdouble)node->finfo->value.value.time.nsecs / 1000000000.0;
-
-        gchar value_string_buffer[64];
-        g_ascii_dtostr(value_string_buffer, 64, value);
-
-
-        gchar* command = NULL;
-        command = g_strdup_printf("INSERT INTO dissection_details(id, parent_id, field_id, buffer_id, position, length, double_value) VALUES "
-            "(%i, %i, %i, %i, %i, %i, %s);",
-            callback_args->last_dissection_details_id[0], callback_args->parent_id[0], header_field_info->id, callback_args->buffer_id[0], position, length, value_string_buffer);
-
-        g_ptr_array_add(callback_args->command_queue, command);
+        dissection_details_data->double_value = value;
     }
     else if (field_type == FT_GUID)
     {
@@ -773,87 +1068,23 @@ wsqlite_add_tree_node_sql_to_command_queue(proto_node* node, gpointer data)
             guid.data4[0], guid.data4[1], guid.data4[2], guid.data4[3],
             guid.data4[4], guid.data4[5], guid.data4[6], guid.data4[7]);
 
-        gchar* string_command = NULL;
-        string_command = g_strdup_printf("INSERT OR IGNORE INTO strings(string) VALUES (\"%s\");",
-            value);
-
-        g_ptr_array_add(callback_args->command_queue, string_command);
-
-        gchar* command = NULL;
-        command = g_strdup_printf("INSERT INTO dissection_details(id, parent_id, field_id, buffer_id, position, length, string_value_id) VALUES "
-            "(%i, %i, %i, %i, %i, %i, (SELECT id FROM strings WHERE string = \"%s\"));",
-            callback_args->last_dissection_details_id[0], callback_args->parent_id[0], header_field_info->id, callback_args->buffer_id[0], position, length, value);
-
-        g_free(value);
-        g_ptr_array_add(callback_args->command_queue, command);
+        dissection_details_data->string_value = value;
     }
     else // FT_NONE
     {
-        gchar* command = NULL;
-        command = g_strdup_printf("INSERT INTO dissection_details(id, parent_id, field_id, buffer_id, position, length) VALUES "
-                                    "(%i, %i, %i, %i, %i, %i);",
-                                    callback_args->last_dissection_details_id[0], callback_args->parent_id[0], header_field_info->id, callback_args->buffer_id[0], position, length);
-
-        g_ptr_array_add(callback_args->command_queue, command);
+        // Nothing to do
     }
 
-    if (representation != NULL)
-    {
-        gchar* string_command = NULL;
-        string_command = g_strdup_printf("INSERT OR IGNORE INTO strings(string) VALUES (\"%s\");",
-            representation);
+    wsqlite_command_t dissection_details_command;
+    dissection_details_command.command_type = WSQLITE_CT_DISSECTION_DETAILS;
+    dissection_details_command.data.dissection_details_data = dissection_details_data;
+    g_array_append_val(current_thread_item->command_queue.collect_queue, dissection_details_command);
 
-        g_ptr_array_add(callback_args->command_queue, string_command);
+    // Preserve previous parent id
+    guint32 last_parent_id = current_thread_item->ids.parent_id;
+    current_thread_item->ids.parent_id = current_thread_item->ids.dissection_details_id;
 
-        gchar* representation_command = NULL;
-        representation_command = g_strdup_printf("UPDATE dissection_details SET representation_id = (SELECT id FROM strings WHERE string = \"%s\") WHERE id = %i;",
-            representation, callback_args->last_dissection_details_id[0]);
-
-        g_ptr_array_add(callback_args->command_queue, representation_command);
-    }
-
-    g_free(representation);
-
-    guint64 last_parent_id = callback_args->parent_id[0];
-    callback_args->parent_id[0] = callback_args->last_dissection_details_id[0];
     proto_tree_children_foreach(node, wsqlite_add_tree_node_sql_to_command_queue, callback_args);
-    callback_args->parent_id[0] = last_parent_id;
-}
 
-gchar*
-wsqlite_join_strings_from_queue(GPtrArray* command_queue)
-{
-    if(command_queue == NULL)
-    {
-        return NULL;
-    }
-    guint command_queue_length = g_ptr_array_len(command_queue);
-
-    if(command_queue_length == 0)
-    {
-        return NULL;
-    }
-
-    // g_strjoinv expects a NULL terminated array
-    g_ptr_array_add(command_queue, NULL);
-    gchar* result = g_strjoinv("\n", (gchar**)command_queue->pdata);
-
-    // remove NULL pointer at the end because g_ptr_array_free would fail otherwise.
-    g_ptr_array_remove_index_fast(command_queue, command_queue_length);
-
-    return result;
-}
-
-gchar*
-wsqlite_repair_string(gchar* string)
-{
-    if(string == NULL)
-    {
-        return NULL;
-    }
-    gchar** splitted_string = g_strsplit(string, "\"", -1);
-    gchar* result = g_strjoinv("\"\"", splitted_string);
-    g_strfreev(splitted_string);
-
-    return result;
+    current_thread_item->ids.parent_id = last_parent_id;
 }
