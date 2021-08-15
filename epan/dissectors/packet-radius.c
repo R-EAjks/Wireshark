@@ -22,6 +22,7 @@
  * RFC 2869 - RADIUS Extensions
  * RFC 3162 - RADIUS and IPv6
  * RFC 3576 - Dynamic Authorization Extensions to RADIUS
+ * RFC 6613 - RADIUS over TCP
  * RFC 6929 - Remote Authentication Dial-In User Service (RADIUS) Protocol Extensions
  *
  * See also
