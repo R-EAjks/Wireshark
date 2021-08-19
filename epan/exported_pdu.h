@@ -175,6 +175,7 @@ typedef struct _exp_pdu_data_t {
 #define OLD_PT_IBQP         14
 #define OLD_PT_BLUETOOTH    15
 #define OLD_PT_TDMOP        16
+#define OLD_PT_IWARP_MPA    17
 
 
 /** Compute the size (in bytes) of a pdu item
