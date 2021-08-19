@@ -41,7 +41,8 @@ static const QStringList export_extensions = QStringList()
     << "csv"
     << "psml"
     << "pdml"
-    << "sqlite"
+    << "wsdb"
+    << "wsdb multicore"
     << "c"
     << "json";
 
@@ -100,16 +101,18 @@ ExportDissectionDialog::ExportDissectionDialog(QWidget *parent, capture_file *ca
             << tr("Comma Separated Values - summary (*.csv)")
             << tr("PSML - summary (*.psml, *.xml)")
             << tr("PDML - details (*.pdml, *.xml)")
-            << tr("SQLite - SQLite Database (*.sqlite)")
+            << tr("wsdb - wsdb database (*.wsdb)")
+            << tr("wsdb - wsdb database multicore(*.wsdb)")
             << tr("JSON (*.json)")
             << tr("C Arrays - bytes (*.c, *.h)");
     export_type_map_[name_filters[0]] = export_type_text;
     export_type_map_[name_filters[1]] = export_type_csv;
     export_type_map_[name_filters[2]] = export_type_psml;
     export_type_map_[name_filters[3]] = export_type_pdml;
-    export_type_map_[name_filters[4]] = export_type_sqlite;
-    export_type_map_[name_filters[5]] = export_type_json;
-    export_type_map_[name_filters[6]] = export_type_carrays;
+    export_type_map_[name_filters[4]] = export_type_wsdb;
+    export_type_map_[name_filters[5]] = export_type_wsdb_multicore;
+    export_type_map_[name_filters[6]] = export_type_json;
+    export_type_map_[name_filters[7]] = export_type_carrays;
     setNameFilters(name_filters);
     selectNameFilter(export_type_map_.key(export_type));
     exportTypeChanged(export_type_map_.key(export_type));
@@ -223,8 +226,11 @@ void ExportDissectionDialog::dialogAccepted()
         case export_type_pdml:      /* PDML */
             status = cf_write_pdml_packets(cap_file_, &print_args_);
             break;
-        case export_type_sql:      /* SQL */
-            status = cf_write_sqlite_packets(cap_file_, &print_args_);
+        case export_type_wsdb:      /* wsdb */
+            status = cf_write_wsdb_packets(cap_file_, &print_args_, 1);
+            break;
+        case export_type_wsdb_multicore:      /* wsdb */
+            status = cf_write_wsdb_packets(cap_file_, &print_args_, g_get_num_processors() - 1);
             break;
         case export_type_json:      /* JSON */
             status = cf_write_json_packets(cap_file_, &print_args_);

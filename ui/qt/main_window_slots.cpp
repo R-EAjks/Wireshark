@@ -1820,9 +1820,14 @@ void MainWindow::on_actionFileExportAsPDML_triggered()
     exportDissections(export_type_pdml);
 }
 
-void MainWindow::on_actionFileExportAsSQLite_triggered()
+void MainWindow::on_actionFileExportAsWsdb_triggered()
 {
-    exportDissections(export_type_sqlite);
+    exportDissections(export_type_wsdb);
+}
+
+void MainWindow::on_actionFileExportAsWsdbMulticore_triggered()
+{
+    exportDissections(export_type_wsdb_multicore);
 }
 
 void MainWindow::on_actionFileExportAsJSON_triggered()
