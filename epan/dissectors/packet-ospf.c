@@ -3558,7 +3558,7 @@ dissect_ospf_lsa_ext_link(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_t
                     proto_tree_add_item(stlv_tree, hf_ospf_ls_app_udabm_length, tvb, local_offset + 1, 1, ENC_NA);
                     udabm_length = tvb_get_guint8(tvb, local_offset + 1);
                     reserved = tvb_get_guint16(tvb, local_offset + 2, ENC_BIG_ENDIAN);
-                    ti = proto_tree_add_item(stlv_tree, hf_ospf_header_reserved, tvb, local_offset + 2, 2, ENC_BIG_ENDIAN);
+                    ti = proto_tree_add_item(stlv_tree, hf_ospf_header_reserved, tvb, local_offset + 2, 2, ENC_NA);
                     if (reserved != 0) {
                         expert_add_info(pinfo, ti, &ei_ospf_header_reserved);
                     }
