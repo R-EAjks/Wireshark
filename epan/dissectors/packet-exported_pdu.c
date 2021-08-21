@@ -1,4 +1,4 @@
-/* packet-exported_pdu.c
+﻿/* packet-exported_pdu.c
  * Routines for exported_pdu dissection
  * Copyright 2013, Anders Broman <anders-broman@ericsson.com>
  *
@@ -337,6 +337,9 @@ dissect_exported_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
         }
 
         offset = offset + tag_len;
+
+        // If not already on a 4-byte boundary, skip padding bytes up to the next 4-byte boundary
+        if (offset % 4 != 0) offset += 4 - (offset % 4);
 
     } while(tag != 0);
 
