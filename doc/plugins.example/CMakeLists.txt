@@ -13,6 +13,7 @@ cmake_policy(SET CMP0048 NEW)
 project(Hello VERSION 0.0.1 DESCRIPTION "Wireshark Hello Plugin" LANGUAGES C)
 
 find_package(Wireshark CONFIG REQUIRED)
+set(CMAKE_MODULE_PATH ${Wireshark_DIR})
 
 if(NOT Wireshark_PLUGINS_ENABLED)
 	message(WARNING "Wireshark was compiled without support for plugins")
@@ -25,8 +26,11 @@ endif()
 
 add_definitions(-DVERSION=\"${PROJECT_VERSION}\")
 
+find_package(GLIB2 "2.38.0" REQUIRED)
+
 add_library(hello MODULE hello.c)
 set_target_properties(hello PROPERTIES PREFIX "" DEFINE_SYMBOL "")
+target_include_directories(hello SYSTEM PRIVATE ${GLIB2_INCLUDE_DIRS})
 target_link_libraries(hello epan)
 
 install(TARGETS hello
