@@ -1545,16 +1545,8 @@ dissect_vt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, enum vt_directio
             }
             else
             {
-                if (status == 0)
-                {
-                    col_append_fstr(pinfo->cinfo, COL_INFO, "Status of Auxiliary Input %s was successfully changed to disabled",
-                        get_object_id_string(auxiliary_input_object_id));
-                }
-                else if (status == 1)
-                {
-                    col_append_fstr(pinfo->cinfo, COL_INFO, "Status of Auxiliary Input %s was successfully changed to enabled",
-                        get_object_id_string(auxiliary_input_object_id));
-                }
+                col_append_fstr(pinfo->cinfo, COL_INFO, "Status of Auxiliary Input %s was successfully changed to enabled",
+                    get_object_id_string(auxiliary_input_object_id));
             }
         }
     }
