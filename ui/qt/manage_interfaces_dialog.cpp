@@ -613,6 +613,7 @@ void ManageInterfacesDialog::showRemoteInterfaces()
                continue;
             }
 
+            // get the QTreeWidgetItem* for the host
             item = getRemoteHostItem( device->remote_opts.remote_host_opts.remote_host );
 
             child = new QTreeWidgetItem(item);
