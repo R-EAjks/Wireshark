@@ -8344,6 +8344,14 @@ Changer la direction de la connexion (voir le flux inverse).&lt;/p&gt;&lt;/body&
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Use cache for filter results (for capture files only)</source>
+        <translation type="unfinished"></translation>
+    </message>
+	<message>
+        <source>cache entries</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Main toolbar style:</source>
         <translation>Style de la barre d&apos;outils principale :</translation>
     </message>

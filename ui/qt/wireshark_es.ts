@@ -8302,6 +8302,14 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation>Mostrar completado automático para texto de filtro</translation>
     </message>
     <message>
+        <source>Use cache for filter results (for capture files only)</source>
+        <translation type="unfinished"></translation>
+    </message>
+	<message>
+        <source>cache entries</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Main toolbar style:</source>
         <translation>Estilo de barra de herramientas principal:</translation>
     </message>

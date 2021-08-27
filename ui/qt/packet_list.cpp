@@ -113,6 +113,23 @@ packet_list_select_first_row(void)
     gbl_cur_packet_list->goFirstPacket(false);
 }
 
+void
+packet_list_select_packet_by_frame_number(guint32 frame_number)
+{
+    if (gbl_cur_packet_list == NULL)
+    {
+        return;
+    }
+
+    if (frame_number == 0)
+    {
+        return;
+    }
+
+
+    gbl_cur_packet_list->goToPacket((int)frame_number);
+}
+
 /*
  * Given a frame_data structure, scroll to and select the row in the
  * packet list corresponding to that frame.  If there is no such

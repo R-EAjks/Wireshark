@@ -726,6 +726,34 @@ guint32 cf_comment_types(capture_file *cf);
  */
 gboolean cf_add_ip_name_from_string(capture_file *cf, const char *addr, const char *name);
 
+gboolean cf_is_cachable(capture_file *cf);
+
+capture_file_cache* cf_get_cache(capture_file *cf);
+
+void cf_cache_clear(capture_file *cf);
+
+void cf_cache_free(capture_file *cf);
+
+void cf_cache_invalidate(capture_file *cf);
+
+gboolean cf_cache_init(capture_file *cf, guint32 max_state_count);
+
+void cf_cache_set_removal_policy(capture_file *cf, enum capture_file_cache_removal_policy removal_policy);
+
+gboolean cf_cache_store_state(capture_file *cf, gchar* state_name);
+
+gboolean cf_cache_restore_state(capture_file *cf, gchar* state_name);
+
+capture_file_state* cf_cache_get_state(capture_file *cf, gchar* state_name);
+
+void cf_cache_remove_state(capture_file *cf, gchar* state_name);
+
+void cf_cache_remove_oldest_state(capture_file *cf);
+
+void cf_cache_remove_longest_unused_state(capture_file *cf);
+
+gboolean cf_cache_contains_state(capture_file *cf, gchar* state_name);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

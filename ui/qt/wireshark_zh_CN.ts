@@ -8347,6 +8347,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>显示过滤器文本的自动完成</translation>
     </message>
     <message>
+        <source>Use cache for filter results (for capture files only)</source>
+        <translation type="unfinished"></translation>
+    </message>
+	<message>
+        <source>cache entries</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Main toolbar style:</source>
         <translation>主工具栏样式：</translation>
     </message>

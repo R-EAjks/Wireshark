@@ -8374,6 +8374,14 @@ Till exempel, använd 1 timma för att en ny fil skall skapas varje timma vid he
         <translation>Visa autokomplettering av filtertext</translation>
     </message>
     <message>
+        <source>Use cache for filter results (for capture files only)</source>
+        <translation type="unfinished"></translation>
+    </message>
+	<message>
+        <source>cache entries</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Main toolbar style:</source>
         <translation>Stil för huvudverktygsrad:</translation>
     </message>

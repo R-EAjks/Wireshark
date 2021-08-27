@@ -8374,6 +8374,14 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Autovervollständigung für Filtertext anzeigen</translation>
     </message>
     <message>
+        <source>Use cache for filter results (for capture files only)</source>
+        <translation>Cache für Filterergebnisse verwenden (nur für Capture-Dateien)</translation>
+    </message>
+    <message>
+        <source>cache entries</source>
+        <translation>Cache-Einträge</translation>
+    </message>
+    <message>
         <source>Main toolbar style:</source>
         <translation>Stil Hauptleiste</translation>
     </message>

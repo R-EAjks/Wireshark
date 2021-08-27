@@ -110,7 +110,6 @@ static gboolean find_packet(capture_file *cf, ws_match_function match_function,
     void *criterion, search_direction dir);
 
 static void cf_rename_failure_alert_box(const char *filename, int err);
-static void ref_time_packets(capture_file *cf);
 
 /* Seconds spent processing packets between pushing UI updates. */
 #define PROGBAR_UPDATE_INTERVAL 0.150
@@ -332,6 +331,8 @@ cf_open(capture_file *cf, const char *fname, unsigned int type, gboolean is_temp
   wtap_set_cb_new_ipv6(cf->provider.wth, (wtap_new_ipv6_callback_t) add_ipv6_name);
   wtap_set_cb_new_secrets(cf->provider.wth, secrets_wtap_callback);
 
+  cf_cache_init(cf, prefs.gui_max_filter_cache_count);
+
   return CF_OK;
 
 fail:
@@ -368,6 +369,8 @@ cf_close(capture_file *cf)
   ws_assert(!cf->read_lock);
 
   cf_callback_invoke(cf_cb_file_closing, cf);
+
+  cf_cache_free(cf);
 
   /* close things, if not already closed before */
   color_filters_cleanup();
@@ -1485,78 +1488,91 @@ cf_merge_files_to_tempfile(gpointer pd_window, char **out_filenamep,
 cf_status_t
 cf_filter_packets(capture_file *cf, gchar *dftext, gboolean force)
 {
-  const char *filter_new = dftext ? dftext : "";
-  const char *filter_old = cf->dfilter ? cf->dfilter : "";
-  dfilter_t  *dfcode;
-  gchar      *err_msg;
+  dfilter_t* display_filter_code = NULL;
+  gchar* error_message = NULL;
+
+  // We make our own copy of the filter strings to work with
+  gchar* new_filter = dftext ? g_strdup(dftext) : g_strdup("");
+  gchar* old_filter = cf->dfilter ? g_strdup(cf->dfilter) : g_strdup("");
 
   /* if new filter equals old one, do nothing unless told to do so */
-  if (!force && strcmp(filter_new, filter_old) == 0) {
+  if (force == FALSE && strcmp(new_filter, old_filter) == 0)
+  {
+    g_free(new_filter);
+    g_free(old_filter);
+
     return CF_OK;
   }
 
-  dfcode=NULL;
+  gboolean filter_compilation_result = dfilter_compile(new_filter, &display_filter_code, &error_message);
 
-  if (dftext == NULL) {
-    /* The new filter is an empty filter (i.e., display all packets).
-     * so leave dfcode==NULL
-     */
-  } else {
-    /*
-     * We have a filter; make a copy of it (as we'll be saving it),
-     * and try to compile it.
-     */
-    dftext = g_strdup(dftext);
-    if (!dfilter_compile(dftext, &dfcode, &err_msg)) {
-      /* The attempt failed; report an error. */
-      simple_message_box(ESD_TYPE_ERROR, NULL,
-          "See the help for a description of the display filter syntax.",
-          "\"%s\" isn't a valid display filter: %s",
-          dftext, err_msg);
-      g_free(err_msg);
-      g_free(dftext);
-      return CF_ERROR;
-    }
+  if (filter_compilation_result == FALSE)
+  {
+    /* The attempt failed; report an error. */
+    simple_message_box(ESD_TYPE_ERROR, NULL,
+      "See the help for a description of the display filter syntax.",
+      "\"%s\" isn't a valid display filter: %s",
+      new_filter, error_message);
 
-    /* Was it empty? */
-    if (dfcode == NULL) {
-      /* Yes - free the filter text, and set it to null. */
-      g_free(dftext);
-      dftext = NULL;
-    }
+    g_free(error_message);
+
+    g_free(new_filter);
+    g_free(old_filter);
+
+    return CF_ERROR;
   }
 
-  /* We have a valid filter.  Replace the current filter. */
+  cf_cache_store_state(cf, old_filter);
+
+
+  gboolean cache_restore_result = cf_cache_restore_state(cf, new_filter);
+
+  if (cache_restore_result == TRUE)
+  {
+    dfilter_free(display_filter_code);
+
+    g_free(new_filter);
+    g_free(old_filter);
+
+    return CF_OK;
+  }
+
+
+  // We have a valid filter. Replace the current filter.
   g_free(cf->dfilter);
-  cf->dfilter = dftext;
+  // Empty filters are stored as NULL for filter text instead of ""
+  cf->dfilter = display_filter_code == NULL ? NULL : g_strdup(new_filter);
 
 
   /* Now rescan the packet list, applying the new filter, but not
    * throwing away information constructed on a previous pass.
    * If a dissection is already in progress, queue it.
    */
-  if (cf->redissection_queued == RESCAN_NONE) {
-    if (cf->read_lock) {
+  if (cf->redissection_queued == RESCAN_NONE)
+  {
+    if (cf->read_lock)
+    {
       cf->redissection_queued = RESCAN_SCAN;
-    } else if (cf->state != FILE_CLOSED) {
-      if (dftext == NULL) {
+    }
+    else if (cf->state != FILE_CLOSED)
+    {
+      if (display_filter_code == NULL)
+      {
         rescan_packets(cf, "Resetting", "filter", FALSE);
-      } else {
-        rescan_packets(cf, "Filtering", dftext, FALSE);
+      }
+      else
+      {
+        rescan_packets(cf, "Filtering", new_filter, FALSE);
       }
     }
   }
 
-  /* Cleanup and release all dfilter resources */
-  dfilter_free(dfcode);
+  dfilter_free(display_filter_code);
+
+  g_free(new_filter);
+  g_free(old_filter);
 
   return CF_OK;
-}
-
-void
-cf_reftime_packets(capture_file *cf)
-{
-  ref_time_packets(cf);
 }
 
 void
@@ -1674,6 +1690,11 @@ rescan_packets(capture_file *cf, const char *action, const char *action_item, gb
 
   /* If any tap listeners require the columns, construct them. */
   cinfo = (tap_flags & TL_REQUIRES_COLUMNS) ? &cf->cinfo : NULL;
+
+  if (redissect)
+  {
+    cf_cache_invalidate(cf);
+  }
 
   /*
    * Determine whether we need to create a protocol tree.
@@ -2022,8 +2043,8 @@ rescan_packets(capture_file *cf, const char *action, const char *action_item, gb
  * without rereading the file.
  * XXX - do we need a progres bar or is this fast enough?
  */
-static void
-ref_time_packets(capture_file *cf)
+void
+cf_reftime_packets(capture_file* cf)
 {
   guint32     framenum;
   frame_data *fdata;
@@ -5026,6 +5047,531 @@ cf_reload(capture_file *cf) {
   /* "cf_open()" made a copy of the file name we handed it, so
      we should free up our copy. */
   g_free(filename);
+}
+gboolean
+cf_is_cachable(capture_file *cf _U_)
+{
+  return TRUE;
+}
+
+capture_file_cache*
+cf_get_cache(capture_file *cf)
+{
+  if(cf == NULL)
+  {
+    return NULL;
+  }
+
+  return &cf->cache;
+}
+
+void
+cf_cache_clear(capture_file *cf)
+{
+  if(cf == NULL)
+  {
+    return;
+  }
+
+  if(cf->cache.states == NULL)
+  {
+    return;
+  }
+
+  g_hash_table_remove_all(cf->cache.states);
+}
+
+static void
+cf_capture_file_state_free(gpointer data)
+{
+  capture_file_state* cf_state = (capture_file_state*)data;
+
+  if(cf_state == NULL)
+  {
+    return;
+  }
+
+  if(cf_state->frame_data != NULL)
+  {
+    g_array_free(cf_state->frame_data, TRUE);
+  }
+
+  if(cf_state->state_name != NULL)
+  {
+    g_free(cf_state->state_name);
+  }
+
+  g_free(cf_state);
+}
+
+void
+cf_cache_free(capture_file *cf)
+{
+  if(cf == NULL)
+  {
+    return;
+  }
+
+  if(cf->cache.states != NULL)
+  {
+    g_hash_table_destroy(cf->cache.states);
+    cf->cache.states = NULL;
+  }
+
+  cf->cache.max_state_count = 0;
+  cf->cache.is_valid = FALSE;
+  cf->cache.removal_policy = CFC_REMOVE_OLDEST;
+}
+
+void
+cf_cache_invalidate(capture_file *cf)
+{
+  if(cf == NULL)
+  {
+    return;
+  }
+
+  cf_cache_clear(cf);
+
+  cf->cache.is_valid = FALSE;
+}
+
+gboolean
+cf_cache_init(capture_file *cf, guint32 max_state_count)
+{
+  if(cf == NULL)
+  {
+    return FALSE;
+  }
+
+  if(cf->cache.states == NULL)
+  {
+    cf->cache.states = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, cf_capture_file_state_free);
+  }
+  else
+  {
+    cf_cache_clear(cf);
+  }
+
+  cf->cache.max_state_count = max_state_count;
+  cf->cache.is_valid = TRUE;
+  cf->cache.removal_policy = CFC_REMOVE_OLDEST;
+
+  return TRUE;
+}
+
+void
+cf_cache_set_removal_policy(capture_file *cf, enum capture_file_cache_removal_policy removal_policy)
+{
+  if(cf == NULL)
+  {
+    return;
+  }
+
+  cf->cache.removal_policy = removal_policy;
+}
+
+gboolean
+cf_cache_store_state(capture_file *cf, gchar* state_name)
+{
+  if(prefs.gui_use_filter_cache == FALSE)
+  {
+    return FALSE;
+  }
+
+  if(cf == NULL)
+  {
+    return FALSE;
+  }
+
+  if(state_name == NULL)
+  {
+    return FALSE;
+  }
+
+  if(cf->cache.states == NULL)
+  {
+    return FALSE;
+  }
+
+  if(cf->cache.is_valid == FALSE)
+  {
+    gboolean init_result = cf_cache_init(cf, prefs.gui_max_filter_cache_count);
+    if(init_result == FALSE)
+    {
+      return FALSE;
+    }
+  }
+
+  // If cache is still invalid we need to return
+  if(cf->cache.is_valid == FALSE)
+  {
+    return FALSE;
+  }
+
+  guint32 current_count = (guint32)g_hash_table_size(cf->cache.states);
+
+  // Every time we leave a filter we cache it so we need one addional entry
+  if(current_count > cf->cache.max_state_count + 1)
+  {
+    if(cf->cache.removal_policy == CFC_REMOVE_OLDEST)
+    {
+      cf_cache_remove_oldest_state(cf);
+    }
+    else if(cf->cache.removal_policy == CFC_REMOVE_LONGEST_UNUSED)
+    {
+      cf_cache_remove_longest_unused_state(cf);
+    }
+    else
+    {
+      // Default
+      cf_cache_remove_oldest_state(cf);
+    }
+  }
+
+  current_count = (guint32)g_hash_table_size(cf->cache.states);
+
+  // If cache is still full we need to return
+  // Every time we leave a filter we cache it so we need one addional entry
+  if(current_count > cf->cache.max_state_count + 1)
+  {
+    return FALSE;
+  }
+
+  gint64 now = g_get_monotonic_time();
+
+  capture_file_state* cf_state = g_hash_table_lookup(cf->cache.states, state_name);
+
+  // Is it a new one
+  if(cf_state == NULL)
+  {
+    cf_state = g_new0(capture_file_state, 1);
+    cf_state->state_name = g_strdup(state_name);
+    cf_state->creation_time = now;
+    cf_state->last_usage_time = now;
+    cf_state->frame_data = NULL;
+
+    gchar* state_name_key = g_strdup(state_name);
+    g_hash_table_insert(cf->cache.states, state_name_key, cf_state);
+  }
+  else // It is an existing one
+  {
+    cf_state->last_usage_time = now;
+    g_array_free(cf_state->frame_data, TRUE);
+    cf_state->frame_data = NULL;
+  }
+
+  // Handle frame data
+  guint32 capture_file_frame_count = cf->count;
+  cf_state->frame_data = g_array_sized_new(FALSE, TRUE, sizeof(cached_frame_data), capture_file_frame_count);
+
+  for(guint32 i = 0; i < capture_file_frame_count; i++)
+  {
+    frame_data* current_frame_data = frame_data_sequence_find(cf->provider.frames, i+1);
+
+    if(current_frame_data == NULL)
+    {
+      cf_cache_remove_state(cf, state_name);
+
+      return FALSE;
+    }
+
+    cached_frame_data cached_frame_data_to_store;
+    cached_frame_data_to_store.passed_dfilter = current_frame_data->passed_dfilter;
+    cached_frame_data_to_store.dependent_of_displayed = current_frame_data->dependent_of_displayed;
+    cached_frame_data_to_store.prev_dis_num = current_frame_data->prev_dis_num;
+
+    g_array_append_val(cf_state->frame_data, cached_frame_data_to_store);
+  }
+
+  // Handle capture file data
+  cf_state->current_frame_number = cf->current_frame != NULL ? (gint64)cf->current_frame->num : (gint64)(-1);
+  cf_state->displayed_count = cf->displayed_count;
+  cf_state->first_displayed = cf->first_displayed;
+  cf_state->last_displayed = cf->last_displayed;
+
+  return TRUE;
+}
+
+gboolean
+cf_cache_restore_state(capture_file *cf, gchar* state_name)
+{
+  if(prefs.gui_use_filter_cache == FALSE)
+  {
+    return FALSE;
+  }
+
+  if(cf == NULL)
+  {
+    return FALSE;
+  }
+
+  if(state_name == NULL)
+  {
+    return FALSE;
+  }
+
+  if(cf->cache.states == NULL)
+  {
+    return FALSE;
+  }
+
+  // If cache is still invalid we need to return
+  if(cf->cache.is_valid == FALSE)
+  {
+    return FALSE;
+  }
+
+  capture_file_state* cf_state = g_hash_table_lookup(cf->cache.states, state_name);
+
+  if(cf_state == NULL)
+  {
+    return FALSE;
+  }
+
+  gint64 now = g_get_monotonic_time();
+
+  cf_state->last_usage_time = now;
+
+  guint32 capture_file_frame_count = cf->count;
+  guint32 stored_frame_count = (guint32)cf_state->frame_data->len;
+
+  if(capture_file_frame_count != stored_frame_count)
+  {
+    cf_cache_invalidate(cf);
+    return FALSE;
+  }
+
+  // Handle frame data
+
+  cf->current_row = -1;
+  cf->current_frame = NULL;
+  guint32 visible_row_count = 0;
+
+  packet_list_clear();
+
+  for(guint32 i = 0; i < capture_file_frame_count; i++)
+  {
+    frame_data* current_frame_data = frame_data_sequence_find(cf->provider.frames, i+1);
+
+    cached_frame_data stored_cached_frame_data = g_array_index(cf_state->frame_data, cached_frame_data, i);
+
+    current_frame_data->passed_dfilter = stored_cached_frame_data.passed_dfilter;
+    current_frame_data->dependent_of_displayed = stored_cached_frame_data.dependent_of_displayed;
+    current_frame_data->prev_dis_num = stored_cached_frame_data.prev_dis_num;
+
+    // If the current frame is the one that shall be selected we keep the reference to prevent a search later on
+    if (cf_state->current_frame_number == (gint64)current_frame_data->num)
+    {
+      cf->current_row = visible_row_count;
+      cf->current_frame = current_frame_data;
+    }
+
+    if (current_frame_data->passed_dfilter > 0 || current_frame_data->ref_time > 0)
+    {
+      visible_row_count++;
+    }
+
+    packet_list_append(NULL, current_frame_data);
+  }
+
+  // Handle captre file data
+  g_free(cf->dfilter);
+  cf->dfilter = g_strdup(state_name);
+  dfilter_free(cf->dfcode);
+  dfilter_compile(cf->dfilter, &cf->dfcode, NULL);
+
+  cf->displayed_count = cf_state->displayed_count;
+  cf->first_displayed = cf_state->first_displayed;
+  cf->last_displayed = cf_state->last_displayed;
+
+  cf_reftime_packets(cf);
+
+  packet_list_select_row_from_data(cf->current_frame);
+
+  statusbar_push_temporary_msg("Using cached result for: \"%s\"", state_name);
+
+  return TRUE;
+}
+
+capture_file_state*
+cf_cache_get_state(capture_file *cf, gchar* state_name)
+{
+  if(cf == NULL)
+  {
+    return NULL;
+  }
+
+  if(state_name == NULL)
+  {
+    return NULL;
+  }
+
+  if(cf->cache.states == NULL)
+  {
+    return NULL;
+  }
+
+  if(cf->cache.is_valid == FALSE)
+  {
+    return NULL;
+  }
+
+  capture_file_state* cf_state = g_hash_table_lookup(cf->cache.states, state_name);
+
+  return cf_state;
+}
+
+void
+cf_cache_remove_state(capture_file *cf, gchar* state_name)
+{
+  if(cf == NULL)
+  {
+    return;
+  }
+
+  if(state_name == NULL)
+  {
+    return;
+  }
+
+  if(cf->cache.states == NULL)
+  {
+    return;
+  }
+
+  if(cf->cache.is_valid == FALSE)
+  {
+    return;
+  }
+
+  g_hash_table_remove(cf->cache.states, state_name);
+}
+
+static void
+cf_cache_get_oldest_state(gpointer key _U_, gpointer value, gpointer user_data)
+{
+  capture_file_state** oldest_cf_state_pointer = (capture_file_state**)user_data;
+  capture_file_state* current_cf_state = (capture_file_state*)value;
+
+  if(oldest_cf_state_pointer[0] == NULL)
+  {
+    oldest_cf_state_pointer[0] = current_cf_state;
+  }
+  else if(oldest_cf_state_pointer[0]->creation_time < current_cf_state->creation_time)
+  {
+    oldest_cf_state_pointer[0] = current_cf_state;
+  }
+  else
+  {
+    // Do nothing
+  }
+}
+
+void
+cf_cache_remove_oldest_state(capture_file *cf)
+{
+  if(cf == NULL)
+  {
+    return;
+  }
+
+  if(cf->cache.states == NULL)
+  {
+    return;
+  }
+
+  if(cf->cache.is_valid == FALSE)
+  {
+    return;
+  }
+
+  capture_file_state* oldest_cf_state = NULL;
+  g_hash_table_foreach(cf->cache.states, cf_cache_get_oldest_state, &oldest_cf_state);
+
+  if(oldest_cf_state == NULL)
+  {
+    return;
+  }
+
+  cf_cache_remove_state(cf, oldest_cf_state->state_name);
+}
+
+static void
+cf_cache_get_longest_unused_state(gpointer key _U_, gpointer value, gpointer user_data)
+{
+  capture_file_state** longest_unused_cf_state_pointer = (capture_file_state**)user_data;
+  capture_file_state* current_cf_state = (capture_file_state*)value;
+
+  if(longest_unused_cf_state_pointer[0] == NULL)
+  {
+    longest_unused_cf_state_pointer[0] = current_cf_state;
+  }
+  else if(longest_unused_cf_state_pointer[0]->last_usage_time < current_cf_state->last_usage_time)
+  {
+    longest_unused_cf_state_pointer[0] = current_cf_state;
+  }
+  else
+  {
+    // Do nothing
+  }
+}
+
+void
+cf_cache_remove_longest_unused_state(capture_file *cf)
+{
+  if(cf == NULL)
+  {
+    return;
+  }
+
+  if(cf->cache.states == NULL)
+  {
+    return;
+  }
+
+  if(cf->cache.is_valid == FALSE)
+  {
+    return;
+  }
+
+  capture_file_state* longest_unused_cf_state = NULL;
+  g_hash_table_foreach(cf->cache.states, cf_cache_get_longest_unused_state, &longest_unused_cf_state);
+
+  if(longest_unused_cf_state == NULL)
+  {
+    return;
+  }
+
+  cf_cache_remove_state(cf, longest_unused_cf_state->state_name);
+}
+
+gboolean
+cf_cache_contains_state(capture_file *cf, gchar* state_name)
+{
+  if(cf == NULL)
+  {
+    return FALSE;
+  }
+
+  if(state_name == NULL)
+  {
+    return FALSE;
+  }
+
+  if(cf->cache.states == NULL)
+  {
+    return FALSE;
+  }
+
+  if(cf->cache.is_valid == FALSE)
+  {
+    return FALSE;
+  }
+
+  gboolean cointains_result = g_hash_table_contains(cf->cache.states, state_name);
+
+  return cointains_result;
 }
 
 /*

@@ -62,6 +62,40 @@ struct packet_provider_data {
   GTree       *frames_modified_blocks; /* BST with modified blocks for frames (key = frame_data) */
 };
 
+enum capture_file_cache_removal_policy
+{
+  CFC_REMOVE_OLDEST = 0,
+  CFC_REMOVE_LONGEST_UNUSED = 1
+};
+
+typedef struct _cached_frame_data {
+  guint8 passed_dfilter : 1;
+  guint8 dependent_of_displayed : 1;
+  guint32 prev_dis_num;
+
+} cached_frame_data;
+
+
+typedef struct _capture_file_state {
+  GArray* frame_data; /* GArray of frame_data */
+  gchar* state_name; /* own copy of the state name which needs to be freed when this capture_file_state gets freed */
+  gint64 creation_time; /* The time when this state is created. It will be used for CFC_REMOVE_OLDEST removal policy. */
+  gint64 last_usage_time; /* The most recent time when this state was used. It will be used for CFC_REMOVE_LONGEST_UNUSED removal policy. */
+  gint64 current_frame_number;
+  guint32 displayed_count;
+  guint32 first_displayed;
+  guint32 last_displayed;
+
+} capture_file_state;
+
+typedef struct _capture_file_cache {
+  GHashTable* states;       /* GHashTable[key: gchar* state_name; value: capture_file_state*] while state_name is a copy which is owned by the hash table which needs to be freed when the hash table gets freed.*/
+  gboolean is_valid;        /* Indicated if the cache is currently usable */
+  guint32 max_state_count;  /* The cache can store up to this number of elements */
+  enum capture_file_cache_removal_policy removal_policy; /* Removal policy determines which item is removed first when the cache is full. (count >= max_state_count) */
+
+} capture_file_cache;
+
 typedef struct _capture_file {
   epan_t                     *epan;
   file_state                  state;                /* Current state of capture file */
@@ -125,6 +159,8 @@ typedef struct _capture_file {
   gulong                      computed_elapsed;     /* Elapsed time to load the file (in msec). */
 
   guint32                     cum_bytes;
+
+  capture_file_cache          cache;                /* Cache allows to store/restore different states of the capture file. Majorly intended to cache different filter results. */
 } capture_file;
 
 extern void cap_file_init(capture_file *cf);

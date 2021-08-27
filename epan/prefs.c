@@ -3233,6 +3233,17 @@ prefs_register_modules(void)
                                    "Display an autocomplete suggestion for display and capture filter controls",
                                    &prefs.gui_autocomplete_filter);
 
+    prefs_register_bool_preference(gui_module, "use_filter_cache",
+        "Use cache for filter results (for capture files only)",
+        "Use cache for filter results (for capture files only)",
+        &prefs.gui_use_filter_cache);
+
+    prefs_register_uint_preference(gui_module, "max_filter_cache_count",
+        "The max. number of entries in the filter cache",
+        "The max. number of entries in the filter cache",
+        25,
+        &prefs.gui_max_filter_cache_count);
+
     prefs_register_bool_preference(gui_module, "find_wrap",
                                    "Wrap to beginning/end of file during search",
                                    "Wrap to beginning/end of file during search?",
@@ -4129,6 +4140,8 @@ pre_init_prefs(void)
     prefs.gui_fileopen_preview       = 3;
     prefs.gui_ask_unsaved            = TRUE;
     prefs.gui_autocomplete_filter    = TRUE;
+    prefs.gui_use_filter_cache       = FALSE;
+    prefs.gui_max_filter_cache_count = 25;
     prefs.gui_find_wrap              = TRUE;
     prefs.gui_update_enabled         = TRUE;
     prefs.gui_update_channel         = UPDATE_CHANNEL_STABLE;
