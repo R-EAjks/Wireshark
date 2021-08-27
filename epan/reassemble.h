@@ -153,6 +153,8 @@ WS_DLL_PUBLIC const reassembly_table_functions
 	addresses_reassembly_table_functions;		/* keys have endpoint addresses and an ID */
 WS_DLL_PUBLIC const reassembly_table_functions
 	addresses_ports_reassembly_table_functions;	/* keys have endpoint addresses and ports and an ID */
+WS_DLL_PUBLIC const reassembly_table_functions
+	conversation_reassembly_table_functions;	/* keys have a conversation (passed in as data) and a direction and an ID */
 
 /*
  * Register a reassembly table. By registering the table with epan, the creation and

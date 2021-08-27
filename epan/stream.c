@@ -315,7 +315,7 @@ void stream_init( void )
     stream_init_pdu_data();
 
     reassembly_table_init(&stream_reassembly_table,
-                          &addresses_reassembly_table_functions);
+                          &conversation_reassembly_table_functions);
 }
 
 /*****************************************************************************/
@@ -331,6 +331,7 @@ stream_pdu_fragment_t *stream_add_frag( stream_t *stream, guint32 framenum, guin
     fragment_head *fd_head;
     stream_pdu_t *pdu;
     stream_pdu_fragment_t *frag_data;
+    int save_p2p_dir;
 
     DISSECTOR_ASSERT(stream);
 
@@ -346,9 +347,12 @@ stream_pdu_fragment_t *stream_add_frag( stream_t *stream, guint32 framenum, guin
     }
 
     /* add it to the reassembly tables */
+    save_p2p_dir = pinfo->p2p_dir;
+    pinfo->p2p_dir = stream->key->p2p_dir;
     fd_head = fragment_add_seq_next(&stream_reassembly_table,
-                                    tvb, 0, pinfo, pdu->id, NULL,
+                                    tvb, 0, pinfo, pdu->id, stream->key->conv,
                                     tvb_reported_length(tvb), more_frags);
+    pinfo->p2p_dir = save_p2p_dir;
     /* add it to our hash */
     frag_data = fragment_hash_insert( stream, framenum, offset, tvb_reported_length(tvb));
     frag_data -> pdu = pdu;
