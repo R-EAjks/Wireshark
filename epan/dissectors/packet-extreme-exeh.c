@@ -34,7 +34,7 @@
  * 00 - 01: Unknown
  *          always zero for incoming(?)
  *          often non-zero for outgoing
- * 10 - 23: Unknown
+ * 10 - 23: Unknown (traffic properties?)
  * 28 - 29: Unknown
  *          always zero(?)
  * 32 - 33: Unknown
@@ -59,7 +59,11 @@ static int hf_exeh_module1 = -1;
 static int hf_exeh_port1 = -1;
 static int hf_exeh_module2 = -1; /* m2 + p2 always zero for outgoing(?) */
 static int hf_exeh_port2 = -1;
-static int hf_exeh_unknown_10_23 = -1;
+static int hf_exeh_unknown_10_16 = -1;
+static int hf_exeh_unknown_17_0xfd = -1;
+static int hf_exeh_unknown_17_0x02 = -1;
+static int hf_exeh_unknown_18_21 = -1;
+static int hf_exeh_unknown_22_23 = -1;
 static int hf_exeh_incoming_framesource = -1;
 static int hf_exeh_outgoing_framesource = -1;
 static int hf_exeh_vlan = -1;
@@ -83,6 +87,13 @@ static gint ett_exeh = -1;
 static const value_string exeh_direction_vals[] = {
 	{0x07, "Incoming"},
 	{0xff, "Outgoing"},
+
+	{0, NULL},
+};
+
+static const value_string exeh_outgoing_vlanid_vals[] = {
+	{0x0000, "No tag or VLAN ID = 0"},
+	{0x000f, "Has VLAN ID"},
 
 	{0, NULL},
 };
@@ -131,8 +142,15 @@ dissect_exeh(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
 	if ( !(direction == 255 && module2 == 0) && (module1 != module2 || port1 != port2) )
 			expert_add_info(pinfo, ti, &ei_exeh_unequal_ports);
 	offset += 2;
-	proto_tree_add_item(exeh_tree, hf_exeh_unknown_10_23, tvb, offset, 14, ENC_NA);
-	offset += 14;
+	proto_tree_add_item(exeh_tree, hf_exeh_unknown_10_16, tvb, offset, 7, ENC_NA);
+	offset += 7;
+	proto_tree_add_item(exeh_tree, hf_exeh_unknown_17_0xfd, tvb, offset, 1, ENC_NA);
+	proto_tree_add_item(exeh_tree, hf_exeh_unknown_17_0x02, tvb, offset, 1, ENC_NA);
+	offset += 1;
+	proto_tree_add_item(exeh_tree, hf_exeh_unknown_18_21, tvb, offset, 4, ENC_NA);
+	offset += 4;
+	proto_tree_add_item(exeh_tree, hf_exeh_unknown_22_23, tvb, offset, 2, ENC_BIG_ENDIAN);
+	offset += 2;
 	if ( direction == 7 ) {
 		ti = proto_tree_add_item_ret_uint(exeh_tree, hf_exeh_incoming_framesource, tvb, offset, 2, ENC_BIG_ENDIAN, &framesource);
 		if ( framesource != 0 )
@@ -195,8 +213,24 @@ proto_register_exeh(void)
 		{ "Port",	"exeh.port2", FT_UINT16, BASE_DEC, NULL,
 			0x0, NULL, HFILL }},
 
-		{ &hf_exeh_unknown_10_23,
-		{ "Unknown_10",	"exeh.unknown10", FT_BYTES, BASE_NONE, NULL,
+		{ &hf_exeh_unknown_10_16,
+		{ "Unknown_10 (incoming specific?)",	"exeh.unknown10", FT_BYTES, BASE_NONE, NULL,
+			0x0, NULL, HFILL }},
+
+		{ &hf_exeh_unknown_17_0xfd,
+		{ "Unknown_17",	"exeh.unknown17", FT_UINT8, BASE_HEX, NULL,
+			0xfd, NULL, HFILL }},
+
+		{ &hf_exeh_unknown_17_0x02,
+		{ "Unknown_17 (Add dot1Q?)",	"exeh.unknown17", FT_BOOLEAN, 8, TFS(&tfs_no_yes),
+			0x02, NULL, HFILL }},
+
+		{ &hf_exeh_unknown_18_21,
+		{ "Unknown_18 (outgoing specific?)",	"exeh.unknown18", FT_BYTES, BASE_NONE, NULL,
+			0x0, NULL, HFILL }},
+
+		{ &hf_exeh_unknown_22_23,
+		{ "Add VLAN ID?",	"exeh.unknown22", FT_UINT16, BASE_NONE, VALS(exeh_outgoing_vlanid_vals),
 			0x0, NULL, HFILL }},
 
 		{ &hf_exeh_incoming_framesource,
@@ -234,7 +268,6 @@ proto_register_exeh(void)
 		{ &hf_exeh_etypelen,
 		{ "Length",	"exeh.etypelen", FT_INT16, BASE_DEC, NULL,
 			0x0, "Bytes from 8100 to end of frame", HFILL }},
-
 	};
 
 
