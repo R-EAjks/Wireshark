@@ -480,6 +480,11 @@ void IOGraphDialog::copyFromProfile(QString filename)
 
 void IOGraphDialog::addGraph(bool checked, QString name, QString dfilter, QRgb color_idx, IOGraph::PlotStyles style, io_graph_item_unit_t value_units, QString yfield, int moving_average, int y_axis_factor)
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     // should not fail, but you never know.
     if (!uat_model_->insertRows(uat_model_->rowCount(), 1)) {
         qDebug() << "Failed to add a new record";
@@ -507,6 +512,11 @@ void IOGraphDialog::addGraph(bool checked, QString name, QString dfilter, QRgb c
 
 void IOGraphDialog::addGraph(bool copy_from_current)
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     const QModelIndex &current = ui->graphUat->currentIndex();
     if (copy_from_current && !current.isValid())
         return;
@@ -531,6 +541,11 @@ void IOGraphDialog::addGraph(bool copy_from_current)
 
 void IOGraphDialog::createIOGraph(int currentRow)
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     // XXX - Should IOGraph have it's own list that has to sync with UAT?
     ioGraphs_.append(new IOGraph(ui->ioPlot));
     IOGraph* iog = ioGraphs_[currentRow];
@@ -576,6 +591,11 @@ void IOGraphDialog::addDefaultGraph(bool enabled, int idx)
 
 void IOGraphDialog::syncGraphSettings(int row)
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     IOGraph *iog = ioGraphs_.value(row, Q_NULLPTR);
 
     if (!uat_model_->index(row, colEnabled).isValid() || !iog)
@@ -746,6 +766,11 @@ void IOGraphDialog::reject()
 
 void IOGraphDialog::zoomAxes(bool in)
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     QCustomPlot *iop = ui->ioPlot;
     double h_factor = iop->axisRect()->rangeZoomFactor(Qt::Horizontal);
     double v_factor = iop->axisRect()->rangeZoomFactor(Qt::Vertical);
@@ -764,6 +789,11 @@ void IOGraphDialog::zoomAxes(bool in)
 
 void IOGraphDialog::zoomXAxis(bool in)
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     QCustomPlot *iop = ui->ioPlot;
     double h_factor = iop->axisRect()->rangeZoomFactor(Qt::Horizontal);
 
@@ -779,6 +809,11 @@ void IOGraphDialog::zoomXAxis(bool in)
 
 void IOGraphDialog::zoomYAxis(bool in)
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     QCustomPlot *iop = ui->ioPlot;
     double v_factor = iop->axisRect()->rangeZoomFactor(Qt::Vertical);
 
@@ -794,6 +829,11 @@ void IOGraphDialog::zoomYAxis(bool in)
 
 void IOGraphDialog::panAxes(int x_pixels, int y_pixels)
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+    
     QCustomPlot *iop = ui->ioPlot;
     double h_pan = 0.0;
     double v_pan = 0.0;
@@ -816,6 +856,11 @@ void IOGraphDialog::panAxes(int x_pixels, int y_pixels)
 
 void IOGraphDialog::toggleTracerStyle(bool force_default)
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     if (!tracer_->visible() && !force_default) return;
     if (!ui->ioPlot->graph(0)) return;
 
@@ -843,6 +888,11 @@ void IOGraphDialog::toggleTracerStyle(bool force_default)
 // currently selected, visible graph or the first visible graph otherwise.
 IOGraph *IOGraphDialog::currentActiveGraph() const
 {
+    if(ui == NULL)
+    {
+        return NULL;
+    }
+
     QModelIndex index = ui->graphUat->currentIndex();
     if (index.isValid()) {
         return ioGraphs_.value(index.row(), NULL);
@@ -911,6 +961,11 @@ void IOGraphDialog::getGraphInfo()
 
 void IOGraphDialog::updateLegend()
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     QCustomPlot *iop = ui->ioPlot;
     QSet<QString> vu_label_set;
     QString intervalText = ui->intervalComboBox->itemText(ui->intervalComboBox->currentIndex());
@@ -970,6 +1025,11 @@ void IOGraphDialog::updateLegend()
 
 QRectF IOGraphDialog::getZoomRanges(QRect zoom_rect)
 {
+    if(ui == NULL)
+    {
+        return QRectF();
+    }
+
     QRectF zoom_ranges = QRectF();
 
     if (zoom_rect.width() < min_zoom_pixels_ && zoom_rect.height() < min_zoom_pixels_) {
@@ -995,6 +1055,11 @@ QRectF IOGraphDialog::getZoomRanges(QRect zoom_rect)
 
 void IOGraphDialog::graphClicked(QMouseEvent *event)
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     QCustomPlot *iop = ui->ioPlot;
 
     if (event->button() == Qt::RightButton) {
@@ -1019,6 +1084,11 @@ void IOGraphDialog::graphClicked(QMouseEvent *event)
 
 void IOGraphDialog::mouseMoved(QMouseEvent *event)
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     QCustomPlot *iop = ui->ioPlot;
     QString hint;
     Qt::CursorShape shape = Qt::ArrowCursor;
@@ -1099,6 +1169,11 @@ void IOGraphDialog::mouseMoved(QMouseEvent *event)
 
 void IOGraphDialog::mouseReleased(QMouseEvent *event)
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     QCustomPlot *iop = ui->ioPlot;
     auto_axes_ = false;
     if (rubber_band_) {
@@ -1120,6 +1195,11 @@ void IOGraphDialog::mouseReleased(QMouseEvent *event)
 
 void IOGraphDialog::resetAxes()
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     QCustomPlot *iop = ui->ioPlot;
     QCPRange x_range = iop->xAxis->scaleType() == QCPAxis::stLogarithmic ?
                 iop->xAxis->range().sanitizedForLogScale() : iop->xAxis->range();
@@ -1184,6 +1264,11 @@ void IOGraphDialog::updateStatistics()
 
 void IOGraphDialog::loadProfileGraphs()
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     if (iog_uat_ == NULL) {
 
         iog_uat_ = uat_new("I/O Graphs",
@@ -1223,6 +1308,11 @@ void IOGraphDialog::loadProfileGraphs()
 
 void IOGraphDialog::on_intervalComboBox_currentIndexChanged(int)
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     int interval = ui->intervalComboBox->itemData(ui->intervalComboBox->currentIndex()).toInt();
     bool need_retap = false;
 
@@ -1247,6 +1337,11 @@ void IOGraphDialog::on_intervalComboBox_currentIndexChanged(int)
 
 void IOGraphDialog::on_todCheckBox_toggled(bool checked)
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     double orig_start = start_time_;
     bool orig_auto = auto_axes_;
 
@@ -1265,6 +1360,11 @@ void IOGraphDialog::on_todCheckBox_toggled(bool checked)
 
 void IOGraphDialog::modelRowsReset()
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     ui->deleteToolButton->setEnabled(false);
     ui->copyToolButton->setEnabled(false);
     ui->clearToolButton->setEnabled(uat_model_->rowCount() != 0);
@@ -1272,6 +1372,11 @@ void IOGraphDialog::modelRowsReset()
 
 void IOGraphDialog::on_graphUat_currentItemChanged(const QModelIndex &current, const QModelIndex&)
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     if (current.isValid()) {
         ui->deleteToolButton->setEnabled(true);
         ui->copyToolButton->setEnabled(true);
@@ -1315,6 +1420,11 @@ void IOGraphDialog::on_newToolButton_clicked()
 
 void IOGraphDialog::on_deleteToolButton_clicked()
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     const QModelIndex &current = ui->graphUat->currentIndex();
     if (uat_model_ && current.isValid()) {
         delete ioGraphs_[current.row()];
@@ -1351,6 +1461,11 @@ void IOGraphDialog::on_clearToolButton_clicked()
 
 void IOGraphDialog::on_dragRadioButton_toggled(bool checked)
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     if (checked) mouse_drags_ = true;
     ui->ioPlot->setInteractions(
                 QCP::iRangeDrag |
@@ -1360,12 +1475,22 @@ void IOGraphDialog::on_dragRadioButton_toggled(bool checked)
 
 void IOGraphDialog::on_zoomRadioButton_toggled(bool checked)
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     if (checked) mouse_drags_ = false;
     ui->ioPlot->setInteractions(QCP::Interactions());
 }
 
 void IOGraphDialog::on_logCheckBox_toggled(bool checked)
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     QCustomPlot *iop = ui->ioPlot;
 
     iop->yAxis->setScaleType(checked ? QCPAxis::stLogarithmic : QCPAxis::stLinear);
@@ -1456,6 +1581,11 @@ void IOGraphDialog::on_actionGoToPacket_triggered()
 
 void IOGraphDialog::on_actionDragZoom_triggered()
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     if (mouse_drags_) {
         ui->zoomRadioButton->toggle();
     } else {
@@ -1481,6 +1611,11 @@ void IOGraphDialog::on_buttonBox_helpRequested()
 // XXX - We have similar code in tcp_stream_dialog and packet_diagram. Should this be a common routine?
 void IOGraphDialog::on_buttonBox_accepted()
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     QString file_name, extension;
     QDir path(wsApp->lastOpenDir());
     QString pdf_filter = tr("Portable Document Format (*.pdf)");
@@ -1525,6 +1660,11 @@ void IOGraphDialog::on_buttonBox_accepted()
 
 void IOGraphDialog::makeCsv(QTextStream &stream) const
 {
+    if(ui == NULL)
+    {
+        return;
+    }
+
     QList<IOGraph *> activeGraphs;
 
     int ui_interval = ui->intervalComboBox->itemData(ui->intervalComboBox->currentIndex()).toInt();
