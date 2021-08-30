@@ -3646,6 +3646,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Günlük ölçeği</translation>
     </message>
     <message>
+        <source>Automatic Update</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Reset</source>
         <translation>Sıfırla</translation>
     </message>

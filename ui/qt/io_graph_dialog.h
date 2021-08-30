@@ -185,6 +185,7 @@ private:
     bool need_recalc_; // Medium weight: recalculate values, then replot
     bool need_retap_; // Heavy weight: re-read packet data
     bool auto_axes_;
+    bool automatic_update_;
 
     QSharedPointer<QCPAxisTicker> number_ticker_;
     QSharedPointer<QCPAxisTickerDateTime> datetime_ticker_;
@@ -224,6 +225,7 @@ private slots:
 
     void on_resetButton_clicked();
     void on_logCheckBox_toggled(bool checked);
+    void on_automaticUpdateCheckBox_toggled(bool checked);
     void on_newToolButton_clicked();
     void on_deleteToolButton_clicked();
     void on_copyToolButton_clicked();

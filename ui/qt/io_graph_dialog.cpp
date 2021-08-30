@@ -312,6 +312,7 @@ IOGraphDialog::IOGraphDialog(QWidget &parent, CaptureFile &cf, QString displayFi
     need_replot_(false),
     need_retap_(false),
     auto_axes_(true),
+    automatic_update_(true),
     number_ticker_(new QCPAxisTicker),
     datetime_ticker_(new QCPAxisTickerDateTime)
 {
@@ -375,6 +376,7 @@ IOGraphDialog::IOGraphDialog(QWidget &parent, CaptureFile &cf, QString displayFi
     iop->xAxis->setTicker(number_ticker_);
 
     ui->dragRadioButton->setChecked(mouse_drags_);
+    ui->automaticUpdateCheckBox->setChecked(automatic_update_);
 
     ctx_menu_.addAction(ui->actionZoomIn);
     ctx_menu_.addAction(ui->actionZoomInX);
@@ -1142,43 +1144,42 @@ void IOGraphDialog::updateStatistics()
 {
     if (!isVisible()) return;
 
-    if (need_retap_ && !file_closed_) {
+    if (need_retap_ && !file_closed_ && automatic_update_) {
         need_retap_ = false;
         cap_file_.retapPackets();
         // The user might have closed the window while tapping, which means
         // we might no longer exist.
-    } else {
-        if (need_recalc_ && !file_closed_) {
-            need_recalc_ = false;
-            need_replot_ = true;
-            int enabled_graphs = 0;
+    } else if (need_recalc_ && !file_closed_ && automatic_update_) {
+        need_recalc_ = false;
+        need_replot_ = true;
+        int enabled_graphs = 0;
 
-            if (uat_model_ != NULL) {
-                for (int row = 0; row < uat_model_->rowCount(); row++) {
-                    if (graphIsEnabled(row)) {
-                        ++enabled_graphs;
-                    }
-                }
-            }
-            // With multiple visible graphs, disable Y scaling to avoid
-            // multiple, distinct units.
-            emit recalcGraphData(cap_file_.capFile(), enabled_graphs == 1);
-            if (!tracer_->graph()) {
-                if (base_graph_ && base_graph_->data()->size() > 0) {
-                    tracer_->setGraph(base_graph_);
-                    tracer_->setVisible(true);
-                } else {
-                    tracer_->setVisible(false);
+        if (uat_model_ != NULL) {
+            for (int row = 0; row < uat_model_->rowCount(); row++) {
+                if (graphIsEnabled(row)) {
+                    ++enabled_graphs;
                 }
             }
         }
-        if (need_replot_) {
-            need_replot_ = false;
-            if (auto_axes_) {
-                resetAxes();
+        // With multiple visible graphs, disable Y scaling to avoid
+        // multiple, distinct units.
+        emit recalcGraphData(cap_file_.capFile(), enabled_graphs == 1);
+        if (!tracer_->graph()) {
+            if (base_graph_ && base_graph_->data()->size() > 0) {
+                tracer_->setGraph(base_graph_);
+                tracer_->setVisible(true);
+            } else {
+                tracer_->setVisible(false);
             }
-            ui->ioPlot->replot();
         }
+    }
+    
+    if (need_replot_) {
+        need_replot_ = false;
+        if (auto_axes_) {
+            resetAxes();
+        }
+        ui->ioPlot->replot();
     }
 }
 
@@ -1370,6 +1371,16 @@ void IOGraphDialog::on_logCheckBox_toggled(bool checked)
 
     iop->yAxis->setScaleType(checked ? QCPAxis::stLogarithmic : QCPAxis::stLinear);
     iop->replot();
+}
+
+void IOGraphDialog::on_automaticUpdateCheckBox_toggled(bool checked)
+{
+    automatic_update_ = checked;
+
+    if(automatic_update_)
+    {
+        updateStatistics();
+    }
 }
 
 void IOGraphDialog::on_actionReset_triggered()

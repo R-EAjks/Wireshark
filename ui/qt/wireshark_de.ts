@@ -3663,6 +3663,10 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Logarithmische Skala</translation>
     </message>
     <message>
+        <source>Automatic Update</source>
+        <translation>Automatische Aktualisierung</translation>
+    </message>
+    <message>
         <source>Reset</source>
         <translation>Zurücksetzen</translation>
     </message>

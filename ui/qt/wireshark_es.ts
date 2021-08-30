@@ -3624,6 +3624,10 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation>Escala logarítmica</translation>
     </message>
     <message>
+        <source>Automatic Update</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Reset</source>
         <translation>Restablecer</translation>
     </message>
