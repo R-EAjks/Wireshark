@@ -134,6 +134,7 @@ typedef enum {
 struct wtap_reader_buf {
     guint8 *buf;  /* buffer */
     guint8 *next; /* next byte to deliver from buffer */
+    guint size;
     guint avail;  /* number of bytes available to deliver at next */
 };
 
@@ -141,7 +142,6 @@ struct wtap_reader {
     int fd;                     /* file descriptor */
     gint64 raw_pos;             /* current position in file (just to not call lseek()) */
     gint64 pos;                 /* current position in uncompressed data */
-    guint size;                 /* buffer size */
 
     struct wtap_reader_buf in;  /* input buffer, containing compressed data */
     struct wtap_reader_buf out; /* output buffer, containing uncompressed data */
@@ -219,16 +219,15 @@ buf_read(FILE_T state, struct wtap_reader_buf *buf)
     unsigned char *read_ptr;
     ssize_t ret;
 
-    /* How much space is left at the end of the buffer?
-       XXX - the output buffer actually has state->size * 2 bytes. */
-    space_left = state->size - bytes_in_buffer(buf);
+    /* How much space is left at the end of the buffer? */
+    space_left = buf->size - bytes_in_buffer(buf);
     if (space_left == 0) {
         /* There's no space left, so we start fresh at the beginning
            of the buffer. */
         buf_reset(buf);
 
         read_ptr = buf->buf;
-        to_read = state->size;
+        to_read = buf->size;
     } else {
         /* There's some space left; try to read as much data as we
            can into that space.  We may get less than that if we're
@@ -870,21 +869,14 @@ gz_head(FILE_T state)
     if (state->fast_seek)
         fast_seek_header(state, state->raw_pos - state->in.avail - state->out.avail, state->pos, UNCOMPRESSED);
 
-    /* doing raw i/o, save start of raw data for seeking, copy any leftover
-       input to output -- this assumes that the output buffer is larger than
-       the input buffer, which also assures space for gzungetc() */
+    /* doing raw i/o, save start of raw data for seeking */
     state->raw = state->pos;
-    state->out.next = state->out.buf;
-    /* not a compressed file -- copy everything we've read into the
-       input buffer to the output buffer and fall to raw i/o */
-    already_read = bytes_in_buffer(&state->in);
-    if (already_read != 0) {
-        memcpy(state->out.buf, state->in.buf, already_read);
-        state->out.avail = already_read;
 
-        /* Now discard everything in the input buffer */
-        buf_reset(&state->in);
-    }
+    /* Reset input buffer read position */
+    already_read = bytes_in_buffer(&state->in);
+    state->in.next = state->in.buf;
+    state->in.avail = already_read;
+
     state->compression = UNCOMPRESSED;
     return 0;
 }
@@ -899,12 +891,23 @@ fill_out_buffer(FILE_T state)
             return 0;
     }
     if (state->compression == UNCOMPRESSED) {           /* straight copy */
+        assert(state->out.avail == 0);
+
+        if (state->in.avail > 0) {
+            const guint bytes_to_copy = MIN(state->in.avail, state->out.size);
+            memcpy(state->out.buf, state->in.next, bytes_to_copy);
+            state->in.next += bytes_to_copy;
+            state->in.avail -= bytes_to_copy;
+            state->out.next = state->out.buf;
+            state->out.avail = bytes_to_copy;
+            return 0;
+        }
         if (buf_read(state, &state->out) < 0)
             return -1;
     }
 #ifdef HAVE_ZLIB
     else if (state->compression == ZLIB) {      /* decompress */
-        zlib_read(state, state->out.buf, state->size << 1);
+        zlib_read(state, state->out.buf, state->out.size);
     }
 #endif
 #ifdef HAVE_ZSTD
@@ -914,7 +917,7 @@ fill_out_buffer(FILE_T state)
         if (state->in.avail == 0 && fill_in_buffer(state) == -1)
             return -1;
 
-        ZSTD_outBuffer output = {state->out.buf, state->size << 1, 0};
+        ZSTD_outBuffer output = {state->out.buf, state->out.size, 0};
         ZSTD_inBuffer input = {state->in.next, state->in.avail, 0};
         const size_t ret = ZSTD_decompressStream(state->zstd_dctx, &output, &input);
         if (ZSTD_isError(ret)) {
@@ -941,7 +944,7 @@ fill_out_buffer(FILE_T state)
         if (state->in.avail == 0 && fill_in_buffer(state) == -1)
             return -1;
 
-        size_t outBufSize = state->size << 1;
+        size_t outBufSize = state->out.size;
         size_t inBufSize = state->in.avail;
         const size_t ret = LZ4F_decompress(state->lz4_dctx, state->out.buf, &outBufSize, state->in.next, &inBufSize, NULL);
         if (LZ4F_isError(ret)) {
@@ -1038,7 +1041,7 @@ file_fdopen(int fd)
 #ifdef _STATBUF_ST_BLKSIZE
     ws_statb64 st;
 #endif
-    int want = GZBUFSIZE;
+    guint want = GZBUFSIZE;
     FILE_T state;
     size_t ret;
 
@@ -1077,24 +1080,24 @@ file_fdopen(int fd)
          * use the default.
          */
         if (st.st_blksize <= G_MAXINT)
-            want = (int)st.st_blksize;
+            want = (guint)st.st_blksize;
         /* XXX, verify result? */
     }
 #endif
+    state->in.size = want;
+    state->out.size = want << 1;
 #ifdef HAVE_ZSTD
-    /* we should have separate input and output buf sizes */
-    want = MAX(want, (guint)ZSTD_DStreamInSize());
-    want = MAX(want, (guint)ZSTD_DStreamOutSize());
+    state->in.size = MAX(state->in.size, (guint)ZSTD_DStreamInSize());
+    state->out.size = MAX(state->out.size, (guint)ZSTD_DStreamOutSize());
 #endif
 
     /* allocate buffers */
-    state->in.buf = (unsigned char *)g_try_malloc((gsize)want);
+    state->in.buf = (unsigned char *)g_try_malloc((gsize)state->in.size);
     state->in.next = state->in.buf;
     state->in.avail = 0;
-    state->out.buf = (unsigned char *)g_try_malloc(((gsize)want) << 1);
+    state->out.buf = (unsigned char *)g_try_malloc((gsize)state->out.size);
     state->out.next = state->out.buf;
     state->out.avail = 0;
-    state->size = want;
     if (state->in.buf == NULL || state->out.buf == NULL) {
        goto err;
     }
@@ -1786,13 +1789,17 @@ file_close(FILE_T file)
     int fd = file->fd;
 
     /* free memory and close file */
-    if (file->size) {
 #ifdef HAVE_ZLIB
-        inflateEnd(&(file->strm));
+    inflateEnd(&(file->strm));
 #endif
-        g_free(file->out.buf);
-        g_free(file->in.buf);
-    }
+#ifdef HAVE_ZSTD
+    ZSTD_freeDCtx(file->zstd_dctx);
+#endif
+#ifdef HAVE_LZ4
+    LZ4F_freeDecompressionContext(file->lz4_dctx);
+#endif
+    g_free(file->out.buf);
+    g_free(file->in.buf);
     g_free(file->fast_seek_cur);
     file->err = 0;
     file->err_info = NULL;
