@@ -924,7 +924,7 @@ fill_out_buffer(FILE_T state)
         }
 
         state->in.next = state->in.next + input.pos;
-        state->in.avail -= input.pos;
+        state->in.avail -= (guint) input.pos;
 
         state->out.next = output.dst;
         state->out.avail = (guint)output.pos;
@@ -951,7 +951,7 @@ fill_out_buffer(FILE_T state)
         }
 
         state->in.next = state->in.next + inBufSize;
-        state->in.avail -= inBufSize;
+        state->in.avail -= (guint) inBufSize;
 
         state->out.next = state->out.buf;
         state->out.avail = (guint)outBufSize;
@@ -1083,8 +1083,8 @@ file_fdopen(int fd)
 #endif
 #ifdef HAVE_ZSTD
     /* we should have separate input and output buf sizes */
-    want = MAX(want, (guint)ZSTD_DStreamInSize());
-    want = MAX(want, (guint)ZSTD_DStreamOutSize());
+    want = MAX(want, (int)ZSTD_DStreamInSize());
+    want = MAX(want, (int)ZSTD_DStreamOutSize());
 #endif
 
     /* allocate buffers */
