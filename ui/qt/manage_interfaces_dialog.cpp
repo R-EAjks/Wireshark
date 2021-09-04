@@ -559,7 +559,7 @@ void ManageInterfacesDialog::on_addRemote_clicked()
     dlg->show();
 }
 
-int  ManageInterfacesDialog::remoteInterfaces_exists(char* device_name){
+int  ManageInterfacesDialog::remoteInterfacesExists(char* device_name){
     int exists = 0;
     QTreeWidgetItemIterator it(ui->remoteList);
 
@@ -610,7 +610,7 @@ void ManageInterfacesDialog::showRemoteInterfaces()
         if (!device->local) {
 
             // check if the QTreeWidgetItem for that interface already exists
-            if ( 1 == remoteInterfaces_exists( device->name )){
+            if ( 1 == remoteInterfacesExists( device->name )){
                continue;
             }
 

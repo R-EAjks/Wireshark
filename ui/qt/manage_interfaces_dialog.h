@@ -74,7 +74,7 @@ private slots:
     void remoteAccepted();
     void on_remoteList_currentItemChanged(QTreeWidgetItem *current, QTreeWidgetItem *previous);
     void on_remoteList_itemClicked(QTreeWidgetItem *item, int column);
-    int  remoteInterfaces_exists(char* device_name);
+    int  remoteInterfacesExists(char* device_name);
     QTreeWidgetItem* getRemoteHostItem( char* name );
     void addRemoteInterfaces(GList *rlist, remote_options *roptions);
     void updateRemoteInterfaceList(GList *rlist, remote_options *roptions);
