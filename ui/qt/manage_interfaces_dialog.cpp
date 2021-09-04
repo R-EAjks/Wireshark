@@ -583,7 +583,7 @@ QTreeWidgetItem* ManageInterfacesDialog::getRemoteHostItem( char* name ){
     while (*it) {
         QTreeWidgetItem * item = *it;
 
-        if ( 0 == strcmp( name, item->text(col_r_host_dev_).toStdString().c_str() ) ) {
+        if ( item->text(col_r_host_dev_) == QString( name ) ){
             return item;
         }
 
