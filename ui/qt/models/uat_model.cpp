@@ -283,6 +283,9 @@ QModelIndex UatModel::appendEntry(QVariantList rowData)
     uat_->changed = TRUE;
 
     emit endInsertRows();
+
+    newIndex = index(row, 0, QModelIndex());
+
     return newIndex;
 }
 
