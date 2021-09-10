@@ -96,6 +96,8 @@ set (PF86_ENV "ProgramFiles(x86)")
 set(VC_TOOLS_MERGE_MODULES_DIR)
 if (DEFINED ENV{VCToolsRedistDir})
 	set(VC_TOOLS_MERGE_MODULES_DIR "$ENV{VCToolsRedistDir}/MergeModules")
+elseif(DEFINED MSVC_REDIST_DIR)
+	set(VC_TOOLS_MERGE_MODULES_DIR "${MSVC_REDIST_DIR}/MergeModules")
 endif()
 
 find_path(MERGE_MODULE_DIR ${MERGE_MODULE}

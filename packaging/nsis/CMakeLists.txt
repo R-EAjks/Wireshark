@@ -68,6 +68,11 @@ if(BUILD_wireshark AND QT_FOUND)
 	set (QT_DIR "\${STAGING_DIR}")
 endif()
 
+set(_vcredist_name "vcredist_${TARGET_MACHINE}.exe")
+
+file(TO_NATIVE_PATH "${MSVC_REDIST_DIR}" MSVC_REDIST_DIR_NATIVE)
+message(STATUS "Using MSVC_REDIST_DIR: ${MSVC_REDIST_DIR_NATIVE}")
+
 # Look for the Visual C++ Redistributable packages in the following locations:
 # - _PROJECT_LIB_DIR
 # - _PROJECT_LIB_DIR/vcredist_MSVCxx
@@ -81,7 +86,6 @@ endif()
 # 1912 = VS2017 15.5        / 14.12
 # 1913 = VS2017 15.6        / 14.13
 # 1914 = VS2017 15.7        / 14.14
-set(_vcredist_name "vcredist_${TARGET_MACHINE}.exe")
 if(MSVC_VERSION GREATER_EQUAL 1920)
 	set(_ws_vcredist_subdir "vcredist_MSVC2019")
 	set(_msvs_version 15.0) # Doesn't appear to be set
@@ -116,10 +120,12 @@ if(MSVC_VERSION GREATER_EQUAL 1910 AND VCINSTALLDIR)
 endif()
 
 find_program(VCREDIST_EXE "${_vcredist_name}"
-	PATHS "${_PROJECT_LIB_DIR}" $ENV{VCToolsRedistDir} "${VCINSTALLDIR}"
+	PATHS "${_PROJECT_LIB_DIR}" $ENV{VCToolsRedistDir} ${MSVC_REDIST_DIR} "${VCINSTALLDIR}"
 	PATH_SUFFIXES ${_ws_vcredist_subdir} ${_ms_vcredist_subdir}
 	NO_DEFAULT_PATH
 )
+
+
 if(VCREDIST_EXE)
 	file(TO_NATIVE_PATH "${VCREDIST_EXE}" VCREDIST_EXE)
 	message(STATUS "Using ${VCREDIST_EXE} for the NSIS installer.")
