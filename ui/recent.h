@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include "epan/timestamp.h"
 #include "ui/ws_ui_util.h"
+#include "ui/text_import.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -82,6 +83,35 @@ typedef enum {
     SEARCH_TYPE_REGEX
 } search_type_type;
 
+/* Parts of text_import_info_t stored in recent file */
+typedef struct recent_text_import {
+    enum text_import_mode  mode;
+
+    /* Hex Dump */
+    enum offset_type       offset_type;
+    gboolean               has_direction;
+
+    /* Regular Expression */
+    gchar                 *regex;
+    enum data_encoding     encoding;
+    gchar                 *in_indication;
+    gchar                 *out_indication;
+
+    /* Import info */
+    gchar                 *timestamp_format;
+    int                    encapsulation;
+    enum dummy_header_type dummy_header_type;
+    gchar                 *pid;
+    gchar                 *protocol;
+    gchar                 *src_port;
+    gchar                 *dst_port;
+    gchar                 *tag;
+    gchar                 *ppi;
+    gchar                 *payload;
+
+    gchar                 *max_frame_length;
+} recent_text_import_t;
+
 /** Recent settings. */
 typedef struct recent_settings_tag {
     gboolean    main_toolbar_show;
@@ -130,6 +160,7 @@ typedef struct recent_settings_tag {
     GList      *endpoint_tabs;                      /* enabled endpoint dialog tabs */
     gchar      *gui_fileopen_remembered_dir;        /* folder of last capture loaded in File Open dialog */
     gboolean    gui_rlc_use_pdus_from_mac;
+    recent_text_import_t text_import;
     GList      *custom_colors;
     GList      *gui_additional_toolbars;
     GList      *interface_toolbars;
