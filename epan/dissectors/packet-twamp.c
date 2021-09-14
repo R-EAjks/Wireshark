@@ -214,8 +214,6 @@ dissect_twamp_control(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void 
     guint32 modes;
     guint32 type_p;
     guint8 ipvn;
-    guint8 conf_sender;
-    guint8 conf_receiver;
 
     if (pinfo->destport == TWAMP_CONTROL_PORT) {
         is_request = TRUE;
@@ -378,12 +376,10 @@ dissect_twamp_control(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void 
         proto_tree_add_uint(twamp_tree, hf_twamp_control_ipvn, tvb, offset, 1, ipvn);
         offset += 1;
 
-        conf_sender = tvb_get_guint8(tvb, offset);
-        proto_tree_add_uint(twamp_tree, hf_twamp_control_conf_sender, tvb, offset, 1, conf_sender);
+        proto_tree_add_item(twamp_tree, hf_twamp_control_conf_sender, tvb, offset, 1, ENC_NA);
         offset += 1;
 
-        conf_receiver = tvb_get_guint8(tvb, offset);
-        proto_tree_add_uint(twamp_tree, hf_twamp_control_conf_receiver, tvb, offset, 1, conf_receiver);
+        proto_tree_add_item(twamp_tree, hf_twamp_control_conf_receiver, tvb, offset, 1, ENC_NA);
 
         offset = 12;
         proto_tree_add_item(twamp_tree, hf_twamp_control_sender_port, tvb, offset, 2, ENC_BIG_ENDIAN);
