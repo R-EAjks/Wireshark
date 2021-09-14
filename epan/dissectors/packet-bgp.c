@@ -1769,7 +1769,7 @@ static const value_string flex_algo_metric_types[] = {
 /* Link state IGP Algorithm Type: https://www.iana.org/assignments/igp-parameters/igp-parameters.xhtml */
 static const value_string igp_algo_types[] = {
     { 0,   "Shortest Path First (SPF)" },
-    { 1,   "Strict Shortest Path First (SPF)" },
+    { 1,   "Strict Shortest Path First (Strict SPF)" },
     { 0,   NULL }
 };
 
@@ -12722,7 +12722,7 @@ proto_register_bgp(void)
         { "UDABM Length", "bgp.ls.tlv.application_specific_link_attributes.udabm_length", FT_UINT8,
           BASE_DEC, NULL, 0x0, NULL, HFILL}},
       { &hf_bgp_ls_tlv_app_spec_link_attrs_reserved,
-        { "Reserved", "bgp.ls.tlv.application_specific_link_attributes.udabm_length", FT_UINT16,
+        { "Reserved", "bgp.ls.tlv.application_specific_link_attributes.reserved", FT_UINT16,
           BASE_HEX, NULL, 0x0, NULL, HFILL}},
       { &hf_bgp_ls_tlv_app_spec_link_attrs_sabm,
         { "Standard Application Identifier Bit Mask", "bgp.ls.tlv.application_specific_link_attribugtes.sabm", FT_UINT32,
