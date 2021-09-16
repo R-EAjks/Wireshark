@@ -161,8 +161,10 @@ set(LIBWIRESHARK_PUBLIC_HEADERS
 	unit_strings.h
 	value_string.h
 	wmem_scopes.h
+	wsdb.h
 	x264_prt_id.h
 	xdlc.h
+	${CMAKE_SOURCE_DIR}/sqlite/sqlite3.h
 )
 
 set(LIBWIRESHARK_HEADER_FILES
@@ -259,10 +261,12 @@ set(LIBWIRESHARK_NONGENERATED_FILES
 	value_string.c
 	unit_strings.c
 	wmem_scopes.c
+	wsdb.c
 	xdlc.c
 	protobuf-helper.c
 	protobuf_lang_tree.c
 	${CMAKE_CURRENT_BINARY_DIR}/ps.c
+	${CMAKE_SOURCE_DIR}/sqlite/sqlite3.c
 )
 
 set(LIBWIRESHARK_FILES ${LIBWIRESHARK_NONGENERATED_FILES})

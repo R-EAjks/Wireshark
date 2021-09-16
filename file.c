@@ -44,6 +44,7 @@
 #include <epan/addr_resolv.h>
 #include <epan/color_filters.h>
 #include <epan/secrets.h>
+#include <epan/wsdb.h>
 
 #include "cfile.h"
 #include "file.h"
@@ -2753,6 +2754,128 @@ cf_write_pdml_packets(capture_file *cf, print_args_t *print_args)
   fclose(fh);
 
   return CF_PRINT_OK;
+}
+
+
+cf_print_status_t cf_write_wsdb_packets(capture_file* capture_file, print_args_t* print_args, guint32 parallel_count)
+{
+  wsdb_callback_args_t callback_args;
+  memset(&callback_args, 0, sizeof(wsdb_callback_args_t));
+  gboolean wsdb_result = wsdb_init_callback_args(&callback_args, parallel_count, print_args->file);
+
+  if(wsdb_result == FALSE)
+  {
+    wsdb_cleanup_callback_args(&callback_args);
+    return CF_PRINT_OPEN_ERROR;
+  }
+
+  for(guint32 i = 0; i < callback_args.parallel_count; i++)
+  {
+    wsdb_result = wsdb_database_set_cache_size(callback_args.thread_items[i].database, WSDB_DEFAULT_CACHE_SIZE);
+    if(wsdb_result == FALSE)
+    {
+      wsdb_cleanup_callback_args(&callback_args);
+      return CF_PRINT_WRITE_ERROR;
+    }
+
+    wsdb_result = wsdb_database_enable_performance_mode(callback_args.thread_items[i].database);
+    if(wsdb_result == FALSE)
+    {
+      wsdb_cleanup_callback_args(&callback_args);
+      return CF_PRINT_WRITE_ERROR;
+    }
+
+    wsdb_result = wsdb_database_create_tables(callback_args.thread_items[i].database);
+
+    if(wsdb_result == FALSE)
+    {
+      wsdb_cleanup_callback_args(&callback_args);
+      return CF_PRINT_WRITE_ERROR;
+    }
+
+    wsdb_result = wsdb_database_create_indexes(callback_args.thread_items[i].database);
+
+    if(wsdb_result == FALSE)
+    {
+      wsdb_cleanup_callback_args(&callback_args);
+      return CF_PRINT_WRITE_ERROR;
+    }
+
+    wsdb_result = wsdb_write_field_types(callback_args.thread_items[i].database);
+
+    if(wsdb_result == FALSE)
+    {
+      wsdb_cleanup_callback_args(&callback_args);
+      return CF_PRINT_WRITE_ERROR;
+    }
+
+    wsdb_result = wsdb_write_info(callback_args.thread_items[i].database, callback_args.parallel_count, i);
+    if(wsdb_result == FALSE)
+    {
+      wsdb_cleanup_callback_args(&callback_args);
+      return CF_PRINT_WRITE_ERROR;
+    }
+  }
+
+  epan_dissect_init(callback_args.epan_dissect, capture_file->epan, TRUE, TRUE);
+
+  /* Iterate through the list of packets, printing the packets we were told to print. */
+  psp_return_t psp_return_code = process_specified_records(capture_file, &print_args->range, "Writing wsdb", "selected packets", TRUE, write_wsdb_packet, &callback_args, TRUE);
+
+  epan_dissect_cleanup(callback_args.epan_dissect);
+
+  if (psp_return_code == PSP_FAILED)
+  {
+    wsdb_cleanup_callback_args(&callback_args);
+    return CF_PRINT_WRITE_ERROR;
+  }
+
+  for (guint32 i = 0; i < callback_args.parallel_count; i++)
+  {
+    wsdb_result = wsdb_commit_queue(&callback_args.thread_items[i], 0, TRUE);
+    if (wsdb_result == FALSE)
+    {
+      wsdb_cleanup_callback_args(&callback_args);
+      return CF_PRINT_WRITE_ERROR;
+    }
+  }
+
+  for (guint32 i = 0; i < callback_args.parallel_count; i++)
+  {
+    callback_args.thread_items[i].cancel_thread = TRUE;
+  }
+
+  for (guint32 i = 0; i < callback_args.parallel_count; i++)
+  {
+    g_thread_join(callback_args.thread_items[i].commit_thread);
+  }
+
+  wsdb_cleanup_callback_args(&callback_args);
+
+  return CF_PRINT_OK;
+}
+
+gboolean
+write_wsdb_packet(capture_file* capture_file, frame_data* fdata, wtap_rec* rec, Buffer* buffer, void* args)
+{
+  wsdb_callback_args_t* callback_args = (wsdb_callback_args_t*)args;
+
+  tvbuff_t* tvb = frame_tvbuff_new_buffer(&capture_file->provider, fdata, buffer);
+
+  /* Create the protocol tree */
+  epan_dissect_run(callback_args->epan_dissect, capture_file->cd_t, rec, tvb, fdata, &capture_file->cinfo);
+
+  wsdb_add_packet_dissection_sql_to_queue(callback_args);
+
+  epan_dissect_reset(callback_args->epan_dissect);
+
+  gboolean wsdb_result = wsdb_commit_queue(&callback_args->thread_items[callback_args->current_index], WSDB_COMMIT_THRESHOLD, TRUE);
+  if (wsdb_result == FALSE)
+  {
+    return FALSE;
+  }
+
+  return TRUE;
 }
 
 static gboolean

@@ -175,6 +175,8 @@
      <addaction name="separator"/>
      <addaction name="actionFileExportAsPSML"/>
      <addaction name="actionFileExportAsPDML"/>
+     <addaction name="actionFileExportAsWsdb"/>
+     <addaction name="actionFileExportAsWsdbMulticore"/>
      <addaction name="actionFileExportAsJSON"/>
     </widget>
     <widget class="QMenu" name="menuFileExportObjects">
@@ -1310,6 +1312,16 @@
    <property name="text">
     <string>As P&amp;DML XML…</string>
    </property>
+  </action>
+  <action name="actionFileExportAsWsdb">
+    <property name="text">
+      <string>As wsdb...</string>
+    </property>
+  </action>
+  <action name="actionFileExportAsWsdbMulticore">
+    <property name="text">
+      <string>As wsdb (multicore)...</string>
+    </property>
   </action>
   <action name="actionFileExportAsJSON">
    <property name="text">

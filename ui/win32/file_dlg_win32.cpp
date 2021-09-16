@@ -59,6 +59,8 @@ typedef enum {
     _T("CSV (Comma Separated Values summary) (*.csv)\0") _T("*.csv\0")   \
     _T("PSML (XML packet summary) (*.psml)\0")           _T("*.psml\0")  \
     _T("PDML (XML packet detail) (*.pdml)\0")            _T("*.pdml\0")  \
+    _T("wsdb database (*.wsdb)\0")                   _T("*.wsdb\0")  \
+    _T("wsdb database multicore(*.wsdb)\0")          _T("*.wsdb\0")  \
     _T("C Arrays (packet bytes) (*.c)\0")                _T("*.c\0")     \
     _T("JSON (*.json)\0")                                _T("*.json\0")
 
@@ -70,6 +72,8 @@ static TCHAR *FILE_EXT_EXPORT[] =
     _T("csv"),
     _T("psml"),
     _T("pdml"),
+    _T("wsdb"),
+    _T("wsdb"),
     _T("c"),
     _T("json")
 };
@@ -560,6 +564,13 @@ win32_export_file(HWND h_wnd, const wchar_t *title, capture_file *cf, export_typ
                 break;
             case export_type_pdml:      /* PDML */
                 status = cf_write_pdml_packets(cf, &print_args);
+                break;
+            case export_type_wsdb:      /* wsdb */
+                status = cf_write_wsdb_packets(cf, &print_args, 1);
+                break;
+            case export_type_wsdb_multicore:      /* wsdb multicore*/
+                // utilize all cores of this machine
+                status = cf_write_wsdb_packets(cf, &print_args, g_get_num_processors() - 1);
                 break;
             case export_type_json:      /* JSON */
                 status = cf_write_json_packets(cf, &print_args);

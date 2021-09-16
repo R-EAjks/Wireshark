@@ -164,6 +164,7 @@ typedef enum {
   WRITE_NONE,     /* dummy initial state */
   WRITE_TEXT,     /* summary or detail text */
   WRITE_XML,      /* PDML or PSML */
+  WRITE_SQLITE,      /* SQL */
   WRITE_FIELDS,   /* User defined list of fields */
   WRITE_JSON,     /* JSON */
   WRITE_JSON_RAW, /* JSON only raw hex */
@@ -439,12 +440,12 @@ print_usage(FILE *output)
   fprintf(output, "  -P, --print              print packet summary even when writing to a file\n");
   fprintf(output, "  -S <separator>           the line separator to print between packets\n");
   fprintf(output, "  -x                       add output of hex and ASCII dump (Packet Bytes)\n");
-  fprintf(output, "  -T pdml|ps|psml|json|jsonraw|ek|tabs|text|fields|?\n");
+  fprintf(output, "  -T pdml|sqlite|ps|psml|json|jsonraw|ek|tabs|text|fields|?\n");
   fprintf(output, "                           format of text output (def: text)\n");
-  fprintf(output, "  -j <protocolfilter>      protocols layers filter if -T ek|pdml|json selected\n");
+  fprintf(output, "  -j <protocolfilter>      protocols layers filter if -T ek|pdml|sqlite|json selected\n");
   fprintf(output, "                           (e.g. \"ip ip.flags text\", filter does not expand child\n");
   fprintf(output, "                           nodes, unless child is specified also in the filter)\n");
-  fprintf(output, "  -J <protocolfilter>      top level protocol filter if -T ek|pdml|json selected\n");
+  fprintf(output, "  -J <protocolfilter>      top level protocol filter if -T ek|pdml|sqlite|json selected\n");
   fprintf(output, "                           (e.g. \"http tcp\", filter which expands all child nodes)\n");
   fprintf(output, "  -e <field>               field to print if -Tfields selected (e.g. tcp.port,\n");
   fprintf(output, "                           _ws.col.Info)\n");
@@ -1342,6 +1343,10 @@ main(int argc, char *argv[])
         output_action = WRITE_XML;
         print_details = TRUE;   /* Need details */
         print_summary = FALSE;  /* Don't allow summary */
+      } else if (strcmp(optarg, "sqlite") == 0) {
+        output_action = WRITE_SQLITE;
+        print_details = TRUE;   /* Need details */
+        print_summary = FALSE;  /* Don't allow summary */
       } else if (strcmp(optarg, "psml") == 0) {
         output_action = WRITE_XML;
         print_details = FALSE;  /* Don't allow details */
@@ -1370,6 +1375,7 @@ main(int argc, char *argv[])
                         "\t\"pdml\"    Packet Details Markup Language, an XML-based format for the\n"
                         "\t          details of a decoded packet. This information is equivalent to\n"
                         "\t          the packet details printed with the -V flag.\n"
+                        "\t\"sqlite\"    SQLite Database\n"
                         "\t\"ps\"      PostScript for a human-readable one-line summary of each of\n"
                         "\t          the packets, or a multi-line view of the details of each of\n"
                         "\t          the packets, depending on whether the -V flag was specified.\n"
@@ -1532,9 +1538,9 @@ main(int argc, char *argv[])
   }
 
   /* If we specified output fields, but not the output field type... */
-  if ((WRITE_FIELDS != output_action && WRITE_XML != output_action && WRITE_JSON != output_action && WRITE_EK != output_action) && 0 != output_fields_num_fields(output_fields)) {
+  if ((WRITE_FIELDS != output_action && WRITE_XML != output_action && WRITE_SQLITE != output_action && WRITE_JSON != output_action && WRITE_EK != output_action) && 0 != output_fields_num_fields(output_fields)) {
         cmdarg_err("Output fields were specified with \"-e\", "
-            "but \"-Tek, -Tfields, -Tjson or -Tpdml\" was not specified.");
+            "but \"-Tek, -Tfields, -Tjson, -Tpdml or -Tsqlite\" was not specified.");
         exit_status = INVALID_OPTION;
         goto clean_exit;
   } else if (WRITE_FIELDS == output_action && 0 == output_fields_num_fields(output_fields)) {
@@ -3939,6 +3945,11 @@ write_preamble(capture_file *cf)
       write_psml_preamble(&cf->cinfo, stdout);
     return !ferror(stdout);
 
+  case WRITE_SQLITE:
+    // AM TODO REPLACE
+    // write_sqlite_preamble(stdout, cf->filename);
+    return !ferror(stdout);
+
   case WRITE_FIELDS:
     write_fields_preamble(output_fields, stdout);
     return !ferror(stdout);
@@ -4284,6 +4295,12 @@ print_packet(capture_file *cf, epan_dissect_t *edt)
     }
     break;
 
+  case WRITE_SQLITE:
+    // AM TODO REPLACE
+    // write_sqlite_proto_tree(output_fields, protocolfilter, protocolfilter_flags, edt, &cf->cinfo, stdout, dissect_color);
+    return !ferror(stdout);
+    break;
+
   case WRITE_FIELDS:
     if (print_summary) {
       /*No non-verbose "fields" format */
@@ -4353,6 +4370,11 @@ write_finale(void)
       write_pdml_finale(stdout);
     else
       write_psml_finale(stdout);
+    return !ferror(stdout);
+
+  case WRITE_SQLITE:
+    // AM TODO REPLACE
+    // write_sqlite_finale(stdout);
     return !ferror(stdout);
 
   case WRITE_FIELDS:

@@ -480,6 +480,8 @@ private slots:
     void on_actionFileExportAsCArrays_triggered();
     void on_actionFileExportAsPSML_triggered();
     void on_actionFileExportAsPDML_triggered();
+    void on_actionFileExportAsWsdb_triggered();
+    void on_actionFileExportAsWsdbMulticore_triggered();
     void on_actionFileExportAsJSON_triggered();
     void on_actionFileExportPacketBytes_triggered();
     void on_actionFilePrint_triggered();

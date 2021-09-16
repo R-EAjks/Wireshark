@@ -475,6 +475,17 @@ cf_print_status_t cf_print_packets(capture_file *cf, print_args_t *print_args,
 cf_print_status_t cf_write_pdml_packets(capture_file *cf, print_args_t *print_args);
 
 /**
+ * Export the capture file into wsdb format.
+ *
+ * @param capture_file the capture file
+ * @param print_args the arguments what and how to export
+ * @return one of cf_print_status_t
+ */
+cf_print_status_t cf_write_wsdb_packets(capture_file* capture_file, print_args_t* print_args, guint32 parallel_count);
+
+gboolean write_wsdb_packet(capture_file* capture_file, frame_data* fdata, wtap_rec* rec, Buffer* buffer, void* argsp);
+
+/**
  * Print (export) the capture file into PSML format.
  *
  * @param cf the capture file
