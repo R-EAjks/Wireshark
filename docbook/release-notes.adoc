@@ -116,6 +116,7 @@ Vector Informatik Binary Log File (BLF)
 [commaize]
 --
 Bluetooth Link Manager Protocol (BT LMP)
+Bundle Protocol Security Specification (BPSEC)
 E2 Application Protocol (E2AP)
 Event Tracing for Windows (ETW)
 High-Performance Connectivity Tracer (HiPerConTracer)
