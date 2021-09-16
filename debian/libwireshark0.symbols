@@ -520,7 +520,6 @@ libwireshark.so.0 libwireshark0 #MINVER#
  dvb_analyze_string_charset@Base 1.12.0~rc1
  dvb_enc_to_item_enc@Base 1.12.0~rc1
  dvbci_event@Base 2.1.0
- dword_to_hex@Base 2.1.0
  eap_aka_subtype_vals@Base 1.9.1
  eap_code_vals@Base 1.9.1
  eap_ms_chap_v2_opcode_vals@Base 1.9.1
@@ -890,7 +889,6 @@ libwireshark.so.0 libwireshark0 #MINVER#
  guids_get_guid_name@Base 1.9.1
  guids_init@Base 1.9.1
  guids_resolve_guid_to_str@Base 1.9.1
- guint8_to_hex@Base 2.3.0
  guint32_to_str_buf@Base 2.4.0~rc2
  guint64_to_str_buf@Base 2.4.0~rc2
  h225_RasMessage_vals@Base 1.9.1
@@ -1917,7 +1915,6 @@ libwireshark.so.0 libwireshark0 #MINVER#
  uat_update_record@Base 1.99.3
  udp_dissect_pdus@Base 1.99.3
  udp_port_to_display@Base 1.99.2
- uint_to_str_back@Base 2.1.0
  union_of_tap_listener_flags@Base 1.9.1
  unit_name_string_get_value@Base 2.3.0
  unit_name_string_get_value64@Base 2.3.0
@@ -2010,7 +2007,6 @@ libwireshark.so.0 libwireshark0 #MINVER#
  wmem_init_scopes@Base 3.5.0
  wmem_packet_scope@Base 3.5.0
  wmem_file_scope@Base 3.5.0
- word_to_hex@Base 2.1.0
  write_carrays_hex_data@Base 1.99.1
  write_csv_column_titles@Base 1.99.1
  write_csv_columns@Base 1.99.1
