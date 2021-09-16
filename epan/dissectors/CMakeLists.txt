@@ -282,6 +282,7 @@ set(DISSECTOR_PUBLIC_HEADERS
 	packet-btle.h
 	packet-btrfcomm.h
 	packet-btsdp.h
+	packet-bundle-protov7.h
 	packet-c1222.h
 	packet-camel.h
 	packet-cdt.h

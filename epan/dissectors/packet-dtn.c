@@ -15,6 +15,9 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
+ * Bundle Protocol Version-7 Support
+ *   -- Krishnamurthy Mayya <krishnamurthymayya@gmail.com>
+ *
  * Specification reference:
  * RFC 5050
  * https://tools.ietf.org/html/rfc5050
@@ -43,6 +46,7 @@
 #include <epan/expert.h>
 #include "packet-dtn.h"
 #include "packet-tcp.h"
+#include "packet-bundle-proto7.h"
 
 static int dissect_admin_record(proto_tree *primary_tree, tvbuff_t *tvb, packet_info *pinfo,
                                 int offset, int payload_length, gboolean* success);
@@ -2561,6 +2565,13 @@ dissect_bundle(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
     /* Custodian from Primary Block, used to validate CTEB */
     gchar      *bundle_custodian = NULL;
 
+    /* Check for the CBOR based dissection of Bundle Protocol version 7 and if its
+     * version 7 call the dissector from here */
+    version = tvb_get_guint8(tvb, offset+2);
+    if (version == 7) {
+     offset = dissect_bp (tvb, pinfo, tree, data);
+     return offset;
+    }
 
     version = tvb_get_guint8(tvb, offset);  /* Primary Header Version */
     if ((version != 4) && (version != 5) && (version != 6)) {
