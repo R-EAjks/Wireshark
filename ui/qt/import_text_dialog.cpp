@@ -26,6 +26,7 @@
 #include "ui/last_open_dir.h"
 #include "ui/alert_box.h"
 #include "ui/help_url.h"
+#include "ui/recent.h"
 
 #include "file.h"
 #include "wsutil/file_util.h"
@@ -155,15 +156,177 @@ ImportTextDialog::ImportTextDialog(QWidget *parent) :
 
     ti_ui_->regexHintLabel->setText(default_regex_hint);
 
-    import_info_.mode = TEXT_IMPORT_HEXDUMP;
-
-    on_modeTabWidget_currentChanged(0);
+    applyRecentSettings();
     updateImportButtonState();
 }
 
 ImportTextDialog::~ImportTextDialog()
 {
+    storeRecentSettings();
+
     delete ti_ui_;
+}
+
+enum offset_type ImportTextDialog::offsetTypeSelected()
+{
+    return ti_ui_->hexOffsetButton->isChecked()     ? OFFSET_HEX :
+           ti_ui_->decimalOffsetButton->isChecked() ? OFFSET_DEC :
+           ti_ui_->octalOffsetButton->isChecked()   ? OFFSET_OCT :
+           OFFSET_NONE;
+}
+
+enum dummy_header_type ImportTextDialog::headerTypeSelected()
+{
+    return ti_ui_->ethernetButton->isChecked()  ? HEADER_ETH :
+           ti_ui_->ipv4Button->isChecked()      ? HEADER_IPV4 :
+           ti_ui_->udpButton->isChecked()       ? HEADER_UDP :
+           ti_ui_->tcpButton->isChecked()       ? HEADER_TCP :
+           ti_ui_->sctpButton->isChecked()      ? HEADER_SCTP :
+           ti_ui_->sctpDataButton->isChecked()  ? HEADER_SCTP_DATA :
+           ti_ui_->exportPduButton->isChecked() ? HEADER_EXPORT_PDU :
+           HEADER_NONE;
+}
+
+void ImportTextDialog::applyRecentSettings()
+{
+    ti_ui_->modeTabWidget->setCurrentIndex(recent.text_import.mode);
+
+    // Hex Dump
+    switch (recent.text_import.offset_type) {
+    case OFFSET_HEX:
+        ti_ui_->hexOffsetButton->setChecked(true);
+        break;
+    case OFFSET_DEC:
+        ti_ui_->decimalOffsetButton->setChecked(true);
+        break;
+    case OFFSET_OCT:
+        ti_ui_->octalOffsetButton->setChecked(true);
+        break;
+    default:
+        ti_ui_->noOffsetButton->setChecked(true);
+        break;
+    }
+
+    ti_ui_->directionIndicationCheckBox->setChecked(recent.text_import.has_direction);
+
+    // Regular Expression
+    ti_ui_->regexTextEdit->setText(recent.text_import.regex);
+    ti_ui_->dataEncodingComboBox->setCurrentIndex(recent.text_import.encoding);
+    ti_ui_->dirInIndicationLineEdit->setText(recent.text_import.in_indication);
+    ti_ui_->dirOutIndicationLineEdit->setText(recent.text_import.out_indication);
+
+    // Import info
+    ti_ui_->timestampFormatLineEdit->setText(recent.text_import.timestamp_format);
+
+    const char *name = wtap_encap_description(recent.text_import.encapsulation);
+    ti_ui_->encapComboBox->setCurrentText(name);
+
+    switch (recent.text_import.dummy_header_type) {
+    case HEADER_NONE:
+        ti_ui_->noDummyButton->setChecked(true);
+        break;
+    case HEADER_ETH:
+        ti_ui_->ethernetButton->setChecked(true);
+        break;
+    case HEADER_IPV4:
+        ti_ui_->ipv4Button->setChecked(true);
+        break;
+    case HEADER_UDP:
+        ti_ui_->udpButton->setChecked(true);
+        break;
+    case HEADER_TCP:
+        ti_ui_->tcpButton->setChecked(true);
+        break;
+    case HEADER_SCTP:
+        ti_ui_->sctpButton->setChecked(true);
+        break;
+    case HEADER_SCTP_DATA:
+        ti_ui_->sctpDataButton->setChecked(true);
+        break;
+    case HEADER_EXPORT_PDU:
+        ti_ui_->exportPduButton->setChecked(true);
+        break;
+    }
+
+    ti_ui_->ethertypeLineEdit->setText(recent.text_import.pid);
+    ti_ui_->protocolLineEdit->setText(recent.text_import.protocol);
+    ti_ui_->sourcePortLineEdit->setText(recent.text_import.src_port);
+    ti_ui_->destinationPortLineEdit->setText(recent.text_import.dst_port);
+    ti_ui_->tagLineEdit->setText(recent.text_import.tag);
+    ti_ui_->ppiLineEdit->setText(recent.text_import.ppi);
+
+    if (recent.text_import.payload && strlen(recent.text_import.payload) > 0) {
+        ti_ui_->dissectorComboBox->setCurrentText(recent.text_import.payload);
+    } else {
+        // Default to the data dissector when not previously set
+        ti_ui_->dissectorComboBox->setCurrentText("data");
+    }
+
+    ti_ui_->maxLengthLineEdit->setText(recent.text_import.max_frame_length);
+
+    // Select mode tab last to enableFieldWidgets()
+    if (recent.text_import.mode == TEXT_IMPORT_REGEX) {
+        on_modeTabWidget_currentChanged(1);
+    } else {
+        on_modeTabWidget_currentChanged(0);
+    }
+}
+
+void ImportTextDialog::storeRecentSettings()
+{
+    recent.text_import.mode = (ti_ui_->modeTabWidget->currentIndex() == 0) ? TEXT_IMPORT_HEXDUMP: TEXT_IMPORT_REGEX;
+
+    /* Hex Dump */
+    recent.text_import.offset_type = offsetTypeSelected();
+    recent.text_import.has_direction = ti_ui_->directionIndicationCheckBox->isChecked();
+
+    // Regular Expression
+    g_free(recent.text_import.regex);
+    // Remove leding/trailing space and newline for simplified string handling in the recent file
+    recent.text_import.regex = qstring_strdup(ti_ui_->regexTextEdit->toPlainText().replace(QRegularExpression("[\\n|\\r]+"), "").trimmed());
+
+    QVariant encoding_val = ti_ui_->dataEncodingComboBox->itemData(ti_ui_->dataEncodingComboBox->currentIndex());
+    if (encoding_val.isValid()) {
+        recent.text_import.encoding = (enum data_encoding) encoding_val.toUInt();
+    } else {
+        recent.text_import.encoding = ENCODING_PLAIN_HEX;
+    }
+
+    g_free(recent.text_import.in_indication);
+    recent.text_import.in_indication = qstring_strdup(ti_ui_->dirInIndicationLineEdit->text());
+    g_free(recent.text_import.out_indication);
+    recent.text_import.out_indication = qstring_strdup(ti_ui_->dirOutIndicationLineEdit->text());
+
+    // Import info
+    g_free(recent.text_import.timestamp_format);
+    recent.text_import.timestamp_format = qstring_strdup(ti_ui_->timestampFormatLineEdit->text());
+
+    QVariant encap_val = ti_ui_->encapComboBox->itemData(ti_ui_->encapComboBox->currentIndex());
+    if (encap_val.isValid()) {
+        recent.text_import.encapsulation = encap_val.toUInt();
+    } else {
+        recent.text_import.encapsulation = WTAP_ENCAP_ETHERNET;
+    }
+
+    recent.text_import.dummy_header_type = headerTypeSelected();
+
+    g_free(recent.text_import.pid);
+    recent.text_import.pid = qstring_strdup(ti_ui_->ethertypeLineEdit->text());
+    g_free(recent.text_import.protocol);
+    recent.text_import.protocol = qstring_strdup(ti_ui_->protocolLineEdit->text());
+    g_free(recent.text_import.src_port);
+    recent.text_import.src_port = qstring_strdup(ti_ui_->sourcePortLineEdit->text());
+    g_free(recent.text_import.dst_port);
+    recent.text_import.dst_port = qstring_strdup(ti_ui_->destinationPortLineEdit->text());
+    g_free(recent.text_import.tag);
+    recent.text_import.tag = qstring_strdup(ti_ui_->tagLineEdit->text());
+    g_free(recent.text_import.ppi);
+    recent.text_import.ppi = qstring_strdup(ti_ui_->ppiLineEdit->text());
+    g_free(recent.text_import.payload);
+    recent.text_import.payload = qstring_strdup(ti_ui_->dissectorComboBox->currentData().toString());
+
+    g_free(recent.text_import.max_frame_length);
+    recent.text_import.max_frame_length = qstring_strdup(ti_ui_->maxLengthLineEdit->text());
 }
 
 QString &ImportTextDialog::capfileName() {
@@ -210,11 +373,7 @@ int ImportTextDialog::exec() {
             goto cleanup_mode;
         }
 
-        import_info_.hexdump.offset_type =
-            ti_ui_->hexOffsetButton->isChecked()     ? OFFSET_HEX :
-            ti_ui_->decimalOffsetButton->isChecked() ? OFFSET_DEC :
-            ti_ui_->octalOffsetButton->isChecked()   ? OFFSET_OCT :
-            OFFSET_NONE;
+        import_info_.hexdump.offset_type = offsetTypeSelected();
         break;
       case TEXT_IMPORT_REGEX:
         import_info_.regex.import_text_GMappedFile = g_mapped_file_new(import_info_.import_text_filename, true, &gerror);
@@ -242,21 +401,7 @@ int ImportTextDialog::exec() {
     if (encap_val.isValid() && (encap_val.toUInt() == WTAP_ENCAP_ETHERNET || encap_val.toUInt() == WTAP_ENCAP_WIRESHARK_UPPER_PDU)
             && !ti_ui_->noDummyButton->isChecked()) {
         // Inputs were validated in the on_xxx_textChanged slots.
-        if (ti_ui_->ethernetButton->isChecked()) {
-            import_info_.dummy_header_type = HEADER_ETH;
-        } else if (ti_ui_->ipv4Button->isChecked()) {
-            import_info_.dummy_header_type = HEADER_IPV4;
-        } else if (ti_ui_->udpButton->isChecked()) {
-            import_info_.dummy_header_type = HEADER_UDP;
-        } else if (ti_ui_->tcpButton->isChecked()) {
-            import_info_.dummy_header_type = HEADER_TCP;
-        } else if (ti_ui_->sctpButton->isChecked()) {
-            import_info_.dummy_header_type = HEADER_SCTP;
-        } else if (ti_ui_->sctpDataButton->isChecked()) {
-            import_info_.dummy_header_type = HEADER_SCTP_DATA;
-        } else if (ti_ui_->exportPduButton->isChecked()) {
-            import_info_.dummy_header_type = HEADER_EXPORT_PDU;
-        }
+        import_info_.dummy_header_type = headerTypeSelected();
     }
     if (import_info_.max_frame_length == 0) {
         import_info_.max_frame_length = WTAP_MAX_PACKET_SIZE_STANDARD;
@@ -502,7 +647,7 @@ void ImportTextDialog::on_regexTextEdit_textChanged()
     GError* gerror = NULL;
     /* TODO: Use GLib's c++ interface or enable C++ int to enum casting
      * because the flags are declared as enum, so we can't pass 0 like
-     * the specificaion reccomends. These options don't hurt.
+     * the specification recommends. These options don't hurt.
      */
     GRegex* regex = g_regex_new(regex_gchar_p, G_REGEX_DUPNAMES, G_REGEX_MATCH_NOTEMPTY, &gerror);
     if (gerror) {

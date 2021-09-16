@@ -46,6 +46,12 @@ private:
     void check_line_edit(SyntaxLineEdit *le, bool &ok_enable, const QString &num_str, int base, guint max_val, bool is_short, guint *val_ptr);
     bool checkDateTimeFormat(const QString &time_format);
 
+    enum offset_type offsetTypeSelected();
+    enum dummy_header_type headerTypeSelected();
+
+    void applyRecentSettings();
+    void storeRecentSettings();
+
     void updateImportButtonState();
 
     Ui::ImportTextDialog *ti_ui_;

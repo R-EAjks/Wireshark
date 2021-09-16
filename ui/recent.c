@@ -70,6 +70,25 @@
 #define RECENT_GUI_SEARCH_CASE_SENSITIVE        "gui.search_case_sensitive"
 #define RECENT_GUI_SEARCH_TYPE                  "gui.search_type"
 
+#define RECENT_GUI_TEXT_IMPORT_MODE             "gui.text_import.mode"
+#define RECENT_GUI_TEXT_IMPORT_OFFSET_TYPE      "gui.text_import.offset_type"
+#define RECENT_GUI_TEXT_IMPORT_HAS_DIRECTION    "gui.text_import.has_direction"
+#define RECENT_GUI_TEXT_IMPORT_REGEX            "gui.text_import.regex"
+#define RECENT_GUI_TEXT_IMPORT_ENCODING         "gui.text_import.encoding"
+#define RECENT_GUI_TEXT_IMPORT_IN_INDICATION    "gui.text_import.in_indication"
+#define RECENT_GUI_TEXT_IMPORT_OUT_INDICATION   "gui.text_import.out_indication"
+#define RECENT_GUI_TEXT_IMPORT_TIMESTAMP        "gui.text_import.timestamp"
+#define RECENT_GUI_TEXT_IMPORT_ENCAPSULATION    "gui.text_import.encapsulation"
+#define RECENT_GUI_TEXT_IMPORT_HEADER           "gui.text_import.dummy_header"
+#define RECENT_GUI_TEXT_IMPORT_PID              "gui.text_import.pid"
+#define RECENT_GUI_TEXT_IMPORT_PROTOCOL         "gui.text_import.protocol"
+#define RECENT_GUI_TEXT_IMPORT_SRC_PORT         "gui.text_import.src_port"
+#define RECENT_GUI_TEXT_IMPORT_DST_PORT         "gui.text_import.dst_port"
+#define RECENT_GUI_TEXT_IMPORT_TAG              "gui.text_import.tag"
+#define RECENT_GUI_TEXT_IMPORT_PPI              "gui.text_import.ppi"
+#define RECENT_GUI_TEXT_IMPORT_PAYLOAD          "gui.text_import.payload"
+#define RECENT_GUI_TEXT_IMPORT_MAX_FRAME_LENGTH "gui.text_import.max_frame_length"
+
 #define RECENT_GUI_GEOMETRY                   "gui.geom."
 
 #define RECENT_KEY_PRIVS_WARN_IF_ELEVATED     "privs.warn_if_elevated"
@@ -145,6 +164,40 @@ static const value_string search_type_values[] = {
     { SEARCH_TYPE_HEX_VALUE,      "HEX_VALUE" },
     { SEARCH_TYPE_STRING,         "STRING" },
     { SEARCH_TYPE_REGEX,          "REGEX" },
+    { 0, NULL }
+};
+
+static const value_string text_import_mode_values[] = {
+    { TEXT_IMPORT_HEXDUMP, "HEXDUMP" },
+    { TEXT_IMPORT_REGEX,   "REGEX" },
+    { 0, NULL }
+};
+
+static const value_string text_import_offset_values[] = {
+    { OFFSET_NONE, "NONE" },
+    { OFFSET_HEX,  "HEX" },
+    { OFFSET_DEC,  "DEC" },
+    { OFFSET_OCT,  "OCT" },
+    { 0, NULL }
+};
+
+static const value_string text_import_data_encoding_values[] = {
+    { ENCODING_PLAIN_HEX, "PLAIN_HEX" },
+    { ENCODING_PLAIN_OCT, "PLAIN_OCT" },
+    { ENCODING_PLAIN_BIN, "PLAIN_BIN" },
+    { ENCODING_BASE64,    "BASE64" },
+    { 0, NULL }
+};
+
+static const value_string text_import_header_values[] = {
+    { HEADER_NONE,       "NONE" },
+    { HEADER_ETH,        "ETHERNET" },
+    { HEADER_IPV4,       "IPv4" },
+    { HEADER_UDP,        "UDP" },
+    { HEADER_TCP,        "TCP" },
+    { HEADER_SCTP,       "SCTP" },
+    { HEADER_SCTP_DATA,  "SCTP_DATA" },
+    { HEADER_EXPORT_PDU, "EXPORT_PDU" },
     { 0, NULL }
 };
 
@@ -930,6 +983,61 @@ write_profile_recent(void)
         fprintf(rf, RECENT_GUI_FILEOPEN_REMEMBERED_DIR ": %s\n", get_last_open_dir());
     }
 
+    write_recent_enum(rf, "Text import mode", RECENT_GUI_TEXT_IMPORT_MODE,
+                      text_import_mode_values, recent.text_import.mode);
+    write_recent_enum(rf, "Text import hexdump offset type", RECENT_GUI_TEXT_IMPORT_OFFSET_TYPE,
+                      text_import_offset_values, recent.text_import.offset_type);
+    write_recent_boolean(rf, "Text import hexdump has direction", RECENT_GUI_TEXT_IMPORT_HAS_DIRECTION,
+                         recent.text_import.has_direction);
+    if (recent.text_import.regex && strlen(recent.text_import.regex) > 0) {
+        fprintf(rf, "\n# Text import regex.\n");
+        fprintf(rf, RECENT_GUI_TEXT_IMPORT_REGEX ": %s\n", recent.text_import.regex);
+    }
+    if (recent.text_import.encoding != ENCODING_PLAIN_HEX) {
+        write_recent_enum(rf, "Text import regex data encoding", RECENT_GUI_TEXT_IMPORT_ENCODING,
+                          text_import_data_encoding_values, recent.text_import.encoding);
+    }
+    if (recent.text_import.in_indication && strlen(recent.text_import.in_indication) > 0) {
+        fprintf(rf, "\n# Text import regex in indication.\n");
+        fprintf(rf, RECENT_GUI_TEXT_IMPORT_IN_INDICATION ": %s\n", recent.text_import.in_indication);
+    }
+    if (recent.text_import.out_indication && strlen(recent.text_import.out_indication) > 0) {
+        fprintf(rf, "\n# Text import regex out indication.\n");
+        fprintf(rf, RECENT_GUI_TEXT_IMPORT_OUT_INDICATION ": %s\n", recent.text_import.out_indication);
+    }
+    if (recent.text_import.timestamp_format && strlen(recent.text_import.timestamp_format) > 0) {
+        fprintf(rf, "\n# Text import timestamp.\n");
+        fprintf(rf, RECENT_GUI_TEXT_IMPORT_TIMESTAMP ": %s\n", recent.text_import.timestamp_format);
+    }
+    fprintf(rf, "\n# Text import encapsulation.\n");
+    fprintf(rf, RECENT_GUI_TEXT_IMPORT_ENCAPSULATION ": %d\n", recent.text_import.encapsulation);
+    write_recent_enum(rf, "Text import dummy header type", RECENT_GUI_TEXT_IMPORT_HEADER,
+                      text_import_header_values, recent.text_import.dummy_header_type);
+    fprintf(rf, "\n# Text import dummy header values.\n");
+    if (recent.text_import.pid && strlen(recent.text_import.pid) > 0) {
+        fprintf(rf, RECENT_GUI_TEXT_IMPORT_PID ": %s\n", recent.text_import.pid);
+    }
+    if (recent.text_import.protocol && strlen(recent.text_import.protocol) > 0) {
+        fprintf(rf, RECENT_GUI_TEXT_IMPORT_PROTOCOL ": %s\n", recent.text_import.protocol);
+    }
+    if (recent.text_import.src_port && strlen(recent.text_import.src_port) > 0) {
+        fprintf(rf, RECENT_GUI_TEXT_IMPORT_SRC_PORT ": %s\n", recent.text_import.src_port);
+    }
+    if (recent.text_import.dst_port && strlen(recent.text_import.dst_port) > 0) {
+        fprintf(rf, RECENT_GUI_TEXT_IMPORT_DST_PORT ": %s\n", recent.text_import.dst_port);
+    }
+    if (recent.text_import.tag && strlen(recent.text_import.tag) > 0) {
+        fprintf(rf, RECENT_GUI_TEXT_IMPORT_TAG ": %s\n", recent.text_import.tag);
+    }
+    if (recent.text_import.ppi && strlen(recent.text_import.ppi) > 0) {
+        fprintf(rf, RECENT_GUI_TEXT_IMPORT_PPI ": %s\n", recent.text_import.ppi);
+    }
+    fprintf(rf, RECENT_GUI_TEXT_IMPORT_PAYLOAD ": %s\n", recent.text_import.payload);
+    if (recent.text_import.max_frame_length && strlen(recent.text_import.max_frame_length) > 0) {
+        fprintf(rf, "\n# Text import max frame length.\n");
+        fprintf(rf, RECENT_GUI_TEXT_IMPORT_MAX_FRAME_LENGTH ": %s\n", recent.text_import.max_frame_length);
+    }
+
     fprintf(rf, "\n# Additional Toolbars shown\n");
     fprintf(rf, "# List of additional toolbars to show.\n");
     string_list = join_string_list(recent.gui_additional_toolbars);
@@ -1198,6 +1306,63 @@ read_set_recent_pair_static(gchar *key, const gchar *value,
     } else if (strcmp(key, RECENT_GUI_FILEOPEN_REMEMBERED_DIR) == 0) {
         g_free(recent.gui_fileopen_remembered_dir);
         recent.gui_fileopen_remembered_dir = g_strdup(value);
+    } else if (strcmp(key, RECENT_GUI_TEXT_IMPORT_MODE) == 0) {
+        recent.text_import.mode =
+            (enum text_import_mode)str_to_val(value, text_import_mode_values, TEXT_IMPORT_HEXDUMP);
+    } else if (strcmp(key, RECENT_GUI_TEXT_IMPORT_OFFSET_TYPE) == 0) {
+        recent.text_import.offset_type =
+            (enum offset_type)str_to_val(value, text_import_offset_values, OFFSET_HEX);
+    } else if (strcmp(key, RECENT_GUI_TEXT_IMPORT_HAS_DIRECTION) == 0) {
+        parse_recent_boolean(value, &recent.text_import.has_direction);
+    } else if (strcmp(key, RECENT_GUI_TEXT_IMPORT_REGEX) == 0) {
+        g_free(recent.text_import.regex);
+        recent.text_import.regex = g_strdup(value);
+    } else if (strcmp(key, RECENT_GUI_TEXT_IMPORT_ENCODING) == 0) {
+        recent.text_import.encoding =
+            (enum data_encoding)str_to_val(value, text_import_data_encoding_values, ENCODING_PLAIN_HEX);
+    } else if (strcmp(key, RECENT_GUI_TEXT_IMPORT_IN_INDICATION) == 0) {
+        g_free(recent.text_import.in_indication);
+        recent.text_import.in_indication = g_strdup(value);
+    } else if (strcmp(key, RECENT_GUI_TEXT_IMPORT_OUT_INDICATION) == 0) {
+        g_free(recent.text_import.out_indication);
+        recent.text_import.out_indication = g_strdup(value);
+    } else if (strcmp(key, RECENT_GUI_TEXT_IMPORT_TIMESTAMP) == 0) {
+        g_free(recent.text_import.timestamp_format);
+        recent.text_import.timestamp_format = g_strdup(value);
+    } else if (strcmp(key, RECENT_GUI_TEXT_IMPORT_ENCAPSULATION) == 0) {
+        num = strtol(value, &p, 0);
+        if (p == value || *p != '\0')
+            return PREFS_SET_SYNTAX_ERR;      /* number was bad */
+        if (num <= 0)
+            return PREFS_SET_SYNTAX_ERR;      /* number must be positive */
+        recent.text_import.encapsulation = (gint)num;
+    } else if (strcmp(key, RECENT_GUI_TEXT_IMPORT_HEADER) == 0) {
+        recent.text_import.dummy_header_type =
+            (enum dummy_header_type)str_to_val(value, text_import_header_values, HEADER_NONE);
+    } else if (strcmp(key, RECENT_GUI_TEXT_IMPORT_PID) == 0) {
+        g_free(recent.text_import.pid);
+        recent.text_import.pid = g_strdup(value);
+    } else if (strcmp(key, RECENT_GUI_TEXT_IMPORT_PROTOCOL) == 0) {
+        g_free(recent.text_import.protocol);
+        recent.text_import.protocol = g_strdup(value);
+    } else if (strcmp(key, RECENT_GUI_TEXT_IMPORT_SRC_PORT) == 0) {
+        g_free(recent.text_import.src_port);
+        recent.text_import.src_port = g_strdup(value);
+    } else if (strcmp(key, RECENT_GUI_TEXT_IMPORT_DST_PORT) == 0) {
+        g_free(recent.text_import.dst_port);
+        recent.text_import.dst_port = g_strdup(value);
+    } else if (strcmp(key, RECENT_GUI_TEXT_IMPORT_TAG) == 0) {
+        g_free(recent.text_import.tag);
+        recent.text_import.tag = g_strdup(value);
+    } else if (strcmp(key, RECENT_GUI_TEXT_IMPORT_PPI) == 0) {
+        g_free(recent.text_import.ppi);
+        recent.text_import.ppi = g_strdup(value);
+    } else if (strcmp(key, RECENT_GUI_TEXT_IMPORT_PAYLOAD) == 0) {
+        g_free(recent.text_import.payload);
+        recent.text_import.payload = g_strdup(value);
+    } else if (strcmp(key, RECENT_GUI_TEXT_IMPORT_MAX_FRAME_LENGTH) == 0) {
+        g_free(recent.text_import.max_frame_length);
+        recent.text_import.max_frame_length = g_strdup(value);
     } else if (strcmp(key, RECENT_GUI_TOOLBAR_SHOW) == 0) {
         recent.gui_additional_toolbars = prefs_get_string_list(value);
     } else if (strcmp(key, RECENT_GUI_INTERFACE_TOOLBAR_SHOW) == 0) {
@@ -1328,7 +1493,30 @@ recent_read_static(char **rf_path_return, int *rf_errno_return)
     return TRUE;
 }
 
+static void recent_reset_text_import(void)
+{
+    g_free(recent.text_import.regex);
+    g_free(recent.text_import.in_indication);
+    g_free(recent.text_import.out_indication);
+    g_free(recent.text_import.timestamp_format);
+    g_free(recent.text_import.pid);
+    g_free(recent.text_import.protocol);
+    g_free(recent.text_import.src_port);
+    g_free(recent.text_import.dst_port);
+    g_free(recent.text_import.tag);
+    g_free(recent.text_import.ppi);
+    g_free(recent.text_import.payload);
+    g_free(recent.text_import.max_frame_length);
 
+    memset(&recent.text_import, 0, sizeof(recent.text_import));
+
+    recent.text_import.mode              = TEXT_IMPORT_HEXDUMP;
+    recent.text_import.offset_type       = OFFSET_HEX;
+    recent.text_import.has_direction     = FALSE;
+    recent.text_import.encoding          = ENCODING_PLAIN_HEX;
+    recent.text_import.encapsulation     = WTAP_ENCAP_ETHERNET;
+    recent.text_import.dummy_header_type = HEADER_NONE;
+}
 
 /* opens the user's recent file and read the first part */
 gboolean
@@ -1371,6 +1559,8 @@ recent_read_profile_static(char **rf_path_return, int *rf_errno_return)
         g_free (recent.gui_fileopen_remembered_dir);
         recent.gui_fileopen_remembered_dir = NULL;
     }
+
+    recent_reset_text_import();
 
     if (recent.gui_additional_toolbars) {
         g_list_free_full (recent.gui_additional_toolbars, g_free);
@@ -1605,6 +1795,9 @@ recent_cleanup(void)
 {
     free_col_width_info(&recent);
     g_free(recent.gui_fileopen_remembered_dir);
+
+    recent_reset_text_import();
+
     g_list_free_full(recent.gui_additional_toolbars, g_free);
     g_list_free_full(recent.interface_toolbars, g_free);
     prefs_clear_string_list(recent.conversation_tabs);
