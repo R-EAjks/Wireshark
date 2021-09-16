@@ -1,7 +1,11 @@
 #ifndef WIRESHARK_PLUGIN_SRC_PACKET_BPV7_H_
 #define WIRESHARK_PLUGIN_SRC_PACKET_BPV7_H_
 
-/* Reference: https://datatracker.ietf.org/doc/draft-ietf-dtn-bpbis/ */
+/*
+* SPDX-License-Identifier: GPL-2.0-or-later
+*
+* Reference: https://datatracker.ietf.org/doc/draft-ietf-dtn-bpbis/
+*/
 #include "config.h"
 #include <ws_symbol_export.h>
 #include <epan/tvbuff.h>
