@@ -50,7 +50,6 @@ static rsa_privkey_record_t *uat_rsa_privkeys;
 static guint uat_num_rsa_privkeys;
 
 static void register_rsa_uats(void);
-#endif  /* HAVE_LIBGNUTLS */
 
 #ifdef HAVE_GNUTLS_PKCS11
 /** PINs for PKCS #11 keys in rsa_privkeys. Must be cleared after rsa_privkeys. */
@@ -64,6 +63,7 @@ static uat_t *pkcs11_libs_uat;
 static pkcs11_lib_record_t *uat_pkcs11_libs;
 static guint uat_num_pkcs11_libs;
 #endif  /* HAVE_GNUTLS_PKCS11 */
+#endif  /* HAVE_LIBGNUTLS */
 
 void
 secrets_init(void)
