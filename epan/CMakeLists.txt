@@ -23,7 +23,7 @@ add_subdirectory(dfilter)
 add_subdirectory(dissectors)
 add_subdirectory(ftypes)
 
-if(LUA_FOUND)
+if(LUA_FOUND AND ENABLE_LUA)
 	add_subdirectory(wslua)
 endif()
 
@@ -297,7 +297,7 @@ add_library(epan
 	$<TARGET_OBJECTS:dissectors>
 	$<TARGET_OBJECTS:dissectors-corba>
 	$<TARGET_OBJECTS:ftypes>
-	$<$<BOOL:${LUA_FOUND}>:$<TARGET_OBJECTS:wslua>>
+	$<$<AND:$<BOOL:${LUA_FOUND}>,$<BOOL:${ENABLE_LUA}>>:$<TARGET_OBJECTS:wslua>>
 	${CMAKE_BINARY_DIR}/image/libwireshark.rc
 )
 
