@@ -66,7 +66,6 @@ static int info_update_freq_ = 100;
 FollowStreamDialog::FollowStreamDialog(QWidget &parent, CaptureFile &cf, follow_type_t type) :
     WiresharkDialog(parent, cf),
     ui(new Ui::FollowStreamDialog),
-    b_find_(NULL),
     follow_type_(type),
     follower_(NULL),
     show_type_(SHOW_ASCII),
@@ -121,8 +120,6 @@ FollowStreamDialog::FollowStreamDialog(QWidget &parent, CaptureFile &cf, follow_
 
     ui->teStreamContent->installEventFilter(this);
 
-    connect(ui->leFind, SIGNAL(useRegexFind(bool)), this, SLOT(useRegexFind(bool)));
-
     QComboBox *cbcs = ui->cbCharset;
     cbcs->blockSignals(true);
     cbcs->addItem(tr("ASCII"), SHOW_ASCII);
@@ -135,25 +132,19 @@ FollowStreamDialog::FollowStreamDialog(QWidget &parent, CaptureFile &cf, follow_
     cbcs->addItem(tr("YAML"), SHOW_YAML);
     cbcs->blockSignals(false);
 
-    b_filter_out_ = ui->buttonBox->addButton(tr("Filter Out This Stream"), QDialogButtonBox::ActionRole);
-    connect(b_filter_out_, SIGNAL(clicked()), this, SLOT(filterOut()));
+    QPushButton *button = ui->buttonBox->addButton(tr("Filter Out This Stream"), QDialogButtonBox::ActionRole);
+    connect(button, &QPushButton::clicked, this, &FollowStreamDialog::filterOut);
 
-    b_print_ = ui->buttonBox->addButton(tr("Print"), QDialogButtonBox::ActionRole);
-    connect(b_print_, SIGNAL(clicked()), this, SLOT(printStream()));
+    button = ui->buttonBox->addButton(tr("Print"), QDialogButtonBox::ActionRole);
+    connect(button, &QPushButton::clicked, this, &FollowStreamDialog::printStream);
 
-    b_save_ = ui->buttonBox->addButton(tr("Save as…"), QDialogButtonBox::ActionRole);
-    connect(b_save_, SIGNAL(clicked()), this, SLOT(saveAs()));
+    button = ui->buttonBox->addButton(tr("Save as…"), QDialogButtonBox::ActionRole);
+    connect(button, &QPushButton::clicked, this, &FollowStreamDialog::saveAs);
 
-    b_back_ = ui->buttonBox->addButton(tr("Back"), QDialogButtonBox::ActionRole);
-    connect(b_back_, SIGNAL(clicked()), this, SLOT(backButton()));
+    button = ui->buttonBox->addButton(tr("Back"), QDialogButtonBox::ActionRole);
+    connect(button, &QPushButton::clicked, this, &FollowStreamDialog::backButton);
 
     ProgressFrame::addToButtonBox(ui->buttonBox, &parent);
-
-    connect(ui->buttonBox, SIGNAL(helpRequested()), this, SLOT(helpButton()));
-    connect(ui->teStreamContent, SIGNAL(mouseMovedToTextCursorPosition(int)),
-            this, SLOT(fillHintLabel(int)));
-    connect(ui->teStreamContent, SIGNAL(mouseClickedOnTextCursorPosition(int)),
-            this, SLOT(goToPacketForTextPos(int)));
 
     fillHintLabel(-1);
 }
@@ -162,6 +153,11 @@ FollowStreamDialog::~FollowStreamDialog()
 {
     delete ui;
     resetStream(); // Frees payload
+}
+
+void FollowStreamDialog::on_teStreamContent_mouseMovedToTextCursorPosition(int pos)
+{
+    fillHintLabel(pos);
 }
 
 void FollowStreamDialog::addCodecs(const QMap<QString, QTextCodec *> &codecMap)
@@ -223,7 +219,7 @@ void FollowStreamDialog::fillHintLabel(int text_pos)
     ui->hintLabel->setText(hint);
 }
 
-void FollowStreamDialog::goToPacketForTextPos(int text_pos)
+void FollowStreamDialog::on_teStreamContent_mouseClickedOnTextCursorPosition(int text_pos)
 {
     int pkt = -1;
     if (file_closed_) {
@@ -250,22 +246,19 @@ void FollowStreamDialog::updateWidgets(bool follow_in_progress)
         enable = false;
     }
 
-    ui->cbDirections->setEnabled(enable);
-    ui->cbCharset->setEnabled(enable);
-    ui->streamNumberSpinBox->setEnabled(enable);
-    if (follow_type_ == FOLLOW_HTTP2 || follow_type_ == FOLLOW_QUIC) {
-        ui->subStreamNumberSpinBox->setEnabled(enable);
+    ui->layoutSettings->setEnabled(enable);
+    ui->layoutFind->setEnabled(enable);
+
+    foreach (QAbstractButton *btn, ui->buttonBox->buttons())
+    {
+        if (ui->buttonBox->buttonRole(btn) == QDialogButtonBox::ActionRole)
+            btn->setEnabled(enable);
     }
-    ui->leFind->setEnabled(enable);
-    ui->bFind->setEnabled(enable);
-    b_filter_out_->setEnabled(enable);
-    b_print_->setEnabled(enable);
-    b_save_->setEnabled(enable);
 
     WiresharkDialog::updateWidgets();
 }
 
-void FollowStreamDialog::useRegexFind(bool use_regex)
+void FollowStreamDialog::on_leFind_useRegexFind(bool use_regex)
 {
     use_regex_find_ = use_regex;
     if (use_regex_find_)
@@ -319,7 +312,7 @@ void FollowStreamDialog::saveAs()
     out.writeRawData(bytes.constData(), bytes.size());
 }
 
-void FollowStreamDialog::helpButton()
+void FollowStreamDialog::on_buttonBox_helpRequested()
 {
     wsApp->helpTopicAction(HELP_FOLLOW_STREAM_DIALOG);
 }
@@ -484,11 +477,7 @@ void FollowStreamDialog::on_buttonBox_rejected()
 
 void FollowStreamDialog::removeStreamControls()
 {
-    ui->horizontalLayout->removeItem(ui->streamNumberSpacer);
-    ui->streamNumberLabel->setVisible(false);
-    ui->streamNumberSpinBox->setVisible(false);
-    ui->subStreamNumberLabel->setVisible(false);
-    ui->subStreamNumberSpinBox->setVisible(false);
+    ui->streamSettings->setVisible(false);
 }
 
 void FollowStreamDialog::resetStream()
@@ -575,12 +564,6 @@ FollowStreamDialog::readStream()
     ui->teStreamContent->moveCursor(QTextCursor::Start);
 
     return ret;
-}
-
-void
-FollowStreamDialog::followStream()
-{
-    readStream();
 }
 
 const int FollowStreamDialog::max_document_length_ = 500 * 1000 * 1000; // Just a guess
@@ -1160,7 +1143,7 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
     ui->cbDirections->addItem(server_to_client_string);
     ui->cbDirections->blockSignals(false);
 
-    followStream();
+    readStream();
     fillHintLabel(-1);
 
     updateWidgets(false);

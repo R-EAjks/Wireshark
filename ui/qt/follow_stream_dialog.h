@@ -56,31 +56,38 @@ private slots:
     void on_bFind_clicked();
     void on_leFind_returnPressed();
 
-    void helpButton();
     void backButton();
     void close();
     void filterOut();
-    void useRegexFind(bool use_regex);
     void findText(bool go_back = true);
     void saveAs();
     void printStream();
     void fillHintLabel(int text_pos);
-    void goToPacketForTextPos(int text_pos);
+
+    void on_leFind_useRegexFind(bool use_regex);
 
     void on_streamNumberSpinBox_valueChanged(int stream_num);
     void on_subStreamNumberSpinBox_valueChanged(int sub_stream_num);
 
+    void on_teStreamContent_mouseMovedToTextCursorPosition(int text_pos);
+    void on_teStreamContent_mouseClickedOnTextCursorPosition(int text_pos);
+
     void on_buttonBox_rejected();
+    void on_buttonBox_helpRequested();
 
 signals:
     void updateFilter(QString filter, bool force);
     void goToPacket(int packet_num);
 
 private:
+    Ui::FollowStreamDialog  *ui;
+
+    void addText(QString text, gboolean is_from_server, guint32 packet_num, gboolean colorize = true);
+
     void removeStreamControls();
     void resetStream(void);
-    void updateWidgets(bool follow_in_progress);
-    void updateWidgets() { updateWidgets(false); } // Needed for WiresharkDialog?
+    void updateWidgets(bool follow_in_progress = false);
+
     frs_return_t
     showBuffer(char *buffer, size_t nchars, gboolean is_from_server,
                 guint32 packet_num, nstime_t abs_ts, guint32 *global_pos);
@@ -88,17 +95,6 @@ private:
     frs_return_t readStream();
     frs_return_t readFollowStream();
     frs_return_t readSslStream();
-
-    void followStream();
-    void addText(QString text, gboolean is_from_server, guint32 packet_num, gboolean colorize = true);
-
-    Ui::FollowStreamDialog  *ui;
-
-    QPushButton             *b_filter_out_;
-    QPushButton             *b_find_;
-    QPushButton             *b_print_;
-    QPushButton             *b_save_;
-    QPushButton             *b_back_;
 
     follow_type_t           follow_type_;
     follow_info_t           follow_info_;
