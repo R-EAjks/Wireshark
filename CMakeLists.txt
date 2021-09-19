@@ -111,13 +111,17 @@ if(WIN32)
 	endif()
 	if(
 		(_vs_platform STREQUAL "x64" AND NOT WIRESHARK_TARGET_PLATFORM STREQUAL "win64")
-		OR
-		(_vs_platform STREQUAL "[undefined]" AND NOT WIRESHARK_TARGET_PLATFORM STREQUAL "win32")
+		# OR
+		# (_vs_platform STREQUAL "[undefined]" AND NOT WIRESHARK_TARGET_PLATFORM STREQUAL "win32")
 	)
 		message(FATAL_ERROR "The PLATFORM environment variable (${_vs_platform})"
 			" doesn't match the generator platform (${WIRESHARK_TARGET_PLATFORM})")
 	endif()
 	message(STATUS "Building for ${WIRESHARK_TARGET_PLATFORM} using ${CMAKE_GENERATOR}")
+
+	# This is potentially dangerous and stupid https://gitlab.kitware.com/cmake/cmake/-/issues/17725
+	include(InstallRequiredSystemLibraries)
+	message(STATUS "mrd: ${MSVC_REDIST_DIR}")
 
 	# Determine where the 3rd party libraries will be
 	if( DEFINED ENV{WIRESHARK_LIB_DIR} )

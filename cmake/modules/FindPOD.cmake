@@ -11,6 +11,7 @@ find_program(POD2MAN_EXECUTABLE
 		/usr/bin
 		/usr/local/bin
 		/sbin
+		"C:/Strawberry/perl/bin"
 )
 
 find_program(POD2HTML_EXECUTABLE
@@ -22,6 +23,7 @@ find_program(POD2HTML_EXECUTABLE
 		/usr/bin
 		/usr/local/bin
 		/sbin
+		"C:/Strawberry/perl/bin"
 )
 
 # handle the QUIETLY and REQUIRED arguments and set POD2HTML_FOUND to TRUE if

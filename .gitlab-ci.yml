@@ -165,11 +165,11 @@ variables:
     - $env:WIRESHARK_BASE_DIR = "C:\Development"
     - $env:Configuration = "RelWithDebInfo"
     - $env:Path += ";C:\Program Files\CMake\bin"
-    - $env:Path += ";C:\Strawberry\c\bin;C:\Strawberry\perl\site\bin;C:\Strawberry\perl\bin"
+    # - $env:Path += ";C:\Strawberry\c\bin;C:\Strawberry\perl\site\bin;C:\Strawberry\perl\bin"
     - $env:Path += ";C:\qt\5.15.2\msvc2019_64\bin"
     # https://help.appveyor.com/discussions/questions/18777-how-to-use-vcvars64bat-from-powershell
-    - cmd.exe /c "call `"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat`" && set > %temp%\vcvars.txt"
-    - Get-Content "$env:temp\vcvars.txt" | Foreach-Object { if ($_ -match "^(.*?)=(.*)$") { Set-Content "env:\$($matches[1])" $matches[2] } }
+    # - cmd.exe /c "call `"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat`" && set > %temp%\vcvars.txt"
+    # - Get-Content "$env:temp\vcvars.txt" | Foreach-Object { if ($_ -match "^(.*?)=(.*)$") { Set-Content "env:\$($matches[1])" $matches[2] } }
     # Testing / debugging only.
     # - cmd.exe /c "set CI_PIPELINE_SOURCE"
     # - cmd.exe /c "set CI_PROJECT_URL"
@@ -582,9 +582,11 @@ Windows Build:
   tags:
     - wireshark-windows-merge-req
   script:
-    - cmake -G "Visual Studio 16 2019" -A x64 -DENABLE_LTO=off ..
-    - msbuild /verbosity:minimal /maxcpucount Wireshark.sln
-    - msbuild /verbosity:minimal /maxcpucount test-programs.vcxproj
+    - cmake -G "Visual Studio 16 2019" -A x64 -T host=x64 -DENABLE_LTO=off ..
+    # - msbuild /verbosity:minimal /maxcpucount Wireshark.sln
+    - cmake --build . --config RelWithDebInfo --parallel
+    # - msbuild /verbosity:minimal /maxcpucount test-programs.vcxproj
+    - cmake --build . --config RelWithDebInfo --target test-programs --parallel
     - ctest -C RelWithDebInfo --parallel 3 --force-new-ctest-process --output-on-failure
 
 # Adapted from https://www.synopsys.com/blogs/software-security/integrating-coverity-scan-with-gitlab-ci/
@@ -646,7 +648,8 @@ Coverity Visual C++ Scan:
     - C:\ProgramData\chocolatey\tools\7z x "$env:temp\cov-analysis-win64.zip" -y -r -o"$env:temp"
     - cmake -DTEST_EXTRA_ARGS=--enable-release -DENABLE_LTO=off -G "Visual Studio 16 2019" -A x64 ..
     - $covAnalysisWin64 = (Get-ChildItem -Path $env:temp -Filter "cov-analysis-win64-*" -Directory)[0].FullName
-    - Invoke-Expression "& $covAnalysisWin64\bin\cov-build.exe --return-emit-failures --dir ..\cov-int msbuild /verbosity:minimal `"/consoleloggerparameters:PerformanceSummary;NoSummary`" /maxcpucount:1 Wireshark.sln"
+    # - Invoke-Expression "& $covAnalysisWin64\bin\cov-build.exe --return-emit-failures --dir ..\cov-int msbuild /verbosity:minimal `"/consoleloggerparameters:PerformanceSummary;NoSummary`" /maxcpucount:1 Wireshark.sln"
+    - Invoke-Expression "& $covAnalysisWin64\bin\cov-build.exe --return-emit-failures --dir ..\cov-int cmake --build . --config RelWithDebInfo
     - cd ..
     - C:\ProgramData\chocolatey\tools\7z a -tzip cov-int.zip cov-int
     - '"export ARTIFACT_JOB_URL=$env:CI_JOB_URL" | Out-File -Encoding ascii job_environment_variables.sh'
@@ -701,8 +704,9 @@ Visual Studio Code Analysis:
       when: always
   script:
     - $env:caexcludepath = "C:\Qt;$env:INCLUDE"
-    - cmake -DENABLE_CODE_ANALYSIS=ON -G "Visual Studio 16 2019" -A x64 -DENABLE_LTO=off ..
-    - msbuild /verbosity:minimal "/consoleloggerparameters:PerformanceSummary;NoSummary" /maxcpucount:2 Wireshark.sln
+    - cmake -DENABLE_CODE_ANALYSIS=ON -G "Visual Studio 16 2019" -A x64 -T host=x64 -DENABLE_LTO=off ..
+    # - msbuild /verbosity:minimal "/consoleloggerparameters:PerformanceSummary;NoSummary" /maxcpucount:2 Wireshark.sln
+    - cmake --build . --parallel 2 --config RelWithDebInfo -- "/consoleloggerparameters:PerformanceSummary;NoSummary"
 
 # Build all doxygen docs
 API Reference:
