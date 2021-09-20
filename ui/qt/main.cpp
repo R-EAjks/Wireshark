@@ -1049,10 +1049,10 @@ int main(int argc, char *qt_argv[])
 
     ret_val = wsApp->exec();
 
+    delete main_w;
     recent_cleanup();
     epan_cleanup();
 
-    delete main_w;
     delete wsApp;
     wsApp = NULL;
 
