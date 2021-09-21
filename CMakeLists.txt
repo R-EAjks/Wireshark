@@ -429,18 +429,20 @@ set_property(DIRECTORY
 
 if(WIN32)
 	#
-	# Make sure everyone is using the same API and that it's sufficient
-	# for our needs.
-	# This should match the following:
-	# - The <compatibility><application> section in image\wireshark.exe.manifest.in
-	# - The GetWindowsVersion parts of packaging\nsis\wireshark.nsi
-	# - The VersionNT parts of packaging\wix\Prerequisites.wxi
-	#
 	# NOTE: Because of the way Qt moc is including "config.h" (not as the
 	# first header) this *MUST* be defined on the command line to precede
 	# every included header and not trigger symbol redefinition errors.
 	#
 	add_definitions(
+		-DWIN32_LEAN_AND_MEAN
+		#
+		# Make sure everyone is using the same API and that it's sufficient
+		# for our needs.
+		# This should match the following:
+		# - The <compatibility><application> section in image\wireshark.exe.manifest.in
+		# - The GetWindowsVersion parts of packaging\nsis\wireshark.nsi
+		# - The VersionNT parts of packaging\wix\Prerequisites.wxi
+		#
 		-DNTDDI_VERSION=NTDDI_WIN7
 		-D_WIN32_WINNT=_WIN32_WINNT_WIN7
 	)
@@ -452,7 +454,6 @@ if( CMAKE_C_COMPILER_ID MATCHES "MSVC")
 	endif()
 
 	add_definitions(
-		/DWIN32_LEAN_AND_MEAN
 		/D_CRT_SECURE_NO_DEPRECATE
 		# NOMINMAX keeps windows.h from defining "min" and "max" via windef.h.
 		# This avoids conflicts with the C++ standard library.
@@ -2592,6 +2593,7 @@ if(BUILD_tshark)
 	add_executable(tshark ${tshark_FILES})
 	set_extra_executable_properties(tshark "Executables")
 	target_link_libraries(tshark ${tshark_LIBS})
+	target_link_options(tshark PRIVATE $<$<BOOL:${MINGW}>:-municode>)
 	install(TARGETS tshark RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
@@ -2638,6 +2640,7 @@ if(BUILD_rawshark AND PCAP_FOUND)
 	add_executable(rawshark ${rawshark_FILES})
 	set_extra_executable_properties(rawshark "Executables")
 	target_link_libraries(rawshark ${rawshark_LIBS})
+	target_link_options(rawshark PRIVATE $<$<BOOL:${MINGW}>:-municode>)
 	install(TARGETS rawshark RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
@@ -2704,6 +2707,7 @@ if(BUILD_randpkt)
 	add_executable(randpkt ${randpkt_FILES})
 	set_extra_executable_properties(randpkt "Executables")
 	target_link_libraries(randpkt ${randpkt_LIBS})
+	target_link_options(randpkt PRIVATE $<$<BOOL:${MINGW}>:-municode>)
 	install(TARGETS randpkt RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
@@ -2731,6 +2735,7 @@ if(BUILD_text2pcap)
 	add_executable(text2pcap ${text2pcap_FILES})
 	set_extra_executable_properties(text2pcap "Executables")
 	target_link_libraries(text2pcap ${text2pcap_LIBS})
+	target_link_options(text2pcap PRIVATE $<$<BOOL:${MINGW}>:-municode>)
 	install(TARGETS text2pcap RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
@@ -2750,6 +2755,7 @@ if(BUILD_mergecap)
 	add_executable(mergecap ${mergecap_FILES})
 	set_extra_executable_properties(mergecap "Executables")
 	target_link_libraries(mergecap ${mergecap_LIBS})
+	target_link_options(mergecap PRIVATE $<$<BOOL:${MINGW}>:-municode>)
 	install(TARGETS mergecap RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
@@ -2769,6 +2775,7 @@ if(BUILD_reordercap)
 	add_executable(reordercap ${reordercap_FILES})
 	set_extra_executable_properties(reordercap "Executables")
 	target_link_libraries(reordercap ${reordercap_LIBS})
+	target_link_options(reordercap PRIVATE $<$<BOOL:${MINGW}>:-municode>)
 	install(TARGETS reordercap RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
@@ -2791,6 +2798,7 @@ if(BUILD_capinfos)
 	set_extra_executable_properties(capinfos "Executables")
 	target_link_libraries(capinfos ${capinfos_LIBS})
 	target_include_directories(capinfos SYSTEM PRIVATE ${GCRYPT_INCLUDE_DIRS})
+	target_link_options(capinfos PRIVATE $<$<BOOL:${MINGW}>:-municode>)
 	install(TARGETS capinfos RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
@@ -2811,6 +2819,7 @@ if(BUILD_captype)
 	add_executable(captype ${captype_FILES})
 	set_extra_executable_properties(captype "Executables")
 	target_link_libraries(captype ${captype_LIBS})
+	target_link_options(captype PRIVATE $<$<BOOL:${MINGW}>:-municode>)
 	install(TARGETS captype RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
@@ -2832,6 +2841,7 @@ if(BUILD_editcap)
 	set_extra_executable_properties(editcap "Executables")
 	target_link_libraries(editcap ${editcap_LIBS})
 	target_include_directories(editcap SYSTEM PRIVATE ${GCRYPT_INCLUDE_DIRS})
+	target_link_options(editcap PRIVATE $<$<BOOL:${MINGW}>:-municode>)
 	install(TARGETS editcap RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
@@ -2862,6 +2872,7 @@ if(BUILD_dumpcap AND PCAP_FOUND)
 	set_extra_executable_properties(dumpcap "Executables")
 	target_link_libraries(dumpcap ${dumpcap_LIBS})
 	target_include_directories(dumpcap SYSTEM PRIVATE ${ZLIB_INCLUDE_DIRS})
+	target_link_options(dumpcap PRIVATE $<$<BOOL:${MINGW}>:-municode>)
 	install(TARGETS dumpcap
 			RUNTIME	DESTINATION ${CMAKE_INSTALL_BINDIR}
 			PERMISSIONS ${DUMPCAP_SETUID}
