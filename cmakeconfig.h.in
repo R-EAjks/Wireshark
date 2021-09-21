@@ -292,6 +292,9 @@
 #  if !defined(QT_VERSION) || !defined(_SSIZE_T_DEFINED)
    typedef int ssize_t;
 #  endif
+#  define strncasecmp strnicmp
+#  define popen       _popen
+#  define pclose      _pclose
 #endif
 
 #if defined(_WIN32)
@@ -305,16 +308,9 @@
     */
 #  define YY_NO_UNISTD_H
 
-#  define strncasecmp strnicmp
-#  define popen       _popen
-#  define pclose      _pclose
-
 #  ifndef __STDC__
 #    define __STDC__ 0
 #  endif
-   /* Use Unicode in Windows runtime functions. */
-#  define UNICODE 1
-#  define _UNICODE 1
 #endif
 
 #include <ws_diag_control.h>

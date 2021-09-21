@@ -436,6 +436,16 @@ if(WIN32)
 	add_definitions(
 		-DWIN32_LEAN_AND_MEAN
 		#
+		# Use Unicode in Windows runtime functions.
+		#
+		-DUNICODE
+		-D_UNICODE
+		#
+		# NOMINMAX keeps windows.h from defining "min" and "max" via windef.h.
+		# This avoids conflicts with the C++ standard library.
+		#
+		-DNOMINMAX
+		#
 		# Make sure everyone is using the same API and that it's sufficient
 		# for our needs.
 		# This should match the following:
@@ -455,9 +465,6 @@ if( CMAKE_C_COMPILER_ID MATCHES "MSVC")
 
 	add_definitions(
 		/D_CRT_SECURE_NO_DEPRECATE
-		# NOMINMAX keeps windows.h from defining "min" and "max" via windef.h.
-		# This avoids conflicts with the C++ standard library.
-		/DNOMINMAX
 		# -DPSAPI_VERSION=1                 Programs that must run on earlier versions of Windows as well as Windows 7 and later
 		#                                   versions should always call this function as GetProcessMemoryInfo. To ensure correct
 		#                                   resolution of symbols, add Psapi.lib to the TARGETLIBS macro and compile the program
@@ -469,6 +476,7 @@ if( CMAKE_C_COMPILER_ID MATCHES "MSVC")
 		#                                   in pcap-stdinc.h when compiling C++ files, e.g. the Qt UI
 		/DPSAPI_VERSION=1
 		/D_ALLOW_KEYWORD_MACROS
+		# Disable deprecation of POSIX function names.
 		# https://stackoverflow.com/questions/37845163/what-is-the-purpose-of-microsofts-underscore-c-functions
 		/D_CRT_NONSTDC_NO_WARNINGS
 	)
