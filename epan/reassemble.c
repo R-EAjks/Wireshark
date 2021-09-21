@@ -1422,8 +1422,9 @@ fragment_add_common(reassembly_table *table, tvbuff_t *tvb, const int offset,
 						 * Yes.
 						 * XXX - can this ever happen?
 						 */
-						THROW_MESSAGE(ReassemblyError,
-						    "Frame already added in first pass");
+						return fd_head;
+						//THROW_MESSAGE(ReassemblyError,
+						//    "Frame already added in first pass");
 					} else {
 						/*
 						 * No.
