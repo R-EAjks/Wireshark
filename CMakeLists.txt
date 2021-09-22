@@ -464,6 +464,16 @@ if(WIN32)
 	)
 endif()
 
+if(MINGW)
+	add_definitions(
+		#
+		# Enable POSIX APIs. This will switch stdio to ANSI C functions and
+		# enable C99 conformant vsnprintf() among other things.
+		#
+		-D_POSIX
+	)
+endif()
+
 if( CMAKE_C_COMPILER_ID MATCHES "MSVC")
 	if ((MSVC_VERSION LESS "1900") OR (MSVC_VERSION GREATER_EQUAL "2000"))
 		message(FATAL_ERROR "You are using an unsupported version of MSVC")
@@ -2524,11 +2534,9 @@ if(BUILD_wireshark AND QT_FOUND)
 			POST_BUILD
 			COMMAND set "PATH=${QT_BIN_PATH};%PATH%"
 			COMMAND "${QT_WINDEPLOYQT_EXECUTABLE}"
-				$<$<CONFIG:Debug>:--debug>
-				$<$<NOT:$<CONFIG:Debug>>:--release>
 				--no-compiler-runtime
 				--verbose 10
-				--pdb
+				$<$<BOOL:${MSVC}>:--pdb>
 				"$<TARGET_FILE:wireshark>"
 		)
 		add_dependencies(copy_qt_dlls wireshark)
