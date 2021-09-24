@@ -239,7 +239,6 @@ static const range_string optommp_mm_areas[] = {
     {   0,          0,          NULL }
 };
 
-
 /* Function Prototypes */
 static guint get_optommp_message_len(packet_info *pinfo _U_, tvbuff_t *tvb,
     int offset, void *data _U_);
@@ -302,8 +301,7 @@ parameters:     pinfo: not used
                 tvb: poiner to packet data
                 offset: not used
                 data: not used
-purpose:        Tests whether or not a packet signature might be 
-				dissectable by OptoMMP.
+purpose:        Tests whether or not a packet signature might be dissectable by OptoMMP.
 ****************************************************************************/
 static gboolean test_optommp(packet_info* pinfo _U_, tvbuff_t* tvb, int offset _U_, void* data _U_)
 {
@@ -979,8 +977,8 @@ parameters:     pinfo: not used
                 tvb: poiner to packet data
                 offset: not used
                 data: not used
-purpose:        Tests the packet format, if a match, sets conversation
-				to use this dissector.
+purpose:        Tests the packet format, if a match,
+                sets conversation to use this dissector.
 ****************************************************************************/
 static gboolean dissect_optommp_heur_tcp(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data)
 {
