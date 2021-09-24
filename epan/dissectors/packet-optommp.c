@@ -302,8 +302,7 @@ parameters:     pinfo: not used
                 tvb: poiner to packet data
                 offset: not used
                 data: not used
-purpose:        Tests whether or not a packet signature might be 
-				dissectable by OptoMMP.
+purpose:        Tests whether or not a packet signature might be dissectable.
 ****************************************************************************/
 static gboolean test_optommp(packet_info* pinfo _U_, tvbuff_t* tvb, int offset _U_, void* data _U_)
 {
