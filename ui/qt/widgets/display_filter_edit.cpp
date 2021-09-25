@@ -561,7 +561,11 @@ void DisplayFilterEdit::applyDisplayFilter()
         return;
 
     if (text().length() > 0)
+    {
         last_applied_ = text();
+    } else {
+        last_applied_ = QString();
+    }
 
     updateClearButton();
 
