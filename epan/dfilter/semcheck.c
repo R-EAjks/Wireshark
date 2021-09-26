@@ -34,8 +34,14 @@
 	printf("%s:%u: ", __FILE__, (unsigned int)__LINE__); \
 	printf x; \
 	fflush(stdout)
+#define DebugNode(x, n) \
+	printf("%s:%u: ", __FILE__, (unsigned int)__LINE__); \
+	printf x; \
+	stnode_fprint(stdout, n); \
+	fflush(stdout)
 #else
 #define DebugLog(x) ;
+#define DebugNode(x,n)
 #endif
 
 static void
@@ -1053,6 +1059,7 @@ check_relation_LHS_RANGE(dfwork_t *dfw, const char *relation_string,
 	stnode_t		*new_st;
 	sttype_id_t		type2;
 	stnode_t		*entity1;
+	sttype_id_t		entity1_type;
 	header_field_info	*hfinfo1, *hfinfo2;
 	ftenum_t		ftype1, ftype2;
 	fvalue_t		*fvalue;
@@ -1064,7 +1071,12 @@ check_relation_LHS_RANGE(dfwork_t *dfw, const char *relation_string,
 
 	type2 = stnode_type_id(st_arg2);
 	entity1 = sttype_range_entity(st_arg1);
-	if (entity1 && stnode_type_id(entity1) == STTYPE_FIELD) {
+	ws_assert(entity1);
+
+	/* Range entities must be protocol fields or functions. */
+	entity1_type = stnode_field_from_unparsed(entity1);
+
+	if (entity1_type == STTYPE_FIELD) {
 		hfinfo1 = (header_field_info *)stnode_data(entity1);
 		ftype1 = hfinfo1->type;
 
@@ -1073,7 +1085,7 @@ check_relation_LHS_RANGE(dfwork_t *dfw, const char *relation_string,
 					hfinfo1->abbrev, ftype_pretty_name(ftype1));
 			THROW(TypeError);
 		}
-	} else if (entity1 && stnode_type_id(entity1) == STTYPE_FUNCTION) {
+	} else if (entity1_type == STTYPE_FUNCTION) {
 		df_func_def_t *funcdef = sttype_function_funcdef(entity1);
 		ftype1 = funcdef->retval_ftype;
 
@@ -1086,12 +1098,8 @@ check_relation_LHS_RANGE(dfwork_t *dfw, const char *relation_string,
 		check_function(dfw, entity1);
 
 	} else {
-		if (entity1 == NULL) {
-			dfilter_fail(dfw, "Range is not supported, details: " G_STRLOC " entity: NULL");
-		} else {
-			dfilter_fail(dfw, "Range is not supported, details: " G_STRLOC " entity: %p of type %d",
-					(void *)entity1, stnode_type_id(entity1));
-		}
+		dfilter_fail(dfw, "Range is not supported for entity <%p> of type %s",
+					(void *)entity1, stnode_type_name(entity1));
 		THROW(TypeError);
 	}
 
@@ -1253,6 +1261,9 @@ check_param_entity(dfwork_t *dfw, stnode_t *st_node)
 	stnode_t		*new_st;
 	fvalue_t		*fvalue;
 	char *s;
+
+	/* All function parameters must be protocol fields. (Are there exceptions?) */
+	stnode_field_from_unparsed(st_node);
 
 	e_type = stnode_type_id(st_node);
 	/* If there's an unparsed string, change it to an FT_STRING */
@@ -1418,53 +1429,16 @@ check_relation(dfwork_t *dfw, const char *relation_string,
 #ifdef DEBUG_dfilter
 	static guint i = 0;
 #endif
-	header_field_info   *hfinfo;
-	stnode_t            *new_st;
-	char                *s;
 
 	DebugLog(("   4 check_relation(\"%s\") [%u]\n", relation_string, i++));
 
-	/* Protocol can only be on LHS (for "contains" or "matches" operators).
-	 * Check to see if protocol is on RHS, and re-interpret it as UNPARSED
-	 * instead. The subsequent functions will parse it according to the
-	 * existing rules for unparsed unquoted strings.
-	 *
-	 * This catches the case where the user has written "fc" on the RHS,
-	 * probably intending a byte value rather than the fibre channel
-	 * protocol, or similar for a number of other possibilities
-	 * ("dc", "ff", "fefd"), and also catches the case where the user
-	 * has written a generic string on the RHS for a "contains" or
-	 * "matches" relation. (XXX: There's still a bit of a confusing mess;
-	 * byte arrays take precedent over generic strings when unquoted, so
-	 * "field contains data" matches "\x64 \x61 \x74 \x61" but
-	 * "field contains dc" matches "\xdc" and not "\x64 \x43", but that's
-	 * an underlying issue.)
-	 *
-	 * XXX: Is there a better way to do this in the lex scanner or grammar
-	 * parser step instead?  Should the determination of whether something
-	 * is a field occur later than it does currently?  This is kind of a
-	 * hack.
-	 */
+	/* If the LHS is unparsed do it now. */
+	stnode_field_from_unparsed(st_arg1);
 
-	if (stnode_type_id(st_arg2) == STTYPE_FIELD) {
-		hfinfo = (header_field_info*)stnode_data(st_arg2);
-		if (hfinfo->type == FT_PROTOCOL) {
-			/* Discard const qualifier from hfinfo->abbrev
-			 * for sttnode_new, even though it duplicates the
-			 * string.
-			 */
-			s = (char *)hfinfo->abbrev;
-			/* Send it through as unparsed and all the other
-			 * functions will take care of it as if it didn't
-			 * match a protocol string.
-			 */
-			new_st = stnode_new(STTYPE_UNPARSED, s);
-			stnode_free(st_arg2);
-			st_arg2 = new_st;
-			sttype_test_set2_args(st_node, st_arg1, new_st);
-		}
-	}
+	DebugNode(("LHS: "), st_arg1);
+	DebugNode(("RHS: "), st_arg2);
 
+	/* Check left side; each type will check the right side. */
 	switch (stnode_type_id(st_arg1)) {
 		case STTYPE_FIELD:
 			check_relation_LHS_FIELD(dfw, relation_string, can_func,

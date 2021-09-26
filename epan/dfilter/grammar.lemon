@@ -69,8 +69,6 @@
 any "error" symbols are shifted, if possible. */
 %syntax_error {
 
-	header_field_info	*hfinfo;
-
 	if (!TOKEN) {
 		dfilter_fail(dfw, "Unexpected end of filter string.");
 		dfw->syntax_error = TRUE;
@@ -100,10 +98,6 @@ any "error" symbols are shifted, if possible. */
 			dfilter_fail(dfw, "The integer %d was unexpected in this context.",
 				stnode_value(TOKEN));
 			break;
-		case STTYPE_FIELD:
-			hfinfo = (header_field_info *)stnode_data(TOKEN);
-			dfilter_fail(dfw, "Syntax error near \"%s\".", hfinfo->abbrev);
-			break;
 		case STTYPE_FUNCTION:
 			dfilter_fail(dfw, "The function \"%s\" was unexpected in this context.",
 				sttype_function_funcdef(TOKEN)->name);
@@ -117,6 +111,7 @@ any "error" symbols are shifted, if possible. */
 		   see them here. */
 		case STTYPE_NUM_TYPES:
 		case STTYPE_RANGE:
+		case STTYPE_FIELD:
 		case STTYPE_FVALUE:
 		case STTYPE_PCRE:
 			ws_assert_not_reached();
@@ -177,14 +172,13 @@ logical_test(T) ::= entity(E).
 
 
 /* Entities, or things that can be compared/tested/checked */
-entity(E) ::= FIELD(F).		{ E = F; }
 entity(E) ::= STRING(S).	{ E = S; }
 entity(E) ::= CHARCONST(C).	{ E = C; }
 entity(E) ::= UNPARSED(U).	{ E = U; }
 entity(E) ::= range(R).		{ E = R; }
 
-range_body(B) ::= FIELD(F).	{ B = F; }
 range_body(B) ::= STRING(S).	{ B = S; }
+range_body(B) ::= UNPARSED(U).	{ B = U; }
 range_body(B) ::= range(R).	{ B = R; }
 
 /* Ranges */

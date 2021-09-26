@@ -95,6 +95,9 @@ stnode_init_int(stnode_t *node, sttype_id_t type_id, gint32 value);
 void
 stnode_free(stnode_t *node);
 
+void
+stnode_replace(stnode_t *node, sttype_id_t type_id, gpointer data);
+
 const char*
 stnode_type_name(stnode_t *node);
 
@@ -112,6 +115,15 @@ stnode_value(stnode_t *node);
 
 const char *
 stnode_deprecated(stnode_t *node);
+
+/*
+ * The parser has no notion of STTYPE_FIELD values. The protocol field is
+ * always created during the semantic check phase (after parsing) from an
+ * STTYPE_UNPARSED syntax tree node because unparsed can mean different
+ * things in different contexts.
+ */
+sttype_id_t
+stnode_field_from_unparsed(stnode_t *node);
 
 #include <stdio.h>
 

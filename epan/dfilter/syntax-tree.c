@@ -175,6 +175,17 @@ stnode_free(stnode_t *node)
 	g_free(node);
 }
 
+void
+stnode_replace(stnode_t *node, sttype_id_t type_id, gpointer data)
+{
+	ws_assert(node->type);
+	if (node->type->func_free)
+		node->type->func_free(node->data);
+	node->data = NULL;
+	node->type = NULL;
+	stnode_init(node, type_id, data);
+}
+
 const char*
 stnode_type_name(stnode_t *node)
 {

@@ -398,28 +398,12 @@ static void mark_lval_deprecated(const char *s);
 		([.][-+[:alnum:]_:]+)+[.]{0,2} |
 [-+[:alnum:]_:]+([.][-+[:alnum:]_:]+)*[.]{0,2} {
 	/* Is it a field name or some other value (float, integer, bytes, ...)? */
-	header_field_info *hfinfo;
 	df_func_def_t *df_func_def;
 
 	/* Trailing dot is allowed for floats, but make sure that trailing ".."
 	 * is interpreted as a token on its own. */
 	if (strstr(yytext, "..")) {
 		yyless(yyleng-2);
-	}
-
-	hfinfo = proto_registrar_get_byname(yytext);
-	if (hfinfo) {
-		/* Yes, it's a field name */
-		return set_lval(TOKEN_FIELD, hfinfo);
-	}
-
-	hfinfo = proto_registrar_get_byalias(yytext);
-	if (hfinfo) {
-		/* Yes, it's an aliased field name */
-		/* XXX Do we need to make a copy of yytext? dfilter_compile
-		 * will dup this later on. */
-		mark_lval_deprecated(yytext);
-		return set_lval(TOKEN_FIELD, hfinfo);
 	}
 
 	df_func_def = df_func_lookup(yytext);
@@ -490,9 +474,6 @@ set_lval(int token, gpointer data)
 			break;
 		case TOKEN_CHARCONST:
 			type_id = STTYPE_CHARCONST;
-			break;
-		case TOKEN_FIELD:
-			type_id = STTYPE_FIELD;
 			break;
 		case TOKEN_UNPARSED:
 			type_id = STTYPE_UNPARSED;
