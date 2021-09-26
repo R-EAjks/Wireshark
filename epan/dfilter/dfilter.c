@@ -250,7 +250,7 @@ dfilter_compile(const gchar *text, dfilter_t **dfp, gchar **err_msg)
 	deprecated = g_ptr_array_new();
 
 	while (1) {
-		df_lval = stnode_new(STTYPE_UNINITIALIZED, NULL);
+		df_lval = stnode_new(STTYPE_UNINITIALIZED, NULL, NULL);
 		token = df_lex(scanner);
 
 		/* Check for scanner failure */

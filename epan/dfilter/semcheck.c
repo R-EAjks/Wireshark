@@ -609,7 +609,7 @@ convert_to_bytes(stnode_t *arg)
 	stnode_t      *new_st;
 	drange_node   *rn;
 
-	new_st = stnode_new(STTYPE_RANGE, NULL);
+	new_st = stnode_new(STTYPE_RANGE, NULL, arg->token_value);
 
 	rn = drange_node_new();
 	drange_node_set_start_offset(rn, 0);
@@ -730,7 +730,7 @@ check_relation_LHS_FIELD(dfwork_t *dfw, const char *relation_string,
 			if (!pcre) {
 				THROW(TypeError);
 			}
-			new_st = stnode_new(STTYPE_PCRE, pcre);
+			new_st = stnode_new(STTYPE_PCRE, pcre, st_arg2->token_value);
 		} else {
 			/* Skip incompatible fields */
 			while (hfinfo1->same_name_prev_id != -1 &&
@@ -772,7 +772,7 @@ check_relation_LHS_FIELD(dfwork_t *dfw, const char *relation_string,
 			if (!fvalue) {
 				THROW(TypeError);
 			}
-			new_st = stnode_new(STTYPE_FVALUE, fvalue);
+			new_st = stnode_new(STTYPE_FVALUE, fvalue, st_arg2->token_value);
 		}
 		if (stnode_type_id(st_node) == STTYPE_TEST) {
 			sttype_test_set2_args(st_node, st_arg1, new_st);
@@ -903,7 +903,7 @@ check_relation_LHS_STRING(dfwork_t *dfw, const char* relation_string,
 			}
 		}
 
-		new_st = stnode_new(STTYPE_FVALUE, fvalue);
+		new_st = stnode_new(STTYPE_FVALUE, fvalue, st_arg1->token_value);
 		sttype_test_set2_args(st_node, new_st, st_arg2);
 		stnode_free(st_arg1);
 	}
@@ -922,7 +922,7 @@ check_relation_LHS_STRING(dfwork_t *dfw, const char* relation_string,
 		if (!fvalue) {
 			THROW(TypeError);
 		}
-		new_st = stnode_new(STTYPE_FVALUE, fvalue);
+		new_st = stnode_new(STTYPE_FVALUE, fvalue, st_arg1->token_value);
 		sttype_test_set2_args(st_node, new_st, st_arg2);
 		stnode_free(st_arg1);
 	}
@@ -945,7 +945,7 @@ check_relation_LHS_STRING(dfwork_t *dfw, const char* relation_string,
 
 		check_function(dfw, st_arg2);
 
-		new_st = stnode_new(STTYPE_FVALUE, fvalue);
+		new_st = stnode_new(STTYPE_FVALUE, fvalue, st_arg1->token_value);
 		sttype_test_set2_args(st_node, new_st, st_arg2);
 		stnode_free(st_arg1);
 	}
@@ -997,7 +997,7 @@ check_relation_LHS_UNPARSED(dfwork_t *dfw, const char* relation_string,
 			}
 		}
 
-		new_st = stnode_new(STTYPE_FVALUE, fvalue);
+		new_st = stnode_new(STTYPE_FVALUE, fvalue, st_arg1->token_value);
 		sttype_test_set2_args(st_node, new_st, st_arg2);
 		stnode_free(st_arg1);
 	}
@@ -1016,7 +1016,7 @@ check_relation_LHS_UNPARSED(dfwork_t *dfw, const char* relation_string,
 		if (!fvalue) {
 			THROW(TypeError);
 		}
-		new_st = stnode_new(STTYPE_FVALUE, fvalue);
+		new_st = stnode_new(STTYPE_FVALUE, fvalue, st_arg1->token_value);
 		sttype_test_set2_args(st_node, new_st, st_arg2);
 		stnode_free(st_arg1);
 	}
@@ -1039,7 +1039,7 @@ check_relation_LHS_UNPARSED(dfwork_t *dfw, const char* relation_string,
 
 		check_function(dfw, st_arg2);
 
-		new_st = stnode_new(STTYPE_FVALUE, fvalue);
+		new_st = stnode_new(STTYPE_FVALUE, fvalue, st_arg1->token_value);
 		sttype_test_set2_args(st_node, new_st, st_arg2);
 		stnode_free(st_arg1);
 	}
@@ -1101,8 +1101,8 @@ check_relation_LHS_RANGE(dfwork_t *dfw, const char *relation_string,
 		check_function(dfw, entity1);
 
 	} else {
-		dfilter_fail(dfw, "Range is not supported for entity <%p> of type %s",
-					(void *)entity1, stnode_type_name(entity1));
+		dfilter_fail(dfw, "Range is not supported for entity %s of type %s",
+					stnode_token_value(entity1), stnode_type_name(entity1));
 		THROW(TypeError);
 	}
 
@@ -1136,14 +1136,14 @@ check_relation_LHS_RANGE(dfwork_t *dfw, const char *relation_string,
 			if (!pcre) {
 				THROW(TypeError);
 			}
-			new_st = stnode_new(STTYPE_PCRE, pcre);
+			new_st = stnode_new(STTYPE_PCRE, pcre, st_arg2->token_value);
 		} else {
 			fvalue = dfilter_fvalue_from_string(dfw, FT_BYTES, s);
 			if (!fvalue) {
 				DebugLog(("    5 check_relation_LHS_RANGE(type2 = STTYPE_STRING): Could not convert from string!\n"));
 				THROW(TypeError);
 			}
-			new_st = stnode_new(STTYPE_FVALUE, fvalue);
+			new_st = stnode_new(STTYPE_FVALUE, fvalue, st_arg2->token_value);
 		}
 		sttype_test_set2_args(st_node, st_arg1, new_st);
 		stnode_free(st_arg2);
@@ -1158,7 +1158,7 @@ check_relation_LHS_RANGE(dfwork_t *dfw, const char *relation_string,
 			if (!pcre) {
 				THROW(TypeError);
 			}
-			new_st = stnode_new(STTYPE_PCRE, pcre);
+			new_st = stnode_new(STTYPE_PCRE, pcre, st_arg2->token_value);
 		} else {
 			/*
 			 * The RHS should be FT_BYTES. However, there is a
@@ -1196,7 +1196,7 @@ check_relation_LHS_RANGE(dfwork_t *dfw, const char *relation_string,
 				DebugLog(("    5 check_relation_LHS_RANGE(type2 = STTYPE_UNPARSED): Could not convert from string!\n"));
 				THROW(TypeError);
 			}
-			new_st = stnode_new(STTYPE_FVALUE, fvalue);
+			new_st = stnode_new(STTYPE_FVALUE, fvalue, st_arg2->token_value);
 		}
 		sttype_test_set2_args(st_node, st_arg1, new_st);
 		stnode_free(st_arg2);
@@ -1210,7 +1210,7 @@ check_relation_LHS_RANGE(dfwork_t *dfw, const char *relation_string,
 			if (!pcre) {
 				THROW(TypeError);
 			}
-			new_st = stnode_new(STTYPE_PCRE, pcre);
+			new_st = stnode_new(STTYPE_PCRE, pcre, st_arg2->token_value);
 		} else {
 			/* The RHS should be FT_BYTES, but a character is just a
 			 * one-byte byte string. */
@@ -1219,7 +1219,7 @@ check_relation_LHS_RANGE(dfwork_t *dfw, const char *relation_string,
 				DebugLog(("    5 check_relation_LHS_RANGE(type2 = STTYPE_UNPARSED): Could not convert from string!\n"));
 				THROW(TypeError);
 			}
-			new_st = stnode_new(STTYPE_FVALUE, fvalue);
+			new_st = stnode_new(STTYPE_FVALUE, fvalue, st_arg2->token_value);
 		}
 		sttype_test_set2_args(st_node, st_arg1, new_st);
 		stnode_free(st_arg2);
@@ -1277,7 +1277,7 @@ check_param_entity(dfwork_t *dfw, stnode_t *st_node)
 			THROW(TypeError);
 		}
 
-		new_st = stnode_new(STTYPE_FVALUE, fvalue);
+		new_st = stnode_new(STTYPE_FVALUE, fvalue, st_node->token_value);
 		stnode_free(st_node);
 		return new_st;
 	}
@@ -1346,13 +1346,13 @@ check_relation_LHS_FUNCTION(dfwork_t *dfw, const char *relation_string,
 			if (!pcre) {
 				THROW(TypeError);
 			}
-			new_st = stnode_new(STTYPE_PCRE, pcre);
+			new_st = stnode_new(STTYPE_PCRE, pcre, st_arg2->token_value);
 		} else {
 			fvalue = dfilter_fvalue_from_string(dfw, ftype1, s);
 			if (!fvalue) {
 				THROW(TypeError);
 			}
-			new_st = stnode_new(STTYPE_FVALUE, fvalue);
+			new_st = stnode_new(STTYPE_FVALUE, fvalue, st_arg2->token_value);
 		}
 		sttype_test_set2_args(st_node, st_arg1, new_st);
 		stnode_free(st_arg2);
@@ -1365,13 +1365,13 @@ check_relation_LHS_FUNCTION(dfwork_t *dfw, const char *relation_string,
 			if (!pcre) {
 				THROW(TypeError);
 			}
-			new_st = stnode_new(STTYPE_PCRE, pcre);
+			new_st = stnode_new(STTYPE_PCRE, pcre, st_arg2->token_value);
 		} else {
 			fvalue = dfilter_fvalue_from_unparsed(dfw, ftype1, s, allow_partial_value);
 			if (!fvalue) {
 				THROW(TypeError);
 			}
-			new_st = stnode_new(STTYPE_FVALUE, fvalue);
+			new_st = stnode_new(STTYPE_FVALUE, fvalue, st_arg2->token_value);
 		}
 		sttype_test_set2_args(st_node, st_arg1, new_st);
 		stnode_free(st_arg2);

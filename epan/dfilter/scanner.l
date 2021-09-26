@@ -84,7 +84,8 @@ DIAG_OFF_FLEX
 
 /*#undef YY_NO_UNPUT*/
 
-static int set_lval(int token, gpointer data);
+static int set_lval_str(int token, char *value);
+static int set_lval_func(int token, df_func_def_t *func, const char *value);
 static int set_lval_int(dfwork_t *dfw, int token, char *s);
 static int simple(int token);
 static gboolean str_to_gint32(dfwork_t *dfw, char *s, gint32* pint);
@@ -270,7 +271,7 @@ static void mark_lval_deprecated(const char *s);
 	/* end quote */
 	int token;
 	BEGIN(INITIAL);
-	token = set_lval(TOKEN_STRING, yyextra->quoted_string->str);
+	token = set_lval_str(TOKEN_STRING, yyextra->quoted_string->str);
 	g_string_free(yyextra->quoted_string, TRUE);
 	yyextra->quoted_string = NULL;
 	return token;
@@ -372,7 +373,7 @@ static void mark_lval_deprecated(const char *s);
 	int token;
 	BEGIN(INITIAL);
 	g_string_append_c(yyextra->quoted_string, '\'');
-	token = set_lval(TOKEN_CHARCONST, yyextra->quoted_string->str);
+	token = set_lval_str(TOKEN_CHARCONST, yyextra->quoted_string->str);
 	g_string_free(yyextra->quoted_string, TRUE);
 	yyextra->quoted_string = NULL;
 	return token;
@@ -392,7 +393,7 @@ static void mark_lval_deprecated(const char *s);
 
 [-[:alnum:]_\.:]*\/[[:digit:]]+  {
         /* CIDR */
-        return set_lval(TOKEN_UNPARSED, yytext);
+        return set_lval_str(TOKEN_UNPARSED, yytext);
 }
 
 		([.][-+[:alnum:]_:]+)+[.]{0,2} |
@@ -409,15 +410,15 @@ static void mark_lval_deprecated(const char *s);
 	df_func_def = df_func_lookup(yytext);
 	if (df_func_def) {
 		/* Yes, it's a dfilter function */
-		return set_lval(TOKEN_FUNCTION, df_func_def);
+		return set_lval_func(TOKEN_FUNCTION, df_func_def, yytext);
 	}
 	/* No match, so treat it as an unparsed string */
-	return set_lval(TOKEN_UNPARSED, yytext);
+	return set_lval_str(TOKEN_UNPARSED, yytext);
 }
 
 . {
 	/* Default */
-	return set_lval(TOKEN_UNPARSED, yytext);
+	return set_lval_str(TOKEN_UNPARSED, yytext);
 }
 
 
@@ -464,7 +465,7 @@ simple(int token)
 }
 
 static int
-set_lval(int token, gpointer data)
+set_lval_str(int token, char *value)
 {
 	sttype_id_t	type_id = STTYPE_UNINITIALIZED;
 
@@ -478,13 +479,17 @@ set_lval(int token, gpointer data)
 		case TOKEN_UNPARSED:
 			type_id = STTYPE_UNPARSED;
 			break;
-		case TOKEN_FUNCTION:
-			type_id = STTYPE_FUNCTION;
-			break;
 		default:
 			ws_assert_not_reached();
 	}
-	stnode_init(df_lval, type_id, data);
+	stnode_init(df_lval, type_id, value, value);
+	return token;
+}
+
+static int
+set_lval_func(int token, df_func_def_t *func, const char *value)
+{
+	stnode_init(df_lval, STTYPE_FUNCTION, func, value);
 	return token;
 }
 
@@ -506,7 +511,7 @@ set_lval_int(dfwork_t *dfw, int token, char *s)
 			ws_assert_not_reached();
 	}
 
-	stnode_init_int(df_lval, type_id, val);
+	stnode_init_int(df_lval, type_id, val, s);
 	return token;
 }
 
