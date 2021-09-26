@@ -1930,6 +1930,18 @@ void wtap_sequential_close(wtap *wth);
 WS_DLL_PUBLIC
 void wtap_close(wtap *wth);
 
+/**
+ * @brief Check if the file was opened using a Lua file handler
+ * @details Checks if the file was opened with a Lua file handler
+ *          that would be invalidated when reloading Lua plugins
+ *
+ * @param wth The wiretap session.
+ * @return True if the file was opened with a Lua file handler.
+ *
+ */
+WS_DLL_PUBLIC
+gboolean wtap_uses_lua(wtap* wth);
+
 /*** dump packets into a capture file ***/
 WS_DLL_PUBLIC
 gboolean wtap_dump_can_open(int filetype);
