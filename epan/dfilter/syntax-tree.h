@@ -9,6 +9,7 @@
 #ifndef SYNTAX_TREE_H
 #define SYNTAX_TREE_H
 
+#include <stdint.h>
 #include <glib.h>
 #include "cppmagic.h"
 
@@ -47,13 +48,13 @@ typedef struct {
 
 /** Node (type instance) information */
 typedef struct {
-	guint32		magic;
+	uint32_t	magic;
 	sttype_t	*type;
 
 	/* This could be made an enum, but I haven't
 	 * set aside to time to do so. */
 	gpointer	data;
-	gint32		value;
+	int32_t		value;
 	gboolean	inside_brackets;
 	const char	*deprecated_token;
 } stnode_t;
@@ -111,6 +112,11 @@ stnode_value(stnode_t *node);
 
 const char *
 stnode_deprecated(stnode_t *node);
+
+#include <stdio.h>
+
+void
+stnode_fprint(FILE *fp, stnode_t *node);
 
 #define assert_magic(obj, mnum) \
 	g_assert_true((obj)); \

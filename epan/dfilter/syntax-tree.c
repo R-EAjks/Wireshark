@@ -8,6 +8,7 @@
 
 #include "config.h"
 
+#include <inttypes.h>
 #include "syntax-tree.h"
 #include <wsutil/ws_assert.h>
 
@@ -225,6 +226,19 @@ stnode_deprecated(stnode_t *node)
 		return NULL;
 	}
 	return node->deprecated_token;
+}
+
+void
+stnode_fprint(FILE *fp, stnode_t *node)
+{
+	fprintf(fp, "stnode <%p> = {\n", (void *)node);
+	fprintf(fp, "\tmagic = %"PRIx32"\n", node->magic);
+	fprintf(fp, "\ttype = %s\n", stnode_type_name(node));
+	fprintf(fp, "\tdata = %p\n", node->data);
+	fprintf(fp, "\tvalue = %"PRIi32"\n", node->value);
+	fprintf(fp, "\tinside_brackets = %s\n", node->inside_brackets ? "TRUE" : "FALSE");
+	fprintf(fp, "\tdeprecated_token = %s\n", node->deprecated_token);
+	fprintf(fp, "}\n");
 }
 
 /*
