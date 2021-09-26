@@ -446,6 +446,9 @@ check_exists(dfwork_t *dfw, stnode_t *st_arg1)
 	static guint i = 0;
 #endif
 
+	/* If we have an unparsed string we need to check if it is a protocol field. */
+	stnode_field_from_unparsed(st_arg1);
+
 	DebugLog(("   4 check_exists() [%u]\n", i++));
 	switch (stnode_type_id(st_arg1)) {
 		case STTYPE_FIELD:
