@@ -44,6 +44,7 @@
 #include <epan/stats_tree.h>
 #include <epan/prefs.h>
 #include <epan/exported_pdu.h>
+#include <epan/conversation.h>
 #include <wsutil/time_util.h>
 #include "packet-tcp.h"
 #include "packet-smpp.h"
@@ -74,6 +75,8 @@ static int hf_smpp_command_id                         = -1;
 static int hf_smpp_command_length                     = -1;
 static int hf_smpp_command_status                     = -1;
 static int hf_smpp_sequence_number                    = -1;
+/* Middle of a PDU */
+static int hf_smpp_continuation_data                  = -1;
 
 /*
  * Fixed body section
@@ -2362,9 +2365,39 @@ huawei_sm_result_notify_resp(proto_tree *tree, tvbuff_t *tvb, int offset)
     proto_tree_add_item(tree, hf_huawei_smpp_delivery_result, tvb, offset, 4, ENC_BIG_ENDIAN);
 }
 
+static gboolean
+test_smpp(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+{
+    guint32      command_id;            /* SMPP command         */
+    guint32      command_status;        /* Status code          */
+    guint32      command_length;        /* length of PDU        */
+
+    if (tvb_reported_length_remaining(tvb, offset) < SMPP_MIN_LENGTH ||   /* Mandatory header     */
+        tvb_captured_length_remaining(tvb, offset) < 12)
+        return FALSE;
+    command_length = tvb_get_ntohl(tvb, offset);
+    if (command_length > 64 * 1024 || command_length < SMPP_MIN_LENGTH)
+        return FALSE;
+    command_id = tvb_get_ntohl(tvb, offset + 4);         /* Only known commands  */
+    if (try_val_to_str(command_id, vals_command_id) == NULL)
+        return FALSE;
+    command_status = tvb_get_ntohl(tvb, offset + 8);     /* ..with known status  */
+    if (try_rval_to_str(command_status, rvals_command_status) == NULL)
+        return FALSE;
+
+    return TRUE;
+}
+
 static guint
 get_smpp_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
 {
+    if (!test_smpp(pinfo, tvb, offset, data)) {
+        /* We aren't aligned on a PDU boundary (at capture start or an
+         * error). Just return the entire tvb and we should get realigned
+         * the next time a PDU starts on a segment start.
+         */
+        return tvb_reported_length_remaining(tvb, offset);
+    }
     return tvb_get_ntohl(tvb, offset);
 }
 
@@ -2397,11 +2430,25 @@ dissect_smpp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
     proto_tree     *smpp_tree;
 
     /*
-     * Safety: don't even try to dissect the PDU
-     * when the mandatory header isn't present.
+     * Update the protocol column.
      */
-    if (tvb_reported_length(tvb) < SMPP_MIN_LENGTH)
-        return 0;
+    col_set_str(pinfo->cinfo, COL_PROTOCOL, "SMPP");
+    col_clear(pinfo->cinfo, COL_INFO);
+
+    /*
+     * Does this look like SMPP?
+     */
+    if (!test_smpp(pinfo, tvb, offset, data)) {
+        /* We are sure this conversation is SMPP, but it doesn't look like
+         * it. Probably we're not aligned to the segment boundary.
+         */
+        col_set_str(pinfo->cinfo, COL_INFO, "Continuation");
+        ti = proto_tree_add_item(tree, proto_smpp, tvb, offset, -1, ENC_NA);
+        smpp_tree = proto_item_add_subtree (ti, ett_smpp);
+
+        proto_tree_add_item(smpp_tree, hf_smpp_continuation_data, tvb, offset, -1, ENC_NA);
+        return tvb_captured_length(tvb);
+    }
     command_length = tvb_get_ntohl(tvb, offset);
     offset += 4;
     command_id = tvb_get_ntohl(tvb, offset);
@@ -2419,12 +2466,6 @@ dissect_smpp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
     if (have_tap_listener(exported_pdu_tap)){
         export_smpp_pdu(pinfo,tvb);
     }
-
-    /*
-     * Update the protocol column.
-     */
-    col_set_str(pinfo->cinfo, COL_PROTOCOL, "SMPP");
-    col_clear(pinfo->cinfo, COL_INFO);
 
     /*
      * Create display subtree for the protocol
@@ -2606,7 +2647,7 @@ dissect_smpp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
     if (pinfo->ptype == PT_TCP) {       /* are we running on top of TCP */
         tcp_dissect_pdus(tvb, pinfo, tree,
             reassemble_over_tcp,    /* Do we try to reassemble      */
-            16,                     /* Length of fixed header       */
+            SMPP_FIXED_HEADER_LENGTH, /* Length of fixed header       */
             get_smpp_pdu_len,       /* Function returning PDU len   */
             dissect_smpp_pdu, data);      /* PDU dissector                */
     }
@@ -2646,22 +2687,17 @@ static gboolean
 dissect_smpp_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
     guint32      command_id;            /* SMPP command         */
-    guint32      command_status;        /* Status code          */
-    guint32      command_length;        /* length of PDU        */
 
-    if (tvb_reported_length(tvb) < SMPP_MIN_LENGTH ||   /* Mandatory header     */
-        tvb_captured_length(tvb) < 12)
-        return FALSE;
-    command_length = tvb_get_ntohl(tvb, 0);
-    if (command_length > 64 * 1024 || command_length < SMPP_MIN_LENGTH)
-        return FALSE;
-    command_id = tvb_get_ntohl(tvb, 4);         /* Only known commands  */
-    if (try_val_to_str(command_id, vals_command_id) == NULL)
-        return FALSE;
-    command_status = tvb_get_ntohl(tvb, 8);     /* ..with known status  */
-    if (try_rval_to_str(command_status, rvals_command_status) == NULL)
-        return FALSE;
+    conversation_t* conversation;
 
+    if (!test_smpp(pinfo, tvb, 0, data)) {
+        return FALSE;
+    }
+
+    // Test a few extra bytes in the heuristic dissector, past the
+    // SMPP_FIXED_HEADER_LENGTH that we pass to tcp_dissect_pdus
+
+    command_id = tvb_get_ntohl(tvb, 4);
     //Check for specific values in commands (to avoid false positives)
     switch (command_id)
     {
@@ -2690,6 +2726,10 @@ dissect_smpp_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
     break;
     }
 
+    /* This is called on TCP or X.25, both of which are endpoint types.
+     * Set the conversation so we can handle TCP segmentation. */
+    conversation = find_or_create_conversation(pinfo);
+    conversation_set_dissector(conversation, smpp_handle);
 
     dissect_smpp(tvb, pinfo, tree, data);
     return TRUE;
@@ -2734,6 +2774,13 @@ proto_register_smpp(void)
             {   "Sequence #", "smpp.sequence_number",
                 FT_UINT32, BASE_DEC, NULL, 0x00,
                 "A number to correlate requests with responses.",
+                HFILL
+            }
+        },
+        {   &hf_smpp_continuation_data,
+            {   "Continuation data", "smpp.continuation_data",
+                FT_BYTES, BASE_NONE, NULL, 0x00,
+                "SMPP data that could not be desegmented.",
                 HFILL
             }
         },
