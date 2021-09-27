@@ -85,7 +85,6 @@ DIAG_OFF_FLEX
 /*#undef YY_NO_UNPUT*/
 
 static int set_lval_str(int token, char *value);
-static int set_lval_func(int token, df_func_def_t *func, const char *value);
 static int set_lval_int(dfwork_t *dfw, int token, char *s);
 static int simple(int token);
 static gboolean str_to_gint32(dfwork_t *dfw, char *s, gint32* pint);
@@ -398,21 +397,14 @@ static void mark_lval_deprecated(const char *s);
 
 		([.][-+[:alnum:]_:]+)+[.]{0,2} |
 [-+[:alnum:]_:]+([.][-+[:alnum:]_:]+)*[.]{0,2} {
-	/* Is it a field name or some other value (float, integer, bytes, ...)? */
-	df_func_def_t *df_func_def;
-
 	/* Trailing dot is allowed for floats, but make sure that trailing ".."
 	 * is interpreted as a token on its own. */
 	if (strstr(yytext, "..")) {
 		yyless(yyleng-2);
 	}
 
-	df_func_def = df_func_lookup(yytext);
-	if (df_func_def) {
-		/* Yes, it's a dfilter function */
-		return set_lval_func(TOKEN_FUNCTION, df_func_def, yytext);
-	}
-	/* No match, so treat it as an unparsed string */
+	/* An unparsed string can be a field or function name but also some other
+	 * values (string, bytes, float, integer, ...) */
 	return set_lval_str(TOKEN_UNPARSED, yytext);
 }
 
@@ -483,13 +475,6 @@ set_lval_str(int token, char *value)
 			ws_assert_not_reached();
 	}
 	stnode_init(df_lval, type_id, value, value);
-	return token;
-}
-
-static int
-set_lval_func(int token, df_func_def_t *func, const char *value)
-{
-	stnode_init(df_lval, STTYPE_FUNCTION, func, value);
 	return token;
 }
 

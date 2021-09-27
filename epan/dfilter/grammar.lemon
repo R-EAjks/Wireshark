@@ -50,6 +50,9 @@
 
 %type		rel_op2		{test_op_t}
 
+%type		function 	{stnode_t*}
+%destructor	function	{stnode_free($$);}
+
 %type		range		{stnode_t*}
 %destructor	range		{stnode_free($$);}
 
@@ -98,10 +101,6 @@ any "error" symbols are shifted, if possible. */
 			dfilter_fail(dfw, "The integer %d was unexpected in this context.",
 				stnode_value(TOKEN));
 			break;
-		case STTYPE_FUNCTION:
-			dfilter_fail(dfw, "The function \"%s\" was unexpected in this context.",
-				sttype_function_funcdef(TOKEN)->name);
-			break;
 		case STTYPE_SET:
 			dfilter_fail(dfw, "Syntax error, SET.");
 			break;
@@ -110,6 +109,7 @@ any "error" symbols are shifted, if possible. */
 		   the scanner, so was can assert that we'll never
 		   see them here. */
 		case STTYPE_NUM_TYPES:
+		case STTYPE_FUNCTION:
 		case STTYPE_RANGE:
 		case STTYPE_FIELD:
 		case STTYPE_FVALUE:
@@ -176,6 +176,7 @@ entity(E) ::= STRING(S).	{ E = S; }
 entity(E) ::= CHARCONST(C).	{ E = C; }
 entity(E) ::= UNPARSED(U).	{ E = U; }
 entity(E) ::= range(R).		{ E = R; }
+entity(E) ::= function(F).	{ E = F; }
 
 range_body(B) ::= STRING(S).	{ B = S; }
 range_body(B) ::= UNPARSED(U).	{ B = U; }
@@ -331,16 +332,18 @@ setnode_list(L) ::= setnode_list(P) WHITESPACE entity(X) DOTDOT entity(Y).
 /* Functions */
 
 /* A function can have one or more parameters */
-entity(E) ::= FUNCTION(F) LPAREN funcparams(P) RPAREN.
+function(F) ::= UNPARSED(U) LPAREN funcparams(P) RPAREN.
 {
-	E = F;
-	sttype_function_set_params(E, P);
+	F = stnode_new(STTYPE_FUNCTION, stnode_data(U), stnode_token_value(U));
+	stnode_free(U);
+	sttype_function_set_params(F, P);
 }
 
 /* A function can have zero parameters. */
-entity(E) ::= FUNCTION(F) LPAREN RPAREN.
+function(F) ::= UNPARSED(U) LPAREN RPAREN.
 {
-	E = F;
+	F = stnode_new(STTYPE_FUNCTION, stnode_data(U), stnode_token_value(U));
+	stnode_free(U);
 }
 
 funcparams(P) ::= entity(E).

@@ -628,7 +628,14 @@ check_function(dfwork_t *dfw, stnode_t *st_node)
 	guint          iparam;
 	guint          nparams;
 
+	/* Check that function exists. */
 	funcdef  = sttype_function_funcdef(st_node);
+	if (funcdef == NULL) {
+		dfilter_fail(dfw, "The function '%s' does not exist.",
+			stnode_token_value(st_node));
+		THROW(TypeError);
+	}
+
 	params   = sttype_function_params(st_node);
 	nparams  = g_slist_length(params);
 
@@ -799,6 +806,8 @@ check_relation_LHS_FIELD(dfwork_t *dfw, const char *relation_string,
 		}
 	}
 	else if (type2 == STTYPE_FUNCTION) {
+		check_function(dfw, st_arg2);
+
 		funcdef = sttype_function_funcdef(st_arg2);
 		ftype2 = funcdef->retval_ftype;
 
@@ -814,8 +823,6 @@ check_relation_LHS_FIELD(dfwork_t *dfw, const char *relation_string,
 					funcdef->name, ftype_pretty_name(ftype2));
 			THROW(TypeError);
 		}
-
-		check_function(dfw, st_arg2);
 	}
 	else if (type2 == STTYPE_SET) {
 		GSList *nodelist;
@@ -927,6 +934,8 @@ check_relation_LHS_STRING(dfwork_t *dfw, const char* relation_string,
 		stnode_free(st_arg1);
 	}
 	else if (type2 == STTYPE_FUNCTION) {
+		check_function(dfw, st_arg2);
+
 		funcdef = sttype_function_funcdef(st_arg2);
 		ftype2  = funcdef->retval_ftype;
 
@@ -942,8 +951,6 @@ check_relation_LHS_STRING(dfwork_t *dfw, const char* relation_string,
 		if (!fvalue) {
 			THROW(TypeError);
 		}
-
-		check_function(dfw, st_arg2);
 
 		new_st = stnode_new(STTYPE_FVALUE, fvalue, st_arg1->token_value);
 		sttype_test_set2_args(st_node, new_st, st_arg2);
@@ -1021,6 +1028,8 @@ check_relation_LHS_UNPARSED(dfwork_t *dfw, const char* relation_string,
 		stnode_free(st_arg1);
 	}
 	else if (type2 == STTYPE_FUNCTION) {
+		check_function(dfw, st_arg2);
+
 		funcdef = sttype_function_funcdef(st_arg2);
 		ftype2  = funcdef->retval_ftype;
 
@@ -1036,8 +1045,6 @@ check_relation_LHS_UNPARSED(dfwork_t *dfw, const char* relation_string,
 		if (!fvalue) {
 			THROW(TypeError);
 		}
-
-		check_function(dfw, st_arg2);
 
 		new_st = stnode_new(STTYPE_FVALUE, fvalue, st_arg1->token_value);
 		sttype_test_set2_args(st_node, new_st, st_arg2);
@@ -1089,6 +1096,8 @@ check_relation_LHS_RANGE(dfwork_t *dfw, const char *relation_string,
 			THROW(TypeError);
 		}
 	} else if (entity1_type == STTYPE_FUNCTION) {
+		check_function(dfw, entity1);
+
 		df_func_def_t *funcdef = sttype_function_funcdef(entity1);
 		ftype1 = funcdef->retval_ftype;
 
@@ -1097,9 +1106,6 @@ check_relation_LHS_RANGE(dfwork_t *dfw, const char *relation_string,
 					funcdef->name, ftype_pretty_name(ftype1));
 			THROW(TypeError);
 		}
-
-		check_function(dfw, entity1);
-
 	} else {
 		dfilter_fail(dfw, "Range is not supported for entity %s of type %s",
 					stnode_token_value(entity1), stnode_type_name(entity1));
@@ -1229,6 +1235,8 @@ check_relation_LHS_RANGE(dfwork_t *dfw, const char *relation_string,
 		check_drange_sanity(dfw, st_arg2);
 	}
 	else if (type2 == STTYPE_FUNCTION) {
+		check_function(dfw, st_arg2);
+
 		df_func_def_t *funcdef = sttype_function_funcdef(st_arg2);
 		ftype2  = funcdef->retval_ftype;
 
@@ -1245,8 +1253,6 @@ check_relation_LHS_RANGE(dfwork_t *dfw, const char *relation_string,
 
 			sttype_test_set2_args(st_node, st_arg1, new_st);
 		}
-
-		check_function(dfw, st_arg2);
 	}
 	else if (type2 == STTYPE_SET) {
 		dfilter_fail(dfw, "Only a field may be tested for membership in a set.");
@@ -1393,6 +1399,8 @@ check_relation_LHS_FUNCTION(dfwork_t *dfw, const char *relation_string,
 		}
 	}
 	else if (type2 == STTYPE_FUNCTION) {
+		check_function(dfw, st_arg2);
+
 		funcdef2 = sttype_function_funcdef(st_arg2);
 		ftype2 = funcdef2->retval_ftype;
 
@@ -1409,8 +1417,6 @@ check_relation_LHS_FUNCTION(dfwork_t *dfw, const char *relation_string,
 				     funcdef2->name, ftype_pretty_name(ftype2));
 			THROW(TypeError);
 		}
-
-		check_function(dfw, st_arg2);
 	}
 	else if (type2 == STTYPE_SET) {
 		dfilter_fail(dfw, "Only a field may be tested for membership in a set.");
