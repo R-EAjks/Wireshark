@@ -13,7 +13,6 @@
 
 #include <epan/packet.h>
 #include "packet-tcp.h"
-#include "packet-udp.h"
 
 #define OPTO_FRAME_HEADER_LEN 8
 #define OPTOMMP_MIN_LENGTH 12
@@ -281,52 +280,10 @@ static void dissect_optommp_data_block_byte(proto_item **ti, proto_tree *tree,
 static void dissect_optommp_data_block_quadlet(proto_item **ti, proto_tree
     *tree, tvbuff_t *tvb, guint *poffset);
 static gint optommp_has_destination_offset(guint8 tcode);
-static gboolean test_optommp(packet_info* pinfo _U_, tvbuff_t* tvb,
-    int offset _U_, void* data _U_);
-static guint dissect_optommp_tcp(tvbuff_t* tvb, packet_info* pinfo, proto_tree
-    *tree, void* data);
-static gboolean dissect_optommp_heur_tcp(tvbuff_t* tvb, packet_info* pinfo, proto_tree
-    *tree, void* data);
-static guint dissect_optommp_udp(tvbuff_t* tvb, packet_info* pinfo, proto_tree
-    *tree, void* data);
-static gboolean dissect_optommp_heur_udp(tvbuff_t* tvb, packet_info* pinfo, proto_tree
-    *tree, void* data);
 
 void proto_register_optommp(void);
 void proto_reg_handoff_optommp(void);
 
-/****************************************************************************
-function:       test_optommp()
-parameters:     pinfo: not used
-                tvb: poiner to packet data
-                offset: not used
-                data: not used
-purpose:        Tests whether or not a packet signature might be dissectable by OptoMMP.
-****************************************************************************/
-static gboolean test_optommp(packet_info* pinfo _U_, tvbuff_t* tvb, int offset _U_, void* data _U_)
-{
-    /* 0) Verify needed bytes available in tvb so tvb_get...() doesn't cause exception. */
-    if (tvb_captured_length(tvb) < 4) // We only examine the first four bytes of the packet.
-        return FALSE;
-
-    // Note, that the first two bytes of the OptoMMP packet are usually zero, however
-    // in a multi-tenant scenario, when initiating a PUC (Power-Up Clear) the bits
-    // may be used.
-
-    /* 1) first two LSB's of third byte must be zero, because rt unused */
-    if ((tvb_get_guint8(tvb, 2) & 0x3) != 0x0)
-        return FALSE;
-
-    /* 2) four MSB's of fourth byte are in range (0x0 - 0x7)
-        first four LSB's of fourth byte must be zero AND */
-    guint8 tcode = tvb_get_guint8(tvb, 3) & 0xF0;
-    guint8 pri = tvb_get_guint8(tvb, 3) & 0xF;
-    if (tcode > 0x70 || tcode == 0x3 || pri != 0)
-        return FALSE;
-
-    /* Assume it's an OptoMMP packet ... */
-    return TRUE;
-}
 
 /****************************************************************************
 function:       get_optommp_message_len()
@@ -957,85 +914,6 @@ void proto_register_optommp(void)
 }
 
 /****************************************************************************
-function:       dissect_optommp_tcp()
-parameters:     pinfo: not used
-                tvb: poiner to packet data
-                offset: not used
-                data: not used
-purpose:        The method called by the heuristic dissector for dissecting TCP packets.
-****************************************************************************/
-static guint dissect_optommp_tcp(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data)
-{
-    tcp_dissect_pdus(tvb, pinfo, tree, TRUE, OPTOMMP_MIN_LENGTH,
-        get_optommp_message_len, dissect_optommp, data);
-    return tvb_reported_length(tvb);
-}
-
-/****************************************************************************
-function:       dissect_optommp_heur_tcp()
-parameters:     pinfo: not used
-                tvb: poiner to packet data
-                offset: not used
-                data: not used
-purpose:        Tests the packet format, if a match,
-                sets conversation to use this dissector.
-****************************************************************************/
-static gboolean dissect_optommp_heur_tcp(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data)
-{
-    if (!test_optommp(pinfo, tvb, 0, data))
-        return FALSE;
-
-	/*   sets the converation between two IPs communicating on
-		 a port to use OptoMMP dissection. */
-    conversation_t* conversation = find_or_create_conversation(pinfo);
-    conversation_set_dissector(conversation, optommp_tcp_handle);
-
-    /*   and do the dissection */
-    dissect_optommp_tcp(tvb, pinfo, tree, data);
-
-    return (TRUE);
-}
-
-/****************************************************************************
-function:       dissect_optommp_udp()
-parameters:     pinfo: not used
-                tvb: poiner to packet data
-                offset: not used
-                data: not used
-purpose:        The method called by the heuristic dissector for dissecting UDP packets.
-****************************************************************************/
-static guint dissect_optommp_udp(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data)
-{
-    udp_dissect_pdus(tvb, pinfo, tree, OPTOMMP_MIN_LENGTH, NULL,
-        get_optommp_message_len, dissect_optommp, data);
-    return tvb_reported_length(tvb);
-}
-
-/****************************************************************************
-function:       dissect_optommp_heur_udp()
-parameters:     pinfo: not used
-                tvb: poiner to packet data
-                offset: not used
-                data: not used
-purpose:        The method called by the heuristic dissector for dissecting TCP packets.
-****************************************************************************/
-static gboolean dissect_optommp_heur_udp(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data)
-{
-    if (!test_optommp(pinfo, tvb, 0, data))
-        return FALSE;
-
-	/*   sets the converation between two IPs communicating on
-		 a port to use OptoMMP dissection. */
-    conversation_t* conversation = find_or_create_conversation(pinfo);
-    conversation_set_dissector(conversation, optommp_udp_handle);
-
-    /*   and do the dissection */
-    dissect_optommp_udp(tvb, pinfo, tree, data);
-
-    return (TRUE);
-}
-
-/****************************************************************************
 function:       proto_reg_handoff()
 parameters:     void
 purpose:        plug into wireshark with a handle
@@ -1044,19 +922,6 @@ void proto_reg_handoff_optommp(void)
 {
     optommp_tcp_handle = create_dissector_handle(dissect_optommp_reassemble_tcp, proto_optommp);
     optommp_udp_handle = create_dissector_handle(dissect_optommp_reassemble_udp, proto_optommp);
-
-    static int optommp_inited = FALSE;
-
-    if (!optommp_inited)
-    {
-        /* register as heuristic dissector for both TCP and UDP */
-        heur_dissector_add("tcp", dissect_optommp_heur_tcp, "OptoMMP over TCP",
-            "optommp_tcp", proto_optommp, HEURISTIC_ENABLE);
-        heur_dissector_add("udp", dissect_optommp_heur_udp, "OptoMMP over UDP",
-            "optommp_udp", proto_optommp, HEURISTIC_ENABLE);
-
-        optommp_inited = TRUE;
-    }
 
     dissector_add_for_decode_as_with_preference("tcp.port", optommp_tcp_handle);
     dissector_add_for_decode_as_with_preference("udp.port", optommp_udp_handle);
