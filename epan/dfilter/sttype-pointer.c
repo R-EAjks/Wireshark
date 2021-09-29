@@ -13,6 +13,44 @@
 #include "ftypes/ftypes-int.h"
 #include "syntax-tree.h"
 
+/*
+ * Tries to convert an STTYPE_UNPARSED to a STTYPE_FIELD. STTYPE_UNPARSED is
+ * usually a protocol field but the syntax allows it to be also a string or array,
+ * depending on context (this is more flexible - some would say ambiguous - but it
+ * can be confusing). For example one immediate consequence is that the semantic
+ * meaning of a filter expression can change during execution of the program if
+ * a protocol is registered (for example by dynamically loading a dissector plugin).
+ */
+sttype_id_t
+stnode_field_from_unparsed(stnode_t *node)
+{
+	sttype_id_t type;
+	const char *name;
+	header_field_info *hfinfo;
+
+	type = stnode_type_id(node);
+	if (type != STTYPE_UNPARSED)
+		return type;
+
+	name = (const char *)stnode_data(node);
+
+	hfinfo = proto_registrar_get_byname(name);
+	if (hfinfo) {
+		/* It's a field name */
+		stnode_replace(node, STTYPE_FIELD, hfinfo);
+		return STTYPE_FIELD;
+	}
+
+	hfinfo = proto_registrar_get_byalias(name);
+	if (hfinfo) {
+		/* It's an aliased field name */
+		stnode_replace(node, STTYPE_FIELD, hfinfo);
+		return STTYPE_FIELD;
+	}
+
+	return type;
+}
+
 static void
 fvalue_free(gpointer value)
 {

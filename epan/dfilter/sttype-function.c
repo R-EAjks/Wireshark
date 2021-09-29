@@ -21,16 +21,16 @@ typedef struct {
 #define FUNCTION_MAGIC	0xe10f0f99
 
 static gpointer
-function_new(gpointer funcdef)
+function_new(gpointer name)
 {
 	function_t		*stfuncrec;
 
-	ws_assert(funcdef != NULL);
+	ws_assert(name != NULL);
 
 	stfuncrec = g_new(function_t, 1);
 
 	stfuncrec->magic = FUNCTION_MAGIC;
-	stfuncrec->funcdef = (df_func_def_t *)funcdef;
+	stfuncrec->funcdef = df_func_lookup(name);
 	stfuncrec->params = NULL;
 
 	return (gpointer) stfuncrec;

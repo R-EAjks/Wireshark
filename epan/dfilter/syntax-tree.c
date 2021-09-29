@@ -8,6 +8,7 @@
 
 #include "config.h"
 
+#include <inttypes.h>
 #include "syntax-tree.h"
 #include <wsutil/ws_assert.h>
 
@@ -71,7 +72,7 @@ sttype_lookup(sttype_id_t type_id)
 
 
 stnode_t*
-stnode_new(sttype_id_t type_id, gpointer data)
+stnode_new(sttype_id_t type_id, gpointer data, const char *token_value)
 {
 	sttype_t	*type;
 	stnode_t	*node;
@@ -80,6 +81,7 @@ stnode_new(sttype_id_t type_id, gpointer data)
 	node->magic = STNODE_MAGIC;
 	node->deprecated_token = NULL;
 	node->inside_brackets = FALSE;
+	node->token_value = g_strdup(token_value);
 
 	if (type_id == STTYPE_UNINITIALIZED) {
 		node->type = NULL;
@@ -121,6 +123,7 @@ stnode_dup(const stnode_t *org)
 	node = g_new(stnode_t, 1);
 	node->magic = STNODE_MAGIC;
 	node->deprecated_token = NULL;
+	node->token_value = g_strdup(org->token_value);
 	node->type = type;
 	if (type && type->func_dup)
 		node->data = type->func_dup(org->data);
@@ -133,13 +136,14 @@ stnode_dup(const stnode_t *org)
 }
 
 void
-stnode_init(stnode_t *node, sttype_id_t type_id, gpointer data)
+stnode_init(stnode_t *node, sttype_id_t type_id, gpointer data,  const char *token_value)
 {
 	sttype_t	*type;
 
 	ws_assert_magic(node, STNODE_MAGIC);
 	ws_assert(!node->type);
 	ws_assert(!node->data);
+	ws_assert(!node->token_value);
 
 	type = sttype_lookup(type_id);
 	ws_assert(type);
@@ -150,12 +154,13 @@ stnode_init(stnode_t *node, sttype_id_t type_id, gpointer data)
 	else {
 		node->data = data;
 	}
+	node->token_value = g_strdup(token_value);
 }
 
 void
-stnode_init_int(stnode_t *node, sttype_id_t type_id, gint32 value)
+stnode_init_int(stnode_t *node, sttype_id_t type_id, gint32 value, const char *token_value)
 {
-	stnode_init(node, type_id, NULL);
+	stnode_init(node, type_id, NULL, token_value);
 	node->value = value;
 }
 
@@ -171,7 +176,24 @@ stnode_free(stnode_t *node)
 	else {
 		ws_assert(!node->data);
 	}
+	g_free(node->token_value);
 	g_free(node);
+}
+
+void
+stnode_replace(stnode_t *node, sttype_id_t type_id, gpointer data)
+{
+	char *token_value;
+
+	ws_assert(node->type);
+	if (node->type->func_free)
+		node->type->func_free(node->data);
+	node->data = NULL;
+	node->type = NULL;
+	token_value = node->token_value;
+	node->token_value = NULL;
+	stnode_init(node, type_id, data, token_value);
+	g_free(token_value);
 }
 
 const char*
@@ -225,6 +247,29 @@ stnode_deprecated(stnode_t *node)
 		return NULL;
 	}
 	return node->deprecated_token;
+}
+
+const char *
+stnode_token_value(stnode_t *node)
+{
+	if (node->token_value) {
+		return node->token_value;
+	}
+	return "<unknown token>";
+}
+
+void
+stnode_fprint(FILE *fp, stnode_t *node)
+{
+	fprintf(fp, "stnode <%p> = {\n", (void *)node);
+	fprintf(fp, "\tmagic = %"PRIx32"\n", node->magic);
+	fprintf(fp, "\ttype = %s\n", stnode_type_name(node));
+	fprintf(fp, "\tdata = %p\n", node->data);
+	fprintf(fp, "\tvalue = %"PRIi32"\n", node->value);
+	fprintf(fp, "\tinside_brackets = %s\n", node->inside_brackets ? "TRUE" : "FALSE");
+	fprintf(fp, "\tdeprecated_token = %s\n", node->deprecated_token);
+	fprintf(fp, "\ttoken_value = %s\n", node->token_value);
+	fprintf(fp, "}\n");
 }
 
 /*

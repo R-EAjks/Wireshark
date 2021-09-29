@@ -84,7 +84,7 @@ DIAG_OFF_FLEX
 
 /*#undef YY_NO_UNPUT*/
 
-static int set_lval(int token, gpointer data);
+static int set_lval_str(int token, char *value);
 static int set_lval_int(dfwork_t *dfw, int token, char *s);
 static int simple(int token);
 static gboolean str_to_gint32(dfwork_t *dfw, char *s, gint32* pint);
@@ -270,7 +270,7 @@ static void mark_lval_deprecated(const char *s);
 	/* end quote */
 	int token;
 	BEGIN(INITIAL);
-	token = set_lval(TOKEN_STRING, yyextra->quoted_string->str);
+	token = set_lval_str(TOKEN_STRING, yyextra->quoted_string->str);
 	g_string_free(yyextra->quoted_string, TRUE);
 	yyextra->quoted_string = NULL;
 	return token;
@@ -372,7 +372,7 @@ static void mark_lval_deprecated(const char *s);
 	int token;
 	BEGIN(INITIAL);
 	g_string_append_c(yyextra->quoted_string, '\'');
-	token = set_lval(TOKEN_CHARCONST, yyextra->quoted_string->str);
+	token = set_lval_str(TOKEN_CHARCONST, yyextra->quoted_string->str);
 	g_string_free(yyextra->quoted_string, TRUE);
 	yyextra->quoted_string = NULL;
 	return token;
@@ -392,48 +392,25 @@ static void mark_lval_deprecated(const char *s);
 
 [-[:alnum:]_\.:]*\/[[:digit:]]+  {
         /* CIDR */
-        return set_lval(TOKEN_UNPARSED, yytext);
+        return set_lval_str(TOKEN_UNPARSED, yytext);
 }
 
 		([.][-+[:alnum:]_:]+)+[.]{0,2} |
 [-+[:alnum:]_:]+([.][-+[:alnum:]_:]+)*[.]{0,2} {
-	/* Is it a field name or some other value (float, integer, bytes, ...)? */
-	header_field_info *hfinfo;
-	df_func_def_t *df_func_def;
-
 	/* Trailing dot is allowed for floats, but make sure that trailing ".."
 	 * is interpreted as a token on its own. */
 	if (strstr(yytext, "..")) {
 		yyless(yyleng-2);
 	}
 
-	hfinfo = proto_registrar_get_byname(yytext);
-	if (hfinfo) {
-		/* Yes, it's a field name */
-		return set_lval(TOKEN_FIELD, hfinfo);
-	}
-
-	hfinfo = proto_registrar_get_byalias(yytext);
-	if (hfinfo) {
-		/* Yes, it's an aliased field name */
-		/* XXX Do we need to make a copy of yytext? dfilter_compile
-		 * will dup this later on. */
-		mark_lval_deprecated(yytext);
-		return set_lval(TOKEN_FIELD, hfinfo);
-	}
-
-	df_func_def = df_func_lookup(yytext);
-	if (df_func_def) {
-		/* Yes, it's a dfilter function */
-		return set_lval(TOKEN_FUNCTION, df_func_def);
-	}
-	/* No match, so treat it as an unparsed string */
-	return set_lval(TOKEN_UNPARSED, yytext);
+	/* An unparsed string can be a field or function name but also some other
+	 * values (string, bytes, float, integer, ...) */
+	return set_lval_str(TOKEN_UNPARSED, yytext);
 }
 
 . {
 	/* Default */
-	return set_lval(TOKEN_UNPARSED, yytext);
+	return set_lval_str(TOKEN_UNPARSED, yytext);
 }
 
 
@@ -480,7 +457,7 @@ simple(int token)
 }
 
 static int
-set_lval(int token, gpointer data)
+set_lval_str(int token, char *value)
 {
 	sttype_id_t	type_id = STTYPE_UNINITIALIZED;
 
@@ -491,19 +468,13 @@ set_lval(int token, gpointer data)
 		case TOKEN_CHARCONST:
 			type_id = STTYPE_CHARCONST;
 			break;
-		case TOKEN_FIELD:
-			type_id = STTYPE_FIELD;
-			break;
 		case TOKEN_UNPARSED:
 			type_id = STTYPE_UNPARSED;
-			break;
-		case TOKEN_FUNCTION:
-			type_id = STTYPE_FUNCTION;
 			break;
 		default:
 			ws_assert_not_reached();
 	}
-	stnode_init(df_lval, type_id, data);
+	stnode_init(df_lval, type_id, value, value);
 	return token;
 }
 
@@ -525,7 +496,7 @@ set_lval_int(dfwork_t *dfw, int token, char *s)
 			ws_assert_not_reached();
 	}
 
-	stnode_init_int(df_lval, type_id, val);
+	stnode_init_int(df_lval, type_id, val, s);
 	return token;
 }
 

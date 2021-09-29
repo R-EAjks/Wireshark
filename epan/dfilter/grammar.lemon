@@ -50,6 +50,9 @@
 
 %type		rel_op2		{test_op_t}
 
+%type		function 	{stnode_t*}
+%destructor	function	{stnode_free($$);}
+
 %type		range		{stnode_t*}
 %destructor	range		{stnode_free($$);}
 
@@ -68,8 +71,6 @@
 /* This is called as soon as a syntax error happens. After that, 
 any "error" symbols are shifted, if possible. */
 %syntax_error {
-
-	header_field_info	*hfinfo;
 
 	if (!TOKEN) {
 		dfilter_fail(dfw, "Unexpected end of filter string.");
@@ -100,14 +101,6 @@ any "error" symbols are shifted, if possible. */
 			dfilter_fail(dfw, "The integer %d was unexpected in this context.",
 				stnode_value(TOKEN));
 			break;
-		case STTYPE_FIELD:
-			hfinfo = (header_field_info *)stnode_data(TOKEN);
-			dfilter_fail(dfw, "Syntax error near \"%s\".", hfinfo->abbrev);
-			break;
-		case STTYPE_FUNCTION:
-			dfilter_fail(dfw, "The function \"%s\" was unexpected in this context.",
-				sttype_function_funcdef(TOKEN)->name);
-			break;
 		case STTYPE_SET:
 			dfilter_fail(dfw, "Syntax error, SET.");
 			break;
@@ -116,7 +109,9 @@ any "error" symbols are shifted, if possible. */
 		   the scanner, so was can assert that we'll never
 		   see them here. */
 		case STTYPE_NUM_TYPES:
+		case STTYPE_FUNCTION:
 		case STTYPE_RANGE:
+		case STTYPE_FIELD:
 		case STTYPE_FVALUE:
 		case STTYPE_PCRE:
 			ws_assert_not_reached();
@@ -152,45 +147,45 @@ expr(X) ::= logical_test(L).	{ X = L; }
 /* Logical tests */
 logical_test(T) ::= expr(E) TEST_AND expr(F).
 {
-	T = stnode_new(STTYPE_TEST, NULL);
+	T = stnode_new(STTYPE_TEST, NULL, NULL);
 	sttype_test_set2(T, TEST_OP_AND, E, F);
 }
 
 logical_test(T) ::= expr(E) TEST_OR expr(F).
 {
-	T = stnode_new(STTYPE_TEST, NULL);
+	T = stnode_new(STTYPE_TEST, NULL, NULL);
 	sttype_test_set2(T, TEST_OP_OR, E, F);
 }
 
 logical_test(T) ::= TEST_NOT expr(E).
 {
-	T = stnode_new(STTYPE_TEST, NULL);
+	T = stnode_new(STTYPE_TEST, NULL, NULL);
 	sttype_test_set1(T, TEST_OP_NOT, E);
 }
 
 logical_test(T) ::= entity(E).
 {
-	T = stnode_new(STTYPE_TEST, NULL);
+	T = stnode_new(STTYPE_TEST, NULL, NULL);
 	sttype_test_set1(T, TEST_OP_EXISTS, E);
 }
 
 
 
 /* Entities, or things that can be compared/tested/checked */
-entity(E) ::= FIELD(F).		{ E = F; }
 entity(E) ::= STRING(S).	{ E = S; }
 entity(E) ::= CHARCONST(C).	{ E = C; }
 entity(E) ::= UNPARSED(U).	{ E = U; }
 entity(E) ::= range(R).		{ E = R; }
+entity(E) ::= function(F).	{ E = F; }
 
-range_body(B) ::= FIELD(F).	{ B = F; }
 range_body(B) ::= STRING(S).	{ B = S; }
+range_body(B) ::= UNPARSED(U).	{ B = U; }
 range_body(B) ::= range(R).	{ B = R; }
 
 /* Ranges */
 range(R) ::= range_body(B) LBRACKET drnode_list(L) RBRACKET.
 {
-	R = stnode_new(STTYPE_RANGE, NULL);
+	R = stnode_new(STTYPE_RANGE, NULL, NULL);
 	sttype_range_set(R, B, L);
 
 	/* Delete the list, but not the drange_nodes that
@@ -266,7 +261,7 @@ drnode(D) ::= INTEGER(X).
 /* Relational tests */
 relation_test(T) ::= entity(E) rel_op2(O) entity(F).
 {
-	T = stnode_new(STTYPE_TEST, NULL);
+	T = stnode_new(STTYPE_TEST, NULL, NULL);
 	sttype_test_set2(T, O, E, F);
 }
 
@@ -284,10 +279,10 @@ relation_test(T) ::= entity(E) rel_op2(O) relation_test(R).
 		sttype_test_get(F, NULL, &F, NULL);
 	} while (stnode_type_id(F) == STTYPE_TEST);
 
-	L = stnode_new(STTYPE_TEST, NULL);
+	L = stnode_new(STTYPE_TEST, NULL, NULL);
 	sttype_test_set2(L, O, E, stnode_dup(F));
 
-	T = stnode_new(STTYPE_TEST, NULL);
+	T = stnode_new(STTYPE_TEST, NULL, NULL);
 	sttype_test_set2(T, TEST_OP_AND, L, R);
 }
 
@@ -304,8 +299,8 @@ rel_op2(O) ::= TEST_MATCHES.  { O = TEST_OP_MATCHES; }
 relation_test(T) ::= entity(E) TEST_IN LBRACE setnode_list(L) RBRACE.
 {
 	stnode_t *S;
-	T = stnode_new(STTYPE_TEST, NULL);
-	S = stnode_new(STTYPE_SET, L);
+	T = stnode_new(STTYPE_TEST, NULL, NULL);
+	S = stnode_new(STTYPE_SET, L, NULL);
 	sttype_test_set2(T, TEST_OP_IN, E, S);
 }
 
@@ -337,16 +332,18 @@ setnode_list(L) ::= setnode_list(P) WHITESPACE entity(X) DOTDOT entity(Y).
 /* Functions */
 
 /* A function can have one or more parameters */
-entity(E) ::= FUNCTION(F) LPAREN funcparams(P) RPAREN.
+function(F) ::= UNPARSED(U) LPAREN funcparams(P) RPAREN.
 {
-	E = F;
-	sttype_function_set_params(E, P);
+	F = stnode_new(STTYPE_FUNCTION, stnode_data(U), stnode_token_value(U));
+	stnode_free(U);
+	sttype_function_set_params(F, P);
 }
 
 /* A function can have zero parameters. */
-entity(E) ::= FUNCTION(F) LPAREN RPAREN.
+function(F) ::= UNPARSED(U) LPAREN RPAREN.
 {
-	E = F;
+	F = stnode_new(STTYPE_FUNCTION, stnode_data(U), stnode_token_value(U));
+	stnode_free(U);
 }
 
 funcparams(P) ::= entity(E).
