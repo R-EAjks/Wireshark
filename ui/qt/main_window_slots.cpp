@@ -1529,6 +1529,20 @@ void MainWindow::reloadLuaPlugins()
     if (wsApp->isReloadingLua())
         return;
 
+    // Check if the current capture file will need to be reloaded because
+    // it was opened with a lua file handler.
+    capture_file* cf = CaptureFile::globalCapFile();
+    bool must_reload_capture_file = false;
+    if (wtap_uses_lua(cf->provider.wth)) {
+        // Prompt to save the file before reloading
+        if (cf->unsaved_changes) {
+            QString before_what(tr(" before reloading the file"));
+            if (!testCaptureFileClose(before_what, Reload))
+                return;
+        }
+        must_reload_capture_file = true;
+    }
+
     wsApp->setReloadingLua(true);
 
     wslua_reload_plugins(NULL, NULL);
@@ -1543,8 +1557,15 @@ void MainWindow::reloadLuaPlugins()
     commandline_options_reapply();
 
     prefs_apply_all();
-    fieldsChanged();
-    redissectPackets();
+
+    if (must_reload_capture_file) {
+        // Reload the whole file which will also kick off redissection
+        cf_reload(cf);
+    } else {
+        // Keep the file and just redissect the existing packets
+        fieldsChanged();
+        redissectPackets();
+    }
 
     wsApp->setReloadingLua(false);
     SimpleDialog::displayQueuedMessages();

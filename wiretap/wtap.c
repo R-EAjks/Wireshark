@@ -1828,6 +1828,19 @@ wtap_full_file_seek_read(wtap *wth, gint64 seek_off, wtap_rec *rec, Buffer *buf,
 	return wtap_full_file_read_file(wth, wth->random_fh, rec, buf, err, err_info);
 }
 
+gboolean
+wtap_uses_lua(wtap* wth)
+{
+	if (wth && wth->wslua_data != NULL) {
+		/*
+		 * Currently, wslua_data is set if and only if using a Lua
+		 * file handler.
+		 */
+		return TRUE;
+	}
+	return FALSE;
+}
+
 /*
  * Initialize the library.
  */
