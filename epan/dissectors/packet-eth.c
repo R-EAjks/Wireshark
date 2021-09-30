@@ -14,6 +14,7 @@
 #include <epan/exceptions.h>
 #include <epan/prefs.h>
 #include <epan/etypes.h>
+#include <epan/ipproto.h>
 #include <epan/addr_resolv.h>
 #include <epan/expert.h>
 #include <epan/conversation_table.h>
