@@ -3,11 +3,10 @@
 # Do so in the appropriate Dockerfile at
 # https://gitlab.com/wireshark/wireshark-containers/ instead.
 # The resulting images can be found at
+# https://gitlab.com/wireshark/wireshark-containers/container_registry
 # https://hub.docker.com/r/wireshark/wireshark-centos-7-dev
-# https://hub.docker.com/r/wireshark/wireshark-centos-8-dev
 # https://hub.docker.com/r/wireshark/wireshark-debian-stable-dev
 # https://hub.docker.com/r/wireshark/wireshark-fedora-dev
-# https://hub.docker.com/r/wireshark/wireshark-opensuse-15.2-dev
 # https://hub.docker.com/r/wireshark/wireshark-ubuntu-dev
 
 stages:
@@ -232,7 +231,7 @@ CentOS 7 RPM Test:
 
 CentOS 8 RPM Package:
   extends: .build-rpm
-  image: wireshark/wireshark-centos-8-dev
+  image: registry.gitlab.com/wireshark/wireshark-containers/centos-8-dev
   script:
     - printf "\e[0Ksection_start:%s:cmake_section[collapsed=true]\r\e[0KRunning CMake" "$( date +%s)"
     - cmake -GNinja ..
@@ -240,7 +239,7 @@ CentOS 8 RPM Package:
     - ninja-build rpm-package
 CentOS 8 RPM Test:
   extends: .test-rpm
-  image: wireshark/wireshark-centos-8-dev
+  image: registry.gitlab.com/wireshark/wireshark-containers/centos-8-dev
   script:
     - dnf --nogpgcheck localinstall -y build/packaging/rpm/RPMS/x86_64/*.rpm
     - tshark --version
@@ -248,7 +247,7 @@ CentOS 8 RPM Test:
 
 openSUSE 15.2 RPM Package:
   extends: .build-rpm
-  image: wireshark/wireshark-opensuse-15.2-dev
+  image: registry.gitlab.com/wireshark/wireshark-containers/opensuse-15.2-dev
   script:
     - printf "\e[0Ksection_start:%s:cmake_section[collapsed=true]\r\e[0KRunning CMake" "$( date +%s)"
     - cmake -GNinja ..
@@ -256,9 +255,9 @@ openSUSE 15.2 RPM Package:
     - ninja rpm-package
 openSUSE 15.2 RPM Test:
   extends: .test-rpm
-  image: wireshark/wireshark-opensuse-15.2-dev
+  image: registry.gitlab.com/wireshark/wireshark-containers/opensuse-15.2-dev
   script:
-    - zypper --no-gpg-checks install -y build/packaging/rpm/RPMS/x86_64/*.rpm
+    - zypper --no-gpg-checks --no-remote install -y build/packaging/rpm/RPMS/x86_64/*.rpm
     - tshark --version
   needs: [ 'openSUSE 15.2 RPM Package' ]
 
@@ -568,7 +567,7 @@ Code Checks + Clang Warnings:
     - ../tools/validate-clang-check.sh -c $CLANG_VERSION 2> >(tee ../tmp_clang_analyzer_check.txt)
     - ansi2txt < ../tmp_clang_analyzer_check.txt > ../clang_analyzer_check.txt
     - ansi2html < ../tmp_clang_analyzer_check.txt > ../html/clang_analyzer_check.html
-    - ninja checkAPI 
+    - ninja checkAPI
   artifacts:
     paths:
       - clang_report.txt
