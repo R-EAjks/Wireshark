@@ -135,6 +135,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent) :
 PreferencesDialog::~PreferencesDialog()
 {
     delete pd_ui_;
+    delete searchLineEditTimer;
     prefs_modules_foreach_submodules(NULL, module_prefs_clean_stash, NULL);
 }
 
