@@ -365,7 +365,7 @@ absolute_val_repr_len(fvalue_t *fv, ftrepr_t rtype, int field_display)
 		break;
 
 	default:
-		ws_assert_not_reached();
+		g_assert_not_reached();
 		break;
 	}
 
@@ -396,7 +396,7 @@ absolute_val_to_repr(fvalue_t *fv, ftrepr_t rtype, int field_display, char *buf,
 		break;
 
 	default:
-		ws_assert_not_reached();
+		g_assert_not_reached();
 		break;
 	}
 
