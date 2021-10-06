@@ -71,6 +71,7 @@
 #define OUI_ATM_FORUM       0x00A03E    /* ATM Forum */
 #define OUI_ZEBRA_EXTREME   0x00A0F8    /* Extreme/WING (Zebra) */
 #define OUI_EXTREME         0x00E02B    /* Extreme EDP/ESRP */
+#define OUI_EXTREME_MESH    0x000512    /* Extreme MESH */
 #define OUI_CABLE_BPDU      0x00E02F    /* DOCSIS spanning tree BPDU */
 #define OUI_FOUNDRY         0x00E052    /* Foundry */
 #define OUI_SIEMENS         0x080006    /* Siemens AG */
