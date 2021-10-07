@@ -45,6 +45,7 @@ alteon
 amperage
 ampere
 amperes
+anacap
 analyzers
 analyzes
 annexc
@@ -150,6 +151,7 @@ cannot
 canonicalised
 canonicalize
 canonicalized
+capacitive
 capinfos
 capsa
 captioning
@@ -180,6 +182,7 @@ checkout
 checksum
 choco
 chocolatey
+chromaticities
 chunked
 ciphered
 ciphering
@@ -193,11 +196,13 @@ clientkey
 cmake
 cmdcontrol
 cmstatus
+codabar
 codebook
 codecs
 codepoint
 codeset
 codingrate
+codute
 collectd
 colocated
 coloring
@@ -250,6 +255,7 @@ cyphering
 datagram
 datagrams
 dataitem
+datalen
 datarate
 datastate
 datetime
@@ -259,6 +265,7 @@ deactivated
 deactivating
 deactivation
 deassert
+deasserted
 deassertion
 deauth
 deauthenticate
@@ -268,6 +275,7 @@ deauthentications
 debian
 debug
 decapsulation
+decca
 dechunk
 decompressing
 decompressor
@@ -291,6 +299,7 @@ delimited
 delimiters
 delimiting
 demodulator
+demultiplexed
 demultiplexer
 demultiplexers
 deobfuscated
@@ -317,6 +326,7 @@ deselect
 destport
 deutschland
 devcap
+deviceid
 devmode
 dfilter
 dfilters
@@ -326,6 +336,8 @@ dialed
 dialup
 diffie
 Digicel
+digitizer
+digium
 diplexer
 directionality
 disambiguation
@@ -347,6 +359,7 @@ downlink
 dpauxmon
 dpnss
 drbid
+drdynvc
 droppable
 dsmcc
 dstport
@@ -364,6 +377,7 @@ editcap
 egprs
 egroup
 eigrp
+elided
 elink
 ellipsoid
 encap
@@ -377,14 +391,18 @@ encrypting
 endace
 endian
 endianness
+engineid
 enodeb
+enqueue
 enrollee
 entityid
 entryid
 enumerates
 enumerations
+enumerator
 epasv
 epdcch
+equinf
 ericsson
 erldp
 errinf
@@ -405,6 +423,7 @@ eutra
 eutran
 eventlog
 executables
+exocet
 extattr
 extcap
 extensibility
@@ -467,6 +486,7 @@ google
 gprscdr
 greyed
 groupa
+groupadd
 groupb
 groupcast
 groupmod
@@ -479,6 +499,7 @@ hartip
 hashed
 hashes
 hazelcast
+hcidump
 heuristic
 hfarr
 hfill,
@@ -517,6 +538,7 @@ inband
 incits
 incremented
 incrementing
+indenting
 indirection
 infile
 infiniband
@@ -545,6 +567,7 @@ interworking
 invalidation
 ioctl
 ioerr
+iograph
 ipaddr
 ipaddress
 ipfix
@@ -554,6 +577,7 @@ iptables
 iptrace
 ipv4addr
 isakmp
+iscsi
 iseries
 isobus
 isochronous
@@ -588,6 +612,7 @@ lcsap
 leasequery
 libgcrypt
 libpcap
+linearity
 linkaddr
 linker
 linkinfo
@@ -596,6 +621,7 @@ linux
 list1
 literals
 lithionics
+lnpdqp
 logcat
 loghans
 loglocal
@@ -685,12 +711,14 @@ multirate
 multislot
 multistate
 mumbai
+mycapture
 nacks
 namelen
 namespace
 narrowband
 nbrar
 ndpsm
+negotiability
 netboot
 netfilter
 netflow
@@ -753,6 +781,7 @@ onoff
 ontime
 opcode
 opcodes
+openssh
 openssl
 openstreetmap
 openvpn
@@ -768,6 +797,7 @@ outhdr
 packetcable
 packetization
 packetized
+pagings
 parallelization
 param
 parameterization
@@ -788,6 +818,7 @@ pcmax
 pcmaxc
 pdcch
 pdsch
+pdustatus
 peeraddr
 peerkey
 periodicities
@@ -806,8 +837,10 @@ pname
 polestar
 popup
 portcounters
+portid
 portinfo
 portmod
+portno
 portnumber
 portstatus
 posix
@@ -834,6 +867,7 @@ procid
 profidrive
 profinet
 promiscuously
+propertykey
 protected
 protoabbrev
 protobuf
@@ -850,6 +884,7 @@ pubdir
 pubkey
 pucch
 pusch
+pwach
 pytest
 qam16
 qam64
@@ -871,6 +906,7 @@ randomization
 randomizer
 randpkt
 raster
+rdpudp
 reachability
 readme
 realloc
@@ -888,6 +924,7 @@ reauthenticate
 reauthentication
 reauthorize
 rebalance
+rebase
 rebinding
 rebooted
 reboots
@@ -921,6 +958,7 @@ referer
 referrer
 regex
 regexp
+regionid
 reimplemented
 reinitialization
 reinitialize
@@ -977,7 +1015,9 @@ retyping
 revalidate
 revalidation
 revertive
+revocations
 rfcomm
+rgoose
 rlcmac
 rmcap
 rnsap
@@ -990,6 +1030,7 @@ rxreq
 sanicap
 sanitize
 satisfiable
+scalability
 scaler
 scannable
 scell
@@ -1010,6 +1051,7 @@ serialize
 serialized
 sessionid
 setattr
+setcap
 setuid
 severities
 sflow
@@ -1027,12 +1069,14 @@ simulcast
 skype
 slsch
 smpte
+smrse
 sname
 snaplen
 snow3g
 softkey
 someip
 someipsd
+sonet
 spare
 spare1
 spare2
@@ -1065,6 +1109,8 @@ statusbar
 stderr
 stdout
 streamid
+stringz
+stringzpad
 struct
 structs
 subaddress
@@ -1143,6 +1189,8 @@ telia
 teredo
 tesla
 text2pcap
+thermister
+thermistor
 timeout
 timeslot
 timestamp
@@ -1153,6 +1201,7 @@ toggled
 toggling
 toolbar
 toolongfragment
+toolset
 tooltip
 toshiba
 touchlink
@@ -1161,6 +1210,7 @@ traceroute
 transcoder
 transifex
 transitioning
+transitivity
 traveler
 traversal
 truncatable
@@ -1256,6 +1306,7 @@ unmappable
 unmark
 unmarshal
 unmerged
+unmodulated
 unmute
 unmuted
 unoptimized
@@ -1280,10 +1331,12 @@ unroutable
 unsecure
 unsegmented
 unsequenced
+unspec
 unsubscribe
 unsubscribed
 unsynchronized
 untagged
+unterminated
 untruncated
 untrusted
 untunneled
@@ -1313,6 +1366,8 @@ v1410
 v1530
 v1610
 validator
+varint
+vcredist
 verifier
 verizon
 version2
@@ -1347,12 +1402,14 @@ withoutfcs
 wksta
 workarounds
 writable
+wsbuild
 wscale
 wslua
 wsluarm
 x509sat
 xchannel
 xmlns
+xsltproc
 xtreme
 z3950
 zeroes

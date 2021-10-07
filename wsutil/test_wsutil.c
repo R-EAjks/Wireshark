@@ -15,7 +15,7 @@
 #include "str_util.h"
 
 
-void test_format_size(void)
+static void test_format_size(void)
 {
     char *str;
 
@@ -34,7 +34,7 @@ void test_format_size(void)
 
 #include "to_str.h"
 
-void test_word_to_hex(void)
+static void test_word_to_hex(void)
 {
     static char buf[32];
     char *str;     /* String is not NULL terminated. */
@@ -82,7 +82,7 @@ void test_word_to_hex(void)
     g_assert_cmpint(str[-16], ==, '0');
 }
 
-void test_bytes_to_str(void)
+static void test_bytes_to_str(void)
 {
     char *str;
 
@@ -93,7 +93,7 @@ void test_bytes_to_str(void)
     g_free(str);
 }
 
-void test_bytes_to_str_punct(void)
+static void test_bytes_to_str_punct(void)
 {
     char *str;
 
@@ -104,7 +104,7 @@ void test_bytes_to_str_punct(void)
     g_free(str);
 }
 
-void test_bytes_to_string_trunc1(void)
+static void test_bytes_to_string_trunc1(void)
 {
     char *str;
 
@@ -128,7 +128,7 @@ void test_bytes_to_string_trunc1(void)
     g_free(str);
 }
 
-void test_bytes_to_string_punct_trunc1(void)
+static void test_bytes_to_string_punct_trunc1(void)
 {
     char *str;
 
@@ -154,7 +154,7 @@ void test_bytes_to_string_punct_trunc1(void)
 static char to_str_back_buf[32];
 #define BACK_PTR (&to_str_back_buf[31]) /* pointer to NUL string terminator */
 
-void test_oct_to_str_back(void)
+static void test_oct_to_str_back(void)
 {
     char *str;
 
@@ -168,7 +168,7 @@ void test_oct_to_str_back(void)
     g_assert_cmpstr(str, ==, "010613120332");
 }
 
-void test_oct64_to_str_back(void)
+static void test_oct64_to_str_back(void)
 {
     char *str;
 
@@ -182,7 +182,7 @@ void test_oct64_to_str_back(void)
     g_assert_cmpstr(str, ==, "01263236102754220511046");
 }
 
-void test_hex_to_str_back_len(void)
+static void test_hex_to_str_back_len(void)
 {
     char *str;
 
@@ -196,7 +196,7 @@ void test_hex_to_str_back_len(void)
     g_assert_cmpstr(str, ==, "0x00003f66");
 }
 
-void test_hex64_to_str_back_len(void)
+static void test_hex64_to_str_back_len(void)
 {
     char *str;
 
@@ -210,7 +210,7 @@ void test_hex64_to_str_back_len(void)
     g_assert_cmpstr(str, ==, "0xffffffffffffffff");
 }
 
-void test_uint_to_str_back(void)
+static void test_uint_to_str_back(void)
 {
     char *str;
 
@@ -224,7 +224,7 @@ void test_uint_to_str_back(void)
     g_assert_cmpstr(str, ==, "181787997");
 }
 
-void test_uint64_to_str_back(void)
+static void test_uint64_to_str_back(void)
 {
     char *str;
 
@@ -238,7 +238,7 @@ void test_uint64_to_str_back(void)
     g_assert_cmpstr(str, ==, "95778573911934485");
 }
 
-void test_uint_to_str_back_len(void)
+static void test_uint_to_str_back_len(void)
 {
     char *str;
 
@@ -252,7 +252,7 @@ void test_uint_to_str_back_len(void)
     g_assert_cmpstr(str, ==, "18750000");
 }
 
-void test_uint64_to_str_back_len(void)
+static void test_uint64_to_str_back_len(void)
 {
     char *str;
 
@@ -266,7 +266,7 @@ void test_uint64_to_str_back_len(void)
     g_assert_cmpstr(str, ==, "18446744073709551615");
 }
 
-void test_int_to_str_back(void)
+static void test_int_to_str_back(void)
 {
     char *str;
 
@@ -280,7 +280,7 @@ void test_int_to_str_back(void)
     g_assert_cmpstr(str, ==, "898901469");
 }
 
-void test_int64_to_str_back(void)
+static void test_int64_to_str_back(void)
 {
     char *str;
 
@@ -292,6 +292,179 @@ void test_int64_to_str_back(void)
 
     str = int64_to_str_back(BACK_PTR, G_GINT64_CONSTANT(9223372036854775807));
     g_assert_cmpstr(str, ==, "9223372036854775807");
+}
+
+#include "ws_getopt.h"
+
+#define ARGV_MAX 31
+
+static char **new_argv(int *argc_ptr, const char *args, ...)
+{
+    char **argv;
+    int argc = 0;
+    va_list ap;
+
+    argv = g_malloc((ARGV_MAX + 1) * sizeof(char *));
+
+    va_start(ap, args);
+    while (args != NULL) {
+        /* Increase ARGV_MAX or use a dynamic size if this assertion fails. */
+        g_assert_true(argc < ARGV_MAX);
+        argv[argc++] = g_strdup(args);
+        args = va_arg(ap, const char *);
+    }
+    argv[argc] = NULL;
+    va_end(ap);
+
+    *argc_ptr = argc;
+    return argv;
+}
+
+static void free_argv(char **argv)
+{
+    for (char **p = argv; *p != NULL; p++) {
+        g_free(*p);
+    }
+    g_free(argv);
+}
+
+static void test_getopt_long_basic1(void)
+{
+    char **argv;
+    int argc;
+
+    const char *optstring = "ab:c";
+    argv = new_argv(&argc, "/bin/ls", "-a", "-b", "arg1", "-c", "path", (char *)NULL);
+
+    ws_optind = 1;
+    int opt;
+
+    opt = ws_getopt_long(argc, argv, optstring, NULL, NULL);
+    g_assert_cmpint(opt, ==, 'a');
+    g_assert_null(ws_optarg);
+
+    opt = ws_getopt_long(argc, argv, optstring, NULL, NULL);
+    g_assert_cmpint(opt, ==, 'b');
+    g_assert_cmpstr(ws_optarg, ==, "arg1");
+
+    opt = ws_getopt_long(argc, argv, optstring, NULL, NULL);
+    g_assert_cmpint(opt, ==, 'c');
+    g_assert_null(ws_optarg);
+
+    opt = ws_getopt_long(argc, argv, optstring, NULL, NULL);
+    g_assert_cmpint(opt, ==, -1);
+
+    free_argv(argv);
+}
+
+static void test_getopt_long_basic2(void)
+{
+    char **argv;
+    int argc;
+
+    struct ws_option longopts[] = {
+        { "opt1", ws_no_argument, NULL, '1' },
+        { "opt2", ws_required_argument, NULL, '2' },
+        { "opt3", ws_required_argument, NULL, '3' },
+        { 0, 0, 0, 0 }
+    };
+    argv = new_argv(&argc, "/bin/ls", "--opt1", "--opt2", "arg1", "--opt3=arg2", "path", (char *)NULL);
+
+    ws_optind = 1;
+    int opt;
+
+    opt = ws_getopt_long(argc, argv, "", longopts, NULL);
+    g_assert_cmpint(opt, ==, '1');
+    g_assert_null(ws_optarg);
+
+    opt = ws_getopt_long(argc, argv, "", longopts, NULL);
+    g_assert_cmpint(opt, ==, '2');
+    g_assert_cmpstr(ws_optarg, ==, "arg1");
+
+    opt = ws_getopt_long(argc, argv, "", longopts, NULL);
+    g_assert_cmpint(opt, ==, '3');
+    g_assert_cmpstr(ws_optarg, ==, "arg2");
+
+    opt = ws_getopt_long(argc, argv, "", longopts, NULL);
+    g_assert_cmpint(opt, ==, -1);
+
+    free_argv(argv);
+}
+
+static void test_getopt_optional_argument1(void)
+{
+    char **argv;
+    int argc;
+    int opt;
+
+    struct ws_option longopts_optional[] = {
+        { "optional", ws_optional_argument, NULL, '1' },
+        { 0, 0, 0, 0 }
+    };
+
+    argv = new_argv(&argc, "/bin/ls", "--optional=arg1", (char *)NULL);
+
+    ws_optreset = 1;
+    opt = ws_getopt_long(argc, argv, "", longopts_optional, NULL);
+    g_assert_cmpint(opt, ==, '1');
+    g_assert_cmpstr(ws_optarg, ==, "arg1");
+
+    free_argv(argv);
+    argv = new_argv(&argc, "/bin/ls", "--optional", "arg1", (char *)NULL);
+
+    ws_optreset = 1;
+    opt = ws_getopt_long(argc, argv, "", longopts_optional, NULL);
+    g_assert_cmpint(opt, ==, '1');
+    /* Optional argument does not recognize the form "--arg param" (it's ambiguous). */
+    g_assert_null(ws_optarg);
+
+    free_argv(argv);
+    argv = new_argv(&argc, "/bin/ls", "--optional", (char *)NULL);
+
+    ws_optreset = 1;
+    opt = ws_getopt_long(argc, argv, "", longopts_optional, NULL);
+    g_assert_cmpint(opt, ==, '1');
+    g_assert_null(ws_optarg);
+
+    free_argv(argv);
+}
+
+static void test_getopt_opterr1(void)
+{
+    char **argv;
+    int argc;
+
+#ifdef _WIN32
+    g_test_skip("Not supported on Windows");
+    return;
+#endif
+
+    if (g_test_subprocess()) {
+        const char *optstring = "ab";
+        argv = new_argv(&argc, "/bin/ls", "-a", "-z", "path", (char *)NULL);
+
+        ws_optind = 0;
+        ws_opterr = 1;
+        int opt;
+
+        opt = ws_getopt_long(argc, argv, optstring, NULL, NULL);
+        g_assert_cmpint(opt, ==, 'a');
+
+        opt = ws_getopt_long(argc, argv, optstring, NULL, NULL);
+        g_assert_cmpint(opt, ==, '?');
+        g_assert_cmpint(ws_optopt, ==, 'z');
+
+        opt = ws_getopt_long(argc, argv, optstring, NULL, NULL);
+        g_assert_cmpint(opt, ==, -1);
+
+        free_argv(argv);
+
+        return;
+    }
+
+    g_test_trap_subprocess(NULL, 0, 0);
+    g_test_trap_assert_passed();
+    g_test_trap_assert_stderr("/bin/ls: unrecognized option: z\n");
 }
 
 int main(int argc, char **argv)
@@ -317,6 +490,11 @@ int main(int argc, char **argv)
     g_test_add_func("/to_str/uint64_to_str_back_len", test_uint64_to_str_back_len);
     g_test_add_func("/to_str/int_to_str_back", test_int_to_str_back);
     g_test_add_func("/to_str/int64_to_str_back", test_int64_to_str_back);
+
+    g_test_add_func("/ws_getopt/basic1", test_getopt_long_basic1);
+    g_test_add_func("/ws_getopt/basic2", test_getopt_long_basic2);
+    g_test_add_func("/ws_getopt/optional1", test_getopt_optional_argument1);
+    g_test_add_func("/ws_getopt/opterr1", test_getopt_opterr1);
 
     ret = g_test_run();
 

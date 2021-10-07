@@ -161,6 +161,7 @@ set(LIBWIRESHARK_PUBLIC_HEADERS
 	unit_strings.h
 	value_string.h
 	wmem_scopes.h
+	wscbor.h
 	x264_prt_id.h
 	xdlc.h
 )
@@ -255,8 +256,10 @@ set(LIBWIRESHARK_NONGENERATED_FILES
 	tvbuff_lz77.c
 	tvbuff_lz77huff.c
 	tvbuff_lznt1.c
+	tvbuff_rdp.c
 	uat.c
 	value_string.c
+	wscbor.c
 	unit_strings.c
 	wmem_scopes.c
 	xdlc.c
@@ -415,6 +418,13 @@ set_target_properties(tvbtest PROPERTIES
 	FOLDER "Tests"
 	EXCLUDE_FROM_DEFAULT_BUILD True
 	COMPILE_DEFINITIONS "WS_BUILD_DLL"
+)
+
+add_executable(wscbor_test EXCLUDE_FROM_ALL wscbor_test.c)
+target_link_libraries(wscbor_test epan)
+set_target_properties(wscbor_test PROPERTIES
+    FOLDER "Tests"
+    EXCLUDE_FROM_DEFAULT_BUILD True
 )
 
 CHECKAPI(

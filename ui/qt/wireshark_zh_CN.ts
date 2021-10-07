@@ -721,6 +721,10 @@
 <context>
     <name>ByteViewText</name>
     <message>
+        <source>Allow hover selection</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Show bytes as hexadecimal</source>
         <translation>将字节显示为十六进制</translation>
     </message>
@@ -3642,6 +3646,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>对数刻度</translation>
     </message>
     <message>
+        <source>Automatic Update</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Reset</source>
         <translation>复位</translation>
     </message>
@@ -4322,10 +4330,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>&lt;small&gt;&lt;i&gt;reccomended regex:&lt;/small&gt;&lt;/i&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>encodingRegexExample</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4376,6 +4380,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>None</source>
         <translation>无</translation>
+    </message>
+    <message>
+        <source>&lt;small&gt;&lt;i&gt;recommended regex:&lt;/small&gt;&lt;/i&gt;</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>The format in which to parse timestamps in the text file (e.g. %H:%M:%S.). Format specifiers are based on strptime(3)</source>
@@ -8235,6 +8243,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>在开始新捕获前</translation>
     </message>
     <message>
+        <source> before reloading Lua plugins</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Please wait while Wireshark is initializing…</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8685,10 +8697,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
 </context>
 <context>
     <name>PacketCommentDialog</name>
-    <message>
-        <source>Packet %1 Comment</source>
-        <translation type="vanished">分组 %1 注释</translation>
-    </message>
     <message>
         <source>Edit Packet Comment</source>
         <translation type="unfinished"></translation>

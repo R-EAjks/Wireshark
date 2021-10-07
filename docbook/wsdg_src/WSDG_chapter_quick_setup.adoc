@@ -25,8 +25,7 @@ The following must be installed in order to build Wireshark:
 Either make or Ninja can be used to build Wireshark; at least one of
 those must be installed.
 
-To build the Developer's Guide and the User's Guide, Asciidoctor,
-Xsltproc, and DocBook must be installed.
+To build the manual pages, Developer's Guide and User's Guide, Asciidoctor, Xsltproc, and DocBook must be installed.
 
 Some features of Wireshark require additional libraries to be installed.
 
@@ -151,10 +150,10 @@ to run it by entering `wireshark`.
 
 ==== Optional: Create User’s and Developer’s Guide
 
-To build the Wireshark User's Guide and the Wireshark Developer's Guide
+To build the Wireshark User's Guide and the Wireshark Developer's Guide,
 build the `all_guides` target, e.g.  `make all_guides` or `ninja
 all_guides`.  Detailed information to build these guides can be found in
-the file _docbook\README.adoc_ in the Wireshark sources.
+the file _docbook/README.adoc_ in the Wireshark sources.
 
 ==== Optional: Create an installable or source code package
 
@@ -398,7 +397,8 @@ Chocolatey ensures cmake.exe is on your path.
 
 ==== Install Asciidoctor, Xsltproc, And DocBook
 
-https://asciidoctor.org/[Asciidoctor] can be run directly as a Ruby script or via a Java wrapper (AsciidoctorJ) or JavaScript (Asciidoctor.js).
+https://asciidoctor.org/[Asciidoctor] can be run directly as a Ruby script or via a Java wrapper (AsciidoctorJ).
+The JavaScript flavor (Asciidoctor.js) isn’t yet supported.
 It is used in conjunction with Xsltproc and DocBook to generate the documentation you're reading and the User’s Guide.
 
 You can install AsciidoctorJ, Xsltproc, and DocBook using Chocolatey.
@@ -624,7 +624,7 @@ on using the <<ChToolsDebugger, Debugger Tools>>.
 
 ==== Optional: Create User’s and Developer’s Guide
 
-To build the Wireshark User's Guide and the Wireshark Developer's Guide
+To build the Wireshark User's Guide and the Wireshark Developer's Guide,
 build the `all_guides` target, e.g.  `msbuild all_guides.vcxproj`.
 Detailed information to build these guides can be found in the file
 _docbook\README.adoc_ in the Wireshark sources.

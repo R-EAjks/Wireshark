@@ -723,6 +723,10 @@
 <context>
     <name>ByteViewText</name>
     <message>
+        <source>Allow hover selection</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Show bytes as hexadecimal</source>
         <translation type="unfinished"></translation>
     </message>
@@ -3622,6 +3626,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Логарифмічна шкала</translation>
     </message>
     <message>
+        <source>Automatic Update</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Reset</source>
         <translation>Скинути</translation>
     </message>
@@ -4302,10 +4310,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>&lt;small&gt;&lt;i&gt;reccomended regex:&lt;/small&gt;&lt;/i&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>encodingRegexExample</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4356,6 +4360,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>None</source>
         <translation type="unfinished">Відсутня</translation>
+    </message>
+    <message>
+        <source>&lt;small&gt;&lt;i&gt;recommended regex:&lt;/small&gt;&lt;/i&gt;</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>The format in which to parse timestamps in the text file (e.g. %H:%M:%S.). Format specifiers are based on strptime(3)</source>
@@ -8190,6 +8198,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source> before starting a new capture</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> before reloading Lua plugins</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

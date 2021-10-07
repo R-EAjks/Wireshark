@@ -68,6 +68,7 @@ set(PIDL_DISSECTOR_SRC
 )
 
 set(CLEAN_ASN1_DISSECTOR_SRC
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-lix2.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ansi_map.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-acp133.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-acse.c
@@ -295,6 +296,7 @@ set(DISSECTOR_PUBLIC_HEADERS
 	packet-cmp.h
 	packet-cms.h
 	packet-coap.h
+	packet-cose.h
 	packet-credssp.h
 	packet-crmf.h
 	packet-csn1.h
@@ -643,6 +645,7 @@ set(DISSECTOR_HEADER_FILES
 )
 
 set(DISSECTOR_SRC
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-li5g.c
 	${CMAKE_CURRENT_SOURCE_DIR}/file-blf.c
 	${CMAKE_CURRENT_SOURCE_DIR}/file-btsnoop.c
 	${CMAKE_CURRENT_SOURCE_DIR}/file-elf.c
@@ -854,6 +857,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-cops.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-corosync-totemnet.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-corosync-totemsrp.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-cose.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-cosine.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-couchbase.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-cp2179.c
@@ -1656,6 +1660,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-rdp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-rdp_multitransport.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-rdp_drdynvc.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-rdp_egfx.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-rdpudp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-rdt.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-redback.c

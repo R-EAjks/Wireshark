@@ -722,6 +722,10 @@
 <context>
     <name>ByteViewText</name>
     <message>
+        <source>Allow hover selection</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Show bytes as hexadecimal</source>
         <translation>Visa byte hexadecimalt</translation>
     </message>
@@ -3663,6 +3667,10 @@ Till exempel, använd 1 timma för att en ny fil skall skapas varje timma vid he
         <translation>Log-skala</translation>
     </message>
     <message>
+        <source>Automatic Update</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Reset</source>
         <translation>Återställ</translation>
     </message>
@@ -4343,10 +4351,6 @@ Till exempel, använd 1 timma för att en ny fil skall skapas varje timma vid he
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>&lt;small&gt;&lt;i&gt;reccomended regex:&lt;/small&gt;&lt;/i&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>encodingRegexExample</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4397,6 +4401,10 @@ Till exempel, använd 1 timma för att en ny fil skall skapas varje timma vid he
     <message>
         <source>None</source>
         <translation>Ingen</translation>
+    </message>
+    <message>
+        <source>&lt;small&gt;&lt;i&gt;recommended regex:&lt;/small&gt;&lt;/i&gt;</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>The format in which to parse timestamps in the text file (e.g. %H:%M:%S.). Format specifiers are based on strptime(3)</source>
@@ -8262,6 +8270,10 @@ Till exempel, använd 1 timma för att en ny fil skall skapas varje timma vid he
         <translation> före en ny fångst startas</translation>
     </message>
     <message>
+        <source> before reloading Lua plugins</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Please wait while Wireshark is initializing…</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8713,10 +8725,6 @@ Till exempel, använd 1 timma för att en ny fil skall skapas varje timma vid he
 </context>
 <context>
     <name>PacketCommentDialog</name>
-    <message>
-        <source>Packet %1 Comment</source>
-        <translation type="vanished">Paket %1 kommentar</translation>
-    </message>
     <message>
         <source>Edit Packet Comment</source>
         <translation type="unfinished"></translation>

@@ -721,6 +721,10 @@
 <context>
     <name>ByteViewText</name>
     <message>
+        <source>Allow hover selection</source>
+        <translation>Fareyle üzerine gelme seçimine izin ver</translation>
+    </message>
+    <message>
         <source>Show bytes as hexadecimal</source>
         <translation>Baytları onaltılık olarak göster</translation>
     </message>
@@ -3646,6 +3650,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Günlük ölçeği</translation>
     </message>
     <message>
+        <source>Automatic Update</source>
+        <translation>Otomatik Güncelleme</translation>
+    </message>
+    <message>
         <source>Reset</source>
         <translation>Sıfırla</translation>
     </message>
@@ -4326,10 +4334,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Veriler nasıl kodlanır</translation>
     </message>
     <message>
-        <source>&lt;small&gt;&lt;i&gt;reccomended regex:&lt;/small&gt;&lt;/i&gt;</source>
-        <translation>&lt;small&gt;&lt;i&gt;önerilen normal ifade:&lt;/small&gt;&lt;/i&gt;</translation>
-    </message>
-    <message>
         <source>encodingRegexExample</source>
         <translation>kodlamaRegexÖrneği</translation>
     </message>
@@ -4380,6 +4384,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>None</source>
         <translation>Yok</translation>
+    </message>
+    <message>
+        <source>&lt;small&gt;&lt;i&gt;recommended regex:&lt;/small&gt;&lt;/i&gt;</source>
+        <translation>&lt;small&gt;&lt;i&gt;önerilen normal ifade:&lt;/small&gt;&lt;/i&gt;</translation>
     </message>
     <message>
         <source>The format in which to parse timestamps in the text file (e.g. %H:%M:%S.). Format specifiers are based on strptime(3)</source>
@@ -8226,17 +8234,21 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Delete packet comments</source>
-        <translation type="unfinished"></translation>
+        <translation>Paket yorumlarını sil</translation>
     </message>
     <message numerus="yes">
         <source>Delete comments from %n packet(s)</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
+        <translation>
+            <numerusform>%n paketinden() yorumları sil</numerusform>
         </translation>
     </message>
     <message>
         <source> before starting a new capture</source>
         <translation> yeni bir yakalamaya başlamadan önce</translation>
+    </message>
+    <message>
+        <source> before reloading Lua plugins</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Please wait while Wireshark is initializing…</source>
@@ -8690,16 +8702,12 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
 <context>
     <name>PacketCommentDialog</name>
     <message>
-        <source>Packet %1 Comment</source>
-        <translation type="vanished">Paket %1 Yorum</translation>
-    </message>
-    <message>
         <source>Edit Packet Comment</source>
-        <translation type="unfinished"></translation>
+        <translation>Paket Yorumunu Düzenle</translation>
     </message>
     <message>
         <source>Add Packet Comment</source>
-        <translation type="unfinished"></translation>
+        <translation>Paket Yorumu Ekle</translation>
     </message>
 </context>
 <context>
@@ -12752,7 +12760,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Hex Digits</source>
-        <translation type="unfinished"></translation>
+        <translation>Onaltılı Rakamlar</translation>
     </message>
     <message>
         <source>Quoted-Printable</source>

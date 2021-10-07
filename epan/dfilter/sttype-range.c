@@ -72,6 +72,23 @@ range_free(gpointer value)
 	g_free(range);
 }
 
+static char *
+range_tostr(const void *data)
+{
+	range_t	*range = (range_t*)data;
+	ws_assert_magic(range, RANGE_MAGIC);
+	char *repr, *entity_str, *drange_str;
+
+	entity_str = stnode_tostr(range->entity);
+	drange_str = drange_tostr(range->drange);
+
+	repr = g_strdup_printf("%s[%s]", entity_str, drange_str);
+	g_free(entity_str);
+	g_free(drange_str);
+
+	return repr;
+}
+
 void
 sttype_range_remove_drange(stnode_t *node)
 {
@@ -104,9 +121,21 @@ sttype_range_set1(stnode_t *node, stnode_t *entity, drange_node *rn)
 	sttype_range_set(node, entity, g_slist_append(NULL, rn));
 }
 
-STTYPE_ACCESSOR(stnode_t*, range, entity, RANGE_MAGIC)
-STTYPE_ACCESSOR(drange_t*, range, drange, RANGE_MAGIC)
+stnode_t *
+sttype_range_entity(stnode_t *node)
+{
+	range_t *range = node->data;
+	ws_assert_magic(range, RANGE_MAGIC);
+	return range->entity;
+}
 
+drange_t *
+sttype_range_drange(stnode_t *node)
+{
+	range_t *range = node->data;
+	ws_assert_magic(range, RANGE_MAGIC);
+	return range->drange;
+}
 
 void
 sttype_register_range(void)
@@ -116,7 +145,8 @@ sttype_register_range(void)
 		"RANGE",
 		range_new,
 		range_free,
-		range_dup
+		range_dup,
+		range_tostr
 	};
 
 	sttype_register(&range_type);

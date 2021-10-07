@@ -290,6 +290,7 @@ extern "C" {
 #define WTAP_ENCAP_SLL2                         210
 #define WTAP_ENCAP_ZWAVE_SERIAL                 211
 #define WTAP_ENCAP_ETW                          212
+#define WTAP_ENCAP_ERI_ENB_LOG                  213
 
 /* After adding new item here, please also add new item to encap_table_base array */
 
@@ -2235,6 +2236,8 @@ WS_DLL_PUBLIC
 void wtap_register_open_info(struct open_info *oi, const gboolean first_routine);
 WS_DLL_PUBLIC
 gboolean wtap_has_open_info(const gchar *name);
+WS_DLL_PUBLIC
+gboolean wtap_uses_lua_filehandler(const wtap* wth);
 WS_DLL_PUBLIC
 void wtap_deregister_open_info(const gchar *name);
 

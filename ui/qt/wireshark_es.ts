@@ -722,6 +722,10 @@
 <context>
     <name>ByteViewText</name>
     <message>
+        <source>Allow hover selection</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Show bytes as hexadecimal</source>
         <translation>Mostrar bytes como hexadecimal</translation>
     </message>
@@ -3624,6 +3628,10 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation>Escala logarítmica</translation>
     </message>
     <message>
+        <source>Automatic Update</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Reset</source>
         <translation>Restablecer</translation>
     </message>
@@ -4304,10 +4312,6 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>&lt;small&gt;&lt;i&gt;reccomended regex:&lt;/small&gt;&lt;/i&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>encodingRegexExample</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4358,6 +4362,10 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
     <message>
         <source>None</source>
         <translation>Ninguno</translation>
+    </message>
+    <message>
+        <source>&lt;small&gt;&lt;i&gt;recommended regex:&lt;/small&gt;&lt;/i&gt;</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>The format in which to parse timestamps in the text file (e.g. %H:%M:%S.). Format specifiers are based on strptime(3)</source>
@@ -8190,6 +8198,10 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source> before reloading Lua plugins</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Please wait while Wireshark is initializing…</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8641,10 +8653,6 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
 </context>
 <context>
     <name>PacketCommentDialog</name>
-    <message>
-        <source>Packet %1 Comment</source>
-        <translation type="vanished">Comentario de paquete %1</translation>
-    </message>
     <message>
         <source>Edit Packet Comment</source>
         <translation type="unfinished"></translation>

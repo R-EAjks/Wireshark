@@ -76,6 +76,7 @@ ADDITIONAL_LIST="libcap-devel \
 #	oxipng \
 #	pngcrush"
 
+# XXX
 RPMDEPS_LIST="rpm-build"
 
 # Guess which package manager we will use
@@ -174,6 +175,13 @@ echo "update-desktop-files is unavailable" >&2
 add_package BASIC_LIST perl-podlators ||
 echo "perl-podlators unavailable" >&2
 
+# rubygem-asciidoctor.noarch: Centos 7, Fedora
+# ruby2.5-rubygem-asciidoctor: openSUSE 15.2
+# You will get nothing and you will like it: CentOS 8
+add_package RPMDEPS_LIST rubygem-asciidoctor.noarch || add_package RPMDEPS_LIST ruby2.5-rubygem-asciidoctor ||
+echo "asciidoctor is unavailable" >&2
+
+
 # libcap: CentOS 7, Fedora 28, Fedora 29
 # libcap2: OpenSUSE Leap 42.3, OpenSUSE Leap 15.0
 add_package ADDITIONAL_LIST libcap || add_package ADDITIONAL_LIST libcap2 ||
@@ -203,9 +211,6 @@ echo "Gettext devel is unavailable" >&2
 
 add_package ADDITIONAL_LIST perl-Pod-Html ||
 echo "perl-Pod-Html is unavailable" >&2
-
-add_package ADDITIONAL_LIST asciidoctor || add_package ADDITIONAL_LIST rubygem-asciidoctor.noarch ||
-echo "asciidoctor is unavailable" >&2
 
 add_package ADDITIONAL_LIST ninja || add_package ADDITIONAL_LIST ninja-build ||
 echo "ninja is unavailable" >&2

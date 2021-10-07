@@ -98,6 +98,10 @@ The following features are new (or have been significantly updated) since versio
 
 * Wireshark now supports the Turkish language.
 
+* The settings in the 'Import from Hex Dump' dialog is now stored in a profile import_hexdump.json file.
+
+* Reload Lua plugins has been improved to properly support FileHandler.
+
 // === Removed Features and Support
 
 // === Removed Dissectors
@@ -117,6 +121,7 @@ Vector Informatik Binary Log File (BLF)
 --
 Bluetooth Link Manager Protocol (BT LMP)
 Bundle Protocol Security Specification (BPSEC)
+CBOR Object Signing and Encryption (COSE)
 E2 Application Protocol (E2AP)
 Event Tracing for Windows (ETW)
 High-Performance Connectivity Tracer (HiPerConTracer)

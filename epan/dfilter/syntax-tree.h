@@ -9,8 +9,11 @@
 #ifndef SYNTAX_TREE_H
 #define SYNTAX_TREE_H
 
+#include <stdio.h>
+#include <stdint.h>
 #include <glib.h>
-#include "cppmagic.h"
+
+#include "ws_log_defs.h"
 
 /** @file
  */
@@ -34,6 +37,7 @@ typedef enum {
 typedef gpointer        (*STTypeNewFunc)(gpointer);
 typedef gpointer        (*STTypeDupFunc)(gconstpointer);
 typedef void            (*STTypeFreeFunc)(gpointer);
+typedef char*           (*STTypeToStrFunc)(gconstpointer);
 
 
 /* Type information */
@@ -43,19 +47,23 @@ typedef struct {
 	STTypeNewFunc		func_new;
 	STTypeFreeFunc		func_free;
 	STTypeDupFunc		func_dup;
+	STTypeToStrFunc		func_tostr;
 } sttype_t;
+
+#define STNODE_F_INSIDE_PARENS (1 << 0)
 
 /** Node (type instance) information */
 typedef struct {
-	guint32		magic;
+	uint32_t	magic;
 	sttype_t	*type;
+	uint16_t	flags;
 
 	/* This could be made an enum, but I haven't
 	 * set aside to time to do so. */
 	gpointer	data;
-	gint32		value;
-	gboolean	inside_brackets;
-	const char	*deprecated_token;
+	int32_t		value;
+
+	char		*token_value;
 } stnode_t;
 
 /* These are the sttype_t registration function prototypes. */
@@ -77,19 +85,22 @@ void
 sttype_register(sttype_t *type);
 
 stnode_t*
-stnode_new(sttype_id_t type_id, gpointer data);
-
-void
-stnode_set_bracket(stnode_t *node, gboolean bracket);
+stnode_new(sttype_id_t type_id, gpointer data, const char *token_value);
 
 stnode_t*
 stnode_dup(const stnode_t *org);
 
 void
-stnode_init(stnode_t *node, sttype_id_t type_id, gpointer data);
+stnode_clear(stnode_t *node);
 
 void
-stnode_init_int(stnode_t *node, sttype_id_t type_id, gint32 value);
+stnode_init(stnode_t *node, sttype_id_t type_id, gpointer data, const char *token_value);
+
+void
+stnode_init_int(stnode_t *node, sttype_id_t type_id, gint32 value, const char *token_value);
+
+void
+stnode_replace(stnode_t *node, sttype_id_t type_id, gpointer data);
 
 void
 stnode_free(stnode_t *node);
@@ -110,35 +121,44 @@ gint32
 stnode_value(stnode_t *node);
 
 const char *
-stnode_deprecated(stnode_t *node);
+stnode_token_value(stnode_t *node);
 
-#define assert_magic(obj, mnum) \
-	g_assert_true((obj)); \
-	if ((obj)->magic != (mnum)) { \
-		g_print("\nMagic num is 0x%08x, but should be 0x%08x", \
-			(obj)->magic, (mnum)); \
-			g_assert_true((obj)->magic == (mnum)); \
-	}
+char *
+stnode_tostr(stnode_t *node);
 
-#ifdef WS_DEBUG
-#define ws_assert_magic(obj, mnum) assert_magic(obj, mnum)
+gboolean
+stnode_inside_parens(stnode_t *node);
+
+void
+stnode_set_inside_parens(stnode_t *node, gboolean inside);
+
+void
+log_stnode_full(enum ws_log_level level,
+			const char *file, int line, const char *func,
+			stnode_t *node, const char *msg);
+
+#ifdef WS_DISABLE_DEBUG
+#define log_stnode(node) (void)0;
 #else
-#define ws_assert_magic(obj, mnum)
+#define log_stnode(node) \
+	log_stnode_full(LOG_LEVEL_NOISY, __FILE__, __LINE__, __func__, node, #node)
 #endif
 
-#define STTYPE_ACCESSOR(ret,type,attr,magicnum) \
-	ret \
-	CONCAT(CONCAT(CONCAT(sttype_,type),_),attr) (stnode_t *node) \
-{\
-	CONCAT(type,_t)	*value; \
-	value = (CONCAT(type,_t) *)stnode_data(node);\
-	ws_assert_magic(value, magicnum); \
-	return value->attr; \
-}
+void
+log_syntax_tree(enum ws_log_level, stnode_t *root, const char *msg);
 
-#define STTYPE_ACCESSOR_PROTOTYPE(ret,type,attr) \
-	ret \
-	CONCAT(CONCAT(CONCAT(sttype_,type),_),attr) (stnode_t *node);
+void
+ws_assert_magic_full(const char *domain, enum ws_log_level level,
+				const char *file, int line, const char *func,
+				const void *node, uint32_t magic);
 
-
+#ifdef WS_DISABLE_DEBUG
+#define ws_assert_magic(obj, mnum) (void)0
+#else
+#define ws_assert_magic(obj, mnum) \
+	ws_assert_magic_full(LOG_DOMAIN_DFILTER, LOG_LEVEL_CRITICAL, \
+			__FILE__, __LINE__, __func__, \
+			obj, mnum)
 #endif
+
+#endif /* SYNTAX_TREE_H */

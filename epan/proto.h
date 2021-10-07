@@ -2488,6 +2488,12 @@ proto_deregister_field (const int parent, gint hf_id);
 WS_DLL_PUBLIC void
 proto_add_deregistered_data (void *data);
 
+/** Add a memory slice to be freed when deregistered fields are freed.
+ @param block_size the size of the block
+ @param mem_block a pointer to the block to free */
+void
+proto_add_deregistered_slice (gsize block_size, gpointer mem_block);
+
 /** Free strings in a field.
  @param field_type the field type (one of FT_ values)
  @param field_display field display value (one of BASE_ values)
@@ -3112,12 +3118,14 @@ proto_tree_add_bits_ret_val(proto_tree *tree, const int hf_index, tvbuff_t *tvb,
  @param bit_offset start of data in tvb expressed in bits
  @param no_of_bits length of data in tvb expressed in bit
  @param value data to display
+ @param encoding data encoding
  @param format printf like format string
  @return the newly created item */
 WS_DLL_PUBLIC proto_item *
 proto_tree_add_uint_bits_format_value(proto_tree *tree, const int hf_index, tvbuff_t *tvb,
-    const guint bit_offset, const gint no_of_bits, guint32 value, const char *format, ...)
-    G_GNUC_PRINTF(7,8);
+    const guint bit_offset, const gint no_of_bits, guint32 value, const guint encoding,
+    const char *format, ...)
+    G_GNUC_PRINTF(8,9);
 
 /** Add bits for a FT_UINT8, FT_UINT16, FT_UINT24 or FT_UINT32
     header field to a proto_tree, with the format generating the
@@ -3128,12 +3136,14 @@ proto_tree_add_uint_bits_format_value(proto_tree *tree, const int hf_index, tvbu
  @param bit_offset start of data in tvb expressed in bits
  @param no_of_bits length of data in tvb expressed in bit
  @param value data to display
+ @param encoding data encoding
  @param format printf like format string
  @return the newly created item */
 WS_DLL_PUBLIC proto_item *
 proto_tree_add_uint64_bits_format_value(proto_tree *tree, const int hf_index, tvbuff_t *tvb,
-    const guint bit_offset, const gint no_of_bits, guint64 value, const char *format, ...)
-    G_GNUC_PRINTF(7,8);
+    const guint bit_offset, const gint no_of_bits, guint64 value, const guint encoding,
+    const char *format, ...)
+    G_GNUC_PRINTF(8,9);
 
 /** Add bits for a FT_BOOLEAN header field to a proto_tree, with
     the format generating the string for the value and with the field
@@ -3144,13 +3154,15 @@ proto_tree_add_uint64_bits_format_value(proto_tree *tree, const int hf_index, tv
  @param bit_offset start of data in tvb expressed in bits
  @param no_of_bits length of data in tvb expressed in bit
  @param value data to display
+ @param encoding data encoding
  @param format printf like format string
  @param ... printf like parameters
  @return the newly created item */
 proto_item *
 proto_tree_add_boolean_bits_format_value(proto_tree *tree, const int hf_index, tvbuff_t *tvb,
-    const guint bit_offset, const gint no_of_bits, guint32 value, const char *format, ...)
-    G_GNUC_PRINTF(7,8);
+    const guint bit_offset, const gint no_of_bits, guint32 value, const guint encoding,
+    const char *format, ...)
+    G_GNUC_PRINTF(8,9);
 
 /** Add bits for a FT_BOOLEAN header field to a proto_tree, with
     the format generating the string for the value and with the field
@@ -3161,13 +3173,15 @@ proto_tree_add_boolean_bits_format_value(proto_tree *tree, const int hf_index, t
  @param bit_offset start of data in tvb expressed in bits
  @param no_of_bits length of data in tvb expressed in bit
  @param value data to display
+ @param encoding data encoding
  @param format printf like format string
  @param ... printf like parameters
  @return the newly created item */
 proto_item *
 proto_tree_add_boolean_bits_format_value64(proto_tree *tree, const int hf_index, tvbuff_t *tvb,
-    const guint bit_offset, const gint no_of_bits, guint64 value, const char *format, ...)
-    G_GNUC_PRINTF(7,8);
+    const guint bit_offset, const gint no_of_bits, guint64 value, const guint encoding,
+    const char *format, ...)
+    G_GNUC_PRINTF(8,9);
 
 /** Add bits for a FT_INT8, FT_INT16, FT_INT24 or FT_INT32
     header field to a proto_tree, with the format generating the
@@ -3178,13 +3192,15 @@ proto_tree_add_boolean_bits_format_value64(proto_tree *tree, const int hf_index,
  @param bit_offset start of data in tvb expressed in bits
  @param no_of_bits length of data in tvb expressed in bit
  @param value data to display
+ @param encoding data encoding
  @param format printf like format string
  @param ... printf like parameters
  @return the newly created item */
 proto_item *
 proto_tree_add_int_bits_format_value(proto_tree *tree, const int hf_index, tvbuff_t *tvb,
-    const guint bit_offset, const gint no_of_bits, gint32 value, const char *format, ...)
-    G_GNUC_PRINTF(7,8);
+    const guint bit_offset, const gint no_of_bits, gint32 value, const guint encoding,
+    const char *format, ...)
+    G_GNUC_PRINTF(8,9);
 
 /** Add bits for a FT_INT8, FT_INT16, FT_INT24 or FT_INT32
     header field to a proto_tree, with the format generating the
@@ -3195,13 +3211,15 @@ proto_tree_add_int_bits_format_value(proto_tree *tree, const int hf_index, tvbuf
  @param bit_offset start of data in tvb expressed in bits
  @param no_of_bits length of data in tvb expressed in bit
  @param value data to display
+ @param encoding data encoding
  @param format printf like format string
  @param ... printf like parameters
  @return the newly created item */
 proto_item *
 proto_tree_add_int64_bits_format_value(proto_tree *tree, const int hf_index, tvbuff_t *tvb,
-    const guint bit_offset, const gint no_of_bits, gint64 value, const char *format, ...)
-    G_GNUC_PRINTF(7,8);
+    const guint bit_offset, const gint no_of_bits, gint64 value, const guint encoding,
+    const char *format, ...)
+    G_GNUC_PRINTF(8,9);
 
 /** Add bits for a FT_FLOAT header field to a proto_tree, with
     the format generating the string for the value and with the field
@@ -3212,13 +3230,15 @@ proto_tree_add_int64_bits_format_value(proto_tree *tree, const int hf_index, tvb
  @param bit_offset start of data in tvb expressed in bits
  @param no_of_bits length of data in tvb expressed in bit
  @param value data to display
+ @param encoding data encoding
  @param format printf like format string
  @param ... printf like parameters
  @return the newly created item */
 proto_item *
 proto_tree_add_float_bits_format_value(proto_tree *tree, const int hf_index, tvbuff_t *tvb,
-    const guint bit_offset, const gint no_of_bits, float value, const char *format, ...)
-    G_GNUC_PRINTF(7,8);
+    const guint bit_offset, const gint no_of_bits, float value, const guint encoding,
+    const char *format, ...)
+    G_GNUC_PRINTF(8,9);
 
 
 /** Add a FT_STRING with ENC_3GPP_TS_23_038_7BITS_PACKED encoding to a

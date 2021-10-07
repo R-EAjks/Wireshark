@@ -1297,7 +1297,7 @@ void MainWindow::setMenusForSelectedPacket()
     main_ui_->actionAnalyzeFollowTCPStream->setEnabled(is_tcp);
     main_ui_->actionAnalyzeFollowUDPStream->setEnabled(is_udp);
     main_ui_->actionAnalyzeFollowDCCPStream->setEnabled(is_dccp);
-    main_ui_->actionAnalyzeFollowTLSStream->setEnabled(is_tls);
+    main_ui_->actionAnalyzeFollowTLSStream->setEnabled(is_tls && !is_quic);
     main_ui_->actionAnalyzeFollowHTTPStream->setEnabled(is_http);
     main_ui_->actionAnalyzeFollowHTTP2Stream->setEnabled(is_http2);
     main_ui_->actionAnalyzeFollowQUICStream->setEnabled(is_quic);
@@ -1529,6 +1529,22 @@ void MainWindow::reloadLuaPlugins()
     if (wsApp->isReloadingLua())
         return;
 
+    gboolean uses_lua_filehandler = FALSE;
+
+    if (capture_file_.capFile()) {
+        // Check if the current capture file is opened with a Lua FileHandler
+        capture_file *cf = capture_file_.capFile();
+        uses_lua_filehandler = wtap_uses_lua_filehandler(cf->provider.wth);
+
+        if (uses_lua_filehandler && cf->unsaved_changes) {
+            // Prompt to save the file before reloading, in case the FileHandler has changed
+            QString before_what(tr(" before reloading Lua plugins"));
+            if (!testCaptureFileClose(before_what, Reload)) {
+                return;
+            }
+        }
+    }
+
     wsApp->setReloadingLua(true);
 
     wslua_reload_plugins(NULL, NULL);
@@ -1542,9 +1558,18 @@ void MainWindow::reloadLuaPlugins()
     wsApp->readConfigurationFiles(true);
     commandline_options_reapply();
 
-    prefs_apply_all();
     fieldsChanged();
-    redissectPackets();
+    prefs_apply_all();
+
+    if (uses_lua_filehandler) {
+        // Reload the file in case the FileHandler has changed
+        if (cf_reload(capture_file_.capFile()) != CF_OK) {
+            cf_close(capture_file_.capFile());
+        }
+        proto_free_deregistered_fields();
+    } else {
+        redissectPackets();
+    }
 
     wsApp->setReloadingLua(false);
     SimpleDialog::displayQueuedMessages();
@@ -3575,6 +3600,11 @@ void MainWindow::on_actionTelephonyUCPMessages_triggered()
 void MainWindow::on_actionTelephonyF1APMessages_triggered()
 {
 	openStatisticsTreeDialog("f1ap");
+}
+
+void MainWindow::on_actionTelephonyNGAPMessages_triggered()
+{
+    openStatisticsTreeDialog("ngap");
 }
 
 void MainWindow::on_actionTelephonySipFlows_triggered()

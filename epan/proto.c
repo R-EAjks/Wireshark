@@ -362,9 +362,16 @@ struct _protocol {
 /* List of all protocols */
 static GList *protocols = NULL;
 
+/* Structure stored for deregistered g_slice */
+struct g_slice_data {
+	gsize    block_size;
+	gpointer mem_block;
+};
+
 /* Deregistered fields */
 static GPtrArray *deregistered_fields = NULL;
 static GPtrArray *deregistered_data = NULL;
+static GPtrArray *deregistered_slice = NULL;
 
 /* indexed by prefix, contains initializers */
 static GHashTable* prefixes = NULL;
@@ -502,6 +509,7 @@ proto_init(GSList *register_all_plugin_protocols_list,
 	gpa_protocol_aliases     = g_hash_table_new(g_str_hash, g_str_equal);
 	deregistered_fields      = g_ptr_array_new();
 	deregistered_data        = g_ptr_array_new();
+	deregistered_slice       = g_ptr_array_new();
 
 	/* Initialize the ftype subsystem */
 	ftypes_initialize();
@@ -628,6 +636,11 @@ proto_cleanup_base(void)
 	if (deregistered_data) {
 		g_ptr_array_free(deregistered_data, TRUE);
 		deregistered_data = NULL;
+	}
+
+	if (deregistered_slice) {
+		g_ptr_array_free(deregistered_slice, TRUE);
+		deregistered_slice = NULL;
 	}
 
 	g_free(tree_is_expanded);
@@ -8008,6 +8021,17 @@ proto_add_deregistered_data (void *data)
 	g_ptr_array_add(deregistered_data, data);
 }
 
+void
+proto_add_deregistered_slice (gsize block_size, gpointer mem_block)
+{
+	struct g_slice_data *slice_data = g_slice_new(struct g_slice_data);
+
+	slice_data->block_size = block_size;
+	slice_data->mem_block = mem_block;
+
+	g_ptr_array_add(deregistered_slice, slice_data);
+}
+
 void proto_free_field_strings (ftenum_t field_type, unsigned int field_display, const void *field_strings)
 {
 	if (field_strings == NULL) {
@@ -8121,6 +8145,15 @@ free_deregistered_data (gpointer data, gpointer user_data _U_)
 	g_free (data);
 }
 
+static void
+free_deregistered_slice (gpointer data, gpointer user_data _U_)
+{
+	struct g_slice_data *slice_data = (struct g_slice_data *)data;
+
+	g_slice_free1(slice_data->block_size, slice_data->mem_block);
+	g_slice_free(struct g_slice_data, slice_data);
+}
+
 /* free deregistered fields and data */
 void
 proto_free_deregistered_fields (void)
@@ -8134,6 +8167,10 @@ proto_free_deregistered_fields (void)
 	g_ptr_array_foreach(deregistered_data, free_deregistered_data, NULL);
 	g_ptr_array_free(deregistered_data, TRUE);
 	deregistered_data = g_ptr_array_new();
+
+	g_ptr_array_foreach(deregistered_slice, free_deregistered_slice, NULL);
+	g_ptr_array_free(deregistered_slice, TRUE);
+	deregistered_slice = g_ptr_array_new();
 }
 
 /* chars allowed in field abbrev: alphanumerics, '-', "_", and ".". */
@@ -12272,7 +12309,7 @@ _proto_tree_add_bits_ret_val(proto_tree *tree, const int hfindex, tvbuff_t *tvb,
 	CHECK_FOR_NULL_TREE(tree);
 	TRY_TO_FAKE_THIS_ITEM(tree, hfindex, hf_field);
 
-	bf_str = decode_bits_in_field(bit_offset, no_of_bits, value);
+	bf_str = decode_bits_in_field(PNODE_POOL(tree), bit_offset, no_of_bits, value, encoding);
 
 	switch (hf_field->type) {
 	case FT_BOOLEAN:
@@ -12323,7 +12360,7 @@ _proto_tree_add_bits_ret_val(proto_tree *tree, const int hfindex, tvbuff_t *tvb,
 		break;
 
 	case FT_BYTES:
-		bytes = tvb_get_bits_array(PNODE_POOL(tree), tvb, bit_offset, no_of_bits, &bytes_length);
+		bytes = tvb_get_bits_array(PNODE_POOL(tree), tvb, bit_offset, no_of_bits, &bytes_length, encoding);
 		pi = proto_tree_add_bytes_with_length(tree, hfindex, tvb, offset, length, bytes, (gint) bytes_length);
 		proto_item_fill_label(PITEM_FINFO(pi), lbl_str);
 		proto_item_set_text(pi, "%s", lbl_str);
@@ -12531,17 +12568,27 @@ proto_tree_add_split_bits_crumb(proto_tree *tree, const int hfindex, tvbuff_t *t
 				const crumb_spec_t *crumb_spec, guint16 crumb_index)
 {
 	header_field_info *hfinfo;
+	gint start = bit_offset >> 3;
+	gint length = ((bit_offset + crumb_spec[crumb_index].crumb_bit_length - 1) >> 3) - (bit_offset >> 3) + 1;
+
+	/* We have to duplicate this length check from proto_tree_add_text_internal in order to check for a null tree
+	 * so that we can use the tree's memory scope in calculating the string */
+	if (length == -1) {
+		tvb_captured_length(tvb) ? tvb_ensure_captured_length_remaining(tvb, start) : 0;
+	} else {
+		tvb_ensure_bytes_exist(tvb, start, length);
+	}
+	if (!tree) return;
 
 	PROTO_REGISTRAR_GET_NTH(hfindex, hfinfo);
-	proto_tree_add_text_internal(tree, tvb,
-			    bit_offset >> 3,
-			    ((bit_offset + crumb_spec[crumb_index].crumb_bit_length - 1) >> 3) - (bit_offset >> 3) + 1,
+	proto_tree_add_text_internal(tree, tvb, start, length,
 			    "%s crumb %d of %s (decoded above)",
-			    decode_bits_in_field(bit_offset, crumb_spec[crumb_index].crumb_bit_length,
+			    decode_bits_in_field(PNODE_POOL(tree), bit_offset, crumb_spec[crumb_index].crumb_bit_length,
 						 tvb_get_bits(tvb,
 							      bit_offset,
 							      crumb_spec[crumb_index].crumb_bit_length,
-							      ENC_BIG_ENDIAN)),
+							      ENC_BIG_ENDIAN),
+						 ENC_BIG_ENDIAN),
 			    crumb_index,
 			    hfinfo->name);
 }
@@ -12566,7 +12613,7 @@ static proto_item *
 _proto_tree_add_bits_format_value(proto_tree *tree, const int hfindex,
 				 tvbuff_t *tvb, const guint bit_offset,
 				 const gint no_of_bits, void *value_ptr,
-				 gchar *value_str)
+				 const guint encoding, gchar *value_str)
 {
 	gint     offset;
 	guint    length;
@@ -12603,14 +12650,14 @@ _proto_tree_add_bits_format_value(proto_tree *tree, const int hfindex,
 		length++;
 
 	if (no_of_bits < 65) {
-		value = tvb_get_bits64(tvb, bit_offset, no_of_bits, ENC_BIG_ENDIAN);
+		value = tvb_get_bits64(tvb, bit_offset, no_of_bits, encoding);
 	} else {
 		REPORT_DISSECTOR_BUG("field %s passed to proto_tree_add_bits_format_value() has a bit width of %u > 65",
 				     hf_field->abbrev, no_of_bits);
 		return NULL;
 	}
 
-	str = decode_bits_in_field(bit_offset, no_of_bits, value);
+	str = decode_bits_in_field(PNODE_POOL(tree), bit_offset, no_of_bits, value, encoding);
 
 	(void) g_strlcat(str, " = ", 256+64);
 	(void) g_strlcat(str, hf_field->name, 256+64);
@@ -12680,13 +12727,13 @@ static proto_item *
 proto_tree_add_bits_format_value(proto_tree *tree, const int hfindex,
 				 tvbuff_t *tvb, const guint bit_offset,
 				 const gint no_of_bits, void *value_ptr,
-				 gchar *value_str)
+				 const guint encoding, gchar *value_str)
 {
 	proto_item *item;
 
 	if ((item = _proto_tree_add_bits_format_value(tree, hfindex,
 						      tvb, bit_offset, no_of_bits,
-						      value_ptr, value_str))) {
+						      value_ptr, encoding, value_str))) {
 		FI_SET_FLAG(PNODE_FINFO(item), FI_BITS_OFFSET(bit_offset));
 		FI_SET_FLAG(PNODE_FINFO(item), FI_BITS_SIZE(no_of_bits));
 	}
@@ -12702,6 +12749,7 @@ proto_item *
 proto_tree_add_uint_bits_format_value(proto_tree *tree, const int hfindex,
 				      tvbuff_t *tvb, const guint bit_offset,
 				      const gint no_of_bits, guint32 value,
+				      const guint encoding,
 				      const char *format, ...)
 {
 	va_list ap;
@@ -12728,13 +12776,14 @@ proto_tree_add_uint_bits_format_value(proto_tree *tree, const int hfindex,
 
 	CREATE_VALUE_STRING(tree, dst, format, ap);
 
-	return proto_tree_add_bits_format_value(tree, hfindex, tvb, bit_offset, no_of_bits, &value, dst);
+	return proto_tree_add_bits_format_value(tree, hfindex, tvb, bit_offset, no_of_bits, &value, encoding, dst);
 }
 
 proto_item *
 proto_tree_add_uint64_bits_format_value(proto_tree *tree, const int hfindex,
 				      tvbuff_t *tvb, const guint bit_offset,
 				      const gint no_of_bits, guint64 value,
+				      const guint encoding,
 				      const char *format, ...)
 {
 	va_list ap;
@@ -12761,13 +12810,14 @@ proto_tree_add_uint64_bits_format_value(proto_tree *tree, const int hfindex,
 
 	CREATE_VALUE_STRING(tree, dst, format, ap);
 
-	return proto_tree_add_bits_format_value(tree, hfindex, tvb, bit_offset, no_of_bits, &value, dst);
+	return proto_tree_add_bits_format_value(tree, hfindex, tvb, bit_offset, no_of_bits, &value, encoding, dst);
 }
 
 proto_item *
 proto_tree_add_float_bits_format_value(proto_tree *tree, const int hfindex,
 				       tvbuff_t *tvb, const guint bit_offset,
 				       const gint no_of_bits, float value,
+				       const guint encoding,
 				       const char *format, ...)
 {
 	va_list ap;
@@ -12782,13 +12832,14 @@ proto_tree_add_float_bits_format_value(proto_tree *tree, const int hfindex,
 
 	CREATE_VALUE_STRING(tree, dst, format, ap);
 
-	return proto_tree_add_bits_format_value(tree, hfindex, tvb, bit_offset, no_of_bits, &value, dst);
+	return proto_tree_add_bits_format_value(tree, hfindex, tvb, bit_offset, no_of_bits, &value, encoding, dst);
 }
 
 proto_item *
 proto_tree_add_int_bits_format_value(proto_tree *tree, const int hfindex,
 				     tvbuff_t *tvb, const guint bit_offset,
 				     const gint no_of_bits, gint32 value,
+	                             const guint encoding,
 				     const char *format, ...)
 {
 	va_list ap;
@@ -12815,13 +12866,14 @@ proto_tree_add_int_bits_format_value(proto_tree *tree, const int hfindex,
 
 	CREATE_VALUE_STRING(tree, dst, format, ap);
 
-	return proto_tree_add_bits_format_value(tree, hfindex, tvb, bit_offset, no_of_bits, &value, dst);
+	return proto_tree_add_bits_format_value(tree, hfindex, tvb, bit_offset, no_of_bits, &value, encoding, dst);
 }
 
 proto_item *
 proto_tree_add_int64_bits_format_value(proto_tree *tree, const int hfindex,
 				     tvbuff_t *tvb, const guint bit_offset,
 				     const gint no_of_bits, gint64 value,
+				     const guint encoding,
 				     const char *format, ...)
 {
 	va_list ap;
@@ -12848,13 +12900,14 @@ proto_tree_add_int64_bits_format_value(proto_tree *tree, const int hfindex,
 
 	CREATE_VALUE_STRING(tree, dst, format, ap);
 
-	return proto_tree_add_bits_format_value(tree, hfindex, tvb, bit_offset, no_of_bits, &value, dst);
+	return proto_tree_add_bits_format_value(tree, hfindex, tvb, bit_offset, no_of_bits, &value, encoding, dst);
 }
 
 proto_item *
 proto_tree_add_boolean_bits_format_value(proto_tree *tree, const int hfindex,
 					 tvbuff_t *tvb, const guint bit_offset,
 					 const gint no_of_bits, guint32 value,
+				         const guint encoding,
 					 const char *format, ...)
 {
 	va_list ap;
@@ -12869,13 +12922,14 @@ proto_tree_add_boolean_bits_format_value(proto_tree *tree, const int hfindex,
 
 	CREATE_VALUE_STRING(tree, dst, format, ap);
 
-	return proto_tree_add_bits_format_value(tree, hfindex, tvb, bit_offset, no_of_bits, &value, dst);
+	return proto_tree_add_bits_format_value(tree, hfindex, tvb, bit_offset, no_of_bits, &value, encoding, dst);
 }
 
 proto_item *
 proto_tree_add_boolean_bits_format_value64(proto_tree *tree, const int hfindex,
 					 tvbuff_t *tvb, const guint bit_offset,
 					 const gint no_of_bits, guint64 value,
+				         const guint encoding,
 					 const char *format, ...)
 {
 	va_list ap;
@@ -12890,7 +12944,7 @@ proto_tree_add_boolean_bits_format_value64(proto_tree *tree, const int hfindex,
 
 	CREATE_VALUE_STRING(tree, dst, format, ap);
 
-	return proto_tree_add_bits_format_value(tree, hfindex, tvb, bit_offset, no_of_bits, &value, dst);
+	return proto_tree_add_bits_format_value(tree, hfindex, tvb, bit_offset, no_of_bits, &value, encoding, dst);
 }
 
 proto_item *

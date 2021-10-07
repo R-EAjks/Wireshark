@@ -21,19 +21,6 @@
 #include "ui/win32/console_win32.h"
 #endif
 
-/*
- * If we have getopt_long() in the system library, include <getopt.h>.
- * Otherwise, we're using our own getopt_long() (either because the
- * system has getopt() but not getopt_long(), as with some UN*Xes,
- * or because it doesn't even have getopt(), as with Windows), so
- * include our getopt_long()'s header.
- */
-#ifdef HAVE_GETOPT_LONG
-#include <getopt.h>
-#else
-#include <wsutil/wsgetopt.h>
-#endif
-
 #include <ui/clopts_common.h>
 #include <ui/cmdarg_err.h>
 #include <ui/exit_codes.h>
@@ -1053,10 +1040,11 @@ int main(int argc, char *qt_argv[])
     }
 #endif /* HAVE_LIBPCAP */
 
-    // UAT files used in configuration profiles which are used in Qt dialogs
-    // are not registered during startup because they only get loaded when
-    // the dialog is shown.  Register them here.
-    g_free(get_persconffile_path("io_graphs", TRUE));
+    // UAT and UI settings files used in configuration profiles which are used
+    // in Qt dialogs are not registered during startup because they only get
+    // loaded when the dialog is shown.  Register them here.
+    profile_register_persconffile("io_graphs");
+    profile_register_persconffile("import_hexdump.json");
 
     profile_store_persconffiles(FALSE);
 
