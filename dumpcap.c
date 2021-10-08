@@ -4083,6 +4083,20 @@ capture_loop_start(capture_options *capture_opts, gboolean *stats_known, struct 
         if (inpkts > 0) {
             global_ld.inpkts_to_sync_pipe += inpkts;
 
+            /* check -b packets:NUM */
+            if (global_capture_opts.has_file_packets && global_ld.packets_written >= global_capture_opts.file_packets) {
+                if (!do_file_switch_or_stop(&global_capture_opts))
+                    continue;
+            }
+            /* check -a filesize:NUM */
+            if (global_capture_opts.has_autostop_filesize &&
+                global_capture_opts.autostop_filesize > 0 &&
+                global_ld.bytes_written / 1000 >= global_capture_opts.autostop_filesize) {
+                /* Capture size limit reached, do we have another file? */
+                if (!do_file_switch_or_stop(&global_capture_opts))
+                    continue;
+            }
+
             if (capture_opts->output_to_pipe) {
                 fflush(global_ld.pdh);
             }
@@ -4481,19 +4495,6 @@ capture_loop_wrote_one_packet(capture_src *pcap_src) {
     if (global_capture_opts.has_autostop_packets && global_ld.packets_captured >= global_capture_opts.autostop_packets) {
         fflush(global_ld.pdh);
         global_ld.go = FALSE;
-        return;
-    }
-    /* check -b packets:NUM */
-    if (global_capture_opts.has_file_packets && global_ld.packets_written >= global_capture_opts.file_packets) {
-        do_file_switch_or_stop(&global_capture_opts);
-        return;
-    }
-    /* check -a filesize:NUM */
-    if (global_capture_opts.has_autostop_filesize &&
-        global_capture_opts.autostop_filesize > 0 &&
-        global_ld.bytes_written / 1000 >= global_capture_opts.autostop_filesize) {
-        /* Capture size limit reached, do we have another file? */
-        do_file_switch_or_stop(&global_capture_opts);
         return;
     }
 }
