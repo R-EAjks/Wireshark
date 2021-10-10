@@ -283,6 +283,7 @@ set(DISSECTOR_PUBLIC_HEADERS
 	packet-btle.h
 	packet-btrfcomm.h
 	packet-btsdp.h
+	packet-bundle-proto7.h
 	packet-c1222.h
 	packet-camel.h
 	packet-cdt.h
@@ -800,6 +801,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-btsap.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-btsdp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-btsmp.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-bundle-proto7.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-bvlc.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-bzr.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-c15ch.c
