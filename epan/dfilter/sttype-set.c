@@ -22,7 +22,7 @@ static void
 slist_stnode_free(gpointer data)
 {
 	if (data) {
-		stnode_free((stnode_t *)data);
+		stnode_unref((stnode_t *)data);
 	}
 }
 

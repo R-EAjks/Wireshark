@@ -55,6 +55,7 @@ typedef struct {
 /** Node (type instance) information */
 typedef struct {
 	uint32_t	magic;
+	int		ref_count;
 	sttype_t	*type;
 	uint16_t	flags;
 	gpointer	data;
@@ -82,8 +83,16 @@ sttype_register(sttype_t *type);
 stnode_t*
 stnode_new(sttype_id_t type_id, gpointer data, const char *token_value);
 
+/* Usually this isn't necessary. A reference is automatically added when a
+ * node is added to the tree. Be sure not to increase the ref twice. */
 stnode_t*
-stnode_dup(const stnode_t *org);
+stnode_ref(stnode_t *node);
+
+stnode_t*
+stnode_unref(stnode_t *node);
+
+stnode_t*
+stnode_dup(stnode_t *org);
 
 void
 stnode_clear(stnode_t *node);
@@ -95,7 +104,7 @@ void
 stnode_replace(stnode_t *node, sttype_id_t type_id, gpointer data);
 
 void
-stnode_free(stnode_t *node);
+stnode_destroy(stnode_t *node);
 
 const char*
 stnode_type_name(stnode_t *node);

@@ -44,7 +44,7 @@ function_dup(gconstpointer data)
 	stfuncrec = (function_t *)function_new(org->funcdef);
 
 	for (p = org->params; p; p = p->next) {
-		const stnode_t *param = (const stnode_t *)p->data;
+		stnode_t *param = p->data;
 		stfuncrec->params = g_slist_append(stfuncrec->params, stnode_dup(param));
 	}
 	return (gpointer) stfuncrec;
@@ -80,7 +80,7 @@ function_tostr(const void *data)
 static void
 slist_stnode_free(gpointer data)
 {
-	stnode_free((stnode_t *)data);
+	stnode_unref((stnode_t *)data);
 }
 
 void

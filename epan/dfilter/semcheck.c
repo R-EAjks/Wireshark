@@ -1150,7 +1150,7 @@ check_param_entity(dfwork_t *dfw, stnode_t *st_node)
 	if (e_type == STTYPE_UNPARSED || e_type == STTYPE_CHARCONST) {
 		fvalue = dfilter_fvalue_from_unparsed(dfw, FT_STRING, st_node, TRUE, NULL);
 		new_st = stnode_new(STTYPE_FVALUE, fvalue, st_node->token_value);
-		stnode_free(st_node);
+		stnode_unref(st_node);
 		return new_st;
 	}
 	return st_node;

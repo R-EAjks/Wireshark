@@ -57,9 +57,9 @@ test_free(gpointer value)
 	ws_assert_magic(test, TEST_MAGIC);
 
 	if (test->val1)
-		stnode_free(test->val1);
+		stnode_unref(test->val1);
 	if (test->val2)
-		stnode_free(test->val2);
+		stnode_unref(test->val2);
 
 	g_free(test);
 }
@@ -162,7 +162,7 @@ sttype_test_set1(stnode_t *node, test_op_t op, stnode_t *val1)
 
 	g_assert_true(num_operands(op) == 1);
 	test->op = op;
-	test->val1 = val1;
+	test->val1 = stnode_ref(val1);
 }
 
 void
@@ -175,8 +175,8 @@ sttype_test_set2(stnode_t *node, test_op_t op, stnode_t *val1, stnode_t *val2)
 
 	g_assert_true(num_operands(op) == 2);
 	test->op = op;
-	test->val1 = val1;
-	test->val2 = val2;
+	test->val1 = stnode_ref(val1);
+	test->val2 = stnode_ref(val2);
 }
 
 void
@@ -190,8 +190,8 @@ sttype_test_set2_args(stnode_t *node, stnode_t *val1, stnode_t *val2)
 	if (num_operands(test->op) == 1) {
 		g_assert_true(val2 == NULL);
 	}
-	test->val1 = val1;
-	test->val2 = val2;
+	test->val1 = stnode_ref(val1);
+	test->val2 = stnode_ref(val2);
 }
 
 void

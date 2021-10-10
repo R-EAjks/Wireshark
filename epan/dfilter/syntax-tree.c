@@ -76,6 +76,7 @@ static void
 _node_clear(stnode_t *node)
 {
 	ws_assert_magic(node, STNODE_MAGIC);
+	node->ref_count = 0;
 	if (node->type) {
 		if (node->type->func_free && node->data) {
 			node->type->func_free(node->data);
@@ -106,6 +107,7 @@ _node_init(stnode_t *node, sttype_id_t type_id, gpointer data)
 	ws_assert_magic(node, STNODE_MAGIC);
 	ws_assert(!node->type);
 	ws_assert(!node->data);
+	node->ref_count = 0;
 	node->flags = 0;
 
 	if (type_id == STTYPE_UNINITIALIZED) {
@@ -137,9 +139,11 @@ void
 stnode_replace(stnode_t *node, sttype_id_t type_id, gpointer data)
 {
 	uint16_t flags = node->flags; /* Save flags. */
+	int ref_count = node->ref_count; /* Save ref count. */
 	_node_clear(node);
 	_node_init(node, type_id, data);
 	node->flags = flags;
+	node->ref_count = ref_count;
 }
 
 stnode_t*
@@ -156,36 +160,41 @@ stnode_new(sttype_id_t type_id, gpointer data, const char *token_value)
 }
 
 stnode_t*
-stnode_dup(const stnode_t *org)
+stnode_ref(stnode_t *node)
 {
-	sttype_t	*type;
-	stnode_t	*node;
-
-	if (!org)
-		return NULL;
-
-	type = org->type;
-
-	node = g_new(stnode_t, 1);
-	node->magic = STNODE_MAGIC;
-
-	node->type = type;
-	node->flags = org->flags;
-
-	if (type && type->func_dup)
-		node->data = type->func_dup(org->data);
-	else
-		node->data = org->data;
-
-	node->token_value = g_strdup(org->token_value);
-
+	ws_assert_magic(node, STNODE_MAGIC);
+	node->ref_count++;
 	return node;
 }
 
-void
-stnode_free(stnode_t *node)
+stnode_t*
+stnode_unref(stnode_t *node)
 {
 	ws_assert_magic(node, STNODE_MAGIC);
+	node->ref_count--;
+	if (node->ref_count > 0)
+		return node;
+	stnode_destroy(node);
+	return NULL;
+}
+
+stnode_t*
+stnode_dup(stnode_t *node)
+{
+	/*
+	 * Are there corner case where the meaning of UNPARSED varies wildly?
+	 * If so we may have to add an exception here and do a deep copy for
+	 * UNPARSED.
+	 */
+	return stnode_ref(node);
+}
+
+void
+stnode_destroy(stnode_t *node)
+{
+	ws_assert_magic(node, STNODE_MAGIC);
+	if (node->ref_count > 0)
+		g_critical("Reference count is > 1");
 	stnode_clear(node);
 	g_free(node);
 }

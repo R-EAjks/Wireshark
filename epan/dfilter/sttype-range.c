@@ -67,7 +67,7 @@ range_free(gpointer value)
 		drange_free(range->drange);
 
 	if (range->entity)
-		stnode_free(range->entity);
+		stnode_unref(range->entity);
 
 	g_free(range);
 }
