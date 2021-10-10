@@ -487,7 +487,7 @@ check_exists(dfwork_t *dfw, stnode_t *st_arg1)
 		case STTYPE_CHARCONST:
 		case STTYPE_UNPARSED:
 			dfilter_fail(dfw, "\"%s\" is neither a field nor a protocol name.",
-					(char *)stnode_data(st_arg1));
+					stnode_tostr(st_arg1));
 			THROW(TypeError);
 			break;
 
@@ -930,8 +930,8 @@ check_relation_LHS_STRING(dfwork_t *dfw, const char* relation_string,
 	         type2 == STTYPE_CHARCONST) {
 		/* Well now that's silly... */
 		dfilter_fail(dfw, "Neither \"%s\" nor \"%s\" are field or protocol names.",
-				(char *)stnode_data(st_arg1),
-				(char *)stnode_data(st_arg2));
+				stnode_tostr(st_arg1),
+				stnode_tostr(st_arg2));
 		THROW(TypeError);
 	}
 	else if (type2 == STTYPE_RANGE) {
@@ -998,8 +998,8 @@ check_relation_LHS_UNPARSED(dfwork_t *dfw, const char* relation_string,
 	         type2 == STTYPE_CHARCONST) {
 		/* Well now that's silly... */
 		dfilter_fail(dfw, "Neither \"%s\" nor \"%s\" are field or protocol names.",
-				(char *)stnode_data(st_arg1),
-				(char *)stnode_data(st_arg2));
+				stnode_tostr(st_arg1),
+				stnode_tostr(st_arg2));
 		THROW(TypeError);
 	}
 	else if (type2 == STTYPE_RANGE) {
@@ -1350,10 +1350,26 @@ check_relation(dfwork_t *dfw, const char *relation_string,
 			check_relation_LHS_FUNCTION(dfw, relation_string, can_func,
 					allow_partial_value, st_node, st_arg1, st_arg2);
 			break;
+		case STTYPE_FVALUE:
+			/* If we have an fvalue it means it's a reference to a duplicated
+			 * semantic value that was already resolved to a concrete type
+			 * in a previous pass.
+			 * With reference counting two duplicated nodes point to the same
+			 * object in the tree. */
+			if (IS_FT_STRING(fvalue_type_ftenum(stnode_data(st_arg1)))) {
+				check_relation_LHS_STRING(dfw, relation_string, can_func,
+								allow_partial_value,
+								st_node, st_arg1, st_arg2);
+			}
+			else {
+				check_relation_LHS_UNPARSED(dfw, relation_string, can_func,
+								allow_partial_value,
+								st_node, st_arg1, st_arg2);
+			}
+			break;
 
 		case STTYPE_UNINITIALIZED:
 		case STTYPE_TEST:
-		case STTYPE_FVALUE:
 		case STTYPE_SET:
 		default:
 			ws_assert_not_reached();
