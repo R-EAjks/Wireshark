@@ -37,7 +37,7 @@ typedef enum {
 typedef gpointer        (*STTypeNewFunc)(gpointer);
 typedef gpointer        (*STTypeDupFunc)(gconstpointer);
 typedef void            (*STTypeFreeFunc)(gpointer);
-typedef char*           (*STTypeToStrFunc)(gconstpointer);
+typedef char*           (*STTypeToStrFunc)(gconstpointer, gboolean pretty);
 
 
 /* Type information */
@@ -60,7 +60,8 @@ typedef struct {
 	uint16_t	flags;
 	gpointer	data;
 	char		*token_value;
-	char 		*repr;
+	char 		*cached_repr;
+	char 		*cached_str;
 } stnode_t;
 
 /* These are the sttype_t registration function prototypes. */
@@ -124,6 +125,9 @@ stnode_token_value(stnode_t *node);
 
 const char *
 stnode_tostr(stnode_t *node);
+
+const char *
+stnode_repr(stnode_t *node);
 
 gboolean
 stnode_inside_parens(stnode_t *node);

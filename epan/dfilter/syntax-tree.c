@@ -89,8 +89,10 @@ _node_clear(stnode_t *node)
 	node->type = NULL;
 	node->flags = 0;
 	node->data = NULL;
-	g_free(node->repr);
-	node->repr = NULL;
+	g_free(node->cached_repr);
+	node->cached_repr = NULL;
+	g_free(node->cached_str);
+	node->cached_str = NULL;
 }
 
 void
@@ -111,7 +113,8 @@ _node_init(stnode_t *node, sttype_id_t type_id, gpointer data)
 	ws_assert(!node->data);
 	node->ref_count = 0;
 	node->flags = 0;
-	node->repr = NULL;
+	node->cached_repr = NULL;
+	node->cached_str = NULL;
 
 	if (type_id == STTYPE_UNINITIALIZED) {
 		node->type = NULL;
@@ -268,15 +271,31 @@ stnode_set_inside_parens(stnode_t *node, gboolean inside)
 const char *
 stnode_tostr(stnode_t *node)
 {
-	if (node->repr != NULL)
-		return node->repr;
+	if (node->cached_str != NULL)
+		return node->cached_str;
 
 	if (node->type->func_tostr == NULL)
-		node->repr = g_strdup("<FIXME>");
+		node->cached_str = g_strdup("<FIXME>");
 	else
-		node->repr = node->type->func_tostr(node->data);
+		node->cached_str = node->type->func_tostr(node->data, TRUE);
+	return node->cached_str;
+}
 
-	return node->repr;
+const char *
+stnode_repr(stnode_t *node)
+{
+	char *s;
+
+	if (node->cached_repr != NULL)
+		return node->cached_repr;
+
+	if (node->type->func_tostr == NULL)
+		s = g_strdup("FIXME");
+	else
+		s = node->type->func_tostr(node->data, FALSE);
+	node->cached_repr = g_strdup_printf("%s<%s>", stnode_type_name(node), s);
+	g_free(s);
+	return node->cached_repr;
 }
 
 static char *
@@ -290,7 +309,7 @@ sprint_node(stnode_t *node)
 	wmem_strbuf_append_printf(buf,
 			"\tflags = %"PRIx16" (inside_parens = %s)\n",
 			node->flags, true_or_false(stnode_inside_parens(node)));
-	wmem_strbuf_append_printf(buf, "\tdata = %s<%s>\n", stnode_type_name(node), stnode_tostr(node));
+	wmem_strbuf_append_printf(buf, "\tdata = %s\n", stnode_repr(node));
 	wmem_strbuf_append_printf(buf, "}\n");
 	return wmem_strbuf_finalize(buf);
 }
@@ -346,7 +365,7 @@ visit_tree(wmem_strbuf_t *buf, stnode_t *node, int level)
 		wmem_strbuf_append(buf, ")");
 	}
 	else {
-		wmem_strbuf_append_printf(buf, "%s<%s>", stnode_type_name(node), stnode_tostr(node));
+		wmem_strbuf_append(buf, stnode_repr(node));
 	}
 }
 
