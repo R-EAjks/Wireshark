@@ -609,8 +609,8 @@ WSLUA_CONSTRUCTOR Field_new(lua_State *L) {
     Field f;
 
     if (!proto_registrar_get_byname(name) && !wslua_is_field_available(L, name)) {
-        WSLUA_ARG_ERROR(Field_new,FIELDNAME,"a field with this name must exist");
-        return 0;
+        lua_pushnil(L);
+        return 1;
     }
 
     if (!wanted_fields) {
@@ -624,7 +624,7 @@ WSLUA_CONSTRUCTOR Field_new(lua_State *L) {
     g_ptr_array_add(wanted_fields, f);
 
     pushField(L,f);
-    WSLUA_RETURN(1); /* The field extractor */
+    WSLUA_RETURN(1); /* The field extractor or nil if the field does not exist */
 }
 
 WSLUA_CONSTRUCTOR Field_list(lua_State *L) {
