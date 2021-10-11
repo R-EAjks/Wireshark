@@ -30,28 +30,28 @@
 %token_type			{stnode_t*}
 %token_destructor		{
 	(void) dfw; /* Mark unused, similar to Q_UNUSED */
-	stnode_free($$);
+	stnode_unref($$);
 }
 
 %type		sentence	{stnode_t*}
 
 
 %type		expr		{stnode_t*}
-%destructor	expr		{stnode_free($$);}
+%destructor	expr		{stnode_unref($$);}
 
 %type		entity		{stnode_t*}
-%destructor	entity		{stnode_free($$);}
+%destructor	entity		{stnode_unref($$);}
 
 %type		relation_test	{stnode_t*}
-%destructor	relation_test	{stnode_free($$);}
+%destructor	relation_test	{stnode_unref($$);}
 
 %type		logical_test	{stnode_t*}
-%destructor	logical_test	{stnode_free($$);}
+%destructor	logical_test	{stnode_unref($$);}
 
 %type		rel_binop	{test_op_t}
 
 %type		range		{stnode_t*}
-%destructor	range		{stnode_free($$);}
+%destructor	range		{stnode_unref($$);}
 
 %type		range_node	{drange_node*}
 %destructor	range_node	{drange_node_free($$);}
@@ -133,7 +133,7 @@ shifting 3 more symbols. */
 %right TEST_NOT.
 
 /* Top-level targets */
-sentence ::= expr(X).		{ dfw->st_root = X; }
+sentence ::= expr(X).		{ dfw->st_root = stnode_ref(X); }
 sentence ::= .			{ dfw->st_root = NULL; }
 
 expr(X) ::= relation_test(R).	{ X = R; }
@@ -209,8 +209,8 @@ range_node(D) ::= INTEGER(X) COLON INTEGER(Y).
 	drange_node_set_start_offset(D, start);
 	drange_node_set_length(D, length);
 
-	stnode_free(X);
-	stnode_free(Y);
+	stnode_unref(X);
+	stnode_unref(Y);
 }
 
 /* x-y */
@@ -225,8 +225,8 @@ range_node(D) ::= INTEGER(X) HYPHEN INTEGER(Y).
 	drange_node_set_start_offset(D, start);
 	drange_node_set_end_offset(D, offset);
 
-	stnode_free(X);
-	stnode_free(Y);
+	stnode_unref(X);
+	stnode_unref(Y);
 }
 
 
@@ -241,7 +241,7 @@ range_node(D) ::= COLON INTEGER(Y).
 	drange_node_set_start_offset(D, 0);
 	drange_node_set_length(D, length);
 
-	stnode_free(Y);
+	stnode_unref(Y);
 }
 
 /* x: = x:-1 */
@@ -255,7 +255,7 @@ range_node(D) ::= INTEGER(X) COLON.
 	drange_node_set_start_offset(D, start);
 	drange_node_set_to_the_end(D);
 
-	stnode_free(X);
+	stnode_unref(X);
 }
 
 /* x = x:1 */
@@ -269,7 +269,7 @@ range_node(D) ::= INTEGER(X).
 	drange_node_set_start_offset(D, start);
 	drange_node_set_length(D, 1);
 
-	stnode_free(X);
+	stnode_unref(X);
 }
 
 rel_binop(O) ::= TEST_EQ.	{ O = TEST_OP_EQ; }
@@ -304,7 +304,7 @@ relation_test(T) ::= entity(E) rel_binop(O) relation_test(R).
 	} while (stnode_type_id(F) == STTYPE_TEST);
 
 	L = stnode_new(STTYPE_TEST, NULL, NULL);
-	sttype_test_set2(L, O, E, stnode_dup(F));
+	sttype_test_set2(L, O, E, F);
 
 	T = stnode_new(STTYPE_TEST, NULL, NULL);
 	sttype_test_set2(T, TEST_OP_AND, L, R);
@@ -349,7 +349,7 @@ set_node_list(L) ::= set_node_list(P) WHITESPACE entity(X) DOTDOT entity(Y).
 function(F) ::= UNPARSED(U) LPAREN function_params(P) RPAREN.
 {
 	F = dfilter_new_function(dfw, stnode_token_value(U));
-	stnode_free(U);
+	stnode_unref(U);
 	sttype_function_set_params(F, P);
 }
 
@@ -357,7 +357,7 @@ function(F) ::= UNPARSED(U) LPAREN function_params(P) RPAREN.
 function(F) ::= UNPARSED(U) LPAREN RPAREN.
 {
 	F = dfilter_new_function(dfw, stnode_token_value(U));
-	stnode_free(U);
+	stnode_unref(U);
 }
 
 function_params(P) ::= entity(E).

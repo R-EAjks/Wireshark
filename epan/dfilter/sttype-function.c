@@ -44,29 +44,27 @@ function_dup(gconstpointer data)
 	stfuncrec = (function_t *)function_new(org->funcdef);
 
 	for (p = org->params; p; p = p->next) {
-		const stnode_t *param = (const stnode_t *)p->data;
+		stnode_t *param = p->data;
 		stfuncrec->params = g_slist_append(stfuncrec->params, stnode_dup(param));
 	}
 	return (gpointer) stfuncrec;
 }
 
 static char *
-function_tostr(const void *data)
+function_tostr(const void *data, gboolean pretty)
 {
 	const function_t *stfuncrec = (const function_t *)data;
 	const df_func_def_t *def = stfuncrec->funcdef;
 	GSList *params = stfuncrec->params;
 	GString *repr = g_string_new("");
-	char *s;
 
 	ws_assert(def);
 
 	g_string_printf(repr, "%s(", def->name);
 	while (params != NULL) {
 		ws_assert(params->data);
-		s = stnode_tostr(params->data);
-		g_string_append(repr, s);
-		g_free(s);
+		g_string_append(repr,
+			pretty ? stnode_tostr(params->data) : stnode_repr(params->data));
 		params = params->next;
 		if (params != NULL) {
 			g_string_append(repr, ", ");
@@ -80,7 +78,7 @@ function_tostr(const void *data)
 static void
 slist_stnode_free(gpointer data)
 {
-	stnode_free((stnode_t *)data);
+	stnode_unref((stnode_t *)data);
 }
 
 void

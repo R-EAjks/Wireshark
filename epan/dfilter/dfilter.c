@@ -251,7 +251,7 @@ static void
 dfwork_free(dfwork_t *dfw)
 {
 	if (dfw->st_root) {
-		stnode_free(dfw->st_root);
+		stnode_unref(dfw->st_root);
 	}
 
 	if (dfw->loaded_fields) {
@@ -420,7 +420,7 @@ dfilter_compile(const gchar *text, dfilter_t **dfp, gchar **err_msg)
 	/* If we created an stnode_t but didn't use it, free it; the
 	 * parser doesn't know about it and won't free it for us. */
 	if (df_lval) {
-		stnode_free(df_lval);
+		stnode_unref(df_lval);
 		df_lval = NULL;
 	}
 

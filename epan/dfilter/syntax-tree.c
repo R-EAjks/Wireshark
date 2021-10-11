@@ -76,6 +76,7 @@ static void
 _node_clear(stnode_t *node)
 {
 	ws_assert_magic(node, STNODE_MAGIC);
+	node->ref_count = 0;
 	if (node->type) {
 		if (node->type->func_free && node->data) {
 			node->type->func_free(node->data);
@@ -88,6 +89,10 @@ _node_clear(stnode_t *node)
 	node->type = NULL;
 	node->flags = 0;
 	node->data = NULL;
+	g_free(node->cached_repr);
+	node->cached_repr = NULL;
+	g_free(node->cached_str);
+	node->cached_str = NULL;
 }
 
 void
@@ -106,7 +111,10 @@ _node_init(stnode_t *node, sttype_id_t type_id, gpointer data)
 	ws_assert_magic(node, STNODE_MAGIC);
 	ws_assert(!node->type);
 	ws_assert(!node->data);
+	node->ref_count = 0;
 	node->flags = 0;
+	node->cached_repr = NULL;
+	node->cached_str = NULL;
 
 	if (type_id == STTYPE_UNINITIALIZED) {
 		node->type = NULL;
@@ -137,9 +145,11 @@ void
 stnode_replace(stnode_t *node, sttype_id_t type_id, gpointer data)
 {
 	uint16_t flags = node->flags; /* Save flags. */
+	int ref_count = node->ref_count; /* Save ref count. */
 	_node_clear(node);
 	_node_init(node, type_id, data);
 	node->flags = flags;
+	node->ref_count = ref_count;
 }
 
 stnode_t*
@@ -156,36 +166,41 @@ stnode_new(sttype_id_t type_id, gpointer data, const char *token_value)
 }
 
 stnode_t*
-stnode_dup(const stnode_t *org)
+stnode_ref(stnode_t *node)
 {
-	sttype_t	*type;
-	stnode_t	*node;
-
-	if (!org)
-		return NULL;
-
-	type = org->type;
-
-	node = g_new(stnode_t, 1);
-	node->magic = STNODE_MAGIC;
-
-	node->type = type;
-	node->flags = org->flags;
-
-	if (type && type->func_dup)
-		node->data = type->func_dup(org->data);
-	else
-		node->data = org->data;
-
-	node->token_value = g_strdup(org->token_value);
-
+	ws_assert_magic(node, STNODE_MAGIC);
+	node->ref_count++;
 	return node;
 }
 
-void
-stnode_free(stnode_t *node)
+stnode_t*
+stnode_unref(stnode_t *node)
 {
 	ws_assert_magic(node, STNODE_MAGIC);
+	node->ref_count--;
+	if (node->ref_count > 0)
+		return node;
+	stnode_destroy(node);
+	return NULL;
+}
+
+stnode_t*
+stnode_dup(stnode_t *node)
+{
+	/*
+	 * Are there corner case where the meaning of UNPARSED varies wildly?
+	 * If so we may have to add an exception here and do a deep copy for
+	 * UNPARSED.
+	 */
+	return stnode_ref(node);
+}
+
+void
+stnode_destroy(stnode_t *node)
+{
+	ws_assert_magic(node, STNODE_MAGIC);
+	if (node->ref_count > 0)
+		g_critical("Reference count is > 1");
 	stnode_clear(node);
 	g_free(node);
 }
@@ -253,20 +268,40 @@ stnode_set_inside_parens(stnode_t *node, gboolean inside)
 	}
 }
 
-char *
+const char *
 stnode_tostr(stnode_t *node)
 {
-	if (node->type->func_tostr == NULL)
-		return g_strdup("<FIXME>");
+	if (node->cached_str != NULL)
+		return node->cached_str;
 
-	return node->type->func_tostr(node->data);
+	if (node->type->func_tostr == NULL)
+		node->cached_str = g_strdup("<FIXME>");
+	else
+		node->cached_str = node->type->func_tostr(node->data, TRUE);
+	return node->cached_str;
+}
+
+const char *
+stnode_repr(stnode_t *node)
+{
+	char *s;
+
+	if (node->cached_repr != NULL)
+		return node->cached_repr;
+
+	if (node->type->func_tostr == NULL)
+		s = g_strdup("FIXME");
+	else
+		s = node->type->func_tostr(node->data, FALSE);
+	node->cached_repr = g_strdup_printf("%s<%s>", stnode_type_name(node), s);
+	g_free(s);
+	return node->cached_repr;
 }
 
 static char *
 sprint_node(stnode_t *node)
 {
 	wmem_strbuf_t *buf = wmem_strbuf_new(NULL, NULL);
-	char *s;
 
 	wmem_strbuf_append_printf(buf, "stnode <%p> = {\n", (void *)node);
 	wmem_strbuf_append_printf(buf, "\tmagic = %"PRIx32"\n", node->magic);
@@ -274,9 +309,7 @@ sprint_node(stnode_t *node)
 	wmem_strbuf_append_printf(buf,
 			"\tflags = %"PRIx16" (inside_parens = %s)\n",
 			node->flags, true_or_false(stnode_inside_parens(node)));
-	s = stnode_tostr(node);
-	wmem_strbuf_append_printf(buf, "\tdata = %s<%s>\n", stnode_type_name(node), s);
-	g_free(s);
+	wmem_strbuf_append_printf(buf, "\tdata = %s\n", stnode_repr(node));
 	wmem_strbuf_append_printf(buf, "}\n");
 	return wmem_strbuf_finalize(buf);
 }
@@ -307,12 +340,9 @@ static void
 visit_tree(wmem_strbuf_t *buf, stnode_t *node, int level)
 {
 	stnode_t *left, *right;
-	char *str;
 
 	if (stnode_type_id(node) == STTYPE_TEST) {
-		str = stnode_tostr(node);
-		wmem_strbuf_append_printf(buf, "%s(", str);
-		g_free(str);
+		wmem_strbuf_append_printf(buf, "%s(", stnode_tostr(node));
 		sttype_test_get(node, NULL, &left, &right);
 		if (left && right) {
 			wmem_strbuf_append_c(buf, '\n');
@@ -335,9 +365,7 @@ visit_tree(wmem_strbuf_t *buf, stnode_t *node, int level)
 		wmem_strbuf_append(buf, ")");
 	}
 	else {
-		str = stnode_tostr(node);
-		wmem_strbuf_append_printf(buf, "%s<%s>", stnode_type_name(node), str);
-		g_free(str);
+		wmem_strbuf_append(buf, stnode_repr(node));
 	}
 }
 

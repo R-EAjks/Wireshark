@@ -487,7 +487,7 @@ check_exists(dfwork_t *dfw, stnode_t *st_arg1)
 		case STTYPE_CHARCONST:
 		case STTYPE_UNPARSED:
 			dfilter_fail(dfw, "\"%s\" is neither a field nor a protocol name.",
-					(char *)stnode_data(st_arg1));
+					stnode_tostr(st_arg1));
 			THROW(TypeError);
 			break;
 
@@ -611,7 +611,6 @@ check_drange_sanity(dfwork_t *dfw, stnode_t *st)
 	header_field_info	*hfinfo1;
 	ftenum_t		ftype1;
 	struct check_drange_sanity_args	args;
-	char *s;
 
 	entity1 = sttype_range_entity(st);
 	if (entity1 && stnode_type_id(entity1) == STTYPE_FIELD) {
@@ -638,10 +637,8 @@ check_drange_sanity(dfwork_t *dfw, stnode_t *st)
 		/* Should this be rejected instead? */
 		check_drange_sanity(dfw, entity1);
 	} else if (entity1) {
-		s = stnode_tostr(entity1);
 		dfilter_fail(dfw, "Range is not supported for entity %s of type %s",
-					s, stnode_type_name(entity1));
-		g_free(s);
+					stnode_tostr(entity1), stnode_type_name(entity1));
 		THROW(TypeError);
 	} else {
 		dfilter_fail(dfw, "Range is not supported, details: " G_STRLOC " entity: NULL");
@@ -930,8 +927,8 @@ check_relation_LHS_STRING(dfwork_t *dfw, const char* relation_string,
 	         type2 == STTYPE_CHARCONST) {
 		/* Well now that's silly... */
 		dfilter_fail(dfw, "Neither \"%s\" nor \"%s\" are field or protocol names.",
-				(char *)stnode_data(st_arg1),
-				(char *)stnode_data(st_arg2));
+				stnode_tostr(st_arg1),
+				stnode_tostr(st_arg2));
 		THROW(TypeError);
 	}
 	else if (type2 == STTYPE_RANGE) {
@@ -998,8 +995,8 @@ check_relation_LHS_UNPARSED(dfwork_t *dfw, const char* relation_string,
 	         type2 == STTYPE_CHARCONST) {
 		/* Well now that's silly... */
 		dfilter_fail(dfw, "Neither \"%s\" nor \"%s\" are field or protocol names.",
-				(char *)stnode_data(st_arg1),
-				(char *)stnode_data(st_arg2));
+				stnode_tostr(st_arg1),
+				stnode_tostr(st_arg2));
 		THROW(TypeError);
 	}
 	else if (type2 == STTYPE_RANGE) {
@@ -1150,7 +1147,7 @@ check_param_entity(dfwork_t *dfw, stnode_t *st_node)
 	if (e_type == STTYPE_UNPARSED || e_type == STTYPE_CHARCONST) {
 		fvalue = dfilter_fvalue_from_unparsed(dfw, FT_STRING, st_node, TRUE, NULL);
 		new_st = stnode_new(STTYPE_FVALUE, fvalue, st_node->token_value);
-		stnode_free(st_node);
+		stnode_unref(st_node);
 		return new_st;
 	}
 	return st_node;
@@ -1350,10 +1347,26 @@ check_relation(dfwork_t *dfw, const char *relation_string,
 			check_relation_LHS_FUNCTION(dfw, relation_string, can_func,
 					allow_partial_value, st_node, st_arg1, st_arg2);
 			break;
+		case STTYPE_FVALUE:
+			/* If we have an fvalue it means it's a reference to a duplicated
+			 * semantic value that was already resolved to a concrete type
+			 * in a previous pass.
+			 * With reference counting two duplicated nodes point to the same
+			 * object in the tree. */
+			if (IS_FT_STRING(fvalue_type_ftenum(stnode_data(st_arg1)))) {
+				check_relation_LHS_STRING(dfw, relation_string, can_func,
+								allow_partial_value,
+								st_node, st_arg1, st_arg2);
+			}
+			else {
+				check_relation_LHS_UNPARSED(dfw, relation_string, can_func,
+								allow_partial_value,
+								st_node, st_arg1, st_arg2);
+			}
+			break;
 
 		case STTYPE_UNINITIALIZED:
 		case STTYPE_TEST:
-		case STTYPE_FVALUE:
 		case STTYPE_SET:
 		default:
 			ws_assert_not_reached();
