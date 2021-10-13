@@ -110,6 +110,38 @@ dfilter_resolve_unparsed(dfwork_t *dfw, stnode_t *node)
 	return node;
 }
 
+stnode_t *
+dfilter_resolve_reference(dfwork_t *dfw, stnode_t *node)
+{
+	const char *name;
+	header_field_info *hfinfo;
+
+	ws_assert(stnode_type_id(node) == STTYPE_UNPARSED);
+
+	name = stnode_data(node);
+
+	hfinfo = proto_registrar_get_byname(name);
+	if (hfinfo == NULL) {
+		hfinfo = proto_registrar_get_byalias(name);
+		if (hfinfo == NULL) {
+			/* It's not a field. */
+			dfilter_fail(dfw, "\"%s\" is not a valid field.", name);
+			return node;
+		}
+		/* It's an aliased field name */
+		add_deprecated_token(dfw, name);
+	}
+
+	if (hfinfo->type == FT_NONE || hfinfo->type == FT_PROTOCOL) {
+		dfilter_fail(dfw, "%s with type %s is not a valid field reference.",
+				hfinfo->abbrev, ftype_pretty_name(hfinfo->type));
+		return node;
+	}
+
+	stnode_replace(node, STTYPE_REFERENCE, hfinfo);
+	return node;
+}
+
 /* Initialize the dfilter module */
 void
 dfilter_init(void)
@@ -286,6 +318,9 @@ const char *tokenstr(int token)
 		case TOKEN_DOTDOT:	return "DOTDOT";
 		case TOKEN_LPAREN:	return "LPAREN";
 		case TOKEN_RPAREN:	return "RPAREN";
+		case TOKEN_REFERENCE:	return "REFERENCE";
+		case TOKEN_REF_OPEN:	return "REF_OPEN";
+		case TOKEN_REF_CLOSE:	return "REF_CLOSE";
 	}
 	return "<unknown>";
 }
@@ -309,8 +344,9 @@ add_deprecated_token(dfwork_t *dfw, const char *token)
 }
 
 gboolean
-dfilter_compile_real(const gchar *text, dfilter_t **dfp,
-			gchar **error_ret, const char *caller)
+dfilter_compile_real(const gchar *text, struct epan_dissect *edt, int df_flags,
+			dfilter_t **dfp, gchar **error_ret,
+			const char *caller)
 {
 	gchar		*expanded_text;
 	int		token;
@@ -343,8 +379,8 @@ dfilter_compile_real(const gchar *text, dfilter_t **dfp,
 	}
 	else {
 		ws_log(WS_LOG_DOMAIN, LOG_LEVEL_DEBUG,
-			"%s() called from %s(), compiling filter: %s",
-			__func__, caller, text);
+			"%s() called from %s(), flags = 0x%x, compiling filter: %s",
+			__func__, caller, df_flags, text);
 	}
 
 	dfw = dfwork_new();
@@ -435,6 +471,9 @@ dfilter_compile_real(const gchar *text, dfilter_t **dfp,
 	}
 	else {
 		log_syntax_tree(LOG_LEVEL_NOISY, dfw->st_root, "Syntax tree before semantic check");
+
+		dfw->edt = edt;
+		dfw->flags = df_flags;
 
 		/* Check semantics and do necessary type conversion*/
 		if (!dfw_semcheck(dfw)) {

@@ -39,7 +39,6 @@
 #include <epan/epan_dissect.h>
 #include <epan/tap.h>
 #include <epan/timestamp.h>
-#include <epan/dfilter/dfilter-macro.h>
 #include <epan/strutil.h>
 #include <epan/addr_resolv.h>
 #include <epan/color_filters.h>
@@ -1506,7 +1505,7 @@ cf_filter_packets(capture_file *cf, gchar *dftext, gboolean force)
      * and try to compile it.
      */
     dftext = g_strdup(dftext);
-    if (!dfilter_compile(dftext, &dfcode, &err_msg)) {
+    if (!dfilter_compile_edt(dftext, cf->edt, 0, &dfcode, &err_msg)) {
       /* The attempt failed; report an error. */
       simple_message_box(ESD_TYPE_ERROR, NULL,
           "See the help for a description of the display filter syntax.",
@@ -1659,7 +1658,7 @@ rescan_packets(capture_file *cf, const char *action, const char *action_item, gb
    * We assume this will not fail since cf->dfilter is only set in
    * cf_filter IFF the filter was valid.
    */
-  compiled = dfilter_compile(cf->dfilter, &dfcode, NULL);
+  compiled = dfilter_compile_edt(cf->dfilter, cf->edt, 0, &dfcode, NULL);
   ws_assert(!cf->dfilter || (compiled && dfcode));
 
   /* Get the union of the flags for all tap listeners. */
@@ -3880,8 +3879,6 @@ cf_select_packet(capture_file *cf, int row)
   epan_dissect_run(cf->edt, cf->cd_t, &cf->rec,
                    frame_tvbuff_new_buffer(&cf->provider, cf->current_frame, &cf->buf),
                    cf->current_frame, NULL);
-
-  dfilter_macro_build_ftv_cache(cf->edt->tree);
 
   if (old_edt != NULL)
     epan_dissect_free(old_edt);

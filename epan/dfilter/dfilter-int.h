@@ -13,6 +13,7 @@
 #include "dfilter.h"
 #include "syntax-tree.h"
 
+#include <epan/epan_dissect.h>
 #include <epan/proto.h>
 #include <stdio.h>
 
@@ -44,6 +45,8 @@ typedef struct {
 	int		next_register;
 	int		first_constant; /* first register used as a constant */
 	GPtrArray	*deprecated;
+	struct epan_dissect *edt;
+	int		flags;
 } dfwork_t;
 
 /*
@@ -121,6 +124,9 @@ DfilterTrace(FILE *TraceFILE, char *zTracePrompt);
 
 stnode_t *
 dfilter_resolve_unparsed(dfwork_t *dfw, stnode_t *node);
+
+stnode_t *
+dfilter_resolve_reference(dfwork_t *dfw, stnode_t *node);
 
 const char *tokenstr(int token);
 

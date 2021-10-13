@@ -176,6 +176,12 @@ stnode_new_unparsed(const char *str, char *token)
 }
 
 stnode_t *
+stnode_new_reference(const char *str, char *token)
+{
+	return stnode_new(STTYPE_REFERENCE, g_strdup(str), token);
+}
+
+stnode_t *
 stnode_new_charconst(unsigned long number, char *token)
 {
 	return stnode_new(STTYPE_CHARCONST, g_memdup2(&number, sizeof(number)), token);

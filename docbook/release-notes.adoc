@@ -47,6 +47,8 @@ They previously shipped with Npcap 1.55.
 ** The display filter engine now uses PCRE2 instead of GRegex (GLib bindings to the older end-of-life PCRE library).
    PCRE2 is compatible with PCRE so the user-visible changes should be minimal.
    Some exotic patterns may now be invalid and require rewriting.
+** Display filter macros using tree fields have been re-implemented as a syntactical element in the display filter language,
+   called field references. The sigil notation is unchanged, e.g: frame.number > ${frame.number}.
 
 * HTTP2 dissector now supports using fake headers to parse the DATAs of streams captured without first HEADERS frames of a long-lived stream (like
   gRPC streaming call which allows sending many request or response messages in one HTTP2 stream). User can specify fake headers according to the

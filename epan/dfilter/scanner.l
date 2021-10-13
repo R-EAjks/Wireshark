@@ -99,6 +99,7 @@ static gboolean parse_charconst(dfwork_t *dfw, const char *s, unsigned long *val
 %x RANGE
 %x DQUOTE
 %x SQUOTE
+%x REFERENCE
 
 %%
 
@@ -137,6 +138,25 @@ static gboolean parse_charconst(dfwork_t *dfw, const char *s, unsigned long *val
 "||"		return simple(TOKEN_TEST_OR);
 "or"		return simple(TOKEN_TEST_OR);
 "in"		return simple(TOKEN_TEST_IN);
+
+"${"					{
+	BEGIN(REFERENCE);
+	return simple(TOKEN_REF_OPEN);
+}
+
+<REFERENCE>[^}]+		{
+	return set_lval_str(TOKEN_REFERENCE, yytext);
+}
+
+<REFERENCE>"}"				{
+	BEGIN(INITIAL);
+	return simple(TOKEN_REF_CLOSE);
+}
+
+<REFERENCE><<EOF>>				{
+	dfilter_fail(yyextra->dfw, "Right brace missing from field reference.");
+	return SCAN_FAILED;
+}
 
 "["				{
 	BEGIN(RANGE);

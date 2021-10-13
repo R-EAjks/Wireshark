@@ -32,6 +32,8 @@ dfilter_init(void);
 void
 dfilter_cleanup(void);
 
+#define DFILTER_F_CHECK_SYNTAX (1 << 0)
+
 /* Compiles a string to a dfilter_t.
  * On success, sets the dfilter* pointed to by dfp
  * to either a NULL pointer (if the filter is a null
@@ -48,11 +50,14 @@ dfilter_cleanup(void);
  */
 WS_DLL_PUBLIC
 gboolean
-dfilter_compile_real(const gchar *text, dfilter_t **dfp,
-			gchar **err_msg, const char *caller);
+dfilter_compile_real(const gchar *text, struct epan_dissect *edt, int flags,
+                        dfilter_t **dfp, gchar **err_msg, const char *caller);
+
+#define dfilter_compile_edt(text, edt, flags, dfp, err_msg) \
+        dfilter_compile_real(text, edt, flags, dfp, err_msg, __func__)
 
 #define dfilter_compile(text, dfp, err_msg) \
-	dfilter_compile_real(text, dfp, err_msg, __func__)
+        dfilter_compile_edt(text, NULL, 0, dfp, err_msg)
 
 /* Frees all memory used by dfilter, and frees
  * the dfilter itself. */

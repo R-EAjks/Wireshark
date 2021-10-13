@@ -23,6 +23,7 @@ typedef enum {
 	STTYPE_UNINITIALIZED,
 	STTYPE_TEST,
 	STTYPE_UNPARSED,
+	STTYPE_REFERENCE,
 	STTYPE_STRING,
 	STTYPE_CHARCONST,
 	STTYPE_FIELD,
@@ -111,6 +112,9 @@ stnode_new_string(const char *str, char *token);
 
 stnode_t *
 stnode_new_unparsed(const char *str, char *token);
+
+stnode_t *
+stnode_new_reference(const char *str, char *token);
 
 stnode_t *
 stnode_new_charconst(unsigned long number, char *token);

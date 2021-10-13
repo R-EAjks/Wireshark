@@ -233,6 +233,12 @@ fvalue_new(ftenum_t ftype)
 	return fv;
 }
 
+fvalue_t*
+fvalue_dup(fvalue_t *fv)
+{
+	return g_slice_dup(fvalue_t, fv);
+}
+
 void
 fvalue_init(fvalue_t *fv, ftenum_t ftype)
 {
