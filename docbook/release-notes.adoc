@@ -103,6 +103,8 @@ The following features are new (or have been significantly updated) since versio
 
 * Reload Lua plugins has been improved to properly support FileHandler.
 
+* Mesh Connex (MCX) support in existing 802.11 packets.
+
 // === Removed Features and Support
 
 // === Removed Dissectors
@@ -131,6 +133,7 @@ ISO 10681
 Kerberos SPAKE
 Linux psample protocol
 Local Interconnect Network (LIN)
+Mesh Connex (MCX)
 Microsoft Task Scheduler Service
 O-RAN E2AP
 O-RAN fronthaul UC-plane (O-RAN)
