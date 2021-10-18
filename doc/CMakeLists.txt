@@ -27,9 +27,11 @@ set(HTML_INSTALL_FILES)
 macro (ASCIIDOCTOR2MANHTML _page_name _man_section)
 	if(ASCIIDOCTOR_FOUND)
 		ASCIIDOCTOR2HTML(${_page_name}.adoc)
-		ASCIIDOCTOR2MAN(${_page_name}.adoc ${_man_section})
-
 		list(APPEND HTML_INSTALL_FILES ${CMAKE_CURRENT_BINARY_DIR}/${_page_name}.html)
+	endif()
+
+	if(NOT WIN32 AND ASCIIDOCTOR_FOUND)
+		ASCIIDOCTOR2MAN(${_page_name}.adoc ${_man_section})
 		if (${_man_section} EQUAL 1)
 			list(APPEND MAN1_INSTALL_FILES ${CMAKE_CURRENT_BINARY_DIR}/${_page_name}.${_man_section})
 		elseif (${_man_section} EQUAL 4)
@@ -101,7 +103,7 @@ add_custom_target(
 )
 set_target_properties(docs PROPERTIES FOLDER "Docs")
 
-if(ASCIIDOCTOR_FOUND)
+if(NOT WIN32 AND ASCIIDOCTOR_FOUND)
 	install(
 		FILES
 			${MAN1_INSTALL_FILES}
