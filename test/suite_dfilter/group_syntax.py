@@ -37,8 +37,12 @@ class case_syntax(unittest.TestCase):
 
     def test_matches_2(self, checkDFilterFail):
         dfilter = 'http.request.method matches HEAD'
-        checkDFilterFail(dfilter, '"HEAD" was unexpected in this context')
+        checkDFilterFail(dfilter, 'Expected a string')
 
     def test_matches_3(self, checkDFilterFail):
         dfilter = 'http.request.method matches "^HEAD" matches "^POST"'
         checkDFilterFail(dfilter, '"matches" was unexpected in this context.')
+
+    def test_matches_4(self, checkDFilterCount):
+        dfilter = r'http.host matches r"update\.microsoft\.c.."'
+        checkDFilterCount(dfilter, 1)
