@@ -298,7 +298,7 @@ add_option_info(tvbuff_t *tvb, int pos, proto_tree *tree, proto_item *ti)
             break;
 
         case WLAN_RADIO_HDR_CHANNEL:
-            proto_tree_add_item(tag_tree, hf_channel, tvb, pos, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(tag_tree, hf_channel, tvb, pos, length, ENC_BIG_ENDIAN);
             break;
 
         case TZSP_HDR_SENSOR:
