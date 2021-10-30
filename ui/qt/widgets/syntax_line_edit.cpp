@@ -221,8 +221,8 @@ void SyntaxLineEdit::checkFieldName(QString field)
         return;
     }
 
-    char invalid_char = proto_check_field_name(field.toUtf8().constData());
-    if (invalid_char) {
+    gboolean invalid_field = proto_check_filter_name(field.toUtf8().constData(), NULL);
+    if (invalid_field) {
         setSyntaxState(SyntaxLineEdit::Invalid);
     } else {
         checkDisplayFilter(field);
@@ -241,7 +241,7 @@ void SyntaxLineEdit::checkCustomColumn(QString fields)
 
     for (guint i = 0; i < g_strv_length(splitted_fields); i++) {
         if (splitted_fields[i] && *splitted_fields[i]) {
-            if (proto_check_field_name(splitted_fields[i]) != 0) {
+            if (!proto_check_filter_name(splitted_fields[i], NULL)) {
                 setSyntaxState(SyntaxLineEdit::Invalid);
                 g_strfreev(splitted_fields);
                 return;

@@ -454,7 +454,6 @@ static gboolean
 sctp_chunk_type_update_cb(void *r, char **err)
 {
   type_field_t *rec = (type_field_t *)r;
-  char c;
   if (rec->type_name == NULL) {
     *err = g_strdup("Header name can't be empty");
     return FALSE;
@@ -469,9 +468,7 @@ sctp_chunk_type_update_cb(void *r, char **err)
   /* Check for invalid characters (to avoid asserting out when
   * registering the field).
   */
-  c = proto_check_field_name(rec->type_name);
-  if (c) {
-    *err = g_strdup_printf("Header name can't contain '%c'", c);
+  if (!proto_check_filter_name(rec->type_name, err)) {
     return FALSE;
   }
 

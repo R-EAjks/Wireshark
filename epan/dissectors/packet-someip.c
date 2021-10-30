@@ -616,18 +616,11 @@ register_someip_port_tcp(guint32 portnumber) {
 
 static char*
 check_filter_string(gchar *filter_string, guint32 id) {
-    char   *err = NULL;
-    guchar  c;
+    char   *err = NULL, *err_str = NULL;
 
-    c = proto_check_field_name(filter_string);
-    if (c) {
-        if (c == '.') {
-            err = g_strdup_printf("Filter String contains illegal chars '.' (ID: %i )", id);
-        } else if (g_ascii_isprint(c)) {
-            err = g_strdup_printf("Filter String contains illegal chars '%c' (ID: %i)", c, id);
-        } else {
-            err = g_strdup_printf("Filter String contains invalid byte \\%03o (ID: %i)", c, id);
-        }
+    if (!proto_check_filter_name(filter_string, &err_str)) {
+        err = g_strdup_printf("%s (ID: %i)", err_str, id);
+        g_free(err_str);
     }
 
     return err;
@@ -1009,7 +1002,6 @@ copy_someip_parameter_list_cb(void *n, const void *o, size_t size _U_) {
 static gboolean
 update_someip_parameter_list(void *r, char **err) {
     someip_parameter_list_uat_t *rec = (someip_parameter_list_uat_t *)r;
-    guchar c;
 
     if (rec->service_id > 0xffff) {
         *err = g_strdup_printf("We currently only support 16 bit Service IDs (Service-ID: %i  Name: %s)", rec->service_id, rec->name);
@@ -1046,15 +1038,7 @@ update_someip_parameter_list(void *r, char **err) {
         return FALSE;
     }
 
-    c = proto_check_field_name(rec->filter_string);
-    if (c) {
-        if (c == '.') {
-            *err = g_strdup_printf("Filter String contains illegal chars '.' (Service-ID: %i  Method-ID: %i)", rec->service_id, rec->method_id);
-        } else if (g_ascii_isprint(c)) {
-            *err = g_strdup_printf("Filter String contains illegal chars '%c' (Service-ID: %i  Method-ID: %i)", c, rec->service_id, rec->method_id);
-        } else {
-            *err = g_strdup_printf("Filter String contains invalid byte \\%03o (Service-ID: %i  Method-ID: %i)", c, rec->service_id, rec->method_id);
-        }
+    if (!proto_check_filter_name(rec->filter_string, err)) {
         return FALSE;
     }
 
@@ -2152,32 +2136,17 @@ update_dynamic_param_hf_entry(gpointer key _U_, gpointer value, gpointer data) {
         gboolean service_name_needs_free = FALSE;
         gboolean method_name_needs_free  = FALSE;
 
-        guchar c;
         char *service_name = someip_lookup_service_name(list->service_id);
         char *method_name = someip_lookup_method_name(list->service_id, list->method_id);
 
-        if (service_name != NULL) {
-            c = proto_check_field_name(service_name);
-            if (c) {
-                service_name = NULL;
-            }
-        }
-
-        if (service_name == NULL) {
-            service_name_needs_free = TRUE;
+        if (service_name != NULL && !proto_check_filter_name(service_name, NULL)) {
             service_name = g_strdup_printf("0x%04x", list->service_id);
+            service_name_needs_free = TRUE;
         }
 
-        if (method_name != NULL) {
-            c = proto_check_field_name(method_name);
-            if (c) {
-                method_name = NULL;
-            }
-        }
-
-        if (method_name == NULL) {
-            method_name_needs_free = TRUE;
+        if (method_name != NULL && !proto_check_filter_name(method_name, NULL)) {
             method_name = g_strdup_printf("0x%04x", list->method_id);
+            method_name_needs_free = TRUE;
         }
 
         char *abbrev = g_strdup_printf("someip.payload.%s", item->filter_string);

@@ -7363,10 +7363,11 @@ proto_tree_set_appendix(proto_tree *tree, tvbuff_t *tvb, gint start,
 static void
 check_valid_filter_name_or_fail(const char *filter_name)
 {
-	if (proto_check_field_name(filter_name) != '\0') {
-		ws_error("Protocol filter name \"%s\" has one or more invalid characters."
-			" Allowed are letters, digits, '-', '_' and non-repeating '.'."
-			" This might be caused by an inappropriate plugin or a development error.", filter_name);
+	char *err_msg;
+
+	if (!proto_check_filter_name(filter_name, &err_msg)) {
+		ws_error("%s This might be caused by an inappropriate "
+				"plugin or a development error.", err_msg);
 	}
 
 	/* Check for reserved keywords. */
@@ -8199,27 +8200,6 @@ proto_free_deregistered_fields (void)
 	deregistered_slice = g_ptr_array_new();
 }
 
-/* chars allowed in field abbrev: alphanumerics, '-', "_", and ".". */
-static
-const guint8 fld_abbrev_chars[256] = {
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0x00-0x0F */
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0x10-0x1F */
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, /* 0x20-0x2F '-', '.'	   */
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, /* 0x30-0x3F '0'-'9'	   */
-	0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* 0x40-0x4F 'A'-'O'	   */
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, /* 0x50-0x5F 'P'-'Z', '_' */
-	0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* 0x60-0x6F 'a'-'o'	   */
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, /* 0x70-0x7F 'p'-'z'	   */
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0x80-0x8F */
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0x90-0x9F */
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0xA0-0xAF */
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0xB0-0xBF */
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0xC0-0xCF */
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0xD0-0xDF */
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0xE0-0xEF */
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0xF0-0xFF */
-};
-
 static const value_string hf_display[] = {
 	{ BASE_NONE,			  "BASE_NONE"			   },
 	{ BASE_DEC,			  "BASE_DEC"			   },
@@ -8885,21 +8865,9 @@ proto_register_field_init(header_field_info *hfinfo, const int parent)
 	if ((hfinfo->name[0] != 0) && (hfinfo->abbrev[0] != 0 )) {
 
 		header_field_info *same_name_next_hfinfo;
-		guchar c;
 
-		/* Check that the filter name (abbreviation) is legal;
-		 * it must contain only alphanumerics, '-', "_", and ".". */
-		c = proto_check_field_name(hfinfo->abbrev);
-		if (c) {
-			if (c == '.') {
-				fprintf(stderr, "Invalid leading, duplicated or trailing '.' found in filter name '%s'\n", hfinfo->abbrev);
-			} else if (g_ascii_isprint(c)) {
-				fprintf(stderr, "Invalid character '%c' in filter name '%s'\n", c, hfinfo->abbrev);
-			} else {
-				fprintf(stderr, "Invalid byte \\%03o in filter name '%s'\n", c, hfinfo->abbrev);
-			}
-			DISSECTOR_ASSERT_NOT_REACHED();
-		}
+		/* Check that the filter name (abbreviation) is legal */
+		check_valid_filter_name_or_fail(hfinfo->abbrev);
 
 		/* We allow multiple hfinfo's to be registered under the same
 		 * abbreviation. This was done for X.25, as, depending
@@ -13144,30 +13112,54 @@ proto_tree_add_checksum(proto_tree *tree, tvbuff_t *tvb, const guint offset,
 	return ti;
 }
 
-guchar
-proto_check_field_name(const gchar *field_name)
+/* chars allowed in field abbrev: alphanumerics, '-', "_", and ".". */
+static
+const guint8 fld_abbrev_chars[128] = {
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0x00-0x0F */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 0x10-0x1F */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, /* 0x20-0x2F '-', '.'	   */
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, /* 0x30-0x3F '0'-'9'	   */
+	0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* 0x40-0x4F 'A'-'O'	   */
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, /* 0x50-0x5F 'P'-'Z', '_' */
+	0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, /* 0x60-0x6F 'a'-'o'	   */
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, /* 0x70-0x7F 'p'-'z'	   */
+};
+
+gboolean
+proto_check_filter_name(const gchar *filter_name, char **err_msg)
 {
-	const char *p = field_name;
-	guchar c = '.', lastc;
+	/* Leading '.' or '-' is disallowed. */
+	if (filter_name[0] == '-' || filter_name[0] == '.') {
+		*err_msg = g_strdup_printf("Filter name \"%s\" cannot begin with '-' or '.'.", filter_name);
+		return FALSE;
+	}
 
-	/* First character cannot be '-'. */
-	if (field_name[0] == '-')
-		return '-';
+	guchar c, lastc = '\0';
 
-	do {
-		lastc = c;
-		c = *(p++);
-		/* Leading '.' or substring ".." are disallowed. */
-		if (c == '.' && lastc == '.') {
-			break;
+	for (const char *s = filter_name; *s != '\0'; s++) {
+		c = *s;
+		if (!fld_abbrev_chars[c]) {
+			*err_msg = g_strdup_printf("Filter name \"%s\" has invalid character '%c'."
+				" Allowed are alphanumerics, '-', '_' and non-repeating '.'.",
+				filter_name, c);
+			return FALSE;
 		}
-	} while (fld_abbrev_chars[c]);
+
+		/* Substring ".." is disallowed. */
+		if (c == '.' && lastc == '.') {
+			*err_msg = g_strdup_printf("Filter name \"%s\" cannot contain \"..\".", filter_name);
+			return FALSE;
+		}
+		lastc = c;
+	}
 
 	/* Trailing '.' is disallowed. */
 	if (lastc == '.') {
-		return '.';
+		*err_msg = g_strdup_printf("Filter name \"%s\" cannot have a trailing '.'.", filter_name);
+		return FALSE;
 	}
-	return c;
+
+	return TRUE;
 }
 
 gboolean

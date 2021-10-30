@@ -149,7 +149,6 @@ static gboolean
 user_data_fields_update_cb(void *r, char **err)
 {
   user_data_field_t *rec = (user_data_field_t *)r;
-  char c;
   *err = NULL;
 
   if (rec->udf_length == 0) {
@@ -179,9 +178,7 @@ user_data_fields_update_cb(void *r, char **err)
   }
 
   /* Check for invalid characters (to avoid asserting out when registering the field). */
-  c = proto_check_field_name(rec->udf_name);
-  if (c) {
-    *err = g_strdup_printf("Name of user data field can't contain '%c'", c);
+  if (!proto_check_filter_name(rec->udf_name, err)) {
     return (*err == NULL);
   }
 

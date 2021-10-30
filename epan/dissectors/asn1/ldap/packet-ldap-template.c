@@ -465,7 +465,6 @@ static gboolean
 attribute_types_update_cb(void *r, char **err)
 {
   attribute_type_t *rec = (attribute_type_t *)r;
-  char c;
 
   if (rec->attribute_type == NULL) {
     *err = g_strdup("Attribute type can't be empty");
@@ -481,9 +480,7 @@ attribute_types_update_cb(void *r, char **err)
   /* Check for invalid characters (to avoid asserting out when
    * registering the field).
    */
-  c = proto_check_field_name(rec->attribute_type);
-  if (c) {
-    *err = g_strdup_printf("Attribute type can't contain '%c'", c);
+  if (!proto_check_filter_name(rec->attribute_type, err)) {
     return FALSE;
   }
 

@@ -3306,9 +3306,10 @@ WS_DLL_PUBLIC const value_string proto_checksum_vals[];
 
 /** Check if given string is a valid field name
  @param field_name the field name to check
- @return 0 if valid, else first illegal character */
-WS_DLL_PUBLIC guchar
-proto_check_field_name(const gchar *field_name);
+ @param err_msg returns the error message if any
+ @return TRUE if valid, else FALSE */
+WS_DLL_PUBLIC gboolean
+proto_check_filter_name(const gchar *field_name, char **err_msg);
 
 
 /** Check if given string is a valid field name

@@ -321,7 +321,6 @@ static gboolean
 header_fields_update_cb(void *r, char **err)
 {
   header_field_t *rec = (header_field_t *)r;
-  char c;
 
   if (rec->header_name == NULL) {
     *err = g_strdup("Header name can't be empty");
@@ -337,9 +336,7 @@ header_fields_update_cb(void *r, char **err)
   /* Check for invalid characters (to avoid asserting out when
    * registering the field).
    */
-  c = proto_check_field_name(rec->header_name);
-  if (c) {
-    *err = g_strdup_printf("Header name can't contain '%c'", c);
+  if (!proto_check_filter_name(rec->header_name, err)) {
     return FALSE;
   }
 
