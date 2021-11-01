@@ -386,6 +386,8 @@
     <addaction name="actionViewShowPacketInNewWindow"/>
     <addaction name="actionViewReload_as_File_Format_or_Capture"/>
     <addaction name="actionViewReload"/>
+    <addaction name="separator"/>
+    <addaction name="actionViewWaveFile"/>
    </widget>
    <widget class="QMenu" name="menuAnalyze">
     <property name="title">
@@ -1238,6 +1240,17 @@
    </property>
    <property name="shortcut">
     <string notr="true">Ctrl+Shift+F</string>
+   </property>
+  </action>
+  <action name="actionViewWaveFile">
+   <property name="text">
+    <string>Open &amp;Waveform Viewer</string>
+   </property>
+   <property name="toolTip">
+    <string>Open a waveform viewer with waves referred to by this packet capture</string>
+   </property>
+   <property name="iconVisibleInMenu">
+    <bool>false</bool>
    </property>
   </action>
   <action name="actionCaptureOptions">

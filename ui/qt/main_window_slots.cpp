@@ -281,6 +281,8 @@ bool MainWindow::openCaptureFile(QString cf_path, QString read_filter, unsigned 
 
     main_ui_->statusBar->showExpert();
 
+    wave_newcapturefile();
+
 finish:
 #ifdef HAVE_LIBPCAP
     if (global_commandline_info.quit_after_cap)
@@ -2764,6 +2766,7 @@ void MainWindow::on_actionViewReload_triggered()
     }
 
     cf_reload(cf);
+    wave_newcapturefile();
 }
 
 void MainWindow::on_actionViewReload_as_File_Format_or_Capture_triggered()
@@ -2782,8 +2785,30 @@ void MainWindow::on_actionViewReload_as_File_Format_or_Capture_triggered()
         cf->open_type = WTAP_TYPE_AUTO;
 
     cf_reload(cf);
+    wave_newcapturefile();
 }
 
+void MainWindow::on_actionViewWaveFile_triggered()
+{
+    wave_open();
+}
+
+void MainWindow::waveViewerFinished(int, QProcess::ExitStatus)
+{
+    wave_finished();
+}
+
+void MainWindow::waveViewerStarted()
+{
+    wave_started();
+}
+
+void MainWindow::waveViewerFramesSelected(QList<int> frames)
+{
+   if (frames.count() != 1)
+        return;
+    wave_framesel();
+}
 
 // Expand / collapse slots in proto_tree
 

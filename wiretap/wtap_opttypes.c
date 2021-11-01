@@ -1053,6 +1053,19 @@ wtap_block_get_nth_string_option_value(wtap_block_t block, guint option_id, guin
 }
 
 wtap_opttype_return_val
+wtap_block_get_nth_custom_option_value(wtap_block_t block, guint option_id, guint idx, custom_opt_t** value)
+{
+    wtap_opttype_return_val ret;
+    wtap_optval_t *optval;
+
+    ret = wtap_block_get_nth_option_common(block, option_id, WTAP_OPTTYPE_CUSTOM, idx, &optval);
+    if (ret != WTAP_OPTTYPE_SUCCESS)
+        return ret;
+    *value = &optval->custom_opt;
+    return WTAP_OPTTYPE_SUCCESS;
+}
+
+wtap_opttype_return_val
 wtap_block_add_bytes_option(wtap_block_t block, guint option_id, const guint8 *value, gsize value_length)
 {
     wtap_opttype_return_val ret;
