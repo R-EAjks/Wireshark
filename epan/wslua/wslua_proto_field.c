@@ -484,14 +484,16 @@ static unit_name_string* unit_name_string_from_table(lua_State* L, int idx) {
 static const gchar* check_field_name(lua_State* L, const int abbr_idx, const enum ftenum type) {
     const gchar* abbr = luaL_checkstring(L,abbr_idx);
     const header_field_info* hfinfo = NULL;
+    char *err = NULL;
 
     if (!abbr[0]) {
         luaL_argerror(L, abbr_idx, "Empty field name abbreviation");
         return NULL;
     }
 
-    if (proto_check_field_name(abbr)) {
-        luaL_argerror(L, abbr_idx, "Invalid char in abbrev");
+    if (!proto_check_filter_name(abbr, &err)) {
+        luaL_argerror(L, abbr_idx, err);
+        g_free(err);
         return NULL;
     }
 

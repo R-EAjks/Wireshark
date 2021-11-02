@@ -93,7 +93,7 @@ WSLUA_CONSTRUCTOR Proto_new(lua_State* L) { /* Creates a new <<lua_class_Proto,`
     }
 
     loname = g_ascii_strdown(name, -1);
-    if (proto_check_field_name(loname)) {
+    if (!proto_check_filter_name(loname, NULL)) {
         g_free(loname);
         WSLUA_ARG_ERROR(Proto_new,NAME,"invalid character in name");
         return 0;

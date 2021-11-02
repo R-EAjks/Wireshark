@@ -55,14 +55,16 @@ WSLUA_CONSTRUCTOR ProtoExpert_new(lua_State* L) {
     const gchar* text = wslua_checkstring_only(L,WSLUA_ARG_ProtoExpert_new_TEXT);
     int group         = (int)luaL_checkinteger(L, WSLUA_ARG_ProtoExpert_new_GROUP);
     int severity      = (int)luaL_checkinteger(L, WSLUA_ARG_ProtoExpert_new_SEVERITY);
+    char *err;
 
     if (!abbr[0]) {
         luaL_argerror(L, WSLUA_ARG_ProtoExpert_new_ABBR, "Empty field name abbrev");
         return 0;
     }
 
-    if (proto_check_field_name(abbr)) {
-        luaL_argerror(L, WSLUA_ARG_ProtoExpert_new_ABBR, "Invalid char in abbrev");
+    if (!proto_check_filter_name(abbr, &err)) {
+        luaL_argerror(L, WSLUA_ARG_ProtoExpert_new_ABBR, err);
+        g_free(err);
         return 0;
     }
 

@@ -2671,22 +2671,21 @@ get_dissector_table_param(const char *name)
 static void
 check_valid_heur_name_or_fail(const char *heur_name)
 {
-	gboolean found_invalid = proto_check_field_name(heur_name);
+	char *err_msg;
 
-	/* Additionally forbid upper case characters. */
-	if (!found_invalid) {
-		for (guint i = 0; heur_name[i]; i++) {
-			if (g_ascii_isupper(heur_name[i])) {
-				found_invalid = TRUE;
-				break;
-			}
-		}
-	}
-
-	if (found_invalid) {
-		ws_error("Heuristic Protocol internal name \"%s\" has one or more invalid characters."
+	if (!proto_check_filter_name(heur_name, &err_msg)) {
+		ws_error("%s"
 			" Allowed are lowercase, digits, '-', '_' and non-repeating '.'."
 			" This might be caused by an inappropriate plugin or a development error.", heur_name);
+	}
+
+	/* Additionally forbid upper case characters. */
+	for (guint i = 0; heur_name[i]; i++) {
+		if (g_ascii_isupper(heur_name[i])) {
+			ws_error("Heuristic Protocol internal name \"%s\" cannot contain upper case."
+				" Allowed are lowercase, digits, '-', '_' and non-repeating '.'."
+				" This might be caused by an inappropriate plugin or a development error.", heur_name);
+		}
 	}
 }
 

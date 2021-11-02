@@ -359,7 +359,6 @@ UAT_CSTRING_CB_DEF(object_name, name, lwm2m_object_name_t)
 static gboolean lwm2m_resource_update_cb(void *record, char **error)
 {
 	lwm2m_resource_t *rec = (lwm2m_resource_t *)record;
-	char c;
 
 	if (rec->name == NULL) {
 		*error = g_strdup("Resource Name can't be empty");
@@ -381,9 +380,7 @@ static gboolean lwm2m_resource_update_cb(void *record, char **error)
 	}
 
 	/* Check for invalid characters (to avoid asserting out when registering the field). */
-	c = proto_check_field_name(rec->field_name);
-	if (c) {
-		*error = g_strdup_printf("Resource Name can't contain '%c'", c);
+	if (!proto_check_filter_name(rec->field_name, error)) {
 		return FALSE;
 	}
 

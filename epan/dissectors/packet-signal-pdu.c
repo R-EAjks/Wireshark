@@ -421,6 +421,7 @@ copy_generic_one_id_string_cb(void *n, const void *o, size_t size _U_) {
 static gboolean
 update_generic_one_identifier_32bit(void *r, char **err) {
     generic_one_id_string_t *rec = (generic_one_id_string_t *)r;
+    char *err_str = NULL;
 
     if (rec->id > 0xffffffff) {
         *err = g_strdup_printf("We currently only support 32 bit identifiers (ID: %i  Name: %s)", rec->id, rec->name);
@@ -432,15 +433,9 @@ update_generic_one_identifier_32bit(void *r, char **err) {
         return FALSE;
     }
 
-    guchar c = proto_check_field_name(rec->name);
-    if (c) {
-        if (c == '.') {
-            *err = g_strdup_printf("Name contains illegal chars '.' (ID: 0x%08x)", rec->id);
-        } else if (g_ascii_isprint(c)) {
-            *err = g_strdup_printf("Name contains illegal chars '%c' (ID: 0x%08x)", c, rec->id);
-        } else {
-            *err = g_strdup_printf("Name contains invalid byte \\%03o  (ID: 0x%08x)", c, rec->id);
-        }
+    if (!proto_check_filter_name(rec->name, &err_str)) {
+        *err = g_strdup_printf("%s (ID: 0x%08x)", err_str, rec->id);
+        g_free(err_str);
         return FALSE;
     }
 
@@ -564,7 +559,6 @@ copy_spdu_signal_list_cb(void *n, const void *o, size_t size _U_) {
 static gboolean
 update_spdu_signal_list(void *r, char **err) {
     gchar *tmp;
-    guchar c;
     gdouble d;
     spdu_signal_list_uat_t *rec = (spdu_signal_list_uat_t *)r;
 
@@ -593,15 +587,7 @@ update_spdu_signal_list(void *r, char **err) {
         return FALSE;
     }
 
-    c = proto_check_field_name(rec->filter_string);
-    if (c) {
-        if (c == '.') {
-            *err = g_strdup_printf("Filter String contains illegal chars '.' (ID: 0x%08x)", rec->id);
-        } else if (g_ascii_isprint(c)) {
-            *err = g_strdup_printf("Filter String contains illegal chars '%c' (ID: 0x%08x)", c, rec->id);
-        } else {
-            *err = g_strdup_printf("Filter String contains invalid byte \\%03o  (ID: 0x%08x)", c, rec->id);
-        }
+    if (!proto_check_filter_name(rec->filter_string, err)) {
         return FALSE;
     }
 
