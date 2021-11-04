@@ -40,7 +40,7 @@
  * Vendor ID listing can be found at:
  *   https://www.dds-foundation.org/dds-rtps-vendor-and-product-ids/
  */
-
+/* Issue #17631 RTPS Group GUID dissector bug field rtps.param.group_guid is not of type FT_BYTES */
 
 #include "config.h"
 
@@ -868,6 +868,7 @@ static int hf_rtps_param_role_name              = -1;
 static int hf_rtps_disable_positive_ack         = -1;
 static int hf_rtps_participant_guid_v1          = -1;
 static int hf_rtps_participant_guid             = -1;
+static int hf_rtps_group_guid_v1                = -1; /* Issue #17631 */
 static int hf_rtps_group_guid                   = -1;
 static int hf_rtps_endpoint_guid                = -1;
 static int hf_rtps_param_host_id                = -1;
@@ -7879,7 +7880,7 @@ static gboolean dissect_parameter_sequence_v1(proto_tree *rtps_parameter_tree, p
       if (version < 0x0200) {
         ENSURE_LENGTH(12);
         rtps_util_add_generic_guid_v1(rtps_parameter_tree, tvb, offset,
-                    hf_rtps_group_guid, hf_rtps_param_host_id, hf_rtps_param_app_id,
+                    hf_rtps_group_guid_v1 /* Issue #17631 */, hf_rtps_param_host_id, hf_rtps_param_app_id,
                     hf_rtps_param_instance_id_v1, hf_rtps_param_app_kind,
                     hf_rtps_param_entity, hf_rtps_param_entity_key, hf_rtps_param_hf_entity_kind);
       } else {
@@ -13550,9 +13551,16 @@ void proto_register_rtps(void) {
         NULL, HFILL }
     },
 
+    /* Issue #17631 */
+    { &hf_rtps_group_guid_v1,
+      { "Group GUID", "rtps.param.group_guid_v1",
+        FT_UINT64, BASE_HEX, NULL, 0,
+        NULL, HFILL }
+    },
+
     { &hf_rtps_group_guid,
       { "Group GUID", "rtps.param.group_guid",
-        FT_UINT64, BASE_HEX, NULL, 0,
+        FT_BYTES, BASE_NONE, NULL, 0,
         NULL, HFILL }
     },
 
