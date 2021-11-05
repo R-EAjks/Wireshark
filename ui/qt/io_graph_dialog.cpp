@@ -81,6 +81,7 @@ typedef struct _io_graph_settings_t {
     guint32 yaxis;
     char* yfield;
     guint32 sma_period;
+    guint32 y_axis_factor; // Added in 3.6
 } io_graph_settings_t;
 
 static const value_string graph_style_vs[] = {
@@ -126,6 +127,7 @@ static const value_string moving_avg_vs[] = {
 static io_graph_settings_t *iog_settings_ = NULL;
 static guint num_io_graphs_ = 0;
 static uat_t *iog_uat_ = NULL;
+static uat_t *iog_uat_3_6_ = NULL; // Forward compatibility
 
 extern "C" {
 
@@ -253,6 +255,7 @@ UAT_COLOR_CB_DEF(io_graph, color, io_graph_settings_t)
 UAT_VS_DEF(io_graph, style, io_graph_settings_t, guint32, 0, "Line")
 UAT_VS_DEF(io_graph, yaxis, io_graph_settings_t, guint32, 0, "Packets")
 UAT_PROTO_FIELD_CB_DEF(io_graph, yfield, io_graph_settings_t)
+UAT_DEC_CB_DEF(io_graph, y_axis_factor, io_graph_settings_t)
 
 static uat_field_t io_graph_fields[] = {
     UAT_FLD_BOOL_ENABLE(io_graph, enabled, "Enabled", "Graph visibility"),
@@ -263,6 +266,21 @@ static uat_field_t io_graph_fields[] = {
     UAT_FLD_VS(io_graph, yaxis, "Y Axis", y_axis_vs, "Y Axis units"),
     UAT_FLD_PROTO_FIELD(io_graph, yfield, "Y Field", "Apply calculations to this field"),
     UAT_FLD_SMA_PERIOD(io_graph, sma_period, "SMA Period", moving_avg_vs, "Simple moving average period"),
+
+    UAT_END_FIELDS
+};
+
+// Forward compatibility with 3.6 and later.
+static uat_field_t io_graph_fields_3_6[] = {
+    UAT_FLD_BOOL_ENABLE(io_graph, enabled, "Enabled", "Graph visibility"),
+    UAT_FLD_CSTRING(io_graph, name, "Graph Name", "The name of the graph"),
+    UAT_FLD_DISPLAY_FILTER(io_graph, dfilter, "Display Filter", "Graph packets matching this display filter"),
+    UAT_FLD_COLOR(io_graph, color, "Color", "Graph color (#RRGGBB)"),
+    UAT_FLD_VS(io_graph, style, "Style", graph_style_vs, "Graph style (Line, Bars, etc.)"),
+    UAT_FLD_VS(io_graph, yaxis, "Y Axis", y_axis_vs, "Y Axis units"),
+    UAT_FLD_PROTO_FIELD(io_graph, yfield, "Y Field", "Apply calculations to this field"),
+    UAT_FLD_SMA_PERIOD(io_graph, sma_period, "SMA Period", moving_avg_vs, "Simple moving average period"),
+    UAT_FLD_DEC(io_graph, y_axis_factor, "Y Axis Factor", "Y Axis Factor"),
 
     UAT_END_FIELDS
 };
@@ -279,6 +297,7 @@ static void* io_graph_copy_cb(void* dst_ptr, const void* src_ptr, size_t) {
     dst->yaxis = src->yaxis;
     dst->yfield = g_strdup(src->yfield);
     dst->sma_period = src->sma_period;
+    dst->y_axis_factor = src->y_axis_factor;
 
     return dst;
 }
@@ -450,18 +469,35 @@ IOGraphDialog::~IOGraphDialog()
 
 void IOGraphDialog::copyFromProfile(QString filename)
 {
-    guint orig_data_len = iog_uat_->raw_data->len;
-
     gchar *err = NULL;
-    if (uat_load(iog_uat_, filename.toUtf8().constData(), &err)) {
-        iog_uat_->changed = TRUE;
-        uat_model_->reloadUat();
-        for (guint i = orig_data_len; i < iog_uat_->raw_data->len; i++) {
+
+    // Try the 3.6 format first, then our native format so that we can print
+    // an appropriate message on error.
+    if (uat_load(iog_uat_3_6_, filename.toUtf8().constData(), &err)) {
+        uat_model_ = new UatModel(NULL, iog_uat_3_6_);
+        ui->graphUat->setModel(uat_model_);
+        guint orig_data_len = iog_uat_3_6_->raw_data->len;
+        iog_uat_3_6_->changed = TRUE;
+        for (guint i = orig_data_len; i < iog_uat_3_6_->raw_data->len; i++) {
             createIOGraph(i);
         }
-    } else {
-        report_failure("Error while loading %s: %s", iog_uat_->name, err);
+    }
+
+    if (err) {
         g_free(err);
+
+        if (uat_load(iog_uat_, filename.toUtf8().constData(), &err)) {
+            uat_model_ = new UatModel(NULL, iog_uat_);
+            ui->graphUat->setModel(uat_model_);
+            guint orig_data_len = iog_uat_->raw_data->len;
+            iog_uat_->changed = TRUE;
+            for (guint i = orig_data_len; i < iog_uat_->raw_data->len; i++) {
+                createIOGraph(i);
+            }
+        } else {
+            report_failure("Error while loading %s: %s", iog_uat_->name, err);
+            g_free(err);
+        }
     }
 }
 
@@ -1168,7 +1204,9 @@ void IOGraphDialog::updateStatistics()
 
 void IOGraphDialog::loadProfileGraphs()
 {
+    uat_t *cur_uat = iog_uat_;
     if (iog_uat_ == NULL) {
+        char* err = NULL;
 
         iog_uat_ = uat_new("I/O Graphs",
                            sizeof(io_graph_settings_t),
@@ -1185,15 +1223,45 @@ void IOGraphDialog::loadProfileGraphs()
                            NULL,
                            io_graph_fields);
 
-        char* err = NULL;
-        if (!uat_load(iog_uat_, NULL, &err)) {
-            report_failure("Error while loading %s: %s.  Default graph values will be used", iog_uat_->name, err);
+        iog_uat_3_6_ = uat_new("I/O Graphs",
+                        sizeof(io_graph_settings_t),
+                        "io_graphs",
+                        TRUE,
+                        &iog_settings_,
+                        &num_io_graphs_,
+                        0, /* doesn't affect anything that requires a GUI update */
+                        "ChStatIOGraphs",
+                        io_graph_copy_cb,
+                        NULL,
+                        io_graph_free_cb,
+                        NULL,
+                        NULL,
+                        io_graph_fields_3_6);
+
+        cur_uat = iog_uat_;
+
+        // First, try the format for 3.6 and later. We won't use y_axis_factor,
+        // but it will be preserved.
+        if (uat_load(iog_uat_3_6_, NULL, &err)) {
+            cur_uat = iog_uat_3_6_;
+        }
+
+        if (err) {
             g_free(err);
-            uat_clear(iog_uat_);
+            uat_clear(iog_uat_3_6_);
+
+            // Next, try the format for 3.4 and earlier. y_axis_factor won't be
+            // written. We try our version-native format last so that we can print
+            // a suitable error message on failure.
+            if (!uat_load(iog_uat_, NULL, &err)) {
+                report_failure("Error while loading %s: %s.  Default graph values will be used", iog_uat_->name, err);
+                g_free(err);
+                uat_clear(iog_uat_);
+            }
         }
     }
 
-    uat_model_ = new UatModel(NULL, iog_uat_);
+    uat_model_ = new UatModel(NULL, cur_uat);
     uat_delegate_ = new UatDelegate;
     ui->graphUat->setModel(uat_model_);
     ui->graphUat->setItemDelegate(uat_delegate_);
