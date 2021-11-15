@@ -65,6 +65,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 message(STATUS "Generating build using CMake ${CMAKE_VERSION}")
 
+# Avoid an empty build type. If this is already set it does nothing.
+set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING
+		"Choose the build configuration (one of Debug, MinSizeRel, RelWithDebInfo, Release)")
+# Build type is ignored by multi-config generators.
+message(STATUS "Using ${CMAKE_GENERATOR} generator and build type ${CMAKE_BUILD_TYPE}")
+
 #Where to find local cmake scripts
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
 
@@ -91,15 +97,15 @@ if(WIN32)
 	# libraries.
 	if(DEFINED ENV{MSYSTEM})
 		set(_msystem $ENV{MSYSTEM})
-		set(_repositoy False)
+		set(_repository False)
 		message(STATUS "Using MSYS2 with MSYSTEM=${_msystem}")
 	else()
 		set(_msystem False)
-		set(_repositoy True)
+		set(_repository True)
 		message(STATUS "Using 3rd party repository")
 	endif()
 	set(USE_MSYSTEM ${_msystem} CACHE INTERNAL "Use MSYS2 subsystem")
-	set(USE_REPOSITORY ${_repositoy} CACHE INTERNAL "Use Wireshark 3rd Party Repository")
+	set(USE_REPOSITORY ${_repository} CACHE INTERNAL "Use Wireshark 3rd Party Repository")
 
 	if(DEFINED ENV{WIRESHARK_TARGET_PLATFORM})
 		string(TOLOWER $ENV{WIRESHARK_TARGET_PLATFORM} _target_platform)
@@ -144,7 +150,7 @@ if(WIN32)
 		endif()
 	endif()
 	message(STATUS
-		"Building for ${WIRESHARK_TARGET_PLATFORM} using \"${CMAKE_GENERATOR}\" \
+		"Building for ${WIRESHARK_TARGET_PLATFORM} \
 and CPU target ${WIRESHARK_TARGET_PROCESSOR_ARCHITECTURE}"
 	)
 
@@ -187,14 +193,6 @@ endif(WIN32)
 
 include(UseCustomIncludes)
 ADD_CUSTOM_CMAKE_INCLUDE()
-
-# This cannot be implemented via option(...)
-if( NOT CMAKE_BUILD_TYPE )
-	set( CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING
-		"Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
-		FORCE)
-endif()
-message(STATUS "CMake build type: ${CMAKE_BUILD_TYPE}")
 
 # Ensure that all executables and libraries end up in the same directory. Actual
 # files might end up in a configuration subdirectory, e.g. run/Debug or
