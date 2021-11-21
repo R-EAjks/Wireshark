@@ -1513,3 +1513,15 @@ xtreme
 z3950
 zeroes
 zigbee
+adpclk
+kasme
+gnodeb
+usbms
+scdma
+unframed
+pcrepattern
+cdmachanneldata
+cdmacallmode
+gregex
+notational
+doxygen
