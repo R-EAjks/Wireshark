@@ -80,12 +80,12 @@ static header_field_info cisco_erspan_timestamp CISCO_ERSPAN_MARKER_HFI_INIT =
  * the below field value by the value of the  UTC offset
  * (37 seconds as of Nov 2021) */
 static header_field_info cisco_erspan_utc_sec CISCO_ERSPAN_MARKER_HFI_INIT =
-{ "UTC Seconds", "cisco_erspan_marker.utc_sec",
+{ "TAI Seconds", "cisco_erspan_marker.utc_sec",
   FT_UINT32, BASE_DEC, NULL, 0xffffffff,
   NULL, HFILL };
 
 static header_field_info cisco_erspan_utc_usec CISCO_ERSPAN_MARKER_HFI_INIT =
-{ "UTC Microseconds", "cisco_erspan_marker.utc_usec",
+{ "TAI Microseconds", "cisco_erspan_marker.utc_usec",
   FT_UINT32, BASE_DEC, NULL, 0xffffffff,
   NULL, HFILL };
 
