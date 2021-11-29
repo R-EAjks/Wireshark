@@ -32,6 +32,23 @@ static void test_format_size(void)
     g_free(str);
 }
 
+static void test_escape_string(void)
+{
+    char *buf;
+
+    buf = ws_escape_string(NULL, "quoted \"\\\" backslash", TRUE);
+    g_assert_cmpstr(buf, ==, "\"quoted \\\"\\\\\\\" backslash\"");
+    wmem_free(NULL, buf);
+
+    buf = ws_escape_string(NULL, "whitespace \t \n \r \f \v", TRUE);
+    g_assert_cmpstr(buf, ==, "\"whitespace \\t \\n \\r \\f \\v""\"");
+    wmem_free(NULL, buf);
+
+    buf = ws_escape_string(NULL, "bytes \xfe\xff", FALSE);
+    g_assert_cmpstr(buf, ==, "bytes \\xfe\\xff");
+    wmem_free(NULL, buf);
+}
+
 #include "to_str.h"
 
 static void test_word_to_hex(void)
@@ -528,6 +545,7 @@ int main(int argc, char **argv)
     g_test_init(&argc, &argv, NULL);
 
     g_test_add_func("/str_util/format_size", test_format_size);
+    g_test_add_func("/str_util/escape_string", test_escape_string);
 
     g_test_add_func("/to_str/word_to_hex", test_word_to_hex);
     g_test_add_func("/to_str/bytes_to_str", test_bytes_to_str);

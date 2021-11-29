@@ -14,6 +14,8 @@
 
 #include <string.h>
 
+#include <wsutil/to_str.h>
+
 int
 ws_xton(char ch)
 {
@@ -263,6 +265,90 @@ gchar
 printable_char_or_period(gchar c)
 {
 	return g_ascii_isprint(c) ? c : '.';
+}
+
+static inline char
+escape_char(char c)
+{
+    switch (c) {
+        case '\a': return 'a';
+        case '\b': return 'b';
+        case '\f': return 'f';
+        case '\n': return 'n';
+        case '\r': return 'r';
+        case '\t': return 't';
+        case '\v': return 'v';
+        case '"':
+        case '\\':
+            return c;
+    }
+    return 0;
+}
+
+static size_t
+escape_string_len(const char *string, bool add_quotes)
+{
+    const char *p;
+    gchar c;
+    size_t repr_len;
+
+    repr_len = 0;
+    for (p = string; (c = *p) != '\0'; p++) {
+        /* Backslashes and double-quotes must
+         * be escaped */
+        if (escape_char(c) != 0) {
+            repr_len += 2;
+        }
+        /* Values that can't nicely be represented
+         * in ASCII need to be escaped. */
+        else if (!g_ascii_isprint(c)) {
+            /* c --> \xNN */
+            repr_len += 4;
+        }
+        /* Other characters are just passed through. */
+        else {
+            repr_len++;
+        }
+    }
+    if (add_quotes)
+        repr_len += 2; /* string plus leading and trailing quotes */
+    return repr_len;
+}
+
+char *
+ws_escape_string(wmem_allocator_t *alloc, const char *string, bool add_quotes)
+{
+    const char *p;
+    char c, r;
+    char *buf, *bufp;
+
+    bufp = buf = wmem_alloc(alloc, escape_string_len(string, add_quotes) + 1);
+    if (add_quotes)
+        *bufp++ = '"';
+    for (p = string; (c = *p) != '\0'; p++) {
+        /* Backslashes and double-quotes must
+         * be escaped. */
+        if ((r = escape_char(c)) != 0) {
+            *bufp++ = '\\';
+            *bufp++ = r;
+        }
+        /* Values that can't nicely be represented
+         * in ASCII need to be escaped. */
+        else if (!g_ascii_isprint(c)) {
+            /* c --> \xNN */
+            *bufp++ = '\\';
+            *bufp++ = 'x';
+            bufp = guint8_to_hex(bufp, c);
+        }
+        /* Other characters are just passed through. */
+        else {
+            *bufp++ = c;
+        }
+    }
+    if (add_quotes)
+        *bufp++ = '"';
+    *bufp = '\0';
+    return buf;
 }
 
 /*
