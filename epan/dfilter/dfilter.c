@@ -122,12 +122,13 @@ dfilter_init(void)
 	/* Allocate an instance of our Lemon-based parser */
 	ParserObj = DfilterAlloc(g_malloc);
 
-/* Enable parser tracing by defining AM_CFLAGS
- * so that it contains "-DDFTRACE".
- */
-#ifdef DFTRACE
-	/* Trace parser */
-	DfilterTrace(stdout, "lemon> ");
+	/* Enable parser tracing by defining an environment variable. */
+#ifndef WS_DISABLE_DEBUG
+	const char *env = g_getenv("WIRESHARK_TRACE_LEMON_PARSER");
+	if (env != NULL && strcmp(env, "1") == 0) {
+		/* Trace parser */
+		DfilterTrace(stderr, "lemon> ");
+	}
 #endif
 
 	/* Initialize the syntax-tree sub-sub-system */
