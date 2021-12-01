@@ -42,6 +42,22 @@ can be found (it is not designed to be launched by hand).  This is done on purpo
 only be extcap programs (executable, python scripts, ...) in the extcap folder to reduce the startup
 time and not have Wireshark trying to execute other file types.
 
+== DEBUG LOGGING
+
+--debug::
++
+--
+Enables debug and sets logging level to debug. If used alone, output is sent to STDERR.
+--
+
+--debug-file=<path to file>::
++
+--
+File where log output will be written. When used, output is written to the file only and no output is sent to STDERR.
+--
+
+When extcap program is called from wireshark or tshark and debug is enabled, it will confuse them. *--debug-file* must be used to avoid it!
+
 == GRAMMAR ELEMENTS
 
 Grammar elements:

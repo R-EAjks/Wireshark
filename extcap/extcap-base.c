@@ -354,6 +354,17 @@ void extcap_cmdline_debug(char** ar, const unsigned n)
     g_string_free(cmdline, TRUE);
 }
 
+static void
+_extcap_discard_log_writer(const char *domain _U_, enum ws_log_level level _U_,
+                                   ws_log_time_t timestamp _U_,
+                                   const char *file _U_, int line _U_, const char *func _U_,
+                                   const char *user_format _U_, va_list user_ap _U_,
+                                   void *user_data _U_)
+{
+	/* Discard log to stdout */
+}
+
+
 /*
  * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
  *
