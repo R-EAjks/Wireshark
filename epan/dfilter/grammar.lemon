@@ -36,38 +36,11 @@ new_test(dfwork_t *dfw, test_op_t op, df_lval_t *lval);
 %token_type			{df_lval_t*}
 %token_destructor		{
 	(void)dfw;
-	df_lval_free($$);
+	df_lval_free($$, TRUE);
 }
 
-%type		sentence	{stnode_t*}
-
-
-%type		expr		{stnode_t*}
-%destructor	expr		{stnode_free($$);}
-
-%type		entity		{stnode_t*}
-%destructor	entity		{stnode_free($$);}
-
-%type		function	{stnode_t*}
-%destructor	function	{stnode_free($$);}
-
-%type		relation_test	{stnode_t*}
-%destructor	relation_test	{stnode_free($$);}
-
-%type		comparison_test	{stnode_t*}
-%destructor	comparison_test	{stnode_free($$);}
-
-%type		logical_test	{stnode_t*}
-%destructor	logical_test	{stnode_free($$);}
-
-%type		rel_binop	{stnode_t*}
-%destructor	rel_binop	{stnode_free($$);}
-
-%type		cmp_op		{stnode_t*}
-%destructor	cmp_op		{stnode_free($$);}
-
-%type		range		{stnode_t*}
-%destructor	range		{stnode_free($$);}
+%default_type			{stnode_t*}
+%default_destructor		{stnode_free($$);}
 
 %type		range_node	{drange_node*}
 %destructor	range_node	{drange_node_free($$);}
@@ -77,9 +50,6 @@ new_test(dfwork_t *dfw, test_op_t op, df_lval_t *lval);
 
 %type		function_params	{GSList*}
 %destructor	function_params	{st_funcparams_free($$);}
-
-%type		set		{stnode_t*}
-%destructor	set		{stnode_free($$);}
 
 %type		set_list	{GSList*}
 %destructor	set_list	{set_nodelist_free($$);}
@@ -126,7 +96,7 @@ expr(X) ::= logical_test(L).	{ X = L; }
 	new_test(dfwork_t *dfw _U_, test_op_t op, df_lval_t *lval)
 	{
 		stnode_t *node = stnode_new_test(op, df_lval_value(lval));
-		df_lval_free(lval);
+		df_lval_free(lval, FALSE);
 		return node;
 	}
 }
@@ -162,18 +132,18 @@ logical_test(T) ::= entity(E).
 entity(E) ::= STRING(S).
 {
 	E = stnode_new_string(df_lval_value(S), df_lval_value(S));
-	df_lval_free(S);
+	df_lval_free(S, FALSE);
 }
 entity(E) ::= CHARCONST(C).
 {
 	E = stnode_new_charconst(df_lval_number(C), df_lval_value(C));
-	df_lval_free(C);
+	df_lval_free(C, FALSE);
 }
 entity(E) ::= UNPARSED(U).
 {
 	E = stnode_new_unparsed(df_lval_value(U), df_lval_value(U));
 	dfilter_resolve_unparsed(dfw, E);
-	df_lval_free(U);
+	df_lval_free(U, FALSE);
 }
 entity(E) ::= range(R).		{ E = R; }
 entity(E) ::= function(F).	{ E = F; }
@@ -210,7 +180,7 @@ range_node(D) ::= RANGE(R).
 		g_free(err);
 	}
 
-	df_lval_free(R);
+	df_lval_free(R, TRUE);
 }
 
 /* Relational tests */
@@ -316,7 +286,7 @@ set_element(N) ::= entity(X) DOTDOT entity(Y).
 			dfilter_fail(dfw, "Function '%s' does not exist", name);
 		}
 		stnode_t *node = stnode_new(STTYPE_FUNCTION, def, df_lval_value(lval));
-		df_lval_free(lval);
+		df_lval_free(lval, FALSE);
 		return node;
 	}
 }
