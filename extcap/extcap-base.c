@@ -112,9 +112,7 @@ static void extcap_custom_log(const char *domain, enum ws_log_level level,
                             const char *user_format, va_list user_ap,
                             void *user_data _U_)
 {
-    if (level <= LOG_LEVEL_DEBUG) {
-        if (!custom_log)
-            return;
+    if (custom_log) {
         ws_log_file_writer(custom_log, domain, level, timestamp, file, line, func, user_format, user_ap);
     } else {
         ws_log_console_writer(domain, level, timestamp, file, line, func, user_format, user_ap);
@@ -353,17 +351,6 @@ void extcap_cmdline_debug(char** ar, const unsigned n)
     ws_debug("%s", cmdline->str);
     g_string_free(cmdline, TRUE);
 }
-
-static void
-_extcap_discard_log_writer(const char *domain _U_, enum ws_log_level level _U_,
-                                   ws_log_time_t timestamp _U_,
-                                   const char *file _U_, int line _U_, const char *func _U_,
-                                   const char *user_format _U_, va_list user_ap _U_,
-                                   void *user_data _U_)
-{
-	/* Discard log to stdout */
-}
-
 
 /*
  * Editor modelines  -  https://www.wireshark.org/tools/modelines.html

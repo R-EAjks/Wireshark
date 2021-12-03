@@ -53,10 +53,12 @@ Enables debug and sets logging level to debug. If used alone, output is sent to 
 --debug-file=<path to file>::
 +
 --
-File where log output will be written. When used, output is written to the file only and no output is sent to STDERR.
+File where log output will be written. When used, output is written to the file only and no output is sent to STDERR. It works even no *--debug* is used.
 --
 
 When extcap program is called from wireshark or tshark and debug is enabled, it will confuse them. *--debug-file* must be used to avoid it!
+
+Do not use hidden parameter *--log-level=* and other hidden *--log-...* parameters with extcaps when run from wireshark/tshark. It routes some messages to STDERR and it confuses calling application.
 
 == GRAMMAR ELEMENTS
 

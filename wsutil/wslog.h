@@ -201,17 +201,6 @@ void ws_log_init_with_writer_and_data(const char *progname,
                         void (*vcmdarg_err)(const char *, va_list ap));
 
 
-/** Set or replace log writer */
-WS_DLL_PUBLIC
-void ws_log_set_writer(ws_log_writer_cb *writer);
-
-
-/** Set or replace log writer and its data */
-WS_DLL_PUBLIC
-void ws_log_set_writer_data(void *user_data,
-                        ws_log_writer_free_data_cb *free_user_data);
-
-
 /** This function is called to output a message to the log.
  *
  * Takes a format string and a variable number of arguments.

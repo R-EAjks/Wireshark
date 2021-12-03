@@ -364,6 +364,7 @@ int main(int argc, char *argv[])
 
 	/* Initialize log handler early so we can have proper logging during startup. */
 	extcap_log_init("sshdump");
+	ws_log_parse_args(&argc, argv, NULL, LOG_ARGS_NOEXIT);
 
 	sshdump_extcap_interface = g_path_get_basename(argv[0]);
 

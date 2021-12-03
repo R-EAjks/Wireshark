@@ -675,7 +675,7 @@ void ws_log_init_with_writer(const char *progname,
                             ws_log_writer_cb *writer,
                             void (*vcmdarg_err)(const char *, va_list ap))
 {
-    ws_log_set_writer(writer);
+    registered_log_writer = writer;
     ws_log_init(progname, vcmdarg_err);
 }
 
@@ -686,19 +686,9 @@ void ws_log_init_with_writer_and_data(const char *progname,
                             ws_log_writer_free_data_cb *free_user_data,
                             void (*vcmdarg_err)(const char *, va_list ap))
 {
-    ws_log_set_writer_data(user_data, free_user_data);
-    ws_log_init_with_writer(progname, writer, vcmdarg_err);
-}
-
-void ws_log_set_writer(ws_log_writer_cb *writer)
-{
-    registered_log_writer = writer;
-}
-
-void ws_log_set_writer_data(void *user_data, ws_log_writer_free_data_cb *free_user_data)
-{
     registered_log_writer_data = user_data;
     registered_log_writer_data_free = free_user_data;
+    ws_log_init_with_writer(progname, writer, vcmdarg_err);
 }
 
 
