@@ -86,6 +86,24 @@ user or automatically by the GUI. All the steps performed are done for every ext
 
 Let's go through those steps.
 
+===== Debug logging
+
+--debug::
++
+--
+Enables debug and sets logging level to debug. If used alone, output is sent to STDERR.
+--
+
+--debug-file=<path to file>::
++
+--
+File where log output will be written. When used, output is written to the file only and no output is sent to STDERR. It works even no *--debug* is used.
+--
+
+When extcap program is called from wireshark or tshark and debug is enabled, it will confuse them. *--debug-file* must be used to avoid it!
+
+Do not use hidden parameter *--log-level=* nor other hidden *--log-...* parameters with extcaps when run from wireshark/tshark. Do not use *WIRESHARK_LOG_...* variables too. It routes some messages to STDERR and it confuses calling application.
+
 ===== Query for available interfaces
 
 In the first step the extcap is queried for its interfaces.

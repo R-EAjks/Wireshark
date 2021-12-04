@@ -42,6 +42,8 @@ can be found (it is not designed to be launched by hand).  This is done on purpo
 only be extcap programs (executable, python scripts, ...) in the extcap folder to reduce the startup
 time and not have Wireshark trying to execute other file types.
 
+NOTE: Much more information is available in https://www.wireshark.org/docs/wsdg_html_chunked/ChCaptureExtcap.html[Wireshark Developer’s Guide, chapter Extcap: Developer Guide].
+
 == DEBUG LOGGING
 
 --debug::
