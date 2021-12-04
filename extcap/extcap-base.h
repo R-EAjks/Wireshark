@@ -36,7 +36,8 @@
     EXTCAP_OPT_CAPTURE_FILTER, \
     EXTCAP_OPT_FIFO, \
     EXTCAP_OPT_LOG_LEVEL, \
-    EXTCAP_OPT_LOG_FILE
+    EXTCAP_OPT_LOG_FILE, \
+    EXTCAP_OPT_CAPCHILD
 
 
 #define EXTCAP_BASE_OPTIONS \
@@ -49,7 +50,8 @@
     { "extcap-capture-filter", ws_required_argument,    NULL, EXTCAP_OPT_CAPTURE_FILTER}, \
     { "fifo", ws_required_argument, NULL, EXTCAP_OPT_FIFO}, \
     { "log-level", ws_required_argument, NULL, EXTCAP_OPT_LOG_LEVEL}, \
-    { "log-file", ws_required_argument, NULL, EXTCAP_OPT_LOG_FILE}
+    { "log-file", ws_required_argument, NULL, EXTCAP_OPT_LOG_FILE}, \
+    { "capchild", ws_no_argument, NULL, EXTCAP_OPT_CAPCHILD}
 
 typedef struct _extcap_parameters
 {

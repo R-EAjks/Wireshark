@@ -357,6 +357,8 @@ extcap_convert_arguments_to_array(GList * arguments)
     gchar ** result = NULL;
     if ( arguments )
     {
+        arguments = g_list_append(arguments, g_strdup(EXTCAP_ARGUMENT_MODE_CAPCHILD));
+
         GList * walker = g_list_first(arguments);
         int cnt = 0;
 
@@ -1400,6 +1402,7 @@ GPtrArray *extcap_prepare_arguments(interface_options *interface_opts)
 #define add_arg(X) g_ptr_array_add(result, g_strdup(X))
 
         add_arg(interface_opts->extcap);
+        add_arg(EXTCAP_ARGUMENT_MODE_CAPCHILD);
         add_arg(EXTCAP_ARGUMENT_RUN_CAPTURE);
         add_arg(EXTCAP_ARGUMENT_INTERFACE);
         add_arg(interface_opts->name);
@@ -2040,6 +2043,7 @@ extcap_load_interface_list(void)
         get_ws_version_number(&major, &minor, NULL);
         char *arg_version = g_strdup_printf("%s=%d.%d", EXTCAP_ARGUMENT_VERSION, major, minor);
         const char *argv[] = {
+            EXTCAP_ARGUMENT_MODE_CAPCHILD,
             EXTCAP_ARGUMENT_LIST_INTERFACES,
             arg_version,
             NULL
