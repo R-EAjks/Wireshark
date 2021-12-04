@@ -58,7 +58,7 @@ File where log output will be written. When used, output is written to the file 
 
 When extcap program is called from wireshark or tshark and debug is enabled, it will confuse them. *--debug-file* must be used to avoid it!
 
-Do not use hidden parameter *--log-level=* and other hidden *--log-...* parameters with extcaps when run from wireshark/tshark. It routes some messages to STDERR and it confuses calling application.
+Do not use hidden parameter *--log-level=* nor other hidden *--log-...* parameters with extcaps when run from wireshark/tshark. Do not use *WIRESHARK_LOG_...* variables too. It routes some messages to STDERR and it confuses calling application.
 
 == GRAMMAR ELEMENTS
 
