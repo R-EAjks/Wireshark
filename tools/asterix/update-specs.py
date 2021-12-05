@@ -244,7 +244,7 @@ def get_ft(ref, n, content, offset):
     t = content['type']
 
     if t == 'Raw':
-        return 'FT_UINT{}, BASE_DEC, NULL, {}'.format(m, mask)
+        return 'FT_UINT{}, BASE_HEX, NULL, {}'.format(m, mask)
     elif t == 'Table':
         return 'FT_UINT{}, BASE_DEC, VALS (valstr_{}), {}'.format(m, ref, mask)
     elif t == 'String':
