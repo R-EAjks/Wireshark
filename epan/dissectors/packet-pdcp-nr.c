@@ -2125,7 +2125,7 @@ static int dissect_pdcp_nr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
 
             write_pdu_label_and_info(root_ti, pinfo, " (SN=%-6u)", seqnum);
         }
-        else {
+        else if (p_pdcp_info->bearerType == Bearer_DCCH) {
             /*******************************/
             /* User-plane Control messages */
             guint32 control_pdu_type;
