@@ -113,9 +113,7 @@ static void extcap_custom_log(const char *domain, enum ws_log_level level,
                             const char *user_format, va_list user_ap,
                             void *user_data _U_)
 {
-    if (level <= LOG_LEVEL_DEBUG) {
-        if (!custom_log)
-            return;
+    if (custom_log) {
         ws_log_file_writer(custom_log, domain, level, timestamp, file, line, func, user_format, user_ap);
     } else {
         ws_log_console_writer(domain, level, timestamp, file, line, func, user_format, user_ap);
