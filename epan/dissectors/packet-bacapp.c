@@ -2931,6 +2931,8 @@ BACnetNetworkPortCommand [] = {
     { 5, "restart-autonegotiation"},
     { 6, "disconnect"},
     { 7, "restart-port"},
+    { 8, "generate-csr-file"},
+    { 9, "validate-changes"},
     { 0,  NULL}
 };
 
@@ -2955,6 +2957,17 @@ BACnetNetworkType [] = {
     { 7, "virtual" },
     { 8, "non-bacnet" },
     { 9, "bacnet-ipv6" },
+    {10, "serial" },
+    {11, "secure-connect" },
+    { 0,  NULL}
+};
+
+
+static const value_string
+BACnetSCHubConnectorState [] = {
+    { 0, "no-hub-connection" },
+    { 1, "connected-to-primary" },
+    { 2, "connected-to-failover" },
     { 0,  NULL}
 };
 
@@ -4352,6 +4365,34 @@ BACnetPropertyIdentifier [] = {
     { 505, "send-now"},
     { 506, "floor-number"},
     { 507, "device-uuid"},
+    { 508, "additional-reference-ports"},
+    { 509, "certificate-signing-request-file"},
+    { 510, "command-validation-result"},
+    { 511, "issuer-certificate-files"},
+    { 4194304, "max-bvlc-length-accepted"},
+    { 4194305, "max-npdu-length-accepted"},
+    { 4194306, "operational-certificate-file"},
+    { 4194307, "current-health"},
+    { 4194308, "sc-connect-wait-timeout"},
+    { 4194309, "sc-direct-connect-accept-enable"},
+    { 4194310, "sc-direct-connect-accept-uris"},
+    { 4194311, "ssc-direct-connect-binding"},
+    { 4194312, "sc-direct-connect-connection-status"},
+    { 4194313, "sc-direct-connect-initiate-enable"},
+    { 4194314, "sc-disconnect-wait-timeout"},
+    { 4194315, "sc-failed-connection-request"},
+    { 4194316, "sc-failover-hub-connection-status"},
+    { 4194317, "sc-failover-hub-uri"},
+    { 4194318, "sc-hub-connector-state"},
+    { 4194319, "sc-hub-function-accept-uris"},
+    { 4194320, "sc-hub-function-binding"},
+    { 4194321, " sc-hub-function-connection-status"},
+    { 4194322, "sc-hub-function-enable"},
+    { 4194323, "sc-heartbeat-timeout"},
+    { 4194324, "sc-primary-hub-connection-status"},
+    { 4194325, "sc-primary-hub-uri"},
+    { 4194326, "sc-maximum-reconnect-time"},
+    { 4194327, "sc-minimum-reconnect-time"},
     { 0,   NULL}
 /* Enumerated values 0-511 are reserved for definition by ASHRAE.
    Enumerated values 512-4194303 may be used by others subject to
@@ -4744,6 +4785,23 @@ BACnetPropertyStates [] = {
     { 46, "network-port-command"},
     { 47, "network-type"},
     { 48, "network-number-quality"},
+    { 49, "escalator-operation-direction"},
+    { 50, "escalator-fault"},
+    { 51, "escalator-mode"},
+    { 52, "lift-car-direction"},
+    { 53, "lift-car-door-command"},
+    { 54, "lift-car-drive-status"},
+    { 55, "lift-car-mode"},
+    { 56, "lift-group-mode"},
+    { 57, "lift-fault"},
+    { 58, "protocol-level"},
+    { 59, "audit-level"},
+    { 60, "audit-operation"},
+    { 63, "extended-value"},
+    {256, "-- example-one"},
+    {257, "-- example-two"},
+    {258, "sc-connection-state"},
+    {258, "sc-hub-connecto-state"},
     { 0, NULL}
 /* Tag values 0-63 are reserved for definition by ASHRAE.
    Tag values of 64-254 may be used by others to accommodate
@@ -9352,6 +9410,9 @@ fAbstractSyntaxNType(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint 
             offset = fHealth(tvb, pinfo, tree, offset);
             break;
 
+        case 4194318: /* sc_hub_connector_state */
+            offset = fApplicationTypesEnumerated(tvb, pinfo, tree, offset, ar, BACnetSCHubConnectorState);
+            break;
         case 85:  /* present-value */
             if ( object_type == 11 )    /* group object handling of present-value */
             {
