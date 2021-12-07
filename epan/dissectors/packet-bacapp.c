@@ -1454,6 +1454,22 @@ static guint
 fDailySchedule(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset);
 
 /**
+ * BACnetHealth ::= SEQUENCE {
+ *  timestamp                   [0] BACnetDateTime,
+ *  result                      [1] Error,
+ *  property                    [2] BACnetPropertiyIdentifier OPTIONAL,
+ *  details                     [3] CharacterString OPTIONAL
+ * }
+ * @param tvb the tv buffer of the current data
+ * @param pinfo the packet info of the current data
+ * @param tree the tree to append this item to
+ * @param offset the offset in the tvb
+ * @return modified offset
+ */
+static guint
+fHealth(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset);
+
+/**
  * BACnetWeeklySchedule ::= SEQUENCE {
  *  week-schedule    SENQUENCE SIZE (7) OF BACnetDailySchedule
  * }
@@ -9331,6 +9347,10 @@ fAbstractSyntaxNType(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint 
                 offset = fObjectSelector(tvb, pinfo, tree, offset);
             }
             break;
+        case 510:     /* command-validation-result */
+        case 4194307: /* current-health */
+            offset = fHealth(tvb, pinfo, tree, offset);
+            break;
 
         case 85:  /* present-value */
             if ( object_type == 11 )    /* group object handling of present-value */
@@ -9766,6 +9786,63 @@ fDailySchedule(tvbuff_t *tvb, packet_info *pinfo, proto_tree *subtree, guint off
     }
     return offset;
 }
+
+/**
+ * BACnetHealth ::= SEQUENCE {
+ *  timestamp                   [0] BACnetDateTime,
+ *  result                      [1] Error,
+ *  property                    [2] BACnetPropertiyIdentifier OPTIONAL,
+ *  details                     [3] CharacterString OPTIONAL
+ * }
+ * @param tvb the tv buffer of the current data
+ * @param pinfo the packet info of the current data
+ * @param tree the tree to append this item to
+ * @param offset the offset in the tvb
+ * @return modified offset
+ */
+static guint
+fHealth(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset)
+{
+    guint   lastoffset = 0;
+    guint8  tag_no, tag_info;
+    guint32 lvt;
+
+    while (tvb_reported_length_remaining(tvb, offset) > 0) {
+        lastoffset = offset;
+        /* check the tag.  A closing tag means we are done */
+        fTagHeader(tvb, pinfo, offset, &tag_no, &tag_info, &lvt);
+        if (tag_is_closing(tag_info)) {
+            return offset;
+        }
+        switch (tag_no) {
+        case 0: /* timestamp */
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            offset = fDateTime(tvb, pinfo, tree, offset, "timestamp: ");
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            break;
+        case 1: /* result */
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            offset = fError(tvb, pinfo, tree, offset);
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            break;
+        case 2: /* property - OPTIONAL*/
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            offset = fPropertyIdentifier(tvb, pinfo, tree, offset);
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            break;
+        case 3: /* details - OPTIONAL */
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            offset = fCharacterString(tvb, pinfo, tree, offset, "details: ");
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            break;
+        default:
+            return offset;
+        }
+        if (offset <= lastoffset) break;     /* nothing happened, exit loop */
+    }
+    return offset;
+}
+
 
 static guint
 fWeeklySchedule(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset)
