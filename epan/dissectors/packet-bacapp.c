@@ -1470,6 +1470,23 @@ static guint
 fHealth(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset);
 
 /**
+ * BACnetSCHubConnection ::= SEQUENCE {
+ *  connection-state            [0] BACnetSCConnectionState,
+ *  connect-timestamp           [1] BACnetDateTime,
+ *  disconnect-timestamp        [2] BACnetDateTime,
+ *  error                       [3] Error OPTIONAL
+ *  error-details               [4] CharacterString OPTIONAL
+ * }
+ * @param tvb the tv buffer of the current data
+ * @param pinfo the packet info of the current data
+ * @param tree the tree to append this item to
+ * @param offset the offset in the tvb
+ * @return modified offset
+ */
+static guint
+fSCHubConnection(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset);
+
+/**
  * BACnetWeeklySchedule ::= SEQUENCE {
  *  week-schedule    SENQUENCE SIZE (7) OF BACnetDailySchedule
  * }
@@ -2962,6 +2979,14 @@ BACnetNetworkType [] = {
     { 0,  NULL}
 };
 
+static const value_string
+BACnetSCConnectionState [] = {
+    { 0, "not-connected" },
+    { 1, "connected" },
+    { 2, "disconnected-with-errors" },
+    { 3, "failed-to-connect" },
+    { 0,  NULL}
+};
 
 static const value_string
 BACnetSCHubConnectorState [] = {
@@ -9410,6 +9435,10 @@ fAbstractSyntaxNType(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint 
             offset = fHealth(tvb, pinfo, tree, offset);
             break;
 
+        case 4194316: /* sc-failover-hub-connection-status */
+        case 4194324: /* sc-primary-hub-connection-status */
+            offset = fSCHubConnection(tvb, pinfo, tree, offset);
+            break;
         case 4194318: /* sc_hub_connector_state */
             offset = fApplicationTypesEnumerated(tvb, pinfo, tree, offset, ar, BACnetSCHubConnectorState);
             break;
@@ -9892,6 +9921,67 @@ fHealth(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset)
             offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
             break;
         case 3: /* details - OPTIONAL */
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            offset = fCharacterString(tvb, pinfo, tree, offset, "details: ");
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            break;
+        default:
+            return offset;
+        }
+        if (offset <= lastoffset) break;     /* nothing happened, exit loop */
+    }
+    return offset;
+}
+
+
+/**
+ * BACnetSCHubConnection ::= SEQUENCE {
+ *  connection-state            [0] BACnetSCConnectionState,
+ *  connect-timestamp           [1] BACnetDateTime,
+ *  disconnect-timestamp        [2] BACnetDateTime,
+ *  error                       [3] Error OPTIONAL
+ *  error-details               [4] CharacterString OPTIONAL
+ * }
+ * @param tvb the tv buffer of the current data
+ * @param pinfo the packet info of the current data
+ * @param tree the tree to append this item to
+ * @param offset the offset in the tvb
+ * @return modified offset
+ */
+static guint
+fSCHubConnection(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset)
+{
+    guint   lastoffset = 0;
+    guint8  tag_no, tag_info;
+    guint32 lvt;
+
+    while (tvb_reported_length_remaining(tvb, offset) > 0) {
+        lastoffset = offset;
+        /* check the tag.  A closing tag means we are done */
+        fTagHeader(tvb, pinfo, offset, &tag_no, &tag_info, &lvt);
+        if (tag_is_closing(tag_info)) {
+            return offset;
+        }
+        switch (tag_no) {
+        case 0: /* connection-state */
+            offset = fEnumeratedTag(tvb, pinfo, tree, offset, "connection-state: ", BACnetSCConnectionState);
+            break;
+        case 1: /* connect-timestamp */
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            offset = fDateTime(tvb, pinfo, tree, offset, "connet-timestamp: ");
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            break;
+        case 2: /* disconnect-timestamp */
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            offset = fDateTime(tvb, pinfo, tree, offset, "diconnect-timestamp: ");
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            break;
+        case 3: /* error */
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            offset = fError(tvb, pinfo, tree, offset);
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            break;
+        case 4: /* details - OPTIONAL */
             offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
             offset = fCharacterString(tvb, pinfo, tree, offset, "details: ");
             offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
