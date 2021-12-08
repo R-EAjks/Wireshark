@@ -45,7 +45,6 @@
  */
 
 #include "config.h"
-
 #include <math.h>
 
 #include <epan/packet.h>
@@ -29162,7 +29161,7 @@ ieee80211_tag_mesh_peering_mgmt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
   ieee80211_tagged_field_data_t* field_data = (ieee80211_tagged_field_data_t*)data;
   int tag_len = tvb_reported_length(tvb);
   int offset = 0;
-  int ampe_frame = 0;
+  guint8 ampe_frame = 0;
 
   proto_tree_add_item(tree, hf_ieee80211_mesh_peering_proto, tvb, offset, 2, ENC_LITTLE_ENDIAN);
   offset += 2;
@@ -29171,7 +29170,6 @@ ieee80211_tag_mesh_peering_mgmt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
 
   if (field_data && field_data->sanity_check)
     ampe_frame = field_data->sanity_check->ampe_frame;
-
   switch (ampe_frame)
   {                                         /* Self-protected action field */
     case SELFPROT_ACTION_MESH_PEERING_OPEN:
@@ -30510,9 +30508,11 @@ static void dissect_mgt_action(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tr
   proto_tree *lcl_fixed_tree;
   proto_tree *tagged_tree;
   int         tagged_parameter_tree_len;
+  association_sanity_check_t association_sanity_check;
+  memset(&association_sanity_check, 0, sizeof(association_sanity_check));
 
   lcl_fixed_tree = proto_tree_add_subtree(tree, tvb, 0, 0, ett_fixed_parameters, &lcl_fixed_hdr, "Fixed parameters");
-  offset += add_ff_action(lcl_fixed_tree, tvb, pinfo, 0, NULL);
+  offset += add_ff_action(lcl_fixed_tree, tvb, pinfo, 0, &association_sanity_check);
 
   proto_item_set_len(lcl_fixed_hdr, offset);
   if (ieee80211_tvb_invalid)
@@ -30523,7 +30523,7 @@ static void dissect_mgt_action(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tr
                                             tagged_parameter_tree_len);
     ieee_80211_add_tagged_parameters(tvb, offset, pinfo, tagged_tree,
                                      tagged_parameter_tree_len, MGT_ACTION,
-                                     NULL);
+                                     &association_sanity_check);
     }
 }
 
