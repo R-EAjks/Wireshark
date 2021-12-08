@@ -1470,6 +1470,24 @@ static guint
 fHealth(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset);
 
 /**
+ * BACnetSCFailedConnectionRequest ::= SEQUENCE {
+ *  timestamp                   [0] BACnetDateTime,
+ *  peer-address                [1] BACnetHostNPort,
+ *  peer-vmac                   [2] OCTET STRING (SIZE(6))
+ *  peer-uuid                   [3] OCTET STRING (SIZE(16))
+ *  error                       [4] Error OPTIONAL
+ *  error-details               [5] CharacterString OPTIONAL
+ * }
+ * @param tvb the tv buffer of the current data
+ * @param pinfo the packet info of the current data
+ * @param tree the tree to append this item to
+ * @param offset the offset in the tvb
+ * @return modified offset
+ */
+static guint
+fSCFailedConnectionRequest(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset);
+
+/**
  * BACnetSCHubConnection ::= SEQUENCE {
  *  connection-state            [0] BACnetSCConnectionState,
  *  connect-timestamp           [1] BACnetDateTime,
@@ -9455,6 +9473,9 @@ fAbstractSyntaxNType(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint 
             offset = fHealth(tvb, pinfo, tree, offset);
             break;
 
+        case 4194315: /* sc-failed-connection-requests */
+            offset = fSCFailedConnectionRequest(tvb, pinfo, tree, offset);
+            break;
         case 4194316: /* sc-failover-hub-connection-status */
         case 4194324: /* sc-primary-hub-connection-status */
             offset = fSCHubConnection(tvb, pinfo, tree, offset);
@@ -9957,6 +9978,69 @@ fHealth(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset)
     return offset;
 }
 
+/**
+ * BACnetSCFailedConnectionRequest ::= SEQUENCE {
+ *  timestamp                   [0] BACnetDateTime,
+ *  peer-address                [1] BACnetHostNPort,
+ *  peer-vmac                   [2] OCTET STRING (SIZE(6))
+ *  peer-uuid                   [3] OCTET STRING (SIZE(16))
+ *  error                       [4] Error OPTIONAL
+ *  error-details               [5] CharacterString OPTIONAL
+ * }
+ * @param tvb the tv buffer of the current data
+ * @param pinfo the packet info of the current data
+ * @param tree the tree to append this item to
+ * @param offset the offset in the tvb
+ * @return modified offset
+ */
+static guint
+fSCFailedConnectionRequest(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset)
+{
+    guint   lastoffset = 0;
+    guint8  tag_no, tag_info;
+    guint32 lvt;
+
+    while (tvb_reported_length_remaining(tvb, offset) > 0) {
+        lastoffset = offset;
+        /* check the tag.  A closing tag means we are done */
+        fTagHeader(tvb, pinfo, offset, &tag_no, &tag_info, &lvt);
+        if (tag_is_closing(tag_info)) {
+            return offset;
+        }
+        switch (tag_no) {
+        case 0: /* timestamp */
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            offset = fDateTime(tvb, pinfo, tree, offset, "connet-timestamp: ");
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            break;
+        case 1: /* peer-address */
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            offset = fHostNPort(tvb, pinfo, tree, offset,"peer-address: ");
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            break;
+        case 2: /* peer-vmac */
+            offset = fOctetString(tvb, pinfo, tree, offset, "peer-vmac: ", lvt);
+            break;
+        case 3: /* peer-uuid */
+            offset = fOctetString(tvb, pinfo, tree, offset, "peer-uuid: ", lvt);
+            break;
+        case 4: /* error */
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            offset = fError(tvb, pinfo, tree, offset);
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            break;
+        case 5: /* details - OPTIONAL */
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            offset = fCharacterString(tvb, pinfo, tree, offset, "details: ");
+            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            break;
+        default:
+            return offset;
+        }
+        if (offset <= lastoffset) break;     /* nothing happened, exit loop */
+    }
+    return offset;
+}
 
 /**
  * BACnetSCHubConnection ::= SEQUENCE {
