@@ -310,6 +310,7 @@ static const char *opt_file    = "--log-file";
 static const char *opt_fatal   = "--log-fatal";
 static const char *opt_debug   = "--log-debug";
 static const char *opt_noisy   = "--log-noisy";
+static const char *opt_option  = "-o";
 
 
 static void print_err(void (*vcmdarg_err)(const char *, va_list ap),
@@ -373,6 +374,10 @@ int ws_log_parse_args(int *argc_ptr, char *argv[],
         else if (g_str_has_prefix(*ptr, opt_noisy)) {
             option = opt_noisy;
             optlen = strlen(opt_noisy);
+        }
+        else if (strcmp(*ptr, opt_option) == 0) {
+            option = opt_option;
+            optlen = strlen(opt_option);
         }
         else {
             ptr += 1;
@@ -448,6 +453,28 @@ int ws_log_parse_args(int *argc_ptr, char *argv[],
         }
         else if (option == opt_noisy) {
             ws_log_set_noisy_filter(value);
+        }
+        else if (option == opt_option && g_str_has_prefix(value, "console.log.level:")) {
+            ws_message("console.log.level is deprecated. Use --log-level instead.");
+            char *ll_str = strchr(value, ':');
+            if (ll_str && strlen(ll_str) > 1) {
+                ll_str++;
+                long log_level;
+                log_level = strtoul(ll_str, NULL, 0);
+                if (log_level & G_LOG_LEVEL_DEBUG) {
+                    ws_log_set_level(LOG_LEVEL_DEBUG);
+                } else if (log_level & G_LOG_LEVEL_INFO) {
+                    ws_log_set_level(LOG_LEVEL_INFO);
+                } else if (log_level & G_LOG_LEVEL_MESSAGE) {
+                    ws_log_set_level(LOG_LEVEL_MESSAGE);
+                } else if (log_level & G_LOG_LEVEL_WARNING) {
+                    ws_log_set_level(LOG_LEVEL_WARNING);
+                } else if (log_level & G_LOG_LEVEL_CRITICAL) {
+                    ws_log_set_level(LOG_LEVEL_CRITICAL);
+                } else if (log_level & G_LOG_LEVEL_ERROR) {
+                    ws_log_set_level(LOG_LEVEL_ERROR);
+                }
+            }
         }
         else {
             /* Option value missing or invalid, do nothing. */
