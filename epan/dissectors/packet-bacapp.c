@@ -9472,7 +9472,6 @@ fAbstractSyntaxNType(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint 
         case 4194307: /* current-health */
             offset = fHealth(tvb, pinfo, tree, offset);
             break;
-
         case 4194315: /* sc-failed-connection-requests */
             offset = fSCFailedConnectionRequest(tvb, pinfo, tree, offset);
             break;
@@ -10081,7 +10080,7 @@ fSCHubConnection(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offs
             break;
         case 2: /* disconnect-timestamp */
             offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
-            offset = fDateTime(tvb, pinfo, tree, offset, "diconnect-timestamp: ");
+            offset = fDateTime(tvb, pinfo, tree, offset, "disconnect-timestamp: ");
             offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
             break;
         case 3: /* error */
