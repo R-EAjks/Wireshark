@@ -5481,6 +5481,9 @@ set_pref(gchar *pref_name, const gchar *value, void *private_data _U_,
             if (string_to_name_resolve(value, &gbl_resolv_flags) != '\0')
                 return PREFS_SET_SYNTAX_ERR;
         }
+    } else if (strcmp(pref_name, "console.log.level") == 0) {
+        /* Handled on the command line within ws_log_parse_args */
+        return PREFS_SET_OK;
     } else if (deprecated_heur_dissector_pref(pref_name, value)) {
          /* Handled within deprecated_heur_dissector_pref() if found */
     } else if (deprecated_enable_dissector_pref(pref_name, value)) {
