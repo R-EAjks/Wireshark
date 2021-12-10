@@ -515,12 +515,12 @@ dfilter_apply_edt(dfilter_t *df, epan_dissect_t* edt)
 
 
 void
-dfilter_prime_proto_tree(const dfilter_t *df, proto_tree *tree)
+dfilter_prime_proto_tree(const dfilter_t *df, proto_tree *tree _U_)
 {
 	int i;
 
 	for (i = 0; i < df->num_interesting_fields; i++) {
-		proto_tree_prime_with_hfid(tree, df->interesting_fields[i]);
+		proto_field_mark_as_referenced_by_id(df->interesting_fields[i], FALSE);
 	}
 }
 

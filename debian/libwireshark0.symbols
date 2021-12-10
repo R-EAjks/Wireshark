@@ -1142,6 +1142,13 @@ libwireshark.so.0 libwireshark0 #MINVER#
  proto_expert@Base 1.9.1
  proto_field_is_referenced@Base 1.9.1
  proto_field_display_to_string@Base 2.1.0
+ proto_field_mark_as_referenced@Base 3.5.0
+ proto_field_mark_as_referenced_array@Base 3.5.0
+ proto_field_mark_as_referenced_by_id@Base 3.5.0
+ proto_field_mark_as_referenced_by_name@Base 3.5.0
+ proto_field_unmark_as_referenced@Base 3.5.0
+ proto_field_unmark_as_referenced_by_id@Base 3.5.0
+ proto_field_unmark_as_referenced_by_name@Base 3.5.0
  proto_find_field_from_offset@Base 1.9.1
  proto_find_finfo@Base 1.9.1
  proto_find_first_finfo@Base 2.3.0

@@ -719,11 +719,22 @@ typedef enum {
 /* For FT_ABSOLUTE_TIME, the display format is an absolute_time_display_e
  * as per time_fmt.h. */
 
-typedef enum {
-    HF_REF_TYPE_NONE,       /**< Field is not referenced */
-    HF_REF_TYPE_INDIRECT,   /**< Field is indirectly referenced (only applicable for FT_PROTOCOL) via. its child */
-    HF_REF_TYPE_DIRECT      /**< Field is directly referenced */
-} hf_ref_type;
+
+typedef struct {
+    guint32 indirect;
+    guint32 indirect_enforced;
+    gboolean direct;
+    gboolean direct_enforced;
+} hf_ref_type_t;
+
+#define HF_REF_TYPE_IS_NONE(x) ((x.indirect == 0) && (x.indirect_enforced == 0) && (x.direct == FALSE) && (x.direct_enforced == FALSE))
+#define HF_REF_TYPE_IS_REFERENCED(x) ((x.indirect > 0) || (x.indirect_enforced > 0) || (x.direct == TRUE) || (x.direct_enforced == TRUE))
+#define HF_REF_TYPE_IS_REFERENCED_DIRECTLY(x) ((x.direct == TRUE) || (x.direct_enforced == TRUE))
+#define HF_REF_TYPE_IS_REFERENCED_INDIRECTLY(x) ((x.indirect > 0) || (x.indirect_enforced > 0))
+#define HF_REF_TYPE_IS_REFERENCED_ENFORCED(x) ((x.direct_enforced == TRUE) || (x.indirect_enforced > 0))
+#define HF_REF_TYPE_IS_NOT_REFERENCED_DIRECTLY(x) ((x.direct == FALSE) && (x.direct_enforced == FALSE))
+#define HF_REF_TYPE_NONE { (guint32)0, (guint32)0, FALSE, FALSE }
+#define HF_REF_TYPE_NONE_FOR_ASSIGN (hf_ref_type_t)HF_REF_TYPE_NONE
 
 /** information describing a header field */
 typedef struct _header_field_info header_field_info;
@@ -745,7 +756,7 @@ struct _header_field_info {
     /* ------- set by proto routines (prefilled by HFILL macro, see below) ------ */
     int                id;                /**< Field ID */
     int                parent;            /**< parent protocol tree */
-    hf_ref_type        ref_type;          /**< is this field referenced by a filter */
+    hf_ref_type_t      ref_type;          /**< is this field referenced by a filter */
     int                same_name_prev_id; /**< ID of previous hfinfo with same abbrev */
     header_field_info *same_name_next;    /**< Link to next hfinfo with same abbrev */
 };
@@ -760,7 +771,7 @@ struct _header_field_info {
 #define HFILL_INIT(hf)   \
     (hf).hfinfo.id                = -1;   \
     (hf).hfinfo.parent            = 0;   \
-    (hf).hfinfo.ref_type          = HF_REF_TYPE_NONE;   \
+    (hf).hfinfo.ref_type          = HF_REF_TYPE_NONE_FOR_ASSIGN;   \
     (hf).hfinfo.same_name_prev_id = -1;   \
     (hf).hfinfo.same_name_next    = NULL;
 
@@ -1182,12 +1193,47 @@ proto_tree_set_visible(proto_tree *tree, gboolean visible);
 extern void
 proto_tree_set_fake_protocols(proto_tree *tree, gboolean fake_protocols);
 
-/** Mark a field/protocol ID as "interesting".
- @param tree the tree to be set (currently ignored)
- @param hfid the interesting field id
- @todo what *does* interesting mean? */
-extern void
-proto_tree_prime_with_hfid(proto_tree *tree, const int hfid);
+/** Mark a field/protocol as referenced.
+ @param field_id the id of the field that shall be marked.
+ @param enforce If TRUE the mark won't be removed automatically so it needs to be removed manually. */
+WS_DLL_PUBLIC gboolean
+proto_field_mark_as_referenced_by_id(const gint field_id, gboolean enforce);
+
+/** Mark a field/protocol as referenced.
+ @param field_name the name of the field that shall be marked.
+ @param enforce If TRUE the mark won't be removed automatically so it needs to be removed manually. */
+WS_DLL_PUBLIC gboolean
+proto_field_mark_as_referenced_by_name(const gchar* field_name, gboolean enforce);
+
+/** Mark a field/protocol as referenced.
+ @param hfid the id of the field that shall be marked.
+ @param enforce If TRUE the mark won't be removed automatically so it needs to be removed manually. */
+WS_DLL_PUBLIC gboolean
+proto_field_mark_as_referenced(header_field_info* hfinfo, gboolean enforce);
+
+/** Mark an array of field/protocol IDs as referenced.
+ @param field_ids GArray of ids of the fields that shall be marked
+ @param enforce If TRUE the mark won't be removed automatically so it needs to be removed manually. */
+WS_DLL_PUBLIC void
+proto_field_mark_as_referenced_array(GArray* field_ids, gboolean enforce);
+
+/** Unmark a field/protocol as referenced.
+ @param field_id the id of the field that shall be unmarked.
+ @param enforced If TRUE it will only touch enforced marks otherwise it will only touch not enforced marks. */
+WS_DLL_PUBLIC gboolean
+proto_field_unmark_as_referenced_by_id(const gint field_id, gboolean enforced);
+
+/** Unmark a field/protocol as referenced.
+ @param field_name the name of the field that shall be unmarked.
+ @param enforced If TRUE it will only touch enforced marks otherwise it will only touch not enforced marks. */
+WS_DLL_PUBLIC gboolean
+proto_field_unmark_as_referenced_by_name(const gchar* field_name, gboolean enforced);
+
+/** Unmark a field/protocol as referenced.
+ @param hfid the id of the field that shall be unmarked.
+ @param enforced If TRUE it will only touch enforced marks otherwise it will only touch not enforced marks. */
+WS_DLL_PUBLIC gboolean
+proto_field_unmark_as_referenced(header_field_info* hfinfo, gboolean enforced);
 
 /** Get a parent item of a subtree.
  @param tree the tree to get the parent from

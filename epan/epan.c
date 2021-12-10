@@ -716,20 +716,15 @@ epan_dissect_prime_with_dfilter(epan_dissect_t *edt, const dfilter_t* dfcode)
 }
 
 void
-epan_dissect_prime_with_hfid(epan_dissect_t *edt, int hfid)
+epan_dissect_prime_with_hfid(epan_dissect_t *edt _U_, int hfid)
 {
-	proto_tree_prime_with_hfid(edt->tree, hfid);
+	proto_field_mark_as_referenced_by_id(hfid, FALSE);
 }
 
 void
-epan_dissect_prime_with_hfid_array(epan_dissect_t *edt, GArray *hfids)
+epan_dissect_prime_with_hfid_array(epan_dissect_t *edt _U_, GArray *hfids)
 {
-	guint i;
-
-	for (i = 0; i < hfids->len; i++) {
-		proto_tree_prime_with_hfid(edt->tree,
-		    g_array_index(hfids, int, i));
-	}
+	proto_field_mark_as_referenced_array(hfids, FALSE);
 }
 
 /* ----------------------- */

@@ -123,7 +123,7 @@ struct ptvcursor {
 	}								\
 	if (!(PTREE_DATA(tree)->visible)) {				\
 		if (PTREE_FINFO(tree)) {				\
-			if ((hfinfo->ref_type != HF_REF_TYPE_DIRECT)	\
+			if (HF_REF_TYPE_IS_NOT_REFERENCED_DIRECTLY(hfinfo->ref_type) \
 			    && (hfinfo->type != FT_PROTOCOL ||		\
 				PTREE_DATA(tree)->fake_protocols)) {	\
 				free_block;				\
@@ -766,23 +766,10 @@ proto_tree_children_foreach(proto_tree *tree, proto_tree_foreach_func func,
 static void
 free_GPtrArray_value(gpointer key, gpointer value, gpointer user_data _U_)
 {
-	GPtrArray         *ptrs = (GPtrArray *)value;
-	gint               hfid = GPOINTER_TO_UINT(key);
-	header_field_info *hfinfo;
+	GPtrArray* ptrs = (GPtrArray*)value;
+	gint hfid = GPOINTER_TO_UINT(key);
 
-	PROTO_REGISTRAR_GET_NTH(hfid, hfinfo);
-	if (hfinfo->ref_type != HF_REF_TYPE_NONE) {
-		/* when a field is referenced by a filter this also
-		   affects the refcount for the parent protocol so we need
-		   to adjust the refcount for the parent as well
-		*/
-		if (hfinfo->parent != -1) {
-			header_field_info *parent_hfinfo;
-			PROTO_REGISTRAR_GET_NTH(hfinfo->parent, parent_hfinfo);
-			parent_hfinfo->ref_type = HF_REF_TYPE_NONE;
-		}
-		hfinfo->ref_type = HF_REF_TYPE_NONE;
-	}
+	proto_field_unmark_as_referenced_by_id(hfid, FALSE);
 
 	g_ptr_array_free(ptrs, TRUE);
 }
@@ -883,7 +870,7 @@ proto_field_is_referenced(proto_tree *tree, int proto_id)
 		return TRUE;
 
 	PROTO_REGISTRAR_GET_NTH(proto_id, hfinfo);
-	if (hfinfo->ref_type != HF_REF_TYPE_NONE)
+	if (HF_REF_TYPE_IS_REFERENCED(hfinfo->ref_type))
 		return TRUE;
 
 	if (hfinfo->type == FT_PROTOCOL && !PTREE_DATA(tree)->fake_protocols)
@@ -2473,7 +2460,7 @@ tree_data_add_maybe_interesting_field(tree_data_t *tree_data, field_info *fi)
 {
 	const header_field_info *hfinfo = fi->hfinfo;
 
-	if (hfinfo->ref_type == HF_REF_TYPE_DIRECT) {
+	if (HF_REF_TYPE_IS_REFERENCED_DIRECTLY(hfinfo->ref_type)) {
 		GPtrArray *ptrs = NULL;
 
 		if (tree_data->interesting_hfids == NULL) {
@@ -7175,33 +7162,146 @@ proto_tree_create_root(packet_info *pinfo)
 	return (proto_tree *)pnode;
 }
 
-
-/* "prime" a proto_tree with a single hfid that a dfilter
- * is interested in. */
-void
-proto_tree_prime_with_hfid(proto_tree *tree _U_, const gint hfid)
+gboolean
+proto_field_mark_as_referenced_by_id(const gint field_id, gboolean enforce)
 {
-	header_field_info *hfinfo;
-
-	PROTO_REGISTRAR_GET_NTH(hfid, hfinfo);
-	/* this field is referenced by a filter so increase the refcount.
-	   also increase the refcount for the parent, i.e the protocol.
-	*/
-	hfinfo->ref_type = HF_REF_TYPE_DIRECT;
-	/* only increase the refcount if there is a parent.
-	   if this is a protocol and not a field then parent will be -1
-	   and there is no parent to add any refcounting for.
-	*/
-	if (hfinfo->parent != -1) {
-		header_field_info *parent_hfinfo;
-		PROTO_REGISTRAR_GET_NTH(hfinfo->parent, parent_hfinfo);
-
-		/* Mark parent as indirectly referenced unless it is already directly
-		 * referenced, i.e. the user has specified the parent in a filter.
-		 */
-		if (parent_hfinfo->ref_type != HF_REF_TYPE_DIRECT)
-			parent_hfinfo->ref_type = HF_REF_TYPE_INDIRECT;
+	if (field_id < 0) {
+		return FALSE;
 	}
+
+	header_field_info* hfinfo;
+	PROTO_REGISTRAR_GET_NTH(field_id, hfinfo);
+
+	return proto_field_mark_as_referenced(hfinfo, enforce);
+}
+
+gboolean
+proto_field_mark_as_referenced_by_name(const gchar* field_name, gboolean enforce)
+{
+	if (field_name == NULL) {
+		return FALSE;
+	}
+
+	header_field_info* hfinfo = proto_registrar_get_byname(field_name);
+
+	if (hfinfo == NULL) {
+		return FALSE;
+	}
+
+	return proto_field_mark_as_referenced(hfinfo, enforce);
+}
+
+gboolean
+proto_field_mark_as_referenced(header_field_info* hfinfo, gboolean enforce)
+{
+	if (hfinfo == NULL) {
+		return FALSE;
+	}
+
+	if(enforce == TRUE) {
+		if(hfinfo->ref_type.direct_enforced == FALSE) {
+			hfinfo->ref_type.direct_enforced = TRUE;
+
+			if (hfinfo->parent != -1) {
+				header_field_info* parent_hfinfo;
+				PROTO_REGISTRAR_GET_NTH(hfinfo->parent, parent_hfinfo);
+
+				parent_hfinfo->ref_type.indirect_enforced++;
+			}
+		}
+	}
+	else { // enforce == FALSE
+		if(hfinfo->ref_type.direct == FALSE) {
+			hfinfo->ref_type.direct = TRUE;
+
+			if (hfinfo->parent != -1) {
+				header_field_info* parent_hfinfo;
+				PROTO_REGISTRAR_GET_NTH(hfinfo->parent, parent_hfinfo);
+
+				parent_hfinfo->ref_type.indirect++;
+			}
+		}
+	}
+
+	return TRUE;
+}
+
+void
+proto_field_mark_as_referenced_array(GArray* hfids, gboolean enforce)
+{
+	if(hfids == NULL) {
+		return;
+	}
+
+	for (guint i = 0; i < hfids->len; i++) {
+		gint hfid = g_array_index(hfids, int, i);
+		if(hfid < 0) {
+			continue;
+		}
+		proto_field_mark_as_referenced_by_id(hfid, enforce);
+	}
+}
+
+gboolean
+proto_field_unmark_as_referenced_by_id(const gint field_id, gboolean enforced)
+{
+	if (field_id < 0) {
+		return FALSE;
+	}
+
+	header_field_info* hfinfo;
+	PROTO_REGISTRAR_GET_NTH(field_id, hfinfo);
+
+	return proto_field_unmark_as_referenced(hfinfo, enforced);
+}
+
+gboolean
+proto_field_unmark_as_referenced_by_name(const gchar* field_name, gboolean enforced)
+{
+	if (field_name == NULL) {
+		return FALSE;
+	}
+
+	header_field_info* hfinfo = proto_registrar_get_byname(field_name);
+
+	if (hfinfo == NULL) {
+		return FALSE;
+	}
+
+	return proto_field_unmark_as_referenced(hfinfo, enforced);
+}
+
+gboolean
+proto_field_unmark_as_referenced(header_field_info* hfinfo, gboolean enforced)
+{
+	if(hfinfo == NULL) {
+		return FALSE;
+	}
+
+	if(enforced == TRUE) {
+		if(hfinfo->ref_type.direct_enforced == TRUE) {
+			hfinfo->ref_type.direct_enforced = FALSE;
+			if (hfinfo->parent != -1) {
+				header_field_info* parent_hfinfo;
+				PROTO_REGISTRAR_GET_NTH(hfinfo->parent, parent_hfinfo);
+
+				parent_hfinfo->ref_type.indirect_enforced--;
+			}
+		}
+	}
+	else { // enforce == FALSE
+		if(hfinfo->ref_type.direct == TRUE) {
+			hfinfo->ref_type.direct = FALSE;
+			if (hfinfo->parent != -1) {
+				header_field_info* parent_hfinfo;
+				PROTO_REGISTRAR_GET_NTH(hfinfo->parent, parent_hfinfo);
+
+				parent_hfinfo->ref_type.indirect--;
+			}
+		}
+	}
+
+	return TRUE;
 }
 
 proto_tree *
@@ -7430,7 +7530,7 @@ proto_register_protocol(const char *name, const char *short_name,
 	hfinfo->display = BASE_NONE;
 	hfinfo->strings = protocol;
 	hfinfo->bitmask = 0;
-	hfinfo->ref_type = HF_REF_TYPE_NONE;
+	hfinfo->ref_type = HF_REF_TYPE_NONE_FOR_ASSIGN;
 	hfinfo->blurb = NULL;
 	hfinfo->parent = -1; /* This field differentiates protos and fields */
 
@@ -7489,7 +7589,7 @@ proto_register_protocol_in_name_only(const char *name, const char *short_name, c
 	}
 	hfinfo->strings = protocol;
 	hfinfo->bitmask = 0;
-	hfinfo->ref_type = HF_REF_TYPE_NONE;
+	hfinfo->ref_type = HF_REF_TYPE_NONE_FOR_ASSIGN;
 	hfinfo->blurb = NULL;
 	hfinfo->parent = -1; /* This field differentiates protos and fields */
 
