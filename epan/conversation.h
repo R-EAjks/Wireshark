@@ -1,11 +1,188 @@
-/* conversation.h
- * Routines for building lists of packets that are part of a "conversation"
+/** @file
+ * \brief Routines for building lists of packets that are part of a "conversation"
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
  * Copyright 1998 Gerald Combs
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * <b>1. Introduction</b>
+ *
+ * It is often useful to enhance dissectors for request/response style protocols
+ * to match requests with responses.
+ * This allows you to display useful information in the decode tree such as which
+ * requests are matched to which response and the response time for individual
+ * transactions.
+ *
+ * This is also useful if you want to pass some data from the request to the
+ * dissection of the response. For example, the RPC dissector does
+ * something like this to pass the command opcode from the request to
+ * the response dissector, since the opcode itself is not part of the response
+ * packet and without the opcode it would not know how to decode the data.
+ *
+ * It is also useful when you need to track information on a per-conversation
+ * basis such as when parameters are negotiated during a login phase of the
+ * protocol and these parameters affect how future commands in that session
+ * should be decoded. The iSCSI dissector does something similar to that to track
+ * which sessions that HeaderDigest is activated for and which ones it is not.
+ *
+ * <b>2. Implementation</b>
+ *
+ * The example below is taken from the PANA dissector and shows
+ * how conversation tracking can be added
+ * to a dissector if the protocol includes a unique transaction id in the
+ * header.
+ *
+ * First we need to include the definitions for conversations:
+ *
+ * \code{.cpp}
+    #include <epan/conversation.h>
+ * \endcode
+ *
+ * Then we need to create a few header fields to show the relations between
+ * request and response as well as the response time:
+ *
+ *  \code{.cpp}
+    static int hf_pana_response_in = -1;
+    static int hf_pana_response_to = -1;
+    static int hf_pana_response_time = -1;
+ *  \endcode
+ *
+ * We'll also need to declare those header fields:
+ * \code{.cpp}
+    static hf_register_info hf[] = {
+    { &hf_pana_response_in,
+      { "Response In", "pana.response_in",
+        FT_FRAMENUM, BASE_NONE, NULL, 0x0,
+        "The response to this PANA request is in this frame", HFILL }
+    },
+    { &hf_pana_response_to,
+      { "Request In", "pana.response_to",
+        FT_FRAMENUM, BASE_NONE, NULL, 0x0,
+        "This is a response to the PANA request in this frame", HFILL }
+    },
+    { &hf_pana_response_time,
+      { "Response Time", "pana.response_time",
+        FT_RELATIVE_TIME, BASE_NONE, NULL, 0x0,
+        "The time between the Call and the Reply", HFILL }
+ * \endcode
+ *
+ * We need a structure that holds all the information stored
+ * between the request and the responses. One such structure will be allocated
+ * for each unique transaction.
+ * Since this structure is persistent and a unique one is allocated for
+ * each request/response pair, this is a good place to store other
+ * data you may want to track from a request to a response.
+ *
+ * In this example we only keep the frame number of the request, the frame number
+ * of the response, and the timestamp for the request:
+ *
+ * \code{.cpp}
+    typedef struct _pana_transaction_t {
+            guint32 req_frame;
+            guint32 rep_frame;
+            nstime_t req_time;
+    } pana_transaction_t;
+ * \endcode
+ *
+ * We'll also need a structure to hold persistent information for each
+ * conversation. A conversation is identified by SRC/DST address and
+ * SRC/DST port and is not sensitive to the direction of the packet,
+ * as is described in README.dissector, section 2.2.
+ * Some protocols negotiate session parameters during a login phase and those
+ * parameters may affect how later commands on the same session is to be decoded,
+ * this would be a good place to store that additional info you may want to keep
+ * around.
+ * In this case, we have a per-conversation hash table to track the
+ * transactions within a conversation:
+ *
+ * \code{.cpp}
+    typedef struct _pana_conv_info_t {
+        wmem_map_t *pdus;
+    } pana_conv_info_t;
+ * \endcode
+ *
+ * Finally for the meat of it, add the conversation and tracking code to the
+ * dissector:
+ *
+ * \code{.cpp}
+	...
+	guint32 seq_num;
+	conversation_t *conversation;
+	pana_conv_info_t *pana_info;
+	pana_transaction_t *pana_trans;
+
+	...
+	// Get the transaction identifier
+	seq_num = tvb_get_ntohl(tvb, 8);
+	...
+
+	// Track state for this protocol on a per-conversation
+	// basis so we can do neat things like request/response tracking
+	conversation = find_or_create_conversation(pinfo);
+
+	// Do we already have a state structure for this conv?
+	pana_info = (pana_conv_info_t *)conversation_get_proto_data(conversation, proto_pana);
+	if (!pana_info) {
+		// No. Attach that information to the conversation, and add
+		// it to the list of information structures.
+		pana_info = wmem_new(wmem_file_scope(), pana_conv_info_t);
+		pana_info->pdus = wmem_map_new(wmem_file_scope(), g_direct_hash, g_direct_equal);
+		conversation_add_proto_data(conversation, proto_pana, pana_info);
+	}
+	if (!PINFO_FD_VISITED(pinfo)) {
+		if (flags&PANA_FLAG_R) {
+			// This is a request
+			pana_trans = wmem_new(wmem_file_scope(), pana_transaction_t);
+			pana_trans->req_frame = pinfo->num;
+			pana_trans->rep_frame = 0;
+			pana_trans->req_time = pinfo->fd->abs_ts;
+			wmem_map_insert(pana_info->pdus, GUINT_TO_POINTER(seq_num), (void *)pana_trans);
+		} else {
+			pana_trans = (pana_transaction_t *)wmem_map_lookup(pana_info->pdus, GUINT_TO_POINTER(seq_num));
+			if (pana_trans) {
+				pana_trans->rep_frame = pinfo->num;
+			}
+		}
+	} else {
+		pana_trans=(pana_transaction_t *)wmem_map_lookup(pana_info->pdus, GUINT_TO_POINTER(seq_num));
+	}
+	if (!pana_trans) {
+		// create a "fake" pana_trans structure
+		pana_trans = wmem_new(pinfo->pool, pana_transaction_t);
+		pana_trans->req_frame = 0;
+		pana_trans->rep_frame = 0;
+		pana_trans->req_time = pinfo->fd->abs_ts;
+	}
+
+	// print state tracking in the tree
+	if (flags&PANA_FLAG_R) {
+		// This is a request
+		if (pana_trans->rep_frame) {
+			proto_item *it;
+
+			it = proto_tree_add_uint(pana_tree, hf_pana_response_in,
+					tvb, 0, 0, pana_trans->rep_frame);
+			proto_item_set_generated(it);
+		}
+	} else {
+		// This is a reply
+		if (pana_trans->req_frame) {
+			proto_item *it;
+			nstime_t ns;
+
+			it = proto_tree_add_uint(pana_tree, hf_pana_response_to,
+					tvb, 0, 0, pana_trans->req_frame);
+			proto_item_set_generated(it);
+
+			nstime_delta(&ns, &pinfo->fd->abs_ts, &pana_trans->req_time);
+			it = proto_tree_add_time(pana_tree, hf_pana_response_time, tvb, 0, 0, &ns);
+			proto_item_set_generated(it);
+		}
+	}
+\endcode
+ *
  */
 
 #ifndef __CONVERSATION_H__
@@ -20,9 +197,6 @@
 extern "C" {
 #endif /* __cplusplus */
 
-/**
- *@file
- */
 /*
  * Flags to pass to "conversation_new()" to indicate that the address 2
  * and/or port 2 values for the conversation should be wildcards.
