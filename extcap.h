@@ -40,6 +40,7 @@
 #define EXTCAP_ARGUMENT_LIST_DLTS               "--extcap-dlts"
 #define EXTCAP_ARGUMENT_VERSION                 "--extcap-version"
 
+#define EXTCAP_ARGUMENT_MODE_CAPCHILD           "--capchild"
 #define EXTCAP_ARGUMENT_RUN_CAPTURE             "--capture"
 #define EXTCAP_ARGUMENT_CAPTURE_FILTER          "--extcap-capture-filter"
 #define EXTCAP_ARGUMENT_RUN_PIPE                "--fifo"
