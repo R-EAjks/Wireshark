@@ -971,12 +971,17 @@ static const value_string mpeg_descr_service_type_vals[] = {
     { 0x0F, "RCS FLS (see EN 301 790)" },
     { 0x10, "DVB MHP service" },
     { 0x11, "MPEG-2 HD digital television service" },
-    { 0x16, "advanced codec SD digital television service" },
-    { 0x17, "advanced codec SD NVOD time-shifted service" },
-    { 0x18, "advanced codec SD NVOD reference service" },
-    { 0x19, "advanced codec HD digital television service" },
-    { 0x1A, "advanced codec HD NVOD time-shifted service" },
+    { 0x16, "H.264/AVC SD digital television service" },
+    { 0x17, "H.264/AVC SD NVOD time-shifted service" },
+    { 0x18, "H.264/AVC SD NVOD reference service" },
+    { 0x19, "H.264/AVC HD digital television service" },
+    { 0x1A, "H.264/AVC HD NVOD time-shifted service" },
+    { 0x1B, "H.264/AVC NVOD reference service" },
+    { 0x1C, "H.264/AVC frame compatible plano-stereoscopic HD digital television service" },
+    { 0x1D, "H.264/AVC rame compatible plano-stereoscopic HD NVOD time-shifted service" },
+    { 0x1E, "H.264/AVC frame compatible plano-stereoscopic HD NVOD reference service" },
     { 0x1F, "HEVC digital television service" },
+    { 0x20, "HEVC UHD digital television service with HDR and/or a frame rate of 100 Hz, 120 000/1 001 Hz, or 120 Hz, or any combination of HDR and these frame rates" },
 
     { 0x00, NULL }
 };
