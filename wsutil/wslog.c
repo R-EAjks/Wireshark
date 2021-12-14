@@ -31,6 +31,7 @@
 
 #include "file_util.h"
 #include "to_str.h"
+#include "strtoi.h"
 
 
 /* Runtime log level. */
@@ -79,7 +80,13 @@ typedef struct {
  * will be printed regardless of log level. This is a feature, not a bug. */
 static enum ws_log_level current_log_level = LOG_LEVEL_NONE;
 
-static gboolean color_enabled = FALSE;
+static gboolean stdout_color_enabled = FALSE;
+
+static gboolean stderr_color_enabled = FALSE;
+
+/* Use stdout for levels "info" and below, for backward compatibility
+ * with GLib. */
+static gboolean stdout_logging_enabled = FALSE;
 
 static const char *registered_progname = DEFAULT_PROGNAME;
 
@@ -109,7 +116,7 @@ static gboolean init_complete = FALSE;
 
 static void print_err(void (*vcmdarg_err)(const char *, va_list ap),
                         int exit_failure,
-                        const char *fmt, ...);
+                        const char *fmt, ...) G_GNUC_PRINTF(3,4);
 
 static void ws_log_cleanup(void);
 
@@ -324,6 +331,88 @@ static void print_err(void (*vcmdarg_err)(const char *, va_list ap),
 }
 
 
+/*
+ * This tries to convert old log level preference to a wslog
+ * configuration. The string must start with "console.log.level:"
+ * It receives an argv for { '-o', 'console.log.level:nnn', ...} or
+ * { '-oconsole.log.level:nnn', ...}.
+ */
+static void
+parse_console_compat_option(char *argv[],
+                        void (*vcmdarg_err)(const char *, va_list ap),
+                        int exit_failure)
+{
+    const char *mask_str;
+    guint32 mask;
+    enum ws_log_level level;
+
+    assert(argv != NULL);
+
+    if (argv[0] == NULL)
+        return;
+
+    if (strcmp(argv[0], "-o") == 0) {
+        if (argv[1] == NULL ||
+                    !g_str_has_prefix(argv[1], "console.log.level:")) {
+            /* Not what we were looking for. */
+            return;
+        }
+        mask_str = argv[1] + strlen("console.log.level:");
+    }
+    else if (g_str_has_prefix(argv[0], "-oconsole.log.level:")) {
+        mask_str = argv[0] + strlen("-oconsole.log.level:");
+    }
+    else {
+        /* Not what we were looking for. */
+        return;
+    }
+
+    print_err(vcmdarg_err, LOG_ARGS_NOEXIT,
+                "Option 'console.log.level' is deprecated, consult '--help' "
+                "for diagnostic message options.");
+
+    if (*mask_str == '\0') {
+        print_err(vcmdarg_err, exit_failure,
+                    "Missing value to 'console.log.level' option.");
+        return;
+    }
+
+    if (!ws_basestrtou32(mask_str, NULL, &mask, 10)) {
+        print_err(vcmdarg_err, exit_failure,
+                    "%s is not a valid decimal number.", mask_str);
+        return;
+    }
+
+    /*
+     * The lowest priority bit in the mask defines the level.
+     */
+    if (mask & G_LOG_LEVEL_DEBUG)
+        level = LOG_LEVEL_DEBUG;
+    else if (mask & G_LOG_LEVEL_INFO)
+        level = LOG_LEVEL_INFO;
+    else if (mask & G_LOG_LEVEL_MESSAGE)
+        level = LOG_LEVEL_MESSAGE;
+    else if (mask & G_LOG_LEVEL_WARNING)
+        level = LOG_LEVEL_WARNING;
+    else if (mask & G_LOG_LEVEL_CRITICAL)
+        level = LOG_LEVEL_CRITICAL;
+    else if (mask & G_LOG_LEVEL_ERROR)
+        level = LOG_LEVEL_ERROR;
+    else
+        level = LOG_LEVEL_NONE;
+
+    if (level == LOG_LEVEL_NONE) {
+        /* Some values (like zero) might not contain any meaningful bits.
+         * Throwing an error in that case seems appropriate. */
+        print_err(vcmdarg_err, exit_failure,
+                    "Value %s is not a valid log mask.", mask_str);
+        return;
+    }
+
+    ws_log_set_level(level);
+}
+
+
 int ws_log_parse_args(int *argc_ptr, char *argv[],
                         void (*vcmdarg_err)(const char *, va_list ap),
                         int exit_failure)
@@ -370,6 +459,13 @@ int ws_log_parse_args(int *argc_ptr, char *argv[],
             optlen = strlen(opt_noisy);
         }
         else {
+            /* Check is we have the old '-o console.log.level' flag,
+             * or '-oconsole.log.level', for backward compatibility.
+             * Then if we do ignore it after processing and let the
+             * preferences module handle it later. */
+            if (*(*ptr + 0) == '-' && *(*ptr + 1) == 'o') {
+                parse_console_compat_option(ptr, vcmdarg_err, exit_failure);
+            }
             ptr += 1;
             count -= 1;
             continue;
@@ -611,14 +707,16 @@ void ws_log_init(const char *progname,
     current_log_level = DEFAULT_LOG_LEVEL;
 
 #if GLIB_CHECK_VERSION(2,50,0)
-    color_enabled = g_log_writer_supports_color(fileno(stderr));
+    stdout_color_enabled = g_log_writer_supports_color(fileno(stdout));
+    stderr_color_enabled = g_log_writer_supports_color(fileno(stderr));
 #elif !defined(_WIN32)
     /* We assume every non-Windows console supports color. */
-    color_enabled = (isatty(fileno(stderr)) == 1);
+    stdout_color_enabled = (isatty(fileno(stdout)) == 1);
+    stderr_color_enabled = (isatty(fileno(stderr)) == 1);
 #else
      /* Our Windows build version of GLib is pretty recent, we are probably
       * fine here, unless we want to do better than GLib. */
-    color_enabled = FALSE;
+    stdout_color_enabled = stderr_color_enabled = FALSE;
 #endif
 
     /* Set the GLib log handler for the default domain. */
@@ -813,6 +911,22 @@ static inline struct tm *get_localtime(time_t unix_time, struct tm **cookie)
 }
 
 
+static inline FILE *console_file(enum ws_log_level level)
+{
+    if (level <= LOG_LEVEL_INFO && stdout_logging_enabled)
+        return stdout;
+    return stderr;
+}
+
+
+static inline bool console_color_enabled(enum ws_log_level level)
+{
+    if (level <= LOG_LEVEL_INFO && stdout_logging_enabled)
+        return stdout_color_enabled;
+    return stderr_color_enabled;
+}
+
+
 /*
  * We must not call anything that might log a message
  * in the log handler context (GLib might log a message if we register
@@ -844,7 +958,7 @@ static void log_write_dispatch(const char *domain, enum ws_log_level level,
                         user_format, user_ap, registered_log_writer_data);
     }
     else {
-        log_write_do_work(stderr, color_enabled,
+        log_write_do_work(console_file(level), console_color_enabled(level),
                             get_localtime(tstamp.tv_sec, &cookie),
                             tstamp.tv_nsec,
                             domain, level, file, line, func,
@@ -959,11 +1073,18 @@ void ws_log_console_writer(const char *domain, enum ws_log_level level,
                             const char *file, int line, const char *func,
                             const char *user_format, va_list user_ap)
 {
-    log_write_do_work(stderr, color_enabled,
+    log_write_do_work(console_file(level), console_color_enabled(level),
                         get_localtime(timestamp.tv_sec, NULL),
                         timestamp.tv_nsec,
                         domain, level, file, line, func,
                         user_format, user_ap);
+}
+
+
+WS_DLL_PUBLIC
+void ws_log_console_writer_set_use_stdout(bool use_stdout)
+{
+    stdout_logging_enabled = use_stdout;
 }
 
 
