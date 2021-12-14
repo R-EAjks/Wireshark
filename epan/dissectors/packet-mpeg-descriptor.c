@@ -1422,6 +1422,7 @@ proto_mpeg_descriptor_dissect_component(tvbuff_t *tvb, guint offset, guint len, 
 
     proto_item *cti;
     proto_tree *content_type_tree;
+    guint end = offset + len;
 
     proto_tree_add_item(tree, hf_mpeg_descr_component_reserved, tvb, offset, 1, ENC_BIG_ENDIAN);
 
@@ -1440,8 +1441,8 @@ proto_mpeg_descriptor_dissect_component(tvbuff_t *tvb, guint offset, guint len, 
     proto_tree_add_item(tree, hf_mpeg_descr_component_lang_code, tvb, offset, 3, ENC_ASCII|ENC_NA);
     offset += 3;
 
-    if (offset < len)
-        proto_tree_add_item(tree, hf_mpeg_descr_component_text, tvb, offset, len - offset, ENC_ASCII|ENC_NA);
+    if (offset < end)
+        proto_tree_add_item(tree, hf_mpeg_descr_component_text, tvb, offset, end - offset, ENC_ASCII|ENC_NA);
 }
 
 /* 0x52 Stream Identifier Descriptor */
