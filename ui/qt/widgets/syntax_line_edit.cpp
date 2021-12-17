@@ -178,7 +178,7 @@ bool SyntaxLineEdit::checkDisplayFilter(QString filter)
 
     dfilter_t *dfp = NULL;
     gchar *err_msg;
-    if (dfilter_compile(filter.toUtf8().constData(), &dfp, &err_msg)) {
+    if (dfilter_compile_edt(filter.toUtf8().constData(), NULL, DFILTER_F_CHECK_SYNTAX, &dfp, &err_msg)) {
         GPtrArray *depr = NULL;
         if (dfp) {
             depr = dfilter_deprecated_tokens(dfp);

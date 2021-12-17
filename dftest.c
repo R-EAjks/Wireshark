@@ -124,7 +124,7 @@ main(int argc, char **argv)
 	printf("Filter: %s\n", text);
 
 	/* Compile it */
-	if (!dfilter_compile(text, &df, &err_msg)) {
+	if (!dfilter_compile_edt(text, NULL, DFILTER_F_CHECK_SYNTAX, &df, &err_msg)) {
 		fprintf(stderr, "dftest: %s\n", err_msg);
 		g_free(err_msg);
 		epan_cleanup();

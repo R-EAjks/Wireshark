@@ -146,6 +146,12 @@ entity(E) ::= UNPARSED(U).
     dfilter_resolve_unparsed(dfw, E);
     df_lval_free(U, FALSE);
 }
+entity(E) ::= REF_OPEN REFERENCE(U) REF_CLOSE.
+{
+    E = stnode_new_unparsed(df_lval_value(U), df_lval_value(U));
+    dfilter_resolve_reference(dfw, E);
+    df_lval_free(U, FALSE);
+}
 entity(E) ::= range(R).         { E = R; }
 entity(E) ::= function(F).      { E = F; }
 

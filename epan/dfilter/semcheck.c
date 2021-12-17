@@ -424,6 +424,46 @@ is_bytes_type(enum ftenum type)
 	return FALSE;
 }
 
+static void
+dfilter_replace_reference(dfwork_t *dfw, stnode_t *st_arg)
+{
+	header_field_info *hfinfo = stnode_data(st_arg);
+	field_info *fi;
+	GPtrArray *arr;
+
+	if (stnode_type_id(st_arg) != STTYPE_REFERENCE) {
+		return;
+	}
+
+	ws_noisy("Replace reference %s", hfinfo->abbrev);
+
+	if (dfw->flags & DFILTER_F_CHECK_SYNTAX) {
+		/* Skip replacing. */
+		/* FT_NONE is a placeholder, this is not
+		 * a validly compiled filter. */
+		fvalue_t *fv_none = fvalue_new(FT_NONE);
+		stnode_replace(st_arg, STTYPE_FVALUE, fv_none);
+		return;
+	}
+
+	if (dfw->edt == NULL) {
+		FAIL(dfw, "No tree context to replace field reference %s.", hfinfo->abbrev);
+	}
+	ws_assert(dfw->edt->tree);
+
+	arr = proto_find_finfo(dfw->edt->tree, hfinfo->id);
+	if (arr->len == 0) {
+		FAIL(dfw, "Cannot find field reference %s in tree.", hfinfo->abbrev);
+	}
+	if (arr->len > 1) {
+		FAIL(dfw, "Reference %s is ambiguous because tree contains multiple values.", hfinfo->abbrev);
+	}
+
+	fi = g_ptr_array_index(arr, 0);
+	stnode_replace(st_arg, STTYPE_FVALUE, fvalue_dup(&fi->value));
+	g_ptr_array_free(arr, TRUE);
+}
+
 /* Check the semantics of an existence test. */
 static void
 check_exists(dfwork_t *dfw, stnode_t *st_arg1)
@@ -579,8 +619,9 @@ check_relation_LHS_FIELD(dfwork_t *dfw, test_op_t st_op,
 				hfinfo1->abbrev, ftype_pretty_name(ftype1),
 				stnode_todisplay(st_node));
 	}
+	dfilter_replace_reference(dfw, st_arg1);
 
-	if (type2 == STTYPE_FIELD) {
+	if (type2 == STTYPE_FIELD || type2 == STTYPE_REFERENCE) {
 		hfinfo2 = stnode_data(st_arg2);
 		ftype2 = hfinfo2->type;
 
@@ -594,6 +635,7 @@ check_relation_LHS_FIELD(dfwork_t *dfw, test_op_t st_op,
 			FAIL(dfw, "%s (type=%s) cannot participate in specified comparison.",
 					hfinfo2->abbrev, ftype_pretty_name(ftype2));
 		}
+		dfilter_replace_reference(dfw, st_arg2);
 	}
 	else if (type2 == STTYPE_STRING || type2 == STTYPE_UNPARSED) {
 		/* Skip incompatible fields */
@@ -668,7 +710,7 @@ check_relation_LHS_STRING(dfwork_t *dfw, test_op_t st_op _U_,
 
 	type2 = stnode_type_id(st_arg2);
 
-	if (type2 == STTYPE_FIELD) {
+	if (type2 == STTYPE_FIELD || type2 == STTYPE_REFERENCE) {
 		hfinfo2 = stnode_data(st_arg2);
 		ftype2 = hfinfo2->type;
 
@@ -677,6 +719,7 @@ check_relation_LHS_STRING(dfwork_t *dfw, test_op_t st_op _U_,
 					hfinfo2->abbrev, ftype_pretty_name(ftype2),
 					stnode_todisplay(st_node));
 		}
+		dfilter_replace_reference(dfw, st_arg2);
 
 		fvalue = dfilter_fvalue_from_string(dfw, ftype2, st_arg1, hfinfo2);
 		stnode_replace(st_arg1, STTYPE_FVALUE, fvalue);
@@ -727,7 +770,7 @@ check_relation_LHS_UNPARSED(dfwork_t *dfw, test_op_t st_op _U_,
 
 	type2 = stnode_type_id(st_arg2);
 
-	if (type2 == STTYPE_FIELD) {
+	if (type2 == STTYPE_FIELD || type2 == STTYPE_REFERENCE) {
 		hfinfo2 = stnode_data(st_arg2);
 		ftype2 = hfinfo2->type;
 
@@ -736,6 +779,7 @@ check_relation_LHS_UNPARSED(dfwork_t *dfw, test_op_t st_op _U_,
 					hfinfo2->abbrev, ftype_pretty_name(ftype2),
 					stnode_todisplay(st_node));
 		}
+		dfilter_replace_reference(dfw, st_arg2);
 
 		fvalue = dfilter_fvalue_from_unparsed(dfw, ftype2, st_arg1, allow_partial_value, hfinfo2);
 		stnode_replace(st_arg1, STTYPE_FVALUE, fvalue);
@@ -785,7 +829,7 @@ check_relation_LHS_CHARCONST(dfwork_t *dfw, test_op_t st_op _U_,
 
 	type2 = stnode_type_id(st_arg2);
 
-	if (type2 == STTYPE_FIELD) {
+	if (type2 == STTYPE_FIELD || type2 == STTYPE_REFERENCE) {
 		hfinfo2 = stnode_data(st_arg2);
 		ftype2 = hfinfo2->type;
 
@@ -794,6 +838,7 @@ check_relation_LHS_CHARCONST(dfwork_t *dfw, test_op_t st_op _U_,
 					hfinfo2->abbrev, ftype_pretty_name(ftype2),
 					stnode_todisplay(st_node));
 		}
+		dfilter_replace_reference(dfw, st_arg2);
 
 		fvalue = dfilter_fvalue_from_charconst(dfw, ftype2, st_arg1);
 		stnode_replace(st_arg1, STTYPE_FVALUE, fvalue);
@@ -845,9 +890,11 @@ check_relation_LHS_RANGE(dfwork_t *dfw, test_op_t st_op,
 
 	type2 = stnode_type_id(st_arg2);
 
-	if (type2 == STTYPE_FIELD) {
+	if (type2 == STTYPE_FIELD || type2 == STTYPE_REFERENCE) {
 		hfinfo2 = stnode_data(st_arg2);
 		ftype2 = hfinfo2->type;
+
+		dfilter_replace_reference(dfw, st_arg2);
 
 		if (!is_bytes_type(ftype2)) {
 			if (!ftype_can_slice(ftype2)) {
@@ -928,7 +975,7 @@ check_relation_LHS_FUNCTION(dfwork_t *dfw, test_op_t st_op,
 				stnode_todisplay(st_node));
 	}
 
-	if (type2 == STTYPE_FIELD) {
+	if (type2 == STTYPE_FIELD || type2 == STTYPE_REFERENCE) {
 		hfinfo2 = stnode_data(st_arg2);
 		ftype2 = hfinfo2->type;
 
@@ -942,6 +989,7 @@ check_relation_LHS_FUNCTION(dfwork_t *dfw, test_op_t st_op,
 			FAIL(dfw, "%s (type=%s) cannot participate in specified comparison.",
 					hfinfo2->abbrev, ftype_pretty_name(ftype2));
 		}
+		dfilter_replace_reference(dfw, st_arg2);
 	}
 	else if (type2 == STTYPE_STRING) {
 		fvalue = dfilter_fvalue_from_string(dfw, ftype1, st_arg2, NULL);
@@ -1003,6 +1051,7 @@ check_relation(dfwork_t *dfw, test_op_t st_op,
 {
 	switch (stnode_type_id(st_arg1)) {
 		case STTYPE_FIELD:
+		case STTYPE_REFERENCE:
 			check_relation_LHS_FIELD(dfw, st_op, can_func,
 					allow_partial_value, st_node, st_arg1, st_arg2);
 			break;
@@ -1067,6 +1116,7 @@ check_relation_contains(dfwork_t *dfw, stnode_t *st_node,
 
 	switch (stnode_type_id(st_arg1)) {
 		case STTYPE_FIELD:
+		case STTYPE_REFERENCE:
 			check_relation_LHS_FIELD(dfw, TEST_OP_CONTAINS, ftype_can_contains,
 							TRUE, st_node, st_arg1, st_arg2);
 			break;
@@ -1114,6 +1164,7 @@ check_relation_matches(dfwork_t *dfw, stnode_t *st_node,
 
 	switch (stnode_type_id(st_arg1)) {
 		case STTYPE_FIELD:
+		case STTYPE_REFERENCE:
 			check_relation_LHS_FIELD(dfw, TEST_OP_MATCHES, ftype_can_matches,
 							TRUE, st_node, st_arg1, st_arg2);
 			break;
