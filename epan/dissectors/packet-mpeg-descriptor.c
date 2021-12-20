@@ -1328,6 +1328,14 @@ static int hf_mpeg_descr_component_high_stream_content_both = -1;
 static int hf_mpeg_descr_component_high_component_type = -1;
 static int hf_mpeg_descr_component_high_stream_content_n_component_type = -1;
 
+static int hf_mpeg_descr_component_nga_bits_b7_reserved = -1;
+static int hf_mpeg_descr_component_nga_bits_b6_headphones = -1;
+static int hf_mpeg_descr_component_nga_bits_b5_interactivity = -1;
+static int hf_mpeg_descr_component_nga_bits_b4_dialogue_enhancement = -1;
+static int hf_mpeg_descr_component_nga_bits_b3_spoken_subtitles = -1;
+static int hf_mpeg_descr_component_nga_bits_b2_audio_description = -1;
+static int hf_mpeg_descr_component_nga_bits_b10_channel_layout = -1;
+
 #define MPEG_DESCR_COMPONENT_STREAM_CONTENT_EXT_MASK      0xF0
 #define MPEG_DESCR_COMPONENT_STREAM_CONTENT_MASK    0x0F
 #define MPEG_DESCR_COMPONENT_CONTENT_TYPE_MASK      0x0FFF
@@ -1337,6 +1345,14 @@ static int hf_mpeg_descr_component_high_stream_content_n_component_type = -1;
 #define MPEG_DESCR_COMPONENT_HIGH_STREAM_CONTENT_BOTH_MASK      0xFF00
 #define MPEG_DESCR_COMPONENT_HIGH_COMPONENT_TYPE_MASK           0x00FF
 #define MPEG_DESCR_COMPONENT_HIGH_STREAM_CONTENT_N_COMPONENT_TYPE_MASK      0xFFFF
+
+#define MPEG_DESCR_COMPONENT_NGA_BITS_B7_MASK    0x0080
+#define MPEG_DESCR_COMPONENT_NGA_BITS_B6_MASK    0x0040
+#define MPEG_DESCR_COMPONENT_NGA_BITS_B5_MASK    0x0020
+#define MPEG_DESCR_COMPONENT_NGA_BITS_B4_MASK    0x0010
+#define MPEG_DESCR_COMPONENT_NGA_BITS_B3_MASK    0x0008
+#define MPEG_DESCR_COMPONENT_NGA_BITS_B2_MASK    0x0004
+#define MPEG_DESCR_COMPONENT_NGA_BITS_B10_MASK   0x0003
 
 static gint ett_mpeg_descriptor_component_content_type = -1;
 
@@ -1359,6 +1375,15 @@ static const value_string mpeg_descr_component_high_stream_content_vals[] = {
     { 0x29, "TTML subtitles"},
     { 0xEB, "NGA flags"},
     { 0xFB, "Component tag based combination"},
+
+    { 0x0, NULL }
+};
+
+static const value_string mpeg_descr_component_preferred_reproduction_channel_layout_vals[] = {
+    { 0x00, "no preference" },
+    { 0x01, "stereo" },
+    { 0x02, "two-dimensional" },
+    { 0x03, "three-dimensional" },
 
     { 0x0, NULL }
 };
@@ -1535,14 +1560,17 @@ proto_mpeg_descriptor_dissect_component(tvbuff_t *tvb, guint offset, guint len, 
         proto_tree_add_item(content_type_tree, hf_mpeg_descr_component_high_stream_content, tvb, offset, 2, ENC_BIG_ENDIAN);
 
         if (stream_content_ext == 0x0E && stream_content == 0x0B) {
-            offset += 1;
-            //TODO: NGA (New Generation Audio) flags.
-
-            offset += 1;
+            proto_tree_add_item(content_type_tree, hf_mpeg_descr_component_nga_bits_b7_reserved, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(content_type_tree, hf_mpeg_descr_component_nga_bits_b6_headphones, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(content_type_tree, hf_mpeg_descr_component_nga_bits_b5_interactivity, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(content_type_tree, hf_mpeg_descr_component_nga_bits_b4_dialogue_enhancement, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(content_type_tree, hf_mpeg_descr_component_nga_bits_b3_spoken_subtitles, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(content_type_tree, hf_mpeg_descr_component_nga_bits_b2_audio_description, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(content_type_tree, hf_mpeg_descr_component_nga_bits_b10_channel_layout, tvb, offset, 2, ENC_BIG_ENDIAN);
         } else {
             proto_tree_add_item(content_type_tree, hf_mpeg_descr_component_high_component_type, tvb, offset, 2, ENC_BIG_ENDIAN);
-            offset += 2;
         }
+        offset += 2;
 
         goto mpeg_descr_component_tail;
     }
@@ -3973,6 +4001,48 @@ proto_register_mpeg_descriptor(void)
         } },
 
         /* 0x50 Component Descriptor */
+        { &hf_mpeg_descr_component_nga_bits_b7_reserved, {
+            "Reserved zero for future use", "mpeg_descr.component.nga.reserved",
+            FT_UINT16, BASE_HEX, NULL,
+            MPEG_DESCR_COMPONENT_NGA_BITS_B7_MASK, NULL, HFILL
+        } },
+
+        { &hf_mpeg_descr_component_nga_bits_b6_headphones, {
+            "Pre-rendered for consumption with headphones", "mpeg_descr.component.nga.headphones",
+            FT_UINT16, BASE_HEX, NULL,
+            MPEG_DESCR_COMPONENT_NGA_BITS_B6_MASK, NULL, HFILL
+        } },
+
+        { &hf_mpeg_descr_component_nga_bits_b5_interactivity, {
+            "Enables interactivity", "mpeg_descr.component.nga.interactivity",
+            FT_UINT16, BASE_HEX, NULL,
+            MPEG_DESCR_COMPONENT_NGA_BITS_B5_MASK, NULL, HFILL
+        } },
+
+        { &hf_mpeg_descr_component_nga_bits_b4_dialogue_enhancement, {
+            "Enables dialogue enhancement", "mpeg_descr.component.nga.dialogue_enhancement",
+            FT_UINT16, BASE_HEX, NULL,
+            MPEG_DESCR_COMPONENT_NGA_BITS_B4_MASK, NULL, HFILL
+        } },
+
+        { &hf_mpeg_descr_component_nga_bits_b3_spoken_subtitles, {
+            "Contains spoken subtitles", "mpeg_descr.component.nga.spoken_subtitles",
+            FT_UINT16, BASE_HEX, NULL,
+            MPEG_DESCR_COMPONENT_NGA_BITS_B3_MASK, NULL, HFILL
+        } },
+
+        { &hf_mpeg_descr_component_nga_bits_b2_audio_description, {
+            "Contains audio description", "mpeg_descr.component.nga.audio_description",
+            FT_UINT16, BASE_HEX, NULL,
+            MPEG_DESCR_COMPONENT_NGA_BITS_B2_MASK, NULL, HFILL
+        } },
+
+        { &hf_mpeg_descr_component_nga_bits_b10_channel_layout, {
+            "Preferred reproduction channel layout", "mpeg_descr.component.nga.channel_layout",
+            FT_UINT16, BASE_HEX, VALS(mpeg_descr_component_preferred_reproduction_channel_layout_vals),
+            MPEG_DESCR_COMPONENT_NGA_BITS_B10_MASK, NULL, HFILL
+        } },
+
         { &hf_mpeg_descr_component_high_stream_content_n_component_type, {
             "Stream Content and Component Type", "mpeg_descr.component.content_type",
             FT_UINT16, BASE_HEX | BASE_EXT_STRING, &mpeg_descr_component_high_content_type_vals_ext,
