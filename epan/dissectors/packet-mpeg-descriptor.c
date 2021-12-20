@@ -1548,6 +1548,10 @@ proto_mpeg_descriptor_dissect_component(tvbuff_t *tvb, guint offset, guint len, 
     proto_tree *content_type_tree;
     guint end = offset + len;
 
+    if (len < 6) {
+        return;
+    }
+
     guint stream_content     = tvb_get_bits8(tvb, offset * 8 + 4, 4);
 
     if (stream_content >= 0x09) {
