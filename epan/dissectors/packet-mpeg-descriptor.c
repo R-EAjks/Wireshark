@@ -1494,6 +1494,7 @@ static const value_string mpeg_descr_component_high_content_type_vals[] = {
     video sub-bit-stream (SDR HFR single PID, HDR with HLG10 HFR single PID)" },
     { 0x0907, "HEVC UHD video, PQ10 HDR, frame rate of 100 Hz, 120 000/1 001 Hz, or 120 Hz without a half \
     frame rate HEVC temporal video sub-bit-stream (HDR with PQ10 HFR single PID)" },
+    { 0x0908, "HEVC 8K" },
     { 0x1900, "AC-4 main audio, mono" },
     { 0x1901, "AC-4 main audio, mono, dialogue enhancement enabled" },
     { 0x1902, "AC-4 main audio, stereo" },
