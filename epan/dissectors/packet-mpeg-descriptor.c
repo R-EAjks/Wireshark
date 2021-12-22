@@ -601,12 +601,17 @@ proto_mpeg_descriptor_dissect_avc_vid(tvbuff_t *tvb, guint offset, proto_tree *t
 }
 
 /* 0x40 Network Name Descriptor */
+static int hf_mpeg_descr_network_name_encoding = -1;
 static int hf_mpeg_descr_network_name_descriptor = -1;
 
 static void
 proto_mpeg_descriptor_dissect_network_name(tvbuff_t *tvb, guint offset, guint len, proto_tree *tree)
 {
-    proto_tree_add_item(tree, hf_mpeg_descr_network_name_descriptor, tvb, offset, len, ENC_ASCII|ENC_NA);
+    dvb_encoding_e  encoding;
+    guint enc_len = dvb_analyze_string_charset(tvb, offset, len, &encoding);
+    dvb_add_chartbl(tree, hf_mpeg_descr_network_name_encoding, tvb, offset, enc_len, encoding);
+
+    proto_tree_add_item(tree, hf_mpeg_descr_network_name_descriptor, tvb, offset+enc_len, len-enc_len, dvb_enc_to_item_enc(encoding));
 }
 
 /* 0x41 Service List Descriptor */
@@ -934,12 +939,17 @@ proto_mpeg_descriptor_dissect_vbi_data(tvbuff_t *tvb, guint offset, guint len, p
 }
 
 /* 0x47 Bouquet Name Descriptor */
+static int hf_mpeg_descr_bouquet_name_encoding = -1;
 static int hf_mpeg_descr_bouquet_name = -1;
 
 static void
 proto_mpeg_descriptor_dissect_bouquet_name(tvbuff_t *tvb, guint offset, guint len, proto_tree *tree)
 {
-    proto_tree_add_item(tree, hf_mpeg_descr_bouquet_name, tvb, offset, len, ENC_ASCII|ENC_NA);
+    dvb_encoding_e  encoding;
+    guint enc_len = dvb_analyze_string_charset(tvb, offset, len, &encoding);
+    dvb_add_chartbl(tree, hf_mpeg_descr_bouquet_name_encoding, tvb, offset, enc_len, encoding);
+
+    proto_tree_add_item(tree, hf_mpeg_descr_bouquet_name, tvb, offset+enc_len, len-enc_len, dvb_enc_to_item_enc(encoding));
 }
 
 /* 0x48 Service Descriptor */
@@ -1315,6 +1325,7 @@ static int hf_mpeg_descr_component_type = -1;
 static int hf_mpeg_descr_component_content_type = -1;
 static int hf_mpeg_descr_component_tag = -1;
 static int hf_mpeg_descr_component_lang_code = -1;
+static int hf_mpeg_descr_component_text_encoding = -1;
 static int hf_mpeg_descr_component_text = -1;
 
 #define MPEG_DESCR_COMPONENT_RESERVED_MASK      0xF0
@@ -1442,7 +1453,13 @@ proto_mpeg_descriptor_dissect_component(tvbuff_t *tvb, guint offset, guint len, 
     offset += 3;
 
     if (offset < end)
-        proto_tree_add_item(tree, hf_mpeg_descr_component_text, tvb, offset, end - offset, ENC_ASCII|ENC_NA);
+    {
+        dvb_encoding_e  encoding;
+        guint enc_len = dvb_analyze_string_charset(tvb, offset, end - offset, &encoding);
+        dvb_add_chartbl(tree, hf_mpeg_descr_component_text_encoding, tvb, offset, enc_len, encoding);
+
+        proto_tree_add_item(tree, hf_mpeg_descr_component_text, tvb, offset+enc_len, end-offset-enc_len, dvb_enc_to_item_enc(encoding));
+    }
 }
 
 /* 0x52 Stream Identifier Descriptor */
@@ -3471,6 +3488,11 @@ proto_register_mpeg_descriptor(void)
         } },
 
         /* 0x40 Network Name Descriptor */
+        { &hf_mpeg_descr_network_name_encoding, {
+            "Network Name Encoding", "mpeg_descr.net_name.name_enc",
+            FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL
+        } },
+
         { &hf_mpeg_descr_network_name_descriptor, {
             "Network Name", "mpeg_descr.net_name.name",
             FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL
@@ -3616,8 +3638,13 @@ proto_register_mpeg_descriptor(void)
         } },
 
         /* 0x47 Bouquet Name Descriptor */
+        { &hf_mpeg_descr_bouquet_name_encoding, {
+            "Bouquet Name Encoding", "mpeg_descr.bouquet_name.name_enc",
+            FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL
+        } },
+
         { &hf_mpeg_descr_bouquet_name, {
-            "Bouquet Name Descriptor", "mpeg_descr.bouquet_name.name",
+            "Bouquet Name", "mpeg_descr.bouquet_name.name",
             FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL
         } },
 
@@ -3878,6 +3905,11 @@ proto_register_mpeg_descriptor(void)
         { &hf_mpeg_descr_component_lang_code, {
             "Language Code", "mpeg_descr.component.lang_code",
             FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL
+        } },
+
+        { &hf_mpeg_descr_component_text_encoding, {
+            "Text Encoding", "mpeg_descr.component.text_enc",
+            FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL
         } },
 
         { &hf_mpeg_descr_component_text, {
