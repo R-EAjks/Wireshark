@@ -81,6 +81,7 @@
 #include <wsutil/cpu_info.h>
 #include <wsutil/os_version_info.h>
 #include <wsutil/privileges.h>
+#include <wsutil/strtoi.h>
 
 #include <glib.h>
 
@@ -118,7 +119,7 @@ static guint32 hdr_ethernet_proto = 0;
 /* Dummy IP header */
 static gboolean hdr_ip = FALSE;
 static gboolean hdr_ipv6 = FALSE;
-static long hdr_ip_proto = -1;
+static guint hdr_ip_proto = G_MAXUINT;
 
 /* Destination and source addresses for IP header */
 static guint32 hdr_ip_dest_addr = 0;
@@ -394,15 +395,17 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
             break;
 
         case 'i':
-            hdr_ip_proto = strtol(ws_optarg, &p, 10);
-            if (p == ws_optarg || *p != '\0' || hdr_ip_proto < 0 ||
-                  hdr_ip_proto > 255) {
+        {
+            guint8 ip_proto;
+            if (!ws_strtou8(p, NULL, &ip_proto)) {
                 cmdarg_err("Bad argument for '-i': %s", ws_optarg);
                 print_usage(stderr);
                 return INVALID_OPTION;
             }
+            hdr_ip_proto = ip_proto;
             hdr_ethernet = TRUE;
             break;
+        }
 
         case 's':
             hdr_sctp = TRUE;
@@ -643,12 +646,12 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
         return INVALID_OPTION;
     }
 
-    if (hdr_ip_proto != -1 && !(hdr_ip || hdr_ipv6)) {
+    if (hdr_ip_proto != G_MAXUINT && !(hdr_ip || hdr_ipv6)) {
         /* If -i <proto> option is specified without -4 or -6 then add the default IPv4 header */
         hdr_ip = TRUE;
     }
 
-    if (hdr_ip_proto == -1 && (hdr_ip || hdr_ipv6)) {
+    if (hdr_ip_proto == G_MAXUINT && (hdr_ip || hdr_ipv6)) {
         /* if -4 or -6 option is specified without an IP protocol then fail */
         cmdarg_err("IP protocol requires a next layer protocol number");
         return INVALID_OPTION;
@@ -786,9 +789,9 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
 
         if (hdr_ethernet) fprintf(stderr, "Generate dummy Ethernet header: Protocol: 0x%0X\n",
                                   hdr_ethernet_proto);
-        if (hdr_ip) fprintf(stderr, "Generate dummy IP header: Protocol: %ld\n",
+        if (hdr_ip) fprintf(stderr, "Generate dummy IP header: Protocol: %u\n",
                             hdr_ip_proto);
-        if (hdr_ipv6) fprintf(stderr, "Generate dummy IPv6 header: Protocol: %ld\n",
+        if (hdr_ipv6) fprintf(stderr, "Generate dummy IPv6 header: Protocol: %u\n",
                             hdr_ip_proto);
         if (hdr_udp) fprintf(stderr, "Generate dummy UDP header: Source port: %u. Dest port: %u\n",
                              hdr_src_port, hdr_dest_port);
