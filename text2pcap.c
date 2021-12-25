@@ -118,7 +118,7 @@ static guint32 hdr_ethernet_proto = 0;
 /* Dummy IP header */
 static gboolean hdr_ip = FALSE;
 static gboolean hdr_ipv6 = FALSE;
-static long hdr_ip_proto = -1;
+static guint hdr_ip_proto = -1;
 
 /* Destination and source addresses for IP header */
 static guint32 hdr_ip_dest_addr = 0;
@@ -786,9 +786,9 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
 
         if (hdr_ethernet) fprintf(stderr, "Generate dummy Ethernet header: Protocol: 0x%0X\n",
                                   hdr_ethernet_proto);
-        if (hdr_ip) fprintf(stderr, "Generate dummy IP header: Protocol: %ld\n",
+        if (hdr_ip) fprintf(stderr, "Generate dummy IP header: Protocol: %u\n",
                             hdr_ip_proto);
-        if (hdr_ipv6) fprintf(stderr, "Generate dummy IPv6 header: Protocol: %ld\n",
+        if (hdr_ipv6) fprintf(stderr, "Generate dummy IPv6 header: Protocol: %u\n",
                             hdr_ip_proto);
         if (hdr_udp) fprintf(stderr, "Generate dummy UDP header: Source port: %u. Dest port: %u\n",
                              hdr_src_port, hdr_dest_port);
