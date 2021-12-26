@@ -722,6 +722,7 @@ private slots:
     void externalMenuItem_triggered();
 
     void on_actionAnalyzeShowPacketBytes_triggered();
+    void on_actionShowFieldValues_triggered();
 
     void on_actionContextWikiProtocolPage_triggered();
     void on_actionContextFilterFieldReference_triggered();

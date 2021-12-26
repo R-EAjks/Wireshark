@@ -347,6 +347,9 @@ void ProtoTree::contextMenuEvent(QContextMenuEvent *event)
         action = window()->findChild<QAction *>("actionFileExportPacketBytes");
         ctx_menu.addAction(action);
 
+        action = window()->findChild<QAction *>("actionShowFieldValues");
+        ctx_menu.addAction(action);
+
         ctx_menu.addSeparator();
     }
 

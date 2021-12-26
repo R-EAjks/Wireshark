@@ -55,6 +55,9 @@ Wireshark 3.7.0 Release Notes
 
      • Mesh Connex (MCX) support in existing 802.11 packets.
 
+     • Wireshark (QT): Field Value Dialog added to show known values
+       for protocol fields, for example: ip.proto
+
   New File Format Decoding Support
 
   New Protocol Support

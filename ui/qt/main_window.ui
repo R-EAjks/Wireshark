@@ -445,6 +445,7 @@
     <addaction name="separator"/>
     <addaction name="actionAnalyzeShowPacketBytes"/>
     <addaction name="actionAnalyzeExpertInfo"/>
+    <addaction name="actionShowFieldValues"/>
    </widget>
    <widget class="QMenu" name="menuStatistics">
     <property name="enabled">
@@ -2927,6 +2928,14 @@
    </property>
    <property name="shortcut">
     <string notr="true">Ctrl+Shift+O</string>
+   </property>
+  </action>
+  <action name="actionShowFieldValues">
+   <property name="text">
+    <string>Show Field Values…</string>
+   </property>
+   <property name="shortcut">
+    <string notr="true">Ctrl+Shift+V</string>
    </property>
   </action>
   <action name="actionContextWikiProtocolPage">
