@@ -11,10 +11,8 @@
 #ifndef __NSTIME_H__
 #define __NSTIME_H__
 
-#include <glib.h>
+#include <wireshark.h>
 #include <time.h>
-
-#include "ws_symbol_export.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -132,7 +130,9 @@ typedef enum {
 /** parse an ISO 8601 format datetime string to nstime, returns number of
     chars parsed on success, 0 on failure.
     Note that nstime is set to unset in the case of failure */
-WS_DLL_PUBLIC guint8 iso8601_to_nstime(nstime_t *nstime, const char *ptr, iso8601_fmt_e format);
+WS_DLL_PUBLIC size_t iso8601_to_nstime(nstime_t *nstime, const char *ptr,
+                            iso8601_fmt_e format, bool use_localtime,
+                            int *tz_secs_offset_ptr);
 
 /** parse an Unix epoch timestamp format datetime string to nstime, returns
     number of chars parsed on success, 0 on failure.

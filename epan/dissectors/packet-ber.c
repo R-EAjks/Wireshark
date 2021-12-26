@@ -3653,7 +3653,7 @@ dissect_ber_GeneralizedTime(gboolean implicit_tag, asn1_ctx_t *actx, proto_tree 
     }
 
     tmpstr = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, len, ENC_ASCII);
-    if (!iso8601_to_nstime(&ts, tmpstr, ISO8601_DATETIME_BASIC)) {
+    if (!iso8601_to_nstime(&ts, tmpstr, ISO8601_DATETIME_BASIC, TRUE, NULL)) {
         cause = proto_tree_add_expert_format(
             tree, actx->pinfo, &ei_ber_invalid_format_generalized_time,
             tvb, offset, len,

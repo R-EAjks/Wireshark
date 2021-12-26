@@ -9,11 +9,10 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
+#include "config.h"
+#include "nstime.h"
 
 #include <stdio.h>
-#include <string.h>
-#include <glib.h>
-#include "nstime.h"
 #include "epochs.h"
 #include "time_util.h"
 
@@ -294,8 +293,8 @@ nsfiletime_to_nstime(nstime_t *nstime, guint64 nsfiletime)
  * YYYY-Www-D, YYYY-DDD, etc. For a relatively easy introduction to
  * these formats, see wikipedia: https://en.wikipedia.org/wiki/ISO_8601
  */
-guint8
-iso8601_to_nstime(nstime_t *nstime, const char *ptr, iso8601_fmt_e format)
+size_t iso8601_to_nstime(nstime_t *nstime, const char *ptr, iso8601_fmt_e format,
+                            bool use_localtime, int *tz_secs_offset_ptr)
 {
     struct tm tm;
     gint n_scanned = 0;
@@ -308,6 +307,7 @@ iso8601_to_nstime(nstime_t *nstime, const char *ptr, iso8601_fmt_e format)
     char sign = '\0';
     gboolean has_separator = FALSE;
     gboolean have_offset = FALSE;
+    int timezone_offset;
 
     memset(&tm, 0, sizeof(tm));
     tm.tm_isdst = -1;
@@ -484,20 +484,34 @@ iso8601_to_nstime(nstime_t *nstime, const char *ptr, iso8601_fmt_e format)
     if (have_offset) {
         nstime->secs = mktime_utc(&tm);
         if (sign == '+') {
-            nstime->secs += (off_hr * 3600) + (off_min * 60);
-        } else if (sign == '-') {
+            timezone_offset = (off_hr * 3600) + (off_min * 60);
+        }
+        else if (sign == '-') {
             /* -00:00 is illegal according to ISO 8601, but RFC 3339 allows
              * it under a convention where -00:00 means "time in UTC is known,
              * local timezone is unknown." This has the same value as an
              * offset of Z or +00:00, but semantically implies that UTC is
              * not the preferred time zone, which is immaterial to us.
              */
-            nstime->secs -= ((-off_hr) * 3600) + (off_min * 60);
+            /* This assumes off_hr is negative and off_min is positive. */
+            timezone_offset = (off_hr * 3600) - (off_min * 60);
+        }
+        else {
+            timezone_offset = 0;
+        }
+        if (tz_secs_offset_ptr) {
+            *tz_secs_offset_ptr = timezone_offset;
+        }
+        if (use_localtime) {
+            nstime->secs += timezone_offset;
         }
     }
     else {
         /* No UTC offset given; ISO 8601 says this means localtime */
         nstime->secs = mktime(&tm);
+        if (tz_secs_offset_ptr) {
+            *tz_secs_offset_ptr = 0;
+        }
     }
     nstime->nsecs = frac;
     ret_val = (guint)(ptr-start);

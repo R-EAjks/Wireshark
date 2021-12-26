@@ -505,6 +505,7 @@ void test_nstime_from_iso8601(void)
     size_t chars;
     nstime_t result, expect;
     struct tm tm1;
+    int tz_off;
 
     memset(&tm1, 0, sizeof(tm1));
     tm1.tm_sec = 25;
@@ -515,50 +516,88 @@ void test_nstime_from_iso8601(void)
     tm1.tm_year = 2013 - 1900;
     tm1.tm_isdst = -1;
 
-    /* Date and time with local time. */
+    /* Date and time in local time (return localtime). */
+    /* This just returns local time - the "use_localtime" flag is ignored. */
     str = "2013-05-30T23:45:25.349124";
     expect.secs = mktime(&tm1);
     expect.nsecs = 349124 * 1000;
-    chars = iso8601_to_nstime(&result, str, ISO8601_DATETIME_AUTO);
+    chars = iso8601_to_nstime(&result, str, ISO8601_DATETIME_AUTO, TRUE, &tz_off);
     g_assert_cmpuint(chars, ==, strlen(str));
     g_assert_cmpint(result.secs, ==, expect.secs);
     g_assert_cmpint(result.nsecs, ==, expect.nsecs);
+    g_assert_cmpint(tz_off, ==, 0);
 
-    /* Date and time with UTC timezone. */
+    /* Date and time in local time (return UTC). */
+    /* This just returns local time - the "use_localtime" flag is ignored. */
+    str = "2013-05-30T23:45:25.349124";
+    expect.secs = mktime(&tm1);
+    expect.nsecs = 349124 * 1000;
+    chars = iso8601_to_nstime(&result, str, ISO8601_DATETIME_AUTO, FALSE, &tz_off);
+    g_assert_cmpuint(chars, ==, strlen(str));
+    g_assert_cmpint(result.secs, ==, expect.secs);
+    g_assert_cmpint(result.nsecs, ==, expect.nsecs);
+    g_assert_cmpint(tz_off, ==, 0);
+
+    /* Date and time in UTC (return localtime). */
+    /* No offset so the local time requested is assumed to be UTC. */
     str = "2013-05-30T23:45:25.349124Z";
     expect.secs = mktime_utc(&tm1);
     expect.nsecs = 349124 * 1000;
-    chars = iso8601_to_nstime(&result, str, ISO8601_DATETIME_AUTO);
+    chars = iso8601_to_nstime(&result, str, ISO8601_DATETIME_AUTO, TRUE, &tz_off);
     g_assert_cmpuint(chars, ==, strlen(str));
     g_assert_cmpint(result.secs, ==, expect.secs);
     g_assert_cmpint(result.nsecs, ==, expect.nsecs);
+    g_assert_cmpint(tz_off, ==, 0);
 
-    /* Date and time with timezone offset with separator. */
+    /* Date and time in UTC (return UTC). */
+    str = "2013-05-30T23:45:25.349124Z";
+    expect.secs = mktime_utc(&tm1);
+    expect.nsecs = 349124 * 1000;
+    chars = iso8601_to_nstime(&result, str, ISO8601_DATETIME_AUTO, FALSE, &tz_off);
+    g_assert_cmpuint(chars, ==, strlen(str));
+    g_assert_cmpint(result.secs, ==, expect.secs);
+    g_assert_cmpint(result.nsecs, ==, expect.nsecs);
+    g_assert_cmpint(tz_off, ==, 0);
+
+    /* Date and time with timezone offset (return localtime). */
     str = "2013-05-30T23:45:25.349124+01:00";
     expect.secs = mktime_utc(&tm1) + 1 * 60 * 60;
     expect.nsecs = 349124 * 1000;
-    chars = iso8601_to_nstime(&result, str, ISO8601_DATETIME_AUTO);
+    chars = iso8601_to_nstime(&result, str, ISO8601_DATETIME_AUTO, TRUE, &tz_off);
     g_assert_cmpuint(chars, ==, strlen(str));
     g_assert_cmpint(result.secs, ==, expect.secs);
     g_assert_cmpint(result.nsecs, ==, expect.nsecs);
+    g_assert_cmpint(tz_off, ==, 1 * 60 * 60);
 
-    /* Date and time with timezone offset without separator. */
+    /* Date and time with timezone offset (return UTC). */
+    str = "2013-05-30T23:45:25.349124+01:00";
+    expect.secs = mktime_utc(&tm1);
+    expect.nsecs = 349124 * 1000;
+    chars = iso8601_to_nstime(&result, str, ISO8601_DATETIME_AUTO, FALSE, &tz_off);
+    g_assert_cmpuint(chars, ==, strlen(str));
+    g_assert_cmpint(result.secs, ==, expect.secs);
+    g_assert_cmpint(result.nsecs, ==, expect.nsecs);
+    g_assert_cmpint(tz_off, ==, 1 * 60 * 60);
+
+    /* Date and time with timezone offset (return UTC). */
     str = "2013-05-30T23:45:25.349124+0100";
-    expect.secs = mktime_utc(&tm1) + 1 * 60 * 60;
+    expect.secs = mktime_utc(&tm1);
     expect.nsecs = 349124 * 1000;
-    chars = iso8601_to_nstime(&result, str, ISO8601_DATETIME_AUTO);
+    chars = iso8601_to_nstime(&result, str, ISO8601_DATETIME_AUTO, FALSE, &tz_off);
     g_assert_cmpuint(chars, ==, strlen(str));
     g_assert_cmpint(result.secs, ==, expect.secs);
     g_assert_cmpint(result.nsecs, ==, expect.nsecs);
+    g_assert_cmpint(tz_off, ==, 1 * 60 * 60);
 
-    /* Date and time with timezone offset with hours only. */
+    /* Date and time with timezone offset (return UTC). */
     str = "2013-05-30T23:45:25.349124+01";
-    expect.secs = mktime_utc(&tm1) + 1 * 60 * 60;
+    expect.secs = mktime_utc(&tm1);
     expect.nsecs = 349124 * 1000;
-    chars = iso8601_to_nstime(&result, str, ISO8601_DATETIME_AUTO);
+    chars = iso8601_to_nstime(&result, str, ISO8601_DATETIME_AUTO, FALSE, &tz_off);
     g_assert_cmpuint(chars, ==, strlen(str));
     g_assert_cmpint(result.secs, ==, expect.secs);
     g_assert_cmpint(result.nsecs, ==, expect.nsecs);
+    g_assert_cmpint(tz_off, ==, 1 * 60 * 60);
 }
 
 #include "ws_getopt.h"

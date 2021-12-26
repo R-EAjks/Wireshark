@@ -1033,7 +1033,7 @@ _parse_time(const guchar* start_field, const guchar* end_field, const gchar* _fo
     (void) g_strlcpy(field, start_field, MIN(end_field - start_field + 1, PARSE_BUF));
     if (ts_fmt_iso) {
         nstime_t ts_iso;
-        if (!iso8601_to_nstime(&ts_iso, field, ISO8601_DATETIME_AUTO)) {
+        if (!iso8601_to_nstime(&ts_iso, field, ISO8601_DATETIME_AUTO, TRUE, NULL)) {
             return FALSE;
         }
         *sec = ts_iso.secs;

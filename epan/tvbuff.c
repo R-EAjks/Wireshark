@@ -1777,6 +1777,7 @@ tvb_get_string_time(tvbuff_t *tvb, const gint offset, const gint length,
 	int	     off_hr    = 0;
 	int	     off_min   = 0;
 	int	     num_chars = 0;
+	size_t	     iso_len   = 0;
 	gboolean     matched   = FALSE;
 
 	errno = EDOM;
@@ -1792,14 +1793,14 @@ tvb_get_string_time(tvbuff_t *tvb, const gint offset, const gint length,
 
 	if (*ptr) {
 		if ((encoding & ENC_ISO_8601_DATE_TIME) == ENC_ISO_8601_DATE_TIME) {
-			if ((num_chars = iso8601_to_nstime(ns, ptr, ISO8601_DATETIME))) {
+			if ((iso_len = iso8601_to_nstime(ns, ptr, ISO8601_DATETIME, TRUE, NULL))) {
 				errno = 0;
-				end = ptr + num_chars;
+				end = ptr + iso_len;
 			}
 		} else if ((encoding & ENC_ISO_8601_DATE_TIME_BASIC) == ENC_ISO_8601_DATE_TIME_BASIC) {
-			if ((num_chars = iso8601_to_nstime(ns, ptr, ISO8601_DATETIME_BASIC))) {
+			if ((iso_len = iso8601_to_nstime(ns, ptr, ISO8601_DATETIME_BASIC, TRUE, NULL))) {
 				errno = 0;
-				end = ptr + num_chars;
+				end = ptr + iso_len;
 			}
 		} else {
 			memset(&tm, 0, sizeof(tm));
