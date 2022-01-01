@@ -109,6 +109,8 @@ variables:
     - export DEB_BUILD_OPTIONS=nocheck,parallel=$(( $(getconf _NPROCESSORS_ONLN) + 2 ))
     - export DH_QUIET=1
     - export MAKEFLAGS=--silent
+    - NUM_COMMITS=$(curl $CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/commits | jq length)
+    - echo "$NUM_COMMITS commit(s) in this MR"
     - mkdir build
     - cd build
   after_script:
@@ -160,8 +162,7 @@ variables:
     - $env:WIRESHARK_BASE_DIR = "C:\Development"
     - $env:Configuration = "RelWithDebInfo"
     - $env:Path += ";C:\Program Files\CMake\bin"
-    - $env:Path += ";C:\Strawberry\c\bin;C:\Strawberry\perl\site\bin;C:\Strawberry\perl\bin"
-    - $env:Path += ";C:\qt\5.15.2\msvc2019_64\bin"
+    - $env:CMAKE_PREFIX_PATH = "C:\qt\5.15.2\msvc2019_64"
     # https://help.appveyor.com/discussions/questions/18777-how-to-use-vcvars64bat-from-powershell
     - cmd.exe /c "call `"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat`" && set > %temp%\vcvars.txt"
     - Get-Content "$env:temp\vcvars.txt" | Foreach-Object { if ($_ -match "^(.*?)=(.*)$") { Set-Content "env:\$($matches[1])" $matches[2] } }
@@ -312,12 +313,8 @@ Win64 Package:
   before_script:
     - $env:WIRESHARK_BASE_DIR = "C:\Development"
     - $env:Configuration = "RelWithDebInfo"
-    - $env:Path += ";C:\Program Files\CMake\bin"
-    - $env:Path += ";C:\Strawberry\c\bin;C:\Strawberry\perl\site\bin;C:\Strawberry\perl\bin"
-    - $env:Path += ";C:\qt\5.15.2\msvc2019_64\bin"
-    - $env:Path += ";C:\Program Files (x86)\NSIS"
-    - $env:Path += ";C:\Program Files (x86)\WiX Toolset v3.11\bin"
     - $env:Path += ";C:\Program Files\Amazon\AWSCLIV2"
+    - $env:CMAKE_PREFIX_PATH = "C:\qt\5.15.2\msvc2019_64"
     # https://help.appveyor.com/discussions/questions/18777-how-to-use-vcvars64bat-from-powershell
     - cmd.exe /c "call `"C:\Program Files (x86)\Microsoft Visual Studio\2019\Professional\VC\Auxiliary\Build\vcvars64.bat`" && set > %temp%\vcvars.txt"
     - Get-Content "$env:temp\vcvars.txt" | Foreach-Object { if ($_ -match "^(.*?)=(.*)$") { Set-Content "env:\$($matches[1])" $matches[2] } }
@@ -359,12 +356,8 @@ Win32 Package:
   before_script:
     - $env:WIRESHARK_BASE_DIR = "C:\Development"
     - $env:Configuration = "RelWithDebInfo"
-    - $env:Path += ";C:\Program Files\CMake\bin"
-    - $env:Path += ";C:\Strawberry\c\bin;C:\Strawberry\perl\site\bin;C:\Strawberry\perl\bin"
-    - $env:Path += ";C:\qt\5.15.2\msvc2019\bin"
-    - $env:Path += ";C:\Program Files (x86)\NSIS"
-    - $env:Path += ";C:\Program Files (x86)\WiX Toolset v3.11\bin"
     - $env:Path += ";C:\Program Files\Amazon\AWSCLIV2"
+    - $env:CMAKE_PREFIX_PATH = "C:\qt\5.15.2\msvc2019"
     # https://help.appveyor.com/discussions/questions/18777-how-to-use-vcvars64bat-from-powershell
     - cmd.exe /c "call `"C:\Program Files (x86)\Microsoft Visual Studio\2019\Professional\VC\Auxiliary\Build\vcvarsamd64_x86.bat`" && set > %temp%\vcvars.txt"
     - Get-Content "$env:temp\vcvars.txt" | Foreach-Object { if ($_ -match "^(.*?)=(.*)$") { Set-Content "env:\$($matches[1])" $matches[2] } }
@@ -377,18 +370,15 @@ Win32 Package:
     - msbuild /verbosity:minimal "/consoleloggerparameters:PerformanceSummary;NoSummary" /maxcpucount Wireshark.sln
     - msbuild /verbosity:minimal /maxcpucount test-programs.vcxproj
     - msbuild /verbosity:minimal /maxcpucount nsis_package_prep.vcxproj
-    - msbuild /verbosity:minimal /maxcpucount wix_package_prep.vcxproj
     - C:\gitlab-builds\bin\sign-files.ps1 -Recurse -Path run\RelWithDebInfo
     - msbuild /verbosity:minimal nsis_package.vcxproj
     - C:\gitlab-builds\bin\sign-files.ps1 -Path packaging\nsis
-    - msbuild /verbosity:minimal wix_package.vcxproj
-    - C:\gitlab-builds\bin\sign-files.ps1 -Path packaging\wix
     - msbuild /verbosity:minimal portableapps_package.vcxproj
     - C:\gitlab-builds\bin\sign-files.ps1 -Path packaging\portableapps
-    - $plugins = Get-ChildItem run\RelWithDebInfo\plugins\*\*.dll ; signtool verify /q /pa /all run\RelWithDebInfo\*.exe run\RelWithDebInfo\extcap\*.exe $plugins run\RelWithDebInfo\libwireshark.dll run\RelWithDebInfo\libwiretap.dll run\RelWithDebInfo\libwsutil.dll packaging\nsis\Wireshark-win??-*.exe packaging\wix\Wireshark-win??-*.msi packaging\portableapps\WiresharkPortable??_*.paf.exe
+    - $plugins = Get-ChildItem run\RelWithDebInfo\plugins\*\*.dll ; signtool verify /q /pa /all run\RelWithDebInfo\*.exe run\RelWithDebInfo\extcap\*.exe $plugins run\RelWithDebInfo\libwireshark.dll run\RelWithDebInfo\libwiretap.dll run\RelWithDebInfo\libwsutil.dll packaging\nsis\Wireshark-win??-*.exe packaging\portableapps\WiresharkPortable??_*.paf.exe
     - msbuild /verbosity:minimal pdb_zip_package.vcxproj
     - C:\gitlab-builds\bin\mse-scan.ps1
-    - $packages = Get-ChildItem "packaging\nsis\Wireshark-win??-*.exe", "packaging\wix\Wireshark-win??-*.msi", "packaging\portableapps\WiresharkPortable??_*.paf.exe", "Wireshark-pdb-win??-*.zip"
+    - $packages = Get-ChildItem "packaging\nsis\Wireshark-win??-*.exe", "packaging\portableapps\WiresharkPortable??_*.paf.exe", "Wireshark-pdb-win??-*.zip"
     - foreach ($package in $packages) { Write-Host $package.name $package.length "bytes" }
     - foreach ($package in $packages) { certutil -hashfile $package SHA256 }
     - |
@@ -407,17 +397,7 @@ macOS Arm Package:
   tags:
     - wireshark-macos-arm-package
   retry: 1
-  before_script:
-    - mkdir build
-    - cd build
   script:
-    - printf "\e[0Ksection_start:%s:cmake_section[collapsed=true]\r\e[0KRunning CMake" "$( date +%s)"
-    # XXX - Move this to a separate DENABLE_PCAP=OFF job?
-    - arch -arch arm64 cmake -DENABLE_CCACHE=ON -DENABLE_PCAP=OFF -DCMAKE_APPLE_SILICON_PROCESSOR=arm64 -DCMAKE_OSX_ARCHITECTURES=arm64 -G Ninja ..
-    - printf "\e[0Ksection_end:%s:cmake_section\r\e[0K" "$( date +%s)"
-    - arch -arch arm64 ninja
-    - cd ..
-    - git clean -d --force --force -x
     - perl tools/make-version.pl --set-release
     - mkdir build
     - cd build
@@ -449,7 +429,7 @@ macOS Intel Package:
     - wireshark-macos-intel-package
   retry: 1
   script:
-    - export CMAKE_PREFIX_PATH=/usr/local/Qt-5.15.3/lib/cmake
+    - export CMAKE_PREFIX_PATH=/usr/local/Qt-5.15.3
     - export PATH="$PATH:$HOME/bin"
     - perl tools/make-version.pl --set-release
     - mkdir build
@@ -531,7 +511,7 @@ Commit Check:
   script:
     # build-ubuntu puts us in `build`.
     - cd ..
-    - bash ./tools/pre-commit 'HEAD^1'
+    - bash ./tools/pre-commit "HEAD^$NUM_COMMITS"
     - tools/validate-commit.py
 
 Ubuntu .dpkg:
@@ -574,11 +554,11 @@ Code Checks + Clang Warnings:
     - cd ..
     - python3 tools/checklicenses.py
     - mkdir cppcheck
-    - ./tools/cppcheck/cppcheck.sh -l 1 | tee cppcheck/cppcheck_report.txt
-    - if [[ -s "cppcheck/cppcheck_report.txt" ]]; then ./tools/cppcheck/cppcheck.sh -l 1 -x > cppcheck/cppcheck_report.xml ; fi
+    - ./tools/cppcheck/cppcheck.sh -l $NUM_COMMITS | tee cppcheck/cppcheck_report.txt
+    - if [[ -s "cppcheck/cppcheck_report.txt" ]]; then ./tools/cppcheck/cppcheck.sh -l $NUM_COMMITS -x > cppcheck/cppcheck_report.xml ; fi
     - if [[ -s "cppcheck/cppcheck_report.txt" ]]; then cppcheck-htmlreport --file cppcheck/cppcheck_report.xml  --report-dir cppcheck ; fi
-    - ./tools/check_typed_item_calls.py --commits 1 | tee item_calls_check.txt
-    - ./tools/check_tfs.py --commits 1 | tee tfs_check.txt
+    - ./tools/check_typed_item_calls.py --commits $NUM_COMMITS | tee item_calls_check.txt
+    - ./tools/check_tfs.py --commits $NUM_COMMITS | tee tfs_check.txt
     - cd build
     - printf "\e[0Ksection_start:%s:cmake_section[collapsed=true]\r\e[0KRunning CMake" "$( date +%s)"
     - cmake -DENABLE_EXTRA_COMPILER_WARNINGS=on -DENABLE_CHECKHF_CONFLICT=on -DCMAKE_EXPORT_COMPILE_COMMANDS=on -DENABLE_CCACHE=ON -G Ninja ..
@@ -601,6 +581,17 @@ Code Checks + Clang Warnings:
       - tfs_check.txt
       - checkhf_conflict.txt
       - html/
+
+No options:
+  extends: .build-ubuntu
+  rules: !reference [.if-merge-request]
+  script: |
+    cmake -GNinja -DENABLE_CCACHE=ON \
+      -DENABLE_BROTLI=OFF -DENABLE_CAP=OFF -DENABLE_CARES=OFF -DENABLE_CHECKHF_CONFLICT=ON -DENABLE_GNUTLS=OFF \
+      -DENABLE_KERBEROS=OFF -DENABLE_LIBXML2=OFF -DENABLE_ILBC=OFF -DENABLE_LUA=OFF -DENABLE_LZ4=OFF -DENABLE_MINIZIP=OFF \
+      -DENABLE_NETLINK=OFF -DENABLE_NGHTTP2=OFF -DENABLE_PCAP=OFF -DENABLE_PLUGIN_IFDEMO=ON -DENABLE_PLUGINS=OFF \
+      -DENABLE_SBC=OFF -DENABLE_SMI=OFF -DENABLE_SNAPPY=OFF -DENABLE_SPANDSP=OFF -DENABLE_ZLIB=OFF -DENABLE_ZSTD=OFF ..
+    ninja
 
 # Windows runners are still beta, at least technically:
 # https://docs.gitlab.com/ee/user/gitlab_com/index.html#windows-shared-runners-beta

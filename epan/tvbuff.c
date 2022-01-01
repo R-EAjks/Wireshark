@@ -3702,7 +3702,7 @@ tvb_get_stringz_enc(wmem_allocator_t *scope, tvbuff_t *tvb, const gint offset, g
  * no more than bufsize number of bytes, including terminating NUL, to buffer.
  * Returns length of string (not including terminating NUL), or -1 if the string was
  * truncated in the buffer due to not having reached the terminating NUL.
- * In this way, it acts like g_snprintf().
+ * In this way, it acts like snprintf().
  *
  * bufsize MUST be greater than 0.
  *
@@ -3788,7 +3788,7 @@ _tvb_get_nstringz(tvbuff_t *tvb, const gint offset, const guint bufsize, guint8*
  * no more than bufsize number of bytes, including terminating NUL, to buffer.
  * Returns length of string (not including terminating NUL), or -1 if the string was
  * truncated in the buffer due to not having reached the terminating NUL.
- * In this way, it acts like g_snprintf().
+ * In this way, it acts like snprintf().
  *
  * When processing a packet where the remaining number of bytes is less
  * than bufsize, an exception is not thrown if the end of the packet
@@ -4486,7 +4486,9 @@ tvb_get_varint(tvbuff_t *tvb, guint offset, guint maxlen, guint64 *value, const 
 {
 	*value = 0;
 
-	if (encoding & ENC_VARINT_PROTOBUF) {
+	switch (encoding & ENC_VARINT_MASK) {
+	case ENC_VARINT_PROTOBUF:
+	{
 		guint i;
 		guint64 b; /* current byte */
 
@@ -4499,7 +4501,11 @@ tvb_get_varint(tvbuff_t *tvb, guint offset, guint maxlen, guint64 *value, const 
 				return i + 1;
 			}
 		}
-	} else if (encoding & ENC_VARINT_ZIGZAG) {
+		break;
+	}
+
+	case ENC_VARINT_ZIGZAG:
+	{
 		guint i;
 		guint64 b; /* current byte */
 
@@ -4513,9 +4519,11 @@ tvb_get_varint(tvbuff_t *tvb, guint offset, guint maxlen, guint64 *value, const 
 				return i + 1;
 			}
 		}
+		break;
 	}
-	else if (encoding & ENC_VARINT_QUIC) {
 
+	case ENC_VARINT_QUIC:
+	{
 		/* calculate variable length */
 		*value = tvb_get_guint8(tvb, offset);
 		switch((*value) >> 6) {
@@ -4535,7 +4543,11 @@ tvb_get_varint(tvbuff_t *tvb, guint offset, guint maxlen, guint64 *value, const 
 			ws_assert_not_reached();
 			break;
 		}
+		break;
+	}
 
+	default:
+		DISSECTOR_ASSERT_NOT_REACHED();
 	}
 
 	return 0; /* 10 bytes scanned, but no bytes' msb is zero */

@@ -30,6 +30,7 @@
 #endif
 
 #include "file_util.h"
+#include "time_util.h"
 #include "to_str.h"
 #include "strtoi.h"
 
@@ -84,8 +85,9 @@ static gboolean stdout_color_enabled = FALSE;
 
 static gboolean stderr_color_enabled = FALSE;
 
-/* Use stderr for levels "info" and below. */
-static gboolean stderr_debug_enabled = FALSE;
+/* Use stdout for levels "info" and below, for backward compatibility
+ * with GLib. */
+static gboolean stdout_logging_enabled = FALSE;
 
 static const char *registered_progname = DEFAULT_PROGNAME;
 
@@ -125,6 +127,8 @@ const char *ws_log_level_to_string(enum ws_log_level level)
     switch (level) {
         case LOG_LEVEL_NONE:
             return "(zero)";
+        case LOG_LEVEL_ECHO:
+            return "ECHO";
         case LOG_LEVEL_ERROR:
             return "ERROR";
         case LOG_LEVEL_CRITICAL:
@@ -164,6 +168,8 @@ static enum ws_log_level string_to_log_level(const char *str_level)
         return LOG_LEVEL_CRITICAL;
     else if (g_ascii_strcasecmp(str_level, "error") == 0)
         return LOG_LEVEL_ERROR;
+    else if (g_ascii_strcasecmp(str_level, "echo") == 0)
+        return LOG_LEVEL_ECHO;
     else
         return LOG_LEVEL_NONE;
 }
@@ -282,12 +288,15 @@ enum ws_log_level ws_log_get_level(void)
 }
 
 
-void ws_log_set_level(enum ws_log_level level)
+enum ws_log_level ws_log_set_level(enum ws_log_level level)
 {
     if (level <= LOG_LEVEL_NONE || level >= _LOG_LEVEL_LAST)
-        return;
+        return LOG_LEVEL_NONE;
+    if (level > LOG_LEVEL_CRITICAL)
+        level = LOG_LEVEL_CRITICAL;
 
     current_log_level = level;
+    return current_log_level;
 }
 
 
@@ -296,11 +305,7 @@ enum ws_log_level ws_log_set_level_str(const char *str_level)
     enum ws_log_level level;
 
     level = string_to_log_level(str_level);
-    if (level == LOG_LEVEL_NONE)
-        return LOG_LEVEL_NONE;
-
-    current_log_level = level;
-    return current_log_level;
+    return ws_log_set_level(level);
 }
 
 
@@ -827,18 +832,25 @@ static inline const char *level_color_on(gboolean enable,
     if (!enable)
         return "";
 
-    if (level <= LOG_LEVEL_DEBUG)
-        return GREEN;
-    else if (level <= LOG_LEVEL_MESSAGE)
-        return CYAN;
-    else if (level <= LOG_LEVEL_WARNING)
-        return YELLOW;
-    else if (level <= LOG_LEVEL_CRITICAL)
-        return MAGENTA;
-    else if (level <= LOG_LEVEL_ERROR)
-        return RED;
-    else
-        return "";
+    switch (level) {
+        case LOG_LEVEL_NOISY:
+        case LOG_LEVEL_DEBUG:
+            return GREEN;
+        case LOG_LEVEL_INFO:
+        case LOG_LEVEL_MESSAGE:
+            return CYAN;
+        case LOG_LEVEL_WARNING:
+            return YELLOW;
+        case LOG_LEVEL_CRITICAL:
+            return MAGENTA;
+        case LOG_LEVEL_ERROR:
+            return RED;
+        case LOG_LEVEL_ECHO:
+            return YELLOW;
+        default:
+            break;
+    }
+    return "";
 }
 
 static inline const char *color_off(gboolean enable)
@@ -903,22 +915,6 @@ static void log_write_do_work(FILE *fp, gboolean use_color,
 }
 
 
-static inline ws_log_time_t *get_timestamp(ws_log_time_t *ts)
-{
-    assert(ts);
-#if defined(HAVE_CLOCK_GETTIME)
-    if (clock_gettime(CLOCK_REALTIME, (struct timespec *)ts) == 0)
-        return ts;
-#elif defined(_WIN32)
-    if (timespec_get((struct timespec *)ts, TIME_UTC) == TIME_UTC)
-        return ts;
-#endif
-    ts->tv_sec = time(NULL);
-    ts->tv_nsec = -1;
-    return ts;
-}
-
-
 static inline struct tm *get_localtime(time_t unix_time, struct tm **cookie)
 {
     if (unix_time == (time_t)-1)
@@ -934,7 +930,7 @@ static inline struct tm *get_localtime(time_t unix_time, struct tm **cookie)
 
 static inline FILE *console_file(enum ws_log_level level)
 {
-    if (level <= LOG_LEVEL_INFO && !stderr_debug_enabled)
+    if (level <= LOG_LEVEL_INFO && stdout_logging_enabled)
         return stdout;
     return stderr;
 }
@@ -942,7 +938,7 @@ static inline FILE *console_file(enum ws_log_level level)
 
 static inline bool console_color_enabled(enum ws_log_level level)
 {
-    if (level <= LOG_LEVEL_INFO && !stderr_debug_enabled)
+    if (level <= LOG_LEVEL_INFO && stdout_logging_enabled)
         return stdout_color_enabled;
     return stderr_color_enabled;
 }
@@ -957,10 +953,10 @@ static void log_write_dispatch(const char *domain, enum ws_log_level level,
                             const char *file, int line, const char *func,
                             const char *user_format, va_list user_ap)
 {
-    ws_log_time_t tstamp;
+    struct timespec tstamp;
     struct tm *cookie = NULL;
 
-    get_timestamp(&tstamp);
+    ws_clock_get_realtime(&tstamp);
 
     if (custom_log) {
         va_list user_ap_copy;
@@ -986,7 +982,7 @@ static void log_write_dispatch(const char *domain, enum ws_log_level level,
                             user_format, user_ap);
     }
 
-    if (level >= fatal_log_level) {
+    if (level >= fatal_log_level && level != LOG_LEVEL_ECHO) {
         abort();
     }
 }
@@ -1077,7 +1073,7 @@ void ws_log_buffer_full(const char *domain, enum ws_log_level level,
 
 
 void ws_log_file_writer(FILE *fp, const char *domain, enum ws_log_level level,
-                            ws_log_time_t timestamp,
+                            struct timespec timestamp,
                             const char *file, int line, const char *func,
                             const char *user_format, va_list user_ap)
 {
@@ -1090,7 +1086,7 @@ void ws_log_file_writer(FILE *fp, const char *domain, enum ws_log_level level,
 
 
 void ws_log_console_writer(const char *domain, enum ws_log_level level,
-                            ws_log_time_t timestamp,
+                            struct timespec timestamp,
                             const char *file, int line, const char *func,
                             const char *user_format, va_list user_ap)
 {
@@ -1103,9 +1099,9 @@ void ws_log_console_writer(const char *domain, enum ws_log_level level,
 
 
 WS_DLL_PUBLIC
-void ws_log_console_writer_set_use_stderr(bool use_stderr)
+void ws_log_console_writer_set_use_stdout(bool use_stdout)
 {
-    stderr_debug_enabled = use_stderr;
+    stdout_logging_enabled = use_stdout;
 }
 
 

@@ -36,15 +36,10 @@
 extern "C" {
 #endif /* __cplusplus */
 
-typedef struct {
-    time_t tv_sec;  /* -1 if no time source is available */
-    long tv_nsec;   /* -1 if subsecond resolution is not available */
-} ws_log_time_t;
-
 
 /** Callback for registering a log writer. */
 typedef void (ws_log_writer_cb)(const char *domain, enum ws_log_level level,
-                            ws_log_time_t timestamp,
+                            struct timespec timestamp,
                             const char *file, int line, const char *func,
                             const char *user_format, va_list user_ap,
                             void *user_data);
@@ -56,26 +51,26 @@ typedef void (ws_log_writer_free_data_cb)(void *user_data);
 
 WS_DLL_PUBLIC
 void ws_log_file_writer(FILE *fp, const char *domain, enum ws_log_level level,
-                            ws_log_time_t timestamp,
+                            struct timespec timestamp,
                             const char *file, int line, const char *func,
                             const char *user_format, va_list user_ap);
 
 
 WS_DLL_PUBLIC
 void ws_log_console_writer(const char *domain, enum ws_log_level level,
-                            ws_log_time_t timestamp,
+                            struct timespec timestamp,
                             const char *file, int line, const char *func,
                             const char *user_format, va_list user_ap);
 
 
-/** Configure all log output to use stderr.
+/** Configure log levels "info" and below to use stdout.
  *
- * Normally log levels "info", "debug" and "noisy" are written to stdout.
- * Calling this function with true configures these levels to be written
- * to stderr as well.
+ * Normally all log messages are written to stderr. For backward compatibility
+ * with GLib calling this function with TRUE configures log levels "info",
+ * "debug" and "noisy" to be written to stdout.
  */
 WS_DLL_PUBLIC
-void ws_log_console_writer_set_use_stderr(bool use_stderr);
+void ws_log_console_writer_set_use_stdout(bool use_stdout);
 
 
 /** Convert a numerical level to its string representation. */
@@ -97,9 +92,10 @@ WS_DLL_PUBLIC
 enum ws_log_level ws_log_get_level(void);
 
 
-/** Set the active log level. */
+/** Set the active log level. Returns the active level or LOG_LEVEL_NONE
+ * if level is invalid. */
 WS_DLL_PUBLIC
-void ws_log_set_level(enum ws_log_level level);
+enum ws_log_level ws_log_set_level(enum ws_log_level level);
 
 
 /** Set the active log level from a string.
@@ -337,6 +333,9 @@ void ws_logv_full(const char *domain, enum ws_log_level level,
  * Accepts a format string and includes the file and function name.
  */
 #define ws_noisy(...)    _LOG_DEBUG(LOG_LEVEL_NOISY, __VA_ARGS__)
+
+
+#define WS_DEBUG_HERE(...)      _LOG_FULL(LOG_LEVEL_ECHO, __VA_ARGS__)
 
 
 /** This function is called to log a buffer (bytes array).

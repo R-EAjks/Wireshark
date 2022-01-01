@@ -4428,7 +4428,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Формат, в котором парсятся временные метки в текстовом файле (например, %H:%M:%S.). Спецификаторы формата базируются на strptime(3)</translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The format in which to parse timestamps in the text file (e.g. %H:%M:%S.%f).&lt;/p&gt;&lt;p&gt;Format specifiers are based on strptime(3) with the addition of %f for second fractions. The percision of %f is determined from it&apos;s length.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The format in which to parse timestamps in the text file (e.g. %H:%M:%S.%f).&lt;/p&gt;&lt;p&gt;Format specifiers are based on strptime(3) with the addition of %f for second fractions. The precision of %f is determined from its length.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -13672,6 +13672,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Save the displayed data in various formats</source>
         <translation>Сохранить отображённые данные в различных форматах</translation>
+    </message>
+    <message>
+        <source>Collapse All</source>
+        <translation type="unfinished">Свернуть Всё</translation>
+    </message>
+    <message>
+        <source>Expand All</source>
+        <translation type="unfinished">Развернуть Всё</translation>
     </message>
     <message>
         <source>Save Statistics As…</source>

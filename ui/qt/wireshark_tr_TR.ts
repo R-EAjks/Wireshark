@@ -4394,8 +4394,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Metin dosyasındaki zaman damgalarının ayrıştırılacağı biçim (ör. %H:%M:%S.). Biçim belirteçleri strptime(3)&apos;e dayalıdır</translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The format in which to parse timestamps in the text file (e.g. %H:%M:%S.%f).&lt;/p&gt;&lt;p&gt;Format specifiers are based on strptime(3) with the addition of %f for second fractions. The percision of %f is determined from it&apos;s length.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Metin dosyasındaki zaman damgalarının ayrıştırılacağı biçim (örn. %H:%M:%S.%f).&lt;/p&gt;&lt;p&gt;Biçim belirteçleri temel alınır. ikinci kesirler için %f eklenmesiyle strptime(3) üzerinde. %f&apos;nin kesinliği, uzunluğundan belirlenir.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The format in which to parse timestamps in the text file (e.g. %H:%M:%S.%f).&lt;/p&gt;&lt;p&gt;Format specifiers are based on strptime(3) with the addition of %f for second fractions. The precision of %f is determined from its length.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Metin dosyasındaki zaman damgalarının ayrıştırılacağı biçim (ör. %H:%M:%S.%f).&lt;/p&gt;&lt;p&gt;Biçim belirteçleri, ikinci kesirler için %f eklenmesiyle strptime(3)&apos;e dayanır. %f&apos;nin kesinliği, uzunluğundan belirlenir.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>%H:%M:%S.%f</source>
@@ -13604,6 +13604,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Save the displayed data in various formats</source>
         <translation>Görüntülenen verileri çeşitli biçimlerde kaydedin</translation>
+    </message>
+    <message>
+        <source>Collapse All</source>
+        <translation>Hepsini Daralt</translation>
+    </message>
+    <message>
+        <source>Expand All</source>
+        <translation>Hepsini Genişlet</translation>
     </message>
     <message>
         <source>Save Statistics As…</source>

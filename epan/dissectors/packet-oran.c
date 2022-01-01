@@ -440,7 +440,7 @@ static void write_pdu_label_and_info(proto_item *ti1, proto_item *ti2,
     }
 
     va_start(ap, format);
-    g_vsnprintf(info_buffer, MAX_INFO_BUFFER, format, ap);
+    vsnprintf(info_buffer, MAX_INFO_BUFFER, format, ap);
     va_end(ap);
 
     /* Add to indicated places */
@@ -493,7 +493,7 @@ addPcOrRtcid(tvbuff_t *tvb, proto_tree *tree, gint *offset, const char *name)
 
     proto_item_append_text(item, " (DU_Port_ID: %d, A_Cell_ID: %d, CC_ID: %d, RU_Port_ID: %d)", duPortId, aCellId, ccId, ruPortId);
     char id[16];
-    g_snprintf(id, 16, "%1x:%2.2x:%1x:%1x", duPortId, aCellId, ccId, ruPortId);
+    snprintf(id, 16, "%1x:%2.2x:%1x:%1x", duPortId, aCellId, ccId, ruPortId);
     proto_item *pi = proto_tree_add_string(oran_pcid_tree, hf_oran_c_eAxC_ID, tvb, id_offset, 2, id);
     proto_item_set_generated(pi);
 }
@@ -646,7 +646,7 @@ static guint32 dissect_bfw_bundle(tvbuff_t *tvb, proto_tree *tree, packet_info *
     /* Set bundle name */
     char bundle_name[32];
     if (bundle_number != ORPHAN_BUNDLE_NUMBER) {
-        g_snprintf(bundle_name, 32, "Bundle %u", bundle_number);
+        snprintf(bundle_name, 32, "Bundle %u", bundle_number);
     }
     else {
         g_strlcpy(bundle_name, "Orphaned", 32);
@@ -1335,7 +1335,7 @@ static int dissect_oran_c(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
     offset++;
 
     char id[16];
-    g_snprintf(id, 16, "%d-%d-%d", frameId, subframeId, slotId);
+    snprintf(id, 16, "%d-%d-%d", frameId, subframeId, slotId);
     proto_item *pi = proto_tree_add_string(section_tree, hf_oran_refa, tvb, ref_a_offset, 3, id);
     proto_item_set_generated(pi);
 
@@ -1461,11 +1461,14 @@ dissect_oran_u(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
     proto_item_append_text(protocol_item, "-U");
     proto_tree *oran_tree = proto_item_add_subtree(protocol_item, ett_oran);
 
+    /* Transport header */
+    /* Real-time control data / IQ data transfer message series identifier */
     addPcOrRtcid(tvb, oran_tree, &offset, "ecpriPcid");
+    /* Message identifier */
     addSeqid(tvb, oran_tree, &offset);
 
+    /* Common header for time reference */
     proto_item *timingHeader;
-
     proto_tree *timing_header_tree = proto_tree_add_subtree(oran_tree, tvb, offset, 4, ett_oran_u_timing, &timingHeader, "Timing header");
 
     guint32 direction;
@@ -1489,7 +1492,7 @@ dissect_oran_u(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
     offset++;
 
     char id[16];
-    g_snprintf(id, 16, "%d-%d-%d", frameId, subframeId, slotId);
+    snprintf(id, 16, "%d-%d-%d", frameId, subframeId, slotId);
     proto_item *pi = proto_tree_add_string(timing_header_tree, hf_oran_refa, tvb, ref_a_offset, 3, id);
     proto_item_set_generated(pi);
 
@@ -1529,6 +1532,8 @@ dissect_oran_u(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
         proto_item *sectionHeading;
         proto_tree *section_tree = proto_tree_add_subtree(oran_tree, tvb, offset, 2, ett_oran_u_section, &sectionHeading, "Section");
 
+        /* Section Header fields */
+
         /* sectionId */
         guint32 sectionId = 0;
         proto_tree_add_item_ret_uint(section_tree, hf_oran_section_id, tvb, offset, 2, ENC_BIG_ENDIAN, &sectionId);
@@ -1558,8 +1563,9 @@ dissect_oran_u(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
 
         write_section_info(sectionHeading, pinfo, protocol_item, sectionId, startPrbu, numPrbu);
 
+        /* TODO: should this use the same pref as c-plane? */
         if (numPrbu == 0) {
-            /* Special case for all PRBs */
+            /* Special case for all PRBs (NR: the total number of PRBs may be > 255) */
             numPrbu = pref_data_plane_section_total_rbs;
             startPrbu = 0;  /* may already be 0... */
         }
@@ -1587,6 +1593,7 @@ dissect_oran_u(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
         number_of_sections++;
     } while (bytesLeft >= (4 + nBytesPerPrb));     /* FIXME: bad heuristic */
 
+    /* Show number of sections found */
     proto_item *ti = proto_tree_add_uint(oran_tree, hf_oran_numberOfSections, tvb, 0, 0, number_of_sections);
     proto_item_set_generated(ti);
 
@@ -1993,7 +2000,7 @@ proto_register_oran(void)
          {"extType", "oran_fh_cus.extType",
           FT_UINT8, BASE_DEC,
           VALS(exttype_vals), 0x7f,
-          "The extension which which provides additional parameters specific to subject data extension",
+          "The extension type, which provides additional parameters specific to subject data extension",
           HFILL}
         },
 

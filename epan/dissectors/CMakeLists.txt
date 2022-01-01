@@ -667,6 +667,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-3com-njack.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-3com-xns.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-3g-a11.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-5co-legacy.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-6lowpan.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-9p.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-a21.c
@@ -1050,9 +1051,11 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-eth.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-etherip.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ethertype.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/packet-eti.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-etsi_card_app_toolkit.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-etv.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-etw.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/packet-eobi.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-evrc.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-evs.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-exablaze.c
@@ -2001,6 +2004,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-xot.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-xra.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-xtp.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/packet-xti.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-xyplex.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-yami.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-yhoo.c

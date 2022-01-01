@@ -1452,14 +1452,14 @@ dissect_radiotap_he_info(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
 static void
 not_captured_custom(gchar *result, guint32 value _U_)
 {
-	g_snprintf(result, ITEM_LABEL_LENGTH,
+	snprintf(result, ITEM_LABEL_LENGTH,
 		"NOT CAPTURED BY CAPTURE SOFTWARE");
 }
 
 static void
 he_sig_b_symbols_custom(gchar *result, guint32 value)
 {
-	g_snprintf(result, ITEM_LABEL_LENGTH, "%d", value+1);
+	snprintf(result, ITEM_LABEL_LENGTH, "%d", value+1);
 }
 
 static void
@@ -1741,11 +1741,14 @@ dissect_radiotap_0_length_psdu(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree
 	guint32 psdu_type;
 	tvbuff_t *new_tvb = NULL;
 
-	zero_len_tree = proto_tree_add_subtree(tree, tvb, offset, 1,
+	zero_len_tree = proto_tree_add_subtree(tree, tvb, offset,
+		tvb_captured_length_remaining(tvb, offset),
 		ett_radiotap_0_length_psdu, NULL, "0-length PSDU");
 
 	proto_tree_add_item_ret_uint(zero_len_tree, hf_radiotap_0_length_psdu_type,
 		tvb, offset, 1, ENC_NA, &psdu_type);
+	offset += 1;
+
 	switch (psdu_type) {
 
 	case 0:
@@ -2239,6 +2242,14 @@ dissect_radiotap_tlv(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
 		phdr->phy = PHDR_802_11_PHY_11AH;
 		s1g_tree = proto_tree_add_subtree(tree, tvb, offset, 6,
 				ett_radiotap_s1g, NULL, "S1G");
+
+		proto_tree_add_item(s1g_tree, hf_radiotap_tlv_type, tvb,
+				    offset, 2, ENC_LITTLE_ENDIAN);
+		offset += 2;
+
+		proto_tree_add_item(s1g_tree, hf_radiotap_tlv_datalen, tvb,
+				    offset, 2, ENC_LITTLE_ENDIAN);
+		offset += 2;
 
 		proto_tree_add_bitmask(s1g_tree, tvb, offset,
 				hf_radiotap_s1g_known, ett_radiotap_s1g_known,

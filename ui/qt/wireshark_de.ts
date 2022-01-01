@@ -4411,8 +4411,8 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Format um den Zeitstempel in der Textdatei einzulesen (z.B. %H:%M:%S.). Format basiert auf strptime(3)</translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The format in which to parse timestamps in the text file (e.g. %H:%M:%S.%f).&lt;/p&gt;&lt;p&gt;Format specifiers are based on strptime(3) with the addition of %f for second fractions. The percision of %f is determined from it&apos;s length.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Format des Zeitstempel der aus der Textdatei ausgelesen werden soll (z.B. %H:%M:%s.%f).&lt;/p&gt;&lt;p&gt;Formatzeichen basieren auf strptime(3) mit dem zusätzlichen Zeichen %f für Sekundenbruchteile. Die Länge von %f bestimmt die Präzision.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The format in which to parse timestamps in the text file (e.g. %H:%M:%S.%f).&lt;/p&gt;&lt;p&gt;Format specifiers are based on strptime(3) with the addition of %f for second fractions. The precision of %f is determined from its length.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>%H:%M:%S.%f</source>
@@ -13638,6 +13638,14 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>Save the displayed data in various formats</source>
         <translation>Die angezeigten Daten in verschiedenen Formaten speichern</translation>
+    </message>
+    <message>
+        <source>Collapse All</source>
+        <translation>Alles einklappen</translation>
+    </message>
+    <message>
+        <source>Expand All</source>
+        <translation>Alles aufklappen</translation>
     </message>
     <message>
         <source>Save Statistics As…</source>

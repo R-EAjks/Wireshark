@@ -4393,8 +4393,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>テキストファイルのタイムスタンプを解析する形式（例 %H:%M:%S） 形式の仕様はstrptime(3)に基づきます</translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The format in which to parse timestamps in the text file (e.g. %H:%M:%S.%f).&lt;/p&gt;&lt;p&gt;Format specifiers are based on strptime(3) with the addition of %f for second fractions. The percision of %f is determined from it&apos;s length.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;テキストファイルのタイムスタンプを解析する形式(例 %H:%M:%S.%f)&lt;/p&gt;&lt;p&gt; 形式の仕様はstrptime(3)に %fでコンマ秒を加えた仕様に基づきます %fの精度はその長さにより決まります。&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The format in which to parse timestamps in the text file (e.g. %H:%M:%S.%f).&lt;/p&gt;&lt;p&gt;Format specifiers are based on strptime(3) with the addition of %f for second fractions. The precision of %f is determined from its length.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;テキストファイルのタイムスタンプを解析する際の形式(例 %H:%M:%S.%f)&lt;/p&gt;&lt;p&gt; 形式の仕様はstrptime(3)に %fでコンマ秒を加えた仕様に基づきます %fの精度はその長さにより決まります。&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>%H:%M:%S.%f</source>
@@ -13607,6 +13607,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Save the displayed data in various formats</source>
         <translation>様々な形式で表示データを保存します</translation>
+    </message>
+    <message>
+        <source>Collapse All</source>
+        <translation>すべて閉じる</translation>
+    </message>
+    <message>
+        <source>Expand All</source>
+        <translation>すべて展開</translation>
     </message>
     <message>
         <source>Save Statistics As…</source>
