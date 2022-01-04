@@ -68,7 +68,6 @@ static gint ett_msrcp = -1;
 static gint ett_msrcp_nxt = -1;
 
 static expert_field ei_msrcp_no_resp = EI_INIT;
-static guint32 retransmission_timer = 1;
 
 // Handles for subparsing
 static dissector_handle_t eth_handle;
@@ -107,7 +106,6 @@ dissect_msrcp(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data _U
     msrcp_conv_info_t* msrcp_info = NULL;
     msrcp_transaction_t* msrcp_trans;
     wmem_tree_key_t  key[3];
-    gboolean retransmission = FALSE;
 
     // NOTE: Doing this to make sure my byte math is right
     data_offset += 4;
@@ -148,20 +146,8 @@ dissect_msrcp(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data _U
                     new_request = TRUE;
                 }
                 else
-                {
-                    /* We don't retransmit but lets help out in case a packet passes through NDIS
-                        more than once...*/
-                    nstime_t request_delta;
-
-                    nstime_delta(&request_delta, &pinfo->abs_ts, &msrcp_trans->req_time);
-                    if ((guint32)nstime_to_sec(&request_delta) < retransmission_timer)
-                    {
-                        retransmission = TRUE;
-                    }
-                    else
-                    {
-                        new_request = TRUE;
-                    }
+                {   
+                    new_request = TRUE;
                 }
 
                 if (new_request)
@@ -189,10 +175,6 @@ dissect_msrcp(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data _U
                         msrcp_trans->rep_frame = pinfo->num;
                         msrcp_trans->matched = TRUE;
                     }
-                    else
-                    {
-                        retransmission = TRUE;
-                    }
                 }
             }
         }
@@ -212,12 +194,6 @@ dissect_msrcp(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data _U
                     retrans_msrcp->rep_frame = 0;
                     retrans_msrcp->req_time = pinfo->abs_ts;
                     msrcp_trans = retrans_msrcp;
-
-                    retransmission = TRUE;
-                }
-                else if ((type == MSRCP_RESPONSE) && (msrcp_trans->rep_frame != pinfo->num))
-                {
-                    retransmission = TRUE;
                 }
             }
         }
