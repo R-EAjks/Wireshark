@@ -274,6 +274,14 @@ Fedora RPM Package:
 #     - tshark --version
 #  needs: [ 'Fedora RPM Package' ]
 
+include:
+  - template: Code-Quality.gitlab-ci.yml
+
+code_quality:
+  stage: test
+  artifacts:
+    paths: [gl-code-quality-report.json]
+
 # Job to generate packages for Debian stable
 Debian Stable APT Package:
   extends: .build-linux
