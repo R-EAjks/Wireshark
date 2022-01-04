@@ -26,6 +26,7 @@
 static const value_string packettypenames[] = {
     { 0, "REQUEST" },
     { 1, "RESPONSE" },
+    {0, NULL}
 };
 
 static const value_string headertypenames[] = {
@@ -34,6 +35,7 @@ static const value_string headertypenames[] = {
     {2, "MSRCP IPv6 Pair"},
     {3, "MSRCP Signature"},
     {4, "MSRCP Maximum"},
+    {0, NULL}
 };
 
 typedef struct _msrcp_conv_info_t {
