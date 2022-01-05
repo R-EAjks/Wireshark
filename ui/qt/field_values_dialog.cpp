@@ -177,11 +177,10 @@ FieldValuesDialog::FieldValuesDialog(QWidget &parent, CaptureFile &cf) :
         string_end_value = "0x" + string_end_value;
 
         QString description = QString::fromUtf8(cdescription);
-
-        ui->fieldValueTable->setStyleSheet("QTreeView::item:hover{background-color:lightyellow; color:black;}");
+        QColor hover_color = ColorUtils::alphaBlend(palette().window(), palette().highlight(), 0.5);
+        ui->fieldValueTable->setStyleSheet(QString("QTreeView::item:hover{background-color:%1; color:palette(text);}").arg(hover_color.name(QColor::HexArgb)));
         FvTreeWidgetItem *item = new FvTreeWidgetItem(ui->fieldValueTable);
-        QFont font = QFont("monospace");
-        font.setStyleHint(QFont::Monospace);
+        QFont font = wsApp->monospaceFont();
         item->setFont(column_value_first, font);
         item->setText(column_value_first, string_value);
         item->setTextAlignment(column_value_first, Qt::AlignRight);
@@ -194,9 +193,9 @@ FieldValuesDialog::FieldValuesDialog(QWidget &parent, CaptureFile &cf) :
         item->setTextAlignment(column_description, Qt::AlignLeft);
         if (field_value >= value && field_value <= value_end) {
             item->setData(0, Qt::UserRole, true);
-            item->setBackground(column_value_first, QBrush(Qt::darkYellow));
-            item->setBackground(column_value_last, QBrush(Qt::darkYellow));
-            item->setBackground(column_description, QBrush(Qt::darkYellow));
+            item->setBackground(column_value_first, QBrush(ColorUtils::fromColorT(&prefs.gui_text_valid)));
+            item->setBackground(column_value_last, QBrush(ColorUtils::fromColorT(&prefs.gui_text_valid)));
+            item->setBackground(column_description, QBrush(ColorUtils::fromColorT(&prefs.gui_text_valid)));
         }
 
         vf = next_vf;
@@ -256,9 +255,9 @@ FieldValuesDialog::FieldValuesDialog(QWidget &parent, CaptureFile &cf) :
         item->setTextAlignment(column_description, Qt::AlignLeft);
 
         item->setData(0, Qt::UserRole, true);
-        item->setBackground(column_value_first, QBrush(Qt::darkYellow));
-        item->setBackground(column_value_last, QBrush(Qt::darkYellow));
-        item->setBackground(column_description, QBrush(Qt::darkYellow));
+        item->setBackground(column_value_first, QBrush(ColorUtils::fromColorT(&prefs.gui_text_valid)));
+        item->setBackground(column_value_last, QBrush(ColorUtils::fromColorT(&prefs.gui_text_valid)));
+        item->setBackground(column_description, QBrush(ColorUtils::fromColorT(&prefs.gui_text_valid)));
     } else {
         QTreeWidgetItem *header = new QTreeWidgetItem();
         header->setText(0, tr("Value"));
@@ -338,7 +337,7 @@ void FieldValuesDialog::on_actionMark_Unmark_Cell_triggered()
         ColorUtils::fromColorT(&prefs.gui_marked_bg))) {
         if (item->data(0, Qt::UserRole).toBool()) {
             fg = QBrush();
-            bg = QBrush(Qt::darkYellow);
+            bg = QBrush(ColorUtils::fromColorT(&prefs.gui_text_valid));
         } else {
             fg = QBrush();
             bg = QBrush();
@@ -369,7 +368,7 @@ void FieldValuesDialog::on_actionMark_Unmark_Row_triggered()
     if (is_marked) {
         if (item->data(0, Qt::UserRole).toBool()) {
             fg = QBrush();
-            bg = QBrush(Qt::darkYellow);
+            bg = QBrush(ColorUtils::fromColorT(&prefs.gui_text_valid));
         } else {
             fg = QBrush();
             bg = QBrush();

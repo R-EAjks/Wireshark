@@ -33,6 +33,8 @@ Examples:
 
 ALLOWED_LICENSES = [
     'BSD',
+    '0BSD',
+    'BSD Zero Clause License',
     'BSD (2 clause)',
     'BSD (2 clause) GPL (v2 or later)',
     'BSD (3 clause)',
@@ -145,6 +147,12 @@ PATH_SPECIFIC_ALLOWED_LICENSES = {
     ],
     'tools/licensecheck.pl': [
         'GPL (v2)'
+    ],
+    'ui/qt/field_values_dialog.cpp': [
+        'UNKNOWN'
+    ],
+    'ui/qt/field_values_dialog.h': [
+        'UNKNOWN'
     ],
     '.gitlab/': [
         'UNKNOWN',
