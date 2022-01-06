@@ -1,4 +1,4 @@
-/* packet-rcp.c
+/* packet-msrcp.c
  * Routines for decoding Microsoft Cluster Route Control Protocol (MSRCP)
  * Copyright 2022, Will Aftring <william.aftring@outlook.com>
  * 
@@ -8,7 +8,7 @@
  * By Gerald Combs <gerald@wireshark.org>
  * Copyright 1998 Gerald Combs
  * 
-*/
+ */
 
 
 #include "config.h"
@@ -20,7 +20,8 @@
 #define MSRCP_PORT 3343
 #define MSRCP_REQUEST 0
 #define MSRCP_RESPONSE 1
-
+#define MSRCP_OFFSET_TYPE 6
+#define MSRCP_OFFSET_SEQ 12
 
 
 static const value_string packettypenames[] = {
@@ -94,7 +95,6 @@ dissect_msrcp(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data _U
             DstAddr:        16 bytes
     */
     guint tree_offset = 0;
-    gint data_offset = 0;
 
     proto_tree* msrcp_tree, * nxt_tree;
     proto_item* ti, * nxt_ti;
@@ -108,16 +108,8 @@ dissect_msrcp(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data _U
     msrcp_transaction_t* msrcp_trans;
     wmem_tree_key_t  key[3];
 
-    // NOTE: Doing this to make sure my byte math is right
-    data_offset += 4;
-    data_offset += 1;
-    data_offset += 1;
-    type = tvb_get_guint8(tvb, data_offset);
-    data_offset += 2;
-    data_offset += 2;
-    data_offset += 2;
-    seq = tvb_get_guint32(tvb, data_offset, ENC_LITTLE_ENDIAN);
-
+    type = tvb_get_guint8(tvb, MSRCP_OFFSET_TYPE);
+    seq = tvb_get_guint32(tvb, MSRCP_OFFSET_SEQ, ENC_LITTLE_ENDIAN);
 
     conv = find_or_create_conversation(pinfo);
     msrcp_info = (msrcp_conv_info_t*)conversation_get_proto_data(conv, proto_msrcp);
@@ -140,27 +132,14 @@ dissect_msrcp(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data _U
         {
             if (type == MSRCP_REQUEST)
             {
-                gboolean new_request = FALSE;
                 msrcp_trans = (msrcp_transaction_t*)wmem_tree_lookup32_array_le(msrcp_info->pdus, key);
-                if ((msrcp_trans == NULL) || (msrcp_trans->seq != seq) || (msrcp_trans->rep_frame > 0))
-                {
-                    new_request = TRUE;
-                }
-                else
-                {   
-                    new_request = TRUE;
-                }
-
-                if (new_request)
-                {
-                    msrcp_trans = wmem_new(wmem_file_scope(), msrcp_transaction_t);
-                    msrcp_trans->req_frame = pinfo->num;
-                    msrcp_trans->rep_frame = 0;
-                    msrcp_trans->req_time = pinfo->abs_ts;
-                    msrcp_trans->seq = seq;
-                    msrcp_trans->matched = FALSE;
-                    wmem_tree_insert32_array(msrcp_info->pdus, key, (void*)msrcp_trans);
-                }
+                msrcp_trans = wmem_new(wmem_file_scope(), msrcp_transaction_t);
+                msrcp_trans->req_frame = pinfo->num;
+                msrcp_trans->rep_frame = 0;
+                msrcp_trans->req_time = pinfo->abs_ts;
+                msrcp_trans->seq = seq;
+                msrcp_trans->matched = FALSE;
+                wmem_tree_insert32_array(msrcp_info->pdus, key, (void*)msrcp_trans);
             }
             else
             {
@@ -285,10 +264,10 @@ proto_register_msrcp(void)
 
     static hf_register_info hf[] = {
     { &hf_msrcp_id,
-    { "MSRCP ID", "msrcp.id",
+        { "MSRCP ID", "msrcp.id",
         FT_UINT32, BASE_DEC_HEX,
         NULL, 0x0,
-        NULL, HFILL },
+        NULL, HFILL},
     },
     { &hf_msrcp_vers,
         { "Version", "msrcp.vers",
@@ -298,9 +277,9 @@ proto_register_msrcp(void)
     },
     { &hf_msrcp_reserved,
         { "Reserved", "msrcp.reserved",
-            FT_UINT8, BASE_DEC,
-            NULL, 0x0,
-            NULL, HFILL}
+        FT_UINT8, BASE_DEC,
+        NULL, 0x0,
+        NULL, HFILL}
     },
     { &hf_msrcp_type,
         { "MSRCP Type", "msrcp.type",
@@ -328,13 +307,13 @@ proto_register_msrcp(void)
     },
     { &hf_msrcp_response_in,
         { "Response In", "msrcp.response_in",
-           FT_FRAMENUM, BASE_NONE, FRAMENUM_TYPE(FT_FRAMENUM_RESPONSE), 0x0,
-           "The response to this MSRCP request is in frame", HFILL}
+        FT_FRAMENUM, BASE_NONE, FRAMENUM_TYPE(FT_FRAMENUM_RESPONSE), 0x0,
+        "The response to this MSRCP request is in frame", HFILL}
     },
     { &hf_msrcp_response_to,
         { "Request In", "msrcp.response_to",
-           FT_FRAMENUM,BASE_NONE, FRAMENUM_TYPE(FT_FRAMENUM_REQUEST), 0x0,
-           "This is a response to an MSRCP request in frame", HFILL}
+        FT_FRAMENUM,BASE_NONE, FRAMENUM_TYPE(FT_FRAMENUM_REQUEST), 0x0,
+        "This is a response to an MSRCP request in frame", HFILL}
     },
     { &hf_msrcp_ext_header,
         { "Extension Header", "msrcp.ext",
@@ -345,14 +324,12 @@ proto_register_msrcp(void)
     { &hf_msrcp_ext_next_header,
         { "Next Header", "msrcp.ext_nxt_header",
         FT_UINT16, BASE_DEC,
-        VALS(headertypenames), 0x0,
-        NULL, HFILL}
+        VALS(headertypenames), 0x0, NULL, HFILL}
     },
     { &hf_msrcp_ext_len,
         {"Length", "msrcp.ext_len",
         FT_UINT16, BASE_DEC,
-        NULL, 0x0,
-        NULL, HFILL}
+        NULL, 0x0, NULL, HFILL}
     },
     { &hf_msrcp_ext_res,
         { "Reserved", "msrcp.nxt_res",
@@ -371,7 +348,7 @@ proto_register_msrcp(void)
         {
             &ei_msrcp_no_resp,
             { "msrcp.no_resp", PI_SEQUENCE, PI_WARN,
-                "MSRCP Response not found", EXPFILL }
+              "MSRCP Response not found", EXPFILL }
         }
     };
 
