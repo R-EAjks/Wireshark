@@ -24,6 +24,7 @@
 #include <ui/qt/utils/qt_ui_utils.h>
 #include <ui/qt/utils/variant_pointer.h>
 #include <ui/qt/widgets/wireshark_file_dialog.h>
+#include <ui/qt/widgets/text_find_delegate.h>
 #include "wireshark_application.h"
 
 #include <QCheckBox>
@@ -141,6 +142,7 @@ bool EndpointDialog::addTrafficTable(register_ct_t *table)
     const char* table_name = proto_get_protocol_short_name(find_protocol_by_id(proto_id));
 
     trafficTableTabWidget()->addTab(endp_tree, table_name);
+    TextFindDelegate::attachToView(this, endp_tree, textSearchLayout(), this);
 
     connect(endp_tree, SIGNAL(titleChanged(QWidget*,QString)),
             this, SLOT(setTabText(QWidget*,QString)));

@@ -45,6 +45,7 @@
 #include <ui/qt/utils/stock_icon.h>
 #include "wireshark_application.h"
 #include "ui/qt/widgets/wireshark_file_dialog.h"
+#include <ui/qt/widgets/text_find_delegate.h>
 
 /*
  * @file RTP stream analysis dialog
@@ -400,6 +401,7 @@ int RtpAnalysisDialog::addTabUI(tab_info_t *new_tab)
     ui->tabWidget->tabBar()->setTabTextColor(new_tab_no, color);
     ui->tabWidget->tabBar()->setTabToolTip(new_tab_no, *new_tab->tab_name);
     ui->tabWidget->setUpdatesEnabled(true);
+    TextFindDelegate::attachToView(this, new_tab->tree_widget, ui->textSearchLayout, this);
 
     QPen pen = QPen(color);
     QCPScatterStyle jitter_shape;
@@ -999,6 +1001,8 @@ void RtpAnalysisDialog::closeTab(int index)
         ui->streamGraph->removeGraph(tab->diff_graph);
         ui->streamGraph->removeGraph(tab->delta_graph);
         clearLayout(tab->graphHorizontalLayout);
+        TextFindDelegate::detachFromView(tab->tree_widget, this);
+
         delete remove_tab;
         deleteTabInfo(tab);
         g_free(tab);

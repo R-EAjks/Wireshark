@@ -22,6 +22,8 @@
 #include <ui/qt/models/timeline_delegate.h>
 #include "wireshark_application.h"
 
+#include <ui/qt/widgets/text_find_delegate.h>
+
 #include <QCheckBox>
 #include <QDateTime>
 #include <QDialogButtonBox>
@@ -161,6 +163,7 @@ bool ConversationDialog::addTrafficTable(register_ct_t* table)
     const char* table_name = proto_get_protocol_short_name(find_protocol_by_id(proto_id));
 
     trafficTableTabWidget()->addTab(conv_tree, table_name);
+    TextFindDelegate::attachToView(this, conv_tree, textSearchLayout(), this);
 
     conv_tree->setItemDelegateForColumn(CONV_COLUMN_START, new TimelineDelegate(conv_tree));
     conv_tree->setItemDelegateForColumn(CONV_COLUMN_DURATION, new TimelineDelegate(conv_tree));
