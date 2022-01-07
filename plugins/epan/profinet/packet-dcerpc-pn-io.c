@@ -2041,7 +2041,9 @@ static const value_string pn_io_mau_type[] = {
     { 0x002E, "100BASELX10" },
     /*0x002F - 0x0035 reserved */
     { 0x0036, "100BASEPXFD" },
-    /*0x0037 - 0xFFFF reserved */
+    /*0x0037 - 0x008C reserved */
+    { 0x008D, "10BASET1L" },
+    /*0x008E - 0xFFFF reserved */
     { 0, NULL }
 };
 
