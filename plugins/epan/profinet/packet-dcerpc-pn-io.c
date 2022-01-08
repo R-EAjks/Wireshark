@@ -2130,7 +2130,9 @@ static const range_string pn_io_mau_type_extension[] = {
     { 0x0000, 0x0000, "No SubMAUType" },
     { 0x0001, 0x00FF, "Reserved" },
     { 0x0100, 0x0100, "POF" },
-    { 0x0101, 0xFFEF, "Reserved for SubMAUType" },
+    { 0x0101, 0x01FF, "Reserved for SubMAUType" },
+    { 0x0200, 0x0200, "APL" },
+    { 0x0201, 0xFFEF, "Reserved for SubMAUType" },
     { 0xFFF0, 0xFFFF, "Reserved" },
     { 0, 0, NULL }
 };
