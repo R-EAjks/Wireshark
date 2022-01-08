@@ -61,6 +61,8 @@ private:
     const field_info       *finfo_;
     QString                 hint_label_;
     const static int cell_width = -13;
+
+    void make_description_only(const QString &text);
 };
 
 class FvTreeWidgetItem : public QTreeWidgetItem

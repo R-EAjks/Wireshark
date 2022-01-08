@@ -229,48 +229,136 @@ FieldValuesDialog::FieldValuesDialog(QWidget &parent, CaptureFile &cf) :
         header->setText(2, tr("Description"));
         ui->fieldValueTable->setHeaderItem(header);
     }
-
-    if (hfinfo->display & BASE_RANGE_STRING) {
-
+    if (finfo_->flags & FI_GENERATED) {
+        make_description_only(tr("Wireshark Generated Field - not part of protocol"));
+    } else if (hfinfo->type ==  FT_STRING) {
+        make_description_only(tr("string without null terminator"));
+    } else if (hfinfo->type ==  FT_STRINGZ) {
+        make_description_only(tr("null terminated string"));
+    } else if (hfinfo->type ==  FT_UINT_STRING) {
+        make_description_only(tr("string with count being the first part of the value"));
+    } else if (hfinfo->type ==  FT_STRINGZPAD) {
+        make_description_only(tr("null-padded string"));
+    } else if (hfinfo->type ==  FT_STRINGZTRUNC) {
+        make_description_only(tr("null-truncated string"));
+    } else if (hfinfo->type ==  FT_IEEE_11073_SFLOAT) {
+        make_description_only(tr("IEEE 11073 SFLOAT"));
+    } else if (hfinfo->type ==  FT_IEEE_11073_FLOAT) {
+        make_description_only(tr("IEEE 11073 FLOAT"));
+    } else if (hfinfo->type == FT_FLOAT ) {
+        make_description_only(tr("float"));
+    } else if (hfinfo->type ==  FT_DOUBLE) {
+        make_description_only(tr("double"));
+    } else if (hfinfo->type ==  FT_PROTOCOL || hfinfo->type ==  FT_BYTES) {
+        make_description_only(tr("data"));
     } else if ((hfinfo->display & BASE_RANGE_STRING) == 0 &&
             ui->fieldValueTable->topLevelItemCount() == 0 &&
-            field_length > 0) {
+            field_length > 0 &&
+            ones <= 64) {
         FvTreeWidgetItem *item = new FvTreeWidgetItem(ui->fieldValueTable);
-        item->setText(column_value_first, QString("0x00"));
-        item->setTextAlignment(column_value_first, Qt::AlignRight);
 
-        QString last;
-        if (ones <= 64) {
-            uint64_t max = 1;
-            uint64_t ones64 = ones;
-            max <<= ones64;
-            max -= 1;
-            last = "0x" + QString().setNum(max, 16);
+        QString first;
+        QString last = QString();
+        QString description = tr("data");
+
+        if (IS_FT_INT(hfinfo->type)) {
+            int64_t first_value;
+            int64_t last_value;
+
+            int64_t bits = 0;
+            if (hfinfo->type ==  FT_INT8) {
+                bits = 8;
+            } else if (hfinfo->type == FT_INT16) {
+                bits = 16;
+            } else if (hfinfo->type == FT_INT24) {
+                bits = 24;
+            } else if (hfinfo->type == FT_INT32) {
+                bits = 32;
+            } else if (hfinfo->type == FT_INT40) {
+                bits = 40;
+            } else if (hfinfo->type == FT_INT48) {
+                bits = 48;
+            } else if (hfinfo->type == FT_INT56) {
+                bits = 56;
+            } else if (hfinfo->type == FT_INT64) {
+                bits = 64;
+            }
+
+            first_value = -(1 << (bits - 1));
+            last_value = (1 << (bits - 1)) - 1;
+
+            first = QString().setNum(first_value);
+            last = QString().setNum(last_value);
+            description = QString("type is int%1").arg(bits);
         } else {
-            last = "2**" + QString().setNum(ones) + "-1";
+            first = QString("0x00");
+            if (IS_FT_UINT(hfinfo->type)) {
+                uint64_t bits = 0;
+                if (hfinfo->type ==  FT_UINT8) {
+                    bits = 8;
+                } else if (hfinfo->type == FT_UINT16) {
+                    bits = 16;
+                } else if (hfinfo->type == FT_UINT24) {
+                    bits = 24;
+                } else if (hfinfo->type == FT_UINT32) {
+                    bits = 32;
+                } else if (hfinfo->type == FT_UINT40) {
+                    bits = 40;
+                } else if (hfinfo->type == FT_UINT48) {
+                    bits = 48;
+                } else if (hfinfo->type == FT_UINT56) {
+                    bits = 56;
+                } else if (hfinfo->type == FT_UINT64) {
+                    bits = 64;
+                }
+                description = QString("type is uint%1").arg(bits);
+            }
         }
+
+        uint64_t max = 1;
+        uint64_t ones64 = ones;
+        max <<= ones64;
+        max -= 1;
+        if (last.isEmpty()) {
+            last = "0x" + QString().setNum(max, 16);
+        }
+
+        item->setText(column_value_first, first);
+        item->setTextAlignment(column_value_first, Qt::AlignRight);
         item->setText(column_value_last, last);
         item->setTextAlignment(column_value_last, Qt::AlignRight);
-        item->setText(column_description, QString(tr("data")));
+        item->setText(column_description, QString(description));
         item->setTextAlignment(column_description, Qt::AlignLeft);
 
         item->setData(0, Qt::UserRole, true);
         item->setBackground(column_value_first, QBrush(ColorUtils::fromColorT(&prefs.gui_text_valid)));
         item->setBackground(column_value_last, QBrush(ColorUtils::fromColorT(&prefs.gui_text_valid)));
         item->setBackground(column_description, QBrush(ColorUtils::fromColorT(&prefs.gui_text_valid)));
-    } else {
+    } else if (ui->fieldValueTable->topLevelItemCount() > 0) {
         QTreeWidgetItem *header = new QTreeWidgetItem();
         header->setText(0, tr("Value"));
         header->setText(1, tr("Description"));
         ui->fieldValueTable->setHeaderItem(header);
+    } else {
+        make_description_only(tr("data"));
+    }
+    QString field_value_str = QString();
+    if (vf == NULL) {
+        field_value_str = fvalue_to_string_repr(NULL, &finfo_->value, FTREPR_DISPLAY, hfinfo->display);
+        if (field_value_str.isEmpty()) {
+            field_value_str = tr("N/A");
+        }
+    } else {
+        field_value_str.setNum(field_value);
     }
 
-    hint_label_ = tr("Frame %1, %2, %3 bit(s) in %4 byte(s), bitmask 0x%5. Items: %6", "")
+    hint_label_ = tr("Frame %1, %2, %3 bit(s) in %4 byte(s), bitmask 0x%5. Value: %6. Items: %7", "")
                      .arg(cf.capFile()->current_frame->num)
                      .arg(field_name)
                      .arg(ones)
                      .arg(field_length)
                      .arg(bitmask, 1, 16)
+                     .arg(field_value_str)
                      .arg(ui->fieldValueTable->topLevelItemCount());
     updateHintLabel();
 }
@@ -279,6 +367,17 @@ FieldValuesDialog::FieldValuesDialog(QWidget &parent, CaptureFile &cf) :
 FieldValuesDialog::~FieldValuesDialog()
 {
     delete ui;
+}
+
+
+void FieldValuesDialog::make_description_only(const QString &text)
+{
+    QTreeWidgetItem *header = new QTreeWidgetItem();
+    header->setText(0, tr("Description"));
+    ui->fieldValueTable->setHeaderItem(header);
+
+    FvTreeWidgetItem *item = new FvTreeWidgetItem(ui->fieldValueTable);
+    item->setText(0, text);
 }
 
 
