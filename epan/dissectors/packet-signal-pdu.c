@@ -32,6 +32,7 @@
 #include <packet-lin.h>
 #include <packet-autosar-ipdu-multiplexer.h>
 #include <packet-dlt.h>
+#include <packet-uds.h>
 
 
 /*
@@ -62,6 +63,7 @@
 #define DATAFILE_SPDU_PDU_TRANSPORT_MAPPING                 "Signal_PDU_Binding_PDU_Transport"
 #define DATAFILE_SPDU_IPDUM_MAPPING                         "Signal_PDU_Binding_AUTOSAR_IPduM"
 #define DATAFILE_SPDU_DLT_MAPPING                           "Signal_PDU_Binding_DLT"
+#define DATAFILE_SPDU_UDS_MAPPING                           "Signal_PDU_Binding_UDS"
 
 /* ID wireshark identifies the dissector by */
 static int proto_signal_pdu                                 = -1;
@@ -99,6 +101,7 @@ static GHashTable *data_spdu_lin_mappings                   = NULL;
 static GHashTable *data_spdu_pdu_transport_mappings         = NULL;
 static GHashTable *data_spdu_ipdum_mappings                 = NULL;
 static GHashTable *data_spdu_dlt_mappings                   = NULL;
+static GHashTable *data_spdu_uds_mappings                   = NULL;
 
 static hf_register_info *dynamic_hf                         = NULL;
 static guint dynamic_hf_size                                = 0;
@@ -118,6 +121,7 @@ typedef enum _spdu_data_type {
     SPDU_DATA_TYPE_INT,
     SPDU_DATA_TYPE_FLOAT,
     SPDU_DATA_TYPE_STRING,
+    SPDU_DATA_TYPE_STRINGZ,
     SPDU_DATA_TYPE_UINT_STRING,
 } spdu_dt_t;
 
@@ -134,6 +138,7 @@ typedef struct _spdu_signal_item {
     gboolean    multiplexer;
     gint        multiplex_value_only;
     gboolean    hidden;
+    guint       encoding;
 
     gint       *hf_id_effective;
     gint       *hf_id_raw;
@@ -259,12 +264,24 @@ typedef struct _spdu_ipdum_mapping {
 } spdu_ipdum_mapping_t;
 typedef spdu_ipdum_mapping_t spdu_ipdum_mapping_uat_t;
 
+
 typedef struct _spdu_dlt_mapping {
     gchar      *ecu_id;
     guint32     dlt_message_id;
     guint32     message_id;
 } spdu_dlt_mapping_t;
 typedef spdu_dlt_mapping_t spdu_dlt_mapping_uat_t;
+
+
+typedef struct _spdu_uds_mapping {
+    guint32     uds_address;
+    guint32     service;
+    gboolean    reply;
+    guint32     id;
+    guint32     message_id;
+} spdu_uds_mapping_t;
+typedef spdu_uds_mapping_t spdu_uds_mapping_uat_t;
+
 
 static generic_one_id_string_t *spdu_message_ident = NULL;
 static guint spdu_message_ident_num = 0;
@@ -296,6 +313,10 @@ static guint spdu_ipdum_mapping_num = 0;
 static spdu_dlt_mapping_t *spdu_dlt_mapping = NULL;
 static guint spdu_dlt_mapping_num = 0;
 
+static spdu_uds_mapping_t *spdu_uds_mapping = NULL;
+static guint spdu_uds_mapping_num = 0;
+
+
 void proto_register_signal_pdu(void);
 void proto_reg_handoff_signal_pdu(void);
 
@@ -314,7 +335,7 @@ register_signal_pdu_can(void) {
 
         GList *tmp;
         for (tmp = keys; tmp != NULL; tmp = tmp->next) {
-            gint32 id = (*(gint32*)tmp->data);
+            gint32 id = (*(gint32 *)tmp->data);
 
             if ((id & CAN_EFF_FLAG) == CAN_EFF_FLAG) {
                 dissector_add_uint("can.extended_id", id & CAN_EFF_MASK, signal_pdu_handle_can);
@@ -341,7 +362,7 @@ register_signal_pdu_lin(void) {
 
         GList *tmp;
         for (tmp = keys; tmp != NULL; tmp = tmp->next) {
-            gint32 *id = (gint32*)tmp->data;
+            gint32 *id = (gint32 *)tmp->data;
             /* we register the combination of bus and frame id */
             dissector_add_uint("lin.frame_id", *id, signal_pdu_handle_lin);
         }
@@ -364,7 +385,7 @@ register_signal_pdu_someip(void) {
 
         GList *tmp;
         for (tmp = keys; tmp != NULL; tmp = tmp->next) {
-            gint64 *id = (gint64*)tmp->data;
+            gint64 *id = (gint64 *)tmp->data;
             guint32 message_id = (guint32)((guint64)(*id)) & 0xffffffff;
             dissector_add_uint("someip.messageid", message_id, signal_pdu_handle_someip);
         }
@@ -387,7 +408,7 @@ register_signal_pdu_pdu_transport(void) {
 
         GList *tmp;
         for (tmp = keys; tmp != NULL; tmp = tmp->next) {
-            gint64 *id = (gint64*)tmp->data;
+            gint64 *id = (gint64 *)tmp->data;
             dissector_add_uint("pdu_transport.id", ((guint32)((guint64)(*id)) & 0xffffffff), signal_pdu_handle_pdu_transport);
         }
 
@@ -409,7 +430,7 @@ register_signal_pdu_ipdum_ids(void) {
 
         GList *tmp;
         for (tmp = keys; tmp != NULL; tmp = tmp->next) {
-            gint64 *id = (gint64*)tmp->data;
+            gint64 *id = (gint64 *)tmp->data;
             dissector_add_uint("ipdum.pdu.id", ((guint32)((guint64)(*id)) & 0xffffffff), signal_pdu_handle_ipdum);
         }
 
@@ -431,7 +452,7 @@ spdu_payload_free_generic_data(gpointer data _U_) {
 /* ID -> Name */
 static void *
 copy_generic_one_id_string_cb(void *n, const void *o, size_t size _U_) {
-    generic_one_id_string_t       *new_rec = (generic_one_id_string_t *)n;
+    generic_one_id_string_t *new_rec = (generic_one_id_string_t *)n;
     const generic_one_id_string_t *old_rec = (const generic_one_id_string_t *)o;
 
     if (old_rec->name == NULL) {
@@ -495,14 +516,14 @@ post_update_one_id_string_template_cb(generic_one_id_string_t *data, guint data_
 
 
 /*** Signal PDU Messages ***/
-UAT_HEX_CB_DEF        (spdu_message_ident, id,    generic_one_id_string_t)
-UAT_CSTRING_CB_DEF    (spdu_message_ident, name,  generic_one_id_string_t)
+UAT_HEX_CB_DEF(spdu_message_ident, id, generic_one_id_string_t)
+UAT_CSTRING_CB_DEF(spdu_message_ident, name, generic_one_id_string_t)
 
 static void
 post_update_spdu_message_cb(void) {
     /* destroy old hash table, if it exists */
     if (data_spdu_messages) {
-        g_hash_table_destroy (data_spdu_messages);
+        g_hash_table_destroy(data_spdu_messages);
         data_spdu_messages = NULL;
     }
 
@@ -511,7 +532,7 @@ post_update_spdu_message_cb(void) {
     post_update_one_id_string_template_cb(spdu_message_ident, spdu_message_ident_num, data_spdu_messages);
 }
 
-static char*
+static char *
 get_message_name(guint32 id) {
     guint32 tmp = id;
 
@@ -541,8 +562,8 @@ UAT_BOOL_CB_DEF(spdu_signal_list, hidden, spdu_signal_list_uat_t)
 
 static void *
 copy_spdu_signal_list_cb(void *n, const void *o, size_t size _U_) {
-    spdu_signal_list_uat_t        *new_rec = (spdu_signal_list_uat_t *)n;
-    const spdu_signal_list_uat_t  *old_rec = (const spdu_signal_list_uat_t *)o;
+    spdu_signal_list_uat_t *new_rec = (spdu_signal_list_uat_t *)n;
+    const spdu_signal_list_uat_t *old_rec = (const spdu_signal_list_uat_t *)o;
 
     new_rec->id = old_rec->id;
     new_rec->num_of_params = old_rec->num_of_params;
@@ -648,8 +669,12 @@ update_spdu_signal_list(void *r, char **err) {
         g_strcmp0(rec->data_type, "int") != 0 &&
         g_strcmp0(rec->data_type, "float") != 0 &&
         g_strcmp0(rec->data_type, "string") != 0 &&
-        g_strcmp0(rec->data_type, "uint_string") != 0) {
-        *err = ws_strdup_printf("Currently the only supported data types are uint, int, float, string, and uint_string (ID: 0x%08x)", rec->id);
+        g_strcmp0(rec->data_type, "stringz") != 0 &&
+        g_strcmp0(rec->data_type, "uint_string") != 0 &&
+        g_strcmp0(rec->data_type, "utf_string") != 0 &&
+        g_strcmp0(rec->data_type, "utf_stringz") != 0 &&
+        g_strcmp0(rec->data_type, "utf_uint_string") != 0) {
+            *err = ws_strdup_printf("Currently the only supported data types are uint, int, float, string, stringz, uint_string, utf_string, utf_stringz, and utf_uint_string (ID: 0x%08x)", rec->id);
         return FALSE;
     }
 
@@ -686,7 +711,7 @@ update_spdu_signal_list(void *r, char **err) {
             return FALSE;
         }
 
-        if ((scaler != 1.0) && (offset != 0.0)) {
+        if ((scaler != 1.0) || (offset != 0.0)) {
             *err = ws_strdup_printf("Data type float currently does not support scaling and offset (ID: 0x%08x)", rec->id);
             return FALSE;
         }
@@ -697,25 +722,40 @@ update_spdu_signal_list(void *r, char **err) {
         }
     }
 
-    /* string, uint_string */
-    if (g_strcmp0(rec->data_type, "string") == 0 || g_strcmp0(rec->data_type, "uint_string") == 0) {
-        if ((scaler != 1.0) && (offset != 0.0)) {
-            *err = ws_strdup_printf("Data types string and uint_string currently do not support scaling and offset (ID: 0x%08x)", rec->id);
+    /* string, stringz, uint_string, utf_string, utf_stringz, utf_uint_string */
+    if (g_strcmp0(rec->data_type, "string") == 0 || g_strcmp0(rec->data_type, "stringz") == 0 || g_strcmp0(rec->data_type, "uint_string") == 0 ||
+        g_strcmp0(rec->data_type, "utf_string") == 0 || g_strcmp0(rec->data_type, "utf_stringz") == 0 || g_strcmp0(rec->data_type, "utf_uint_string") == 0) {
+        if ((scaler != 1.0) || (offset != 0.0)) {
+            *err = ws_strdup_printf("Data types string, stringz, uint_string, utf_string, utf_stringz, and utf_uint_string currently do not support scaling and offset (ID: 0x%08x)", rec->id);
             return FALSE;
         }
 
         if (rec->multiplexer == TRUE) {
-            *err = ws_strdup_printf("Data types string and uint_string currently cannot be used as multiplexer (ID: 0x%08x)", rec->id);;
+            *err = ws_strdup_printf("Data types string, stringz, uint_string, utf_string, utf_stringz, and utf_uint_string currently cannot be used as multiplexer (ID: 0x%08x)", rec->id);;
             return FALSE;
         }
 
-        if (rec->bitlength_base_type != 8) {
-            *err = ws_strdup_printf("Data typesstring and uint_string only support 8 bit Bitlength base type since they are ASCII-based (ID: 0x%08x)", rec->id);
+        if ((g_strcmp0(rec->data_type, "string") == 0 || g_strcmp0(rec->data_type, "stringz") == 0 || g_strcmp0(rec->data_type, "uint_string") == 0) &&
+            rec->bitlength_base_type != 8) {
+            *err = ws_strdup_printf("Data types string, stringz, and uint_string only support 8 bit Bitlength base type since they are ASCII-based (ID: 0x%08x)", rec->id);
             return FALSE;
         }
 
-        if (g_strcmp0(rec->data_type, "uint_string") == 0 && (rec->bitlength_encoded_type != 8) && (rec->bitlength_encoded_type != 16) && (rec->bitlength_encoded_type != 32) && (rec->bitlength_encoded_type != 64)) {
-            *err = ws_strdup_printf("Data type uint_string is only supported with 8, 16, 32, or 64 bit (ID: 0x%08x)", rec->id);
+        if ((g_strcmp0(rec->data_type, "utf_string") == 0 || g_strcmp0(rec->data_type, "utf_stringz") == 0 || g_strcmp0(rec->data_type, "utf_uint_string") == 0) &&
+            rec->bitlength_base_type != 8 && rec->bitlength_base_type != 16) {
+            *err = ws_strdup_printf("Data types utf_string, utf_stringz, and utf_uint_string only support Bitlength base type with 8 bit (UTF-8) or 16 bit (UTF-16) (ID: 0x%08x)", rec->id);
+            return FALSE;
+        }
+
+        if ((g_strcmp0(rec->data_type, "stringz") == 0 || g_strcmp0(rec->data_type, "utf_stringz") == 0 ) &&
+            (rec->bitlength_encoded_type != 0)) {
+            *err = ws_strdup_printf("Data types stringz and utf_stringz only support Bitlength encoded with 0 bit since the length is determined by zero-termination (ID: 0x%08x)", rec->id);
+            return FALSE;
+        }
+
+        if ((g_strcmp0(rec->data_type, "uint_string") == 0 || g_strcmp0(rec->data_type, "utf_uint_string") == 0) &&
+            (rec->bitlength_encoded_type != 8) && (rec->bitlength_encoded_type != 16) && (rec->bitlength_encoded_type != 32) && (rec->bitlength_encoded_type != 64)) {
+            *err = ws_strdup_printf("Data types uint_string and utf_uint_string only support Bitlength encoded with 8, 16, 32, or 64 bit since that defines the length of the length field (ID: 0x%08x)", rec->id);
             return FALSE;
         }
     }
@@ -724,7 +764,7 @@ update_spdu_signal_list(void *r, char **err) {
 }
 
 static void
-free_spdu_signal_list_cb(void*r) {
+free_spdu_signal_list_cb(void *r) {
     spdu_signal_list_uat_t *rec = (spdu_signal_list_uat_t *)r;
     if (rec->name) {
         g_free(rec->name);
@@ -758,9 +798,9 @@ deregister_user_data(void)
     }
 }
 
-static spdu_signal_value_name_t* get_signal_value_name_config(guint32 id, guint16 pos);
+static spdu_signal_value_name_t *get_signal_value_name_config(guint32 id, guint16 pos);
 
-static gint*
+static gint *
 create_hf_entry(guint i, guint32 id, guint32 pos, gchar *name, gchar *filter_string, spdu_dt_t data_type, gboolean scale_or_offset, gboolean raw) {
     if (i >= dynamic_hf_size) {
         return NULL;
@@ -812,6 +852,11 @@ create_hf_entry(guint i, guint32 id, guint32 pos, gchar *name, gchar *filter_str
         case SPDU_DATA_TYPE_STRING:
             dynamic_hf[i].hfinfo.display = BASE_NONE;
             dynamic_hf[i].hfinfo.type = FT_STRING;
+            break;
+
+        case SPDU_DATA_TYPE_STRINGZ:
+            dynamic_hf[i].hfinfo.display = BASE_NONE;
+            dynamic_hf[i].hfinfo.type = FT_STRINGZ;
             break;
 
         case SPDU_DATA_TYPE_UINT_STRING:
@@ -881,19 +926,41 @@ post_update_spdu_signal_list_read_in_data(spdu_signal_list_uat_t *data, guint da
                 /* we do not care if we overwrite param */
                 item->name = g_strdup(data[i].name);
                 item->pos = data[i].pos;
+
+                item->encoding = ENC_ASCII;
+                if (g_strcmp0("utf_string", data[i].data_type) == 0 ||
+                    g_strcmp0("utf_stringz", data[i].data_type) == 0 ||
+                    g_strcmp0("utf_uint_string", data[i].data_type) == 0) {
+                    switch (data[i].bitlength_base_type) {
+                    case 8:
+                        item->encoding = ENC_UTF_8;
+                        break;
+                    case 16:
+                        item->encoding = ENC_UTF_16;
+                        break;
+                    default:
+                        /* this should never happen, since it is validated in the update callback */
+                        item->encoding = ENC_ASCII;
+                        break;
+                    }
+                }
+
                 if (g_strcmp0("uint", data[i].data_type) == 0) {
                     item->data_type = SPDU_DATA_TYPE_UINT;
                 } else if (g_strcmp0("int", data[i].data_type) == 0) {
                     item->data_type = SPDU_DATA_TYPE_INT;
                 } else if (g_strcmp0("float", data[i].data_type) == 0) {
                     item->data_type = SPDU_DATA_TYPE_FLOAT;
-                } else if (g_strcmp0("string", data[i].data_type) == 0) {
+                } else if (g_strcmp0("string", data[i].data_type) == 0 || g_strcmp0("utf_string", data[i].data_type) == 0) {
                     item->data_type = SPDU_DATA_TYPE_STRING;
-                } else if (g_strcmp0("uint_string", data[i].data_type) == 0) {
+                } else if (g_strcmp0("stringz", data[i].data_type) == 0 || g_strcmp0("utf_stringz", data[i].data_type) == 0) {
+                    item->data_type = SPDU_DATA_TYPE_STRINGZ;
+                } else if (g_strcmp0("uint_string", data[i].data_type) == 0 || g_strcmp0("utf_uint_string", data[i].data_type) == 0) {
                     item->data_type = SPDU_DATA_TYPE_UINT_STRING;
                 } else {
                     item->data_type = SPDU_DATA_TYPE_NONE;
                 }
+
                 item->big_endian = data[i].big_endian;
                 item->bitlength_base_type = data[i].bitlength_base_type;
                 item->bitlength_encoded_type = data[i].bitlength_encoded_type;
@@ -932,14 +999,14 @@ reset_spdu_signal_list(void)
     deregister_user_data();
 }
 
-static spdu_signal_list_t*
+static spdu_signal_list_t *
 get_parameter_config(guint64 id) {
     if (data_spdu_signal_list == NULL) {
         return NULL;
     }
 
     gint64 key = (gint64)id;
-    return (spdu_signal_list_t*)g_hash_table_lookup(data_spdu_signal_list, &key);
+    return (spdu_signal_list_t *)g_hash_table_lookup(data_spdu_signal_list, &key);
 }
 
 /* UAT: Value Names */
@@ -994,7 +1061,7 @@ update_spdu_signal_value_name(void *r, char **err) {
 }
 
 static void
-free_spdu_signal_value_name_cb(void*r) {
+free_spdu_signal_value_name_cb(void *r) {
     spdu_signal_value_name_uat_t *rec = (spdu_signal_value_name_uat_t *)r;
     if (rec->value_name) {
         g_free(rec->value_name);
@@ -1075,14 +1142,14 @@ post_update_spdu_signal_value_names_cb(void) {
     post_update_spdu_signal_value_names_read_in_data(spdu_signal_value_names, spdu_parameter_value_names_num, data_spdu_signal_value_names);
 }
 
-static spdu_signal_value_name_t*
+static spdu_signal_value_name_t *
 get_signal_value_name_config(guint32 id, guint16 pos) {
     if (data_spdu_signal_list == NULL) {
         return NULL;
     }
 
     gint64 key = (guint64)id | (guint64)pos << 32;
-    return (spdu_signal_value_name_t*)g_hash_table_lookup(data_spdu_signal_value_names, &key);
+    return (spdu_signal_value_name_t *)g_hash_table_lookup(data_spdu_signal_value_names, &key);
 }
 
 /* UAT: SOME/IP Mapping */
@@ -1099,7 +1166,7 @@ spdu_someip_key(guint16 service_id, guint16 method_id, guint8 major_version, gui
 
 static void *
 copy_spdu_someip_mapping_cb(void *n, const void *o, size_t size _U_) {
-    spdu_someip_mapping_uat_t       *new_rec = (spdu_someip_mapping_uat_t *)n;
+    spdu_someip_mapping_uat_t *new_rec = (spdu_someip_mapping_uat_t *)n;
     const spdu_someip_mapping_uat_t *old_rec = (const spdu_someip_mapping_uat_t *)o;
 
     new_rec->service_id = old_rec->service_id;
@@ -1123,18 +1190,18 @@ update_spdu_someip_mapping(void *r, char **err) {
 
     if (rec->method_id > 0xffff) {
         *err = ws_strdup_printf("We currently only support 16 bit SOME/IP Method IDs (Service-ID: %x  Method-ID: %x  MsgType: %x  Version: %i)",
-            rec->service_id, rec->method_id, rec->message_type, rec->major_version);
+                                rec->service_id, rec->method_id, rec->message_type, rec->major_version);
         return FALSE;
     }
 
     if (rec->major_version > 0xff) {
         *err = ws_strdup_printf("We currently only support 8 bit SOME/IP major versions (Service-ID: %x  Method-ID: %x  MsgType: %x  Version: %i)",
-            rec->service_id, rec->method_id, rec->message_type, rec->major_version);
+                                 rec->service_id, rec->method_id, rec->message_type, rec->major_version);
     }
 
     if (rec->message_type > 0xff) {
         *err = ws_strdup_printf("We currently only support 8 bit SOME/IP message types (Service-ID: %x  Method-ID: %x  MsgType: %x  Version: %i)",
-            rec->service_id, rec->method_id, rec->message_type, rec->major_version);
+                                 rec->service_id, rec->method_id, rec->message_type, rec->major_version);
     }
 
     return TRUE;
@@ -1172,14 +1239,14 @@ post_update_spdu_someip_mapping_cb(void) {
     register_signal_pdu_someip();
 }
 
-static spdu_someip_mapping_t*
+static spdu_someip_mapping_t *
 get_someip_mapping(guint16 service_id, guint16 method_id, guint8 major_version, guint8 message_type) {
     if (data_spdu_someip_mappings == NULL) {
         return NULL;
     }
 
     gint64 key = spdu_someip_key(service_id, method_id, major_version, message_type);
-    return (spdu_someip_mapping_t*)g_hash_table_lookup(data_spdu_someip_mappings, &key);
+    return (spdu_someip_mapping_t *)g_hash_table_lookup(data_spdu_someip_mappings, &key);
 }
 
 /* UAT: CAN Mapping */
@@ -1189,7 +1256,7 @@ UAT_HEX_CB_DEF(spdu_can_mapping, message_id, spdu_can_mapping_uat_t)
 
 static void *
 copy_spdu_can_mapping_cb(void *n, const void *o, size_t size _U_) {
-    spdu_can_mapping_uat_t       *new_rec = (spdu_can_mapping_uat_t *)n;
+    spdu_can_mapping_uat_t *new_rec = (spdu_can_mapping_uat_t *)n;
     const spdu_can_mapping_uat_t *old_rec = (const spdu_can_mapping_uat_t *)o;
 
     new_rec->can_id = old_rec->can_id;
@@ -1246,7 +1313,7 @@ post_update_spdu_can_mapping_cb(void) {
     register_signal_pdu_can();
 }
 
-static spdu_can_mapping_t*
+static spdu_can_mapping_t *
 get_can_mapping(guint32 id, guint16 bus_id) {
     if (data_spdu_can_mappings == NULL) {
         return NULL;
@@ -1273,7 +1340,7 @@ UAT_HEX_CB_DEF(spdu_flexray_mapping, message_id, spdu_flexray_mapping_uat_t)
 
 static void *
 copy_spdu_flexray_mapping_cb(void *n, const void *o, size_t size _U_) {
-    spdu_flexray_mapping_uat_t       *new_rec = (spdu_flexray_mapping_uat_t *)n;
+    spdu_flexray_mapping_uat_t *new_rec = (spdu_flexray_mapping_uat_t *)n;
     const spdu_flexray_mapping_uat_t *old_rec = (const spdu_flexray_mapping_uat_t *)o;
 
     new_rec->channel    = old_rec->channel;
@@ -1329,14 +1396,14 @@ post_update_spdu_flexray_mapping_cb(void) {
     }
 }
 
-static spdu_flexray_mapping_t*
+static spdu_flexray_mapping_t *
 get_flexray_mapping(guint8 channel, guint8 cycle, guint16 flexray_id) {
     if (data_spdu_flexray_mappings == NULL) {
         return NULL;
     }
 
     gint64 key = (channel << 24) | (cycle << 16) | flexray_id;
-    return (spdu_flexray_mapping_t*)g_hash_table_lookup(data_spdu_flexray_mappings, &key);
+    return (spdu_flexray_mapping_t *)g_hash_table_lookup(data_spdu_flexray_mappings, &key);
 }
 
 
@@ -1347,8 +1414,8 @@ UAT_HEX_CB_DEF(spdu_lin_mapping, message_id, spdu_lin_mapping_uat_t)
 
 static void *
 copy_spdu_lin_mapping_cb(void *n, const void *o, size_t size _U_) {
-    spdu_lin_mapping_uat_t *new_rec = (spdu_lin_mapping_uat_t*)n;
-    const spdu_lin_mapping_uat_t *old_rec = (const spdu_lin_mapping_uat_t*)o;
+    spdu_lin_mapping_uat_t *new_rec = (spdu_lin_mapping_uat_t *)n;
+    const spdu_lin_mapping_uat_t *old_rec = (const spdu_lin_mapping_uat_t *)o;
 
     new_rec->frame_id = old_rec->frame_id;
     new_rec->bus_id = old_rec->bus_id;
@@ -1393,7 +1460,7 @@ post_update_spdu_lin_mapping_cb(void) {
         guint i;
         for (i = 0; i < spdu_lin_mapping_num; i++) {
             gint *key = wmem_new(wmem_epan_scope(), gint);
-            *key = (spdu_lin_mapping[i].frame_id)&LIN_ID_MASK;
+            *key = (spdu_lin_mapping[i].frame_id) & LIN_ID_MASK;
             *key |= ((spdu_lin_mapping[i].bus_id) & 0xffff) << 16;
 
             g_hash_table_insert(data_spdu_lin_mappings, key, &spdu_lin_mapping[i]);
@@ -1404,20 +1471,20 @@ post_update_spdu_lin_mapping_cb(void) {
     register_signal_pdu_lin();
 }
 
-static spdu_lin_mapping_t*
+static spdu_lin_mapping_t *
 get_lin_mapping(lin_info_t *lininfo) {
     if (data_spdu_lin_mappings == NULL) {
         return NULL;
     }
 
-    gint32 key = ((lininfo->id)&LIN_ID_MASK) | (((lininfo->bus_id) & 0xffff) << 16);
+    gint32 key = ((lininfo->id) & LIN_ID_MASK) | (((lininfo->bus_id) & 0xffff) << 16);
 
-    spdu_lin_mapping_uat_t *tmp = (spdu_lin_mapping_uat_t*)g_hash_table_lookup(data_spdu_lin_mappings, &key);
+    spdu_lin_mapping_uat_t *tmp = (spdu_lin_mapping_uat_t *)g_hash_table_lookup(data_spdu_lin_mappings, &key);
 
     if (tmp == NULL) {
         /* try again without Bus ID set */
         key = (lininfo->id) & LIN_ID_MASK;
-        tmp = (spdu_lin_mapping_uat_t*)g_hash_table_lookup(data_spdu_lin_mappings, &key);
+        tmp = (spdu_lin_mapping_uat_t *)g_hash_table_lookup(data_spdu_lin_mappings, &key);
     }
 
     return tmp;
@@ -1429,8 +1496,8 @@ UAT_HEX_CB_DEF(spdu_pdu_transport_mapping, message_id, spdu_pdu_transport_mappin
 
 static void *
 copy_spdu_pdu_transport_mapping_cb(void *n, const void *o, size_t size _U_) {
-    spdu_pdu_transport_mapping_uat_t *new_rec = (spdu_pdu_transport_mapping_uat_t*)n;
-    const spdu_pdu_transport_mapping_uat_t *old_rec = (const spdu_pdu_transport_mapping_uat_t*)o;
+    spdu_pdu_transport_mapping_uat_t *new_rec = (spdu_pdu_transport_mapping_uat_t *)n;
+    const spdu_pdu_transport_mapping_uat_t *old_rec = (const spdu_pdu_transport_mapping_uat_t *)o;
 
     new_rec->pdu_id = old_rec->pdu_id;
     new_rec->message_id = old_rec->message_id;
@@ -1479,14 +1546,14 @@ post_update_spdu_pdu_transport_mapping_cb(void) {
     register_signal_pdu_pdu_transport();
 }
 
-static spdu_pdu_transport_mapping_t*
+static spdu_pdu_transport_mapping_t *
 get_pdu_transport_mapping(guint32 pdu_transport_id) {
     if (data_spdu_pdu_transport_mappings == NULL) {
         return NULL;
     }
 
     gint64 key = pdu_transport_id;
-    return (spdu_pdu_transport_mapping_uat_t*)g_hash_table_lookup(data_spdu_pdu_transport_mappings, &key);
+    return (spdu_pdu_transport_mapping_uat_t *)g_hash_table_lookup(data_spdu_pdu_transport_mappings, &key);
 }
 
 /* UAT: IPduM Mapping */
@@ -1495,8 +1562,8 @@ UAT_HEX_CB_DEF(spdu_ipdum_mapping, message_id, spdu_ipdum_mapping_uat_t)
 
 static void *
 copy_spdu_ipdum_mapping_cb(void *n, const void *o, size_t size _U_) {
-    spdu_ipdum_mapping_uat_t *new_rec = (spdu_ipdum_mapping_uat_t*)n;
-    const spdu_ipdum_mapping_uat_t *old_rec = (const spdu_ipdum_mapping_uat_t*)o;
+    spdu_ipdum_mapping_uat_t *new_rec = (spdu_ipdum_mapping_uat_t *)n;
+    const spdu_ipdum_mapping_uat_t *old_rec = (const spdu_ipdum_mapping_uat_t *)o;
 
     new_rec->pdu_id = old_rec->pdu_id;
     new_rec->message_id = old_rec->message_id;
@@ -1545,14 +1612,14 @@ post_update_spdu_ipdum_mapping_cb(void) {
     register_signal_pdu_ipdum_ids();
 }
 
-static spdu_ipdum_mapping_uat_t*
+static spdu_ipdum_mapping_uat_t *
 get_ipdum_mapping(guint32 pdu_id) {
     if (data_spdu_ipdum_mappings == NULL) {
         return NULL;
     }
 
     gint64 key = pdu_id;
-    return (spdu_ipdum_mapping_uat_t*)g_hash_table_lookup(data_spdu_ipdum_mappings, &key);
+    return (spdu_ipdum_mapping_uat_t *)g_hash_table_lookup(data_spdu_ipdum_mappings, &key);
 }
 
 /* UAT: DLT Mapping */
@@ -1582,7 +1649,7 @@ update_spdu_dlt_mapping(void *r, char **err) {
     spdu_dlt_mapping_uat_t *rec = (spdu_dlt_mapping_uat_t *)r;
 
     if (rec->ecu_id != NULL && strlen(rec->ecu_id) > 4) {
-            *err = ws_strdup_printf("ECU ID can only be up to 4 characters long!");
+        *err = ws_strdup_printf("ECU ID can only be up to 4 characters long!");
         return FALSE;
     }
 
@@ -1626,6 +1693,112 @@ get_dlt_mapping(guint32 pdu_id, const gchar *ecu_id) {
     key |= (gint64)dlt_ecu_id_to_gint32(ecu_id) << 32;
 
     return (spdu_dlt_mapping_uat_t *)g_hash_table_lookup(data_spdu_dlt_mappings, &key);
+}
+
+/* UAT: UDS Mapping */
+UAT_HEX_CB_DEF(spdu_uds_mapping, uds_address, spdu_uds_mapping_uat_t)
+UAT_HEX_CB_DEF(spdu_uds_mapping, service, spdu_uds_mapping_uat_t)
+UAT_BOOL_CB_DEF(spdu_uds_mapping, reply, spdu_uds_mapping_uat_t)
+UAT_HEX_CB_DEF(spdu_uds_mapping, id, spdu_uds_mapping_uat_t)
+UAT_HEX_CB_DEF(spdu_uds_mapping, message_id, spdu_uds_mapping_uat_t)
+
+static void *
+copy_spdu_uds_mapping_cb(void *n, const void *o, size_t size _U_) {
+    spdu_uds_mapping_uat_t *new_rec = (spdu_uds_mapping_uat_t *)n;
+    const spdu_uds_mapping_uat_t *old_rec = (const spdu_uds_mapping_uat_t *)o;
+
+    new_rec->uds_address = old_rec->uds_address;
+    new_rec->service = old_rec->service;
+    new_rec->reply = old_rec->reply;
+    new_rec->id = old_rec->id;
+    new_rec->message_id = old_rec->message_id;
+
+    return new_rec;
+}
+
+static gboolean
+update_spdu_uds_mapping(void *r, char **err) {
+    spdu_uds_mapping_uat_t *rec = (spdu_uds_mapping_uat_t *)r;
+
+    if (rec->id > 0xffff) {
+        *err = g_strdup_printf("UDS IDs are only uint16!");
+        return FALSE;
+    }
+
+    if (rec->service > 0xff) {
+        *err = g_strdup_printf("UDS Services are only uint8!");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static void
+post_update_spdu_uds_mapping_cb(void) {
+    /* destroy old hash table, if it exists */
+    if (data_spdu_uds_mappings) {
+        g_hash_table_destroy(data_spdu_uds_mappings);
+        data_spdu_uds_mappings = NULL;
+    }
+
+    /* we don't need to free the data as long as we don't alloc it first */
+    data_spdu_uds_mappings = g_hash_table_new_full(g_int64_hash, g_int64_equal, &spdu_payload_free_key, NULL);
+
+    if (data_spdu_uds_mappings == NULL || spdu_uds_mapping == NULL) {
+        return;
+    }
+
+    if (spdu_uds_mapping_num > 0) {
+        guint i;
+        guint32 sid;
+        for (i = 0; i < spdu_uds_mapping_num; i++) {
+            gint64 *key = wmem_new(wmem_epan_scope(), gint64);
+            if (spdu_uds_mapping[i].reply) {
+                sid = (0xff & spdu_uds_mapping[i].service) | UDS_REPLY_MASK;
+            } else {
+                sid = (0xff & spdu_uds_mapping[i].service);
+            }
+
+            *key = (guint64)(spdu_uds_mapping[i].uds_address) | ((guint64)(0xffff & spdu_uds_mapping[i].id) << 32) | ((guint64)sid << 48);
+            g_hash_table_insert(data_spdu_uds_mappings, key, &spdu_uds_mapping[i]);
+
+            /* Adding with 0xffffffff (ANY) as address too */
+            key = wmem_new(wmem_epan_scope(), gint64);
+            *key = (guint64)(0xffffffff) | ((guint64)(0xffff & spdu_uds_mapping[i].id) << 32) | ((guint64)sid << 48);
+            g_hash_table_insert(data_spdu_uds_mappings, key, &spdu_uds_mapping[i]);
+        }
+    }
+}
+
+static spdu_uds_mapping_uat_t *
+get_uds_mapping(uds_info_t *uds_info) {
+    guint32 sid;
+
+    DISSECTOR_ASSERT(uds_info);
+    if (data_spdu_uds_mappings == NULL) {
+        return NULL;
+    }
+
+    gint64 *key = wmem_new(wmem_epan_scope(), gint64);
+    if (uds_info->reply) {
+        sid = (0xff & uds_info->service) | UDS_REPLY_MASK;
+    } else {
+        sid = (0xff & uds_info->service);
+    }
+    *key = (guint64)(uds_info->uds_address) | ((guint64)(0xffff & uds_info->id) << 32) | ((guint64)sid << 48);
+
+    spdu_uds_mapping_uat_t *tmp = (spdu_uds_mapping_uat_t *)g_hash_table_lookup(data_spdu_uds_mappings, key);
+
+    /* if we cannot find it for the Address, lets look at MAXUINT32 */
+    if (tmp == NULL) {
+        *key = (guint64)(G_MAXUINT32) | ((guint64)(0xffff & uds_info->id) << 32) | ((guint64)sid << 48);
+
+        tmp = (spdu_uds_mapping_uat_t *)g_hash_table_lookup(data_spdu_uds_mappings, key);
+    }
+
+    wmem_free(wmem_epan_scope(), key);
+
+    return tmp;
 }
 
 /**************************************
@@ -1828,7 +2001,7 @@ dissect_spdu_payload_signal(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         subtree = proto_item_add_subtree(ti, ett_spdu_signal);
         ti = proto_tree_add_uint64(subtree, hf_id_raw, tvb, offset, signal_length, value_guint64);
         proto_item_append_text(ti, " (0x%" PRIx64 ")", value_guint64);
-     }
+    }
         break;
 
     case SPDU_DATA_TYPE_INT: {
@@ -1894,7 +2067,15 @@ dissect_spdu_payload_signal(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
             expert_spdu_unaligned_data(tree, pinfo, tvb, offset, 0);
         }
 
-        proto_tree_add_item(tree, hf_id_effective, tvb, offset, signal_length, ENC_ASCII);
+        proto_tree_add_item(tree, hf_id_effective, tvb, offset, signal_length, item->encoding);
+        break;
+
+    case SPDU_DATA_TYPE_STRINGZ:
+        if (offset_bits != 0) {
+            expert_spdu_unaligned_data(tree, pinfo, tvb, offset, 0);
+        }
+        proto_tree_add_item_ret_length(tree, hf_id_effective, tvb, offset, -1, item->encoding, &string_length);
+        string_length *= 8;
         break;
 
     case SPDU_DATA_TYPE_UINT_STRING:
@@ -1903,9 +2084,9 @@ dissect_spdu_payload_signal(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         }
 
         if (item->big_endian) {
-            proto_tree_add_item_ret_length(tree, hf_id_effective, tvb, offset, signal_length, ENC_ASCII|ENC_BIG_ENDIAN, &string_length);
+            proto_tree_add_item_ret_length(tree, hf_id_effective, tvb, offset, signal_length, item->encoding | ENC_BIG_ENDIAN, &string_length);
         } else {
-            proto_tree_add_item_ret_length(tree, hf_id_effective, tvb, offset, signal_length, ENC_ASCII|ENC_LITTLE_ENDIAN, &string_length);
+            proto_tree_add_item_ret_length(tree, hf_id_effective, tvb, offset, signal_length, item->encoding | ENC_LITTLE_ENDIAN, &string_length);
         }
         string_length = string_length * 8 - (gint)item->bitlength_encoded_type;
         break;
@@ -1986,7 +2167,7 @@ dissect_spdu_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *root_tree, g
 
 static int
 dissect_spdu_message_someip(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data) {
-    someip_info_t *someip_info = (someip_info_t*)data;
+    someip_info_t *someip_info = (someip_info_t *)data;
 
     DISSECTOR_ASSERT(someip_info);
 
@@ -2024,7 +2205,7 @@ dissect_spdu_message_can_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 
 static int
 dissect_spdu_message_flexray(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data) {
-    struct flexray_info *flexray_data = (struct flexray_info*)data;
+    struct flexray_info *flexray_data = (struct flexray_info *)data;
     DISSECTOR_ASSERT(flexray_data);
 
     spdu_flexray_mapping_t *flexray_mapping = get_flexray_mapping(flexray_data->ch, flexray_data->cc, flexray_data->id);
@@ -2058,7 +2239,7 @@ dissect_spdu_message_lin(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
 
 static int
 dissect_spdu_message_pdu_transport(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data) {
-    pdu_transport_info_t *pdu_info = (pdu_transport_info_t*)data;
+    pdu_transport_info_t *pdu_info = (pdu_transport_info_t *)data;
     DISSECTOR_ASSERT(pdu_info);
 
     spdu_pdu_transport_mapping_t *pdu_transport_mapping = get_pdu_transport_mapping(pdu_info->id);
@@ -2072,7 +2253,7 @@ dissect_spdu_message_pdu_transport(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 
 static int
 dissect_spdu_message_ipdum(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data) {
-    autosar_ipdu_multiplexer_info_t *pdu_info = (autosar_ipdu_multiplexer_info_t*)data;
+    autosar_ipdu_multiplexer_info_t *pdu_info = (autosar_ipdu_multiplexer_info_t *)data;
     DISSECTOR_ASSERT(pdu_info);
 
     spdu_ipdum_mapping_uat_t *ipdum_mapping = get_ipdum_mapping(pdu_info->pdu_id);
@@ -2098,6 +2279,19 @@ dissect_spdu_message_dlt_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
     return dissect_spdu_payload(tvb, pinfo, tree, dlt_mapping->message_id, TRUE);
 }
 
+static gboolean
+dissect_spdu_message_uds_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data) {
+    uds_info_t *uds_info = (uds_info_t *)data;
+    DISSECTOR_ASSERT(uds_info);
+
+    spdu_uds_mapping_t *uds_mapping = get_uds_mapping(uds_info);
+    if (uds_mapping == NULL) {
+        return FALSE;
+    }
+
+    return dissect_spdu_payload(tvb, pinfo, tree, uds_mapping->message_id, FALSE) != 0;
+}
+
 /**************************************
  ********  Register Dissector  ********
  **************************************/
@@ -2108,21 +2302,21 @@ proto_register_signal_pdu(void) {
     expert_module_t *expert_module_lpdu;
 
     /* UAT for naming */
-    uat_t  *spdu_messages_uat;
+    uat_t *spdu_messages_uat;
 
     /* the UATs for parsing the message*/
-    uat_t  *spdu_signal_list_uat;
-    uat_t  *spdu_parameter_value_names_uat;
+    uat_t *spdu_signal_list_uat;
+    uat_t *spdu_parameter_value_names_uat;
 
     /* UATs for mapping different incoming payloads to messages*/
-    uat_t  *spdu_someip_mapping_uat;
-    uat_t  *spdu_can_mapping_uat;
-    uat_t  *spdu_flexray_mapping_uat;
-    uat_t  *spdu_lin_mapping_uat;
-    uat_t  *spdu_pdu_transport_mapping_uat;
-    uat_t  *spdu_ipdum_mapping_uat;
-    uat_t  *spdu_dlt_mapping_uat;
-
+    uat_t *spdu_someip_mapping_uat;
+    uat_t *spdu_can_mapping_uat;
+    uat_t *spdu_flexray_mapping_uat;
+    uat_t *spdu_lin_mapping_uat;
+    uat_t *spdu_pdu_transport_mapping_uat;
+    uat_t *spdu_ipdum_mapping_uat;
+    uat_t *spdu_dlt_mapping_uat;
+    uat_t *spdu_uds_mapping_uat;
 
     /* data fields */
     static hf_register_info hf[] = {
@@ -2222,6 +2416,15 @@ proto_register_signal_pdu(void) {
         UAT_END_FIELDS
     };
 
+    static uat_field_t spdu_uds_mapping_uat_fields[] = {
+        UAT_FLD_HEX(spdu_uds_mapping, uds_address,                      "ECU Address",           "ECU Address (32bit hex without leading 0x, 0xffffffff means any)"),
+        UAT_FLD_HEX(spdu_uds_mapping, service,                          "UDS Service",           "UDS Service (8bit hex without leading 0x)"),
+        UAT_FLD_BOOL(spdu_uds_mapping, reply,                           "Reply",                 "Reply [FALSE|TRUE]"),
+        UAT_FLD_HEX(spdu_uds_mapping, id,                               "ID",                    "ID (16bit hex without leading 0x)"),
+        UAT_FLD_HEX(spdu_uds_mapping, message_id,                       "Signal PDU ID",         "ID of the Signal PDU (32bit hex without leading 0x)"),
+        UAT_END_FIELDS
+    };
+
     static ei_register_info ei[] = {
         { &ef_spdu_payload_truncated, {"signal_pdu.payload.expert_truncated",
           PI_MALFORMED, PI_ERROR, "Signal PDU: Truncated payload!", EXPFILL} },
@@ -2247,7 +2450,7 @@ proto_register_signal_pdu(void) {
         sizeof(generic_one_id_string_t),            /* record size           */
         DATAFILE_SPDU_MESSAGES,                     /* filename              */
         TRUE,                                       /* from profile          */
-        (void**) &spdu_message_ident,               /* data_ptr              */
+        (void **)&spdu_message_ident,               /* data_ptr              */
         &spdu_message_ident_num,                    /* numitems_ptr          */
         UAT_AFFECTS_DISSECTION,                     /* but not fields        */
         NULL,                                       /* help                  */
@@ -2282,7 +2485,7 @@ proto_register_signal_pdu(void) {
 
     spdu_parameter_value_names_uat = uat_new("Signal Value Names",
         sizeof(spdu_signal_value_name_uat_t), DATAFILE_SPDU_VALUE_NAMES, TRUE,
-        (void**)&spdu_signal_value_names,
+        (void **)&spdu_signal_value_names,
         &spdu_parameter_value_names_num,
         UAT_AFFECTS_DISSECTION,
         NULL, /* help */
@@ -2298,11 +2501,12 @@ proto_register_signal_pdu(void) {
     prefs_register_uat_preference(spdu_module, "_spdu_parameter_value_names", "Value Names",
         "A table to define names of signal values", spdu_parameter_value_names_uat);
 
+
     spdu_signal_list_uat = uat_new("Signal PDU Signal List",
         sizeof(spdu_signal_list_uat_t), DATAFILE_SPDU_SIGNALS, TRUE,
-        (void**)&spdu_signal_list,
+        (void **)&spdu_signal_list,
         &spdu_signal_list_num,
-        UAT_AFFECTS_DISSECTION|UAT_AFFECTS_FIELDS,
+        UAT_AFFECTS_DISSECTION | UAT_AFFECTS_FIELDS,
         NULL, /* help */
         copy_spdu_signal_list_cb,
         update_spdu_signal_list,
@@ -2312,9 +2516,9 @@ proto_register_signal_pdu(void) {
         spdu_signal_list_uat_fields
     );
 
-
     prefs_register_uat_preference(spdu_module, "_spdu_signal_list", "Signal List",
         "A table to define names of signals", spdu_signal_list_uat);
+
 
     prefs_register_static_text_preference(spdu_module, "empty2", "", NULL);
     prefs_register_static_text_preference(spdu_module, "map", "Protocol Mappings:", NULL);
@@ -2322,7 +2526,7 @@ proto_register_signal_pdu(void) {
 
     spdu_someip_mapping_uat = uat_new("SOME/IP",
         sizeof(spdu_someip_mapping_uat_t), DATAFILE_SPDU_SOMEIP_MAPPING, TRUE,
-        (void**)&spdu_someip_mapping,
+        (void **)&spdu_someip_mapping,
         &spdu_someip_mapping_num,
         UAT_AFFECTS_DISSECTION,
         NULL, /* help */
@@ -2340,7 +2544,7 @@ proto_register_signal_pdu(void) {
 
     spdu_can_mapping_uat = uat_new("CAN",
         sizeof(spdu_can_mapping_uat_t), DATAFILE_SPDU_CAN_MAPPING, TRUE,
-        (void**)&spdu_can_mapping,
+        (void **)&spdu_can_mapping,
         &spdu_can_mapping_num,
         UAT_AFFECTS_DISSECTION,
         NULL, /* help */
@@ -2358,7 +2562,7 @@ proto_register_signal_pdu(void) {
 
     spdu_flexray_mapping_uat = uat_new("FlexRay",
         sizeof(spdu_flexray_mapping_uat_t), DATAFILE_SPDU_FLEXRAY_MAPPING, TRUE,
-        (void**)&spdu_flexray_mapping,
+        (void **)&spdu_flexray_mapping,
         &spdu_flexray_mapping_num,
         UAT_AFFECTS_DISSECTION,
         NULL, /* help */
@@ -2376,7 +2580,7 @@ proto_register_signal_pdu(void) {
 
     spdu_lin_mapping_uat = uat_new("LIN",
         sizeof(spdu_lin_mapping_uat_t), DATAFILE_SPDU_LIN_MAPPING, TRUE,
-        (void**)&spdu_lin_mapping,
+        (void **)&spdu_lin_mapping,
         &spdu_lin_mapping_num,
         UAT_AFFECTS_DISSECTION,
         NULL, /* help */
@@ -2394,7 +2598,7 @@ proto_register_signal_pdu(void) {
 
     spdu_pdu_transport_mapping_uat = uat_new("PDU Transport",
         sizeof(spdu_pdu_transport_mapping_uat_t), DATAFILE_SPDU_PDU_TRANSPORT_MAPPING, TRUE,
-        (void**)&spdu_pdu_transport_mapping,
+        (void **)&spdu_pdu_transport_mapping,
         &spdu_pdu_transport_mapping_num,
         UAT_AFFECTS_DISSECTION,
         NULL, /* help */
@@ -2412,7 +2616,7 @@ proto_register_signal_pdu(void) {
 
     spdu_ipdum_mapping_uat = uat_new("AUTOSAR I-PduM",
         sizeof(spdu_ipdum_mapping_uat_t), DATAFILE_SPDU_IPDUM_MAPPING, TRUE,
-        (void**)&spdu_ipdum_mapping,
+        (void **)&spdu_ipdum_mapping,
         &spdu_ipdum_mapping_num,
         UAT_AFFECTS_DISSECTION,
         NULL, /* help */
@@ -2444,6 +2648,24 @@ proto_register_signal_pdu(void) {
 
     prefs_register_uat_preference(spdu_module, "_spdu_dlt_mapping", "DLT Mappings",
         "A table to map DLT non-verbose Payloads to Signal PDUs", spdu_dlt_mapping_uat);
+
+
+    spdu_uds_mapping_uat = uat_new("UDS",
+        sizeof(spdu_uds_mapping_uat_t), DATAFILE_SPDU_UDS_MAPPING, TRUE,
+        (void **)&spdu_uds_mapping,
+        &spdu_uds_mapping_num,
+        UAT_AFFECTS_DISSECTION,
+        NULL, /* help */
+        copy_spdu_uds_mapping_cb,
+        update_spdu_uds_mapping,
+        NULL,
+        post_update_spdu_uds_mapping_cb,
+        NULL, /* reset */
+        spdu_uds_mapping_uat_fields
+    );
+
+    prefs_register_uat_preference(spdu_module, "_spdu_uds_mapping", "UDS Mappings",
+        "A table to map UDS payloads to Signal PDUs", spdu_uds_mapping_uat);
 }
 
 void
@@ -2468,6 +2690,8 @@ proto_reg_handoff_signal_pdu(void) {
         signal_pdu_handle_ipdum = register_dissector("signal_pdu_over_IPduM", dissect_spdu_message_ipdum, proto_signal_pdu);
 
         heur_dissector_add("dlt", dissect_spdu_message_dlt_heur, "Signal-PDU-Heuristic", "signal_pdu_dlt_heur", proto_signal_pdu, HEURISTIC_ENABLE);
+
+        heur_dissector_add("uds", dissect_spdu_message_uds_heur, "Signal-PDU-Heuristic", "signal_pdu_uds_heur", proto_signal_pdu, HEURISTIC_ENABLE);
 
         initialized = TRUE;
     }
