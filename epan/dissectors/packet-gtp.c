@@ -272,6 +272,13 @@ static int hf_gtp_earp_pci = -1;
 static int hf_gtp_earp_pl = -1;
 static int hf_gtp_earp_pvi = -1;
 static int hf_gtp_ext_comm_flags_uasi = -1;
+static int hf_gtp_ext_comm_flags_bdwi = -1;
+static int hf_gtp_ext_comm_flags_pcri = -1;
+static int hf_gtp_ext_comm_flags_vb = -1;
+static int hf_gtp_ext_comm_flags_retloc = -1;
+static int hf_gtp_ext_comm_flags_cpsr = -1;
+static int hf_gtp_ext_comm_flags_ccrsi = -1;
+static int hf_gtp_ext_comm_flags_uimsi = -1;
 static int hf_gtp_ext_comm_flags_II_pnsi = -1;
 static int hf_gtp_ext_comm_flags_II_dtci = -1;
 static int hf_gtp_ext_comm_flags_II_pmtsmi = -1;
@@ -8000,7 +8007,23 @@ decode_gtp_extended_common_flgs(tvbuff_t * tvb, int offset, packet_info * pinfo 
     proto_tree_add_item(ext_tree, hf_gtp_ext_length, tvb, offset, 2, ENC_BIG_ENDIAN);
     offset = offset + 2;
 
+    /* UE available for Signaling Indication */
     proto_tree_add_item(ext_tree, hf_gtp_ext_comm_flags_uasi, tvb, offset, 1, ENC_BIG_ENDIAN);
+    /* Buffered DL Data Waiting Indication */
+    proto_tree_add_item(ext_tree, hf_gtp_ext_comm_flags_bdwi, tvb, offset, 1, ENC_BIG_ENDIAN);
+    /* P-CSCF Restoration Indication */
+    proto_tree_add_item(ext_tree, hf_gtp_ext_comm_flags_pcri, tvb, offset, 1, ENC_BIG_ENDIAN);
+    /* Voice Bearer */
+    proto_tree_add_item(ext_tree, hf_gtp_ext_comm_flags_vb, tvb, offset, 1, ENC_BIG_ENDIAN);
+    /* Retrieve Location */
+    proto_tree_add_item(ext_tree, hf_gtp_ext_comm_flags_retloc, tvb, offset, 1, ENC_BIG_ENDIAN);
+    /* CS to PS SRVCC indication */
+    proto_tree_add_item(ext_tree, hf_gtp_ext_comm_flags_cpsr, tvb, offset, 1, ENC_BIG_ENDIAN);
+    /* CSG Change Reporting Support Indication */
+    proto_tree_add_item(ext_tree, hf_gtp_ext_comm_flags_ccrsi, tvb, offset, 1, ENC_BIG_ENDIAN);
+    /* Unauthenticated IMSI */
+    proto_tree_add_item(ext_tree, hf_gtp_ext_comm_flags_uimsi, tvb, offset, 1, ENC_BIG_ENDIAN);
+
     offset++;
 
     if(length > 1){
@@ -10966,6 +10989,41 @@ proto_register_gtp(void)
         {&hf_gtp_ext_comm_flags_uasi,
          { "UASI", "gtp.ext_comm_flags_uasi",
            FT_BOOLEAN, 8, NULL, 0x80,
+           NULL, HFILL}
+        },
+        {&hf_gtp_ext_comm_flags_bdwi,
+         { "BDWI", "gtp.ext_comm_flags_bdwi",
+           FT_BOOLEAN, 8, NULL, 0x40,
+           NULL, HFILL}
+        },
+        {&hf_gtp_ext_comm_flags_pcri,
+         { "PCRI", "gtp.ext_comm_flags_pcri",
+           FT_BOOLEAN, 8, NULL, 0x20,
+           NULL, HFILL}
+        },
+        {&hf_gtp_ext_comm_flags_vb,
+         { "VB", "gtp.ext_comm_flags_vb",
+           FT_BOOLEAN, 8, NULL, 0x10,
+           NULL, HFILL}
+        },
+        {&hf_gtp_ext_comm_flags_retloc,
+         { "RetLoc", "gtp.ext_comm_flags_retloc",
+           FT_BOOLEAN, 8, NULL, 0x08,
+           NULL, HFILL}
+        },
+        {&hf_gtp_ext_comm_flags_cpsr,
+         { "CPSR", "gtp.ext_comm_flags_cpsr",
+           FT_BOOLEAN, 8, NULL, 0x04,
+           NULL, HFILL}
+        },
+        {&hf_gtp_ext_comm_flags_ccrsi,
+         { "CCRSI", "gtp.ext_comm_flags_ccrsi",
+           FT_BOOLEAN, 8, NULL, 0x02,
+           NULL, HFILL}
+        },
+        {&hf_gtp_ext_comm_flags_uimsi,
+         { "Unauthenticated IMSI", "gtp.ext_comm_flags_uimsi",
+           FT_BOOLEAN, 8, NULL, 0x01,
            NULL, HFILL}
         },
         {&hf_gtp_ext_comm_flags_II_pnsi,
