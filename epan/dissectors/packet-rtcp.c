@@ -72,6 +72,7 @@
 #include <epan/expert.h>
 #include <epan/to_str.h>
 #include <epan/proto_data.h>
+#include <epan/proto.h>
 
 void proto_register_rtcp(void);
 void proto_reg_handoff_rtcp(void);
@@ -4361,9 +4362,14 @@ dissect_rtcp_common( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
         }
         col_set_str(pinfo->cinfo, COL_PROTOCOL, (srtcp_info) ? "SRTCP" : "RTCP");
     } else {
-        col_set_str(pinfo->cinfo, COL_PROTOCOL, "SRTCP");
-        srtcp_encrypted = is_srtp;
-        proto_to_use = proto_srtcp;
+        if (proto_is_protocol_enabled(find_protocol_by_id(proto_srtcp)))
+        {
+            col_set_str(pinfo->cinfo, COL_PROTOCOL, "SRTCP");
+            srtcp_encrypted = is_srtp;
+            proto_to_use = proto_srtcp;
+        } else {
+            col_set_str(pinfo->cinfo, COL_PROTOCOL, "RTCP");
+        }
     }
 
 
