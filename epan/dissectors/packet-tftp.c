@@ -778,7 +778,7 @@ is_valid_requerest_body(tvbuff_t *tvb)
   offset += tvb_strsize(tvb, offset);
   guint len = tvb_strsize(tvb, offset);
   const gchar* mode = tvb_format_stringzpad(wmem_packet_scope(), tvb, offset, len);
-  
+
   const gchar* modes[] = {"netscii", "octet", "mail"};
   for(guint i = 0; i < array_length(modes); ++i) {
     if (g_ascii_strcasecmp(mode, modes[i]) == 0) return TRUE;
@@ -1117,7 +1117,7 @@ void
 proto_reg_handoff_tftp(void)
 {
   heur_dissector_add("stun", dissect_embeddedtftp_heur, "TFTP over TURN", "tftp_stun", proto_tftp, HEURISTIC_ENABLE);
-  heur_dissector_add("udp", dissect_tftp_heur, "TFTP", "tftp", proto_tftp, HEURISTIC_ENABLE);
+  heur_dissector_add("udp", dissect_tftp_heur, "TFTP over UDP", "tftp", proto_tftp, HEURISTIC_ENABLE);
 
   dissector_add_uint_range_with_preference("udp.port", UDP_PORT_TFTP_RANGE, tftp_handle);
   apply_tftp_prefs();
