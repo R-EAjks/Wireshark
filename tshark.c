@@ -482,6 +482,8 @@ print_usage(FILE *output)
   fprintf(output, "                           values\n");
   fprintf(output, "  --elastic-mapping-filter <protocols> If -G elastic-mapping is specified, put only the\n");
   fprintf(output, "                           specified protocols within the mapping file\n");
+  fprintf(output, "  --temp-dir <directory>   write temporary files to this directory\n");
+  fprintf(output, "                           (default: %s)\n", g_get_tmp_dir());
   fprintf(output, "\n");
 
   ws_log_print_usage(output);
@@ -616,7 +618,7 @@ about_folders(void)
    */
 
   /* temp */
-  printf("%-21s\t%s\n", "Temp:", g_get_tmp_dir());
+  printf("%-21s\t%s\n", "Temp:", (global_capture_opts.temp_dir ? global_capture_opts.temp_dir : g_get_tmp_dir()));
 
   /* pers conf */
   path = get_persconffile_path("", FALSE);
@@ -1130,6 +1132,7 @@ main(int argc, char *argv[])
     case 'B':        /* Buffer size */
 #endif
     case LONGOPT_COMPRESS_TYPE:        /* compress type */
+    case LONGOPT_CAPTURE_TMPDIR:       /* capture temp directory */
       /* These are options only for packet capture. */
 #ifdef HAVE_LIBPCAP
       exit_status = capture_opts_add_opt(&global_capture_opts, opt, ws_optarg);
