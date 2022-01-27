@@ -618,7 +618,13 @@ about_folders(void)
    */
 
   /* temp */
-  printf("%-21s\t%s\n", "Temp:", (global_capture_opts.temp_dir ? global_capture_opts.temp_dir : g_get_tmp_dir()));
+  constpath = g_get_tmp_dir();
+#ifdef HAVE_LIBPCAP
+  /* global_capture_opts only exists in this case */
+  if (global_capture_opts.temp_dir)
+    constpath = global_capture_opts.temp_dir;
+#endif
+  printf("%-21s\t%s\n", "Temp:", constpath);
 
   /* pers conf */
   path = get_persconffile_path("", FALSE);
