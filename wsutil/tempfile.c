@@ -9,6 +9,9 @@
  */
 
 #include "config.h"
+
+#include <errno.h>
+
 #include "tempfile.h"
 #include "file_util.h"
 
