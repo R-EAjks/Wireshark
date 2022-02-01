@@ -3917,28 +3917,28 @@ dissect_ber_constrained_bitstring(gboolean implicit_tag, asn1_ctx_t *actx, proto
          * may encode the value with a length of 1 and with an initial octet set to 0
          * or may encode it as a bit string with one or more 0 bits following the initial octet.
          */
-        if ((pad == 0) && (len == 1)) {
-            /* empty */
-            item = proto_tree_add_item(parent_tree, hf_id, tvb, offset, len, ENC_BIG_ENDIAN);
-            actx->created_item = item;
-            proto_tree_add_item(parent_tree, hf_ber_bitstring_empty, tvb, offset, 1, ENC_BIG_ENDIAN);
-            if (out_tvb) {
-                *out_tvb = ber_tvb_new_subset_length(tvb, offset, len);
-            }
-            ber_check_length(8 * len - pad, min_len, max_len, actx, item, TRUE);
-            return end_offset;
-        } else {
-            /* padding */
-            proto_item *pad_item = proto_tree_add_item(parent_tree, hf_ber_bitstring_padding, tvb, offset, 1, ENC_BIG_ENDIAN);
-            if (pad > 7) {
-                expert_add_info_format(
-                    actx->pinfo, pad_item, &ei_ber_illegal_padding,
-                    "Illegal padding (0 .. 7): %d", pad);
-            }
-        }
-        offset++;
-        len--;
         if (hf_id >= 0) {
+            if ((pad == 0) && (len == 1)) {
+                /* empty */
+                item = proto_tree_add_item(parent_tree, hf_id, tvb, offset, len, ENC_BIG_ENDIAN);
+                actx->created_item = item;
+                proto_tree_add_item(parent_tree, hf_ber_bitstring_empty, tvb, offset, 1, ENC_BIG_ENDIAN);
+                if (out_tvb) {
+                    *out_tvb = ber_tvb_new_subset_length(tvb, offset, len);
+                }
+                ber_check_length(8 * len - pad, min_len, max_len, actx, item, TRUE);
+                return end_offset;
+            } else {
+                /* padding */
+                proto_item *pad_item = proto_tree_add_item(parent_tree, hf_ber_bitstring_padding, tvb, offset, 1, ENC_BIG_ENDIAN);
+                if (pad > 7) {
+                    expert_add_info_format(
+                        actx->pinfo, pad_item, &ei_ber_illegal_padding,
+                        "Illegal padding (0 .. 7): %d", pad);
+                }
+            }
+            offset++;
+            len--;
             item = proto_tree_add_item(parent_tree, hf_id, tvb, offset, len, ENC_NA);
             actx->created_item = item;
             if (named_bits) {
