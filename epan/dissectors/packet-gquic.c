@@ -3273,7 +3273,7 @@ proto_reg_handoff_gquic(void)
     tls13_handshake_handle = find_dissector("tls13-handshake");
     quic_handle = find_dissector("quic");
     dissector_add_uint_range_with_preference("udp.port", "", gquic_handle);
-    heur_dissector_add("udp", dissect_gquic_heur, "Google QUIC Heuristic", "gquic", proto_gquic, HEURISTIC_ENABLE);
+    heur_dissector_add("udp", dissect_gquic_heur, "Google QUIC", "gquic", proto_gquic, HEURISTIC_ENABLE);
 }
 
 

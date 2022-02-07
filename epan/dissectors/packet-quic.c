@@ -4715,7 +4715,7 @@ proto_reg_handoff_quic(void)
 {
     tls13_handshake_handle = find_dissector("tls13-handshake");
     dissector_add_uint_with_preference("udp.port", 0, quic_handle);
-    heur_dissector_add("udp", dissect_quic_heur, "QUIC Heuristic", "quic", proto_quic, HEURISTIC_ENABLE);
+    heur_dissector_add("udp", dissect_quic_heur, "QUIC", "quic", proto_quic, HEURISTIC_ENABLE);
     quic_follow_tap = register_tap("quic_follow");
 }
 
