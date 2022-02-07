@@ -13,6 +13,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #ifdef HAVE_LIBPCAP
 
 #include <string.h>
@@ -1021,11 +1025,13 @@ capture_opts_add_opt(capture_options *capture_opts, int opt, const char *optarg_
                     optarg_str_p);
             return 1;
         }
+#ifdef S_IRWXU
         if ((fstat.st_mode & S_IRWXU) != S_IRWXU) {
             cmdarg_err("Can't set temporary directory %s: not a writable directory",
                     optarg_str_p);
             return 1;
         }
+#endif /* S_IRWXU */
         capture_opts->temp_dir = g_strdup(optarg_str_p);
         break;
     default:
