@@ -185,7 +185,7 @@ the filesize is limited to a maximum value of 2 GiB.
 
 *packets*:__value__ switch to the next file after it contains __value__
 packets.
-This does not any packets that do not pass the display filter, so it
+This does not include any packets that do not pass the display filter, so it
 may differ from *-c*<capture packet count>.
 --
 
