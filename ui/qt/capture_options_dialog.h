@@ -93,7 +93,6 @@ private slots:
     void itemDoubleClicked(QTreeWidgetItem *item);
     void changeEvent(QEvent* event);
     void tempDirBrowseButtonClicked();
-    void tempDirResetButtonClicked();
 
 signals:
     void startCapture();

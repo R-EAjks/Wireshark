@@ -932,13 +932,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</stri
             </property>
            </widget>
           </item>
-          <item row="0" column="2">
-           <widget class="QPushButton" name="tempDirResetButton">
-            <property name="text">
-             <string>Reset</string>
-            </property>
-           </widget>
-          </item>
          </layout>
         </widget>
        </item>

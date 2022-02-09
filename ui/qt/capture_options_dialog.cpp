@@ -235,7 +235,6 @@ CaptureOptionsDialog::CaptureOptionsDialog(QWidget *parent) :
     connect(ui->interfaceTree, SIGNAL(itemClicked(QTreeWidgetItem*,int)), this, SLOT(itemClicked(QTreeWidgetItem*,int)));
     connect(ui->interfaceTree, SIGNAL(itemDoubleClicked(QTreeWidgetItem*,int)), this, SLOT(itemDoubleClicked(QTreeWidgetItem*)));
     connect(ui->tempDirBrowseButton, SIGNAL(clicked()), this, SLOT(tempDirBrowseButtonClicked()));
-    connect(ui->tempDirResetButton, SIGNAL(clicked()), this, SLOT(tempDirResetButtonClicked()));
 
     updateWidgets();
 }
@@ -390,11 +389,6 @@ void CaptureOptionsDialog::tempDirBrowseButtonClicked()
 {
     QString specified_dir = WiresharkFileDialog::getExistingDirectory(this, tr("Specify temporary directory"));
     ui->tempDirLineEdit->setText(specified_dir);
-}
-
-void CaptureOptionsDialog::tempDirResetButtonClicked()
-{
-    ui->tempDirLineEdit->clear();
 }
 
 void CaptureOptionsDialog::interfaceItemChanged(QTreeWidgetItem *item, int column)
