@@ -167,6 +167,9 @@ tvb_new_subset_length_caplen(tvbuff_t *backing, const gint backing_offset, const
 			        &subset_tvb_offset,
 			        &subset_tvb_length);
 
+	if (reported_length == 0)
+		return NULL;
+
 	if (reported_length == -1)
 		actual_reported_length = backing->reported_length - subset_tvb_offset;
 	else
@@ -192,6 +195,9 @@ tvb_new_subset_length(tvbuff_t *backing, const gint backing_offset, const gint r
 	DISSECTOR_ASSERT(backing && backing->initialized);
 
 	THROW_ON(reported_length < -1, ReportedBoundsError);
+
+	if (reported_length == 0)
+		return NULL;
 
 	if (reported_length == -1)
 		actual_reported_length = backing->reported_length;
