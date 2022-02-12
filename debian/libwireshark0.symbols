@@ -1139,6 +1139,7 @@ libwireshark.so.0 libwireshark0 #MINVER#
  proto_checksum_vals@Base 2.2.0
  proto_construct_match_selected_string@Base 1.9.1
  proto_deregister_field@Base 1.99.9
+ proto_deregister_protocol@Base 3.7.0
  proto_disable_by_default@Base 2.1.2
  proto_disable_proto_by_name@Base 1.99.8
  proto_enable_heuristic_by_name@Base 1.99.8

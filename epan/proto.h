@@ -2440,7 +2440,7 @@ proto_register_protocol_in_name_only(const char *name, const char *short_name, c
 /** Deregister a protocol.
  @param short_name abbreviated name of the protocol
  @return TRUE if protocol is removed */
-gboolean
+WS_DLL_PUBLIC gboolean
 proto_deregister_protocol(const char *short_name);
 
 /** Register a protocol alias.
