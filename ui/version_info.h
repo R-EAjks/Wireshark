@@ -19,6 +19,12 @@
 extern "C" {
 #endif /* __cplusplus */
 
+typedef GList **feature_list;
+typedef void(*gather_feature_func)(feature_list l);
+
+void with_feature(feature_list l, const char *fmt, ...) G_GNUC_PRINTF(2,3);
+void without_feature(feature_list l, const char *fmt, ...) G_GNUC_PRINTF(2,3);
+
 /*
  * Initialize information about the program for various purposes, including
  * reporting the version and build information for the program, putting
@@ -47,6 +53,10 @@ void ws_init_version_info(const char *appname,
     void (*prepend_compile_time_info)(GString *),
     void (*append_compile_time_info)(GString *),
     void (*additional_run_time_info)(GString *));
+
+void ws_init_version_info_new(const char *appname,
+		gather_feature_func gather_compile,
+		gather_feature_func gather_runtime);
 
 /*
  * Get a string giving the application name, as provided to

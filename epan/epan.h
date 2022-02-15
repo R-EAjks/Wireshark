@@ -12,6 +12,7 @@
 
 #include <glib.h>
 
+#include <ui/version_info.h>
 #include <epan/tvbuff.h>
 #include <epan/prefs.h>
 #include <epan/frame_data.h>
@@ -275,12 +276,20 @@ WS_DLL_PUBLIC
 void
 epan_get_compiled_version_info(GString *str);
 
+WS_DLL_PUBLIC
+void
+epan_gather_compile_info(feature_list l);
+
 /**
  * Get runtime information for libraries used by libwireshark.
  */
 WS_DLL_PUBLIC
 void
 epan_get_runtime_version_info(GString *str);
+
+WS_DLL_PUBLIC
+void
+epan_gather_runtime_info(feature_list l);
 
 #ifdef __cplusplus
 }
