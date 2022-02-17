@@ -14,16 +14,11 @@
 #define __WS_VERSION_INFO_H__
 
 #include <glib.h>
+#include <wsutil/feature_list.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
-
-typedef GList **feature_list;
-typedef void(*gather_feature_func)(feature_list l);
-
-void with_feature(feature_list l, const char *fmt, ...) G_GNUC_PRINTF(2,3);
-void without_feature(feature_list l, const char *fmt, ...) G_GNUC_PRINTF(2,3);
 
 /*
  * Initialize information about the program for various purposes, including

@@ -41,15 +41,13 @@
 #include <wsutil/crash_info.h>
 #include <wsutil/plugins.h>
 
-#define FEATURE_WITH "+"
-#define FEATURE_WITHOUT "-"
-#define FEATURE_PREFIX_LEN 1
-
 static char *appname_with_version;
 static char *comp_info;
 static char *runtime_info;
 
 static void get_compiler_info(GString *str);
+static void get_mem_info(GString *str);
+static inline void get_pcre2_runtime_version_info(GString *str);
 
 void
 ws_init_version_info(const char *appname,
@@ -85,56 +83,16 @@ ws_init_version_info(const char *appname,
 		appname_with_version, comp_info, runtime_info);
 }
 
-static gint
-feature_sort_alpha(gconstpointer a, gconstpointer b)
-{
-	gchar *a_str = (gchar *)(a) + FEATURE_PREFIX_LEN;
-	gchar *b_str = (gchar *)(b) + FEATURE_PREFIX_LEN;
-	return strcasecmp(a_str, b_str);
-}
-
 static void
 feature_to_gstring(gpointer data, gpointer user_data)
 {
+	gchar *feature = (gchar *)data;
 	GString *str = (GString *)user_data;
-	g_string_append_printf(str, "%s\n", (gchar *)data);
-}
-
-void
-ws_init_version_info_new(const char *appname,
-		gather_feature_func gather_compile,
-		gather_feature_func gather_runtime)
-{
-	GList *compile_info_list = NULL;
-	GList *runtime_info_list = NULL;
-	GString *comp_info_str = g_string_new(NULL);
-	GString *runtime_info_str = g_string_new(NULL);
-
-	/*
-	 * Combine the supplied application name string with the
-	 * version - including the VCS version, for a build from
-	 * a checkout.
-	 */
-	appname_with_version = ws_strdup_printf("%s %s",
-		appname, get_ws_vcs_version_info());
-
-	gather_compile(&compile_info_list);
-	compile_info_list = g_list_sort(compile_info_list, feature_sort_alpha);
-	g_list_foreach(compile_info_list, feature_to_gstring, comp_info_str);
-	comp_info = g_string_free(comp_info_str, FALSE);
-	g_list_free_full(compile_info_list, g_free);
-
-	gather_runtime(&runtime_info_list);
-	runtime_info_list = g_list_sort(runtime_info_list, feature_sort_alpha);
-	g_list_foreach(runtime_info_list, feature_to_gstring, runtime_info_str);
-	runtime_info = g_string_free(runtime_info_str, FALSE);
-	g_list_free_full(runtime_info_list, g_free);
-}
-
-const char *
-get_appname_and_version(void)
-{
-	return appname_with_version;
+	if (str->len > 0) {
+		g_string_append(str, ", ");
+	}
+	g_string_append_printf(str, "%s %s",
+			(*feature == '+' ? "with" : "without"), feature + 1);
 }
 
 /*
@@ -165,6 +123,109 @@ end_string(GString *str)
 		}
 		p = q + 1;
 	}
+}
+
+static void
+get_zlib_feature_info(feature_list l)
+{
+#ifdef HAVE_ZLIB
+#ifdef ZLIB_VERSION
+	with_feature(l, "zlib "ZLIB_VERSION);
+#else
+	with_feature(l, "zlib (version unknown)");
+#endif /* ZLIB_VERSION */
+#else
+	without_feature("zlib");
+#endif /* HAVE_ZLIB */
+}
+
+void
+ws_init_version_info_new(const char *appname,
+		gather_feature_func gather_compile,
+		gather_feature_func gather_runtime)
+{
+	GList *l = NULL;
+	gchar *lc;
+	GString *comp_info_str = g_string_new("Compiled ");
+	GString *runtime_info_str = g_string_new("Running on ");
+
+	/*
+	 * Combine the supplied application name string with the
+	 * version - including the VCS version, for a build from
+	 * a checkout.
+	 */
+	appname_with_version = ws_strdup_printf("%s %s",
+		appname, get_ws_vcs_version_info());
+
+	/* Compiler info */
+	if (sizeof(comp_info_str) == 4)
+		g_string_append(comp_info_str, "(32-bit) ");
+	else
+		g_string_append(comp_info_str, "(64-bit) ");
+	g_string_append(comp_info_str, "using ");
+	get_compiler_info(comp_info_str);
+	gather_compile(&l);
+#ifdef GLIB_MAJOR_VERSION
+	with_feature(&l,
+		"GLib %d.%d.%d", GLIB_MAJOR_VERSION, GLIB_MINOR_VERSION,
+		GLIB_MICRO_VERSION);
+#else
+	with_feature(&l,
+		"GLib (version unknown)");
+#endif
+	with_feature(&l, "PCRE2");
+	get_zlib_feature_info(&l);
+
+	l = g_list_reverse(l);
+	g_list_foreach(l, feature_to_gstring, comp_info_str);
+#ifdef WS_DISABLE_DEBUG
+	g_string_append(comp_info_str, ", release build");
+#endif
+#ifdef WS_DISABLE_ASSERT
+	g_string_append(comp_info_str, ", without assertions");
+#endif
+	g_string_append(comp_info_str, ".");
+	end_string(comp_info_str);
+	comp_info = g_string_free(comp_info_str, FALSE);
+	free_features(&l);
+
+	/* Runtime info */
+	get_os_version_info(runtime_info_str);
+	get_cpu_info(runtime_info_str);
+	get_mem_info(runtime_info_str);
+	with_feature(&l, "GLib %u.%u.%u",
+			glib_major_version, glib_minor_version, glib_micro_version);
+	get_pcre2_runtime_version_info(runtime_info_str);
+#if defined(HAVE_ZLIB) && !defined(_WIN32)
+	with_feature(&l, "zlib %s", zlibVersion());
+#endif
+	gather_runtime(&l);
+	if ((lc = setlocale(LC_CTYPE, NULL)) != NULL) {
+		with_feature(&l, "LC_TYPE=%s", lc);
+	}
+#ifdef HAVE_PLUGINS
+	if (g_module_supported()) {
+		with_feature(&l, "binary plugins (%d loaded)", plugins_get_count());
+	}
+	else {
+		without_feature(&l, "binary plugins (not supported by the platform)");
+	}
+#else
+	without_feature(&l, "binary plugins");
+#endif
+
+	l = g_list_reverse(l);
+	g_list_foreach(l, feature_to_gstring, runtime_info_str);
+	g_string_append_c(runtime_info_str, '.');
+	end_string(runtime_info_str);
+	runtime_info = g_string_free(runtime_info_str, FALSE);
+	free_features(&l);
+}
+
+const char *
+get_appname_and_version(void)
+{
+	return appname_with_version;
 }
 
 static const gchar *
@@ -591,34 +652,6 @@ show_help_header(const char *description)
 		"%s\n"
 		"See https://www.wireshark.org for more information.\n",
 		appname_with_version, description);
-}
-
-void
-with_feature(feature_list l, const char *fmt, ...)
-{
-	va_list arg;
-	GString *msg;
-
-	msg = g_string_new(FEATURE_WITH);
-
-	va_start(arg, fmt);
-	g_string_append_vprintf(msg,fmt, arg);
-	va_end(arg);
-	*l = g_list_prepend(*l, g_string_free(msg, FALSE));
-}
-
-void
-without_feature(feature_list l, const char *fmt, ...)
-{
-	va_list arg;
-	GString *msg;
-
-	msg = g_string_new(FEATURE_WITHOUT);
-
-	va_start(arg, fmt);
-	g_string_append_vprintf(msg,fmt, arg);
-	va_end(arg);
-	*l = g_list_prepend(*l, g_string_free(msg, FALSE));
 }
 
 /*

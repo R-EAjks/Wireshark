@@ -12,7 +12,7 @@
 #ifndef __CAPTURE_PCAP_UTIL_H__
 #define __CAPTURE_PCAP_UTIL_H__
 
-#include <ui/version_info.h>
+#include <wsutil/feature_list.h>
 
 #ifdef HAVE_LIBPCAP
 

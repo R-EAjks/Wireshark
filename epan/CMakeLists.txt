@@ -295,7 +295,6 @@ add_library(epan
 	${LIBWIRESHARK_HEADER_FILES}
 
 	${LIBWIRESHARK_FILES}
-	$<TARGET_OBJECTS:version_info>
 	$<TARGET_OBJECTS:crypt>
 	$<TARGET_OBJECTS:dfilter>
 	$<TARGET_OBJECTS:dissectors>

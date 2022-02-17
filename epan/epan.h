@@ -12,7 +12,7 @@
 
 #include <glib.h>
 
-#include <ui/version_info.h>
+#include <wsutil/feature_list.h>
 #include <epan/tvbuff.h>
 #include <epan/prefs.h>
 #include <epan/frame_data.h>
