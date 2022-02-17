@@ -582,36 +582,12 @@ print_current_user(void) {
   }
 }
 
-#if 0
-static void
-get_tshark_compiled_version_info(GString *str)
-{
-  /* Capture libraries */
-  get_compiled_caplibs_version(str);
-}
-#endif
-
 static void
 gather_tshark_compile_info(feature_list l)
 {
   gather_caplibs_compile_info(l);
   epan_gather_compile_info(l);
 }
-
-#if 0
-static void
-get_tshark_runtime_version_info(GString *str)
-{
-#ifdef HAVE_LIBPCAP
-    /* Capture libraries */
-    g_string_append(str, ", ");
-    get_runtime_caplibs_version(str);
-#endif
-
-    /* stuff used by libwireshark */
-    epan_get_runtime_version_info(str);
-}
-#endif
 
 static void
 gather_tshark_runtime_info(feature_list l)
@@ -884,12 +860,7 @@ main(int argc, char *argv[])
 #endif /* _WIN32 */
 
   /* Initialize the version information. */
-  /*
-  ws_init_version_info("TShark (Wireshark)", get_tshark_compiled_version_info,
-                       epan_get_compiled_version_info,
-                       get_tshark_runtime_version_info);
-  */
-  ws_init_version_info_new("TShark (Wireshark)",
+  ws_init_version_info("TShark",
       gather_tshark_compile_info, gather_tshark_runtime_info);
 
   /* Fail sometimes. Useful for testing fuzz scripts. */
