@@ -14,6 +14,7 @@
 
 #include <string.h>
 #include <ws_attributes.h>
+#include <wsutil/feature_list.h>
 
 #ifdef HAVE_LIBPCAP
 
@@ -26,7 +27,6 @@
 #include "capture/capture_ifinfo.h"
 #include "capture/capture-pcap-util.h"
 #include "capture/capture-pcap-util-int.h"
-#include <wsutil/feature_list.h>
 
 #ifdef HAVE_PCAP_REMOTE
 GList *

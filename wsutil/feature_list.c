@@ -52,4 +52,3 @@ free_features(feature_list l)
     g_list_free_full(*l, g_free);
     *l = NULL;
 }
-
