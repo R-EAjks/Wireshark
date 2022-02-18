@@ -72,12 +72,6 @@ indent_size = 8
 indent_style = space
 indent_size = 4
 
-[conditions.[ch]]
-indent_size = 2
-
-[file.[ch]]
-indent_size = 2
-
 [frame_tvbuff.[ch]]
 indent_style = tab
 indent_size = tab
