@@ -72,10 +72,6 @@ indent_size = 8
 indent_style = space
 indent_size = 4
 
-[frame_tvbuff.[ch]]
-indent_style = tab
-indent_size = tab
-
 [pcapio.[ch]]
 indent_size = 8
 
