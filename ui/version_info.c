@@ -150,7 +150,7 @@ get_zlib_feature_info(feature_list l)
 	with_feature(l, "zlib (version unknown)");
 #endif /* ZLIB_VERSION */
 #else
-	without_feature("zlib");
+	without_feature(l, "zlib");
 #endif /* HAVE_ZLIB */
 }
 

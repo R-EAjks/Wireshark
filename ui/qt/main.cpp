@@ -231,9 +231,9 @@ gather_wireshark_qt_compiled_info(feature_list l)
     }
 #ifdef _WIN32
 #ifdef HAVE_AIRPCAP
-    with_feature("AirPcap");
+    with_feature(l, "AirPcap");
 #else
-    without_feature("AirPcap");
+    without_feature(l, "AirPcap");
 #endif
 #endif /* _WIN32 */
 #ifdef HAVE_SPEEXDSP
