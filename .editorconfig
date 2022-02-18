@@ -72,21 +72,6 @@ indent_size = 8
 indent_style = space
 indent_size = 4
 
-[randpkt_core.[ch]]
-indent_style = tab
-indent_size = tab
-
-[sharkd.c]
-indent_size = 2
-
-[sharkd_daemon.c]
-indent_style = tab
-indent_size = tab
-
-[sharkd_session.c]
-indent_style = tab
-indent_size = tab
-
 [version_info.[ch]]
 indent_style = tab
 indent_size = tab
