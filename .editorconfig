@@ -72,9 +72,6 @@ indent_size = 8
 indent_style = space
 indent_size = 4
 
-[{tshark}.c]
-indent_size = 2
-
 [{dftest,randpkt,trigcap}.c]
 indent_style = tab
 indent_size = tab
