@@ -72,7 +72,7 @@ indent_size = 8
 indent_style = space
 indent_size = 4
 
-[{dftest,randpkt,trigcap}.c]
+[{randpkt,trigcap}.c]
 indent_style = tab
 indent_size = tab
 
