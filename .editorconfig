@@ -72,7 +72,7 @@ indent_size = 8
 indent_style = space
 indent_size = 4
 
-[{mergecap,tfshark,tshark}.c]
+[{tfshark,tshark}.c]
 indent_size = 2
 
 [{dftest,randpkt,trigcap}.c]
