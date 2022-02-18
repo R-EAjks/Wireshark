@@ -2428,11 +2428,11 @@ clean_exit:
 /*#define USE_BROKEN_G_MAIN_LOOP*/
 
 #ifdef USE_BROKEN_G_MAIN_LOOP
-GMainLoop *loop;
+    GMainLoop *loop;
 #else
-gboolean loop_running = FALSE;
+    gboolean loop_running = FALSE;
 #endif
-guint32 packet_count = 0;
+    guint32 packet_count = 0;
 
 
 typedef struct pipe_input_tag {
