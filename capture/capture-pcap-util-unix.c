@@ -119,12 +119,13 @@ gather_caplibs_compile_info(feature_list l)
 	 * So, for now, we just give up on reporting the version
 	 * of libpcap with which we were compiled.
 	 */
-	with_feature(l, "libpcap");
 #ifdef HAVE_PCAP_REMOTE
 	/*
 	 * We have remote pcap support in libpcap.
 	 */
-	with_feature(l, "remote capture");
+	with_feature(l, "libpcap with remote capture");
+#else
+	with_feature(l, "libpcap");
 #endif
 
 	/*
@@ -136,12 +137,12 @@ gather_caplibs_compile_info(feature_list l)
 	/* LIBCAP */
 #ifdef HAVE_LIBCAP
 #ifdef _LINUX_CAPABILITY_VERSION
-	with_feature(l, "POSIX (Linux)");
+	with_feature(l, "POSIX capabilities (Linux)");
 #else /* _LINUX_CAPABILITY_VERSION */
-	with_feature(l, "POSIX");
+	with_feature(l, "POSIX capabilities");
 #endif /* _LINUX_CAPABILITY_VERSION */
 #else /* HAVE_LIBCAP */
-	without_feature(l, "POSIX");
+	without_feature(l, "POSIX capabilities");
 #endif /* HAVE_LIBCAP */
 
 #ifdef __linux__
