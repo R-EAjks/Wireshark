@@ -159,6 +159,69 @@ get_compiled_caplibs_version(GString *str)
 #endif /* __linux__ */
 }
 
+void
+gather_caplibs_compile_info(feature_list l)
+{
+	/*
+	 * NOTE: in *some* flavors of UN*X, the data from a shared
+	 * library might be linked into executable images that are
+	 * linked with that shared library, in which case you could
+	 * look at pcap_version[] to get the version with which
+	 * the program was compiled.
+	 *
+	 * In other flavors of UN*X, that doesn't happen, so
+	 * pcap_version[] gives you the version the program is
+	 * running with, not the version it was built with, and,
+	 * in at least some of them, if the length of a data item
+	 * referred to by the executable - such as the pcap_version[]
+	 * string - isn't the same in the version of the library
+	 * with which the program was built and the version with
+	 * which it was run, the run-time linker will complain,
+	 * which is Not Good.
+	 *
+	 * So, for now, we just give up on reporting the version
+	 * of libpcap with which we were compiled.
+	 */
+	with_feature(l, "libpcap");
+#ifdef HAVE_PCAP_REMOTE
+	/*
+	 * We have remote pcap support in libpcap.
+	 */
+	with_feature(l, "remote capture");
+#endif
+
+	/*
+	 * XXX - these libraries are actually used only by dumpcap,
+	 * but we mention them here so that a user reporting a bug
+	 * can get information about dumpcap's libraries without
+	 * having to run dumpcap.
+	 */
+	/* LIBCAP */
+#ifdef HAVE_LIBCAP
+#ifdef _LINUX_CAPABILITY_VERSION
+	with_feature(l, "POSIX (Linux)");
+#else /* _LINUX_CAPABILITY_VERSION */
+	with_feature(l, "POSIX");
+#endif /* _LINUX_CAPABILITY_VERSION */
+#else /* HAVE_LIBCAP */
+	without_feature(l, "POSIX");
+#endif /* HAVE_LIBCAP */
+
+#ifdef __linux__
+	/* This is a Linux-specific library. */
+	/* LIBNL */
+#if defined(HAVE_LIBNL1)
+	with_feature(l, "libnl 1");
+#elif defined(HAVE_LIBNL2)
+	with_feature(l, "libnl 2");
+#elif defined(HAVE_LIBNL3)
+	with_feature(l, "libnl 3");
+#else /* no libnl */
+	without_feature(l, "libnl");
+#endif /* libnl version */
+#endif /* __linux__ */
+}
+
 /*
  * Append the version of libpcap with which we're running to a GString.
  */
@@ -177,6 +240,21 @@ get_runtime_caplibs_version(GString *str)
 		g_string_append_printf(str, "with %s", vstr);
 }
 
+void
+gather_caplibs_runtime_info(feature_list l)
+{
+	const char *vstr = pcap_lib_version();
+
+	/*
+	 * Remove the substring "version" from the output of pcap_lib_version()
+	 * to be consistent with our format.
+	 */
+	if (g_str_has_prefix(vstr, "libpcap version ")) /* Sanity check */
+		with_feature(l, "libpcap %s", vstr + strlen("libpcap version "));
+	else
+		with_feature(l, "%s", vstr);
+}
+
 #else /* HAVE_LIBPCAP */
 
 /*
@@ -190,11 +268,22 @@ get_compiled_caplibs_version(GString *str)
 	g_string_append(str, "without libpcap");
 }
 
+void
+gather_caplibs_compile_info(feature_list l)
+{
+	without_feature(l, "libpcap");
+}
+
 /*
  * Don't append anything, as we weren't even compiled to use libpcap.
  */
 void
 get_runtime_caplibs_version(GString *str _U_)
+{
+}
+
+void
+gather_caplibs_runtime_info(feature_list l _U_)
 {
 }
 

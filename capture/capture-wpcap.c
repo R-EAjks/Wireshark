@@ -819,6 +819,13 @@ get_compiled_caplibs_version(GString *str)
 	g_string_append(str, "with libpcap");
 }
 
+void
+gather_caplibs_compile_info(feature_list l)
+{
+	with_feature(l, "libpcap");
+}
+
+
 /*
  * Append the version of Npcap with which we're running to a GString.
  */
@@ -831,10 +838,23 @@ get_runtime_caplibs_version(GString *str)
 	 * not and, if we have it, what version we have.
 	 */
 	if (has_wpcap) {
-		g_string_append_printf(str, "with ");
-		g_string_append_printf(str, p_pcap_lib_version());
+		g_string_append_printf(str, "with %s", p_pcap_lib_version());
 	} else
 		g_string_append(str, "without Npcap or WinPcap");
+}
+
+void
+gather_caplibs_runtime_info(feature_list l)
+{
+	/*
+	 * On Windows, we might have been compiled with WinPcap/Npcap but
+	 * might not have it loaded; indicate whether we have it or
+	 * not and, if we have it, what version we have.
+	 */
+	if (has_wpcap) {
+		with_feature(l, "%s", p_pcap_lib_version());
+	} else
+		without_feature(l, "libpcap");
 }
 
 /*
@@ -889,11 +909,23 @@ get_compiled_caplibs_version(GString *str)
 	g_string_append(str, "without Npcap or WinPcap");
 }
 
+void
+gather_caplibs_compile_info(feature_list l)
+{
+	without_feature(l, "libpcap");
+}
+
+
 /*
  * Don't append anything, as we weren't even compiled to use WinPcap/Npcap.
  */
 void
 get_runtime_caplibs_version(GString *str _U_)
+{
+}
+
+void
+gather_caplibs_runtime_info(feature_list l _U_)
 {
 }
 

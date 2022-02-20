@@ -4814,19 +4814,17 @@ out:
 }
 
 static void
-get_dumpcap_compiled_info(GString *str)
+gather_dumpcap_compiled_info(feature_list l)
 {
     /* Capture libraries */
-    g_string_append(str, ", ");
-    get_compiled_caplibs_version(str);
+    gather_caplibs_compile_info(l);
 }
 
 static void
-get_dumpcap_runtime_info(GString *str)
+gather_dumpcap_runtime_info(feature_list l)
 {
     /* Capture libraries */
-    g_string_append(str, ", ");
-    get_runtime_caplibs_version(str);
+    gather_caplibs_runtime_info(l);
 }
 
 #define LONGOPT_IFNAME             LONGOPT_BASE_APPLICATION+1
@@ -4931,8 +4929,8 @@ main(int argc, char *argv[])
 #endif
 
     /* Initialize the version information. */
-    ws_init_version_info("Dumpcap (Wireshark)", NULL, get_dumpcap_compiled_info,
-                         get_dumpcap_runtime_info);
+    ws_init_version_info("Dumpcap", gather_dumpcap_compiled_info,
+                         gather_dumpcap_runtime_info);
 
 #ifdef HAVE_PCAP_REMOTE
 #define OPTSTRING_r "r"
