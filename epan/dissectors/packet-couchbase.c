@@ -408,6 +408,7 @@ static int hf_extras_start_seqno = -1;
 static int hf_extras_end_seqno = -1;
 static int hf_extras_high_completed_seqno = -1;
 static int hf_extras_max_visible_seqno = -1;
+static int hf_extras_snapshot_marker_timestamp = -1;
 static int hf_extras_marker_version = -1;
 static int hf_extras_vbucket_uuid = -1;
 static int hf_extras_snap_start_seqno = -1;
@@ -994,6 +995,49 @@ static gboolean couchbase_desegment_body = TRUE;
 static guint couchbase_ssl_port = 11207;
 static guint couchbase_ssl_port_pref = 11207;
 
+#define ISO8601_TIMESTAMP_LENGTH 33
+static int generate_iso8601_timestamp(char *destination, size_t destination_size, time_t now, uint64_t frac_of_second) {
+  if (destination_size < ISO8601_TIMESTAMP_LENGTH) {
+    return -1;
+  }
+  struct tm utc_time;
+  struct tm local_time;
+#ifdef WIN32
+  gmtime_s(&utc_time, &now);
+  localtime_s(&local_time, &now);
+#else
+  gmtime_r(&now, &utc_time);
+  localtime_r(&now, &local_time);
+#endif
+  time_t utc = mktime(&utc_time);
+  time_t local = mktime(&local_time);
+
+  if (utc_time.tm_isdst != 0) {
+    /* UTC should not be adjusted to daylight savings */
+    utc -= 3600;
+  }
+
+  double total_seconds_diff = difftime(local, utc);
+  double total_minutes_diff = total_seconds_diff / 60;
+  int32_t hours = (int32_t)(total_minutes_diff / 60);
+  int32_t minutes = (int32_t)(total_minutes_diff) % 60;
+
+  int offset = snprintf(
+      destination, destination_size, "%04u-%02u-%02uT%02u:%02u:%02u.%06" PRIu64,
+      local_time.tm_year + 1900, local_time.tm_mon + 1, local_time.tm_mday,
+      local_time.tm_hour, local_time.tm_min, local_time.tm_sec, frac_of_second);
+
+  if (total_seconds_diff == 0.0) {
+    offset += snprintf(destination + offset, destination_size - offset, "Z");
+  } else if (total_seconds_diff < 0.0) {
+    offset += snprintf(destination + offset, destination_size - offset,
+                       "-%02u:%02u", abs(hours), abs(minutes));
+  } else {
+    offset += snprintf(destination + offset, destination_size - offset,
+                       "+%02u:%02u", hours, minutes);
+  }
+  return offset;
+}
 
 static guint
 get_couchbase_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
@@ -2377,8 +2421,8 @@ dissect_value(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         ti = proto_tree_add_item(tree, hf_get_errmap_version, tvb, offset, value_len, ENC_BIG_ENDIAN);
       }
     } else if (request && opcode == PROTOCOL_BINARY_DCP_SNAPSHOT_MARKER) {
-      if (value_len != 36) {
-        expert_add_info_format(pinfo, ti, &ef_warn_illegal_value_length, "Illegal Value length, should be 36");
+      if (value_len < 36) {
+        expert_add_info_format(pinfo, ti, &ef_warn_illegal_value_length, "Illegal Value length, should be (at least) 36");
         ti = proto_tree_add_item(tree, hf_value, tvb, offset, value_len, ENC_ASCII | ENC_NA);
       } else {
         proto_tree_add_item(tree, hf_extras_start_seqno, tvb, offset, 8, ENC_BIG_ENDIAN);
@@ -2390,6 +2434,30 @@ dissect_value(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         proto_tree_add_item(tree, hf_extras_max_visible_seqno, tvb, offset, 8, ENC_BIG_ENDIAN);
         offset += 8;
         proto_tree_add_item(tree, hf_extras_high_completed_seqno, tvb, offset, 8, ENC_BIG_ENDIAN);
+        offset += 8;
+
+        if (value_len >= 44) {
+          char *timestamp_buffer = wmem_alloc(pinfo->pool, ISO8601_TIMESTAMP_LENGTH);
+          if (timestamp_buffer) {
+            uint64_t ns = tvb_get_ntoh64(tvb, offset);
+            uint64_t us = ns / 1000;
+            uint64_t sec = us / 1000 / 1000;
+            us -= (sec * 1000 * 1000);
+            ti = proto_tree_add_item(tree, hf_extras_snapshot_marker_timestamp, tvb, offset, 8, ENC_BIG_ENDIAN);
+            if (generate_iso8601_timestamp(timestamp_buffer, ISO8601_TIMESTAMP_LENGTH, sec, us) > 0) {
+              proto_item_append_text(ti, " (%s)", timestamp_buffer);
+            }
+          } else {
+            /* Allocation failed, ignore textual dump */
+            proto_tree_add_item(tree, hf_extras_snapshot_marker_timestamp, tvb, offset, 8, ENC_BIG_ENDIAN);
+          }
+          offset += 8;
+
+          /* Add the unknown bytes */
+          if (value_len > 44) {
+              proto_tree_add_item(tree, hf_value, tvb, offset, value_len - 44, ENC_ASCII | ENC_NA);
+          }
+        }
       }
     } else {
       ti = proto_tree_add_item(tree, hf_value, tvb, offset, value_len, ENC_ASCII | ENC_NA);
@@ -3060,6 +3128,7 @@ proto_register_couchbase(void)
     { &hf_extras_end_seqno, { "End Sequence Number", "couchbase.extras.end_seqno", FT_UINT64, BASE_DEC, NULL, 0x0, NULL, HFILL } },
     { &hf_extras_high_completed_seqno, { "High Completed Sequence Number", "couchbase.extras.high_completed_seqno", FT_UINT64, BASE_DEC, NULL, 0x0, NULL, HFILL } },
     { &hf_extras_max_visible_seqno, { "Max Visible Seqno", "couchbase.extras.max_visible_seqno", FT_UINT64, BASE_DEC, NULL, 0x0, NULL, HFILL } },
+    { &hf_extras_snapshot_marker_timestamp, { "Snapshot Marker Timestamp", "couchbase.extras.snapshot_marker_timestamp", FT_UINT64, BASE_DEC, NULL, 0x0, NULL, HFILL } },
     { &hf_extras_marker_version, { "Snapshot Marker Version", "couchbase.extras.marker_version", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL } },
     { &hf_extras_vbucket_uuid, { "VBucket UUID", "couchbase.extras.vbucket_uuid", FT_UINT64, BASE_HEX, NULL, 0x0, NULL, HFILL } },
     { &hf_extras_snap_start_seqno, { "Snapshot Start Sequence Number", "couchbase.extras.snap_start_seqno", FT_UINT64, BASE_DEC, NULL, 0x0, NULL, HFILL } },
