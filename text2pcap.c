@@ -86,6 +86,7 @@
 #include <glib.h>
 
 #include <wsutil/str_util.h>
+#include <wsutil/strnatcmp.h>
 #include <wsutil/wslog.h>
 #include <wsutil/ws_getopt.h>
 
@@ -162,9 +163,6 @@ static char *output_filename;
 
 static wtap_dumper* wdh;
 
-/* Encapsulation type; see wiretap/wtap.h for details */
-static guint32 wtap_encap_type = 1;   /* Default is WTAP_ENCAP_ETHERNET */
-
 /*----------------------------------------------------------------------
  * Print usage string and exit
  */
@@ -214,11 +212,13 @@ print_usage (FILE *output)
             "Output:\n"
             "  -F <capture type>      set the output file type; default is pcap.\n"
             "                         an empty \"-F\" option will list the file types.\n"
-            "  -l <typenum>           link-layer type number; default is 1 (Ethernet).  See\n"
+            "  -E <encap type>        set the output file encapsulation type; default is\n"
+            "                         ether (Ethernet). An empty \"-E\" option will list\n"
+            "                         the encapsulation types.\n"
+            "  -l <typenum>           set the output file encapsulation type via link-layer\n"
+            "                         type number; default is 1 (Ethernet). See\n"
             "                         https://www.tcpdump.org/linktypes.html for a list of\n"
-            "                         numbers.  Use this option if your dump is a complete\n"
-            "                         hex dump of an encapsulated packet and you wish to\n"
-            "                         specify the exact type of encapsulation.\n"
+            "                         numbers.\n"
             "                         Example: -l 7 for ARCNet packets.\n"
             "  -m <max-packet>        max packet length in output; default is %d\n"
             "  -n                     use pcapng instead of pcap as output format.\n"
@@ -230,14 +230,15 @@ print_usage (FILE *output)
             "                         Example: -e 0x806 to specify an ARP packet.\n"
             "  -i <proto>             prepend dummy IP header with specified IP protocol\n"
             "                         (in DECIMAL).\n"
-            "                         Automatically prepends Ethernet header as well.\n"
+            "                         Automatically prepends Ethernet header as well if\n"
+            "                         link-layer type is Ethernet.\n"
             "                         Example: -i 46\n"
             "  -4 <srcip>,<destip>    prepend dummy IPv4 header with specified\n"
             "                         dest and source address.\n"
             "                         Example: -4 10.0.0.1,10.0.0.2\n"
             "  -6 <srcip>,<destip>    prepend dummy IPv6 header with specified\n"
             "                         dest and source address.\n"
-            "                         Example: -6 fe80::202:b3ff:fe1e:8329,2001:0db8:85a3::8a2e:0370:7334\n"
+            "                         Example: -6 2001:db8::b3ff:fe1e:8329,2001:0db8:85a3::8a2e:0370:7334\n"
             "  -u <srcp>,<destp>      prepend dummy UDP header with specified\n"
             "                         source and destination ports (in DECIMAL).\n"
             "                         Automatically prepends Ethernet & IP headers as well.\n"
@@ -256,7 +257,6 @@ print_usage (FILE *output)
             "                         Automatically prepends a dummy SCTP DATA\n"
             "                         chunk header with payload protocol identifier ppi.\n"
             "                         Example: -S 30,40,34\n"
-            "\n"
             "  -P <dissector>         prepend EXPORTED_PDU header with specifieddissector\n"
             "                         as the payload PROTO_NAME tag.\n"
             "                         Automatically sets link type to Upper PDU Export.\n"
@@ -278,11 +278,6 @@ print_usage (FILE *output)
  * Set the hdr_ip_proto parameter, and set the flag indicate that the
  * parameter has been specified.
  *
- * Also indicate that we should add an Ethernet link-layer header.
- * (That's not an *inherent* requirement, as we could write a file
- * with a "raw IP packet" link-layer type, meaning that there *is*
- * no link-layer header, but it's the way text2pcap currently works.)
- *
  * XXX - catch the case where two different options set it differently?
  */
 static void
@@ -290,21 +285,66 @@ set_hdr_ip_proto(guint8 ip_proto)
 {
     have_hdr_ip_proto = TRUE;
     hdr_ip_proto = ip_proto;
-    hdr_ethernet = TRUE;
 }
 
 static void
 list_capture_types(void) {
-  GArray *writable_type_subtypes;
+    GArray *writable_type_subtypes;
 
-  cmdarg_err("The available capture file types for the \"-F\" flag are:\n");
-  writable_type_subtypes = wtap_get_writable_file_types_subtypes(FT_SORT_BY_NAME);
-  for (guint i = 0; i < writable_type_subtypes->len; i++) {
-    int ft = g_array_index(writable_type_subtypes, int, i);
-    fprintf(stderr, "    %s - %s\n", wtap_file_type_subtype_name(ft),
+    cmdarg_err("The available capture file types for the \"-F\" flag are:\n");
+    writable_type_subtypes = wtap_get_writable_file_types_subtypes(FT_SORT_BY_NAME);
+    for (guint i = 0; i < writable_type_subtypes->len; i++) {
+        int ft = g_array_index(writable_type_subtypes, int, i);
+        fprintf(stderr, "    %s - %s\n", wtap_file_type_subtype_name(ft),
             wtap_file_type_subtype_description(ft));
-  }
-  g_array_free(writable_type_subtypes, TRUE);
+    }
+    g_array_free(writable_type_subtypes, TRUE);
+}
+
+struct string_elem {
+    const char *sstr;   /* The short string */
+    const char *lstr;   /* The long string */
+};
+
+static gint
+string_nat_compare(gconstpointer a, gconstpointer b)
+{
+    return ws_ascii_strnatcmp(((const struct string_elem *)a)->sstr,
+        ((const struct string_elem *)b)->sstr);
+}
+
+static void
+string_elem_print(gpointer data, gpointer stream_ptr)
+{
+    fprintf((FILE *) stream_ptr, "    %s - %s\n",
+        ((struct string_elem *)data)->sstr,
+        ((struct string_elem *)data)->lstr);
+}
+
+static void
+list_encap_types(void) {
+    int i;
+    struct string_elem *encaps;
+    GSList *list = NULL;
+
+    encaps = g_new(struct string_elem, wtap_get_num_encap_types());
+    cmdarg_err("The available encapsulation types for the \"-E\" flag are:\n");
+    for (i = 0; i < wtap_get_num_encap_types(); i++) {
+        /* Exclude wtap encapsulations that require a pseudo header,
+         * because we won't setup one from the text we import and
+         * wiretap doesn't allow us to write 'raw' frames
+         */
+        if (!wtap_encap_requires_phdr(i)) {
+            encaps[i].sstr = wtap_encap_name(i);
+            if (encaps[i].sstr != NULL) {
+                encaps[i].lstr = wtap_encap_description(i);
+                list = g_slist_insert_sorted(list, &encaps[i], string_nat_compare);
+            }
+        }
+    }
+    g_slist_foreach(list, string_elem_print, stderr);
+    g_slist_free(list);
+    g_free(encaps);
 }
 
 /*----------------------------------------------------------------------
@@ -325,6 +365,7 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
     /* Link-layer type; see https://www.tcpdump.org/linktypes.html for details */
     guint32 pcap_link_type = 1;   /* Default is LINKTYPE_ETHERNET */
     int file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_UNKNOWN;
+    int wtap_encap_type = WTAP_ENCAP_ETHERNET;
     int err;
     char* err_info;
     GError* gerror = NULL;
@@ -339,7 +380,7 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
     ws_init_version_info("Text2pcap (Wireshark)", NULL, NULL, NULL);
 
     /* Scan CLI parameters */
-    while ((c = ws_getopt_long(argc, argv, "hqab:De:F:i:l:m:nN:o:u:P:r:s:S:t:T:v4:6:", long_options, NULL)) != -1) {
+    while ((c = ws_getopt_long(argc, argv, "hqab:De:E:F:i:l:m:nN:o:u:P:r:s:S:t:T:v4:6:", long_options, NULL)) != -1) {
         switch (c) {
         case 'h':
             show_help_header("Generate a capture file from an ASCII hexdump of packets.");
@@ -349,7 +390,10 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
         case 'q': quiet = TRUE; break;
         case 'a': info->hexdump.identify_ascii = TRUE; break;
         case 'D': info->hexdump.has_direction = TRUE; break;
-        case 'l': pcap_link_type = (guint32)strtol(ws_optarg, NULL, 0); break;
+        case 'l':
+            pcap_link_type = (guint32)strtol(ws_optarg, NULL, 0);
+            wtap_encap_type = wtap_pcap_encap_to_wtap_encap(pcap_link_type);
+            break;
         case 'm': max_offset = (guint32)strtol(ws_optarg, NULL, 0); break;
         case 'n': file_type_subtype = wtap_pcapng_file_type_subtype(); break;
         case 'N': interface_name = ws_optarg; break;
@@ -397,6 +441,15 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
             }
             break;
 
+        case 'E':
+            wtap_encap_type = wtap_name_to_encap(ws_optarg);
+            if (wtap_encap_type < 0) {
+                cmdarg_err("\"%s\" isn't a valid encapsulation type", ws_optarg);
+                list_encap_types();
+                return INVALID_OPTION;
+            }
+            break;
+
         case 'F':
             file_type_subtype = wtap_name_to_file_type_subtype(ws_optarg);
             if  (file_type_subtype < 0) {
@@ -420,7 +473,6 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
 
         case 'P':
             hdr_export_pdu = TRUE;
-            pcap_link_type = 252;
             info->payload = ws_optarg;
             break;
 
@@ -655,6 +707,10 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
 
         case '?':
             switch(ws_optopt) {
+            case 'E':
+                list_encap_types();
+                return INVALID_OPTION;
+                break;
             case 'F':
                 list_capture_types();
                 return INVALID_OPTION;
@@ -695,15 +751,6 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
             return INVALID_OPTION;
         }
     }
-    if (pcap_link_type != 1 && hdr_ethernet) {
-        cmdarg_err("Dummy headers (-e, -i, -u, -s, -S -T) cannot be specified with link type override (-l)");
-        return INVALID_OPTION;
-    }
-
-    if (pcap_link_type != 252 && hdr_export_pdu) {
-        cmdarg_err("Export PDU (-P) requires WIRESHARK_UPPER_PDU link type (252)");
-        return INVALID_OPTION;
-    }
 
     if (have_hdr_ip_proto && !(hdr_ip || hdr_ipv6)) {
         /*
@@ -727,12 +774,47 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
         hdr_ip = TRUE;
     }
 
-    if (hdr_ip)
-    {
-        hdr_ethernet_proto = 0x0800;
-    } else if (hdr_ipv6)
-    {
-        hdr_ethernet_proto = 0x86DD;
+    if (hdr_export_pdu && wtap_encap_type != WTAP_ENCAP_WIRESHARK_UPPER_PDU) {
+        cmdarg_err("Export PDU (-P) requires WIRESHARK_UPPER_PDU link type (252)");
+        return INVALID_OPTION;
+    }
+
+    /* The other dummy headers require a IPv4 or IPv6 header. Allow
+     * encapsulation types of Ethernet (and add a Ethernet header in that
+     * case if we haven't already), or the appropriate raw IP types.
+     */
+    if (hdr_ip) {
+        switch (wtap_encap_type) {
+
+        case (WTAP_ENCAP_ETHERNET):
+            hdr_ethernet = TRUE;
+            hdr_ethernet_proto = 0x0800;
+            break;
+
+        case (WTAP_ENCAP_RAW_IP):
+        case (WTAP_ENCAP_RAW_IP4):
+            break;
+
+        default:
+            cmdarg_err("Dummy IPv4 header not supported with encapsulation %s (%s)", wtap_encap_description(wtap_encap_type), wtap_encap_name(wtap_encap_type));
+            return INVALID_OPTION;
+        }
+    } else if (hdr_ipv6) {
+        switch (wtap_encap_type) {
+
+        case (WTAP_ENCAP_ETHERNET):
+            hdr_ethernet = TRUE;
+            hdr_ethernet_proto = 0x86DD;
+            break;
+
+        case (WTAP_ENCAP_RAW_IP):
+        case (WTAP_ENCAP_RAW_IP6):
+            break;
+
+        default:
+            cmdarg_err("Dummy IPv6 header not supported with encapsulation %s (%s)", wtap_encap_description(wtap_encap_type), wtap_encap_name(wtap_encap_type));
+            return INVALID_OPTION;
+        }
     }
 
     if (strcmp(argv[ws_optind], "-") != 0) {
@@ -773,7 +855,6 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
 
     wtap_dump_params_init(params, NULL);
 
-    wtap_encap_type = wtap_pcap_encap_to_wtap_encap(pcap_link_type);
     params->encap = wtap_encap_type;
     params->snaplen = max_offset;
     if (file_type_subtype == WTAP_FILE_TYPE_SUBTYPE_UNKNOWN) {

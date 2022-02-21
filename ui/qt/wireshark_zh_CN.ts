@@ -377,7 +377,7 @@
         <translation>标记/取消标记行</translation>
     </message>
     <message>
-        <source>Ctrl-M</source>
+        <source>Ctrl+M</source>
         <translation type="unfinished">Ctrl+M</translation>
     </message>
     <message>
@@ -722,7 +722,6 @@
     <name>ByteViewText</name>
     <message>
         <source>Allow hover highlighting</source>
-        <oldsource>Allow hover selection</oldsource>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1466,6 +1465,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Optionally specify a temporary directory for unnamed capture files.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Directory for temporary files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Capture Options</source>
         <translation type="unfinished">捕获选项</translation>
     </message>
@@ -1479,6 +1486,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Specify a Capture File</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Specify temporary directory</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1966,6 +1977,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>使用此字段匹配</translation>
     </message>
     <message>
+        <source>Change behavior when the field matches this value</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Field value type (and base, if Integer)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Current&quot;Decode As&quot; behavior</source>
         <translation>当前“解码为”行为</translation>
     </message>
@@ -1975,7 +1994,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Change behavior when the protocol field matches this value</source>
-        <translation>协议字段与此值匹配时更改行为</translation>
+        <translation type="vanished">协议字段与此值匹配时更改行为</translation>
     </message>
     <message>
         <source>String</source>
@@ -2658,8 +2677,16 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>开始</translation>
     </message>
     <message>
+        <source>Save</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Default</source>
         <translation>默认</translation>
+    </message>
+    <message>
+        <source>Restore default value of the item</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Extcap Help cannot be found</source>
@@ -4379,10 +4406,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>The IP Version for to use for the dummy IP header</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Interface name:</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4507,10 +4530,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>以太网</translation>
     </message>
     <message>
-        <source>Prefix each frame with an Ethernet, IPv4 and SCTP header</source>
-        <translation type="vanished">每一帧前添加以太网、IPv4 及 SCTP 头部</translation>
-    </message>
-    <message>
         <source>SCTP</source>
         <translation>SCTP</translation>
     </message>
@@ -4535,10 +4554,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>标签:</translation>
     </message>
     <message>
-        <source>Prefix each frame with an Ethernet, IPv4 and UDP header</source>
-        <translation type="vanished">每一帧前添加以太网、IPv4 及 UDP 头部</translation>
-    </message>
-    <message>
         <source>UDP</source>
         <translation>UDP</translation>
     </message>
@@ -4549,10 +4564,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>The Ethertype value of each frame</source>
         <translation>每一帧的以太类型值</translation>
-    </message>
-    <message>
-        <source>Prefix each frame with an Ethernet, IPv4 and TCP header</source>
-        <translation type="vanished">每一帧前添加以太网、IPv4 及 TCP 头部</translation>
     </message>
     <message>
         <source>TCP</source>
@@ -4571,27 +4582,15 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>以太类型 (十六进制):</translation>
     </message>
     <message>
-        <source>The IPv4 protocol ID for each frame</source>
-        <translation type="vanished">每一帧的 IPv4 协议 ID</translation>
-    </message>
-    <message>
-        <source>Prefix each frame with an Ethernet, IPv4 and SCTP (DATA) header</source>
-        <translation type="vanished">每一帧前添加以太网、IPv4 及 SCTP (DATA) 头部</translation>
-    </message>
-    <message>
         <source>SCTP (Data)</source>
         <translation>SCTP (Data)</translation>
     </message>
     <message>
-        <source>Prefix each frame with an Ethernet and IPv4 header</source>
-        <translation type="vanished">每一帧前添加以太网及 IPv4 头部</translation>
-    </message>
-    <message>
-        <source>IPv4</source>
-        <translation type="vanished">IPv4</translation>
-    </message>
-    <message>
         <source>The dissector to use for each frame</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The IP Version to use for the dummy IP header</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4678,7 +4677,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>已禁用外部捕获接口。</translation>
     </message>
     <message>
-        <source>&lt;p&gt;Local interfaces are unavailable because no packet capture driver is installed.&lt;/p&gt;&lt;p&gt;You can fix this by installing &lt;a href=&quot;https://nmap.org/npcap/&quot;&gt;Npcap&lt;/a&gt; or &lt;a href=&quot;https://www.winpcap.org/install/default.htm&quot;&gt;WinPcap&lt;/a&gt;.&lt;/p&gt;</source>
+        <source>&lt;p&gt;Local interfaces are unavailable because no packet capture driver is installed.&lt;/p&gt;&lt;p&gt;You can fix this by installing &lt;a href=&quot;https://npcap.com/&quot;&gt;Npcap&lt;/a&gt;.&lt;/p&gt;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6353,10 +6352,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>HTTP</translation>
     </message>
     <message>
-        <source>900000000</source>
-        <translation>900000000</translation>
-    </message>
-    <message>
         <source>&amp;File</source>
         <translation>文件(&amp;F)</translation>
     </message>
@@ -6706,6 +6701,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Reliable Server Pooling (RSerPool)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>SOME/IP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -7170,6 +7169,22 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Sametime statistics</source>
         <translation>Sametime协议统计</translation>
+    </message>
+    <message>
+        <source>SOME/IP Messages</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>SOME/IP Message statistics</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>SOME/IP-SD Entries</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>SOME/IP-SD Entries statistics</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>&amp;ISUP Messages</source>
@@ -8287,6 +8302,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Configure all extcaps before start of capture.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Invalid capture filter.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8841,6 +8860,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>&lt;small&gt;&lt;i&gt;&lt;/i&gt;&lt;/small&gt;</translation>
     </message>
     <message>
+        <source>Show packet bytes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Packet %1</source>
         <translation>分组 %1</translation>
     </message>
@@ -8918,6 +8941,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Bytes</source>
         <translation>字节流</translation>
+    </message>
+    <message>
+        <source>Include secondary data sources</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Generate hexdumps for secondary data sources like reassembled or decrypted buffers in addition to the frame&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -12869,8 +12900,16 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>图像</translation>
     </message>
     <message>
+        <source>Json</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Raw</source>
         <translation>原始数据</translation>
+    </message>
+    <message>
+        <source>Rust Array</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>UTF-8</source>

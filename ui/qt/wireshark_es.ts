@@ -378,8 +378,8 @@
         <translation>Marcar/Desmarcar fila</translation>
     </message>
     <message>
-        <source>Ctrl-M</source>
-        <translation>Ctrl-M</translation>
+        <source>Ctrl+M</source>
+        <translation type="unfinished">Ctrl+M</translation>
     </message>
     <message>
         <source>Mark/Unmark Cell</source>
@@ -723,8 +723,7 @@
     <name>ByteViewText</name>
     <message>
         <source>Allow hover highlighting</source>
-        <oldsource>Allow hover selection</oldsource>
-        <translation type="unfinished">Permitir selección al desplazar</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Show bytes as hexadecimal</source>
@@ -1450,6 +1449,14 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation>Detiene la captura después de que haya pasado la cantidad de tiempo especificada.</translation>
     </message>
     <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Optionally specify a temporary directory for unnamed capture files.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Directory for temporary files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Capture Options</source>
         <translation>Opciones de captura</translation>
     </message>
@@ -1464,6 +1471,10 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
     <message>
         <source>Specify a Capture File</source>
         <translation>Especifique un archivo de captura</translation>
+    </message>
+    <message>
+        <source>Specify temporary directory</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>%1: %2</source>
@@ -1950,15 +1961,19 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Change behavior when the field matches this value</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Field value type (and base, if Integer)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Current&quot;Decode As&quot; behavior</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Default &quot;Decode As&quot; behavior</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Change behavior when the protocol field matches this value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -2644,8 +2659,16 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Save</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Default</source>
         <translation type="unfinished">Predeterminado</translation>
+    </message>
+    <message>
+        <source>Restore default value of the item</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Extcap Help cannot be found</source>
@@ -4361,10 +4384,6 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>The IP Version for to use for the dummy IP header</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Interface name:</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4489,10 +4508,6 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation>Ethernet</translation>
     </message>
     <message>
-        <source>Prefix each frame with an Ethernet, IPv4 and SCTP header</source>
-        <translation type="vanished">Prefijo para cada trama con una cabecera ethernet, IPv4 y SCTP</translation>
-    </message>
-    <message>
         <source>SCTP</source>
         <translation>SCTP</translation>
     </message>
@@ -4517,10 +4532,6 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation>Etiqueta:</translation>
     </message>
     <message>
-        <source>Prefix each frame with an Ethernet, IPv4 and UDP header</source>
-        <translation type="vanished">Prefijo para cada trama con una cabecera ethernet, IPv4 y UDP</translation>
-    </message>
-    <message>
         <source>UDP</source>
         <translation>UDP</translation>
     </message>
@@ -4531,10 +4542,6 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
     <message>
         <source>The Ethertype value of each frame</source>
         <translation>El valor Ethertype para cada trama</translation>
-    </message>
-    <message>
-        <source>Prefix each frame with an Ethernet, IPv4 and TCP header</source>
-        <translation type="vanished">Prefijo para cada trama con una cabecera ethernet, IPv4 y TCP</translation>
     </message>
     <message>
         <source>TCP</source>
@@ -4553,27 +4560,15 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation>Ethertype (hex):</translation>
     </message>
     <message>
-        <source>The IPv4 protocol ID for each frame</source>
-        <translation type="vanished">El ID de protocolo IPv4 para cada trama</translation>
-    </message>
-    <message>
-        <source>Prefix each frame with an Ethernet, IPv4 and SCTP (DATA) header</source>
-        <translation type="vanished">Prefijo para cada trama con una cabecera ethernet, IPv4 y SCTP (Datos)</translation>
-    </message>
-    <message>
         <source>SCTP (Data)</source>
         <translation>SCTP (Datos)</translation>
     </message>
     <message>
-        <source>Prefix each frame with an Ethernet and IPv4 header</source>
-        <translation type="vanished">Prefijo para cada trama con una cabecera ethernet y IPv4</translation>
-    </message>
-    <message>
-        <source>IPv4</source>
-        <translation type="vanished">IPv4</translation>
-    </message>
-    <message>
         <source>The dissector to use for each frame</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The IP Version to use for the dummy IP header</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4660,7 +4655,7 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>&lt;p&gt;Local interfaces are unavailable because no packet capture driver is installed.&lt;/p&gt;&lt;p&gt;You can fix this by installing &lt;a href=&quot;https://nmap.org/npcap/&quot;&gt;Npcap&lt;/a&gt; or &lt;a href=&quot;https://www.winpcap.org/install/default.htm&quot;&gt;WinPcap&lt;/a&gt;.&lt;/p&gt;</source>
+        <source>&lt;p&gt;Local interfaces are unavailable because no packet capture driver is installed.&lt;/p&gt;&lt;p&gt;You can fix this by installing &lt;a href=&quot;https://npcap.com/&quot;&gt;Npcap&lt;/a&gt;.&lt;/p&gt;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6314,10 +6309,6 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation>HTTP</translation>
     </message>
     <message>
-        <source>900000000</source>
-        <translation>900000000</translation>
-    </message>
-    <message>
         <source>&amp;File</source>
         <translation>&amp;Archivo</translation>
     </message>
@@ -6667,6 +6658,10 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
     </message>
     <message>
         <source>Reliable Server Pooling (RSerPool)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>SOME/IP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -7131,6 +7126,22 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
     <message>
         <source>Sametime statistics</source>
         <translation>Estadísticas de Sametime</translation>
+    </message>
+    <message>
+        <source>SOME/IP Messages</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>SOME/IP Message statistics</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>SOME/IP-SD Entries</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>SOME/IP-SD Entries statistics</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>&amp;ISUP Messages</source>
@@ -8241,6 +8252,10 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Configure all extcaps before start of capture.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Invalid capture filter.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8797,6 +8812,10 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation>&lt;small&gt;&lt;i&gt;&lt;/i&gt;&lt;/small&gt;</translation>
     </message>
     <message>
+        <source>Show packet bytes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Packet %1</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8874,6 +8893,14 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
     <message>
         <source>Bytes</source>
         <translation>Bytes</translation>
+    </message>
+    <message>
+        <source>Include secondary data sources</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Generate hexdumps for secondary data sources like reassembled or decrypted buffers in addition to the frame&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -12805,8 +12832,16 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation>Imagen</translation>
     </message>
     <message>
+        <source>Json</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Raw</source>
         <translation>Raw</translation>
+    </message>
+    <message>
+        <source>Rust Array</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>UTF-8</source>

@@ -1,7 +1,7 @@
 Wireshark 3.7.0 Release Notes
 
  This is an experimental release intended to test new features for
- Wireshark 3.6.
+ Wireshark 4.0.
 
  What is Wireshark?
 
@@ -65,10 +65,32 @@ Wireshark 3.7.0 Release Notes
        timezone) or by appending the suffix "UTC" to the legacy formats.
        Otherwise local time is used.
 
-     • text2pcap has been updated to use the new logging output options
-       and the "-d" flag has been removed. The "debug" log level
+     • text2pcap and "Import from Hex Dump":
+
+        • text2pcap supports writing the output file in all the capture
+       file formats that wiretap library supports, using the same "-F"
+       option as editcap, mergecap, and tshark.
+
+        • text2pcap supports selecting the encapsulation type of the
+       output file format using the wiretap library short names with an
+       "-E" option, similiar to the "-T" option of editcap.
+
+        • text2pcap has been updated to use the new logging output
+       options and the "-d" flag has been removed. The "debug" log level
        corresponds to the old "-d" flag, and the "noisy" log level
        corresponds to using "-d" multiple times.
+
+        • text2pcap and Import from Hex Dump support writing fake IP
+       headers (and fake TCP, UDP, and SCTP headers) to files with Raw
+       IP, Raw IPv4, and Raw IPv6 encapsulations, in addition to
+       Ethernet encapsulation as previously.
+
+        • text2pcap supports scanning the input file using a custom
+       regular expression, as supported in Import from Hex Dump in
+       Wireshark 3.6.x.
+
+        • In general, text2pcap and wireshark’s Import from Hex Dump
+       have feature parity.
 
      • HTTP2 dissector now supports using fake headers to parse the
        DATAs of streams captured without first HEADERS frames of a
@@ -90,16 +112,34 @@ Wireshark 3.7.0 Release Notes
      • It is possible to set extcap passwords on cli for tshark and
        other cli tools.
 
+     • Extcap configuration dialog now supports and remembers empty
+       strings. There are new buttons to reset a value back to default
+       value.
+
      • Wireshark (QT): Field Value Dialog added to show known values
        for protocol fields, for example: ip.proto
+
+  Removed Features and Support
+
+     • CMake: The options starting with DISABLE_something were renamed
+       ENABLE_something for consistency. For example DISABLE_WERROR=On
+       became ENABLE_WERROR=Off. The defaults are unchanged.
 
   New File Format Decoding Support
 
   New Protocol Support
 
-   FiveCo’s Legacy Register Access Protocol (5co-legacy), Host IP
-   Configuration Protocol (HICP), Mesh Connex (MCX), and Secure Host IP
-   Configuration Protocol (SHICP)
+   Allied Telesis Loop Detection (AT LDF), AUTOSAR I-PDU Multiplexer
+   (AUTOSAR I-PduM), DTN Bundle Protocol Security (BPSec), DTN Bundle
+   Protocol Version 7 (BPv7), DTN TCP Convergence Layer Protocol
+   (TCPCL), DVB Selection Information Table (DVB SIT), Enhanced Cash
+   Trading Interface 10.0 (XTI), Enhanced Order Book Interface 10.0
+   (EOBI), Enhanced Trading Interface 10.0 (ETI), FiveCo’s Legacy
+   Register Access Protocol (5co-legacy), Generic Data Transfer Protocol
+   (GDT), Host IP Configuration Protocol (HICP), Mesh Connex (MCX),
+   Microsoft Cluster Remote Control Protocol (RCP), Realtek, Secure File
+   Transfer Protocol (sftp), Secure Host IP Configuration Protocol
+   (SHICP), USB Attached SCSI (UASP), and ZBOSS NCP
 
   Updated Protocol Support
 
@@ -147,7 +187,7 @@ Wireshark 3.7.0 Release Notes
 
   A complete FAQ is available on the Wireshark web site[6].
 
-  Last updated 2022-01-02 16:06:46 UTC
+  Last updated 2022-02-20 16:06:38 UTC
 
  References
 

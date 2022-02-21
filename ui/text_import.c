@@ -126,11 +126,12 @@ static gboolean hdr_ipv6 = FALSE;
 static guint hdr_ip_proto = 0;
 
 /* Destination and source addresses for IP header */
-/* XXX: Add default destination and source addresses for IPv6 when :: is
- * passed in? */
-#if 0
 static ws_in6_addr NO_IPv6_ADDRESS    = {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
-#endif
+/* These IPv6 default addresses are unique local addresses generated using
+ * the pseudo-random method from Section 3.2.2 of RFC 4193
+ */
+static ws_in6_addr IPv6_SRC = {{0xfd, 0xce, 0xd8, 0x62, 0x14, 0x1b, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}};
+static ws_in6_addr IPv6_DST = {{0xfd, 0xce, 0xd8, 0x62, 0x14, 0x1b, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02}};
 
 /* Dummy UDP header */
 static gboolean hdr_udp = FALSE;
@@ -531,12 +532,15 @@ write_current_packet(gboolean cont)
             pseudoh.protocol    = (guint8) hdr_ip_proto;
             pseudoh.length      = g_htons(proto_length);
         } else if (hdr_ipv6) {
-            if (isOutbound) {
-                memcpy(&HDR_IPv6.ip6_src, &info_p->ip_dest_addr.ipv6, sizeof(ws_in6_addr));
-                memcpy(&HDR_IPv6.ip6_dst, &info_p->ip_src_addr.ipv6, sizeof(ws_in6_addr));
+            if (memcmp(&info_p->ip_dest_addr.ipv6, &NO_IPv6_ADDRESS, sizeof(ws_in6_addr))) {
+                memcpy(isOutbound ? &HDR_IPv6.ip6_src : &HDR_IPv6.ip6_dst, &info_p->ip_dest_addr.ipv6, sizeof(ws_in6_addr));
             } else {
-                memcpy(&HDR_IPv6.ip6_src, &info_p->ip_src_addr.ipv6, sizeof(ws_in6_addr));
-                memcpy(&HDR_IPv6.ip6_dst, &info_p->ip_dest_addr.ipv6, sizeof(ws_in6_addr));
+                memcpy(isOutbound ? &HDR_IPv6.ip6_src : &HDR_IPv6.ip6_dst, &IPv6_DST, sizeof(ws_in6_addr));
+            }
+            if (memcmp(&info_p->ip_src_addr.ipv6, &NO_IPv6_ADDRESS, sizeof(ws_in6_addr))) {
+                memcpy(isOutbound ? &HDR_IPv6.ip6_dst : &HDR_IPv6.ip6_src, &info_p->ip_src_addr.ipv6, sizeof(ws_in6_addr));
+            } else {
+                memcpy(isOutbound ? &HDR_IPv6.ip6_dst : &HDR_IPv6.ip6_src, &IPv6_SRC, sizeof(ws_in6_addr));
             }
 
             HDR_IPv6.ip6_ctlun.ip6_un2_vfc &= 0x0F;
@@ -695,18 +699,32 @@ write_current_packet(gboolean cont)
 
         memset(&rec, 0, sizeof rec);
 
-        rec.rec_type = REC_TYPE_PACKET;
-        rec.block = wtap_block_create(WTAP_BLOCK_PACKET);
-        rec.ts.secs = ts_sec;
-        rec.ts.nsecs = ts_nsec;
-        rec.rec_header.packet_header.caplen = rec.rec_header.packet_header.len = prefix_length + curr_offset + eth_trailer_length;
-        rec.rec_header.packet_header.pkt_encap = info_p->encapsulation;
-        rec.presence_flags = WTAP_HAS_CAP_LEN|WTAP_HAS_INTERFACE_ID|WTAP_HAS_TS;
-        if (has_direction) {
-            wtap_block_add_uint32_option(rec.block, OPT_PKT_FLAGS, direction);
-        }
-        if (has_seqno) {
-            wtap_block_add_uint64_option(rec.block, OPT_PKT_PACKETID, seqno);
+        if (info_p->encapsulation == WTAP_ENCAP_SYSTEMD_JOURNAL) {
+            rec.rec_type = REC_TYPE_SYSTEMD_JOURNAL_EXPORT;
+            rec.block = wtap_block_create(WTAP_BLOCK_SYSTEMD_JOURNAL_EXPORT);
+            rec.rec_header.systemd_journal_export_header.record_len = prefix_length + curr_offset + eth_trailer_length;
+            rec.presence_flags = WTAP_HAS_CAP_LEN|WTAP_HAS_TS;
+            /* XXX: Ignore our direction, packet id, and timestamp. For a
+             * systemd Journal Export Block the timestamp comes from the
+             * __REALTIME_TIMESTAMP= field. We don't check to see if that
+             * field is there (it MUST be, but we don't check whether our
+             * input is malformed in general), but since the presence flags
+             * aren't really used when writing, it doesn't matter.
+             */
+        } else {
+            rec.rec_type = REC_TYPE_PACKET;
+            rec.block = wtap_block_create(WTAP_BLOCK_PACKET);
+            rec.rec_header.packet_header.caplen = rec.rec_header.packet_header.len = prefix_length + curr_offset + eth_trailer_length;
+            rec.ts.secs = ts_sec;
+            rec.ts.nsecs = ts_nsec;
+            rec.rec_header.packet_header.pkt_encap = info_p->encapsulation;
+            rec.presence_flags = WTAP_HAS_CAP_LEN|WTAP_HAS_INTERFACE_ID|WTAP_HAS_TS;
+            if (has_direction) {
+                wtap_block_add_uint32_option(rec.block, OPT_PKT_FLAGS, direction);
+            }
+            if (has_seqno) {
+                wtap_block_add_uint64_option(rec.block, OPT_PKT_PACKETID, seqno);
+            }
         }
 
         if (!wtap_dump(info_p->wdh, &rec, packet_buf, &err, &err_info)) {
@@ -1535,19 +1553,6 @@ text_import(text_import_info_t * const info)
     int ret;
     struct tm *now_tm;
 
-    packet_buf = (guint8 *)g_malloc(sizeof(HDR_ETHERNET) + sizeof(HDR_IP) +
-                                    sizeof(HDR_SCTP) + sizeof(HDR_DATA_CHUNK) +
-                                    sizeof(HDR_EXPORT_PDU) + WTAP_MAX_PACKET_SIZE_STANDARD);
-
-    if (!packet_buf)
-    {
-        /* XXX: This doesn't happen, because g_malloc aborts the program on
-         * error, unlike malloc or g_try_malloc.
-         */
-        report_failure("FATAL ERROR: no memory for packet buffer");
-        return INIT_FAILED;
-    }
-
     /* Lets start from the beginning */
     state = INIT;
     curr_offset = 0;
@@ -1605,7 +1610,11 @@ text_import(text_import_info_t * const info)
         has_seqno = g_regex_get_string_number(info->regex.format, "seqno") >= 0;
     }
 
-    ts_fmt_iso = !(g_strcmp0(info->timestamp_format, "ISO"));
+    if (info->timestamp_format == NULL || g_ascii_strcasecmp(info->timestamp_format, "ISO")) {
+        ts_fmt_iso = FALSE;
+    } else {
+        ts_fmt_iso = TRUE;
+    }
     offset_warned = FALSE;
     timecode_warned = FALSE;
 
@@ -1625,8 +1634,6 @@ text_import(text_import_info_t * const info)
         case HEADER_IPV4:
             hdr_ip = TRUE;
             hdr_ip_proto = info->protocol;
-            hdr_ethernet = TRUE;
-            hdr_ethernet_proto = 0x800;
             break;
 
         case HEADER_UDP:
@@ -1634,8 +1641,6 @@ text_import(text_import_info_t * const info)
             hdr_tcp = FALSE;
             hdr_ip = TRUE;
             hdr_ip_proto = 17;
-            hdr_ethernet = TRUE;
-            hdr_ethernet_proto = 0x800;
             break;
 
         case HEADER_TCP:
@@ -1643,16 +1648,12 @@ text_import(text_import_info_t * const info)
             hdr_udp = FALSE;
             hdr_ip = TRUE;
             hdr_ip_proto = 6;
-            hdr_ethernet = TRUE;
-            hdr_ethernet_proto = 0x800;
             break;
 
         case HEADER_SCTP:
             hdr_sctp = TRUE;
             hdr_ip = TRUE;
             hdr_ip_proto = 132;
-            hdr_ethernet = TRUE;
-            hdr_ethernet_proto = 0x800;
             break;
 
         case HEADER_SCTP_DATA:
@@ -1660,8 +1661,6 @@ text_import(text_import_info_t * const info)
             hdr_data_chunk = TRUE;
             hdr_ip = TRUE;
             hdr_ip_proto = 132;
-            hdr_ethernet = TRUE;
-            hdr_ethernet_proto = 0x800;
             break;
 
         case HEADER_EXPORT_PDU:
@@ -1677,11 +1676,54 @@ text_import(text_import_info_t * const info)
             hdr_ipv6 = TRUE;
             hdr_ip = FALSE;
             hdr_ethernet_proto = 0x86DD;
+        } else {
+            hdr_ethernet_proto = 0x0800;
+        }
+
+        switch (info->encapsulation) {
+
+        case (WTAP_ENCAP_ETHERNET):
+            hdr_ethernet = TRUE;
+            break;
+
+        case (WTAP_ENCAP_RAW_IP):
+            break;
+
+        case (WTAP_ENCAP_RAW_IP4):
+            if (info->ipv6) {
+                report_failure("Encapsulation %s only supports IPv4 headers, not IPv6", wtap_encap_name(info->encapsulation));
+                return INVALID_OPTION;
+            }
+            break;
+
+        case (WTAP_ENCAP_RAW_IP6):
+            if (!info->ipv6) {
+                report_failure("Encapsulation %s only supports IPv6 headers, not IPv4", wtap_encap_name(info->encapsulation));
+                return INVALID_OPTION;
+            }
+            break;
+
+        default:
+            report_failure("Dummy IP header not supported with encapsulation: %s (%s)", wtap_encap_name(info->encapsulation), wtap_encap_description(info->encapsulation));
+            return INVALID_OPTION;
         }
     }
 
     info->num_packets_read = 0;
     info->num_packets_written = 0;
+
+    packet_buf = (guint8 *)g_malloc(sizeof(HDR_ETHERNET) + sizeof(HDR_IP) +
+                                    sizeof(HDR_SCTP) + sizeof(HDR_DATA_CHUNK) +
+                                    sizeof(HDR_EXPORT_PDU) + WTAP_MAX_PACKET_SIZE_STANDARD);
+
+    if (!packet_buf)
+    {
+        /* XXX: This doesn't happen, because g_malloc aborts the program on
+         * error, unlike malloc or g_try_malloc.
+         */
+        report_failure("FATAL ERROR: no memory for packet buffer");
+        return INIT_FAILED;
+    }
 
     if (info->mode == TEXT_IMPORT_HEXDUMP) {
         status = text_import_scan(info->hexdump.import_text_FILE);
@@ -1756,8 +1798,13 @@ text_import_pre_open(wtap_dump_params * const params, int file_type_subtype, con
         g_array_append_val(params->shb_hdrs, shb_hdr);
     }
 
-    /* wtap_dumper will create a dummy interface block if needed, but since
-     * we have the option of including the interface name, create it ourself.
+    /* wtap_dump_init_dumper() will create a interface block if the file type
+     * supports it and one isn't created already, but since we have the
+     * option of including the interface name, create it ourself.
+     *
+     * (XXX: IDBs should be optional for wtap_dump_init_dumper(), e.g. if
+     * the encap type is WTAP_ENCAP_SYSTEMD_JOURNAL, which doesn't use
+     * interfaces. But it's not, so always create it here.)
      */
     if (wtap_file_type_subtype_supports_block(file_type_subtype, WTAP_BLOCK_IF_ID_AND_INFO) != BLOCK_NOT_SUPPORTED) {
         int_data = wtap_block_create(WTAP_BLOCK_IF_ID_AND_INFO);

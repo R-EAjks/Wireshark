@@ -151,6 +151,7 @@ static int hf_icmpv6_opt_cga = -1;
 static int hf_icmpv6_opt_cga_modifier = -1;
 static int hf_icmpv6_opt_cga_subnet_prefix = -1;
 static int hf_icmpv6_opt_cga_count = -1;
+static int hf_icmpv6_opt_cga_subject_public_key_info = -1;
 static int hf_icmpv6_opt_cga_ext_type = -1;
 static int hf_icmpv6_opt_cga_ext_length = -1;
 static int hf_icmpv6_opt_cga_ext_data = -1;
@@ -1892,11 +1893,11 @@ dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree 
                 proto_tree_add_item(cga_tree, hf_icmpv6_opt_cga_subnet_prefix, tvb, opt_offset, 8, ENC_NA);
                 opt_offset += 8;
 
-                proto_tree_add_item(cga_tree ,hf_icmpv6_opt_cga_count, tvb, opt_offset, 1, ENC_NA);
+                proto_tree_add_item(cga_tree, hf_icmpv6_opt_cga_count, tvb, opt_offset, 1, ENC_NA);
                 opt_offset += 1;
 
                 asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
-                opt_offset = dissect_x509af_SubjectPublicKeyInfo(FALSE, tvb, opt_offset, &asn1_ctx, cga_tree, -1);
+                opt_offset = dissect_x509af_SubjectPublicKeyInfo(FALSE, tvb, opt_offset, &asn1_ctx, cga_tree, hf_icmpv6_opt_cga_subject_public_key_info);
 
                 /* Process RFC 4581*/
                 while (opt_offset < par_len) {
@@ -1994,7 +1995,7 @@ dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree 
                         break;
                     case 2:
                         /* FQDN */
-                        proto_tree_add_item(icmp6opt_tree, hf_icmpv6_opt_name_fqdn, tvb, opt_offset, par_len, ENC_ASCII|ENC_NA);
+                        proto_tree_add_item(icmp6opt_tree, hf_icmpv6_opt_name_fqdn, tvb, opt_offset, par_len, ENC_ASCII);
                         break;
                     default:
                         break;
@@ -2529,7 +2530,7 @@ dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree 
             {
                 proto_item *ti_cp;
 
-                ti_cp = proto_tree_add_item(icmp6opt_tree, hf_icmpv6_opt_captive_portal, tvb, opt_offset, opt_len-2, ENC_ASCII|ENC_NA);
+                ti_cp = proto_tree_add_item(icmp6opt_tree, hf_icmpv6_opt_captive_portal, tvb, opt_offset, opt_len-2, ENC_ASCII);
                 proto_item_set_url(ti_cp);
                 opt_offset += opt_len - 2;
 
@@ -4955,6 +4956,9 @@ proto_register_icmpv6(void)
             NULL, HFILL }},
         { &hf_icmpv6_opt_cga_count,
           { "Count", "icmpv6.opt.cga.count", FT_BYTES, BASE_NONE, NULL, 0x0,
+            NULL, HFILL }},
+        { &hf_icmpv6_opt_cga_subject_public_key_info,
+          { "Subject Public Key Info", "icmpv6.opt.cga.subject_public_key_info", FT_NONE, BASE_NONE, NULL, 0x0,
             NULL, HFILL }},
         { &hf_icmpv6_opt_cga_ext_type,
           { "Ext Type", "icmpv6.opt.cga.ext_type", FT_UINT16, BASE_DEC, NULL, 0x0,

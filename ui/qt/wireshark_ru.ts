@@ -379,8 +379,8 @@
         <translation>Пометить Строку/Убрать пометку строки</translation>
     </message>
     <message>
-        <source>Ctrl-M</source>
-        <translation>Ctrl-M</translation>
+        <source>Ctrl+M</source>
+        <translation type="unfinished">Ctrl+M</translation>
     </message>
     <message>
         <source>Mark/Unmark Cell</source>
@@ -724,7 +724,6 @@
     <name>ByteViewText</name>
     <message>
         <source>Allow hover highlighting</source>
-        <oldsource>Allow hover selection</oldsource>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1482,6 +1481,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Прекратить захват после окончания указанного времени.</translation>
     </message>
     <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Optionally specify a temporary directory for unnamed capture files.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Directory for temporary files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Capture Options</source>
         <translation>Опции Захвата</translation>
     </message>
@@ -1496,6 +1503,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Specify a Capture File</source>
         <translation>Указать Файл Захвата</translation>
+    </message>
+    <message>
+        <source>Specify temporary directory</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>%1: %2</source>
@@ -1982,6 +1993,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Подобрать, используя это поле</translation>
     </message>
     <message>
+        <source>Change behavior when the field matches this value</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Field value type (and base, if Integer)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Current&quot;Decode As&quot; behavior</source>
         <translation>Текущее поведение  &quot;Декодировать как&quot;</translation>
     </message>
@@ -1991,7 +2010,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Change behavior when the protocol field matches this value</source>
-        <translation>Изменить поведение, когда поле протокола соответствует этой величине</translation>
+        <translation type="vanished">Изменить поведение, когда поле протокола соответствует этой величине</translation>
     </message>
     <message>
         <source>String</source>
@@ -2676,8 +2695,16 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Старт</translation>
     </message>
     <message>
+        <source>Save</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Default</source>
         <translation>По умолчанию</translation>
+    </message>
+    <message>
+        <source>Restore default value of the item</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Extcap Help cannot be found</source>
@@ -4417,10 +4444,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>The IP Version for to use for the dummy IP header</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Interface name:</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4545,10 +4568,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Ethernet</translation>
     </message>
     <message>
-        <source>Prefix each frame with an Ethernet, IPv4 and SCTP header</source>
-        <translation type="vanished">В префиксе каждого кадра - заголовок Ethernet, IPv4 и SCTP</translation>
-    </message>
-    <message>
         <source>SCTP</source>
         <translation>SCTP</translation>
     </message>
@@ -4573,10 +4592,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Тег:</translation>
     </message>
     <message>
-        <source>Prefix each frame with an Ethernet, IPv4 and UDP header</source>
-        <translation type="vanished">В префиксе каждого кадра - заголовок Ethernet, IPv4 и UDP</translation>
-    </message>
-    <message>
         <source>UDP</source>
         <translation>UDP</translation>
     </message>
@@ -4587,10 +4602,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>The Ethertype value of each frame</source>
         <translation>Значение Ethertype каждого кадра</translation>
-    </message>
-    <message>
-        <source>Prefix each frame with an Ethernet, IPv4 and TCP header</source>
-        <translation type="vanished">В префиксе каждого кадра - заголовок Ethernet, IPv4 и TCP</translation>
     </message>
     <message>
         <source>TCP</source>
@@ -4609,28 +4620,16 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Ethertype (шестнадцатеричная система):</translation>
     </message>
     <message>
-        <source>The IPv4 protocol ID for each frame</source>
-        <translation type="vanished">ID протокола IPv4 для каждого кадра</translation>
-    </message>
-    <message>
-        <source>Prefix each frame with an Ethernet, IPv4 and SCTP (DATA) header</source>
-        <translation type="vanished">В префиксе каждого кадра - заголовок Ethernet, IPv4 и SCTP (DATA)</translation>
-    </message>
-    <message>
         <source>SCTP (Data)</source>
         <translation>SCTP (данные)</translation>
     </message>
     <message>
-        <source>Prefix each frame with an Ethernet and IPv4 header</source>
-        <translation type="vanished">В префиксе каждого кадра - заголовок Ethernet и IPv4</translation>
-    </message>
-    <message>
-        <source>IPv4</source>
-        <translation type="vanished">IPv4</translation>
-    </message>
-    <message>
         <source>The dissector to use for each frame</source>
         <translation>Диссектор для использования для каждого пакета</translation>
+    </message>
+    <message>
+        <source>The IP Version to use for the dummy IP header</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>The maximum size of the frames to write to the import capture file (max 256kiB)</source>
@@ -4716,8 +4715,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Внешние интерфейсы захвата отключены. </translation>
     </message>
     <message>
-        <source>&lt;p&gt;Local interfaces are unavailable because no packet capture driver is installed.&lt;/p&gt;&lt;p&gt;You can fix this by installing &lt;a href=&quot;https://nmap.org/npcap/&quot;&gt;Npcap&lt;/a&gt; or &lt;a href=&quot;https://www.winpcap.org/install/default.htm&quot;&gt;WinPcap&lt;/a&gt;.&lt;/p&gt;</source>
-        <translation>Локальные интерфейсы недоступны, потому что драйвер захвата пакетов не загружен.&lt;p&gt;Вы можете исправить это, установив &lt;a href=&quot;https://nmap.org/npcap/&quot;&gt;Npcap&lt;/a&gt; или &lt;a href=&quot;https://www.winpcap.org/install/default.htm&quot;&gt;WinPcap&lt;/a&gt;.&lt;/p&gt;</translation>
+        <source>&lt;p&gt;Local interfaces are unavailable because no packet capture driver is installed.&lt;/p&gt;&lt;p&gt;You can fix this by installing &lt;a href=&quot;https://npcap.com/&quot;&gt;Npcap&lt;/a&gt;.&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>&lt;p&gt;Local interfaces are unavailable because the packet capture driver isn&apos;t loaded.&lt;/p&gt;&lt;p&gt;You can fix this by running &lt;pre&gt;net start npcap&lt;/pre&gt; if you have Npcap installed or &lt;pre&gt;net start npf&lt;/pre&gt; if you have WinPcap installed. Both commands must be run as Administrator.&lt;/p&gt;</source>
@@ -6399,10 +6398,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>HTTP</translation>
     </message>
     <message>
-        <source>900000000</source>
-        <translation>900000000</translation>
-    </message>
-    <message>
         <source>&amp;File</source>
         <translation>&amp;Файл</translation>
     </message>
@@ -6752,6 +6747,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Reliable Server Pooling (RSerPool)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>SOME/IP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -7216,6 +7215,22 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Sametime statistics</source>
         <translation>Статистика Sametime</translation>
+    </message>
+    <message>
+        <source>SOME/IP Messages</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>SOME/IP Message statistics</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>SOME/IP-SD Entries</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>SOME/IP-SD Entries statistics</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>&amp;ISUP Messages</source>
@@ -8335,6 +8350,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Сохранение %1…</translation>
     </message>
     <message>
+        <source>Configure all extcaps before start of capture.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Invalid capture filter.</source>
         <translation>Неправильный фильтр захвата.</translation>
     </message>
@@ -8893,6 +8912,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>&lt;small&gt;&lt;i&gt;&lt;/i&gt;&lt;/small&gt;</translation>
     </message>
     <message>
+        <source>Show packet bytes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Packet %1</source>
         <translation>Пакет %1</translation>
     </message>
@@ -8970,6 +8993,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Bytes</source>
         <translation>Байты</translation>
+    </message>
+    <message>
+        <source>Include secondary data sources</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Generate hexdumps for secondary data sources like reassembled or decrypted buffers in addition to the frame&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -12946,8 +12977,16 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Изображение</translation>
     </message>
     <message>
+        <source>Json</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Raw</source>
         <translation>Raw</translation>
+    </message>
+    <message>
+        <source>Rust Array</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>UTF-8</source>
