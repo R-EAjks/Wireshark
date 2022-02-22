@@ -780,11 +780,10 @@ epan_gather_compile_info(feature_list l)
 
 	/* GnuTLS */
 #ifdef HAVE_LIBGNUTLS
-	with_feature(l, "GnuTLS %s", LIBGNUTLS_VERSION);
 #ifdef HAVE_GNUTLS_PKCS11
-	with_feature(l, "PKCS#11");
+	with_feature(l, "GnuTLS %s and PKCS #11 support", LIBGNUTLS_VERSION);
 #else
-	without_feature(l, "PKCS#11");
+	with_feature(l, "GnuTLS %s", LIBGNUTLS_VERSION);
 #endif /* HAVE_GNUTLS_PKCS11 */
 #else
 	without_feature(l, "GnuTLS");

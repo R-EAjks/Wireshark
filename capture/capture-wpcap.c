@@ -848,7 +848,7 @@ gather_caplibs_runtime_info(feature_list l)
 	if (has_wpcap) {
 		with_feature(l, "%s", p_pcap_lib_version());
 	} else
-		without_feature(l, "libpcap");
+		without_feature(l, "Npcap or WinPcap");
 }
 
 /*

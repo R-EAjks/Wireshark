@@ -171,9 +171,6 @@ get_compiled_version_info(gather_feature_func gather_compile)
 	g_string_append(str, "using ");
 	get_compiler_info(str);
 
-	if (gather_compile != NULL) {
-		gather_compile(&l);
-	}
 #ifdef GLIB_MAJOR_VERSION
 	with_feature(&l,
 		"GLib %d.%d.%d", GLIB_MAJOR_VERSION, GLIB_MINOR_VERSION,
@@ -184,6 +181,10 @@ get_compiled_version_info(gather_feature_func gather_compile)
 #endif
 	with_feature(&l, "PCRE2");
 	get_zlib_feature_info(&l);
+
+	if (gather_compile != NULL) {
+		gather_compile(&l);
+	}
 
 	l = g_list_reverse(l);
 	g_list_foreach(l, feature_to_gstring, str);
@@ -394,7 +395,6 @@ get_compiler_info(GString *str)
 static inline void
 get_pcre2_runtime_version_info(feature_list l)
 {
-	GString *str = g_string_new(NULL);
 	/* From pcre2_api(3):
 	 *     The where argument should point to a buffer that is at  least  24  code
 	 *     units  long.  (The  exact  length  required  can  be  found  by calling
@@ -414,11 +414,8 @@ get_pcre2_runtime_version_info(feature_list l)
 	buf_pcre2 = g_malloc(size + 1);
 	pcre2_config(PCRE2_CONFIG_VERSION, buf_pcre2);
 	buf_pcre2[size] = '\0';
-	g_string_append(str, "PCRE2 ");
-	g_string_append(str, buf_pcre2);
+	with_feature(l, "PCRE2 %s", buf_pcre2);
 	g_free(buf_pcre2);
-	with_feature(l, "%s", str->str);
-	g_string_free(str, TRUE);
 }
 
 /*

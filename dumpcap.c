@@ -3868,6 +3868,8 @@ handle_npcap_bug(char *adapter_name _U_, char *cap_err_str _U_)
     char *msg;
 
     pcap_info_str = g_string_new("");
+    // TODO: test directly for Npcap here, so we can remove
+    // get_runtime_caplibs_version()
     get_runtime_caplibs_version(pcap_info_str);
     if (!g_str_has_prefix(pcap_info_str->str, "Npcap")) {
         /*
