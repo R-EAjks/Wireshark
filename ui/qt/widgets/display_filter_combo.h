@@ -27,9 +27,6 @@ protected:
 private:
     void updateStyleSheet();
 
-Q_SIGNALS:
-    void filterTextChanged(QString filter);
-
 public slots:
     bool checkDisplayFilter();
     void applyDisplayFilter();
