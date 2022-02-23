@@ -49,6 +49,8 @@ DisplayFilterCombo::DisplayFilterCombo(QWidget *parent) :
     setToolTip(tr("Select from previously used filters."));
 
     connect(wsApp, &WiresharkApplication::preferencesChanged, this, &DisplayFilterCombo::updateMaxCount);
+
+    connect(this, &QComboBox::editTextChanged, this, &DisplayFilterCombo::filterTextChanged);
 }
 
 extern "C" void dfilter_recent_combo_write_all(FILE *rf) {
