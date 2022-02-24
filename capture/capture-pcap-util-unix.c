@@ -123,7 +123,7 @@ gather_caplibs_compile_info(feature_list l)
 	/*
 	 * We have remote pcap support in libpcap.
 	 */
-	with_feature(l, "libpcap with remote capture");
+	with_feature(l, "libpcap (including remote capture support)");
 #else
 	with_feature(l, "libpcap");
 #endif
