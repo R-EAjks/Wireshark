@@ -52,8 +52,11 @@ static dissector_handle_t e2ap_handle;
 #line 1 "./asn1/e2ap/packet-e2ap-val.h"
 #define maxProtocolIEs                 65535
 #define maxnoofErrors                  256
+#define maxofE2nodeComponents          1024
 #define maxofRANfunctionID             256
 #define maxofRICactionID               16
+#define maxofTNLA                      32
+#define id_RICindicationType           28
 #define maxofMessageProtocolTests      15
 #define maxofRICstyles                 63
 #define maxnoofQCI                     256
@@ -73,7 +76,9 @@ typedef enum _ProcedureCode_enum {
   id_RICserviceQuery =   6,
   id_RICserviceUpdate =   7,
   id_RICsubscription =   8,
-  id_RICsubscriptionDelete =   9
+  id_RICsubscriptionDelete =   9,
+  id_E2nodeConfigurationUpdate =  10,
+  id_E2connectionUpdate =  11
 } ProcedureCode_enum;
 
 typedef enum _ProtocolIE_ID_enum {
@@ -104,11 +109,24 @@ typedef enum _ProtocolIE_ID_enum {
   id_RICindicationHeader =  25,
   id_RICindicationMessage =  26,
   id_RICindicationSN =  27,
-  id_RICindicationType =  28,
   id_RICrequestID =  29,
   id_RICsubscriptionDetails =  30,
   id_TimeToWait =  31,
-  id_RICcontrolOutcome =  32
+  id_RICcontrolOutcome =  32,
+  id_E2nodeComponentConfigUpdate =  33,
+  id_E2nodeComponentConfigUpdate_Item =  34,
+  id_E2nodeComponentConfigUpdateAck =  35,
+  id_E2nodeComponentConfigUpdateAck_Item =  36,
+  id_E2connectionSetup =  39,
+  id_E2connectionSetupFailed =  40,
+  id_E2connectionSetupFailed_Item =  41,
+  id_E2connectionFailed_Item =  42,
+  id_E2connectionUpdate_Item =  43,
+  id_E2connectionUpdateAdd =  44,
+  id_E2connectionUpdateModify =  45,
+  id_E2connectionUpdateRemove =  46,
+  id_E2connectionUpdateRemove_Item =  47,
+  id_TNLinformation =  48
 } ProtocolIE_ID_enum;
 
 /*--- End of included file: packet-e2ap-val.h ---*/
@@ -157,6 +175,22 @@ static int hf_e2ap_ErrorIndication_PDU = -1;      /* ErrorIndication */
 static int hf_e2ap_E2setupRequest_PDU = -1;       /* E2setupRequest */
 static int hf_e2ap_E2setupResponse_PDU = -1;      /* E2setupResponse */
 static int hf_e2ap_E2setupFailure_PDU = -1;       /* E2setupFailure */
+static int hf_e2ap_E2connectionUpdate_PDU = -1;   /* E2connectionUpdate */
+static int hf_e2ap_E2connectionUpdate_List_PDU = -1;  /* E2connectionUpdate_List */
+static int hf_e2ap_E2connectionUpdate_Item_PDU = -1;  /* E2connectionUpdate_Item */
+static int hf_e2ap_E2connectionUpdateRemove_List_PDU = -1;  /* E2connectionUpdateRemove_List */
+static int hf_e2ap_E2connectionUpdateRemove_Item_PDU = -1;  /* E2connectionUpdateRemove_Item */
+static int hf_e2ap_E2connectionUpdateAcknowledge_PDU = -1;  /* E2connectionUpdateAcknowledge */
+static int hf_e2ap_E2connectionSetupFailed_List_PDU = -1;  /* E2connectionSetupFailed_List */
+static int hf_e2ap_E2connectionSetupFailed_Item_PDU = -1;  /* E2connectionSetupFailed_Item */
+static int hf_e2ap_E2connectionUpdateFailure_PDU = -1;  /* E2connectionUpdateFailure */
+static int hf_e2ap_E2nodeConfigurationUpdate_PDU = -1;  /* E2nodeConfigurationUpdate */
+static int hf_e2ap_E2nodeComponentConfigUpdate_List_PDU = -1;  /* E2nodeComponentConfigUpdate_List */
+static int hf_e2ap_E2nodeComponentConfigUpdate_Item_PDU = -1;  /* E2nodeComponentConfigUpdate_Item */
+static int hf_e2ap_E2nodeConfigurationUpdateAcknowledge_PDU = -1;  /* E2nodeConfigurationUpdateAcknowledge */
+static int hf_e2ap_E2nodeComponentConfigUpdateAck_List_PDU = -1;  /* E2nodeComponentConfigUpdateAck_List */
+static int hf_e2ap_E2nodeComponentConfigUpdateAck_Item_PDU = -1;  /* E2nodeComponentConfigUpdateAck_Item */
+static int hf_e2ap_E2nodeConfigurationUpdateFailure_PDU = -1;  /* E2nodeConfigurationUpdateFailure */
 static int hf_e2ap_ResetRequest_PDU = -1;         /* ResetRequest */
 static int hf_e2ap_ResetResponse_PDU = -1;        /* ResetResponse */
 static int hf_e2ap_RICserviceUpdate_PDU = -1;     /* RICserviceUpdate */
@@ -194,6 +228,22 @@ static int hf_e2ap_CriticalityDiagnostics_IE_List_item = -1;  /* CriticalityDiag
 static int hf_e2ap_iECriticality = -1;            /* Criticality */
 static int hf_e2ap_iE_ID = -1;                    /* ProtocolIE_ID */
 static int hf_e2ap_typeOfError = -1;              /* TypeOfError */
+static int hf_e2ap_gNBconfigUpdate = -1;          /* E2nodeComponentConfigUpdateGNB */
+static int hf_e2ap_en_gNBconfigUpdate = -1;       /* E2nodeComponentConfigUpdateENgNB */
+static int hf_e2ap_ng_eNBconfigUpdate = -1;       /* E2nodeComponentConfigUpdateNGeNB */
+static int hf_e2ap_eNBconfigUpdate = -1;          /* E2nodeComponentConfigUpdateENB */
+static int hf_e2ap_ngAPconfigUpdate = -1;         /* OCTET_STRING */
+static int hf_e2ap_xnAPconfigUpdate = -1;         /* OCTET_STRING */
+static int hf_e2ap_e1APconfigUpdate = -1;         /* OCTET_STRING */
+static int hf_e2ap_f1APconfigUpdate = -1;         /* OCTET_STRING */
+static int hf_e2ap_x2APconfigUpdate = -1;         /* OCTET_STRING */
+static int hf_e2ap_s1APconfigUpdate = -1;         /* OCTET_STRING */
+static int hf_e2ap_updateOutcome = -1;            /* T_updateOutcome */
+static int hf_e2ap_failureCause = -1;             /* Cause */
+static int hf_e2ap_e2nodeComponentTypeGNB_CU_UP = -1;  /* E2nodeComponentGNB_CU_UP_ID */
+static int hf_e2ap_e2nodeComponentTypeGNB_DU = -1;  /* E2nodeComponentGNB_DU_ID */
+static int hf_e2ap_gNB_CU_UP_ID = -1;             /* GNB_CU_UP_ID */
+static int hf_e2ap_gNB_DU_ID = -1;                /* GNB_DU_ID */
 static int hf_e2ap_macro_eNB_ID = -1;             /* BIT_STRING_SIZE_20 */
 static int hf_e2ap_home_eNB_ID = -1;              /* BIT_STRING_SIZE_28 */
 static int hf_e2ap_short_Macro_eNB_ID = -1;       /* BIT_STRING_SIZE_18 */
@@ -209,8 +259,6 @@ static int hf_e2ap_eNB = -1;                      /* GlobalE2node_eNB_ID */
 static int hf_e2ap_global_gNB_ID = -1;            /* GlobalenGNB_ID */
 static int hf_e2ap_global_eNB_ID = -1;            /* GlobalENB_ID */
 static int hf_e2ap_global_gNB_ID_01 = -1;         /* GlobalgNB_ID */
-static int hf_e2ap_gNB_CU_UP_ID = -1;             /* GNB_CU_UP_ID */
-static int hf_e2ap_gNB_DU_ID = -1;                /* GNB_DU_ID */
 static int hf_e2ap_global_ng_eNB_ID = -1;         /* GlobalngeNB_ID */
 static int hf_e2ap_pLMN_Identity = -1;            /* PLMN_Identity */
 static int hf_e2ap_eNB_ID = -1;                   /* ENB_ID */
@@ -224,6 +272,8 @@ static int hf_e2ap_ricRequestorID_01 = -1;        /* INTEGER_0_65535 */
 static int hf_e2ap_ricInstanceID = -1;            /* INTEGER_0_65535 */
 static int hf_e2ap_ricSubsequentActionType = -1;  /* RICsubsequentActionType */
 static int hf_e2ap_ricTimeToWait = -1;            /* RICtimeToWait */
+static int hf_e2ap_tnlAddress = -1;               /* BIT_STRING_SIZE_1_160_ */
+static int hf_e2ap_tnlPort = -1;                  /* BIT_STRING_SIZE_16 */
 static int hf_e2ap_protocolIEs = -1;              /* ProtocolIE_Container */
 static int hf_e2ap_ricEventTriggerDefinition = -1;  /* RICeventTriggerDefinition */
 static int hf_e2ap_ricAction_ToBeSetup_List = -1;  /* RICactions_ToBeSetup_List */
@@ -235,10 +285,22 @@ static int hf_e2ap_ricSubsequentAction = -1;      /* RICsubsequentAction */
 static int hf_e2ap_RICaction_Admitted_List_item = -1;  /* ProtocolIE_SingleContainer */
 static int hf_e2ap_RICaction_NotAdmitted_List_item = -1;  /* ProtocolIE_SingleContainer */
 static int hf_e2ap_cause = -1;                    /* Cause */
+static int hf_e2ap_E2connectionUpdate_List_item = -1;  /* ProtocolIE_SingleContainer */
+static int hf_e2ap_tnlInformation = -1;           /* TNLinformation */
+static int hf_e2ap_tnlUsage = -1;                 /* TNLusage */
+static int hf_e2ap_E2connectionUpdateRemove_List_item = -1;  /* ProtocolIE_SingleContainer */
+static int hf_e2ap_E2connectionSetupFailed_List_item = -1;  /* ProtocolIE_SingleContainer */
+static int hf_e2ap_E2nodeComponentConfigUpdate_List_item = -1;  /* ProtocolIE_SingleContainer */
+static int hf_e2ap_e2nodeComponentType = -1;      /* E2nodeComponentType */
+static int hf_e2ap_e2nodeComponentID = -1;        /* E2nodeComponentID */
+static int hf_e2ap_e2nodeComponentConfigUpdate = -1;  /* E2nodeComponentConfigUpdate */
+static int hf_e2ap_E2nodeComponentConfigUpdateAck_List_item = -1;  /* ProtocolIE_SingleContainer */
+static int hf_e2ap_e2nodeComponentConfigUpdateAck = -1;  /* E2nodeComponentConfigUpdateAck */
 static int hf_e2ap_RANfunctions_List_item = -1;   /* ProtocolIE_SingleContainer */
 static int hf_e2ap_ranFunctionID = -1;            /* RANfunctionID */
 static int hf_e2ap_ranFunctionDefinition = -1;    /* RANfunctionDefinition */
 static int hf_e2ap_ranFunctionRevision = -1;      /* RANfunctionRevision */
+static int hf_e2ap_ranFunctionOID = -1;           /* RANfunctionOID */
 static int hf_e2ap_RANfunctionsID_List_item = -1;  /* ProtocolIE_SingleContainer */
 static int hf_e2ap_RANfunctionsIDcause_List_item = -1;  /* ProtocolIE_SingleContainer */
 static int hf_e2ap_initiatingMessage = -1;        /* InitiatingMessage */
@@ -343,6 +405,15 @@ static gint ett_e2ap_Cause = -1;
 static gint ett_e2ap_CriticalityDiagnostics = -1;
 static gint ett_e2ap_CriticalityDiagnostics_IE_List = -1;
 static gint ett_e2ap_CriticalityDiagnostics_IE_Item = -1;
+static gint ett_e2ap_E2nodeComponentConfigUpdate = -1;
+static gint ett_e2ap_E2nodeComponentConfigUpdateGNB = -1;
+static gint ett_e2ap_E2nodeComponentConfigUpdateENgNB = -1;
+static gint ett_e2ap_E2nodeComponentConfigUpdateNGeNB = -1;
+static gint ett_e2ap_E2nodeComponentConfigUpdateENB = -1;
+static gint ett_e2ap_E2nodeComponentConfigUpdateAck = -1;
+static gint ett_e2ap_E2nodeComponentID = -1;
+static gint ett_e2ap_E2nodeComponentGNB_CU_UP_ID = -1;
+static gint ett_e2ap_E2nodeComponentGNB_DU_ID = -1;
 static gint ett_e2ap_ENB_ID = -1;
 static gint ett_e2ap_ENB_ID_Choice = -1;
 static gint ett_e2ap_ENGNB_ID = -1;
@@ -359,6 +430,7 @@ static gint ett_e2ap_GlobalRIC_ID = -1;
 static gint ett_e2ap_GNB_ID_Choice = -1;
 static gint ett_e2ap_RICrequestID = -1;
 static gint ett_e2ap_RICsubsequentAction = -1;
+static gint ett_e2ap_TNLinformation = -1;
 static gint ett_e2ap_RICsubscriptionRequest = -1;
 static gint ett_e2ap_RICsubscriptionDetails = -1;
 static gint ett_e2ap_RICactions_ToBeSetup_List = -1;
@@ -380,6 +452,22 @@ static gint ett_e2ap_ErrorIndication = -1;
 static gint ett_e2ap_E2setupRequest = -1;
 static gint ett_e2ap_E2setupResponse = -1;
 static gint ett_e2ap_E2setupFailure = -1;
+static gint ett_e2ap_E2connectionUpdate = -1;
+static gint ett_e2ap_E2connectionUpdate_List = -1;
+static gint ett_e2ap_E2connectionUpdate_Item = -1;
+static gint ett_e2ap_E2connectionUpdateRemove_List = -1;
+static gint ett_e2ap_E2connectionUpdateRemove_Item = -1;
+static gint ett_e2ap_E2connectionUpdateAcknowledge = -1;
+static gint ett_e2ap_E2connectionSetupFailed_List = -1;
+static gint ett_e2ap_E2connectionSetupFailed_Item = -1;
+static gint ett_e2ap_E2connectionUpdateFailure = -1;
+static gint ett_e2ap_E2nodeConfigurationUpdate = -1;
+static gint ett_e2ap_E2nodeComponentConfigUpdate_List = -1;
+static gint ett_e2ap_E2nodeComponentConfigUpdate_Item = -1;
+static gint ett_e2ap_E2nodeConfigurationUpdateAcknowledge = -1;
+static gint ett_e2ap_E2nodeComponentConfigUpdateAck_List = -1;
+static gint ett_e2ap_E2nodeComponentConfigUpdateAck_Item = -1;
+static gint ett_e2ap_E2nodeConfigurationUpdateFailure = -1;
 static gint ett_e2ap_ResetRequest = -1;
 static gint ett_e2ap_ResetResponse = -1;
 static gint ett_e2ap_RICserviceUpdate = -1;
@@ -480,6 +568,8 @@ struct e2ap_private_data {
 
 /* Global variables */
 static guint gbl_e2apSctpPort = SCTP_PORT_E2AP;
+static gboolean gbl_e2apCallASN = FALSE;
+static gboolean gbl_e2apCallJson = FALSE;
 
 /* Dissector tables */
 static dissector_table_t e2ap_ies_dissector_table;
@@ -552,6 +642,8 @@ static const value_string e2ap_ProcedureCode_vals[] = {
   { id_RICserviceUpdate, "id-RICserviceUpdate" },
   { id_RICsubscription, "id-RICsubscription" },
   { id_RICsubscriptionDelete, "id-RICsubscriptionDelete" },
+  { id_E2nodeConfigurationUpdate, "id-E2nodeConfigurationUpdate" },
+  { id_E2connectionUpdate, "id-E2connectionUpdate" },
   { 0, NULL }
 };
 
@@ -600,11 +692,24 @@ static const value_string e2ap_ProtocolIE_ID_vals[] = {
   { id_RICindicationHeader, "id-RICindicationHeader" },
   { id_RICindicationMessage, "id-RICindicationMessage" },
   { id_RICindicationSN, "id-RICindicationSN" },
-  { id_RICindicationType, "id-RICindicationType" },
   { id_RICrequestID, "id-RICrequestID" },
   { id_RICsubscriptionDetails, "id-RICsubscriptionDetails" },
   { id_TimeToWait, "id-TimeToWait" },
   { id_RICcontrolOutcome, "id-RICcontrolOutcome" },
+  { id_E2nodeComponentConfigUpdate, "id-E2nodeComponentConfigUpdate" },
+  { id_E2nodeComponentConfigUpdate_Item, "id-E2nodeComponentConfigUpdate-Item" },
+  { id_E2nodeComponentConfigUpdateAck, "id-E2nodeComponentConfigUpdateAck" },
+  { id_E2nodeComponentConfigUpdateAck_Item, "id-E2nodeComponentConfigUpdateAck-Item" },
+  { id_E2connectionSetup, "id-E2connectionSetup" },
+  { id_E2connectionSetupFailed, "id-E2connectionSetupFailed" },
+  { id_E2connectionSetupFailed_Item, "id-E2connectionSetupFailed-Item" },
+  { id_E2connectionFailed_Item, "id-E2connectionFailed-Item" },
+  { id_E2connectionUpdate_Item, "id-E2connectionUpdate-Item" },
+  { id_E2connectionUpdateAdd, "id-E2connectionUpdateAdd" },
+  { id_E2connectionUpdateModify, "id-E2connectionUpdateModify" },
+  { id_E2connectionUpdateRemove, "id-E2connectionUpdateRemove" },
+  { id_E2connectionUpdateRemove_Item, "id-E2connectionUpdateRemove-Item" },
+  { id_TNLinformation, "id-TNLinformation" },
   { 0, NULL }
 };
 
@@ -912,6 +1017,224 @@ dissect_e2ap_CriticalityDiagnostics(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_
 
 
 static int
+dissect_e2ap_OCTET_STRING(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_octet_string(tvb, offset, actx, tree, hf_index,
+                                       NO_BOUND, NO_BOUND, FALSE, NULL);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2nodeComponentConfigUpdateGNB_sequence[] = {
+  { &hf_e2ap_ngAPconfigUpdate, ASN1_EXTENSION_ROOT    , ASN1_OPTIONAL    , dissect_e2ap_OCTET_STRING },
+  { &hf_e2ap_xnAPconfigUpdate, ASN1_EXTENSION_ROOT    , ASN1_OPTIONAL    , dissect_e2ap_OCTET_STRING },
+  { &hf_e2ap_e1APconfigUpdate, ASN1_EXTENSION_ROOT    , ASN1_OPTIONAL    , dissect_e2ap_OCTET_STRING },
+  { &hf_e2ap_f1APconfigUpdate, ASN1_EXTENSION_ROOT    , ASN1_OPTIONAL    , dissect_e2ap_OCTET_STRING },
+  { NULL, 0, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2nodeComponentConfigUpdateGNB(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
+                                   ett_e2ap_E2nodeComponentConfigUpdateGNB, E2nodeComponentConfigUpdateGNB_sequence);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2nodeComponentConfigUpdateENgNB_sequence[] = {
+  { &hf_e2ap_x2APconfigUpdate, ASN1_EXTENSION_ROOT    , ASN1_OPTIONAL    , dissect_e2ap_OCTET_STRING },
+  { NULL, 0, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2nodeComponentConfigUpdateENgNB(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
+                                   ett_e2ap_E2nodeComponentConfigUpdateENgNB, E2nodeComponentConfigUpdateENgNB_sequence);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2nodeComponentConfigUpdateNGeNB_sequence[] = {
+  { &hf_e2ap_ngAPconfigUpdate, ASN1_EXTENSION_ROOT    , ASN1_OPTIONAL    , dissect_e2ap_OCTET_STRING },
+  { &hf_e2ap_xnAPconfigUpdate, ASN1_EXTENSION_ROOT    , ASN1_OPTIONAL    , dissect_e2ap_OCTET_STRING },
+  { NULL, 0, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2nodeComponentConfigUpdateNGeNB(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
+                                   ett_e2ap_E2nodeComponentConfigUpdateNGeNB, E2nodeComponentConfigUpdateNGeNB_sequence);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2nodeComponentConfigUpdateENB_sequence[] = {
+  { &hf_e2ap_s1APconfigUpdate, ASN1_EXTENSION_ROOT    , ASN1_OPTIONAL    , dissect_e2ap_OCTET_STRING },
+  { &hf_e2ap_x2APconfigUpdate, ASN1_EXTENSION_ROOT    , ASN1_OPTIONAL    , dissect_e2ap_OCTET_STRING },
+  { NULL, 0, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2nodeComponentConfigUpdateENB(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
+                                   ett_e2ap_E2nodeComponentConfigUpdateENB, E2nodeComponentConfigUpdateENB_sequence);
+
+  return offset;
+}
+
+
+static const value_string e2ap_E2nodeComponentConfigUpdate_vals[] = {
+  {   0, "gNBconfigUpdate" },
+  {   1, "en-gNBconfigUpdate" },
+  {   2, "ng-eNBconfigUpdate" },
+  {   3, "eNBconfigUpdate" },
+  { 0, NULL }
+};
+
+static const per_choice_t E2nodeComponentConfigUpdate_choice[] = {
+  {   0, &hf_e2ap_gNBconfigUpdate, ASN1_EXTENSION_ROOT    , dissect_e2ap_E2nodeComponentConfigUpdateGNB },
+  {   1, &hf_e2ap_en_gNBconfigUpdate, ASN1_EXTENSION_ROOT    , dissect_e2ap_E2nodeComponentConfigUpdateENgNB },
+  {   2, &hf_e2ap_ng_eNBconfigUpdate, ASN1_EXTENSION_ROOT    , dissect_e2ap_E2nodeComponentConfigUpdateNGeNB },
+  {   3, &hf_e2ap_eNBconfigUpdate, ASN1_EXTENSION_ROOT    , dissect_e2ap_E2nodeComponentConfigUpdateENB },
+  { 0, NULL, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2nodeComponentConfigUpdate(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_choice(tvb, offset, actx, tree, hf_index,
+                                 ett_e2ap_E2nodeComponentConfigUpdate, E2nodeComponentConfigUpdate_choice,
+                                 NULL);
+
+  return offset;
+}
+
+
+static const value_string e2ap_T_updateOutcome_vals[] = {
+  {   0, "success" },
+  {   1, "failure" },
+  { 0, NULL }
+};
+
+
+static int
+dissect_e2ap_T_updateOutcome(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_enumerated(tvb, offset, actx, tree, hf_index,
+                                     2, NULL, TRUE, 0, NULL);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2nodeComponentConfigUpdateAck_sequence[] = {
+  { &hf_e2ap_updateOutcome  , ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_T_updateOutcome },
+  { &hf_e2ap_failureCause   , ASN1_EXTENSION_ROOT    , ASN1_OPTIONAL    , dissect_e2ap_Cause },
+  { NULL, 0, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2nodeComponentConfigUpdateAck(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
+                                   ett_e2ap_E2nodeComponentConfigUpdateAck, E2nodeComponentConfigUpdateAck_sequence);
+
+  return offset;
+}
+
+
+static const value_string e2ap_E2nodeComponentType_vals[] = {
+  {   0, "gNB" },
+  {   1, "gNB-CU-UP" },
+  {   2, "gNB-DU" },
+  {   3, "en-gNB" },
+  {   4, "eNB" },
+  {   5, "ng-eNB" },
+  { 0, NULL }
+};
+
+
+static int
+dissect_e2ap_E2nodeComponentType(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_enumerated(tvb, offset, actx, tree, hf_index,
+                                     6, NULL, TRUE, 0, NULL);
+
+  return offset;
+}
+
+
+
+static int
+dissect_e2ap_GNB_CU_UP_ID(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_constrained_integer_64b(tvb, offset, actx, tree, hf_index,
+                                                            0U, G_GUINT64_CONSTANT(68719476735), NULL, FALSE);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2nodeComponentGNB_CU_UP_ID_sequence[] = {
+  { &hf_e2ap_gNB_CU_UP_ID   , ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_GNB_CU_UP_ID },
+  { NULL, 0, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2nodeComponentGNB_CU_UP_ID(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
+                                   ett_e2ap_E2nodeComponentGNB_CU_UP_ID, E2nodeComponentGNB_CU_UP_ID_sequence);
+
+  return offset;
+}
+
+
+
+static int
+dissect_e2ap_GNB_DU_ID(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_constrained_integer_64b(tvb, offset, actx, tree, hf_index,
+                                                            0U, G_GUINT64_CONSTANT(68719476735), NULL, FALSE);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2nodeComponentGNB_DU_ID_sequence[] = {
+  { &hf_e2ap_gNB_DU_ID      , ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_GNB_DU_ID },
+  { NULL, 0, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2nodeComponentGNB_DU_ID(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
+                                   ett_e2ap_E2nodeComponentGNB_DU_ID, E2nodeComponentGNB_DU_ID_sequence);
+
+  return offset;
+}
+
+
+static const value_string e2ap_E2nodeComponentID_vals[] = {
+  {   0, "e2nodeComponentTypeGNB-CU-UP" },
+  {   1, "e2nodeComponentTypeGNB-DU" },
+  { 0, NULL }
+};
+
+static const per_choice_t E2nodeComponentID_choice[] = {
+  {   0, &hf_e2ap_e2nodeComponentTypeGNB_CU_UP, ASN1_EXTENSION_ROOT    , dissect_e2ap_E2nodeComponentGNB_CU_UP_ID },
+  {   1, &hf_e2ap_e2nodeComponentTypeGNB_DU, ASN1_EXTENSION_ROOT    , dissect_e2ap_E2nodeComponentGNB_DU_ID },
+  { 0, NULL, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2nodeComponentID(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_choice(tvb, offset, actx, tree, hf_index,
+                                 ett_e2ap_E2nodeComponentID, E2nodeComponentID_choice,
+                                 NULL);
+
+  return offset;
+}
+
+
+
+static int
 dissect_e2ap_BIT_STRING_SIZE_20(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
   offset = dissect_per_bit_string(tvb, offset, actx, tree, hf_index,
                                      20, 20, FALSE, NULL, 0, NULL, NULL);
@@ -1075,26 +1398,6 @@ dissect_e2ap_GlobalgNB_ID(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U
 }
 
 
-
-static int
-dissect_e2ap_GNB_CU_UP_ID(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-  offset = dissect_per_constrained_integer_64b(tvb, offset, actx, tree, hf_index,
-                                                            0U, G_GUINT64_CONSTANT(68719476735), NULL, FALSE);
-
-  return offset;
-}
-
-
-
-static int
-dissect_e2ap_GNB_DU_ID(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-  offset = dissect_per_constrained_integer_64b(tvb, offset, actx, tree, hf_index,
-                                                            0U, G_GUINT64_CONSTANT(68719476735), NULL, FALSE);
-
-  return offset;
-}
-
-
 static const per_sequence_t GlobalE2node_gNB_ID_sequence[] = {
   { &hf_e2ap_global_gNB_ID_01, ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_GlobalgNB_ID },
   { &hf_e2ap_gNB_CU_UP_ID   , ASN1_EXTENSION_ROOT    , ASN1_OPTIONAL    , dissect_e2ap_GNB_CU_UP_ID },
@@ -1242,12 +1545,19 @@ dissect_e2ap_GlobalRIC_ID(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U
 
 static int
 dissect_e2ap_RANfunctionDefinition(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 242 "./asn1/e2ap/e2ap.cnf"
+#line 269 "./asn1/e2ap/e2ap.cnf"
   tvbuff_t *parameter_tvb;
     offset = dissect_per_octet_string(tvb, offset, actx, tree, hf_index,
                                        NO_BOUND, NO_BOUND, FALSE, &parameter_tvb);
 
-  dissect_E2SM_KPM_RANfunction_Description_PDU(parameter_tvb, actx->pinfo, tree, NULL);
+
+  if (gbl_e2apCallJson) {
+    dissector_handle_t json_handle = find_dissector("json");
+    call_dissector_only(json_handle, parameter_tvb, actx->pinfo, tree, NULL);
+  }
+  if (gbl_e2apCallASN) {
+    dissect_E2SM_KPM_RANfunction_Description_PDU(parameter_tvb, actx->pinfo, tree, NULL);
+  }
 
 
 
@@ -1260,6 +1570,16 @@ static int
 dissect_e2ap_RANfunctionID(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
   offset = dissect_per_constrained_integer(tvb, offset, actx, tree, hf_index,
                                                             0U, 4095U, NULL, FALSE);
+
+  return offset;
+}
+
+
+
+static int
+dissect_e2ap_RANfunctionOID(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_PrintableString(tvb, offset, actx, tree, hf_index,
+                                          1, 1000, TRUE);
 
   return offset;
 }
@@ -1283,7 +1603,14 @@ dissect_e2ap_RICactionDefinition(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *
     offset = dissect_per_octet_string(tvb, offset, actx, tree, hf_index,
                                        NO_BOUND, NO_BOUND, FALSE, &parameter_tvb);
 
-  dissect_E2SM_KPM_ActionDefinition_PDU(parameter_tvb, actx->pinfo, tree, NULL);
+  if (gbl_e2apCallJson) {
+    dissector_handle_t json_handle = find_dissector("json");
+    call_dissector_only(json_handle, parameter_tvb, actx->pinfo, tree, NULL);
+  }
+  if (gbl_e2apCallASN) {
+    dissect_E2SM_KPM_ActionDefinition_PDU(parameter_tvb, actx->pinfo, tree, NULL);
+  }
+
 
 
 
@@ -1321,12 +1648,19 @@ dissect_e2ap_RICactionType(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _
 
 static int
 dissect_e2ap_RICcallProcessID(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 247 "./asn1/e2ap/e2ap.cnf"
+#line 281 "./asn1/e2ap/e2ap.cnf"
   tvbuff_t *parameter_tvb;
     offset = dissect_per_octet_string(tvb, offset, actx, tree, hf_index,
                                        NO_BOUND, NO_BOUND, FALSE, &parameter_tvb);
 
-  dissect_RANcallProcess_ID_string_PDU(parameter_tvb, actx->pinfo, tree, NULL);
+  if (gbl_e2apCallJson) {
+    dissector_handle_t json_handle = find_dissector("json");
+    call_dissector_only(json_handle, parameter_tvb, actx->pinfo, tree, NULL);
+  }
+  if (gbl_e2apCallASN) {
+      dissect_RANcallProcess_ID_string_PDU(parameter_tvb, actx->pinfo, tree, NULL);
+  }
+
 
 
 
@@ -1403,12 +1737,18 @@ dissect_e2ap_RICcontrolStatus(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *act
 
 static int
 dissect_e2ap_RICeventTriggerDefinition(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 226 "./asn1/e2ap/e2ap.cnf"
+#line 233 "./asn1/e2ap/e2ap.cnf"
   tvbuff_t *parameter_tvb;
     offset = dissect_per_octet_string(tvb, offset, actx, tree, hf_index,
                                        NO_BOUND, NO_BOUND, FALSE, &parameter_tvb);
 
-  dissect_E2SM_KPM_EventTriggerDefinition_PDU(parameter_tvb, actx->pinfo, tree, NULL);
+  if (gbl_e2apCallJson) {
+    dissector_handle_t json_handle = find_dissector("json");
+    call_dissector_only(json_handle, parameter_tvb, actx->pinfo, tree, NULL);
+  }
+  if (gbl_e2apCallASN) {
+    dissect_E2SM_KPM_EventTriggerDefinition_PDU(parameter_tvb, actx->pinfo, tree, NULL);
+  }
 
 
 
@@ -1419,12 +1759,18 @@ dissect_e2ap_RICeventTriggerDefinition(tvbuff_t *tvb _U_, int offset _U_, asn1_c
 
 static int
 dissect_e2ap_RICindicationHeader(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 231 "./asn1/e2ap/e2ap.cnf"
+#line 244 "./asn1/e2ap/e2ap.cnf"
   tvbuff_t *parameter_tvb;
     offset = dissect_per_octet_string(tvb, offset, actx, tree, hf_index,
                                        NO_BOUND, NO_BOUND, FALSE, &parameter_tvb);
 
-  dissect_E2SM_KPM_IndicationHeader_PDU(parameter_tvb, actx->pinfo, tree, NULL);
+  if (gbl_e2apCallJson) {
+    dissector_handle_t json_handle = find_dissector("json");
+    call_dissector_only(json_handle, parameter_tvb, actx->pinfo, tree, NULL);
+  }
+  if (gbl_e2apCallASN) {
+    dissect_E2SM_KPM_IndicationHeader_PDU(parameter_tvb, actx->pinfo, tree, NULL);
+  }
 
 
 
@@ -1435,13 +1781,21 @@ dissect_e2ap_RICindicationHeader(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *
 
 static int
 dissect_e2ap_RICindicationMessage(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 236 "./asn1/e2ap/e2ap.cnf"
+#line 255 "./asn1/e2ap/e2ap.cnf"
   tvbuff_t *parameter_tvb;
     offset = dissect_per_octet_string(tvb, offset, actx, tree, hf_index,
                                        NO_BOUND, NO_BOUND, FALSE, &parameter_tvb);
 
-  /* It is believed that this is an error in the ASN in V1 of the spec... */
-  dissect_E2SM_KPM_IndicationMessage_Format1_PDU(parameter_tvb, actx->pinfo, tree, NULL);
+  if (gbl_e2apCallJson) {
+    dissector_handle_t json_handle = find_dissector("json");
+    call_dissector_only(json_handle, parameter_tvb, actx->pinfo, tree, NULL);
+  }
+  if (gbl_e2apCallASN) {
+    /* It is believed that this is an error in the ASN in V1 of the spec... */
+    dissect_E2SM_KPM_IndicationMessage_Format1_PDU(parameter_tvb, actx->pinfo, tree, NULL);
+  }
+
+
 
 
 
@@ -1558,6 +1912,58 @@ dissect_e2ap_TimeToWait(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_,
 }
 
 
+
+static int
+dissect_e2ap_BIT_STRING_SIZE_1_160_(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_bit_string(tvb, offset, actx, tree, hf_index,
+                                     1, 160, TRUE, NULL, 0, NULL, NULL);
+
+  return offset;
+}
+
+
+
+static int
+dissect_e2ap_BIT_STRING_SIZE_16(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_bit_string(tvb, offset, actx, tree, hf_index,
+                                     16, 16, FALSE, NULL, 0, NULL, NULL);
+
+  return offset;
+}
+
+
+static const per_sequence_t TNLinformation_sequence[] = {
+  { &hf_e2ap_tnlAddress     , ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_BIT_STRING_SIZE_1_160_ },
+  { &hf_e2ap_tnlPort        , ASN1_EXTENSION_ROOT    , ASN1_OPTIONAL    , dissect_e2ap_BIT_STRING_SIZE_16 },
+  { NULL, 0, 0, NULL }
+};
+
+static int
+dissect_e2ap_TNLinformation(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
+                                   ett_e2ap_TNLinformation, TNLinformation_sequence);
+
+  return offset;
+}
+
+
+static const value_string e2ap_TNLusage_vals[] = {
+  {   0, "ric-service" },
+  {   1, "support-function" },
+  {   2, "both" },
+  { 0, NULL }
+};
+
+
+static int
+dissect_e2ap_TNLusage(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_enumerated(tvb, offset, actx, tree, hf_index,
+                                     3, NULL, TRUE, 0, NULL);
+
+  return offset;
+}
+
+
 static const per_sequence_t RICsubscriptionRequest_sequence[] = {
   { &hf_e2ap_protocolIEs    , ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_ProtocolIE_Container },
   { NULL, 0, 0, NULL }
@@ -1565,7 +1971,7 @@ static const per_sequence_t RICsubscriptionRequest_sequence[] = {
 
 static int
 dissect_e2ap_RICsubscriptionRequest(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 500 "./asn1/e2ap/e2ap.cnf"
+#line 558 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "RICsubscriptionRequest");
 
 
@@ -1629,7 +2035,7 @@ static const per_sequence_t RICsubscriptionResponse_sequence[] = {
 
 static int
 dissect_e2ap_RICsubscriptionResponse(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 503 "./asn1/e2ap/e2ap.cnf"
+#line 561 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "RICsubscriptionResponse");
 
 
@@ -1706,7 +2112,7 @@ static const per_sequence_t RICsubscriptionFailure_sequence[] = {
 
 static int
 dissect_e2ap_RICsubscriptionFailure(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 497 "./asn1/e2ap/e2ap.cnf"
+#line 555 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "RICsubscriptionFailure");
 
 
@@ -1724,7 +2130,7 @@ static const per_sequence_t RICsubscriptionDeleteRequest_sequence[] = {
 
 static int
 dissect_e2ap_RICsubscriptionDeleteRequest(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 511 "./asn1/e2ap/e2ap.cnf"
+#line 569 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "RICsubscriptionDeleteRequest");
 
 
@@ -1742,7 +2148,7 @@ static const per_sequence_t RICsubscriptionDeleteResponse_sequence[] = {
 
 static int
 dissect_e2ap_RICsubscriptionDeleteResponse(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 514 "./asn1/e2ap/e2ap.cnf"
+#line 572 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "RICsubscriptionDeleteResponse");
 
 
@@ -1766,7 +2172,7 @@ static const per_sequence_t RICsubscriptionDeleteFailure_sequence[] = {
 
 static int
 dissect_e2ap_RICsubscriptionDeleteFailure(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 508 "./asn1/e2ap/e2ap.cnf"
+#line 566 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "RICsubscriptionDeleteFailure");
 
 
@@ -1784,7 +2190,7 @@ static const per_sequence_t RICindication_sequence[] = {
 
 static int
 dissect_e2ap_RICindication(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 478 "./asn1/e2ap/e2ap.cnf"
+#line 536 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "RICindication");
 
 
@@ -1803,7 +2209,7 @@ static const per_sequence_t RICcontrolRequest_sequence[] = {
 
 static int
 dissect_e2ap_RICcontrolRequest(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 475 "./asn1/e2ap/e2ap.cnf"
+#line 533 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "RICcontrolRequest");
 
 
@@ -1821,7 +2227,7 @@ static const per_sequence_t RICcontrolAcknowledge_sequence[] = {
 
 static int
 dissect_e2ap_RICcontrolAcknowledge(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 467 "./asn1/e2ap/e2ap.cnf"
+#line 525 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "RICcontrolAcknowledge");
 
 
@@ -1841,7 +2247,7 @@ static const per_sequence_t RICcontrolFailure_sequence[] = {
 
 static int
 dissect_e2ap_RICcontrolFailure(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 472 "./asn1/e2ap/e2ap.cnf"
+#line 530 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "RICcontrolFailure");
 
 
@@ -1859,7 +2265,7 @@ static const per_sequence_t ErrorIndication_sequence[] = {
 
 static int
 dissect_e2ap_ErrorIndication(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 458 "./asn1/e2ap/e2ap.cnf"
+#line 516 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "ErrorIndication");
 
 
@@ -1877,7 +2283,7 @@ static const per_sequence_t E2setupRequest_sequence[] = {
 
 static int
 dissect_e2ap_E2setupRequest(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 452 "./asn1/e2ap/e2ap.cnf"
+#line 510 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "E2setupRequest");
 
 
@@ -1895,7 +2301,7 @@ static const per_sequence_t E2setupResponse_sequence[] = {
 
 static int
 dissect_e2ap_E2setupResponse(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 455 "./asn1/e2ap/e2ap.cnf"
+#line 513 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "E2setupResponse");
 
 
@@ -1913,12 +2319,242 @@ static const per_sequence_t E2setupFailure_sequence[] = {
 
 static int
 dissect_e2ap_E2setupFailure(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 449 "./asn1/e2ap/e2ap.cnf"
+#line 507 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "E2setupFailure");
 
 
   offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
                                    ett_e2ap_E2setupFailure, E2setupFailure_sequence);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2connectionUpdate_sequence[] = {
+  { &hf_e2ap_protocolIEs    , ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_ProtocolIE_Container },
+  { NULL, 0, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2connectionUpdate(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
+                                   ett_e2ap_E2connectionUpdate, E2connectionUpdate_sequence);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2connectionUpdate_List_sequence_of[1] = {
+  { &hf_e2ap_E2connectionUpdate_List_item, ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_e2ap_ProtocolIE_SingleContainer },
+};
+
+static int
+dissect_e2ap_E2connectionUpdate_List(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_constrained_sequence_of(tvb, offset, actx, tree, hf_index,
+                                                  ett_e2ap_E2connectionUpdate_List, E2connectionUpdate_List_sequence_of,
+                                                  1, maxofTNLA, FALSE);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2connectionUpdate_Item_sequence[] = {
+  { &hf_e2ap_tnlInformation , ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_TNLinformation },
+  { &hf_e2ap_tnlUsage       , ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_TNLusage },
+  { NULL, 0, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2connectionUpdate_Item(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
+                                   ett_e2ap_E2connectionUpdate_Item, E2connectionUpdate_Item_sequence);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2connectionUpdateRemove_List_sequence_of[1] = {
+  { &hf_e2ap_E2connectionUpdateRemove_List_item, ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_e2ap_ProtocolIE_SingleContainer },
+};
+
+static int
+dissect_e2ap_E2connectionUpdateRemove_List(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_constrained_sequence_of(tvb, offset, actx, tree, hf_index,
+                                                  ett_e2ap_E2connectionUpdateRemove_List, E2connectionUpdateRemove_List_sequence_of,
+                                                  1, maxofTNLA, FALSE);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2connectionUpdateRemove_Item_sequence[] = {
+  { &hf_e2ap_tnlInformation , ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_TNLinformation },
+  { NULL, 0, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2connectionUpdateRemove_Item(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
+                                   ett_e2ap_E2connectionUpdateRemove_Item, E2connectionUpdateRemove_Item_sequence);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2connectionUpdateAcknowledge_sequence[] = {
+  { &hf_e2ap_protocolIEs    , ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_ProtocolIE_Container },
+  { NULL, 0, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2connectionUpdateAcknowledge(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
+                                   ett_e2ap_E2connectionUpdateAcknowledge, E2connectionUpdateAcknowledge_sequence);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2connectionSetupFailed_List_sequence_of[1] = {
+  { &hf_e2ap_E2connectionSetupFailed_List_item, ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_e2ap_ProtocolIE_SingleContainer },
+};
+
+static int
+dissect_e2ap_E2connectionSetupFailed_List(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_constrained_sequence_of(tvb, offset, actx, tree, hf_index,
+                                                  ett_e2ap_E2connectionSetupFailed_List, E2connectionSetupFailed_List_sequence_of,
+                                                  1, maxofTNLA, FALSE);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2connectionSetupFailed_Item_sequence[] = {
+  { &hf_e2ap_tnlInformation , ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_TNLinformation },
+  { &hf_e2ap_cause          , ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_Cause },
+  { NULL, 0, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2connectionSetupFailed_Item(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
+                                   ett_e2ap_E2connectionSetupFailed_Item, E2connectionSetupFailed_Item_sequence);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2connectionUpdateFailure_sequence[] = {
+  { &hf_e2ap_protocolIEs    , ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_ProtocolIE_Container },
+  { NULL, 0, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2connectionUpdateFailure(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
+                                   ett_e2ap_E2connectionUpdateFailure, E2connectionUpdateFailure_sequence);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2nodeConfigurationUpdate_sequence[] = {
+  { &hf_e2ap_protocolIEs    , ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_ProtocolIE_Container },
+  { NULL, 0, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2nodeConfigurationUpdate(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
+                                   ett_e2ap_E2nodeConfigurationUpdate, E2nodeConfigurationUpdate_sequence);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2nodeComponentConfigUpdate_List_sequence_of[1] = {
+  { &hf_e2ap_E2nodeComponentConfigUpdate_List_item, ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_e2ap_ProtocolIE_SingleContainer },
+};
+
+static int
+dissect_e2ap_E2nodeComponentConfigUpdate_List(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_constrained_sequence_of(tvb, offset, actx, tree, hf_index,
+                                                  ett_e2ap_E2nodeComponentConfigUpdate_List, E2nodeComponentConfigUpdate_List_sequence_of,
+                                                  1, maxofE2nodeComponents, FALSE);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2nodeComponentConfigUpdate_Item_sequence[] = {
+  { &hf_e2ap_e2nodeComponentType, ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_E2nodeComponentType },
+  { &hf_e2ap_e2nodeComponentID, ASN1_EXTENSION_ROOT    , ASN1_OPTIONAL    , dissect_e2ap_E2nodeComponentID },
+  { &hf_e2ap_e2nodeComponentConfigUpdate, ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_E2nodeComponentConfigUpdate },
+  { NULL, 0, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2nodeComponentConfigUpdate_Item(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
+                                   ett_e2ap_E2nodeComponentConfigUpdate_Item, E2nodeComponentConfigUpdate_Item_sequence);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2nodeConfigurationUpdateAcknowledge_sequence[] = {
+  { &hf_e2ap_protocolIEs    , ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_ProtocolIE_Container },
+  { NULL, 0, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2nodeConfigurationUpdateAcknowledge(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
+                                   ett_e2ap_E2nodeConfigurationUpdateAcknowledge, E2nodeConfigurationUpdateAcknowledge_sequence);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2nodeComponentConfigUpdateAck_List_sequence_of[1] = {
+  { &hf_e2ap_E2nodeComponentConfigUpdateAck_List_item, ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_e2ap_ProtocolIE_SingleContainer },
+};
+
+static int
+dissect_e2ap_E2nodeComponentConfigUpdateAck_List(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_constrained_sequence_of(tvb, offset, actx, tree, hf_index,
+                                                  ett_e2ap_E2nodeComponentConfigUpdateAck_List, E2nodeComponentConfigUpdateAck_List_sequence_of,
+                                                  1, maxofE2nodeComponents, FALSE);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2nodeComponentConfigUpdateAck_Item_sequence[] = {
+  { &hf_e2ap_e2nodeComponentType, ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_E2nodeComponentType },
+  { &hf_e2ap_e2nodeComponentID, ASN1_EXTENSION_ROOT    , ASN1_OPTIONAL    , dissect_e2ap_E2nodeComponentID },
+  { &hf_e2ap_e2nodeComponentConfigUpdateAck, ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_E2nodeComponentConfigUpdateAck },
+  { NULL, 0, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2nodeComponentConfigUpdateAck_Item(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
+                                   ett_e2ap_E2nodeComponentConfigUpdateAck_Item, E2nodeComponentConfigUpdateAck_Item_sequence);
+
+  return offset;
+}
+
+
+static const per_sequence_t E2nodeConfigurationUpdateFailure_sequence[] = {
+  { &hf_e2ap_protocolIEs    , ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_ProtocolIE_Container },
+  { NULL, 0, 0, NULL }
+};
+
+static int
+dissect_e2ap_E2nodeConfigurationUpdateFailure(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
+                                   ett_e2ap_E2nodeConfigurationUpdateFailure, E2nodeConfigurationUpdateFailure_sequence);
 
   return offset;
 }
@@ -1931,7 +2567,7 @@ static const per_sequence_t ResetRequest_sequence[] = {
 
 static int
 dissect_e2ap_ResetRequest(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 461 "./asn1/e2ap/e2ap.cnf"
+#line 519 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "ResetRequest");
 
 
@@ -1949,7 +2585,7 @@ static const per_sequence_t ResetResponse_sequence[] = {
 
 static int
 dissect_e2ap_ResetResponse(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 464 "./asn1/e2ap/e2ap.cnf"
+#line 522 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "ResetResponse");
 
 
@@ -1967,7 +2603,7 @@ static const per_sequence_t RICserviceUpdate_sequence[] = {
 
 static int
 dissect_e2ap_RICserviceUpdate(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 485 "./asn1/e2ap/e2ap.cnf"
+#line 543 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "RICserviceUpdate");
 
 
@@ -1997,6 +2633,7 @@ static const per_sequence_t RANfunction_Item_sequence[] = {
   { &hf_e2ap_ranFunctionID  , ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_RANfunctionID },
   { &hf_e2ap_ranFunctionDefinition, ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_RANfunctionDefinition },
   { &hf_e2ap_ranFunctionRevision, ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_e2ap_RANfunctionRevision },
+  { &hf_e2ap_ranFunctionOID , ASN1_NOT_EXTENSION_ROOT, ASN1_OPTIONAL    , dissect_e2ap_RANfunctionOID },
   { NULL, 0, 0, NULL }
 };
 
@@ -2045,7 +2682,7 @@ static const per_sequence_t RICserviceUpdateAcknowledge_sequence[] = {
 
 static int
 dissect_e2ap_RICserviceUpdateAcknowledge(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 489 "./asn1/e2ap/e2ap.cnf"
+#line 547 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "RICserviceUpdateAcknowledge");
 
 
@@ -2092,7 +2729,7 @@ static const per_sequence_t RICserviceUpdateFailure_sequence[] = {
 
 static int
 dissect_e2ap_RICserviceUpdateFailure(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 492 "./asn1/e2ap/e2ap.cnf"
+#line 550 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "RICserviceUpdateFailure");
 
 
@@ -2112,7 +2749,7 @@ static const per_sequence_t RICserviceQuery_sequence[] = {
 
 static int
 dissect_e2ap_RICserviceQuery(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 482 "./asn1/e2ap/e2ap.cnf"
+#line 540 "./asn1/e2ap/e2ap.cnf"
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "RICserviceQuery");
 
 
@@ -3617,6 +4254,134 @@ static int dissect_E2setupFailure_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_,
   offset += 7; offset >>= 3;
   return offset;
 }
+static int dissect_E2connectionUpdate_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+  int offset = 0;
+  asn1_ctx_t asn1_ctx;
+  asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, TRUE, pinfo);
+  offset = dissect_e2ap_E2connectionUpdate(tvb, offset, &asn1_ctx, tree, hf_e2ap_E2connectionUpdate_PDU);
+  offset += 7; offset >>= 3;
+  return offset;
+}
+static int dissect_E2connectionUpdate_List_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+  int offset = 0;
+  asn1_ctx_t asn1_ctx;
+  asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, TRUE, pinfo);
+  offset = dissect_e2ap_E2connectionUpdate_List(tvb, offset, &asn1_ctx, tree, hf_e2ap_E2connectionUpdate_List_PDU);
+  offset += 7; offset >>= 3;
+  return offset;
+}
+static int dissect_E2connectionUpdate_Item_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+  int offset = 0;
+  asn1_ctx_t asn1_ctx;
+  asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, TRUE, pinfo);
+  offset = dissect_e2ap_E2connectionUpdate_Item(tvb, offset, &asn1_ctx, tree, hf_e2ap_E2connectionUpdate_Item_PDU);
+  offset += 7; offset >>= 3;
+  return offset;
+}
+static int dissect_E2connectionUpdateRemove_List_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+  int offset = 0;
+  asn1_ctx_t asn1_ctx;
+  asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, TRUE, pinfo);
+  offset = dissect_e2ap_E2connectionUpdateRemove_List(tvb, offset, &asn1_ctx, tree, hf_e2ap_E2connectionUpdateRemove_List_PDU);
+  offset += 7; offset >>= 3;
+  return offset;
+}
+static int dissect_E2connectionUpdateRemove_Item_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+  int offset = 0;
+  asn1_ctx_t asn1_ctx;
+  asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, TRUE, pinfo);
+  offset = dissect_e2ap_E2connectionUpdateRemove_Item(tvb, offset, &asn1_ctx, tree, hf_e2ap_E2connectionUpdateRemove_Item_PDU);
+  offset += 7; offset >>= 3;
+  return offset;
+}
+static int dissect_E2connectionUpdateAcknowledge_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+  int offset = 0;
+  asn1_ctx_t asn1_ctx;
+  asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, TRUE, pinfo);
+  offset = dissect_e2ap_E2connectionUpdateAcknowledge(tvb, offset, &asn1_ctx, tree, hf_e2ap_E2connectionUpdateAcknowledge_PDU);
+  offset += 7; offset >>= 3;
+  return offset;
+}
+static int dissect_E2connectionSetupFailed_List_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+  int offset = 0;
+  asn1_ctx_t asn1_ctx;
+  asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, TRUE, pinfo);
+  offset = dissect_e2ap_E2connectionSetupFailed_List(tvb, offset, &asn1_ctx, tree, hf_e2ap_E2connectionSetupFailed_List_PDU);
+  offset += 7; offset >>= 3;
+  return offset;
+}
+static int dissect_E2connectionSetupFailed_Item_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+  int offset = 0;
+  asn1_ctx_t asn1_ctx;
+  asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, TRUE, pinfo);
+  offset = dissect_e2ap_E2connectionSetupFailed_Item(tvb, offset, &asn1_ctx, tree, hf_e2ap_E2connectionSetupFailed_Item_PDU);
+  offset += 7; offset >>= 3;
+  return offset;
+}
+static int dissect_E2connectionUpdateFailure_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+  int offset = 0;
+  asn1_ctx_t asn1_ctx;
+  asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, TRUE, pinfo);
+  offset = dissect_e2ap_E2connectionUpdateFailure(tvb, offset, &asn1_ctx, tree, hf_e2ap_E2connectionUpdateFailure_PDU);
+  offset += 7; offset >>= 3;
+  return offset;
+}
+static int dissect_E2nodeConfigurationUpdate_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+  int offset = 0;
+  asn1_ctx_t asn1_ctx;
+  asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, TRUE, pinfo);
+  offset = dissect_e2ap_E2nodeConfigurationUpdate(tvb, offset, &asn1_ctx, tree, hf_e2ap_E2nodeConfigurationUpdate_PDU);
+  offset += 7; offset >>= 3;
+  return offset;
+}
+static int dissect_E2nodeComponentConfigUpdate_List_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+  int offset = 0;
+  asn1_ctx_t asn1_ctx;
+  asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, TRUE, pinfo);
+  offset = dissect_e2ap_E2nodeComponentConfigUpdate_List(tvb, offset, &asn1_ctx, tree, hf_e2ap_E2nodeComponentConfigUpdate_List_PDU);
+  offset += 7; offset >>= 3;
+  return offset;
+}
+static int dissect_E2nodeComponentConfigUpdate_Item_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+  int offset = 0;
+  asn1_ctx_t asn1_ctx;
+  asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, TRUE, pinfo);
+  offset = dissect_e2ap_E2nodeComponentConfigUpdate_Item(tvb, offset, &asn1_ctx, tree, hf_e2ap_E2nodeComponentConfigUpdate_Item_PDU);
+  offset += 7; offset >>= 3;
+  return offset;
+}
+static int dissect_E2nodeConfigurationUpdateAcknowledge_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+  int offset = 0;
+  asn1_ctx_t asn1_ctx;
+  asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, TRUE, pinfo);
+  offset = dissect_e2ap_E2nodeConfigurationUpdateAcknowledge(tvb, offset, &asn1_ctx, tree, hf_e2ap_E2nodeConfigurationUpdateAcknowledge_PDU);
+  offset += 7; offset >>= 3;
+  return offset;
+}
+static int dissect_E2nodeComponentConfigUpdateAck_List_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+  int offset = 0;
+  asn1_ctx_t asn1_ctx;
+  asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, TRUE, pinfo);
+  offset = dissect_e2ap_E2nodeComponentConfigUpdateAck_List(tvb, offset, &asn1_ctx, tree, hf_e2ap_E2nodeComponentConfigUpdateAck_List_PDU);
+  offset += 7; offset >>= 3;
+  return offset;
+}
+static int dissect_E2nodeComponentConfigUpdateAck_Item_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+  int offset = 0;
+  asn1_ctx_t asn1_ctx;
+  asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, TRUE, pinfo);
+  offset = dissect_e2ap_E2nodeComponentConfigUpdateAck_Item(tvb, offset, &asn1_ctx, tree, hf_e2ap_E2nodeComponentConfigUpdateAck_Item_PDU);
+  offset += 7; offset >>= 3;
+  return offset;
+}
+static int dissect_E2nodeConfigurationUpdateFailure_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+  int offset = 0;
+  asn1_ctx_t asn1_ctx;
+  asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, TRUE, pinfo);
+  offset = dissect_e2ap_E2nodeConfigurationUpdateFailure(tvb, offset, &asn1_ctx, tree, hf_e2ap_E2nodeConfigurationUpdateFailure_PDU);
+  offset += 7; offset >>= 3;
+  return offset;
+}
 static int dissect_ResetRequest_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
   int offset = 0;
   asn1_ctx_t asn1_ctx;
@@ -3772,7 +4537,7 @@ static int dissect_RANcallProcess_ID_string_PDU(tvbuff_t *tvb _U_, packet_info *
 
 
 /*--- End of included file: packet-e2ap-fn.c ---*/
-#line 121 "./asn1/e2ap/packet-e2ap-template.c"
+#line 123 "./asn1/e2ap/packet-e2ap-template.c"
 
 static int dissect_ProtocolIEFieldValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
@@ -3833,6 +4598,7 @@ dissect_e2ap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
 
   /* make entry in the Protocol column on summary display */
   col_set_str(pinfo->cinfo, COL_PROTOCOL, "E2AP");
+  /* ensure that parent dissector is not e2ap before clearing fence */
   col_clear(pinfo->cinfo, COL_INFO);
 
   /* create the e2ap protocol tree */
@@ -3896,6 +4662,22 @@ proto_reg_handoff_e2ap(void)
   dissector_add_uint("e2ap.ies", id_RICrequestID, create_dissector_handle(dissect_RICrequestID_PDU, proto_e2ap));
   dissector_add_uint("e2ap.ies", id_RICsubscriptionDetails, create_dissector_handle(dissect_RICsubscriptionDetails_PDU, proto_e2ap));
   dissector_add_uint("e2ap.ies", id_TimeToWait, create_dissector_handle(dissect_TimeToWait_PDU, proto_e2ap));
+  dissector_add_uint("e2ap.ies", id_E2nodeComponentConfigUpdate, create_dissector_handle(dissect_E2nodeComponentConfigUpdate_List_PDU, proto_e2ap));
+  dissector_add_uint("e2ap.ies", id_E2nodeComponentConfigUpdate_Item, create_dissector_handle(dissect_E2nodeComponentConfigUpdate_Item_PDU, proto_e2ap));
+  dissector_add_uint("e2ap.ies", id_E2nodeComponentConfigUpdateAck, create_dissector_handle(dissect_E2nodeComponentConfigUpdateAck_List_PDU, proto_e2ap));
+  dissector_add_uint("e2ap.ies", id_E2nodeComponentConfigUpdateAck_Item, create_dissector_handle(dissect_E2nodeComponentConfigUpdateAck_Item_PDU, proto_e2ap));
+  dissector_add_uint("e2ap.ies", id_E2connectionSetupFailed_Item, create_dissector_handle(dissect_E2connectionSetupFailed_Item_PDU, proto_e2ap));
+  dissector_add_uint("e2ap.ies", id_E2connectionSetupFailed, create_dissector_handle(dissect_E2connectionSetupFailed_List_PDU, proto_e2ap));
+  dissector_add_uint("e2ap.ies", id_E2connectionUpdateAdd, create_dissector_handle(dissect_E2connectionUpdate_List_PDU, proto_e2ap));
+  dissector_add_uint("e2ap.ies", id_E2connectionUpdate_Item, create_dissector_handle(dissect_E2connectionUpdate_Item_PDU, proto_e2ap));
+  dissector_add_uint("e2ap.ies", id_E2connectionUpdateRemove_Item, create_dissector_handle(dissect_E2connectionUpdateRemove_Item_PDU, proto_e2ap));
+  dissector_add_uint("e2ap.ies", id_E2connectionUpdateRemove, create_dissector_handle(dissect_E2connectionUpdateRemove_List_PDU, proto_e2ap));
+  dissector_add_uint("e2ap.proc.imsg", id_E2connectionUpdate, create_dissector_handle(dissect_E2connectionUpdate_PDU, proto_e2ap));
+  dissector_add_uint("e2ap.proc.sout", id_E2connectionUpdate, create_dissector_handle(dissect_E2connectionUpdateAcknowledge_PDU, proto_e2ap));
+  dissector_add_uint("e2ap.proc.uout", id_E2connectionUpdate, create_dissector_handle(dissect_E2connectionUpdateFailure_PDU, proto_e2ap));
+  dissector_add_uint("e2ap.proc.imsg", id_E2nodeConfigurationUpdate, create_dissector_handle(dissect_E2nodeConfigurationUpdate_PDU, proto_e2ap));
+  dissector_add_uint("e2ap.proc.sout", id_E2nodeConfigurationUpdate, create_dissector_handle(dissect_E2nodeConfigurationUpdateAcknowledge_PDU, proto_e2ap));
+  dissector_add_uint("e2ap.proc.uout", id_E2nodeConfigurationUpdate, create_dissector_handle(dissect_E2nodeConfigurationUpdateFailure_PDU, proto_e2ap));
   dissector_add_uint("e2ap.proc.uout", id_E2setup, create_dissector_handle(dissect_E2setupFailure_PDU, proto_e2ap));
   dissector_add_uint("e2ap.proc.imsg", id_E2setup, create_dissector_handle(dissect_E2setupRequest_PDU, proto_e2ap));
   dissector_add_uint("e2ap.proc.sout", id_E2setup, create_dissector_handle(dissect_E2setupResponse_PDU, proto_e2ap));
@@ -3919,7 +4701,7 @@ proto_reg_handoff_e2ap(void)
 
 
 /*--- End of included file: packet-e2ap-dis-tab.c ---*/
-#line 210 "./asn1/e2ap/packet-e2ap-template.c"
+#line 213 "./asn1/e2ap/packet-e2ap-template.c"
 
   } else {
     if (SctpPort != 0) {
@@ -4094,6 +4876,70 @@ void proto_register_e2ap(void) {
       { "E2setupFailure", "e2ap.E2setupFailure_element",
         FT_NONE, BASE_NONE, NULL, 0,
         NULL, HFILL }},
+    { &hf_e2ap_E2connectionUpdate_PDU,
+      { "E2connectionUpdate", "e2ap.E2connectionUpdate_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_E2connectionUpdate_List_PDU,
+      { "E2connectionUpdate-List", "e2ap.E2connectionUpdate_List",
+        FT_UINT32, BASE_DEC, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_E2connectionUpdate_Item_PDU,
+      { "E2connectionUpdate-Item", "e2ap.E2connectionUpdate_Item_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_E2connectionUpdateRemove_List_PDU,
+      { "E2connectionUpdateRemove-List", "e2ap.E2connectionUpdateRemove_List",
+        FT_UINT32, BASE_DEC, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_E2connectionUpdateRemove_Item_PDU,
+      { "E2connectionUpdateRemove-Item", "e2ap.E2connectionUpdateRemove_Item_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_E2connectionUpdateAcknowledge_PDU,
+      { "E2connectionUpdateAcknowledge", "e2ap.E2connectionUpdateAcknowledge_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_E2connectionSetupFailed_List_PDU,
+      { "E2connectionSetupFailed-List", "e2ap.E2connectionSetupFailed_List",
+        FT_UINT32, BASE_DEC, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_E2connectionSetupFailed_Item_PDU,
+      { "E2connectionSetupFailed-Item", "e2ap.E2connectionSetupFailed_Item_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_E2connectionUpdateFailure_PDU,
+      { "E2connectionUpdateFailure", "e2ap.E2connectionUpdateFailure_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_E2nodeConfigurationUpdate_PDU,
+      { "E2nodeConfigurationUpdate", "e2ap.E2nodeConfigurationUpdate_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_E2nodeComponentConfigUpdate_List_PDU,
+      { "E2nodeComponentConfigUpdate-List", "e2ap.E2nodeComponentConfigUpdate_List",
+        FT_UINT32, BASE_DEC, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_E2nodeComponentConfigUpdate_Item_PDU,
+      { "E2nodeComponentConfigUpdate-Item", "e2ap.E2nodeComponentConfigUpdate_Item_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_E2nodeConfigurationUpdateAcknowledge_PDU,
+      { "E2nodeConfigurationUpdateAcknowledge", "e2ap.E2nodeConfigurationUpdateAcknowledge_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_E2nodeComponentConfigUpdateAck_List_PDU,
+      { "E2nodeComponentConfigUpdateAck-List", "e2ap.E2nodeComponentConfigUpdateAck_List",
+        FT_UINT32, BASE_DEC, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_E2nodeComponentConfigUpdateAck_Item_PDU,
+      { "E2nodeComponentConfigUpdateAck-Item", "e2ap.E2nodeComponentConfigUpdateAck_Item_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_E2nodeConfigurationUpdateFailure_PDU,
+      { "E2nodeConfigurationUpdateFailure", "e2ap.E2nodeConfigurationUpdateFailure_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
     { &hf_e2ap_ResetRequest_PDU,
       { "ResetRequest", "e2ap.ResetRequest_element",
         FT_NONE, BASE_NONE, NULL, 0,
@@ -4242,6 +5088,70 @@ void proto_register_e2ap(void) {
       { "typeOfError", "e2ap.typeOfError",
         FT_UINT32, BASE_DEC, VALS(e2ap_TypeOfError_vals), 0,
         NULL, HFILL }},
+    { &hf_e2ap_gNBconfigUpdate,
+      { "gNBconfigUpdate", "e2ap.gNBconfigUpdate_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        "E2nodeComponentConfigUpdateGNB", HFILL }},
+    { &hf_e2ap_en_gNBconfigUpdate,
+      { "en-gNBconfigUpdate", "e2ap.en_gNBconfigUpdate_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        "E2nodeComponentConfigUpdateENgNB", HFILL }},
+    { &hf_e2ap_ng_eNBconfigUpdate,
+      { "ng-eNBconfigUpdate", "e2ap.ng_eNBconfigUpdate_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        "E2nodeComponentConfigUpdateNGeNB", HFILL }},
+    { &hf_e2ap_eNBconfigUpdate,
+      { "eNBconfigUpdate", "e2ap.eNBconfigUpdate_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        "E2nodeComponentConfigUpdateENB", HFILL }},
+    { &hf_e2ap_ngAPconfigUpdate,
+      { "ngAPconfigUpdate", "e2ap.ngAPconfigUpdate",
+        FT_BYTES, BASE_NONE, NULL, 0,
+        "OCTET_STRING", HFILL }},
+    { &hf_e2ap_xnAPconfigUpdate,
+      { "xnAPconfigUpdate", "e2ap.xnAPconfigUpdate",
+        FT_BYTES, BASE_NONE, NULL, 0,
+        "OCTET_STRING", HFILL }},
+    { &hf_e2ap_e1APconfigUpdate,
+      { "e1APconfigUpdate", "e2ap.e1APconfigUpdate",
+        FT_BYTES, BASE_NONE, NULL, 0,
+        "OCTET_STRING", HFILL }},
+    { &hf_e2ap_f1APconfigUpdate,
+      { "f1APconfigUpdate", "e2ap.f1APconfigUpdate",
+        FT_BYTES, BASE_NONE, NULL, 0,
+        "OCTET_STRING", HFILL }},
+    { &hf_e2ap_x2APconfigUpdate,
+      { "x2APconfigUpdate", "e2ap.x2APconfigUpdate",
+        FT_BYTES, BASE_NONE, NULL, 0,
+        "OCTET_STRING", HFILL }},
+    { &hf_e2ap_s1APconfigUpdate,
+      { "s1APconfigUpdate", "e2ap.s1APconfigUpdate",
+        FT_BYTES, BASE_NONE, NULL, 0,
+        "OCTET_STRING", HFILL }},
+    { &hf_e2ap_updateOutcome,
+      { "updateOutcome", "e2ap.updateOutcome",
+        FT_UINT32, BASE_DEC, VALS(e2ap_T_updateOutcome_vals), 0,
+        NULL, HFILL }},
+    { &hf_e2ap_failureCause,
+      { "failureCause", "e2ap.failureCause",
+        FT_UINT32, BASE_DEC, VALS(e2ap_Cause_vals), 0,
+        "Cause", HFILL }},
+    { &hf_e2ap_e2nodeComponentTypeGNB_CU_UP,
+      { "e2nodeComponentTypeGNB-CU-UP", "e2ap.e2nodeComponentTypeGNB_CU_UP_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        "E2nodeComponentGNB_CU_UP_ID", HFILL }},
+    { &hf_e2ap_e2nodeComponentTypeGNB_DU,
+      { "e2nodeComponentTypeGNB-DU", "e2ap.e2nodeComponentTypeGNB_DU_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        "E2nodeComponentGNB_DU_ID", HFILL }},
+    { &hf_e2ap_gNB_CU_UP_ID,
+      { "gNB-CU-UP-ID", "e2ap.gNB_CU_UP_ID",
+        FT_UINT64, BASE_DEC, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_gNB_DU_ID,
+      { "gNB-DU-ID", "e2ap.gNB_DU_ID",
+        FT_UINT64, BASE_DEC, NULL, 0,
+        NULL, HFILL }},
     { &hf_e2ap_macro_eNB_ID,
       { "macro-eNB-ID", "e2ap.macro_eNB_ID",
         FT_BYTES, BASE_NONE, NULL, 0,
@@ -4302,14 +5212,6 @@ void proto_register_e2ap(void) {
       { "global-gNB-ID", "e2ap.global_gNB_ID_element",
         FT_NONE, BASE_NONE, NULL, 0,
         "GlobalgNB_ID", HFILL }},
-    { &hf_e2ap_gNB_CU_UP_ID,
-      { "gNB-CU-UP-ID", "e2ap.gNB_CU_UP_ID",
-        FT_UINT64, BASE_DEC, NULL, 0,
-        NULL, HFILL }},
-    { &hf_e2ap_gNB_DU_ID,
-      { "gNB-DU-ID", "e2ap.gNB_DU_ID",
-        FT_UINT64, BASE_DEC, NULL, 0,
-        NULL, HFILL }},
     { &hf_e2ap_global_ng_eNB_ID,
       { "global-ng-eNB-ID", "e2ap.global_ng_eNB_ID_element",
         FT_NONE, BASE_NONE, NULL, 0,
@@ -4362,6 +5264,14 @@ void proto_register_e2ap(void) {
       { "ricTimeToWait", "e2ap.ricTimeToWait",
         FT_UINT32, BASE_DEC, VALS(e2ap_RICtimeToWait_vals), 0,
         NULL, HFILL }},
+    { &hf_e2ap_tnlAddress,
+      { "tnlAddress", "e2ap.tnlAddress",
+        FT_BYTES, BASE_NONE, NULL, 0,
+        "BIT_STRING_SIZE_1_160_", HFILL }},
+    { &hf_e2ap_tnlPort,
+      { "tnlPort", "e2ap.tnlPort",
+        FT_BYTES, BASE_NONE, NULL, 0,
+        "BIT_STRING_SIZE_16", HFILL }},
     { &hf_e2ap_protocolIEs,
       { "protocolIEs", "e2ap.protocolIEs",
         FT_UINT32, BASE_DEC, NULL, 0,
@@ -4406,6 +5316,50 @@ void proto_register_e2ap(void) {
       { "cause", "e2ap.cause",
         FT_UINT32, BASE_DEC, VALS(e2ap_Cause_vals), 0,
         NULL, HFILL }},
+    { &hf_e2ap_E2connectionUpdate_List_item,
+      { "ProtocolIE-SingleContainer", "e2ap.ProtocolIE_SingleContainer_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_tnlInformation,
+      { "tnlInformation", "e2ap.tnlInformation_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_tnlUsage,
+      { "tnlUsage", "e2ap.tnlUsage",
+        FT_UINT32, BASE_DEC, VALS(e2ap_TNLusage_vals), 0,
+        NULL, HFILL }},
+    { &hf_e2ap_E2connectionUpdateRemove_List_item,
+      { "ProtocolIE-SingleContainer", "e2ap.ProtocolIE_SingleContainer_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_E2connectionSetupFailed_List_item,
+      { "ProtocolIE-SingleContainer", "e2ap.ProtocolIE_SingleContainer_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_E2nodeComponentConfigUpdate_List_item,
+      { "ProtocolIE-SingleContainer", "e2ap.ProtocolIE_SingleContainer_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_e2nodeComponentType,
+      { "e2nodeComponentType", "e2ap.e2nodeComponentType",
+        FT_UINT32, BASE_DEC, VALS(e2ap_E2nodeComponentType_vals), 0,
+        NULL, HFILL }},
+    { &hf_e2ap_e2nodeComponentID,
+      { "e2nodeComponentID", "e2ap.e2nodeComponentID",
+        FT_UINT32, BASE_DEC, VALS(e2ap_E2nodeComponentID_vals), 0,
+        NULL, HFILL }},
+    { &hf_e2ap_e2nodeComponentConfigUpdate,
+      { "e2nodeComponentConfigUpdate", "e2ap.e2nodeComponentConfigUpdate",
+        FT_UINT32, BASE_DEC, VALS(e2ap_E2nodeComponentConfigUpdate_vals), 0,
+        NULL, HFILL }},
+    { &hf_e2ap_E2nodeComponentConfigUpdateAck_List_item,
+      { "ProtocolIE-SingleContainer", "e2ap.ProtocolIE_SingleContainer_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_e2nodeComponentConfigUpdateAck,
+      { "e2nodeComponentConfigUpdateAck", "e2ap.e2nodeComponentConfigUpdateAck_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
     { &hf_e2ap_RANfunctions_List_item,
       { "ProtocolIE-SingleContainer", "e2ap.ProtocolIE_SingleContainer_element",
         FT_NONE, BASE_NONE, NULL, 0,
@@ -4421,6 +5375,10 @@ void proto_register_e2ap(void) {
     { &hf_e2ap_ranFunctionRevision,
       { "ranFunctionRevision", "e2ap.ranFunctionRevision",
         FT_UINT32, BASE_DEC, NULL, 0,
+        NULL, HFILL }},
+    { &hf_e2ap_ranFunctionOID,
+      { "ranFunctionOID", "e2ap.ranFunctionOID",
+        FT_STRING, BASE_NONE, NULL, 0,
         NULL, HFILL }},
     { &hf_e2ap_RANfunctionsID_List_item,
       { "ProtocolIE-SingleContainer", "e2ap.ProtocolIE_SingleContainer_element",
@@ -4776,7 +5734,7 @@ void proto_register_e2ap(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-e2ap-hfarr.c ---*/
-#line 230 "./asn1/e2ap/packet-e2ap-template.c"
+#line 233 "./asn1/e2ap/packet-e2ap-template.c"
 
   };
 
@@ -4792,6 +5750,15 @@ void proto_register_e2ap(void) {
     &ett_e2ap_CriticalityDiagnostics,
     &ett_e2ap_CriticalityDiagnostics_IE_List,
     &ett_e2ap_CriticalityDiagnostics_IE_Item,
+    &ett_e2ap_E2nodeComponentConfigUpdate,
+    &ett_e2ap_E2nodeComponentConfigUpdateGNB,
+    &ett_e2ap_E2nodeComponentConfigUpdateENgNB,
+    &ett_e2ap_E2nodeComponentConfigUpdateNGeNB,
+    &ett_e2ap_E2nodeComponentConfigUpdateENB,
+    &ett_e2ap_E2nodeComponentConfigUpdateAck,
+    &ett_e2ap_E2nodeComponentID,
+    &ett_e2ap_E2nodeComponentGNB_CU_UP_ID,
+    &ett_e2ap_E2nodeComponentGNB_DU_ID,
     &ett_e2ap_ENB_ID,
     &ett_e2ap_ENB_ID_Choice,
     &ett_e2ap_ENGNB_ID,
@@ -4808,6 +5775,7 @@ void proto_register_e2ap(void) {
     &ett_e2ap_GNB_ID_Choice,
     &ett_e2ap_RICrequestID,
     &ett_e2ap_RICsubsequentAction,
+    &ett_e2ap_TNLinformation,
     &ett_e2ap_RICsubscriptionRequest,
     &ett_e2ap_RICsubscriptionDetails,
     &ett_e2ap_RICactions_ToBeSetup_List,
@@ -4829,6 +5797,22 @@ void proto_register_e2ap(void) {
     &ett_e2ap_E2setupRequest,
     &ett_e2ap_E2setupResponse,
     &ett_e2ap_E2setupFailure,
+    &ett_e2ap_E2connectionUpdate,
+    &ett_e2ap_E2connectionUpdate_List,
+    &ett_e2ap_E2connectionUpdate_Item,
+    &ett_e2ap_E2connectionUpdateRemove_List,
+    &ett_e2ap_E2connectionUpdateRemove_Item,
+    &ett_e2ap_E2connectionUpdateAcknowledge,
+    &ett_e2ap_E2connectionSetupFailed_List,
+    &ett_e2ap_E2connectionSetupFailed_Item,
+    &ett_e2ap_E2connectionUpdateFailure,
+    &ett_e2ap_E2nodeConfigurationUpdate,
+    &ett_e2ap_E2nodeComponentConfigUpdate_List,
+    &ett_e2ap_E2nodeComponentConfigUpdate_Item,
+    &ett_e2ap_E2nodeConfigurationUpdateAcknowledge,
+    &ett_e2ap_E2nodeComponentConfigUpdateAck_List,
+    &ett_e2ap_E2nodeComponentConfigUpdateAck_Item,
+    &ett_e2ap_E2nodeConfigurationUpdateFailure,
     &ett_e2ap_ResetRequest,
     &ett_e2ap_ResetResponse,
     &ett_e2ap_RICserviceUpdate,
@@ -4901,7 +5885,7 @@ void proto_register_e2ap(void) {
     &ett_e2ap_PerQCIReportListItemFormat,
 
 /*--- End of included file: packet-e2ap-ettarr.c ---*/
-#line 237 "./asn1/e2ap/packet-e2ap-template.c"
+#line 240 "./asn1/e2ap/packet-e2ap-template.c"
   };
 
 
@@ -4935,6 +5919,17 @@ void proto_register_e2ap(void) {
                                  "Set the SCTP port for e2ap messages",
                                  10,
                                  &gbl_e2apSctpPort);
+
+  prefs_register_bool_preference(e2ap_module, "attempt_asn_decode",
+      "Call ASN dissector for bytestrings",
+      "",
+      &gbl_e2apCallASN);
+
+  /* Whether to try JSON dissector on payload. */
+  prefs_register_bool_preference(e2ap_module, "attempt_json_decode",
+      "Call JSON dissector for bytestrings",
+      "",
+      &gbl_e2apCallJson);
 }
 
 /*

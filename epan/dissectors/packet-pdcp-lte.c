@@ -25,8 +25,11 @@
    Note that the use of these algorithms is restricted, so a version of Wireshark with these
    ciphering algorithms enabled would not be distributable. */
 
-/* #define HAVE_SNOW3G */
-/* #define HAVE_ZUC */
+#include "snow3g_algorithm.h"
+#define HAVE_SNOW3G
+
+#include "zuc_algorithm.h"
+#define HAVE_ZUC
 
 #include "packet-rlc-lte.h"
 #include "packet-pdcp-lte.h"
