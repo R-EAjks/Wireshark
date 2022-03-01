@@ -136,6 +136,7 @@
 #define LONGOPT_EXPORT_TLS_SESSION_KEYS LONGOPT_BASE_APPLICATION+5
 #define LONGOPT_CAPTURE_COMMENT         LONGOPT_BASE_APPLICATION+6
 #define LONGOPT_HEXDUMP                 LONGOPT_BASE_APPLICATION+7
+#define LONGOPT_COLUMNS                 LONGOPT_BASE_APPLICATION+8
 
 capture_file cfile;
 
@@ -175,6 +176,7 @@ static gchar* delimiter_char = " ";
 static gboolean dissect_color = FALSE;
 static guint hexdump_source_option = HEXDUMP_SOURCE_MULTI; /* Default - Enable legacy multi-source mode */
 static guint hexdump_ascii_option = HEXDUMP_ASCII_INCLUDE; /* Default - Enable legacy undelimited ASCII dump */
+static gboolean need_columns = FALSE;
 
 static print_format_e print_format = PR_FMT_TEXT;
 static print_stream_t *print_stream = NULL;
@@ -419,8 +421,9 @@ print_usage(FILE *output)
     fprintf(output, "                           enable dissection of heuristic protocol\n");
     fprintf(output, "  --disable-heuristic <short_name>\n");
     fprintf(output, "                           disable dissection of heuristic protocol\n");
+    fprintf(output, "  --columns                fill in column fields for internal use\n");
 
-    /*fprintf(output, "\n");*/
+    fprintf(output, "\n");
     fprintf(output, "Output:\n");
     fprintf(output, "  -w <outfile|->           write packets to a pcapng-format file named \"outfile\"\n");
     fprintf(output, "                           (or '-' for stdout)\n");
@@ -749,6 +752,7 @@ main(int argc, char *argv[])
         {"elastic-mapping-filter", ws_required_argument, NULL, LONGOPT_ELASTIC_MAPPING_FILTER},
         {"capture-comment", ws_required_argument, NULL, LONGOPT_CAPTURE_COMMENT},
         {"hexdump", ws_required_argument, NULL, LONGOPT_HEXDUMP},
+        {"columns", ws_no_argument, NULL, LONGOPT_COLUMNS},
         {0, 0, 0, 0}
     };
     gboolean             arg_error = FALSE;
@@ -1553,6 +1557,9 @@ main(int argc, char *argv[])
                     exit_status = INVALID_OPTION;
                     goto clean_exit;
                 }
+                break;
+            case LONGOPT_COLUMNS: /* fill in columns for internal use */
+                need_columns = TRUE;
                 break;
             default:
             case '?':        /* Bad flag - print usage message */
@@ -3316,7 +3323,7 @@ process_packet_second_pass(capture_file *cf, epan_dissect_t *edt,
            2) we're printing packet info but we're *not* verbose; in verbose
            mode, we print the protocol tree, not the protocol summary.
            */
-        if ((tap_flags & TL_REQUIRES_COLUMNS) || (print_packet_info && print_summary) || output_fields_has_cols(output_fields))
+        if ((tap_flags & TL_REQUIRES_COLUMNS) || (print_packet_info && print_summary) || output_fields_has_cols(output_fields) || need_columns)
             cinfo = &cf->cinfo;
         else
             cinfo = NULL;
@@ -3966,7 +3973,7 @@ process_packet_single_pass(capture_file *cf, epan_dissect_t *edt, gint64 offset,
            mode, we print the protocol tree, not the protocol summary.
            or
            3) there is a column mapped as an individual field */
-        if ((tap_flags & TL_REQUIRES_COLUMNS) || (print_packet_info && print_summary) || output_fields_has_cols(output_fields))
+        if ((tap_flags & TL_REQUIRES_COLUMNS) || (print_packet_info && print_summary) || output_fields_has_cols(output_fields) || need_columns)
             cinfo = &cf->cinfo;
         else
             cinfo = NULL;
