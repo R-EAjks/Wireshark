@@ -391,6 +391,7 @@ static gint ett_ssh2 = -1;
 
 static expert_field ei_ssh_packet_length = EI_INIT;
 static expert_field ei_ssh_packet_decode = EI_INIT;
+static expert_field ei_ssh_channel_number = EI_INIT;
 static expert_field ei_ssh_invalid_keylen = EI_INIT;
 static expert_field ei_ssh_mac_bad = EI_INIT;
 
@@ -649,6 +650,7 @@ static int ssh_dissect_public_key_blob(tvbuff_t *packet_tvb, packet_info *pinfo,
 static int ssh_dissect_public_key_signature(tvbuff_t *packet_tvb, packet_info *pinfo,
         int offset, proto_item *msg_type_tree);
 
+static void create_channel(struct ssh_peer_data *peer_data, guint client_channel_number, guint server_channel_number);
 static dissector_handle_t get_subdissector_for_channel(struct ssh_peer_data *peer_data, guint uiNumChannel);
 static void set_subdissector_for_channel(struct ssh_peer_data *peer_data, guint uiNumChannel, guint8* subsystem_name);
 
@@ -3764,7 +3766,7 @@ ssh_dissect_connection_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
 {
         if(msg_code==SSH_MSG_CHANNEL_OPEN){
                 guint   slen;
-                slen = tvb_get_ntohl(packet_tvb, offset) ;
+                slen = tvb_get_ntohl(packet_tvb, offset);
                 proto_tree_add_item(msg_type_tree, hf_ssh_connection_type_name_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
                 offset += 4;
                 proto_tree_add_item(msg_type_tree, hf_ssh_connection_type_name, packet_tvb, offset, slen, ENC_UTF_8);
@@ -3776,14 +3778,19 @@ ssh_dissect_connection_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
                 proto_tree_add_item(msg_type_tree, hf_ssh_connection_maximum_packet_size, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
                 offset += 4;
         }else if(msg_code==SSH_MSG_CHANNEL_OPEN_CONFIRMATION){
+                guint client_channel_number;
+                guint server_channel_number;
                 proto_tree_add_item(msg_type_tree, hf_ssh_connection_recipient_channel, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
+                client_channel_number = tvb_get_ntohl(packet_tvb, offset);
                 offset += 4;
                 proto_tree_add_item(msg_type_tree, hf_ssh_connection_sender_channel, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
+                server_channel_number = tvb_get_ntohl(packet_tvb, offset);
                 offset += 4;
                 proto_tree_add_item(msg_type_tree, hf_ssh_connection_initial_window, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
                 offset += 4;
                 proto_tree_add_item(msg_type_tree, hf_ssh_connection_maximum_packet_size, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
                 offset += 4;
+                create_channel(peer_data, client_channel_number, server_channel_number);
         }else if(msg_code==SSH_MSG_CHANNEL_WINDOW_ADJUST){
                 proto_tree_add_item(msg_type_tree, hf_ssh_connection_recipient_channel, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
                 offset += 4;
@@ -3792,7 +3799,7 @@ ssh_dissect_connection_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
         }else if(msg_code==SSH_MSG_CHANNEL_DATA){
                 guint   uiNumChannel;
                 uiNumChannel = tvb_get_ntohl(packet_tvb, offset) ;
-                proto_tree_add_item(msg_type_tree, hf_ssh_connection_recipient_channel, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
+                proto_item* ti = proto_tree_add_item(msg_type_tree, hf_ssh_connection_recipient_channel, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
                 offset += 4;
 // TODO: process according to the type of channel
                 guint   slen;
@@ -3803,6 +3810,8 @@ ssh_dissect_connection_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
                 dissector_handle_t subdissector_handle = get_subdissector_for_channel(peer_data, uiNumChannel);
                 if(subdissector_handle){
                         call_dissector(subdissector_handle, next_tvb, pinfo, msg_type_tree);
+                }else{
+                        expert_add_info_format(pinfo, ti, &ei_ssh_channel_number, "Error looking up channel %d", uiNumChannel);
                 }
                 offset += slen;
         }else if(msg_code==SSH_MSG_CHANNEL_EOF){
@@ -3845,6 +3854,26 @@ ssh_dissect_connection_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
 	return offset;
 }
 
+static void
+create_channel(struct ssh_peer_data *peer_data, guint client_channel_number, guint server_channel_number)
+{
+        ssh_channel_info_t *ci = NULL;
+        ssh_channel_info_t **pci = &peer_data->global_data->channel_info;
+        while(*pci){
+            if ((*pci)->client_channel_number == client_channel_number && (*pci)->server_channel_number == server_channel_number) {
+                ci = *pci;
+                break;
+            }
+            pci = &(*pci)->next;
+        }
+        if(!ci){
+            ci = wmem_new(wmem_file_scope(), ssh_channel_info_t);
+            *pci = ci;
+        }
+        ci->client_channel_number = client_channel_number;
+        ci->server_channel_number = server_channel_number;
+}
+
 static dissector_handle_t
 get_subdissector_for_channel(struct ssh_peer_data *peer_data, guint uiNumChannel)
 {
@@ -3854,7 +3883,7 @@ get_subdissector_for_channel(struct ssh_peer_data *peer_data, guint uiNumChannel
             if(channel_number==uiNumChannel){return ci->subdissector_handle;}
             ci = ci->next;
         }
-        ws_debug("Error lookin up channel %d", uiNumChannel);
+        ws_debug("Error looking up channel %d", uiNumChannel);
         return NULL;
 }
 
@@ -4834,6 +4863,7 @@ proto_register_ssh(void)
     static ei_register_info ei[] = {
         { &ei_ssh_packet_length,  { "ssh.packet_length.error", PI_PROTOCOL, PI_WARN, "Overly large number", EXPFILL }},
         { &ei_ssh_packet_decode,  { "ssh.packet_decode.error", PI_PROTOCOL, PI_WARN, "Packet decoded length not equal to packet length", EXPFILL }},
+        { &ei_ssh_channel_number, { "ssh.channel_number.error", PI_PROTOCOL, PI_WARN, "Coud not find channel", EXPFILL }},
         { &ei_ssh_invalid_keylen, { "ssh.key_length.error", PI_PROTOCOL, PI_ERROR, "Invalid key length", EXPFILL }},
         { &ei_ssh_mac_bad,        { "ssh.mac_bad.expert", PI_CHECKSUM, PI_ERROR, "Bad MAC", EXPFILL }},
     };
