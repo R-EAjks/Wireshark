@@ -87,6 +87,9 @@
     </layout>
    </item>
    <item>
+     <layout class="QHBoxLayout" name="textSearchLayout"/>
+   </item>
+   <item>
     <widget class="QDialogButtonBox" name="buttonBox">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>

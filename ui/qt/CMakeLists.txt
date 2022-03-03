@@ -47,6 +47,7 @@ set(WIRESHARK_WIDGET_HEADERS
 	widgets/splash_overlay.h
 	widgets/stock_icon_tool_button.h
 	widgets/syntax_line_edit.h
+	widgets/text_find_delegate.h
 	widgets/tabnav_tree_view.h
 	widgets/wireless_timeline.h
 	widgets/wireshark_file_dialog.h
@@ -292,6 +293,7 @@ set(WIRESHARK_WIDGET_SRCS
 	widgets/splash_overlay.cpp
 	widgets/stock_icon_tool_button.cpp
 	widgets/syntax_line_edit.cpp
+	widgets/text_find_delegate.cpp
 	widgets/tabnav_tree_view.cpp
 	widgets/wireless_timeline.cpp
 	widgets/wireshark_file_dialog.cpp

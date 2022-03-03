@@ -25,9 +25,10 @@
 #include "wireshark_application.h"
 #include <ui/qt/models/voip_calls_info_model.h>
 
+#include <ui/qt/widgets/text_find_delegate.h>
+
 #include <QClipboard>
 #include <QContextMenuEvent>
-#include <QToolButton>
 
 // To do:
 // - More context menu items
@@ -89,6 +90,7 @@ VoipCallsDialog::VoipCallsDialog(QWidget &parent, CaptureFile &cf, bool all_flow
     sorted_model_ = new VoipCallsInfoSortedModel(this);
     sorted_model_->setSourceModel(cache_model_);
     ui->callTreeView->setModel(sorted_model_);
+    TextFindDelegate::attachToView(this, ui->callTreeView, ui->textSearchLayout, this);
 
     connect(ui->callTreeView->selectionModel(), SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
             this, SLOT(updateWidgets()));
@@ -161,6 +163,7 @@ bool VoipCallsDialog::eventFilter(QObject *, QEvent *event)
 {
     if (ui->callTreeView->hasFocus() && event->type() == QEvent::KeyPress) {
         QKeyEvent &keyEvent = static_cast<QKeyEvent&>(*event);
+
         switch(keyEvent.key()) {
             case Qt::Key_I:
                 if (keyEvent.modifiers() == Qt::ControlModifier) {

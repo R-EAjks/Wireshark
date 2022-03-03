@@ -15,6 +15,9 @@
     <widget class="QTabWidget" name="trafficTableTabWidget"/>
    </item>
    <item>
+    <layout class="QHBoxLayout" name="textSearchLayout"/>
+   </item>
+   <item>
     <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0,0,0,1,0">
      <item>
       <widget class="QCheckBox" name="nameResolutionCheckBox">

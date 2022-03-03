@@ -168,6 +168,11 @@ QPushButton *TrafficTableDialog::enabledTypesPushButton() const
     return ui->enabledTypesPushButton;
 }
 
+QBoxLayout *TrafficTableDialog::textSearchLayout() const
+{
+    return ui->textSearchLayout;
+}
+
 void TrafficTableDialog::currentTabChanged()
 {
     bool has_resolution = false;

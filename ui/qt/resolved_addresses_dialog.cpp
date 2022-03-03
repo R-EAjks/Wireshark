@@ -30,6 +30,8 @@
 #include <ui/qt/models/astringlist_list_model.h>
 #include <ui/qt/models/resolved_addresses_models.h>
 
+#include <ui/qt/widgets/text_find_delegate.h>
+
 const QString no_entries_ = QObject::tr("No entries.");
 const QString entry_count_ = QObject::tr("%1 entries.");
 
@@ -89,6 +91,7 @@ ResolvedAddressesDialog::ResolvedAddressesDialog(QWidget *parent, QString captur
     ui->tblAddresses->resizeColumnsToContents();
     ui->tblAddresses->horizontalHeader()->setStretchLastSection(true);
     ui->tblAddresses->sortByColumn(1, Qt::AscendingOrder);
+    TextFindDelegate::attachToView(this, ui->tblAddresses, ui->textSearchLayout, this);
     ui->cmbDataType->addItems(ethModel->filterValues());
 
     portSortModel = new AStringListListSortFilterProxyModel(this);
@@ -105,6 +108,7 @@ ResolvedAddressesDialog::ResolvedAddressesDialog(QWidget *parent, QString captur
     ui->tblPorts->resizeColumnsToContents();
     ui->tblPorts->horizontalHeader()->setStretchLastSection(true);
     ui->tblPorts->sortByColumn(1, Qt::AscendingOrder);
+    TextFindDelegate::attachToView(this, ui->tblPorts, ui->textSearchLayout, this);
     ui->cmbPortFilterType->addItems(portModel->filterValues());
 }
 

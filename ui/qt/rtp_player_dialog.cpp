@@ -37,6 +37,7 @@
 #include <widgets/rtp_audio_graph.h>
 #include "wireshark_application.h"
 #include "ui/qt/widgets/wireshark_file_dialog.h"
+#include <ui/qt/widgets/text_find_delegate.h>
 
 #include <QAudio>
 #include <QAudioDeviceInfo>
@@ -182,6 +183,7 @@ RtpPlayerDialog::RtpPlayerDialog(QWidget &parent, CaptureFile &cf, bool capture_
     ui->splitter->setStretchFactor(1, 1);
 
     ui->streamTreeWidget->sortByColumn(first_pkt_col_, Qt::AscendingOrder);
+    TextFindDelegate::attachToView(this, ui->streamTreeWidget, ui->textSearchLayout, this);
 
     graph_ctx_menu_ = new QMenu(this);
 

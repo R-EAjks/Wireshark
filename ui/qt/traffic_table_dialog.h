@@ -24,6 +24,7 @@
 
 #include <QMenu>
 #include <QTreeWidgetItem>
+#include <QBoxLayout>
 
 class QCheckBox;
 class QDialogButtonBox;
@@ -143,6 +144,7 @@ protected:
     QCheckBox *nameResolutionCheckBox() const;
     QCheckBox *absoluteTimeCheckBox() const;
     QPushButton *enabledTypesPushButton() const;
+    QBoxLayout *textSearchLayout() const;
 
 protected slots:
     virtual void currentTabChanged();

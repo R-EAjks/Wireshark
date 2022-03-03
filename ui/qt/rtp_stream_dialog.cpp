@@ -21,6 +21,7 @@
 #include "rtp_analysis_dialog.h"
 #include "wireshark_application.h"
 #include "ui/qt/widgets/wireshark_file_dialog.h"
+#include "ui/qt/widgets/text_find_delegate.h"
 
 #include <QAction>
 #include <QClipboard>
@@ -302,6 +303,7 @@ RtpStreamDialog::RtpStreamDialog(QWidget &parent, CaptureFile &cf) :
     ui->streamTreeWidget->header()->setSortIndicator(0, Qt::AscendingOrder);
     connect(ui->streamTreeWidget, SIGNAL(customContextMenuRequested(QPoint)),
                 SLOT(showStreamMenu(QPoint)));
+    TextFindDelegate::attachToView(this, ui->streamTreeWidget, ui->textSearchLayout, this);
 
     find_reverse_button_ = new QToolButton();
     ui->buttonBox->addButton(find_reverse_button_, QDialogButtonBox::ActionRole);

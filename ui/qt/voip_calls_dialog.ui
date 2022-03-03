@@ -41,6 +41,9 @@
     </widget>
    </item>
    <item>
+    <layout class="QHBoxLayout" name="textSearchLayout"/>
+   </item>
+   <item>
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
       <widget class="QCheckBox" name="displayFilterCheckBox">
