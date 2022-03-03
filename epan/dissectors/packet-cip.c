@@ -6456,7 +6456,7 @@ static void save_route_connection_path(packet_info* pinfo, tvbuff_t* tvb, int of
    }
 }
 
-static int get_connection_timeout_multiplier(timeout_value)
+static int get_connection_timeout_multiplier(guint32 timeout_value)
 {
    guint32 timeout_multiplier;
    switch (timeout_value)
@@ -6494,7 +6494,7 @@ static int get_connection_timeout_multiplier(timeout_value)
    return timeout_multiplier;
 }
 
-void display_connection_information_fwd_close_req(packet_info* pinfo, tvbuff_t* tvb, proto_tree* tree, cip_conn_info_t* conn_info)
+static void display_connection_information_fwd_close_req(packet_info* pinfo, tvbuff_t* tvb, proto_tree* tree, cip_conn_info_t* conn_info)
 {
    if (!conn_info)
    {
