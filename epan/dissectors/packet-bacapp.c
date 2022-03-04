@@ -4527,13 +4527,22 @@ BACnetPropertyIdentifier [] = {
     { 4194318, "sc-hub-connector-state"},
     { 4194319, "sc-hub-function-accept-uris"},
     { 4194320, "sc-hub-function-binding"},
-    { 4194321, " sc-hub-function-connection-status"},
+    { 4194321, "sc-hub-function-connection-status"},
     { 4194322, "sc-hub-function-enable"},
     { 4194323, "sc-heartbeat-timeout"},
     { 4194324, "sc-primary-hub-connection-status"},
     { 4194325, "sc-primary-hub-uri"},
     { 4194326, "sc-maximum-reconnect-time"},
     { 4194327, "sc-minimum-reconnect-time"},
+    { 4194328, "color-override"},
+    { 4194329, "color-reference"},
+    { 4194330, "default-color"},
+    { 4194331, "default-color-temperature"},
+    { 4194332, "override-color-reference"},
+    { 4194334, "color-command"},
+    { 4194335, "high_end_trim"},
+    { 4194336, "low_end_trim"},
+    { 4194337, "trim_fade_time"},
     { 0,   NULL}
 /* Enumerated values 0-511 are reserved for definition by ASHRAE.
    Enumerated values 512-4194303 may be used by others subject to
