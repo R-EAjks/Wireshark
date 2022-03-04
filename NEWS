@@ -120,6 +120,9 @@ Wireshark 3.7.0 Release Notes
        strings. There are new buttons to reset a value back to default
        value.
 
+     • Wireshark (QT): Field Value Dialog added to show known values
+       for protocol fields, for example: ip.proto
+
   Removed Features and Support
 
      • CMake: The options starting with DISABLE_something were renamed

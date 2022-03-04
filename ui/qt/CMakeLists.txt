@@ -160,6 +160,7 @@ set(WIRESHARK_QT_HEADERS
 	extcap_argument_multiselect.h
 	extcap_argument.h
 	extcap_options_dialog.h
+	field_values_dialog.h
 	file_set_dialog.h
 	filter_action.h
 	filter_dialog.h
@@ -398,6 +399,7 @@ set(WIRESHARK_QT_SRC
 	extcap_argument_multiselect.cpp
 	extcap_argument.cpp
 	extcap_options_dialog.cpp
+	field_values_dialog.cpp
 	file_set_dialog.cpp
 	filter_action.cpp
 	filter_dialog.cpp
@@ -541,6 +543,7 @@ set(WIRESHARK_QT_UI
 	export_object_dialog.ui
 	export_pdu_dialog.ui
 	extcap_options_dialog.ui
+	field_values_dialog.ui
 	file_set_dialog.ui
 	filter_dialog.ui
 	filter_expression_frame.ui

@@ -112,6 +112,7 @@ DIAG_ON(frame-larger-than=)
 #include "export_object_dialog.h"
 #include "export_pdu_dialog.h"
 #include "extcap_options_dialog.h"
+#include "field_values_dialog.h"
 #include "file_set_dialog.h"
 #include "filter_action.h"
 #include "filter_dialog.h"
@@ -1440,6 +1441,7 @@ void MainWindow::setMenusForSelectedTreeRow(FieldInformation *finfo) {
     main_ui_->actionEditCopyAsFilter->setEnabled(can_match_selected);
 
     main_ui_->actionAnalyzeShowPacketBytes->setEnabled(have_packet_bytes);
+    main_ui_->actionShowFieldValues->setEnabled(have_packet_bytes);
     main_ui_->actionFileExportPacketBytes->setEnabled(have_packet_bytes);
 
     main_ui_->actionViewExpandSubtrees->setEnabled(have_subtree);
@@ -1924,6 +1926,13 @@ void MainWindow::on_actionAnalyzeShowPacketBytes_triggered()
     spbd->addCodecs(text_codec_map_);
     spbd->show();
 }
+
+void MainWindow::on_actionShowFieldValues_triggered()
+{
+    FieldValuesDialog *dialog = new FieldValuesDialog(*this, capture_file_);
+    dialog->show();
+}
+
 
 void MainWindow::on_actionFileExportPDU_triggered()
 {
