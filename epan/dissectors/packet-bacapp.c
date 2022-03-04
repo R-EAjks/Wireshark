@@ -5160,7 +5160,7 @@ BACnetSuccessFilter [] = {
 
 /* These values are (manually) transferred from
  * http://www.bacnet.org/VendorID/BACnet Vendor IDs.htm
- * Version: "As of May 03, 2021"
+ * Version: "As of January 12, 2022"
  */
 
 static const value_string
@@ -6473,6 +6473,40 @@ BACnetVendorIdentifiers [] = {
     { 1306, "GBX Technology, LLC" },
     { 1307, "Kaiterra" },
     { 1308, "ThinKuan loT Technology (Shanghai) Co., Ltd" },
+    { 1309,	"HoCoSto B.V." },
+    { 1310,	"Shenzhen AS-AI Technology Co., Ltd." },
+    { 1311,	"RPS S.p.a." },
+    { 1312,	"Delta Dore Ems" },
+    { 1313,	"IOTech Systems Limited" },
+    { 1314,	"i-AutoLogic Co., Ltd." },
+    { 1315,	"New Age Micro, LLC" },
+    { 1316,	"Guardian Glass" },
+    { 1317,	"Guangzhou Zhaoyu Information Technology" },
+    { 1318,	"ACE IoT Solutions LLC" },
+    { 1319,	"Poris Electronics Co., Ltd." },
+    { 1320,	"Terminus Technologies Group" },
+    { 1321,	"Intech 21, Inc." },
+    { 1322,	"Accurate Electronics" },
+    { 1323,	"Fluence Bioengineering" },
+    { 1324,	"Mun Hean Singapore Pte Ltd" },
+    { 1325,	"Katronic AG & Co. KG" },
+    { 1326,	"Suzhou XinAo Information Technology Co. Ltd" },
+    { 1327,	"Linktekk Technology, JSC." },
+    { 1328,	"Stirling Ultracold" },
+    { 1329,	"UV Partners, Inc." },
+    { 1330,	"ProMinent GmbH" },
+    { 1331,	"Multi-Tech Systems, Inc." },
+    { 1332,	"JUMO GmbH & Co. KG" },
+    { 1333,	"Qingdao Huarui Technology Co. Ltd." },
+    { 1334,	"Cairn Systemes" },
+    { 1335,	"NeuroLogic Research Corp." },
+    { 1336,	"Transition Technologies Advanced Solutions Sp. z o.o" },
+    { 1337,	"Xxter bv" },
+    { 1338,	"PassiveLogic" },
+    { 1339,	"EnSmart Controls" },
+    { 1340,	"Watts Heating and Hot Water Solutions, dba Lync" },
+    { 1341,	"Troposphaira Technologies LLP" },
+    { 1342,	"Network Thermostat" },
     {    0, NULL }
 };
 static value_string_ext BACnetVendorIdentifiers_ext = VALUE_STRING_EXT_INIT(BACnetVendorIdentifiers);
