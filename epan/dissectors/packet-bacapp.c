@@ -10168,7 +10168,7 @@ fHealth(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset)
     return offset;
 }
 
-/**
+/** 
  * BACnetSCDirectConnection ::= SEQUENCE {
  *  uri                         [0] CharacterString
  *  connection-state            [1] BACnetSCConnectionState,
