@@ -2497,6 +2497,12 @@ static guint
 fLightingCommand(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset, const gchar *lable);
 
 static guint
+fColorCommand(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, guint offset, const gchar* lable);
+
+static guint
+fXyColor(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, guint offset, const gchar* lable);
+
+static guint
 fTimerStateChangeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset);
 
 static guint
@@ -2899,6 +2905,25 @@ BACnetLightingInProgress[] = {
     { 2, "ramp-active" },
     { 3, "not-controlled" },
     { 4, "other" },
+    { 5, "trim-active" },
+    { 0, NULL }
+};
+
+static const value_string
+BACnetColorOperationInProgress[] = {
+    { 0, "idle" },
+    { 1, "fade-active" },
+    { 2, "ramp-active" },
+    { 3, "not-controlled" },
+    { 4, "other" },
+    { 0, NULL }
+};
+
+static const value_string
+BACnetColorTransition[] = {
+    { 0, "none" },
+    { 1, "fade" },
+    { 2, "ramp" },
     { 0, NULL }
 };
 
@@ -3356,6 +3381,18 @@ BACnetLightingOperation[] = {
 };
 
 static const value_string
+BACnetColorOperation[] = {
+    { 0, "none" },
+    { 1, "fade-to-color" },
+    { 2, "fade-to-cct" },
+    { 3, "ramp-to-cct" },
+    { 4, "step-up-cct" },
+    { 5, "step-down-cct" },
+    { 6, "stop" },
+    { 0, NULL }
+};
+
+static const value_string
 BACnetConfirmedServiceChoice[] = {
     {  0, "acknowledgeAlarm"},
     {  1, "confirmedCOVNotification"},
@@ -3517,6 +3554,8 @@ BACnetObjectType [] = {
     { 60, "staging"},
     { 61, "audit-log"},
     { 62, "audit-reporter"},
+    { 63, "color"},
+    { 64, "color-temperature"},
     { 0,  NULL}
 /* Enumerated values 0-127 are reserved for definition by ASHRAE.
    Enumerated values 128-1023 may be used by others subject to
@@ -8393,15 +8432,22 @@ fChannelValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset,
 
   if (tvb_reported_length_remaining(tvb, offset) > 0) {
       fTagHeader(tvb, pinfo, offset, &tag_no, &tag_info, &lvt);
-      if (tag_is_opening(tag_info)) {
+      if (tag_is_opening(tag_info) && tag_no == 0) {
           offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
           offset = fLightingCommand(tvb, pinfo, tree, offset, "lighting-command: ");
+          offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+      } else if (tag_is_opening(tag_info) && tag_no == 1) {
+          offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+          offset = fXyColor(tvb, pinfo, tree, offset, "xy-color: ");
+          offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+      } else if (tag_is_opening(tag_info) && tag_no == 2) {
+          offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+          offset = fColorCommand(tvb, pinfo, tree, offset, "color-command: ");
           offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
       } else {
           if (tag_info) {
               offset = fContextTaggedValue(tvb, pinfo, tree, offset, label);
-          }
-          else {
+          } else {
               offset = fApplicationTypes(tvb, pinfo, tree, offset, label);
           }
       }
@@ -8629,7 +8675,6 @@ fApplicationTypesEnumeratedSplit(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
     guint   tag_len;
 
     if (tvb_reported_length_remaining(tvb, offset) > 0) {
-
         tag_len = fTagHeader(tvb, pinfo, offset, &tag_no, &tag_info, &lvt);
         if (!tag_is_context_specific(tag_info)) {
             switch (tag_no) {
@@ -8681,7 +8726,6 @@ fApplicationTypesEnumeratedSplit(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
             default:
                 break;
             }
-
         }
     }
     return offset;
@@ -9268,6 +9312,13 @@ fAbstractSyntaxNType(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint 
             offset = fApplicationTypesEnumerated(tvb, pinfo, tree, offset, ar, BACnetLifeSafetyOperation);
             break;
         case 164: /* tracking-value */
+            if (object_type == 21 || object_type == 22) /* life-safety-point/zone */
+                offset = fApplicationTypesEnumerated(tvb, pinfo, tree, offset, ar, BACnetLifeSafetyState);
+            else if (object_type == 63) /* color */
+                offset = fXyColor(tvb, pinfo, tree, offset, ar);
+            else if (object_type == 64) /* color-temperature */
+                offset = fUnsignedTag(tvb, pinfo, tree, offset, ar);
+            break;
         case 166: /* life-safety-alarm-values */
             offset = fApplicationTypesEnumerated(tvb, pinfo, tree, offset, ar, BACnetLifeSafetyState);
             break;
@@ -9337,7 +9388,12 @@ fAbstractSyntaxNType(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint 
             offset = fApplicationTypesEnumerated(tvb, pinfo, tree, offset, ar, BACnetWriteStatus);
             break;
         case 385: /* transition */
-            offset = fApplicationTypesEnumerated(tvb, pinfo, tree, offset, ar, BACnetLightingTransition);
+            if (object_type == 54) /* lighting-output */
+                offset = fApplicationTypesEnumerated(tvb, pinfo, tree, offset, ar, BACnetLightingTransition);
+            else if (object_type == 63) /* color */
+                offset = fApplicationTypesEnumerated(tvb, pinfo, tree, offset, ar, BACnetColorTransition);
+            else if (object_type == 64) /* color-temperature */
+                offset = fApplicationTypesEnumerated(tvb, pinfo, tree, offset, ar, BACnetColorTransition);
             break;
         case 288: /* negative-access-rules */
         case 302: /* positive-access-rules */
@@ -9365,7 +9421,12 @@ fAbstractSyntaxNType(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint 
             offset = fApplicationTypesEnumerated(tvb, pinfo, tree, offset, ar, BACnetAuthorizationExemption);
             break;
         case 378: /* in-progress */
-            offset = fApplicationTypesEnumerated(tvb, pinfo, tree, offset, ar, BACnetLightingInProgress);
+            if (object_type == 54) /* lighting-output */
+                offset = fApplicationTypesEnumerated(tvb, pinfo, tree, offset, ar, BACnetLightingInProgress);
+            else if (object_type == 63) /* color */
+                offset = fApplicationTypesEnumerated(tvb, pinfo, tree, offset, ar, BACnetColorOperationInProgress);
+            else if (object_type == 64) /* color-temperature */
+                offset = fApplicationTypesEnumerated(tvb, pinfo, tree, offset, ar, BACnetColorOperationInProgress);
             break;
         case 380: /* lighting-command */
             offset = fLightingCommand(tvb, pinfo, tree, offset, ar);
@@ -9609,6 +9670,12 @@ fAbstractSyntaxNType(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint 
         case 4194321: /* sc-hub-function-connection-status */
             offset = fSCHubFunctionConnection(tvb, pinfo, tree, offset);
             break;
+        case 4194330: /* default-color */
+            offset = fXyColor(tvb, pinfo, tree, offset, ar);
+            break;
+        case 4194334: /* color-command */
+            offset = fColorCommand(tvb, pinfo, tree, offset, ar);
+            break;
 
         case 85:  /* present-value */
             if ( object_type == 11 )    /* group object handling of present-value */
@@ -9650,6 +9717,10 @@ fAbstractSyntaxNType(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint 
             else if (object_type == 44) /* date-time-value */
             {
                 offset = fDateTime(tvb, pinfo, tree, offset, ar);
+            }
+            else if (object_type == 63) /* color */
+            {
+                offset = fXyColor(tvb, pinfo, tree, offset, ar);
             }
             else
             {
@@ -10468,7 +10539,7 @@ fWriteGroupRequest(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint of
 
                     switch (tag_no) {
                     case 0: /* channel */
-                        if (tag_info) {
+                        if (tag_info && ! tag_is_opening(tag_info)) {
                             /* context tagged */
                             offset = fUnsignedTag(tvb, pinfo, subtree, offset, "Channel: ");
                         } else {
@@ -10477,7 +10548,7 @@ fWriteGroupRequest(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint of
                         }
                         break;
                     case 1: /* overriding-priority */
-                        if (tag_info) {
+                        if (tag_info && ! tag_is_opening(tag_info)) {
                             /* context tagged */
                             offset = fUnsignedTag(tvb, pinfo, subtree, offset, "Overriding priority: ");
                         } else {
@@ -12296,6 +12367,65 @@ fLightingCommand(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offs
 }
 
 static guint
+fColorCommand(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, guint offset, const gchar* lable)
+{
+    guint   lastoffset = 0;
+    guint8  tag_no, tag_info;
+    guint32 lvt;
+    proto_tree* subtree = tree;
+
+    subtree = proto_tree_add_subtree_format(subtree, tvb, offset, 0,
+        ett_bacapp_value, NULL, "%s", lable);
+
+    while (tvb_reported_length_remaining(tvb, offset) > 0 && offset > lastoffset) {
+        lastoffset = offset;
+        /* check the tag.  A closing tag means we are done */
+        fTagHeader(tvb, pinfo, offset, &tag_no, &tag_info, &lvt);
+        if (tag_is_closing(tag_info)) {
+            return offset;
+        }
+        switch (tag_no) {
+        case 0: /* operation */
+            offset = fEnumeratedTag(tvb, pinfo, subtree, offset, "operation: ", BACnetColorOperation);
+            break;
+        case 1: /* target-color */
+            offset += fTagHeaderTree(tvb, pinfo, subtree, offset, &tag_no, &tag_info, &lvt);
+            offset = fXyColor(tvb, pinfo, subtree, offset, "xy-color: ");
+            offset += fTagHeaderTree(tvb, pinfo, subtree, offset, &tag_no, &tag_info, &lvt);
+            break;
+        case 2: /* target-color-temperature */
+            offset = fUnsignedTag(tvb, pinfo, subtree, offset, "target-color-temperature: ");
+            break;
+        case 3: /* fade-time */
+            offset = fUnsignedTag(tvb, pinfo, subtree, offset, "fade-time: ");
+            break;
+        case 4: /* ramp-rate */
+            offset = fUnsignedTag(tvb, pinfo, subtree, offset, "ramp-rate: ");
+            break;
+        case 5: /* step-increment */
+            offset = fUnsignedTag(tvb, pinfo, subtree, offset, "step-increment: ");
+            break;
+        default:
+            return offset;
+        }
+    }
+
+    return offset;
+}
+
+static guint
+fXyColor(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, guint offset, const gchar* label)
+{
+    proto_tree* subtree = tree;
+
+    if (label != NULL) {
+        subtree = proto_tree_add_subtree(subtree, tvb, offset, 10, ett_bacapp_value, NULL, label);
+    }
+    offset = fRealTag(tvb, pinfo, subtree, offset, "x-coordinate: ");
+    return fRealTag(tvb, pinfo, subtree, offset, "y-coordinate: ");
+}
+
+static guint
 fTimerStateChangeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset)
 {
     guint   lastoffset = 0;
@@ -12854,32 +12984,15 @@ fObjectSelector(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offse
 static guint
 fStageLimitValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset)
 {
-    guint   lastoffset = 0;
-    guint8  tag_no, tag_info;
-    guint32 lvt;
-
-    while (tvb_reported_length_remaining(tvb, offset) > 0) {  /* exit loop if nothing happens inside */
-        lastoffset = offset;
-        fTagHeader(tvb, pinfo, offset, &tag_no, &tag_info, &lvt);
-        if (tag_is_closing(tag_info)) {
-            break;
-        }
-
-        switch (tag_no) {
-        case 0: /* limit */
-            offset = fRealTag(tvb, pinfo, tree, offset, "limit: ");
-            break;
-        case 1: /* values */
-            offset = fBitStringTag(tvb, pinfo, tree, offset, "values: ");
-            break;
-        case 2: /* deadband */
-            offset = fRealTag(tvb, pinfo, tree, offset, "deadband: ");
-            break;
-        default:
-            break;
-        }
-        if (offset <= lastoffset) break;     /* nothing happened, exit loop */
-    }
+    if (tvb_reported_length_remaining(tvb, offset) <= 0)
+        return offset;
+    offset = fRealTag(tvb, pinfo, tree, offset, "limit: ");
+    if (tvb_reported_length_remaining(tvb, offset) <= 0)
+        return offset;
+    offset = fBitStringTag(tvb, pinfo, tree, offset, "values: ");
+    if (tvb_reported_length_remaining(tvb, offset) <= 0)
+        return offset;
+    offset = fRealTag(tvb, pinfo, tree, offset, "deadband: ");
     return offset;
 }
 
@@ -14716,6 +14829,9 @@ fPriorityArray(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset
 {
     char  i = 1, ar[256];
     guint lastoffset = 0;
+    guint8 tag_no;
+    guint8 tag_info;
+    guint32 lvt;
 
     if (propertyArrayIndex > 0) {
         /* BACnetARRAY index 0 refers to the length
@@ -14736,8 +14852,29 @@ fPriorityArray(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset
                 ASHRAE_Reserved_Fmt,
                 Vendor_Proprietary_Fmt),
             i++);
-        /* DMR Should be fAbstractNSyntax, but that's where we came from! */
-        offset = fApplicationTypes(tvb, pinfo, tree, offset, ar);
+        fTagHeader(tvb, pinfo, offset, &tag_no, &tag_info, &lvt);
+        if ( ! tag_is_context_specific(tag_info)) {
+            /* DMR Should be fAbstractNSyntax, but that's where we came from! */
+            offset = fApplicationTypes(tvb, pinfo, tree, offset, ar);
+        } else {
+            if (tag_is_opening(tag_info) && tag_no == 0) {
+                offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+                offset = fAbstractSyntaxNType(tvb, pinfo, tree, offset);
+                offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            } else if (tag_is_opening(tag_info) && tag_no == 1) {
+                offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+                offset = fDate(tvb, pinfo, tree, offset, "Date: ");
+                offset = fTime(tvb, pinfo, tree, offset, "Time: ");
+                offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            } else if (tag_is_opening(tag_info) && tag_no == 2) {
+                offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+                offset = fXyColor(tvb, pinfo, tree, offset, "xy-color: ");
+                offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
+            } else {
+                /* DMR Should be fAbstractNSyntax, but that's where we came from! */
+                offset = fApplicationTypes(tvb, pinfo, tree, offset, ar);
+            }
+        }
         /* there are only 16 priority array elements */
         if (i > 16) {
             break;
