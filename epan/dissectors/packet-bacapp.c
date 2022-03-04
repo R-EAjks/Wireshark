@@ -9984,14 +9984,10 @@ fHealth(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset)
             offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
             break;
         case 2: /* property - OPTIONAL*/
-            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
             offset = fPropertyIdentifier(tvb, pinfo, tree, offset);
-            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
             break;
         case 3: /* details - OPTIONAL */
-            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
             offset = fCharacterString(tvb, pinfo, tree, offset, "details: ");
-            offset += fTagHeaderTree(tvb, pinfo, tree, offset, &tag_no, &tag_info, &lvt);
             break;
         default:
             return offset;
