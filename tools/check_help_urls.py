@@ -7,7 +7,7 @@
 
 '''
 Go through all user guide help URLs listed in the program
-and confirm these are present in the User's Guide souce files.
+and confirm these are present in the User's Guide source files.
 '''
 
 from re import search
