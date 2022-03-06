@@ -11,10 +11,9 @@ and confirm these are present in the User's Guide souce files.
 '''
 
 from re import search
-from os import listdir
+from glob import glob
 from sys import exit
 
-userguide_source = "docbook/wsug_src/"
 found = {}
 
 with open("ui/help_url.c") as f:
@@ -23,11 +22,10 @@ with open("ui/help_url.c") as f:
             chapter = url.group(1)
             found[chapter] = False
 
-wsug_files = listdir(userguide_source)
-adoc_files = [adoc_file for adoc_file in wsug_files if '.adoc' in adoc_file]
+adoc_files = glob("docbook/wsug_src/*.adoc")
 
 for adoc_file in adoc_files:
-    with open(userguide_source + adoc_file) as f:
+    with open(adoc_file) as f:
         for line in f:
             if tag := search(r"^\[\#(.*)]", line):
                 chapter = tag.group(1)
