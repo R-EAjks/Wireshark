@@ -47,6 +47,22 @@ sort_features(feature_list l)
 }
 
 void
+separate_features(feature_list l, feature_list with_list, feature_list without_list)
+{
+    GList *iter;
+    gchar *data;
+    for (iter = *l; iter != NULL; iter = iter->next) {
+        data = (gchar *)iter->data;
+        if (data[0] == '+')
+            *with_list = g_list_prepend(*with_list, g_strdup(data));
+        else
+            *without_list = g_list_prepend(*without_list, g_strdup(data));
+    }
+    *with_list = g_list_reverse(*with_list);
+    *without_list = g_list_reverse(*without_list);
+}
+
+void
 free_features(feature_list l)
 {
     g_list_free_full(*l, g_free);
