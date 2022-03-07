@@ -56,6 +56,7 @@
 #include <ui/qt/widgets/drag_label.h>
 #include <ui/qt/filter_action.h>
 #include <ui/qt/decode_as_dialog.h>
+#include <ui/qt/themes/theme_support.h>
 
 #include <QAction>
 #include <QActionGroup>
@@ -1991,7 +1992,7 @@ void PacketList::drawNearOverlay()
 
             int next_line = (row - start) * o_height / o_rows;
             if (bgcolor) {
-                QColor color(ColorUtils::fromColorT(bgcolor));
+                QColor color(ColorUtils::fromColorT(bgcolor, mainApp->themeSupport()->darkThemeActive()));
                 painter.fillRect(0, cur_line, o_width, next_line - cur_line, color);
             }
             cur_line = next_line;

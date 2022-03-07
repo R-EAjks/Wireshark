@@ -19,6 +19,7 @@
 #include "epan/register.h"
 
 #include "ui/help_url.h"
+#include "ui/qt/themes/theme_support.h"
 
 #include <QApplication>
 #include <QDir>
@@ -147,6 +148,8 @@ public:
 
     void gotoFrame(int frameNum);
 
+    const ThemeSupport * themeSupport();
+
 private:
     bool initialized_;
     bool is_reloading_lua_;
@@ -165,6 +168,8 @@ private:
 #if defined(HAVE_SOFTWARE_UPDATE) && defined(Q_OS_WIN)
     bool software_update_ok_;
 #endif
+
+    ThemeSupport themeSupport_;
 
     void storeCustomColorsInRecent();
     void clearDynamicMenuGroupItems();

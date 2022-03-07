@@ -25,8 +25,8 @@ class ColorUtils : public QObject
 public:
     explicit ColorUtils(QObject *parent = 0);
 
-    static QColor fromColorT(const color_t *color);
-    static QColor fromColorT(color_t color);
+    static QColor fromColorT(const color_t *color, bool adaptForDark = false);
+    static QColor fromColorT(color_t color, bool adaptForDark = false);
     static const color_t toColorT(const QColor color);
     static QRgb alphaBlend(const QColor &color1, const QColor &color2, qreal alpha);
     static QRgb alphaBlend(const QBrush &brush1, const QBrush &brush2, qreal alpha);

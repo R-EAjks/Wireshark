@@ -30,6 +30,7 @@
 #include <ui/qt/main_window.h>
 #include <ui/qt/main_status_bar.h>
 #include <ui/qt/widgets/wireless_timeline.h>
+#include <ui/qt/themes/theme_support.h>
 
 #include <QColor>
 #include <QElapsedTimer>
@@ -99,6 +100,8 @@ PacketListModel::PacketListModel(QObject *parent, capture_file *cf) :
             this, &PacketListModel::emitItemHeightChanged,
             Qt::QueuedConnection);
     idle_dissection_timer_ = new QElapsedTimer();
+
+    connect(wsApp->themeSupport(), &ThemeSupport::themeHasChanged, this, &PacketListModel::resetTheme);
 }
 
 PacketListModel::~PacketListModel()
@@ -598,7 +601,7 @@ QVariant PacketListModel::data(const QModelIndex &d_index, int role) const
         } else {
             return QVariant();
         }
-        return ColorUtils::fromColorT(color);
+        return ColorUtils::fromColorT(color, wsApp->themeSupport()->darkThemeActive());
     case Qt::ForegroundRole:
         if (fdata->ignored) {
             color = &prefs.gui_ignored_fg;
@@ -610,7 +613,7 @@ QVariant PacketListModel::data(const QModelIndex &d_index, int role) const
         } else {
             return QVariant();
         }
-        return ColorUtils::fromColorT(color);
+        return ColorUtils::fromColorT(color, wsApp->themeSupport()->darkThemeActive());
     case Qt::DisplayRole:
     {
         int column = d_index.column();
@@ -779,4 +782,9 @@ int PacketListModel::visibleIndexOf(frame_data *fdata) const
     }
 
     return -1;
+}
+
+void PacketListModel::resetTheme()
+{
+    resetColumns();
 }

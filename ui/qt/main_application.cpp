@@ -68,6 +68,9 @@
 #  include <QMessageBox>
 #  include <QSettings>
 #endif /* _WIN32 */
+#ifdef Q_OS_MAC
+# include "ui/macosx/cocoa_bridge.h"
+#endif
 
 #include <ui/qt/capture_file.h>
 
@@ -769,13 +772,17 @@ MainApplication::MainApplication(int &argc,  char **argv) :
     connect(this, SIGNAL(appInitialized()), &tap_update_timer_, SLOT(start()));
     connect(&tap_update_timer_, SIGNAL(timeout()), this, SLOT(updateTaps()));
 
-    // Application-wide style sheet
-    QString app_style_sheet = qApp->styleSheet();
-    qApp->setStyleSheet(app_style_sheet);
+ 	#ifdef Q_OS_MAC
+ 	    /* Mac handles dark mode natively, starting with 14.0 */
+ 	    if (CocoaBridge::DarkThemeAvailable())
+ 	#endif
+    {
+        themeSupport_.setTheme(ThemeSupport::System);
+ 	    installEventFilter(&themeSupport_);
+ 	}
 
     // If our window text is lighter than the window background, assume the theme is dark.
     QPalette gui_pal = qApp->palette();
-    prefs_set_gui_theme_is_dark(gui_pal.windowText().color().value() > gui_pal.window().color().value());
 
 #if defined(HAVE_SOFTWARE_UPDATE) && defined(Q_OS_WIN)
     connect(this, SIGNAL(softwareUpdateQuit()), this, SLOT(quit()), Qt::QueuedConnection);
@@ -789,6 +796,11 @@ MainApplication::~MainApplication()
     mainApp = NULL;
     clearDynamicMenuGroupItems();
     free_filter_lists();
+}
+
+const ThemeSupport * MainApplication::themeSupport()
+{
+    return &themeSupport_;
 }
 
 void MainApplication::registerUpdate(register_action_e action, const char *message)
