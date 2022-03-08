@@ -3537,7 +3537,7 @@ proto_register_l2server(void)
     prefs_register_enum_preference(l2server_module, "sn_bits_for_drb",
         "PDCP SN bits for DRB PDUs",
         "",
-        &global_call_pdcp_for_drb, pdcp_drb_col_vals, FALSE);
+        &global_pdcp_drb_sn_length, pdcp_drb_col_vals, FALSE);
 }
 
 static void
