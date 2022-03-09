@@ -275,6 +275,8 @@ static int hf_l2server_spcell_config_ded_len = -1;
 static int hf_l2server_radio_condition_group = -1;
 static int hf_l2server_radio_condition_profile_index = -1;
 
+static int hf_l2server_fname = -1;
+
 
 static const value_string lch_vals[] =
 {
@@ -719,7 +721,22 @@ static void dissect_cell_parm_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *
     /* Dbeam */
 }
 
-
+/* This is nr5g_l2_Srv_RCP_LOADt from nr5g-l2_Srv.h */
+static void dissect_rcp_load_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                 guint offset, guint len _U_)
+{
+    /* RcGroup */
+    proto_tree_add_item(tree, hf_l2server_radio_condition_group, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* CellId */
+    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* DbeamId */
+    proto_tree_add_item(tree, hf_l2server_dbeamid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* Fname */
+    proto_tree_add_item(tree, hf_l2server_fname, tvb, offset, -1, ENC_NA);
+}
 
 
 typedef enum rlc_mode_e { TM, UM, AM } rlc_mode_e;
@@ -2355,7 +2372,7 @@ static TYPE_FUN om_type_funs[] =
         { nr5g_l2_Srv_CELL_CONFIG_ACK,       "nr5g_l2_Srv_CELL_CONFIG_ACK",       dissect_sapi_type_dummy },
         { nr5g_l2_Srv_CELL_CONFIG_NAK,       "nr5g_l2_Srv_CELL_CONFIG_NAK",       dissect_sapi_type_dummy },
 
-        { nr5g_l2_Srv_RCP_LOAD_CMD,       "nr5g_l2_Srv_RCP_LOAD_CMD",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_RCP_LOAD_CMD,       "nr5g_l2_Srv_RCP_LOAD_CMD",       dissect_rcp_load_cmd },
         { nr5g_l2_Srv_RCP_LOAD_ACK,       "nr5g_l2_Srv_RCP_LOAD_ACK",       dissect_sapi_type_dummy },
         { nr5g_l2_Srv_RCP_LOAD_NAK,       "nr5g_l2_Srv_RCP_LOAD_NAK",       dissect_sapi_type_dummy },
 
@@ -3477,13 +3494,16 @@ proto_register_l2server(void)
         { "Length", "l2server.spcell-config-ded-len", FT_UINT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
 
-        { &hf_l2server_radio_condition_group,
-          { "Radio Condition Group", "l2server.radio-condition-group", FT_UINT32, BASE_DEC,
-            NULL, 0x0, NULL, HFILL }},
-        { &hf_l2server_radio_condition_profile_index,
-          { "Radio Condition Profile Index", "l2server.radio-condition-profile-index", FT_UINT32, BASE_DEC,
-            NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_radio_condition_group,
+        { "Radio Condition Group", "l2server.radio-condition-group", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_radio_condition_profile_index,
+        { "Radio Condition Profile Index", "l2server.radio-condition-profile-index", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
 
+      { &hf_l2server_fname,
+        { "fname", "l2server.fname", FT_STRING, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
