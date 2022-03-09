@@ -136,6 +136,7 @@ WORD_CHAR			[][:alnum:]_:/+-]
 "le"		return simple(TOKEN_TEST_LE);
 "bitwise_and"	return simple(TOKEN_TEST_BITWISE_AND);
 "&"		return simple(TOKEN_TEST_BITWISE_AND);
+"=~"		return simple(TOKEN_TEST_CONTAINS);
 "contains"	return simple(TOKEN_TEST_CONTAINS);
 "~"		return simple(TOKEN_TEST_MATCHES);
 "matches"	return simple(TOKEN_TEST_MATCHES);

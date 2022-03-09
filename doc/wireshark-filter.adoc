@@ -83,9 +83,9 @@ The operator !== (any_ne) can also be written as ~=.
 
 Additional operators exist expressed only in English, not C-like syntax:
 
-    contains     Does the protocol, field or slice contain a value
-    matches, ~   Does the string match the given case-insensitive
-                 Perl-compatible regular expression
+    contains, =~   Does the protocol, field or slice contain a value
+    matches,  ~    Does the string match the given case-insensitive
+                   Perl-compatible regular expression
 
 The "contains" operator allows a filter to search for a sequence of
 characters, expressed as a string, or bytes, expressed as a byte array.
