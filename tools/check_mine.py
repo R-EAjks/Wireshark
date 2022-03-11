@@ -6,9 +6,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 import os
-import re
-import subprocess
-import argparse
 import signal
 
 
@@ -36,28 +33,23 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 
-dissectors = [ 'packet-ulgrant.c',
-               'packet-l2server.c',
-               'packet-dlblock.c',
-               'packet-pdcp-uu.c',
-               'packet-pdcp-gtpu.c',
-               'packet-ip-udp.c',
-               'packet-pacs.c',
-               'packet-axe-rpc.c',
-               'packet-textlogger.c',
+dissectors = [ 'packet-ulgrant.c', 'packet-l2server.c',  'packet-dlblock.c',
+               'packet-pdcp-uu.c', 'packet-pdcp-gtpu.c', 'packet-ip-udp.c',
+               'packet-pacs.c',    'packet-axe-rpc.c',   'packet-textlogger.c',
                'packet-tlv.c']
 
-def run_check(tool):
+tools = ['check_tfs.py', 'check_typed_item_calls.py --mask', 'check_static.py', 'check_dissector_urls.py', 'check_spelling.py']
+
+
+def run_check(tool, dissectors):
     print(bcolors.ADDED + tool + bcolors.ENDC)
     command = './tools/' + tool
     for d in dissectors:
         command += (' --file ' + 'epan/dissectors/' + d)
     os.system(command)
 
-
-# Run all tests on all of my dissectors.
-run_check('check_tfs.py')
-run_check('check_typed_item_calls.py')
-run_check('check_static.py')
-run_check('check_dissector_urls.py')
-run_check('check_spelling.py')
+# Run all checks on all of my dissectors.
+for tool in tools:
+    if should_exit:
+        exit(1)
+    run_check(tool, dissectors)
