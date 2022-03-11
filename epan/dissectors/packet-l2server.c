@@ -602,9 +602,9 @@ static gint ett_l2server_drx_config = -1;
 static gint ett_l2server_mac_cell_group_config = -1;
 static gint ett_l2server_spcell_config_ded = -1;
 
-static gint ett_l2server_sp_cell_cfg_tdd_ded = -1;
-static gint ett_l2server_sp_cell_cfg_dl_ded = -1;
-static gint ett_l2server_sp_cell_cfg_ul_ded = -1;
+static gint ett_l2server_sp_cell_cfg_tdd = -1;
+static gint ett_l2server_sp_cell_cfg_dl = -1;
+static gint ett_l2server_sp_cell_cfg_ul = -1;
 static gint ett_l2server_sp_cell_cfg_sup_ul = -1;
 static gint ett_l2server_sp_cell_cfg_cross_carrier_sched = -1;
 static gint ett_l2server_sp_cell_cfg_lte_crs_tomatcharound = -1;
@@ -1529,22 +1529,84 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
 
     // TODO: These groups all depend upon fieldmask's present flags.
 
+    // TddDlUlConfDed
     if (tdd_ded_present) {
-        /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_tdd, tvb,
-                                                              offset, sizeof(bb_nr5g_TDD_UL_DL_CONFIG_DEDICATEDt),
-                                                              "", "TDD UL DL Config");
+        guint32 start_offset = offset;
+        proto_item *ded_ti = proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_tdd, tvb,
+                                                          offset, sizeof(bb_nr5g_TDD_UL_DL_CONFIG_DEDICATEDt),
+                                                          "", "TDD UL DL Config");
         //proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_tdd_ded);
-        offset += sizeof(bb_nr5g_TDD_UL_DL_CONFIG_DEDICATEDt);
 
+        // NbSlotSpecCfgAddMod
+        // TODO: add field!!!! - getting huge values...
+        uint16_t nbSlotSpecCfgAddMod = tvb_get_guint16(tvb, offset, ENC_LITTLE_ENDIAN);
+        offset += 2;
+        // NbSlotSpecCfgDel
+        uint16_t nbSlotSpecCfgDel = tvb_get_guint16(tvb, offset, ENC_LITTLE_ENDIAN);
+        offset += 2;
+        // SlotSpecCfgAddMod
+        offset += (nbSlotSpecCfgAddMod * sizeof(bb_nr5g_TDD_UL_DL_SLOT_CONFIGt));
+        // SlotSpecCfgDel
+        offset += (nbSlotSpecCfgDel * sizeof(uint32_t));
+
+        proto_item_set_len(ded_ti, offset-start_offset);
     }
 
     if (dl_ded_present) {
-        /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_dl, tvb,
-                                                              offset, sizeof(bb_nr5g_DOWNLINK_DEDICATED_CONFIGt),
+        guint start_offset = offset;
+        proto_item *ded_ti = proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_dl, tvb,
+                                                              offset, 0,
                                                               "", "DL Config");
-        //proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_dl);
-        // TODO: has 4 present flags to check for size...
-        offset += sizeof(bb_nr5g_DOWNLINK_DEDICATED_CONFIGt);
+        proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_dl);
+
+        // FieldMask
+        guint32 field_mask;
+        proto_tree_add_item_ret_uint(ded_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN, &field_mask);
+        offset += 4;
+        // DefaultDlBwp
+        offset += 1;
+        // NbDlBwpIdToDel
+        offset += 1;
+        // NbDlBwpIdToAdd
+        guint8 nbDlBwpIdToAdd = tvb_get_guint8(tvb, offset);
+        offset += 1;
+        // NbDlBwpScsSpecCarrier
+        guint8 nbDlBwpScsSpecCarrier = tvb_get_guint8(tvb, offset);
+        offset += 1;
+        // NbRateMatchPatternDedToAdd
+        guint8 nbRateMatchPatternDedToAdd = tvb_get_guint8(tvb, offset);
+        offset += 1;
+        // NbRateMatchPatternDedToDel
+        guint8 nbRateMatchPatternDedToDel = tvb_get_guint8(tvb, offset);
+        offset += 1;
+        // Pad
+        offset += 1;
+        // DlBwpIdToDel
+        offset += (1 * bb_nr5g_MAX_NB_BWPS);
+
+        if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_INITIAL_DL_BWP_PRESENT) {
+            offset += sizeof(bb_nr5g_BWP_DOWNLINKDEDICATEDt);
+        }
+        if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDSCH_PRESENT) {
+            offset += sizeof(bb_nr5g_PDSCH_SERVING_CELL_CFGt);
+        }
+        if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDCCH_PRESENT) {
+            offset += sizeof(bb_nr5g_PDCCH_SERVING_CELL_CFGt);
+        }
+        if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_CSI_MEAS_CFG_PRESENT) {
+            offset += sizeof(bb_nr5g_CSI_MEAS_CFGt);
+        }
+
+        // DlBwpIdToAdd
+        offset += (nbDlBwpIdToAdd * sizeof(bb_nr5g_BWP_DOWNLINKt));
+        // DlChannelBwPerScs
+        offset += (nbDlBwpScsSpecCarrier * sizeof(bb_nr5g_SCS_SPEC_CARRIERt));
+        // RateMatchPatternDedToAdd
+        offset += (nbRateMatchPatternDedToAdd * sizeof(bb_nr5g_RATE_MATCH_PATTERNt));
+        // RateMatchPatternDedToDel
+        offset += (nbRateMatchPatternDedToDel * sizeof(bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS));
+
+        proto_item_set_len(ded_ti, offset-start_offset);
     }
 
     if (ul_ded_present) {
@@ -3710,9 +3772,9 @@ proto_register_l2server(void)
         &ett_l2server_drx_config,
         &ett_l2server_mac_cell_group_config,
         &ett_l2server_spcell_config_ded,
-        &ett_l2server_sp_cell_cfg_tdd_ded,
-        &ett_l2server_sp_cell_cfg_dl_ded,
-        &ett_l2server_sp_cell_cfg_ul_ded,
+        &ett_l2server_sp_cell_cfg_tdd,
+        &ett_l2server_sp_cell_cfg_dl,
+        &ett_l2server_sp_cell_cfg_ul,
         &ett_l2server_sp_cell_cfg_sup_ul,
         &ett_l2server_sp_cell_cfg_cross_carrier_sched,
         &ett_l2server_sp_cell_cfg_lte_crs_tomatcharound,
