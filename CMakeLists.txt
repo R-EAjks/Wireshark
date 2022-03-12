@@ -1533,16 +1533,18 @@ endif()
 set(PLUGIN_INSTALL_VERSION_LIBDIR "${PLUGIN_INSTALL_LIBDIR}/${PLUGIN_PATH_ID}")
 set(PLUGIN_VERSION_DIR "plugins/${PLUGIN_PATH_ID}")
 
-add_subdirectory( capture )
+include_directories(src)
+
+add_subdirectory( src/capture )
 add_subdirectory( doc )
 add_subdirectory( docbook EXCLUDE_FROM_ALL )
 add_subdirectory( epan )
-add_subdirectory( extcap )
-add_subdirectory( randpkt_core )
+add_subdirectory( src/extcap )
+add_subdirectory( src/randpkt_core )
 add_subdirectory( tools/lemon )
-add_subdirectory( ui )
+add_subdirectory( src/ui )
 add_subdirectory( wiretap )
-add_subdirectory( writecap )
+add_subdirectory( src/writecap )
 
 # Location of our data files. This should be set to a value that allows
 # running from the build directory on Windows, on macOS when building an
@@ -1570,7 +1572,7 @@ set(DATAFILE_DIR ${_datafile_dir} CACHE INTERNAL "Build time data file location.
 add_subdirectory( wsutil )
 
 if(BUILD_wireshark AND QT_FOUND)
-	add_subdirectory( ui/qt )
+	add_subdirectory( src/ui/qt )
 endif()
 
 # Location of our plugins. PLUGIN_DIR should allow running
@@ -1854,54 +1856,54 @@ endif()
 # Should this be part of libui?
 if(WIN32)
 	set(PLATFORM_UI_SRC
-		ui/win32/console_win32.cpp
-		ui/win32/file_dlg_win32.cpp
+		src/ui/win32/console_win32.cpp
+		src/ui/win32/file_dlg_win32.cpp
 	)
 	set(PLATFORM_UI_RC_FILES
 		resources/file_dlg_win32.rc
 	)
 elseif(APPLE)
 	set(PLATFORM_UI_SRC
-		ui/macosx/cocoa_bridge.mm
+		src/ui/macosx/cocoa_bridge.mm
 	)
 	if (SPARKLE_FOUND)
-		list(APPEND PLATFORM_UI_SRC ui/macosx/sparkle_bridge.m)
+		list(APPEND PLATFORM_UI_SRC src/ui/macosx/sparkle_bridge.m)
 	endif()
 endif()
 
 set(TSHARK_TAP_SRC
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-credentials.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-camelsrt.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-diameter-avp.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-expert.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-exportobject.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-endpoints.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-flow.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-follow.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-funnel.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-gsm_astat.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-hosts.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-httpstat.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-icmpstat.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-icmpv6stat.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-iostat.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-iousers.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-macltestat.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-protocolinfo.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-protohierstat.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-rlcltestat.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-rpcprogs.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-rtd.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-rtp.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-rtspstat.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-sctpchunkstat.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-simple_stattable.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-sipstat.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-smbsids.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-srt.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-stats_tree.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-sv.c
-	${CMAKE_SOURCE_DIR}/ui/cli/tap-wspstat.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-credentials.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-camelsrt.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-diameter-avp.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-expert.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-exportobject.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-endpoints.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-flow.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-follow.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-funnel.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-gsm_astat.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-hosts.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-httpstat.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-icmpstat.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-icmpv6stat.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-iostat.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-iousers.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-macltestat.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-protocolinfo.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-protohierstat.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-rlcltestat.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-rpcprogs.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-rtd.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-rtp.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-rtspstat.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-sctpchunkstat.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-simple_stattable.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-sipstat.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-smbsids.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-srt.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-stats_tree.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-sv.c
+	${CMAKE_SOURCE_DIR}/src/ui/cli/tap-wspstat.c
 	${CUSTOM_TSHARK_TAP_SRC}
 
 )
@@ -2380,15 +2382,15 @@ set_target_properties(copy_data_files PROPERTIES FOLDER "Copy Tasks")
 
 # sources common for wireshark, tshark, rawshark and sharkd
 add_library(shark_common OBJECT
-	cfile.c
-	extcap.c
-	extcap_parser.c
-	file_packet_provider.c
-	frame_tvbuff.c
-	sync_pipe_write.c
+	src/cfile.c
+	src/extcap.c
+	src/extcap_parser.c
+	src/file_packet_provider.c
+	src/frame_tvbuff.c
+	src/sync_pipe_write.c
 )
-add_library(cli_main OBJECT cli_main.c)
-add_library(capture_opts OBJECT capture_opts.c)
+add_library(cli_main OBJECT src/cli_main.c)
+add_library(capture_opts OBJECT src/capture_opts.c)
 target_include_directories(capture_opts SYSTEM PRIVATE ${PCAP_INCLUDE_DIRS})
 set_target_properties(shark_common cli_main capture_opts
 	PROPERTIES
@@ -2398,8 +2400,8 @@ set_target_properties(shark_common cli_main capture_opts
 
 if(BUILD_wireshark AND QT_FOUND)
 	set(WIRESHARK_SRC
-		file.c
-		fileset.c
+		src/file.c
+		src/fileset.c
 		${PLATFORM_UI_SRC}
 	)
 	set(wireshark_FILES
@@ -2650,7 +2652,7 @@ if(BUILD_tshark)
 		$<TARGET_OBJECTS:cli_main>
 		$<TARGET_OBJECTS:shark_common>
 		tshark-tap-register.c
-		tshark.c
+		src/tshark.c
 		${TSHARK_TAP_SRC}
 	)
 
@@ -2675,7 +2677,7 @@ if(BUILD_tfshark)
 	set(tfshark_FILES
 		$<TARGET_OBJECTS:cli_main>
 		$<TARGET_OBJECTS:shark_common>
-		tfshark.c
+		src/tfshark.c
 		${TSHARK_TAP_SRC}
 	)
 	set_executable_resources(tfshark "TFShark")
@@ -2699,7 +2701,7 @@ if(BUILD_rawshark AND PCAP_FOUND)
 	set(rawshark_FILES
 		$<TARGET_OBJECTS:cli_main>
 		$<TARGET_OBJECTS:shark_common>
-		rawshark.c
+		src/rawshark.c
 	)
 	set_executable_resources(rawshark "Rawshark")
 	add_executable(rawshark ${rawshark_FILES})
@@ -2727,9 +2729,9 @@ if(BUILD_sharkd)
 		# $<TARGET_OBJECTS:cli_main> and has real_main().
 		#
 		$<TARGET_OBJECTS:shark_common>
-		sharkd.c
-		sharkd_daemon.c
-		sharkd_session.c
+		src/sharkd.c
+		src/sharkd_daemon.c
+		src/sharkd_session.c
 	)
 	set_executable_resources(sharkd "SharkD")
 	add_executable(sharkd ${sharkd_FILES})
@@ -2748,7 +2750,7 @@ if(BUILD_dftest)
 		version_info
 	)
 	set(dftest_FILES
-		dftest.c
+		src/dftest.c
 	)
 	set_executable_resources(dftest "Dftest")
 	add_executable(dftest ${dftest_FILES})
@@ -2768,7 +2770,7 @@ if(BUILD_randpkt)
 	)
 	set(randpkt_FILES
 		$<TARGET_OBJECTS:cli_main>
-		randpkt.c
+		src/randpkt.c
 	)
 	set_executable_resources(randpkt "Randpkt"
 		COPYRIGHT_INFO "Copyright (C) 1999 by Gilbert Ramirez <gram@alumni.rice.edu>")
@@ -2795,7 +2797,7 @@ if(BUILD_text2pcap)
 	)
 	set(text2pcap_FILES
 		$<TARGET_OBJECTS:cli_main>
-		text2pcap.c
+		src/text2pcap.c
 	)
 	set_executable_resources(text2pcap "Text2pcap"
 		COPYRIGHT_INFO "2001 Ashok Narayanan <ashokn@cisco.com>")
@@ -2816,7 +2818,7 @@ if(BUILD_mergecap)
 	)
 	set(mergecap_FILES
 		$<TARGET_OBJECTS:cli_main>
-		mergecap.c
+		src/mergecap.c
 	)
 	set_executable_resources(mergecap "Mergecap")
 	add_executable(mergecap ${mergecap_FILES})
@@ -2836,7 +2838,7 @@ if(BUILD_reordercap)
 	)
 	set(reordercap_FILES
 		$<TARGET_OBJECTS:cli_main>
-		reordercap.c
+		src/reordercap.c
 	)
 	set_executable_resources(reordercap "Reordercap")
 	add_executable(reordercap ${reordercap_FILES})
@@ -2858,7 +2860,7 @@ if(BUILD_capinfos)
 	)
 	set(capinfos_FILES
 		$<TARGET_OBJECTS:cli_main>
-		capinfos.c
+		src/capinfos.c
 	)
 	set_executable_resources(capinfos "Capinfos")
 	add_executable(capinfos ${capinfos_FILES})
@@ -2880,7 +2882,7 @@ if(BUILD_captype)
 	)
 	set(captype_FILES
 		$<TARGET_OBJECTS:cli_main>
-		captype.c
+		src/captype.c
 	)
 	set_executable_resources(captype "Captype")
 	add_executable(captype ${captype_FILES})
@@ -2901,7 +2903,7 @@ if(BUILD_editcap)
 	)
 	set(editcap_FILES
 		$<TARGET_OBJECTS:cli_main>
-		editcap.c
+		src/editcap.c
 	)
 	set_executable_resources(editcap "Editcap")
 	add_executable(editcap ${editcap_FILES})
@@ -2930,9 +2932,9 @@ if(BUILD_dumpcap AND PCAP_FOUND)
 	set(dumpcap_FILES
 		$<TARGET_OBJECTS:capture_opts>
 		$<TARGET_OBJECTS:cli_main>
-		dumpcap.c
-		ringbuffer.c
-		sync_pipe_write.c
+		src/dumpcap.c
+		src/ringbuffer.c
+		src/sync_pipe_write.c
 	)
 	set_executable_resources(dumpcap "Dumpcap" UNIQUE_RC)
 	add_executable(dumpcap ${dumpcap_FILES})
@@ -3020,7 +3022,7 @@ if (MAXMINDDB_FOUND)
 		${WIN_WS2_32_LIBRARY}
 	)
 	set(mmdbresolve_FILES
-		mmdbresolve.c
+		src/mmdbresolve.c
 	)
 	set_executable_resources(mmdbresolve "Mmdbresolve")
 	add_executable(mmdbresolve ${mmdbresolve_FILES})
@@ -3448,9 +3450,9 @@ install(
 )
 
 set(SHARK_PUBLIC_HEADERS
-	cfile.h
-	cli_main.h
-	file.h
+	src/cfile.h
+	src/cli_main.h
+	src/file.h
 	include/ws_attributes.h
 	include/ws_compiler_tests.h
 	include/ws_diag_control.h
