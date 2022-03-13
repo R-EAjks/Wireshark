@@ -301,6 +301,9 @@ static int hf_l2server_radio_condition_profile_index = -1;
 
 static int hf_l2server_fname = -1;
 
+static int hf_l2server_nbslotspeccfg_addmod = -1;
+static int hf_l2server_nbslotspeccfg_del = -1;
+
 
 static const value_string lch_vals[] =
 {
@@ -1395,6 +1398,12 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
                                                           "", "PH Cell Config");
     proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_ph_cell_config);
 
+    // Fieldmask
+    guint32 fieldmask;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                 ENC_LITTLE_ENDIAN, &fieldmask);
+    offset += 4;
+
     // HarqACKSpatialBundlingPUCCH
     proto_tree_add_item(config_tree, hf_l2server_harq_ack_spatial_bundling_pucch, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
@@ -1428,9 +1437,21 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
 
     // Pdcch_BlindDetection
     offset += 1;
-    // TODO lots more...
 
-    offset = start_offset + sizeof(bb_nr5g_PH_CELL_GROUP_CONFIGt);
+    // TODO lots more...
+    offset += 22;
+
+    if (fieldmask & bb_nr5g_STRUCT_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16_PRESENT) {
+        offset += sizeof(bb_nr5g_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16t);
+    }
+
+    if (fieldmask & bb_nr5g_STRUCT_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_PRESENT) {
+        offset += sizeof(bb_nr5g_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16t);
+    }
+
+    proto_item_set_len(config_ti, offset-start_offset);
+
+    //offset = start_offset + sizeof(bb_nr5g_PH_CELL_GROUP_CONFIGt);
     return offset;
 }
 
@@ -1462,10 +1483,8 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_dormantbwp_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dormantbwp_present);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &lte_crs_pattern_list1_present);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &lte_crs_pattern_list2_present);
-
-
-
     offset += 4;
+
     // ServCellIdx
     proto_tree_add_item(config_tree, hf_l2server_serv_cell_idx, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -1527,7 +1546,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
     proto_tree_add_item(config_tree, hf_l2server_first_active_ul_bwp_pcell, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
 
-    // TODO: These groups all depend upon fieldmask's present flags.
+    // These groups all depend upon fieldmask's present flags.
 
     // TddDlUlConfDed
     if (tdd_ded_present) {
@@ -1535,14 +1554,16 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         proto_item *ded_ti = proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_tdd, tvb,
                                                           offset, sizeof(bb_nr5g_TDD_UL_DL_CONFIG_DEDICATEDt),
                                                           "", "TDD UL DL Config");
-        //proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_tdd_ded);
+        proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_tdd);
 
         // NbSlotSpecCfgAddMod
         // TODO: add field!!!! - getting huge values...
-        uint16_t nbSlotSpecCfgAddMod = tvb_get_guint16(tvb, offset, ENC_LITTLE_ENDIAN);
+        uint32_t nbSlotSpecCfgAddMod;
+        proto_tree_add_item_ret_uint(ded_tree, hf_l2server_nbslotspeccfg_addmod, tvb, offset, 2, ENC_LITTLE_ENDIAN, &nbSlotSpecCfgAddMod);
         offset += 2;
         // NbSlotSpecCfgDel
-        uint16_t nbSlotSpecCfgDel = tvb_get_guint16(tvb, offset, ENC_LITTLE_ENDIAN);
+        uint32_t nbSlotSpecCfgDel;
+        proto_tree_add_item_ret_uint(ded_tree, hf_l2server_nbslotspeccfg_del, tvb, offset, 2, ENC_LITTLE_ENDIAN, &nbSlotSpecCfgDel);
         offset += 2;
         // SlotSpecCfgAddMod
         offset += (nbSlotSpecCfgAddMod * sizeof(bb_nr5g_TDD_UL_DL_SLOT_CONFIGt));
@@ -3751,6 +3772,15 @@ proto_register_l2server(void)
       { &hf_l2server_fname,
         { "fname", "l2server.fname", FT_STRING, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nbslotspeccfg_addmod,
+        { "NbSlotSpecCfg AddMod", "l2server.nbslotspeccfg-addmod", FT_UINT16, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nbslotspeccfg_del,
+        { "NbSlotSpecCfg Del", "l2server.nbslotspeccfg-del", FT_UINT16, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+
     };
 
     static gint *ett[] = {
