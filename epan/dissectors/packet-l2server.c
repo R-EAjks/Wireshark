@@ -304,6 +304,8 @@ static int hf_l2server_fname = -1;
 static int hf_l2server_nbslotspeccfg_addmod = -1;
 static int hf_l2server_nbslotspeccfg_del = -1;
 
+static int hf_l2server_nbdlbwpidtoadd = -1;
+static int hf_l2server_nbdlbwpidtodel = -1;
 
 static const value_string lch_vals[] =
 {
@@ -1421,7 +1423,7 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     // McsRntValid
     offset += 1;
     // McsCRnti
-    offset += 1;
+    offset += 2;
     // PUE_FR1 [30..33]
     offset += 1;
     // TpcSrsRNTI
@@ -1446,9 +1448,11 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     }
 
     if (fieldmask & bb_nr5g_STRUCT_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_PRESENT) {
+        printf("blind detection present\n");
         offset += sizeof(bb_nr5g_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16t);
     }
 
+    printf("ph cell config len is %u\n", offset-start_offset);
     proto_item_set_len(config_ti, offset-start_offset);
 
     //offset = start_offset + sizeof(bb_nr5g_PH_CELL_GROUP_CONFIGt);
@@ -1548,7 +1552,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
 
     // These groups all depend upon fieldmask's present flags.
 
-    // TddDlUlConfDed
+    // TddDlUlConfDed (bb_nr5g_TDD_UL_DL_CONFIG_DEDICATEDt)
     if (tdd_ded_present) {
         guint32 start_offset = offset;
         proto_item *ded_ti = proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_tdd, tvb,
@@ -1573,6 +1577,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         proto_item_set_len(ded_ti, offset-start_offset);
     }
 
+    // DlCellCfgDed (bb_nr5g_DOWNLINK_DEDICATED_CONFIGt)
     if (dl_ded_present) {
         guint start_offset = offset;
         proto_item *ded_ti = proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_dl, tvb,
@@ -1584,21 +1589,27 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         guint32 field_mask;
         proto_tree_add_item_ret_uint(ded_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN, &field_mask);
         offset += 4;
+
+        // FirstActiveDlBwp
+        offset += 1;
         // DefaultDlBwp
         offset += 1;
         // NbDlBwpIdToDel
+        guint32 nbDlBwpIdToDel;
+        proto_tree_add_item_ret_uint(ded_tree, hf_l2server_nbdlbwpidtodel, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nbDlBwpIdToDel);
         offset += 1;
         // NbDlBwpIdToAdd
-        guint8 nbDlBwpIdToAdd = tvb_get_guint8(tvb, offset);
+        guint32 nbDlBwpIdToAdd;
+        proto_tree_add_item_ret_uint(ded_tree, hf_l2server_nbdlbwpidtoadd, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nbDlBwpIdToAdd);
         offset += 1;
         // NbDlBwpScsSpecCarrier
         guint8 nbDlBwpScsSpecCarrier = tvb_get_guint8(tvb, offset);
         offset += 1;
         // NbRateMatchPatternDedToAdd
-        guint8 nbRateMatchPatternDedToAdd = tvb_get_guint8(tvb, offset);
+        guint32 nbRateMatchPatternDedToAdd = tvb_get_guint8(tvb, offset);
         offset += 1;
         // NbRateMatchPatternDedToDel
-        guint8 nbRateMatchPatternDedToDel = tvb_get_guint8(tvb, offset);
+        guint32 nbRateMatchPatternDedToDel = tvb_get_guint8(tvb, offset);
         offset += 1;
         // Pad
         offset += 1;
@@ -1606,15 +1617,18 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         offset += (1 * bb_nr5g_MAX_NB_BWPS);
 
         if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_INITIAL_DL_BWP_PRESENT) {
+            // TODO: has several present flags and Nb fields...
             offset += sizeof(bb_nr5g_BWP_DOWNLINKDEDICATEDt);
         }
         if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDSCH_PRESENT) {
+            // TODO: contains a list..
             offset += sizeof(bb_nr5g_PDSCH_SERVING_CELL_CFGt);
         }
         if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDCCH_PRESENT) {
             offset += sizeof(bb_nr5g_PDCCH_SERVING_CELL_CFGt);
         }
         if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_CSI_MEAS_CFG_PRESENT) {
+            // TODO: a lot more to do in here...
             offset += sizeof(bb_nr5g_CSI_MEAS_CFGt);
         }
 
@@ -1630,14 +1644,43 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         proto_item_set_len(ded_ti, offset-start_offset);
     }
 
+    // UlCellCfgDed (bb_nr5g_UPLINK_DEDICATED_CONFIGt)
     if (ul_ded_present) {
-        /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_ul, tvb,
+        guint start_offset = offset;
+        proto_item *ded_ti = proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_ul, tvb,
                                                               offset, sizeof(bb_nr5g_UPLINK_DEDICATED_CONFIGt),
                                                               "", "UL Config");
-        //proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_ul);
-        offset += sizeof(bb_nr5g_UPLINK_DEDICATED_CONFIGt);
+        proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_ul);
+
+        // FieldMask
+        guint32 field_mask;
+        proto_tree_add_item_ret_uint(ded_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN, &field_mask);
+        offset += 4;
+        // FirstActiveUlBwp
+        offset += 1;
+        // PowerBoostPi2BPSK
+        offset += 1;
+        // NbUlBwpIdToDel
+        offset += 1;
+        // NbUlBwpIdToAdd
+        offset += 1;
+        // NbUlBwpScsSpecCarrier
+        offset += 1;
+        // Pad
+        offset += 3;
+        // UlBwpIdToDel
+        offset += (bb_nr5g_MAX_NB_BWPS * 1);
+
+        // InitialUlBwp
+        if (field_mask & bb_nr5g_STRUCT_UPLINK_DEDICATED_CONFIG_INITIAL_UL_BWP_PRESENT) {
+            // TODO:
+        }
+
+
+        proto_item_set_len(ded_ti, offset-start_offset);
     }
 
+    // SulCellCfgDed (bb_nr5g_UPLINK_DEDICATED_CONFIGt)
     if (sup_ul_present) {
         /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_sup_ul, tvb,
                                                               offset, sizeof(bb_nr5g_UPLINK_DEDICATED_CONFIGt),
@@ -1646,6 +1689,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         offset += sizeof(bb_nr5g_UPLINK_DEDICATED_CONFIGt);
     }
 
+    // CrossCarrierSchedulingConfig (bb_nr5g_CROSS_CARRIER_SCHEDULING_CONFIGt)
     if (cross_carrier_sched_present) {
         /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_cross_carrier_sched_present, tvb,
                                                               offset, sizeof(bb_nr5g_UPLINK_DEDICATED_CONFIGt),
@@ -1654,6 +1698,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         offset += sizeof(bb_nr5g_CROSS_CARRIER_SCHEDULING_CONFIGt);
     }
 
+    // LteCrsToMatchAround (bb_nr5g_RATE_MATCH_PATTERN_LTEt)
     if (lte_crs_tomatcharound_present) {
         /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_present, tvb,
                                                               offset, sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt),
@@ -1662,6 +1707,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         offset += sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt);
     }
 
+    // DormantBWP_Config_r16 (bb_nr5g_DORMANTBWP_CONFIGt)
     if (dormantbwp_present) {
         /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_dormantbwp_present, tvb,
                                                               offset, sizeof(bb_nr5g_DORMANTBWP_CONFIGt),
@@ -1670,6 +1716,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         offset += sizeof(bb_nr5g_DORMANTBWP_CONFIGt);
     }
 
+    // LteCrsPatternList1_r16 (bb_nr5g_RATE_MATCH_PATTERN_LTEt)
     if (lte_crs_pattern_list1_present) {
         /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_present, tvb,
                                                               offset, sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt),
@@ -1678,6 +1725,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         offset += sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt);
     }
 
+    // LteCrsPatternList2_r16 (bb_nr5g_RATE_MATCH_PATTERN_LTEt)
     if (lte_crs_pattern_list2_present) {
         /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_present, tvb,
                                                               offset, sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt),
@@ -2133,6 +2181,9 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
 
         // PhyCellCnf (bb_nr5g_PH_CELL_GROUP_CONFIGt)
         offset = dissect_ph_cell_config(l1_dedicated_config_tree, tvb, pinfo, offset);
+
+        // TODO: don't understand why we seem to be out here!!!!!????
+        offset += 6;
 
         if (ded_present) {
         // SpCellCfgDed
@@ -3780,7 +3831,12 @@ proto_register_l2server(void)
         { "NbSlotSpecCfg Del", "l2server.nbslotspeccfg-del", FT_UINT16, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
 
-
+      { &hf_l2server_nbdlbwpidtoadd,
+        { "Nb DL BwpId to add", "l2server.nbsdlbwpidtoadd", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nbdlbwpidtodel,
+        { "Nb DL BwpId to del", "l2server.nbsdlbwpidtodel", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
