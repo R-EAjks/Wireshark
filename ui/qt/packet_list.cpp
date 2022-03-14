@@ -1012,6 +1012,7 @@ void PacketList::drawCurrentPacket()
     if (selectionModel() && current_index.isValid()) {
         selectionModel()->clearCurrentIndex();
         selectionModel()->setCurrentIndex(current_index, QItemSelectionModel::SelectCurrent | QItemSelectionModel::Rows);
+        goToPacket(cap_file_->current_frame->num);
     }
 }
 
