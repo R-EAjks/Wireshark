@@ -4560,8 +4560,18 @@ capture_loop_write_pcapng_cb(capture_src *pcap_src, const pcapng_block_header_t 
             global_ld.go = FALSE;
             global_ld.err = err;
             pcap_src->dropped++;
-        } else if (bh->block_type == BLOCK_TYPE_EPB || bh->block_type == BLOCK_TYPE_SPB || bh->block_type == BLOCK_TYPE_SYSTEMD_JOURNAL_EXPORT) {
-            /* count packet only if we actually have an EPB or SPB */
+        } else if (bh->block_type == BLOCK_TYPE_EPB ||
+                   bh->block_type == BLOCK_TYPE_SPB ||
+                   bh->block_type == BLOCK_TYPE_SYSTEMD_JOURNAL_EXPORT ||
+                   bh->block_type == BLOCK_TYPE_CB_NO_COPY ||
+                   bh->block_type == BLOCK_TYPE_CB_COPY ||
+                   bh->block_type == BLOCK_TYPE_SYSDIG_EVENT ||
+                   bh->block_type == BLOCK_TYPE_SYSDIG_EVENT_V2 ||
+                   bh->block_type == BLOCK_TYPE_SYSDIG_EVENT_V2_LARGE) {
+            /**
+             * Count all blocks that are non-internal according to
+             * 'wtapng_block_t::internal'
+             */
 #if defined(DEBUG_DUMPCAP) || defined(DEBUG_CHILD_DUMPCAP)
             ws_info("Wrote a pcapng block type %u of length %d captured on interface %u.",
                    bh->block_type, bh->block_total_length, pcap_src->interface_id);
