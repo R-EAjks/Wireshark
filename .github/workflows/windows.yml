@@ -49,7 +49,7 @@ jobs:
         with:
           python-version: 3.8
       - name: Install pytest
-        run: pip install pytest pytest-xdist
+        run: pip install pytest pytest-xdist packaging
       - name: Run tests
         env:
           PYTEST_ADDOPTS: --skip-missing-programs=rawshark
