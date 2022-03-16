@@ -48,10 +48,7 @@ get_cpu_info(GString *str)
     ws_cpuid(CPUInfo, 0x80000004);
     memcpy(CPUBrandString + 32, CPUInfo, sizeof(CPUInfo));
 
-    if (str->len > 0)
-        g_string_append(str, ", with ");
-
-    g_string_append_printf(str, "%s", g_strstrip(CPUBrandString));
+    g_string_append(str, g_strstrip(CPUBrandString));
 
     if (ws_cpuid_sse42())
         g_string_append(str, " (with SSE4.2)");

@@ -450,8 +450,8 @@ void AboutDialog::updateWiresharkText()
     /* Construct the message string */
     message += "<p>Version " + html_escape(vcs_version_info_str) + "</p>\n\n";
     message += "<p>" + html_escape(copyright_info_str) + "</p>\n\n";
-    message += "<p>" + html_escape(comp_info_str) + "</p>\n\n";
-    message += "<p>" + html_escape(runtime_info_str) + "</p>\n\n";
+    message += "<pre>" + html_escape(comp_info_str) + "</pre>\n\n";
+    message += "<pre>" + html_escape(runtime_info_str) + "</pre>\n\n";
     message += "<p>Wireshark is Open Source Software released under the GNU General Public License.</p>\n\n";
     message += "<p>Check the man page and ";
     message += "<a href=https://www.wireshark.org>https://www.wireshark.org</a> ";
