@@ -21,7 +21,7 @@ install:
   - choco install --ignore-dependencies asciidoctorj docbook-bundle xsltproc
   # Py2 fails the test_tshark_unicode_display_filter test, so use Py3.
   - set PATH=C:\Strawberry\perl\bin\;C:\Python37-x64;C:\Python37-x64\Scripts;%PATH%
-  - pip install pytest pytest-xdist
+  - pip install pytest pytest-xdist packaging
   - ps: New-Item -ItemType Directory -Force -Path $Env:WIRESHARK_BASE_DIR
   - ps: |   # For pkcs11 tests.
       Invoke-WebRequest -Uri https://github.com/disig/SoftHSM2-for-Windows/releases/download/v2.5.0/SoftHSM2-2.5.0.msi -OutFile $Env:WIRESHARK_BASE_DIR\SoftHSM2-2.5.0.msi

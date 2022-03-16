@@ -8,6 +8,7 @@
 '''Fixtures that are specific to Wireshark.'''
 
 from contextlib import contextmanager
+from packaging import version
 import os
 import re
 import subprocess
@@ -173,14 +174,15 @@ def features(cmd_tshark, make_env):
         print('Failed to detect tshark features: %s' % (ex,))
         tshark_v = ''
     gcry_m = re.search(r'with +Gcrypt +([0-9]+\.[0-9]+)', tshark_v)
+    gcry_ver = version.parse(gcry_m.group(1))
     return types.SimpleNamespace(
         have_x64='Compiled (64-bit)' in tshark_v,
         have_lua='with Lua' in tshark_v,
         have_nghttp2='with nghttp2' in tshark_v,
         have_kerberos='with MIT Kerberos' in tshark_v or 'with Heimdal Kerberos' in tshark_v,
-        have_libgcrypt16=gcry_m and float(gcry_m.group(1)) >= 1.6,
-        have_libgcrypt17=gcry_m and float(gcry_m.group(1)) >= 1.7,
-        have_libgcrypt18=gcry_m and float(gcry_m.group(1)) >= 1.8,
+        have_libgcrypt16=gcry_m and gcry_ver >= version.parse("1.6"),
+        have_libgcrypt17=gcry_m and gcry_ver >= version.parse("1.7"),
+        have_libgcrypt18=gcry_m and gcry_ver >= version.parse("1.8"),
         have_gnutls='with GnuTLS' in tshark_v,
         have_pkcs11='and PKCS #11 support' in tshark_v,
         have_brotli='with brotli' in tshark_v,

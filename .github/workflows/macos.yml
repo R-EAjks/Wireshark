@@ -16,7 +16,7 @@ jobs:
       - name: Install dmgbuild
         run: pip3 install dmgbuild
       - name: Install pytest
-        run: pip install pytest pytest-xdist
+        run: pip install pytest pytest-xdist packaging
       - name: Install biplist
         run: pip install biplist
       - name: Set up Ruby 2.6
