@@ -1448,11 +1448,11 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     }
 
     if (fieldmask & bb_nr5g_STRUCT_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_PRESENT) {
-        printf("blind detection present\n");
+        //printf("blind detection present\n");
         offset += sizeof(bb_nr5g_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16t);
     }
 
-    printf("ph cell config len is %u\n", offset-start_offset);
+    //printf("ph cell config len is %u\n", offset-start_offset);
     proto_item_set_len(config_ti, offset-start_offset);
 
     //offset = start_offset + sizeof(bb_nr5g_PH_CELL_GROUP_CONFIGt);
@@ -2404,7 +2404,7 @@ static void dissect_ppu_list_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *p
 }
 
 // Showing nr5g_l2_Srv_CFG_02t from L2ServerMesages.h
-// (controlled by type field)
+// (variation controlled by type field)
 static void dissect_l2_srv_cfg_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                    guint offset, guint len _U_)
 {
