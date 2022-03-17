@@ -3314,7 +3314,7 @@ missing_segments(packet_info *pinfo, struct tcp_multisegment_pdu *msp, guint32 s
         return FALSE;
     }
 
-    fd_head = fragment_get(&tcp_reassembly_table, pinfo, msp->first_frame, NULL);
+    fd_head = fragment_get(&tcp_reassembly_table, pinfo, msp->seq, NULL);
     /* msp implies existence of fragments, this should never be NULL. */
     DISSECTOR_ASSERT(fd_head);
 
@@ -3499,7 +3499,7 @@ again:
             /* Fix for bug 3264: look up ipfd for this (first) segment,
                so can add tcp.reassembled_in generated field on this code path. */
             if (!is_retransmission) {
-                ipfd_head = fragment_get(&tcp_reassembly_table, pinfo, msp->first_frame, NULL);
+                ipfd_head = fragment_get(&tcp_reassembly_table, pinfo, msp->seq, NULL);
                 if (ipfd_head) {
                     if (ipfd_head->reassembled_in != 0) {
                         item = proto_tree_add_uint(tcp_tree, hf_tcp_reassembled_in, tvb, 0,
@@ -3649,12 +3649,12 @@ again:
              * have to worry about increasing the fragment length here.
              */
             fragment_reset_tot_len(&tcp_reassembly_table, pinfo,
-                                   msp->first_frame, NULL,
+                                   msp->seq, NULL,
                                    MAX(seq + len, msp->nxtpdu) - msp->seq);
         }
 
         ipfd_head = fragment_add(&tcp_reassembly_table, tvb, offset,
-                                 pinfo, msp->first_frame, NULL,
+                                 pinfo, msp->seq, NULL,
                                  seq - msp->seq, len,
                                  (LT_SEQ (nxtseq,msp->nxtpdu)) );
 
@@ -3802,7 +3802,7 @@ again:
                 if (pinfo->desegment_offset == 0)
                     remove_last_data_source(pinfo);
                 fragment_set_partial_reassembly(&tcp_reassembly_table,
-                                                pinfo, msp->first_frame, NULL);
+                                                pinfo, msp->seq, NULL);
 
                 /* Update msp->nxtpdu to point to the new next
                  * pdu boundary.
@@ -3981,7 +3981,7 @@ again:
 
             /* add this segment as the first one for this new pdu */
             fragment_add(&tcp_reassembly_table, tvb, deseg_offset,
-                         pinfo, msp->first_frame, NULL,
+                         pinfo, msp->seq, NULL,
                          0, nxtseq - deseg_seq,
                          LT_SEQ(nxtseq, msp->nxtpdu));
         }
@@ -7445,7 +7445,7 @@ dissect_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
                 fragment_head *ipfd_head;
 
                 ipfd_head = fragment_add(&tcp_reassembly_table, tvb, offset,
-                                         pinfo, msp->first_frame, NULL,
+                                         pinfo, msp->seq, NULL,
                                          tcph->th_seq - msp->seq,
                                          tcph->th_seglen,
                                          FALSE );
