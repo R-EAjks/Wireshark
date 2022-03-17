@@ -1,6 +1,6 @@
 #include <windows.h>
 #include "richedit.h"
-#include "../ui/win32/file_dlg_win32.h"
+#include "ui/win32/file_dlg_win32.h"
 
 // We should probably ensure that we're meeting the MS layout guidelines:
 // https://docs.microsoft.com/en-us/windows/win32/uxguide/vis-layout

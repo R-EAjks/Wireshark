@@ -16,7 +16,7 @@
 #ifdef HAVE_SPEEXDSP
 #include <speex/speex_resampler.h>
 #else
-#include "../../speexdsp/speex_resampler.h"
+#include "speexdsp/speex_resampler.h"
 #endif /* HAVE_SPEEXDSP */
 
 #include <QIODevice>
