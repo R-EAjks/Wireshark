@@ -21,6 +21,9 @@ sttype_range_entity(stnode_t *node);
 drange_t *
 sttype_range_drange(stnode_t *node);
 
+drange_t *
+sttype_range_drange_steal(stnode_t *node);
+
 /* Set a range */
 void
 sttype_range_set(stnode_t *node, stnode_t *field, GSList* drange_list);

@@ -137,6 +137,16 @@ sttype_range_drange(stnode_t *node)
 	return range->drange;
 }
 
+drange_t *
+sttype_range_drange_steal(stnode_t *node)
+{
+	range_t *range = node->data;
+	ws_assert_magic(range, RANGE_MAGIC);
+	drange_t  *drange = range->drange;
+	range->drange = NULL;
+	return drange;
+}
+
 void
 sttype_register_range(void)
 {

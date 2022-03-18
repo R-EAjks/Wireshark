@@ -21,13 +21,9 @@ typedef enum {
 	EMPTY,
 	FVALUE,
 	HFINFO,
-	INSN_NUMBER,
-	REGISTER,
-	INTEGER,
 	DRANGE,
-	FUNCTION_DEF,
+	FUNCDEF,
 	PCRE,
-	MEMADDR,
 } dfvm_value_type_t;
 
 typedef struct {
@@ -35,7 +31,6 @@ typedef struct {
 
 	union {
 		fvalue_t		*fvalue;
-		guint32			numeric;
 		drange_t		*drange;
 		header_field_info	*hfinfo;
 		df_func_def_t		*funcdef;
@@ -83,10 +78,10 @@ typedef enum {
 typedef struct {
 	int		id;
 	dfvm_opcode_t	op;
-	dfvm_value_t	*arg1;
-	dfvm_value_t	*arg2;
-	dfvm_value_t	*arg3;
-	dfvm_value_t	*arg4;
+	int		arg1;
+	int		arg2;
+	int		arg3;
+	int		arg4;
 } dfvm_insn_t;
 
 dfvm_insn_t*
