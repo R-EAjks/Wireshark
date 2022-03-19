@@ -47,9 +47,17 @@ dfw_append_const(dfwork_t *dfw, dfvm_value_t *val)
 static int
 dfw_append_const_hfinfo(dfwork_t *dfw, header_field_info *hfinfo)
 {
+	int addr = GPOINTER_TO_INT(g_hash_table_lookup(dfw->stored_hfinfos, hfinfo));
+	if (addr > 0)
+		return addr - 1;
+
 	dfvm_value_t *val = dfvm_value_new(HFINFO);
 	val->value.hfinfo = hfinfo;
-	return dfw_append_const(dfw, val);
+	addr = dfw_append_const(dfw, val);
+	g_hash_table_insert(dfw->stored_hfinfos,
+		hfinfo, GINT_TO_POINTER(addr + 1));
+
+	return addr;
 }
 
 /* returns register number */
@@ -540,6 +548,7 @@ dfw_gencode(dfwork_t *dfw)
 	dfw->insns = g_ptr_array_new();
 	dfw->constants = g_ptr_array_new();
 	dfw->loaded_fields = g_hash_table_new(g_direct_hash, g_direct_equal);
+	dfw->stored_hfinfos = g_hash_table_new(g_direct_hash, g_direct_equal);
 	dfw->interesting_fields = g_hash_table_new(g_direct_hash, g_direct_equal);
 	gencode(dfw, dfw->st_root);
 	dfw_append_insn(dfw, dfvm_insn_new(RETURN));

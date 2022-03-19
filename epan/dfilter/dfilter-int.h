@@ -37,6 +37,7 @@ typedef struct {
 	GPtrArray	*insns;
 	GPtrArray	*constants;
 	GHashTable	*loaded_fields;
+	GHashTable	*stored_hfinfos;
 	GHashTable	*interesting_fields;
 	int		next_insn_id;
 	int		next_register;
