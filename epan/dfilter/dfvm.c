@@ -64,6 +64,45 @@ dfvm_value_new(dfvm_value_type_t type)
 	return v;
 }
 
+static char *
+mem_value_str(dfilter_t *df, int addr)
+{
+	dfvm_value_t *memv;
+
+	memv = g_ptr_array_index(df->constants, addr);
+	switch (memv->type) {
+		case FVALUE:
+			return fvalue_to_debug_repr(NULL, memv->value.fvalue);
+		case HFINFO:
+			return ws_strdup(memv->value.hfinfo->abbrev);
+		case DRANGE:
+			return drange_tostr(memv->value.drange);
+		case FUNCDEF:
+			return ws_strdup(memv->value.funcdef->name);
+		case PCRE:
+			return ws_strdup(ws_regex_pattern(memv->value.pcre));
+		case EMPTY:
+			break;
+	}
+	ws_assert_not_reached();
+}
+
+#define OFFSET (8*3)
+
+static const char *
+indent(const char *kind)
+{
+	int len = (int)strlen("0000 ") + (int)strlen(kind);
+	int gap = OFFSET - len;
+
+	if (gap <= 0)
+		return " ";
+	if (gap <= 8)
+		return "\t";
+	if (gap <= 16)
+		return "\t\t";
+	return "\t\t\t";
+}
 
 void
 dfvm_dump(FILE *f, dfilter_t *df)
@@ -72,7 +111,8 @@ dfvm_dump(FILE *f, dfilter_t *df)
 	dfvm_insn_t	*insn;
 	dfvm_value_t	*memv;
 	int		arg1, arg2, arg3, arg4;
-	char		*str;
+	char		*str, *str2;
+	const char	*kind;
 
 	/* First dump the constant initializations */
 	fprintf(f, "Constants:\n");
@@ -80,37 +120,41 @@ dfvm_dump(FILE *f, dfilter_t *df)
 	for (id = 0; id < length; id++) {
 
 		memv = g_ptr_array_index(df->constants, id);
+		str = mem_value_str(df, id);
 
 		switch (memv->type) {
 			case FVALUE:
-				str = fvalue_to_debug_repr(NULL, memv->value.fvalue);
-				fprintf(f, "%05d <%s> %s\n",
-					id, fvalue_type_name(memv->value.fvalue),
-					str);
-				wmem_free(NULL, str);
+				kind = fvalue_type_name(memv->value.fvalue);
+				str2 = ws_strdup_printf("<%s>", kind);
+				fprintf(f, "%04d %s%s%s\n",
+					id, str2, indent(str2), str);
+				g_free(str2);
 				break;
 			case PCRE:
-				fprintf(f, "%05d <PCRE> %s\n",
-					id, ws_regex_pattern(memv->value.pcre));
+				kind = "<PCRE>";
+				fprintf(f, "%04d %s%s%s\n",
+					id, kind, indent(kind), str);
 				break;
 			case HFINFO:
-				fprintf(f, "%05d <HFINFO> %s\n",
-					id, memv->value.hfinfo->abbrev);
+				kind = "<HFINFO>";
+				fprintf(f, "%04d %s%s%s\n",
+					id, kind, indent(kind), str);
 				break;
 			case DRANGE:
-				str = drange_tostr(memv->value.drange);
-				fprintf(f, "%05d <DRANGE> %s\n",
-					id, str);
-				wmem_free(NULL, str);
+				kind = "<DRANGE>";
+				fprintf(f, "%04d %s%s%s\n",
+					id, kind, indent(kind), str);
 				break;
 			case FUNCDEF:
-				fprintf(f, "%05d <FUNCTION> %s\n",
-					id, memv->value.funcdef->name);
+				kind = "<FUNCTION>";
+				fprintf(f, "%04d %s%s%s\n",
+					id, kind, indent(kind), str);
 				break;
 			default:
 				ws_assert_not_reached();
 				break;
 		}
+		g_free(str);
 	}
 
 	fprintf(f, "\nInstructions:\n");
@@ -126,160 +170,220 @@ dfvm_dump(FILE *f, dfilter_t *df)
 
 		switch (insn->op) {
 			case CHECK_EXISTS:
-				fprintf(f, "%05d CHECK_EXISTS\tmem#%u\n",
-					id, arg1);
+				str = mem_value_str(df, arg1);
+				kind = "CHECK_EXISTS";
+				fprintf(f, "%04d %s%s%s\n",
+					id, kind, indent(kind), str);
+				g_free(str);
 				break;
 
 			case READ_TREE:
-				fprintf(f, "%05d READ_TREE\t\tmem%u -> reg#%u\n",
-					id, arg1, arg2);
+				str = mem_value_str(df, arg1);
+				kind = "READ_TREE";
+				fprintf(f, "%04d %s%s%s -> reg#%d\n",
+					id, kind, indent(kind), str, arg2);
+				g_free(str);
 				break;
 
 			case CALL_FUNCTION:
-				memv = g_ptr_array_index(df->constants, arg1);
-				fprintf(f, "%05d CALL_FUNCTION\tmem#%u[%s] (",
-					id, arg1, memv->value.funcdef->name);
+				str = mem_value_str(df, arg1);
+				kind = "CALL_FUNCTION";
+				fprintf(f, "%04d %s%s%s(",
+					id, kind, indent(kind), str);
 				if (arg3 > 0) {
-					fprintf(f, "reg#%u", arg3);
+					fprintf(f, "reg#%d", arg3);
 				}
 				if (arg4 > 0) {
-					fprintf(f, ", reg#%u", arg4);
+					fprintf(f, ", reg#%d", arg4);
 				}
-				fprintf(f, ") --> reg#%u\n", arg2);
+				fprintf(f, ") -> reg#%d\n", arg2);
+				g_free(str);
 				break;
 
 			case MK_RANGE:
-				arg3 = insn->arg3;
-				fprintf(f, "%05d MK_RANGE\t\treg#%u[mem#%u] -> reg#%u\n",
-					id, arg1, arg3, arg2);
+				str = mem_value_str(df, arg3);
+				kind = "MK_RANGE";
+				fprintf(f, "%04d %s%sreg#%d[%s] -> reg#%d\n",
+					id, kind, indent(kind), arg1, str, arg2);
+				g_free(str);
 				break;
 
 			case ALL_EQ:
-				fprintf(f, "%05d ALL_EQ\t\treg#%u === reg#%u\n",
-					id, arg1, arg2);
+				kind = "ALL_EQ";
+				fprintf(f, "%04d %s%sreg#%d === reg#%d\n",
+					id, kind, indent(kind), arg1, arg2);
 				break;
 
 			case ANY_EQ:
-				fprintf(f, "%05d ANY_EQ\t\treg#%u == reg#%u\n",
-					id, arg1, arg2);
+				kind = "ANY_EQ";
+				fprintf(f, "%04d %s%sreg#%d == reg#%d\n",
+					id, kind, indent(kind), arg1, arg2);
 				break;
 
 			case ALL_NE:
-				fprintf(f, "%05d ALL_NE\t\treg#%u != reg#%u\n",
-					id, arg1, arg2);
+				kind = "ALL_NE";
+				fprintf(f, "%04d %s%sreg#%d != reg#%d\n",
+					id, kind, indent(kind), arg1, arg2);
 				break;
 
 			case ANY_NE:
-				fprintf(f, "%05d ANY_NE\t\treg#%u !== reg#%u\n",
-					id, arg1, arg2);
+				kind = "ANY_NE";
+				fprintf(f, "%04d %s%sreg#%d !== reg#%d\n",
+					id, kind, indent(kind), arg1, arg2);
 				break;
 
 			case ANY_GT:
-				fprintf(f, "%05d ANY_GT\t\treg#%u > reg#%u\n",
-					id, arg1, arg2);
+				kind = "ANY_GT";
+				fprintf(f, "%04d %s%sreg#%d > reg#%d\n",
+					id, kind, indent(kind), arg1, arg2);
 				break;
 
 			case ANY_GE:
-				fprintf(f, "%05d ANY_GE\t\treg#%u >= reg#%u\n",
-					id, arg1, arg2);
+				kind = "ANY_GE";
+				fprintf(f, "%04d %s%sreg#%d >= reg#%d\n",
+					id, kind, indent(kind), arg1, arg2);
 				break;
 
 			case ANY_LT:
-				fprintf(f, "%05d ANY_LT\t\treg#%u < reg#%u\n",
-					id, arg1, arg2);
+				kind = "ANY_LT";
+				fprintf(f, "%04d %s%sreg#%d < reg#%d\n",
+					id, kind, indent(kind), arg1, arg2);
 				break;
 
 			case ANY_LE:
-				fprintf(f, "%05d ANY_LE\t\treg#%u <= reg#%u\n",
-					id, arg1, arg2);
+				kind = "ANY_LE";
+				fprintf(f, "%04d %s%sreg#%d < reg#%d\n",
+					id, kind, indent(kind), arg1, arg2);
 				break;
 
 			case ANY_BITWISE_AND:
-				fprintf(f, "%05d ANY_BITWISE_AND\treg#%u & reg#%u\n",
-					id, arg1, arg2);
+				kind = "ANY_BITWISE_AND";
+				fprintf(f, "%04d %s%sreg#%d & reg#%d\n",
+					id, kind, indent(kind), arg1, arg2);
 				break;
 
 			case ANY_CONTAINS:
-				fprintf(f, "%05d ANY_CONTAINS\treg#%u contains reg#%u\n",
-					id, arg1, arg2);
+				kind = "ANY_CONTAINS";
+				fprintf(f, "%04d %s%sreg#%d contains reg#%d\n",
+					id, kind, indent(kind), arg1, arg2);
 				break;
 
 			case ALL_EQ_M:
-				fprintf(f, "%05d ALL_EQ\t\treg#%u === mem#%u\n",
-					id, arg1, arg2);
+				str = mem_value_str(df, arg2);
+				kind = "ALL_EQ";
+				fprintf(f, "%04d %s%sreg#%d === %s\n",
+					id, kind, indent(kind), arg1, str);
+				g_free(str);
 				break;
 
 			case ANY_EQ_M:
-				fprintf(f, "%05d ANY_EQ\t\treg#%u == mem#%u\n",
-					id, arg1, arg2);
+				str = mem_value_str(df, arg2);
+				kind = "ANY_EQ";
+				fprintf(f, "%04d %s%sreg#%d == %s\n",
+					id, kind, indent(kind), arg1, str);
+				g_free(str);
 				break;
 
 			case ALL_NE_M:
-				fprintf(f, "%05d ALL_NE\t\treg#%u != mem#%u\n",
-					id, arg1, arg2);
+				str = mem_value_str(df, arg2);
+				kind = "ALL_NE";
+				fprintf(f, "%04d %s%sreg#%d != %s\n",
+					id, kind, indent(kind), arg1, str);
+				g_free(str);
 				break;
 
 			case ANY_NE_M:
-				fprintf(f, "%05d ANY_NE\t\treg#%u !== mem#%u\n",
-					id, arg1, arg2);
+				str = mem_value_str(df, arg2);
+				kind = "ANY_NE";
+				fprintf(f, "%04d %s%sreg#%d !== %s\n",
+					id, kind, indent(kind), arg1, str);
+				g_free(str);
 				break;
 
 			case ANY_GT_M:
-				fprintf(f, "%05d ANY_GT\t\treg#%u > mem#%u\n",
-					id, arg1, arg2);
+				str = mem_value_str(df, arg2);
+				kind = "ANY_GT";
+				fprintf(f, "%04d %s%sreg#%d > %s\n",
+					id, kind, indent(kind), arg1, str);
+				g_free(str);
 				break;
 
 			case ANY_GE_M:
-				fprintf(f, "%05d ANY_GE\t\treg#%u >= mem#%u\n",
-					id, arg1, arg2);
+				str = mem_value_str(df, arg2);
+				kind = "ANY_GE";
+				fprintf(f, "%04d %s%sreg#%d >= %s\n",
+					id, kind, indent(kind), arg1, str);
+				g_free(str);
 				break;
 
 			case ANY_LT_M:
-				fprintf(f, "%05d ANY_LT\t\treg#%u < mem#%u\n",
-					id, arg1, arg2);
+				str = mem_value_str(df, arg2);
+				kind = "ANY_LT";
+				fprintf(f, "%04d %s%sreg#%d < %s\n",
+					id, kind, indent(kind), arg1, str);
+				g_free(str);
 				break;
 
 			case ANY_LE_M:
-				fprintf(f, "%05d ANY_LE\t\treg#%u <= mem#%u\n",
-					id, arg1, arg2);
+				str = mem_value_str(df, arg2);
+				kind = "ANY_LE";
+				fprintf(f, "%04d %s%sreg#%d <= %s\n",
+					id, kind, indent(kind), arg1, str);
+				g_free(str);
 				break;
 
 			case ANY_BITWISE_AND_M:
-				fprintf(f, "%05d ANY_BITWISE_AND\treg#%u & mem#%u\n",
-					id, arg1, arg2);
+				str = mem_value_str(df, arg2);
+				kind = "ANY_BITWISE_AND";
+				fprintf(f, "%04d %s%sreg#%d & %s\n",
+					id, kind, indent(kind), arg1, str);
+				g_free(str);
 				break;
 
 			case ANY_CONTAINS_M:
-				fprintf(f, "%05d ANY_CONTAINS\treg#%u contains mem#%u\n",
-					id, arg1, arg2);
+				str = mem_value_str(df, arg2);
+				kind = "ANY_CONTAINS";
+				fprintf(f, "%04d %s%sreg#%d contains %s\n",
+					id, kind, indent(kind), arg1, str);
+				g_free(str);
 				break;
 
 			case ANY_MATCHES_M:
-				fprintf(f, "%05d ANY_MATCHES\treg#%u matches mem#%u\n",
-					id, arg1, arg2);
+				str = mem_value_str(df, arg2);
+				kind = "ANY_MATCHES";
+				fprintf(f, "%04d %s%sreg#%d ~ %s\n",
+					id, kind, indent(kind), arg1, str);
+				g_free(str);
 				break;
 
 			case ANY_INSET2_M:
-				fprintf(f, "%05d ANY_IN_RANGE\treg#%u in {mem#%u..mem#%u}\n",
-					id, arg1, arg2, arg3);
+				str = mem_value_str(df, arg2);
+				str2 = mem_value_str(df, arg3);
+				kind = "ANY_INSET2";
+				fprintf(f, "%04d %s%sreg#%d in {%s .. %s}\n",
+					id, kind, indent(kind), arg1, str, str2);
+				g_free(str);
+				g_free(str2);
 				break;
 
 			case NOT:
-				fprintf(f, "%05d NOT\n", id);
+				fprintf(f, "%04d NOT\n", id);
 				break;
 
 			case RETURN:
-				fprintf(f, "%05d RETURN\n", id);
+				fprintf(f, "%04d RETURN\n", id);
 				break;
 
 			case IF_TRUE_GOTO:
-				fprintf(f, "%05d IF-TRUE-GOTO\t%u\n",
-					id, arg1);
+				kind = "IF_TRUE_GOTO";
+				fprintf(f, "%04d %s%s%d\n",
+					id, kind, indent(kind), arg1);
 				break;
 
 			case IF_FALSE_GOTO:
-				fprintf(f, "%05d IF-FALSE-GOTO\t%u\n",
-					id, arg1);
+				kind = "IF_FALSE_GOTO";
+				fprintf(f, "%04d %s%s%d\n",
+					id, kind, indent(kind), arg1);
 				break;
 
 			default:
