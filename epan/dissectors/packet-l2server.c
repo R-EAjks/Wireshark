@@ -1067,6 +1067,32 @@ static void dissect_rlcmac_data_ind_am(proto_tree *tree, tvbuff_t *tvb, packet_i
 }
 
 
+// nr5g_l2_Srv_CELL_CONFIGt from L2ServerMessages.h
+static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                    guint offset, guint len _U_)
+{
+    // Spare
+    offset += 4;
+    // CellId
+    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // TA
+    offset += 1;
+    // RaInfoValid
+    // RachProbeReq
+    offset += 1;
+    // RA_Info
+    // if (ra_info_valid) {
+    //    guint32 bwpid = 0;
+    //    dissect_rlcmac_cmac_ra_info(tree, tvb, pinfo, offset, len, &bwpid);
+    // }
+
+    // CellCfg
+    // TODO:
+}
+
+
+
 static void dissect_create_ue_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset, guint len _U_)
 {
@@ -1313,7 +1339,7 @@ static void dissect_l1t_log_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
 
 // nr5g_rlcmac_Cmac_RA_Info_t (from nr5g-rlcmac_Cmac.h)
 static guint dissect_rlcmac_cmac_ra_info(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
-                                        guint offset _U_, guint len _U_, guint32 *bwpid)
+                                        guint offset, guint len _U_, guint32 *bwpid)
 {
     int ra_start = offset;
 
@@ -1579,7 +1605,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
 
     // DlCellCfgDed (bb_nr5g_DOWNLINK_DEDICATED_CONFIGt)
     if (dl_ded_present) {
-        guint start_offset = offset;
+        //guint start_offset = offset;
         proto_item *ded_ti = proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_dl, tvb,
                                                               offset, 0,
                                                               "", "DL Config");
@@ -1602,6 +1628,8 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         guint32 nbDlBwpIdToAdd;
         proto_tree_add_item_ret_uint(ded_tree, hf_l2server_nbdlbwpidtoadd, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nbDlBwpIdToAdd);
         offset += 1;
+    }
+#if 0
         // NbDlBwpScsSpecCarrier
         guint8 nbDlBwpScsSpecCarrier = tvb_get_guint8(tvb, offset);
         offset += 1;
@@ -1615,6 +1643,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         offset += 1;
         // DlBwpIdToDel
         offset += (1 * bb_nr5g_MAX_NB_BWPS);
+
 
         if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_INITIAL_DL_BWP_PRESENT) {
             // TODO: has several present flags and Nb fields...
@@ -1737,6 +1766,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
 
     //proto_item_set_len(config_ti, offset-start_offset);
     proto_item_set_len(config_ti, sizeof(bb_nr5g_SERV_CELL_CONFIGt));
+#endif
     return offset;
 }
 
@@ -2628,7 +2658,7 @@ static TYPE_FUN om_type_funs[] =
         { lte_l2_Srv_GETINFO_ACK,            "lte_l2_Srv_GETINFO_ACK",       dissect_sapi_type_dummy },
         { lte_l2_Srv_GETINFO_NAK,            "lte_l2_Srv_GETINFO_NAK",       dissect_sapi_type_dummy },
 
-        { nr5g_l2_Srv_CELL_CONFIG_CMD,       "nr5g_l2_Srv_CELL_CONFIG_CMD",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_CELL_CONFIG_CMD,       "nr5g_l2_Srv_CELL_CONFIG_CMD",       dissect_cell_config_cmd },
         { nr5g_l2_Srv_CELL_CONFIG_ACK,       "nr5g_l2_Srv_CELL_CONFIG_ACK",       dissect_sapi_type_dummy },
         { nr5g_l2_Srv_CELL_CONFIG_NAK,       "nr5g_l2_Srv_CELL_CONFIG_NAK",       dissect_sapi_type_dummy },
 
