@@ -19,9 +19,8 @@
 /* Passed back to user */
 struct epan_dfilter {
 	GPtrArray	*insns;
-	GPtrArray	*consts;
+	GPtrArray	*constants;
 	guint		num_registers;
-	guint		max_registers;
 	GList		**registers;
 	gboolean	*attempted_load;
 	gboolean	*owns_memory;
@@ -36,13 +35,12 @@ typedef struct {
 	gboolean	syntax_error;
 	gchar		*error_message;
 	GPtrArray	*insns;
-	GPtrArray	*consts;
+	GPtrArray	*constants;
 	GHashTable	*loaded_fields;
+	GHashTable	*stored_hfinfos;
 	GHashTable	*interesting_fields;
 	int		next_insn_id;
-	int		next_const_id;
 	int		next_register;
-	int		first_constant; /* first register used as a constant */
 	GPtrArray	*deprecated;
 } dfwork_t;
 

@@ -21,12 +21,9 @@ typedef enum {
 	EMPTY,
 	FVALUE,
 	HFINFO,
-	INSN_NUMBER,
-	REGISTER,
-	INTEGER,
 	DRANGE,
-	FUNCTION_DEF,
-	PCRE
+	FUNCDEF,
+	PCRE,
 } dfvm_value_type_t;
 
 typedef struct {
@@ -34,7 +31,6 @@ typedef struct {
 
 	union {
 		fvalue_t		*fvalue;
-		guint32			numeric;
 		drange_t		*drange;
 		header_field_info	*hfinfo;
 		df_func_def_t		*funcdef;
@@ -44,40 +40,48 @@ typedef struct {
 } dfvm_value_t;
 
 
+/* The M op codes use memory addressing. The order must be preserved.
+ * They *must* appear right after the normal register op. */
 typedef enum {
-
 	IF_TRUE_GOTO,
 	IF_FALSE_GOTO,
 	CHECK_EXISTS,
 	NOT,
 	RETURN,
 	READ_TREE,
-	PUT_FVALUE,
-	PUT_PCRE,
-	ALL_EQ,
-	ANY_EQ,
-	ALL_NE,
-	ANY_NE,
-	ANY_GT,
-	ANY_GE,
-	ANY_LT,
-	ANY_LE,
-	ANY_BITWISE_AND,
-	ANY_CONTAINS,
-	ANY_MATCHES,
-	MK_RANGE,
 	CALL_FUNCTION,
-	ANY_IN_RANGE
-
+	MK_RANGE,
+	ALL_EQ,
+	ALL_EQ_M,
+	ANY_EQ,
+	ANY_EQ_M,
+	ALL_NE,
+	ALL_NE_M,
+	ANY_NE,
+	ANY_NE_M,
+	ANY_GT,
+	ANY_GT_M,
+	ANY_GE,
+	ANY_GE_M,
+	ANY_LT,
+	ANY_LT_M,
+	ANY_LE,
+	ANY_LE_M,
+	ANY_BITWISE_AND,
+	ANY_BITWISE_AND_M,
+	ANY_CONTAINS,
+	ANY_CONTAINS_M,
+	ANY_MATCHES_M,
+	ANY_INSET2_M,
 } dfvm_opcode_t;
 
 typedef struct {
 	int		id;
 	dfvm_opcode_t	op;
-	dfvm_value_t	*arg1;
-	dfvm_value_t	*arg2;
-	dfvm_value_t	*arg3;
-	dfvm_value_t	*arg4;
+	int		arg1;
+	int		arg2;
+	int		arg3;
+	int		arg4;
 } dfvm_insn_t;
 
 dfvm_insn_t*
@@ -90,12 +94,12 @@ dfvm_value_t*
 dfvm_value_new(dfvm_value_type_t type);
 
 void
+dfvm_value_free(dfvm_value_t *v);
+
+void
 dfvm_dump(FILE *f, dfilter_t *df);
 
 gboolean
 dfvm_apply(dfilter_t *df, proto_tree *tree);
-
-void
-dfvm_init_const(dfilter_t *df);
 
 #endif
