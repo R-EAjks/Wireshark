@@ -150,6 +150,7 @@ typedef struct _e_prefs {
   color_t      gui_text_valid, gui_text_invalid, gui_text_deprecated;
   gboolean     restore_filter_after_following_stream;
   gint         gui_toolbar_main_style;
+  guint        gui_column_fixed;
   gchar       *gui_qt_font_name;
   color_t      gui_active_fg;
   color_t      gui_active_bg;

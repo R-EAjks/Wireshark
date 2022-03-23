@@ -3115,6 +3115,13 @@ prefs_register_modules(void)
     prefs_register_uint_custom_preference(gui_column_module, PRS_COL_NUM, "Number of columns",
         "Number of columns in col_list", &custom_cbs, &prefs.num_cols);
 
+    prefs_register_uint_preference(gui_column_module, "column.fixed",
+                                   "Fix columns for packet list",
+                                   "Fix columns for packet list",
+                                   10,
+                                   &prefs.gui_column_fixed);
+
+
     /* User Interface : Font */
     gui_font_module = prefs_register_subtree(gui_module, "Font", "Font", NULL);
 
@@ -4139,6 +4146,8 @@ pre_init_prefs(void)
         prefs.gui_text_deprecated.green  = 0xFFFF;
         prefs.gui_text_deprecated.blue   = 0xAFFF;
     }
+
+    prefs.gui_column_fixed    = 0;
 
     prefs.gui_geometry_save_position = TRUE;
     prefs.gui_geometry_save_size     = TRUE;

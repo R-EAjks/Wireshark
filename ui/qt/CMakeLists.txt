@@ -35,7 +35,9 @@ set(WIRESHARK_WIDGET_HEADERS
 	widgets/field_filter_edit.h
 	widgets/filter_expression_toolbar.h
 	widgets/find_line_edit.h
+	widgets/fixedcolumn_treeview.h
 	widgets/follow_stream_text.h
+	widgets/hover_treeview.h
 	widgets/interface_toolbar_lineedit.h
 	widgets/label_stack.h
 	widgets/overlay_scroll_bar.h
@@ -280,7 +282,9 @@ set(WIRESHARK_WIDGET_SRCS
 	widgets/field_filter_edit.cpp
 	widgets/filter_expression_toolbar.cpp
 	widgets/find_line_edit.cpp
+	widgets/fixedcolumn_treeview.cpp
 	widgets/follow_stream_text.cpp
+	widgets/hover_treeview.cpp
 	widgets/interface_toolbar_lineedit.cpp
 	widgets/label_stack.cpp
 	widgets/overlay_scroll_bar.cpp

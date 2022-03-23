@@ -225,7 +225,7 @@ packet_list_multi_select_active(void)
 #define MIN_COL_WIDTH_STR "MMMMMM"
 
 PacketList::PacketList(QWidget *parent) :
-    QTreeView(parent),
+    FixedColumnTreeView(parent),
     proto_tree_(NULL),
     cap_file_(NULL),
     ctx_column_(-1),
@@ -257,6 +257,7 @@ PacketList::PacketList(QWidget *parent) :
     connect(packet_list_header_, &PacketListHeader::showColumnPreferences, this, &PacketList::showProtocolPreferences);
     connect(packet_list_header_, &PacketListHeader::editColumn, this, &PacketList::editColumn);
     connect(packet_list_header_, &PacketListHeader::columnsChanged, this, &PacketList::columnsChanged);
+    connect(packet_list_header_, &PacketListHeader::fixColumns, this, &PacketList::ctxResetFixedColumns);
     setHeader(packet_list_header_);
 
 #if QT_VERSION >= QT_VERSION_CHECK(5, 11, 0)
@@ -276,6 +277,8 @@ PacketList::PacketList(QWidget *parent) :
 
     packet_list_model_ = new PacketListModel(this, cap_file_);
     setModel(packet_list_model_);
+
+    setFixedColumn(static_cast<int>(prefs.gui_column_fixed) - 1);
 
     Q_ASSERT(gbl_cur_packet_list == Q_NULLPTR);
     gbl_cur_packet_list = this;
@@ -406,7 +409,7 @@ QString PacketList::joinSummaryRow(QStringList col_parts, int row, SummaryCopyTy
 
 void PacketList::drawRow (QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
 {
-    QTreeView::drawRow(painter, option, index);
+    FixedColumnTreeView::drawRow(painter, option, index);
 
     if (prefs.gui_qt_packet_list_separator) {
         QRect rect = visualRect(index);
@@ -470,7 +473,7 @@ QList<int> PacketList::selectedRows(bool useFrameNum)
 
 void PacketList::selectionChanged (const QItemSelection & selected, const QItemSelection & deselected)
 {
-    QTreeView::selectionChanged(selected, deselected);
+    FixedColumnTreeView::selectionChanged(selected, deselected);
 
     if (!cap_file_) return;
 
@@ -592,7 +595,7 @@ void PacketList::selectionChanged (const QItemSelection & selected, const QItemS
     }
 }
 
-void PacketList::contextMenuEvent(QContextMenuEvent *event)
+QMenu * PacketList::contextMenu(QModelIndex ctxIndex)
 {
     const char *module_name = NULL;
 
@@ -630,8 +633,6 @@ void PacketList::contextMenuEvent(QContextMenuEvent *event)
         }
         g_ptr_array_free(finfo_array, TRUE);
     }
-
-    QModelIndex ctxIndex = indexAt(event->pos());
 
     if (selectionModel() && selectionModel()->selectedRows(0).count() > 1)
         selectionModel()->select(ctxIndex, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
@@ -731,6 +732,13 @@ void PacketList::contextMenuEvent(QContextMenuEvent *event)
     action = window()->findChild<QAction *>("actionViewShowPacketInNewWindow");
     ctx_menu->addAction(action);
 
+    ctx_menu->addSeparator();
+    action = ctx_menu->addAction(tr("Freeze column"));
+    action->setProperty("column", QVariant::fromValue<int>(ctxIndex.column()));
+    connect(action, &QAction::triggered, this, &PacketList::ctxFixColumn);
+    action = ctx_menu->addAction(tr("Unfreeze all columns"));
+    action->setEnabled(isColumnFixed());
+    connect(action, &QAction::triggered, this, &PacketList::ctxResetFixedColumns);
 
     // Set menu sensitivity for the current column and set action data.
     if (frameData)
@@ -738,7 +746,29 @@ void PacketList::contextMenuEvent(QContextMenuEvent *event)
     else
         emit framesSelected(QList<int>());
 
-    ctx_menu->exec(event->globalPos());
+    return ctx_menu;
+}
+
+void PacketList::ctxFixColumn()
+{
+    QAction * action = qobject_cast<QAction *>(sender());
+    if ( ! action )
+        return;
+    bool ok = false;
+    int column = action->property("column").toInt(&ok);
+
+    if ( ok && column >= -1 )
+        ctxResetFixedColumns(column);
+}
+
+void PacketList::ctxResetFixedColumns(int column)
+{
+    if ( column < model()->columnCount() )
+    {
+        setFixedColumn(column);
+        prefs.gui_column_fixed = static_cast<guint>(column + 1);
+        prefs_main_write();
+    }
 }
 
 void PacketList::ctxDecodeAsDialog()
@@ -778,7 +808,7 @@ void PacketList::timerEvent(QTimerEvent *event)
             if (create_far_overlay_) drawFarOverlay();
         }
     } else {
-        QTreeView::timerEvent(event);
+        FixedColumnTreeView::timerEvent(event);
     }
 }
 
@@ -788,13 +818,13 @@ void PacketList::paintEvent(QPaintEvent *event)
     // require a new overlay, e.g. page up/down, scrolling, column
     // resizing, etc.
     create_near_overlay_ = true;
-    QTreeView::paintEvent(event);
+    FixedColumnTreeView::paintEvent(event);
 }
 
 void PacketList::mousePressEvent (QMouseEvent *event)
 {
     setAutoScroll(false);
-    QTreeView::mousePressEvent(event);
+    FixedColumnTreeView::mousePressEvent(event);
     setAutoScroll(true);
 
     QModelIndex curIndex = indexAt(event->pos());
@@ -818,7 +848,7 @@ void PacketList::mousePressEvent (QMouseEvent *event)
 }
 
 void PacketList::mouseReleaseEvent(QMouseEvent *event) {
-    QTreeView::mouseReleaseEvent(event);
+    FixedColumnTreeView::mouseReleaseEvent(event);
 
     mouse_pressed_at_ = QModelIndex();
 }
@@ -937,7 +967,7 @@ void PacketList::resizeEvent(QResizeEvent *event)
 {
     create_near_overlay_ = true;
     create_far_overlay_ = true;
-    QTreeView::resizeEvent(event);
+    FixedColumnTreeView::resizeEvent(event);
 }
 
 void PacketList::setColumnVisibility()
@@ -954,7 +984,7 @@ int PacketList::sizeHintForColumn(int column) const
     int size_hint = 0;
 
     // This is a bit hacky but Qt does a fine job of column sizing and
-    // reimplementing QTreeView::sizeHintForColumn seems like a worse idea.
+    // reimplementing FixedColumnTreeView::sizeHintForColumn seems like a worse idea.
     if (itemDelegateForColumn(column)) {
         QStyleOptionViewItem option;
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
@@ -966,7 +996,7 @@ int PacketList::sizeHintForColumn(int column) const
         // on macOS and Linux. We might want to add Q_OS_... #ifdefs accordingly.
         size_hint = itemDelegateForColumn(column)->sizeHint(option, QModelIndex()).width();
     }
-    size_hint += QTreeView::sizeHintForColumn(column); // Decoration padding
+    size_hint += FixedColumnTreeView::sizeHintForColumn(column); // Decoration padding
     return size_hint;
 }
 
@@ -1157,6 +1187,9 @@ void PacketList::preferencesChanged()
         }
     }
 
+    /* Set fixed column from preferences */
+    setFixedColumn(static_cast<int>(prefs.gui_column_fixed) - 1);
+
     // Elide mode.
     // This sets the mode for the entire view. If we want to make this setting
     // per-column we'll either have to generalize RelatedPacketDelegate so that
@@ -1285,11 +1318,6 @@ void PacketList::writeRecent(FILE *rf) {
         }
     }
     fprintf (rf, "\n");
-}
-
-bool PacketList::contextMenuActive()
-{
-    return ctx_column_ >= 0 ? true : false;
 }
 
 QString PacketList::getFilterFromRowAndColumn(QModelIndex idx)
@@ -1795,7 +1823,7 @@ void PacketList::sectionResized(int col, int, int new_width)
         // visible.
         //
         // Don't set column width when columns changed or setting column
-        // visibility because we may get a sectionReized() from QTreeView
+        // visibility because we may get a sectionReized() from FixedColumnTreeView
         // with values from a old columns layout.
         //
         // Don't set column width when hiding a column.
@@ -2130,6 +2158,6 @@ void PacketList::drawFarOverlay()
 
 void PacketList::rowsInserted(const QModelIndex &parent, int start, int end)
 {
-    QTreeView::rowsInserted(parent, start, end);
+    FixedColumnTreeView::rowsInserted(parent, start, end);
     rows_inserted_ = true;
 }

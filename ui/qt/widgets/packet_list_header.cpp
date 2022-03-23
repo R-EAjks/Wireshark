@@ -182,6 +182,14 @@ void PacketListHeader::contextMenuEvent(QContextMenuEvent *event)
 {
     int sectionIdx = logicalIndexAt(event->pos());
     char xalign = recent_get_column_xalign(sectionIdx);
+    PacketList * par = qobject_cast<PacketList *>(parent());
+    if ( par )
+    {
+        QModelIndex idx = par->indexAt(event->pos());
+        if ( idx.isValid() )
+            sectionIdx = idx.column();
+    }
+
     QAction * action = Q_NULLPTR;
     QMenu * contextMenu = new QMenu(this);
     contextMenu->setProperty("column", QVariant::fromValue(sectionIdx));
@@ -250,8 +258,33 @@ void PacketListHeader::contextMenuEvent(QContextMenuEvent *event)
     action = contextMenu->addAction(tr("Remove this Column"));
     action->setEnabled(sectionIdx >= 0 && count() > 2);
     connect(action, &QAction::triggered, this, &PacketListHeader::removeColumn);
+    contextMenu->addSeparator();
+
+    action = contextMenu->addAction(tr("Freeze column"));
+    connect(action, &QAction::triggered, this, &PacketListHeader::ctxFixColumn);
+    action = contextMenu->addAction(tr("Unfreeze all columns"));
+    if ( qobject_cast<PacketList*>(parent()))
+        action->setEnabled(qobject_cast<PacketList*>(parent())->isColumnFixed());
+    connect(action, &QAction::triggered, this, &PacketListHeader::ctxResetFixedColumns);
 
     contextMenu->popup(viewport()->mapToGlobal(event->pos()));
+}
+
+void PacketListHeader::ctxFixColumn()
+{
+    QAction * action = qobject_cast<QAction *>(sender());
+    if ( ! action || ! qobject_cast<QMenu *>(action->parent()) )
+        return;
+
+    bool correct = false;
+    int section = action->parent()->property("column").toInt(&correct);
+    if ( correct && section >= 0)
+        emit fixColumns(section);
+}
+
+void PacketListHeader::ctxResetFixedColumns()
+{
+    emit fixColumns(-1);
 }
 
 void PacketListHeader::setSectionVisibility()
