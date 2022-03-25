@@ -649,6 +649,18 @@ dissect_pdcp_uu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data 
                     }
                     break;
 
+                    case Bearer_CCCH:
+                    {
+                        pdcp_tvb = tvb_new_subset_remaining(tvb, offset);
+                        dissector_handle_t rrc_handle;
+                        rrc_handle = find_dissector_add_dependency((p_pdcp_nr_info->direction) ?
+                                                                       "nr-rrc.dl.ccch" :
+                                                                       "nr-rrc.ul.ccch",
+                                                                   proto_pdcp_nr);
+                        call_dissector_only(rrc_handle, pdcp_tvb, pinfo, tree, NULL);
+                    }
+                    break;
+
                 default:
                     // Ignoring.
                     break;

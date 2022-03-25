@@ -1906,7 +1906,7 @@ static int dissect_pdcp_nr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
     /* If no RLC layer in this frame, query RLC table for configured drb settings */
     if (!p_get_proto_data(wmem_file_scope(), pinfo, proto_rlc_nr, 0)) {
         /* Signalling plane is always 12 bits SN */
-        if (p_pdcp_info->plane == NR_SIGNALING_PLANE) {
+        if (p_pdcp_info->plane == NR_SIGNALING_PLANE && p_pdcp_info->bearerType == Bearer_DCCH) {
             p_pdcp_info->seqnum_length = PDCP_NR_SN_LENGTH_12_BITS;
         }
         /* If DRB channel, query rlc mappings (from RRC) */
@@ -1944,7 +1944,7 @@ static int dissect_pdcp_nr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
     }
 
     /* MACI always present for SRBs */
-    if (p_pdcp_info->plane == NR_SIGNALING_PLANE) {
+    if ((p_pdcp_info->plane == NR_SIGNALING_PLANE) && (p_pdcp_info->bearerType == Bearer_DCCH)) {
         p_pdcp_info->maci_present = TRUE;
     }
 
@@ -2055,25 +2055,27 @@ static int dissect_pdcp_nr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
     /*****************************/
     /* Signalling plane messages */
     if (p_pdcp_info->plane == NR_SIGNALING_PLANE) {
-        /* Always 12 bits SN */
-        /* Verify 4 reserved bits are 0 */
-        guint8 reserved = (first_byte & 0xf0) >> 4;
-        ti = proto_tree_add_item(pdcp_tree, hf_pdcp_nr_control_plane_reserved,
-                                 tvb, offset, 1, ENC_BIG_ENDIAN);
-        if (reserved != 0) {
-            expert_add_info_format(pinfo, ti, &ei_pdcp_nr_reserved_bits_not_zero,
-                                   "PDCP signalling header reserved bits not zero");
-        }
+        if (p_pdcp_info->seqnum_length != 0) {
+            /* Always 12 bits SN */
+            /* Verify 4 reserved bits are 0 */
+            guint8 reserved = (first_byte & 0xf0) >> 4;
+            ti = proto_tree_add_item(pdcp_tree, hf_pdcp_nr_control_plane_reserved,
+                                     tvb, offset, 1, ENC_BIG_ENDIAN);
+            if (reserved != 0) {
+                expert_add_info_format(pinfo, ti, &ei_pdcp_nr_reserved_bits_not_zero,
+                                       "PDCP signalling header reserved bits not zero");
+            }
 
-        /* 12-bit sequence number */
-        proto_tree_add_item_ret_uint(pdcp_tree, hf_pdcp_nr_seq_num_12, tvb, offset, 2, ENC_BIG_ENDIAN, &seqnum);
-        seqnum_set = TRUE;
-        write_pdu_label_and_info(root_ti, pinfo, " (SN=%-4u)", seqnum);
-        offset += 2;
+            /* 12-bit sequence number */
+            proto_tree_add_item_ret_uint(pdcp_tree, hf_pdcp_nr_seq_num_12, tvb, offset, 2, ENC_BIG_ENDIAN, &seqnum);
+            seqnum_set = TRUE;
+            write_pdu_label_and_info(root_ti, pinfo, " (SN=%-4u)", seqnum);
+            offset += 2;
 
-        if (tvb_captured_length_remaining(tvb, offset) == 0) {
-            /* Only PDCP header was captured, stop dissection here */
-            return offset;
+            if (tvb_captured_length_remaining(tvb, offset) == 0) {
+                /* Only PDCP header was captured, stop dissection here */
+                return offset;
+            }
         }
     }
     else if (p_pdcp_info->plane == NR_USER_PLANE) {

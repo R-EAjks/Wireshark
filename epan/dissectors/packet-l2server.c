@@ -150,6 +150,9 @@ static int hf_l2server_traffic_tm = -1;
 static int hf_l2server_traffic_um = -1;
 static int hf_l2server_traffic_am = -1;
 static int hf_l2server_traffic_cnf = -1;
+static int hf_l2server_traffic_ul = -1;
+static int hf_l2server_traffic_dl = -1;
+
 
 static int hf_l2server_rach = -1;
 static int hf_l2server_reestablishment = -1;
@@ -809,9 +812,6 @@ static void dissect_rlcmac_data_req(proto_tree *tree, tvbuff_t *tvb, packet_info
     offset += 1;
     /* enums align.. */
     p_pdcp_nr_info->plane = (enum pdcp_nr_plane)rbtype;
-    if (p_pdcp_nr_info->plane == NR_USER_PLANE) {
-        p_pdcp_nr_info->bearerType = Bearer_DCCH;
-    }
 
     /* SN Length */
     p_pdcp_nr_info->seqnum_length = global_pdcp_drb_sn_length;
@@ -821,8 +821,25 @@ static void dissect_rlcmac_data_req(proto_tree *tree, tvbuff_t *tvb, packet_info
                                  (guint32*)&p_pdcp_nr_info->bearerId);
     offset++;
     /* LCH */
-    proto_tree_add_item(tree, hf_l2server_lch, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 lch;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_lch, tvb, offset, 1, ENC_LITTLE_ENDIAN, &lch);
     offset += 1;
+
+    if (p_pdcp_nr_info->plane == NR_USER_PLANE) {
+        p_pdcp_nr_info->bearerType = Bearer_DCCH;
+    }
+    else {
+        p_pdcp_nr_info->seqnum_length = 12;
+
+        // TODO: switch with all types (allowed in this direction).
+        if (lch == 0x4) {
+            p_pdcp_nr_info->bearerType = Bearer_CCCH;
+        }
+        else {
+            p_pdcp_nr_info->bearerType = Bearer_DCCH;
+        }
+    }
+
     /* Ref(erence for CNF) */
     proto_tree_add_item(tree, hf_l2server_ref, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -845,10 +862,15 @@ static void dissect_rlcmac_data_req(proto_tree *tree, tvbuff_t *tvb, packet_info
     /* Traffic filter */
     proto_item *traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic, tvb, 0, 0, ENC_NA);
     proto_item_set_hidden(traffic_ti);
+    traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic_ul, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(traffic_ti);
+
     switch (mode) {
         case TM:
             traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic_tm, tvb, 0, 0, ENC_NA);
             proto_item_set_hidden(traffic_ti);
+            p_pdcp_nr_info->seqnum_length = 0;
+            p_pdcp_nr_info->maci_present = FALSE;
             break;
         case UM:
             traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic_um, tvb, 0, 0, ENC_NA);
@@ -863,9 +885,21 @@ static void dissect_rlcmac_data_req(proto_tree *tree, tvbuff_t *tvb, packet_info
     proto_item *pdcp_ti = proto_tree_add_item(tree, hf_l2server_pdcp_pdu, tvb, offset, len+8-offset, ENC_LITTLE_ENDIAN);
 
     /* Optionally call pdcp-nr dissector for this payload. */
+
     if (global_call_pdcp_for_drb && p_pdcp_nr_info->plane == NR_USER_PLANE) {
+        // User-plane.
         tvbuff_t *pdcp_tvb = tvb_new_subset_remaining(tvb, offset);
         p_pdcp_nr_info->pdu_length = tvb_reported_length(pdcp_tvb);
+        call_dissector_only(pdcp_nr_handle, pdcp_tvb, pinfo, tree, NULL);
+
+        proto_item_set_hidden(pdcp_ti);
+    }
+    // TODO: need more prefs...
+    else if (p_pdcp_nr_info->plane == NR_SIGNALING_PLANE) {
+        printf("%u: calling pdcp for signalling & UL\n", pinfo->num);
+        tvbuff_t *pdcp_tvb = tvb_new_subset_remaining(tvb, offset);
+        p_pdcp_nr_info->pdu_length = tvb_reported_length(pdcp_tvb);
+        printf("Calling with length %u\n", p_pdcp_nr_info->pdu_length);
         call_dissector_only(pdcp_nr_handle, pdcp_tvb, pinfo, tree, NULL);
 
         proto_item_set_hidden(pdcp_ti);
@@ -954,17 +988,7 @@ static void dissect_rlcmac_data_ind(proto_tree *tree, tvbuff_t *tvb, packet_info
 
     /* RbType */
     guint32 rbtype;
-    proto_tree_add_item_ret_uint(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN,
-                                 &rbtype);
-    /* enums align.. */
-    p_pdcp_nr_info->plane = (enum pdcp_nr_plane)rbtype;
-    if (p_pdcp_nr_info->plane == NR_USER_PLANE) {
-        p_pdcp_nr_info->bearerType = Bearer_DCCH;
-    }
-    else {
-        // TODO: what about SIBs and PCH?
-        p_pdcp_nr_info->bearerType = Bearer_BCCH_BCH;
-    }
+    proto_tree_add_item_ret_uint(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN, &rbtype);
     offset += 1;
 
     /* RbId */
@@ -972,8 +996,34 @@ static void dissect_rlcmac_data_ind(proto_tree *tree, tvbuff_t *tvb, packet_info
                                  (guint32*)&p_pdcp_nr_info->bearerId);
     offset++;
     /* LCH */
-    proto_tree_add_item(tree, hf_l2server_lch, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 lch;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_lch, tvb, offset, 1, ENC_LITTLE_ENDIAN, &lch);
     offset += 1;
+
+    /* enums align.. */
+    p_pdcp_nr_info->plane = (enum pdcp_nr_plane)rbtype;
+    if (p_pdcp_nr_info->plane == NR_USER_PLANE) {
+        p_pdcp_nr_info->bearerType = Bearer_DCCH;
+    }
+    else {
+        p_pdcp_nr_info->seqnum_length = 12;
+
+        // TODO: switch with all types (allowed in this direction).
+        if (lch == 0x4) {
+            p_pdcp_nr_info->bearerType = Bearer_CCCH;
+        }
+        else if (lch == 0x2) {
+            p_pdcp_nr_info->bearerType = Bearer_BCCH_DL_SCH;
+        }
+        else if (lch ==  0x1) {
+            // TODO: what about SIBs and PCH?
+            p_pdcp_nr_info->bearerType = Bearer_BCCH_BCH;
+        }
+        else {
+            p_pdcp_nr_info->bearerType = Bearer_DCCH;
+        }
+    }
+
 
     /* ReEst */
     proto_tree_add_item(tree, hf_l2server_reest, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -1005,10 +1055,14 @@ static void dissect_rlcmac_data_ind(proto_tree *tree, tvbuff_t *tvb, packet_info
     /* Traffic filter */
     proto_item *traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic, tvb, 0, 0, ENC_NA);
     proto_item_set_hidden(traffic_ti);
+    traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic_dl, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(traffic_ti);
+
     switch (mode) {
         case TM:
             traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic_tm, tvb, 0, 0, ENC_NA);
             proto_item_set_hidden(traffic_ti);
+            p_pdcp_nr_info->seqnum_length = 0;
             break;
         case UM:
             traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic_um, tvb, 0, 0, ENC_NA);
@@ -1039,7 +1093,13 @@ static void dissect_rlcmac_data_ind(proto_tree *tree, tvbuff_t *tvb, packet_info
         p_pdcp_nr_info->maci_present = FALSE;
 
         /* Call dissector with data */
-        tvbuff_t *pdcp_tvb = tvb_new_subset_remaining(tvb, offset);
+        tvbuff_t *pdcp_tvb;
+        if (mode == TM) {
+            pdcp_tvb = tvb_new_subset_remaining(tvb, offset);
+        }
+        else {
+            pdcp_tvb = tvb_new_subset_remaining(tvb, offset);
+        }
         p_pdcp_nr_info->pdu_length = tvb_reported_length(pdcp_tvb);
         call_dissector_only(pdcp_nr_handle, pdcp_tvb, pinfo, tree, NULL);
 
@@ -3446,6 +3506,14 @@ proto_register_l2server(void)
       { &hf_l2server_traffic_cnf,
         { "Traffic CNF", "l2server.traffic.cnf", FT_NONE, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_traffic_ul,
+        { "Traffic UL", "l2server.traffic.ul", FT_NONE, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_traffic_dl,
+        { "Traffic DL", "l2server.traffic.dl", FT_NONE, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+
       { &hf_l2server_pdcp_pdu,
         { "PDCP PDU", "l2server.pdcp-pdu", FT_BYTES, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
@@ -3922,7 +3990,7 @@ proto_register_l2server(void)
         "",
         &global_call_pdcp_for_drb);
 
-    prefs_register_bool_preference(l2server_module, "call_pdcp_tm", "Call PDCP for TM PSUs",
+    prefs_register_bool_preference(l2server_module, "call_pdcp_tm", "Call PDCP for TM PDUs",
         "",
         &global_call_pdcp_for_tm);
 
