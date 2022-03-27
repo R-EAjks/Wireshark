@@ -1665,7 +1665,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
 
     // DlCellCfgDed (bb_nr5g_DOWNLINK_DEDICATED_CONFIGt)
     if (dl_ded_present) {
-        //guint start_offset = offset;
+        guint start_offset = offset;
         proto_item *ded_ti = proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_dl, tvb,
                                                               offset, 0,
                                                               "", "DL Config");
@@ -1688,8 +1688,8 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         guint32 nbDlBwpIdToAdd;
         proto_tree_add_item_ret_uint(ded_tree, hf_l2server_nbdlbwpidtoadd, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nbDlBwpIdToAdd);
         offset += 1;
-    }
-#if 0
+//    }
+#if 1
         // NbDlBwpScsSpecCarrier
         guint8 nbDlBwpScsSpecCarrier = tvb_get_guint8(tvb, offset);
         offset += 1;
@@ -1780,45 +1780,45 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
 
     // CrossCarrierSchedulingConfig (bb_nr5g_CROSS_CARRIER_SCHEDULING_CONFIGt)
     if (cross_carrier_sched_present) {
-        /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_cross_carrier_sched_present, tvb,
+        /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_cross_carrier_sched, tvb,
                                                               offset, sizeof(bb_nr5g_UPLINK_DEDICATED_CONFIGt),
-                                                              "", "SUP UL Config");
+                                                              "", "Cross Carrier Sched");
         //proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_cross_carrier_sched);
         offset += sizeof(bb_nr5g_CROSS_CARRIER_SCHEDULING_CONFIGt);
     }
 
     // LteCrsToMatchAround (bb_nr5g_RATE_MATCH_PATTERN_LTEt)
     if (lte_crs_tomatcharound_present) {
-        /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_present, tvb,
+        /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_lte_crs_tomatcharound, tvb,
                                                               offset, sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt),
-                                                              "", "SUP UL Config");
+                                                              "", "tomatcharound");
         //proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_lte_crs_tomatcharound);
         offset += sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt);
     }
 
     // DormantBWP_Config_r16 (bb_nr5g_DORMANTBWP_CONFIGt)
     if (dormantbwp_present) {
-        /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_dormantbwp_present, tvb,
+        /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_dormantbwp, tvb,
                                                               offset, sizeof(bb_nr5g_DORMANTBWP_CONFIGt),
-                                                              "", "SUP UL Config");
+                                                              "", "Dormant-BWP Config");
         //proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_dormantbwp);
         offset += sizeof(bb_nr5g_DORMANTBWP_CONFIGt);
     }
 
     // LteCrsPatternList1_r16 (bb_nr5g_RATE_MATCH_PATTERN_LTEt)
     if (lte_crs_pattern_list1_present) {
-        /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_present, tvb,
+        /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list1, tvb,
                                                               offset, sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt),
-                                                              "", "SUP UL Config");
+                                                              "", "LTE CRS Pattern List1");
         //proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_lte_crs_pattern_list1);
         offset += sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt);
     }
 
     // LteCrsPatternList2_r16 (bb_nr5g_RATE_MATCH_PATTERN_LTEt)
     if (lte_crs_pattern_list2_present) {
-        /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_present, tvb,
+        /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list2, tvb,
                                                               offset, sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt),
-                                                              "", "SUP UL Config");
+                                                              "", "LTE CRS Pattern List2");
         //proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_lte_crs_pattern_list2);
         offset += sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt);
     }

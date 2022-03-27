@@ -1048,7 +1048,7 @@ proto_register_pacs(void)
         },
         { &hf_pacs_qpg,
             {   "QPG", "pacs.qpg", FT_UINT16, BASE_DEC,
-                NULL, 0x7ff, "256-511", HFILL }
+                NULL, 0x07ff, "256-511", HFILL }
         },
 
         /* FPGA Header */
