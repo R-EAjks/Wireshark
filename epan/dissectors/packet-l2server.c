@@ -152,6 +152,7 @@ static int hf_l2server_traffic_am = -1;
 static int hf_l2server_traffic_cnf = -1;
 static int hf_l2server_traffic_ul = -1;
 static int hf_l2server_traffic_dl = -1;
+static int hf_l2server_traffic_bch = -1;
 
 
 static int hf_l2server_rach = -1;
@@ -999,6 +1000,19 @@ static void dissect_rlcmac_data_ind(proto_tree *tree, tvbuff_t *tvb, packet_info
     guint32 lch;
     proto_tree_add_item_ret_uint(tree, hf_l2server_lch, tvb, offset, 1, ENC_LITTLE_ENDIAN, &lch);
     offset += 1;
+
+    /* Filter for BCH traffic */
+    switch (lch) {
+        case 0x1:
+        case 0x2:
+        {
+            proto_item *bch_ti = proto_tree_add_item(tree, hf_l2server_traffic_bch, tvb, 0, 0, ENC_NA);
+            proto_item_set_hidden(bch_ti);
+            break;
+        }
+        default:
+            break;
+    }
 
     /* enums align.. */
     p_pdcp_nr_info->plane = (enum pdcp_nr_plane)rbtype;
@@ -3511,6 +3525,9 @@ proto_register_l2server(void)
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_traffic_dl,
         { "Traffic DL", "l2server.traffic.dl", FT_NONE, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_traffic_bch,
+        { "Traffic BCH", "l2server.traffic.bch", FT_NONE, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
 
 
