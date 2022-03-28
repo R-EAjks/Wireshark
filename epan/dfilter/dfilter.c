@@ -205,6 +205,7 @@ dfilter_free(dfilter_t *df)
 	g_free(df->registers);
 	g_free(df->attempted_load);
 	g_free(df->free_registers);
+	g_free(df->expanded_text);
 	g_free(df);
 }
 
@@ -444,6 +445,7 @@ dfilter_compile_real(const gchar *text, dfilter_t **dfp,
 		dfw->insns = NULL;
 		dfilter->interesting_fields = dfw_interesting_fields(dfw,
 			&dfilter->num_interesting_fields);
+		dfilter->expanded_text = ws_strdup(expanded_text);
 
 		/* Initialize run-time space */
 		dfilter->num_registers = dfw->next_register;
@@ -541,6 +543,28 @@ dfilter_dump(dfilter_t *df)
 		}
 		printf("\n");
 	}
+}
+
+void
+dfilter_log_full(const char *domain, enum ws_log_level level,
+			const char *file, long line, const char *func,
+			dfilter_t *df, const char *msg)
+{
+	if (!ws_log_msg_is_active(domain, level))
+		return;
+
+	if (df == NULL) {
+		ws_log_write_always_full(domain, level, file, line, func,
+				"%s: NULL display filter", msg ? msg : "?");
+		return;
+	}
+
+	char *str = dfvm_dump_str(NULL, df);
+	if (G_UNLIKELY(msg == NULL))
+		ws_log_write_always_full(domain, level, file, line, func, "\n%s", str);
+	else
+		ws_log_write_always_full(domain, level, file, line, func, "%s\n%s", msg, str);
+	g_free(str);
 }
 
 /*
