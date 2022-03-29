@@ -196,6 +196,8 @@ static int hf_l2server_nb_scell_cfg_add = -1;
 static int hf_l2server_nb_scell_cfg_del = -1;
 
 static int hf_l2server_ph_cell_config = -1;
+static int hf_l2server_ph_cell_dcp_config_present = -1;
+static int hf_l2server_ph_pdcch_blind_detection_present = -1;
 static int hf_l2server_harq_ack_spatial_bundling_pucch = -1;
 static int hf_l2server_harq_ack_spatial_bundling_pusch = -1;
 static int hf_l2server_pmax_nr = -1;
@@ -1504,6 +1506,10 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     guint32 fieldmask;
     proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_4, tvb, offset, 4,
                                  ENC_LITTLE_ENDIAN, &fieldmask);
+    gboolean dcp_config_present, pdcch_blind_detection_present;
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_ph_cell_dcp_config_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dcp_config_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_ph_pdcch_blind_detection_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &pdcch_blind_detection_present);
+
     offset += 4;
 
     // HarqACKSpatialBundlingPUCCH
@@ -1519,11 +1525,11 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     proto_tree_add_item(config_tree, hf_l2server_pdsch_harq_ack_codebook, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
 
-    // TODO:
     // McsRntValid
     offset += 1;
     // McsCRnti
     offset += 2;
+
     // PUE_FR1 [30..33]
     offset += 1;
     // TpcSrsRNTI
@@ -1537,25 +1543,24 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     // CsRNTI
     offset += 4;
 
-    // Pdcch_BlindDetection
+    // Pdcch_BlindDetection (1..15)
     offset += 1;
 
     // TODO lots more...
     offset += 22;
 
-    if (fieldmask & bb_nr5g_STRUCT_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16_PRESENT) {
+    if (dcp_config_present) {
+        // N.B. Size of this is fixed.
         offset += sizeof(bb_nr5g_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16t);
     }
 
-    if (fieldmask & bb_nr5g_STRUCT_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_PRESENT) {
-        //printf("blind detection present\n");
+    if (pdcch_blind_detection_present) {
+        // N.B. Size of this is fixed.
         offset += sizeof(bb_nr5g_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16t);
     }
 
-    //printf("ph cell config len is %u\n", offset-start_offset);
     proto_item_set_len(config_ti, offset-start_offset);
 
-    //offset = start_offset + sizeof(bb_nr5g_PH_CELL_GROUP_CONFIGt);
     return offset;
 }
 
@@ -3650,6 +3655,12 @@ proto_register_l2server(void)
       { &hf_l2server_ph_cell_config,
         { "PH Cell Config", "l2server.ph-cell-config", FT_STRING, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ph_cell_dcp_config_present,
+        { "DCP Config Present", "l2server.field-mask.dcp-config-present", FT_BOOLEAN, 8,
+          NULL, bb_nr5g_STRUCT_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16_PRESENT, NULL, HFILL }},
+      { &hf_l2server_ph_pdcch_blind_detection_present,
+        { "PDCCh Blind Detection Present", "l2server.field-mask.pdcch-blind-detection-present", FT_BOOLEAN, 8,
+          NULL, bb_nr5g_STRUCT_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_PRESENT, NULL, HFILL }},
       { &hf_l2server_harq_ack_spatial_bundling_pucch,
         { "HARQ ACK Spacial Bundling PUCCH", "l2server.harq-ack-spatial-bundling-pucch", FT_UINT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
