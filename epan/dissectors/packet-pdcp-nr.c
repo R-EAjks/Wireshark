@@ -2369,6 +2369,7 @@ static int dissect_pdcp_nr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
                 proto_item_append_text(sdap_ti, " (RDI=%s, RQI=%s",
                                        tfs_get_string(rdi, &sdap_rdi), tfs_get_string(rqi, &sdap_rqi));
             }
+            /* QFI is common to both directions */
             proto_tree_add_item_ret_uint(sdap_tree, hf_sdap_qfi, payload_tvb, offset, 1, ENC_NA, &qfi);
             offset++;
             proto_item_append_text(sdap_ti, "  QFI=%u)", qfi);

@@ -2695,6 +2695,15 @@ static void dissect_rcp_set_ue_index_ack(proto_tree *tree, tvbuff_t *tvb, packet
     offset += 4;
 }
 
+static void dissect_cmac_reset_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                   guint offset, guint len _U_)
+{
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+}
+
+
 
 /************************************************************************************/
 
@@ -2903,7 +2912,7 @@ static TYPE_FUN nr_rlcmac_cmac_type_funs[] =
     { nr5g_rlcmac_Cmac_CELL_RRC_STATE_CFG_ACK, "nr5g_rlcmac_Cmac_CELL_RRC_STATE_CFG_ACK",       dissect_sapi_type_dummy /* TODO */},
     { nr5g_rlcmac_Cmac_CELL_RRC_STATE_CFG_NAK, "nr5g_rlcmac_Cmac_CELL_RRC_STATE_CFG_NAK",       dissect_sapi_type_dummy /* TODO */},
 
-    { nr5g_rlcmac_Cmac_RESET_CMD, "nr5g_rlcmac_Cmac_RESET_CMD",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_RESET_CMD, "nr5g_rlcmac_Cmac_RESET_CMD",       dissect_cmac_reset_cmd },
     { nr5g_rlcmac_Cmac_RESET_ACK, "nr5g_rlcmac_Cmac_RESET_ACK",       dissect_sapi_type_dummy /* TODO */},
     { nr5g_rlcmac_Cmac_RESET_NAK, "nr5g_rlcmac_Cmac_RESET_NAK",       dissect_sapi_type_dummy /* TODO */},
 
