@@ -1163,7 +1163,7 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
     //    dissect_rlcmac_cmac_ra_info(tree, tvb, pinfo, offset, len, &bwpid);
     // }
 
-    // CellCfg
+    // CellCfg (nr5g_rlcmac_Cmac_CellCfg_t)
     // TODO:
 }
 
