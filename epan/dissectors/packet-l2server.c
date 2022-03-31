@@ -39,6 +39,7 @@ typedef guint32 comgen_qnxPPUIDt;
 #include "lte-l2_Sap.h"
 #include "nr5g-rlcmac_Data.h"
 //#include "nr5g-rlcmac_Crlc.h"  // causes conflicts
+//#include "nr5g-pdcp_Ctrl.h"    // nope
 
 
 void proto_register_l2server(void);
@@ -312,6 +313,9 @@ static int hf_l2server_nbslotspeccfg_del = -1;
 
 static int hf_l2server_nbdlbwpidtoadd = -1;
 static int hf_l2server_nbdlbwpidtodel = -1;
+
+static int hf_l2server_sibfilterflag = -1;
+
 
 static const value_string lch_vals[] =
 {
@@ -2703,6 +2707,26 @@ static void dissect_cmac_reset_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info 
     offset += 4;
 }
 
+// N.B. also used for ack, where type is identical.
+static void dissect_sib_filter_act_deact_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                             guint offset, guint len _U_)
+{
+    /* CellId */
+    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* SibFilterFlag */
+    offset += 4;
+}
+
+static void dissect_sib_filter_act_deact_nak(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                             guint offset, guint len _U_)
+{
+    /* CellId */
+    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* TODO: Err */
+    offset += 2;
+}
 
 
 /************************************************************************************/
@@ -2960,6 +2984,20 @@ static TYPE_FUN nr_rlcmac_crlc_type_funs[] =
 static value_string  nr_rlcmac_crlc_type_vals[MAX_NR_RLCMAC_CRLC_TYPE_VALS];
 
 
+/* LTE PDCP CTRL */
+static TYPE_FUN lte_pdcp_ctrl_type_funs[] =
+{
+    { nr5g_pdcp_Ctrl_SIB_FILTER_ACT_CMD,           "nr5g_pdcp_Ctrl_SIB_FILTER_ACT_CMD",       dissect_sib_filter_act_deact_cmd },
+    { nr5g_pdcp_Ctrl_SIB_FILTER_ACT_ACK,           "nr5g_pdcp_Ctrl_SIB_FILTER_ACT_ACK",       dissect_sib_filter_act_deact_cmd },
+    { nr5g_pdcp_Ctrl_SIB_FILTER_ACT_NAK,           "nr5g_pdcp_Ctrl_SIB_FILTER_ACT_NAK",       dissect_sib_filter_act_deact_nak },
+    { nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_CMD,         "nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_CMD",     dissect_sib_filter_act_deact_cmd },
+    { nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_ACK,         "nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_ACK",     dissect_sib_filter_act_deact_cmd },
+    { nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_NAK,         "nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_NAK",     dissect_sib_filter_act_deact_nak },
+
+    { 0x00,                               NULL,                             NULL }
+};
+#define MAX_LTE_PDCP_CTRL_TYPE_VALS      array_length(lte_pdcp_ctrl_type_funs)
+static value_string  lte_pdcp_ctrl_type_vals[MAX_LTE_PDCP_CTRL_TYPE_VALS];
 
 
 
@@ -2986,7 +3024,7 @@ static SAPI_FUN sapi_fun_vals[] = {
 
     /* PDCP */
     { lte_l2_Sap_PDCP_ERROR,        "PDCP ERROR", NULL  },
-    { lte_l2_Sap_PDCP_CTRL,         "PDCP CTRL", NULL  },
+    { lte_l2_Sap_PDCP_CTRL,         "PDCP CTRL", lte_pdcp_ctrl_type_funs  },
     { lte_l2_Sap_PDCP_AUX,          "PDCP AUX", NULL  },
     { lte_l2_Sap_PDCP_DATA,         "PDCP DATA", NULL  },
     { lte_l2_Sap_PDCP_STAT,         "PDCP STAT", NULL  },
@@ -3245,6 +3283,7 @@ proto_register_l2server(void)
     init_prim_value_string(nr_rlcmac_crlc_type_vals, nr_rlcmac_crlc_type_funs, MAX_NR_RLCMAC_CRLC_TYPE_VALS);
     init_prim_value_string(nr_rlcmac_l1_test_type_vals, nr_rlcmac_l1_test_type_funs, MAX_NR_RLCMAC_L1_TEST_TYPE_VALS);
     init_prim_value_string(nr_rlcmac_error_type_vals, nr_rlcmac_error_type_funs, MAX_NR_RLCMAC_ERROR_TYPE_VALS);
+    init_prim_value_string(lte_pdcp_ctrl_type_vals, lte_pdcp_ctrl_type_funs, MAX_LTE_PDCP_CTRL_TYPE_VALS);
 
     static hf_register_info hf[] = {
       { &hf_l2server_header,
@@ -3972,6 +4011,10 @@ proto_register_l2server(void)
       { &hf_l2server_nbdlbwpidtodel,
         { "Nb DL BwpId to del", "l2server.nbsdlbwpidtodel", FT_UINT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sibfilterflag,
+        { "SibFilterFlag", "l2server.sib-filter-flag", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
     };
 
     static gint *ett[] = {

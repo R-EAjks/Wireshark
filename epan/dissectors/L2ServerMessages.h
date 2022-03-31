@@ -104,6 +104,17 @@ typedef unsigned char uchar;
 #define  nr5g_l2_Srv_HANDOVER_ACK      (256 + nr5g_l2_Srv_HANDOVER_CMD)
 #define  nr5g_l2_Srv_HANDOVER_NAK      (512 + nr5g_l2_Srv_HANDOVER_CMD)
 
+/*
+ * Activate SIB filtering for a cell
+ */
+#define nr5g_pdcp_Ctrl_SIB_FILTER_ACT_CMD    0x05
+#define nr5g_pdcp_Ctrl_SIB_FILTER_ACT_ACK    (0x100 + nr5g_pdcp_Ctrl_SIB_FILTER_ACT_CMD)
+#define nr5g_pdcp_Ctrl_SIB_FILTER_ACT_NAK    (0x200 + nr5g_pdcp_Ctrl_SIB_FILTER_ACT_CMD)
+
+#define nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_CMD    0x06
+#define nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_ACK    (0x100 + nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_CMD)
+#define nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_NAK    (0x200 + nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_CMD)
+
 typedef struct {
     char   CliName[40];    /* Login Name (1) */
 } lte_l2_Srv_LOGINt;
@@ -587,6 +598,39 @@ typedef struct
 {
     uint    UeId;           /* UE Identifier */
 } lte_l2_Srv_DELETE_UEt;
+
+
+
+
+/*
+ * nr5g_pdcp_Ctrl_SIB_FILTER_ACT_CMD
+ * nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_CMD
+ */
+typedef struct {
+    uint            CellId;         /* Cell Identification */
+    uint            SibFilterFlag;  /* 0 -> Legacy */
+
+} nr5g_pdcp_Ctrl_SIB_FILTER_CMDt;
+
+/*
+ * nr5g_pdcp_Ctrl_SIB_FILTER_ACT_ACK
+ * nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_ACK
+ */
+typedef struct {
+    uint            CellId;   /* Cell Identification */
+    uint            SibFilterFlag;  /* 0 -> Legacy */
+
+} nr5g_pdcp_Ctrl_SIB_FILTER_ACKt;
+
+/*
+ * nr5g_pdcp_Ctrl_SIB_FILTER_ACT_NAK
+ * nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_NAK
+ */
+typedef struct {
+    uint            CellId;   /* Cell Identification */
+    short           Err;      /* Error code */
+
+} nr5g_pdcp_Ctrl_SIB_FILTER_NAKt;
 
 
 #pragma pack()
