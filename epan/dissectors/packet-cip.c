@@ -5579,7 +5579,8 @@ int dissect_cip_attribute(packet_info *pinfo, proto_tree *tree, proto_item *item
       consumed = dissect_cip_utime(tree, tvb, offset, *(attr->phf));
       break;
    case cip_date:
-      guint16 num_days_since_1972 = tvb_get_letohs( tvb, offset);
+   {
+      guint16 num_days_since_1972 = tvb_get_letohs(tvb, offset);
       /* Convert to nstime epoch */
       computed_time = CIP_TIMEBASE+(num_days_since_1972*60U*60U*24U);
       date = gmtime(&computed_time);
@@ -5590,6 +5591,7 @@ int dissect_cip_attribute(packet_info *pinfo, proto_tree *tree, proto_item *item
       proto_tree_add_uint_format_value(tree, *(attr->phf), tvb, offset, 2, num_days_since_1972, "%s", date_str);
       consumed = 2;
       break;
+   }
    case cip_time_of_day:
       temp_time = temp_data = tvb_get_letohl( tvb, offset);
       hour = temp_time/(60*60*1000);
