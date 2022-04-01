@@ -596,6 +596,12 @@ static const value_string  drx_short_cycle_vals[] =
     { 0,   NULL }
 };
 
+static const value_string  sib_folder_flag_vals[] =
+{
+    { 0,    "Legacy" },
+    { 0,   NULL }
+};
+
 
 /* Subtrees */
 static gint ett_l2server = -1;
@@ -2715,6 +2721,7 @@ static void dissect_sib_filter_act_deact_cmd(proto_tree *tree, tvbuff_t *tvb, pa
     proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     /* SibFilterFlag */
+    proto_tree_add_item(tree, hf_l2server_sibfilterflag, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 }
 
@@ -4013,7 +4020,7 @@ proto_register_l2server(void)
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_sibfilterflag,
         { "SibFilterFlag", "l2server.sib-filter-flag", FT_UINT32, BASE_DEC,
-          NULL, 0x0, NULL, HFILL }},
+          VALS(sib_folder_flag_vals), 0x0, NULL, HFILL }},
 
     };
 
