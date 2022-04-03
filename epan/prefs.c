@@ -4093,30 +4093,18 @@ pre_init_prefs(void)
     prefs.gui_marked_bg.red          =         0;
     prefs.gui_marked_bg.green        =      8224;
     prefs.gui_marked_bg.blue         =     10794;
-    prefs.gui_ignored_fg.red         =     32767;
-    prefs.gui_ignored_fg.green       =     32767;
-    prefs.gui_ignored_fg.blue        =     32767;
-    prefs.gui_ignored_bg.red         =     65535;
-    prefs.gui_ignored_bg.green       =     65535;
-    prefs.gui_ignored_bg.blue        =     65535;
     g_free(prefs.gui_colorized_fg);
     prefs.gui_colorized_fg           = g_strdup("000000,000000,000000,000000,000000,000000,000000,000000,000000,000000");
     g_free(prefs.gui_colorized_bg);
     prefs.gui_colorized_bg           = g_strdup("ffc0c0,ffc0ff,e0c0e0,c0c0ff,c0e0e0,c0ffff,c0ffc0,ffffc0,e0e0c0,e0e0e0");
-    prefs.st_client_fg.red           = 32767;
-    prefs.st_client_fg.green         =     0;
-    prefs.st_client_fg.blue          =     0;
-    prefs.st_client_bg.red           = 64507;
-    prefs.st_client_bg.green         = 60909;
-    prefs.st_client_bg.blue          = 60909;
-    prefs.st_server_fg.red           =     0;
-    prefs.st_server_fg.green         =     0;
-    prefs.st_server_fg.blue          = 32767;
-    prefs.st_server_bg.red           = 60909;
-    prefs.st_server_bg.green         = 60909;
-    prefs.st_server_bg.blue          = 64507;
 
     if (gui_theme_is_dark) {
+        prefs.gui_ignored_fg.red         =     65535;
+        prefs.gui_ignored_fg.green       =     65535;
+        prefs.gui_ignored_fg.blue        =     65535;
+        prefs.gui_ignored_bg.red         =     32767;
+        prefs.gui_ignored_bg.green       =     32767;
+        prefs.gui_ignored_bg.blue        =     32767;
         // Green, red and yellow with HSV V = 84
         prefs.gui_text_valid.red         = 0x0000; /* dark green */
         prefs.gui_text_valid.green       = 0x66ff;
@@ -4127,7 +4115,25 @@ pre_init_prefs(void)
         prefs.gui_text_deprecated.red    = 0x66FF; /* dark yellow / olive */
         prefs.gui_text_deprecated.green  = 0x66FF;
         prefs.gui_text_deprecated.blue   = 0x0000;
+        prefs.st_client_fg.red           = 64507;
+        prefs.st_client_fg.green         = 60909;
+        prefs.st_client_fg.blue          = 60909;
+        prefs.st_client_bg.red           = 32767;
+        prefs.st_client_bg.green         =     0;
+        prefs.st_client_bg.blue          =     0;
+        prefs.st_server_fg.red           = 60909;
+        prefs.st_server_fg.green         = 60909;
+        prefs.st_server_fg.blue          = 64507;
+        prefs.st_server_bg.red           =     0;
+        prefs.st_server_bg.green         =     0;
+        prefs.st_server_bg.blue          = 32767;
     } else {
+        prefs.gui_ignored_fg.red         =     32767;
+        prefs.gui_ignored_fg.green       =     32767;
+        prefs.gui_ignored_fg.blue        =     32767;
+        prefs.gui_ignored_bg.red         =     65535;
+        prefs.gui_ignored_bg.green       =     65535;
+        prefs.gui_ignored_bg.blue        =     65535;
         // Green, red and yellow with HSV V = 20
         prefs.gui_text_valid.red         = 0xAFFF; /* light green */
         prefs.gui_text_valid.green       = 0xFFFF;
@@ -4138,6 +4144,18 @@ pre_init_prefs(void)
         prefs.gui_text_deprecated.red    = 0xFFFF; /* light yellow */
         prefs.gui_text_deprecated.green  = 0xFFFF;
         prefs.gui_text_deprecated.blue   = 0xAFFF;
+        prefs.st_client_fg.red           = 32767;
+        prefs.st_client_fg.green         =     0;
+        prefs.st_client_fg.blue          =     0;
+        prefs.st_client_bg.red           = 64507;
+        prefs.st_client_bg.green         = 60909;
+        prefs.st_client_bg.blue          = 60909;
+        prefs.st_server_fg.red           =     0;
+        prefs.st_server_fg.green         =     0;
+        prefs.st_server_fg.blue          = 32767;
+        prefs.st_server_bg.red           = 60909;
+        prefs.st_server_bg.green         = 60909;
+        prefs.st_server_bg.blue          = 64507;
     }
 
     prefs.gui_geometry_save_position = TRUE;

@@ -32,6 +32,18 @@
 #include <epan/prefs.h>
 #include <epan/epan_dissect.h>
 
+/*
+ * Each line in the colorfilters file has the following format:
+ *
+ * @<filter name>@<filter string>@[<background>][<foreground>]
+ * Background and foreground colors are 16-bit comma-separated RGB
+ * triplets.
+ *
+ * To do:
+ * - Support a more standard, copy+paste-able color scheme, e.g.
+ *   #RRGGBB.
+ */
+
 #define RED_COMPONENT(x)   (guint16) (((((x) >> 16) & 0xff) * 65535 / 255))
 #define GREEN_COMPONENT(x) (guint16) (((((x) >>  8) & 0xff) * 65535 / 255))
 #define BLUE_COMPONENT(x)  (guint16) ( (((x)        & 0xff) * 65535 / 255))

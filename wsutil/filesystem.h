@@ -21,6 +21,7 @@ extern "C" {
  * Default profile name.
  */
 #define DEFAULT_PROFILE      "Default"
+#define DEFAULT_DARK_PROFILE "Dark Mode"
 
 
 /*
