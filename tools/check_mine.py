@@ -38,14 +38,19 @@ dissectors = [ 'packet-ulgrant.c', 'packet-l2server.c',  'packet-dlblock.c',
                'packet-pacs.c',    'packet-axe-rpc.c',   'packet-textlogger.c',
                'packet-tlv.c']
 
-tools = ['check_tfs.py', 'check_typed_item_calls.py --mask', 'check_static.py', 'check_dissector_urls.py', 'check_spelling.py']
+tools = ['check_tfs.py', 'check_typed_item_calls.py --mask', 'check_static.py', 'check_dissector_urls.py', 'check_spelling.py', 'cppcheck/cppcheck.sh']
 
 
 def run_check(tool, dissectors):
     print(bcolors.ADDED + tool + bcolors.ENDC)
     command = './tools/' + tool
-    for d in dissectors:
-        command += (' --file ' + 'epan/dissectors/' + d)
+    if tool != 'cppcheck/cppcheck.sh':
+        for d in dissectors:
+            command += (' --file ' + 'epan/dissectors/' + d)
+    else:
+        for d in dissectors:
+            command += (' epan/dissectors/' + d)
+
     os.system(command)
 
 # Run all checks on all of my dissectors.

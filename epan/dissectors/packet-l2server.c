@@ -697,7 +697,7 @@ static void dissect_sapi_type_dummy(proto_tree *tree, tvbuff_t *tvb, packet_info
 
 /* Forward declarations */
 static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
-                                           guint offset _U_, guint len _U_);
+                                           guint offset, guint len _U_);
 
 static void dissect_login_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                               guint offset, guint len)
@@ -1120,12 +1120,8 @@ static void dissect_rlcmac_data_ind(proto_tree *tree, tvbuff_t *tvb, packet_info
 
         /* Call dissector with data */
         tvbuff_t *pdcp_tvb;
-        if (mode == TM) {
-            pdcp_tvb = tvb_new_subset_remaining(tvb, offset);
-        }
-        else {
-            pdcp_tvb = tvb_new_subset_remaining(tvb, offset);
-        }
+
+        pdcp_tvb = tvb_new_subset_remaining(tvb, offset);
         p_pdcp_nr_info->pdu_length = tvb_reported_length(pdcp_tvb);
         call_dissector_only(pdcp_nr_handle, pdcp_tvb, pinfo, tree, NULL);
 
@@ -1757,7 +1753,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         // RateMatchPatternDedToAdd
         offset += (nbRateMatchPatternDedToAdd * sizeof(bb_nr5g_RATE_MATCH_PATTERNt));
         // RateMatchPatternDedToDel
-        offset += (nbRateMatchPatternDedToDel * sizeof(bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS));
+        offset += (nbRateMatchPatternDedToDel * sizeof(uint32_t));
 
         proto_item_set_len(ded_ti, offset-start_offset);
     }
