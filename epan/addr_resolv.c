@@ -2987,6 +2987,11 @@ get_hostname(const guint addr)
      */
     hashipv4_t *tp = host_lookup(addr);
 
+    if (tp->flags & MANUAL_USER_ENTRY)
+    {
+        return tp->name;
+    }
+
     if (!gbl_resolv_flags.network_name)
         return tp->ip;
 
@@ -3005,6 +3010,11 @@ get_hostname6(const ws_in6_addr *addr)
      */
     hashipv6_t *tp = host_lookup6(addr);
 
+    if (tp->flags & MANUAL_USER_ENTRY)
+    {
+        return tp->name;
+    }
+
     if (!gbl_resolv_flags.network_name)
         return tp->ip6;
 
@@ -3015,7 +3025,7 @@ get_hostname6(const ws_in6_addr *addr)
 
 /* -------------------------- */
 void
-add_ipv4_name(const guint addr, const gchar *name)
+add_ipv4_name_and_flag(const guint addr, const gchar *name, guint8 extra_flag)
 {
     hashipv4_t *tp;
 
@@ -3036,12 +3046,18 @@ add_ipv4_name(const guint addr, const gchar *name)
         (void) g_strlcpy(tp->name, name, MAXNAMELEN);
         new_resolved_objects = TRUE;
     }
-    tp->flags |= TRIED_RESOLVE_ADDRESS|NAME_RESOLVED;
+    tp->flags |= TRIED_RESOLVE_ADDRESS|NAME_RESOLVED|extra_flag;
 } /* add_ipv4_name */
 
-/* -------------------------- */
 void
-add_ipv6_name(const ws_in6_addr *addrp, const gchar *name)
+add_ipv4_name(const guint addr, const gchar *name)
+{
+    add_ipv4_name_and_flag(addr, name, 0);
+}
+
+/* -------------------------- */
+static void
+add_ipv6_name_and_flag(const ws_in6_addr *addrp, const gchar *name, guint8 extra_flag)
 {
     hashipv6_t *tp;
 
@@ -3066,21 +3082,27 @@ add_ipv6_name(const ws_in6_addr *addrp, const gchar *name)
         (void) g_strlcpy(tp->name, name, MAXNAMELEN);
         new_resolved_objects = TRUE;
     }
-    tp->flags |= TRIED_RESOLVE_ADDRESS|NAME_RESOLVED;
+    tp->flags |= TRIED_RESOLVE_ADDRESS|NAME_RESOLVED|extra_flag;
 } /* add_ipv6_name */
+
+void
+add_ipv6_name(const ws_in6_addr *addrp, const gchar *name)
+{
+    add_ipv6_name_and_flag(addrp, name, 0);
+}
 
 static void
 add_manually_resolved_ipv4(gpointer key, gpointer value, gpointer user_data _U_)
 {
     resolved_name_t *resolved_ipv4_entry = (resolved_name_t*)value;
-    add_ipv4_name(GPOINTER_TO_UINT(key), resolved_ipv4_entry->name);
+    add_ipv4_name_and_flag(GPOINTER_TO_UINT(key), resolved_ipv4_entry->name, MANUAL_USER_ENTRY);
 }
 
 static void
 add_manually_resolved_ipv6(gpointer key, gpointer value, gpointer user_data _U_)
 {
     resolved_name_t *resolved_ipv6_entry = (resolved_name_t*)value;
-    add_ipv6_name((ws_in6_addr*)key, resolved_ipv6_entry->name);
+    add_ipv6_name_and_flag((ws_in6_addr*)key, resolved_ipv6_entry->name, MANUAL_USER_ENTRY);
 }
 
 static void
