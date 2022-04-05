@@ -939,16 +939,19 @@ static void dissect_rlcmac_data_req_am(proto_tree *tree, tvbuff_t *tvb, packet_i
 }
 
 
+// nr5g_rlcmac_Data_MUI_t (from nr5g-rlcmac_Data.h)
 static void dissect_rlcmac_data_cnf(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                     guint offset, guint len _U_)
 {
     /* Nr5gId (UEId + CellId + BeamIdx) */
+    // TODO: add/use helper that create nice subtree/summary.
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     proto_tree_add_item(tree, hf_l2server_beamidx, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
+
     /* RbType */
     proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
