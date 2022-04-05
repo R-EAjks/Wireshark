@@ -1744,8 +1744,11 @@ alnumerize(char *name)
 	char *w = name;
 	char c;
 
-	for (;(c = *r); r++) {
-		if (g_ascii_isalnum(c) || c == '_' || c == '-' || c == '.') {
+	for (;(c = g_ascii_tolower(*r)); r++) {
+		if (c == '-') {
+			*(w++) = '_';
+		}
+		else if (g_ascii_isalnum(c) || c == '_' || c == '.') {
 			*(w++) = c;
 		}
 	}
@@ -2365,7 +2368,7 @@ real_register_diameter_fields(void)
 		  { "Error","diameter.flags.error", FT_BOOLEAN, 8, TFS(&tfs_set_notset), DIAM_FLAGS_E,
 			  NULL, HFILL }},
 	{ &hf_diameter_flags_T,
-		  { "T(Potentially re-transmitted message)","diameter.flags.T", FT_BOOLEAN, 8, TFS(&tfs_set_notset), DIAM_FLAGS_T,
+		  { "T(Potentially re-transmitted message)","diameter.flags.t", FT_BOOLEAN, 8, TFS(&tfs_set_notset), DIAM_FLAGS_T,
 			  NULL, HFILL }},
 	{ &hf_diameter_flags_reserved4,
 		  { "Reserved","diameter.flags.reserved4", FT_BOOLEAN, 8, TFS(&tfs_set_notset),
@@ -2380,10 +2383,10 @@ real_register_diameter_fields(void)
 		  { "Reserved","diameter.flags.reserved7", FT_BOOLEAN, 8, TFS(&tfs_set_notset),
 			  DIAM_FLAGS_RESERVED7, NULL, HFILL }},
 	{ &hf_diameter_vendor_id,
-		  { "VendorId",	"diameter.vendorId", FT_UINT32, BASE_ENTERPRISES, STRINGS_ENTERPRISES,
+		  { "VendorId",	"diameter.vendorid", FT_UINT32, BASE_ENTERPRISES, STRINGS_ENTERPRISES,
 			  0x0, NULL, HFILL }},
 	{ &hf_diameter_application_id,
-		  { "ApplicationId", "diameter.applicationId", FT_UINT32, BASE_DEC|BASE_EXT_STRING, VALS_EXT_PTR(dictionary.applications),
+		  { "ApplicationId", "diameter.applicationid", FT_UINT32, BASE_DEC|BASE_EXT_STRING, VALS_EXT_PTR(dictionary.applications),
 			  0x0, NULL, HFILL }},
 	{ &hf_diameter_hopbyhopid,
 		  { "Hop-by-Hop Identifier", "diameter.hopbyhopid", FT_UINT32,
@@ -2427,12 +2430,12 @@ real_register_diameter_fields(void)
 		  { "Reserved","diameter.avp.flags.reserved7", FT_BOOLEAN, 8, TFS(&tfs_set_notset),
 			  AVP_FLAGS_RESERVED7,	NULL, HFILL }},
 	{ &hf_diameter_avp_vendor_id,
-		  { "AVP Vendor Id","diameter.avp.vendorId", FT_UINT32, BASE_ENTERPRISES, STRINGS_ENTERPRISES,
+		  { "AVP Vendor Id","diameter.avp.vendorid", FT_UINT32, BASE_ENTERPRISES, STRINGS_ENTERPRISES,
 			  0x0, NULL, HFILL }},
 	{ &(unknown_avp.hf_value),
 		  { "Value","diameter.avp.unknown", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
 	{ &hf_diameter_avp_data_wrong_length,
-		  { "Data","diameter.avp.invalid-data", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
+		  { "Data","diameter.avp.invalid_data", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
 	{ &hf_diameter_avp_pad,
 		  { "Padding","diameter.avp.pad", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
 	{ &hf_diameter_code,
@@ -2462,7 +2465,7 @@ real_register_diameter_fields(void)
 		{ "Experimental-Result-Code", "diameter.3gpp2.exp_res",
 		FT_UINT32, BASE_DEC, VALS(diameter_3gpp2_exp_res_vals), 0x0,	NULL, HFILL }},
 	{ &hf_diameter_other_vendor_exp_res,
-		{ "Experimental-Result-Code", "diameter.other_vendor.Experimental-Result-Code",
+		{ "Experimental-Result-Code", "diameter.other_vendor.experimental_result_code",
 		FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
 	{ &hf_diameter_mip6_feature_vector,
 		{ "MIP6-Feature-Vector", "diameter.mip6_feature_vector",
@@ -2526,8 +2529,8 @@ real_register_diameter_fields(void)
 		{ &ei_diameter_avp_no_data, { "diameter.avp.no_data", PI_UNDECODED, PI_WARN, "Data is empty", EXPFILL }},
 		{ &ei_diameter_avp_pad, { "diameter.avp.pad.non_zero", PI_MALFORMED, PI_NOTE, "Padding is non-zero", EXPFILL }},
 		{ &ei_diameter_avp_pad_missing, { "diameter.avp.pad.missing", PI_MALFORMED, PI_NOTE, "Padding is missing", EXPFILL }},
-		{ &ei_diameter_avp_len, { "diameter.avp.invalid-len", PI_MALFORMED, PI_WARN, "Wrong length", EXPFILL }},
-		{ &ei_diameter_application_id, { "diameter.applicationId.unknown", PI_UNDECODED, PI_WARN, "Unknown Application Id, if you know what this is you can add it to dictionary.xml", EXPFILL }},
+		{ &ei_diameter_avp_len, { "diameter.avp.invalid_len", PI_MALFORMED, PI_WARN, "Wrong length", EXPFILL }},
+		{ &ei_diameter_application_id, { "diameter.applicationid.unknown", PI_UNDECODED, PI_WARN, "Unknown Application Id, if you know what this is you can add it to dictionary.xml", EXPFILL }},
 		{ &ei_diameter_version, { "diameter.version.unknown", PI_UNDECODED, PI_WARN, "Unknown Diameter Version (decoding as RFC 3588)", EXPFILL }},
 		{ &ei_diameter_code, { "diameter.cmd.code.unknown", PI_UNDECODED, PI_WARN, "Unknown command, if you know what this is you can add it to dictionary.xml", EXPFILL }},
 		{ &ei_diameter_invalid_ipv6_prefix_len, { "diameter.invalid_ipv6_prefix_len", PI_MALFORMED, PI_ERROR, "Invalid IPv6 Prefix length", EXPFILL }},
