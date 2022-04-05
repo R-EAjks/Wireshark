@@ -2332,13 +2332,34 @@ free_radius_vendor_info(gpointer data)
 	g_free(vendor);
 }
 
+static char *
+alnumerize(char *name)
+{
+	char *r = name;
+	char *w = name;
+	char c;
+
+	for (;(c = g_ascii_tolower(*r)); r++) {
+		if (c == '-') {
+			*(w++) = '_';
+		}
+		else if (g_ascii_isalnum(c) || c == '_' || c == '.') {
+			*(w++) = c;
+		}
+	}
+
+	*w = '\0';
+
+	return name;
+}
+
 static void
 register_attrs(gpointer k _U_, gpointer v, gpointer p)
 {
 	radius_attr_info_t *a = (radius_attr_info_t *)v;
 	int i;
 	gint *ett = &(a->ett);
-	gchar *abbrev = wmem_strdup_printf(wmem_epan_scope(), "radius.%s", a->name);
+	gchar *abbrev = alnumerize(wmem_strdup_printf(wmem_epan_scope(), "radius.%s", a->name));
 	hf_register_info hfri[] = {
 		{ NULL, { NULL, NULL, FT_NONE,  BASE_NONE, NULL, 0x0, NULL, HFILL }},
 		{ NULL, { NULL, NULL, FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
@@ -2636,34 +2657,34 @@ register_radius_fields(const char *unused _U_)
 		{ "Length", "radius.length", FT_UINT16, BASE_DEC, NULL, 0x0,
 			NULL, HFILL }},
 		{ &(no_dictionary_entry.hf),
-		{ "Unknown-Attribute", "radius.Unknown_Attribute", FT_BYTES, BASE_NONE, NULL, 0x0,
+		{ "Unknown-Attribute", "radius.unknown_attribute", FT_BYTES, BASE_NONE, NULL, 0x0,
 			NULL, HFILL }},
 		{ &(no_dictionary_entry.hf_len),
-		{ "Unknown-Attribute Length", "radius.Unknown_Attribute.length", FT_UINT8, BASE_DEC, NULL, 0x0,
+		{ "Unknown-Attribute Length", "radius.unknown_attribute.length", FT_UINT8, BASE_DEC, NULL, 0x0,
 			NULL, HFILL }},
 		{ &hf_radius_chap_password,
-		{ "CHAP-Password", "radius.CHAP_Password", FT_BYTES, BASE_NONE, NULL, 0x0,
+		{ "CHAP-Password", "radius.chap_password", FT_BYTES, BASE_NONE, NULL, 0x0,
 			NULL, HFILL }},
 		{ &hf_radius_chap_ident,
-		{ "CHAP Ident", "radius.CHAP_Ident", FT_UINT8, BASE_HEX, NULL, 0x0,
+		{ "CHAP Ident", "radius.chap_ident", FT_UINT8, BASE_HEX, NULL, 0x0,
 			NULL, HFILL }},
 		{ &hf_radius_chap_string,
-		{ "CHAP String", "radius.CHAP_String", FT_BYTES, BASE_NONE, NULL, 0x0,
+		{ "CHAP String", "radius.chap_string", FT_BYTES, BASE_NONE, NULL, 0x0,
 			NULL, HFILL }},
 		{ &hf_radius_framed_ip_address,
-		{ "Framed-IP-Address", "radius.Framed-IP-Address", FT_IPv4, BASE_NONE, NULL, 0x0,
+		{ "Framed-IP-Address", "radius.framed_ip_address", FT_IPv4, BASE_NONE, NULL, 0x0,
 			NULL, HFILL }},
 		{ &hf_radius_login_ip_host,
-		{ "Login-IP-Host", "radius.Login-IP-Host", FT_IPv4, BASE_NONE, NULL, 0x0,
+		{ "Login-IP-Host", "radius.login_ip_host", FT_IPv4, BASE_NONE, NULL, 0x0,
 			NULL, HFILL }},
 		{ &hf_radius_framed_ipx_network,
-		{ "Framed-IPX-Network", "radius.Framed-IPX-Network", FT_IPXNET, BASE_NONE, NULL, 0x0,
+		{ "Framed-IPX-Network", "radius.framed_ipx_network", FT_IPXNET, BASE_NONE, NULL, 0x0,
 			NULL, HFILL }},
 		{ &hf_radius_cosine_vpi,
-		{ "Cosine-VPI", "radius.Cosine-Vpi", FT_UINT16, BASE_DEC, NULL, 0x0,
+		{ "Cosine-VPI", "radius.cosine_vpi", FT_UINT16, BASE_DEC, NULL, 0x0,
 			NULL, HFILL }},
 		{ &hf_radius_cosine_vci,
-		{ "Cosine-VCI", "radius.Cosine-Vci", FT_UINT16, BASE_DEC, NULL, 0x0,
+		{ "Cosine-VCI", "radius.cosine_vci", FT_UINT16, BASE_DEC, NULL, 0x0,
 			NULL, HFILL }},
 		{ &hf_radius_dup,
 		{ "Duplicate Message ID", "radius.dup", FT_UINT32, BASE_DEC, NULL, 0x0,
