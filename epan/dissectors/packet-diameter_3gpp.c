@@ -3281,7 +3281,7 @@ proto_register_diameter_3gpp(void)
             NULL, HFILL }
         },
         { &hf_diameter_3gpp_rat_type,
-            { "RAT Type",            "diameter.3gpp.rat-type",
+            { "RAT Type",            "diameter.3gpp.rat_type",
             FT_UINT8, BASE_DEC, VALS(diameter_3gpp_rat_type_vals), 0x00,
             NULL, HFILL }
         },
