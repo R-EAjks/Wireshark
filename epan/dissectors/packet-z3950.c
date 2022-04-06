@@ -8680,7 +8680,7 @@ get_z3950_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data 
     TRY {
         /* Skip past identifier */
         ber_offset = get_ber_identifier(tvb, offset, NULL, NULL, NULL);
-	ber_offset = get_ber_length(tvb, ber_offset, &plen, NULL);
+	ber_offset = get_ber_length(NULL, NULL, tvb, ber_offset, &plen, NULL);
         plen += (ber_offset - offset);
     }
     CATCH(ReportedBoundsError) {

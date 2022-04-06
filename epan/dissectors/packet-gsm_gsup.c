@@ -481,7 +481,7 @@ static void dissect_ss_info_ie(tvbuff_t *tvb, packet_info *pinfo, guint offset, 
 	while (len > (offset - saved_offset)) {
 		/* get the length of the component. there can be multiple components in one message */
 		header_end_offset = get_ber_identifier(tvb, offset, &appclass, &pc, &comp_type_tag);
-		header_end_offset = get_ber_length(tvb, header_end_offset, &component_len, &ind);
+		header_end_offset = get_ber_length(NULL, NULL, tvb, header_end_offset, &component_len, &ind);
 		header_len = header_end_offset -offset;
 		component_len += header_len;
 

@@ -1605,7 +1605,7 @@ dissect_cms_MessageDigest(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offs
 
   /* move past TLV */
   old_offset = get_ber_identifier(tvb, old_offset, NULL, NULL, NULL);
-  old_offset = get_ber_length(tvb, old_offset, NULL, NULL);
+  old_offset = get_ber_length(NULL, NULL, tvb, old_offset, NULL, NULL);
 
   if(cms_data->content_tvb)
     cms_verify_msg_digest(pi, cms_data->content_tvb, x509af_get_last_algorithm_id(), tvb, old_offset);

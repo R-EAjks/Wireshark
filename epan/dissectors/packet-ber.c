@@ -830,7 +830,7 @@ try_dissect_unknown_ber(packet_info *pinfo, tvbuff_t *tvb, volatile int offset, 
 
     offset = get_ber_identifier(tvb, offset, &ber_class, &pc, &tag);
     len_offset = offset;
-    offset = get_ber_length(tvb, offset, &len, &ind);
+    offset = get_ber_length(NULL, NULL, tvb, offset, &len, &ind);
     len_len = offset - len_offset;
 
     if (len > (guint32)tvb_reported_length_remaining(tvb, offset)) {
@@ -879,7 +879,7 @@ try_dissect_unknown_ber(packet_info *pinfo, tvbuff_t *tvb, volatile int offset, 
                     guint32 ber_len = 0;
                     TRY {
                         ber_offset = get_ber_identifier(tvb, offset, NULL, &pc, NULL);
-                        ber_offset = get_ber_length(tvb, ber_offset, &ber_len, NULL);
+                        ber_offset = get_ber_length(NULL, NULL, tvb, ber_offset, &ber_len, NULL);
                     } CATCH_ALL {
                     }
                     ENDTRY;
@@ -979,7 +979,7 @@ try_dissect_unknown_ber(packet_info *pinfo, tvbuff_t *tvb, volatile int offset, 
                 guint32 ber_len = 0;
                 TRY {
                     ber_offset = get_ber_identifier(tvb, offset, NULL, &pc, NULL);
-                    ber_offset = get_ber_length(tvb, ber_offset, &ber_len, NULL);
+                    ber_offset = get_ber_length(NULL, NULL, tvb, ber_offset, &ber_len, NULL);
                 } CATCH_ALL {
                 }
                 ENDTRY;
@@ -1110,7 +1110,7 @@ call_ber_oid_callback(const char *oid, tvbuff_t *tvb, int offset, packet_info *p
                 next_tree = proto_item_add_subtree(item, ett_ber_unknown);
             }
             ber_offset = get_ber_identifier(next_tvb, 0, NULL, NULL, NULL);
-            ber_offset = get_ber_length(next_tvb, ber_offset, &ber_len, NULL);
+            ber_offset = get_ber_length(NULL, NULL, next_tvb, ber_offset, &ber_len, NULL);
             if ((ber_len + ber_offset) == length_remaining) {
                 /* Decoded an ASN.1 tag with a length indicating this
                  * could be BER encoded data.  Try dissecting as unknown BER.
@@ -1268,14 +1268,11 @@ dissect_ber_identifier(packet_info *pinfo _U_, proto_tree *tree, tvbuff_t *tvb, 
 
 /** Try to get the length octets of the BER TLV.
  * Only (TAGs and) LENGTHs that fit inside 32 bit integers are supported.
- *
- * @return TRUE if we have the entire length, FALSE if we're in the middle of
- * an indefinite length and haven't reached EOC.
  */
 /* 8.1.3 Length octets */
 
 static int
-try_get_ber_length(tvbuff_t *tvb, int offset, guint32 *length, gboolean *ind, gint nest_level) {
+try_get_ber_length(packet_info *pinfo, proto_tree *tree, tvbuff_t *tvb, int offset, guint32 *length, gboolean *ind, gint nest_level) {
     guint8   oct, len;
     guint32  indef_len;
     guint32  tmp_length;
@@ -1300,6 +1297,11 @@ try_get_ber_length(tvbuff_t *tvb, int offset, guint32 *length, gboolean *ind, gi
         /* 8.1.3.4 */
         tmp_length = oct;
     } else {
+        if (oct == 0xFF) {
+            /* 8.1.3.5 - c) the value 11111111 shall not be used. */
+            proto_tree_add_expert_format(tree, pinfo, &ei_ber_error_length, tvb, offset-1, 1,
+            "BER Error: length octet 0xFF is not valid.");
+        }
         len = oct & 0x7F;
         if (len) {
             /* 8.1.3.5 */
@@ -1319,7 +1321,7 @@ try_get_ber_length(tvbuff_t *tvb, int offset, guint32 *length, gboolean *ind, gi
                 /* not an EOC at offset */
                 s_offset = offset;
                 offset= get_ber_identifier(tvb, offset, &tclass, &tpc, &ttag);
-                offset= try_get_ber_length(tvb, offset, &indef_len, NULL, nest_level+1);
+                offset= try_get_ber_length(pinfo, tree, tvb, offset, &indef_len, NULL, nest_level+1);
                 tmp_length += indef_len+(offset-s_offset); /* length + tag and length */
                 offset += indef_len;
                                 /* Make sure we've moved forward in the packet */
@@ -1350,9 +1352,9 @@ ws_debug_printf("get BER length %d, offset %d (remaining %d)\n", tmp_length, off
 }
 
 int
-get_ber_length(tvbuff_t *tvb, int offset, guint32 *length, gboolean *ind)
+get_ber_length(packet_info *pinfo, proto_tree *tree, tvbuff_t *tvb, int offset, guint32 *length, gboolean *ind)
 {
-    return try_get_ber_length(tvb, offset, length, ind, 1);
+    return try_get_ber_length(pinfo, tree, tvb, offset, length, ind, 1);
 }
 
 static void
@@ -1380,7 +1382,7 @@ dissect_ber_length(packet_info *pinfo _U_, proto_tree *tree, tvbuff_t *tvb, int 
     guint32  tmp_length;
     gboolean tmp_ind;
 
-    offset = get_ber_length(tvb, offset, &tmp_length, &tmp_ind);
+    offset = get_ber_length(pinfo, tree, tvb, offset, &tmp_length, &tmp_ind);
 
     if (show_internal_ber_fields) {
         if (tmp_ind) {
@@ -2154,7 +2156,7 @@ proto_tree_add_debug_text(tree, "SEQUENCE dissect_ber_sequence(%s) entered\n", n
     hoffset = offset;
     if (!implicit_tag) {
         offset = get_ber_identifier(tvb, offset, NULL, NULL, NULL);
-        offset = get_ber_length(tvb, offset, &lenx, NULL);
+        offset = get_ber_length(NULL, NULL, tvb, offset, &lenx, NULL);
     } else {
         /* was implicit tag so just use the length of the tvb */
         lenx = tvb_reported_length_remaining(tvb, offset);
@@ -2234,7 +2236,7 @@ proto_tree_add_debug_text(tree, "SEQUENCE dissect_ber_sequence(%s) entered\n", n
         hoffset = offset;
         /* read header and len for next field */
         offset = get_ber_identifier(tvb, offset, &ber_class, &pc, &tag);
-        offset = get_ber_length(tvb, offset, &len, &ind_field);
+        offset = get_ber_length(NULL, NULL, tvb, offset, &len, &ind_field);
         eoffset = offset + len;
                 /* Make sure we move forward */
         if (eoffset <= hoffset)
@@ -2612,7 +2614,7 @@ proto_tree_add_debug_text(tree, "SET dissect_ber_set(%s) entered\n", name);
         offset  = get_ber_identifier(tvb, offset, &ber_class, &pc, &tag);
         identifier_len = offset - identifier_offset;
         len_offset = offset;
-        offset  = get_ber_length(tvb, offset, &len, &ind_field);
+        offset  = get_ber_length(NULL, NULL, tvb, offset, &len, &ind_field);
         len_len = offset - len_offset;
         eoffset = offset + len;
 
@@ -2830,7 +2832,7 @@ proto_tree_add_debug_text(tree, "CHOICE dissect_ber_choice(%s) entered len:%d\n"
     identifier_offset = offset;
     offset = get_ber_identifier(tvb, offset, &ber_class, &pc, &tag);
     identifier_len = offset - identifier_offset;
-    offset = get_ber_length(tvb, offset, &len, &ind);
+    offset = get_ber_length(NULL, NULL, tvb, offset, &len, &ind);
     end_offset = offset + len ;
 
     /* Some sanity checks.
@@ -3106,7 +3108,7 @@ proto_tree_add_debug_text(tree, "RESTRICTED STRING dissect_ber_octet_string(%s) 
         identifier_offset = offset;
         offset  = get_ber_identifier(tvb, offset, &ber_class, &pc, &tag);
         identifier_len = offset - identifier_offset;
-        offset  = get_ber_length(tvb, offset, &len, NULL);
+        offset  = get_ber_length(NULL, NULL, tvb, offset, &len, NULL);
         eoffset = offset + len;
 
         /* sanity check */
@@ -3406,7 +3408,7 @@ proto_tree_add_debug_text(tree, "SQ OF dissect_ber_sq_of(%s) entered\n", name);
 
             /* read header and len for next field */
             offset = get_ber_identifier(tvb, offset, NULL, NULL, NULL);
-            offset = get_ber_length(tvb, offset, &len, &ind);
+            offset = get_ber_length(NULL, NULL, tvb, offset, &len, &ind);
             /* best place to get real length of implicit sequence of or set of is here... */
             /* adjust end_offset if we find somthing that doesn't match */
             offset += len;
@@ -3467,7 +3469,7 @@ proto_tree_add_debug_text(tree, "SQ OF dissect_ber_sq_of(%s) entered\n", name);
         identifier_offset = offset;
         offset  = get_ber_identifier(tvb, offset, &ber_class, &pc, &tag);
         identifier_len = offset - identifier_offset;
-        offset  = get_ber_length(tvb, offset, &len, &ind_field);
+        offset  = get_ber_length(NULL, NULL, tvb, offset, &len, &ind_field);
         eoffset = offset + len;
                 /* Make sure we move forward */
         if (eoffset <= hoffset)

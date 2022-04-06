@@ -186,7 +186,7 @@ BulkPDU/request-id bulkPDU_request-id
 	switch(MsgSecurityModel){
 		case SNMP_SEC_USM:	/* 3 */
 			offset = get_ber_identifier(tvb, offset, NULL, NULL, NULL);
-			offset = get_ber_length(tvb, offset, NULL, NULL);
+			offset = get_ber_length(NULL, NULL, tvb, offset, NULL, NULL);
 			offset = dissect_snmp_UsmSecurityParameters(FALSE, tvb, offset, actx, tree, -1);
 			usm_p.user_assoc = get_user_assoc(usm_p.engine_tvb, usm_p.user_tvb, actx->pinfo);
 			break;

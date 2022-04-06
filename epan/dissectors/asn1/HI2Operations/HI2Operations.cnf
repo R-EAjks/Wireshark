@@ -64,7 +64,7 @@ TetraLocation/ms-Loc/lai ms_Loc_lai
       return 0;
     }
     /* Get length just to move offset forward */
-    tmp_offset = get_ber_length(tvb, tmp_offset, &tmp_length, &tmp_ind);
+    tmp_offset = get_ber_length(NULL, NULL, tvb, tmp_offset, &tmp_length, &tmp_ind);
 
     /* Next 2 mandatorry elements
      *  lawfullInterceptionIdentifier [1] LawfulInterceptionIdentifier,

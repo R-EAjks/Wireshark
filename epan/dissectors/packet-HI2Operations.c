@@ -3884,7 +3884,7 @@ dissect_HI2Operations_UUS1_Content(gboolean implicit_tag _U_, tvbuff_t *tvb _U_,
       return 0;
     }
     /* Get length just to move offset forward */
-    tmp_offset = get_ber_length(tvb, tmp_offset, &tmp_length, &tmp_ind);
+    tmp_offset = get_ber_length(NULL, NULL, tvb, tmp_offset, &tmp_length, &tmp_ind);
 
     /* Next 2 mandatorry elements
      *  lawfullInterceptionIdentifier [1] LawfulInterceptionIdentifier,
