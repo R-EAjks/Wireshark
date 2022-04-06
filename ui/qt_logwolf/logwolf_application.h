@@ -21,6 +21,8 @@ class LogwolfApplication : public MainApplication
 public:
     explicit LogwolfApplication(int &argc, char **argv);
     ~LogwolfApplication();
+
+    void refreshLocalInterfaces();
 };
 
 extern LogwolfApplication *lwApp;

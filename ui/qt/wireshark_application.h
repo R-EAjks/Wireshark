@@ -17,6 +17,8 @@ class WiresharkApplication : public MainApplication
 public:
     explicit WiresharkApplication(int &argc,  char **argv);
     ~WiresharkApplication();
+
+    void refreshLocalInterfaces();
 };
 
 extern WiresharkApplication *wsApp;

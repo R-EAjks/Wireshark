@@ -21,6 +21,8 @@
 #include <epan/to_str.h>
 #include <wsutil/wslog.h>
 
+#include "extcap.h"
+
 #include "ui/capture_ui_utils.h"
 #include "ui/capture_globals.h"
 #include "ui/iface_lists.h"
@@ -122,7 +124,7 @@ get_iface_display_name(const gchar *description, const if_info_t *if_info)
  * those interfaces.
  */
 void
-scan_local_interfaces(void (*update_cb)(void))
+scan_local_interfaces(bool extcap_only, void (*update_cb)(void))
 {
     GList             *if_entry, *lt_entry, *if_list;
     if_info_t         *if_info, temp;
@@ -185,9 +187,16 @@ scan_local_interfaces(void (*update_cb)(void))
 
     /* Retrieve list of interface information (if_info_t) into if_list. */
     g_free(global_capture_opts.ifaces_err_info);
-    if_list = capture_interface_list(&global_capture_opts.ifaces_err,
+    if (extcap_only)
+    {
+        if_list = NULL;
+        if_list = append_extcap_interface_list(if_list, &global_capture_opts.ifaces_err_info);
+    } else
+    {
+        if_list = capture_interface_list(&global_capture_opts.ifaces_err,
                                      &global_capture_opts.ifaces_err_info,
                                      update_cb);
+    }
     count = 0;
 
     /*
@@ -425,7 +434,7 @@ scan_local_interfaces(void (*update_cb)(void))
  * record how long it takes in the info log.
  */
 void
-fill_in_local_interfaces(void(*update_cb)(void))
+fill_in_local_interfaces(bool extcap_only, void(*update_cb)(void))
 {
     gint64 start_time;
     double elapsed;
@@ -437,7 +446,7 @@ fill_in_local_interfaces(void(*update_cb)(void))
 
     if (!initialized) {
         /* do the actual work */
-        scan_local_interfaces(update_cb);
+        scan_local_interfaces(extcap_only, update_cb);
         initialized = TRUE;
     }
     /* log how long it took */
