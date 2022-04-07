@@ -17,8 +17,9 @@ brew install opus c-ares glib libgcrypt gnutls lua@5.1 cmake python nghttp2 snap
   libmaxminddb libsmi spandsp brotli minizip zstd libssh libilbc speexdsp gettext qt5 "$@"
 
 # install custom tap of sparkle v1 as homebrew now uses sparkle v2 per default which is not compatible
-brew tap Schm1tz1/homebrew-schm1tz1
-brew cask install schm1tz1/schm1tz1/sparkle
+curl -o /tmp/sparkle.rb https://raw.githubusercontent.com/Homebrew/homebrew-cask/c6dfe6baf1639998ba1707f68668cf8fa97bac9d/Casks/sparkle.rb
+brew install /tmp/sparkle.rb
+rm /tmp/sparkle.rb
 
 # Uncomment to enable automatic updates using Sparkle
 # brew cask install sparkle
