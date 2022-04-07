@@ -3170,6 +3170,11 @@ dissect_l2server_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
     proto_item *root_ti;
     gint offset = 0;
 
+    /* Create a data source just for L2 payload.  This makes it easier to spot offsets inside message */
+    tvbuff_t *l2_tvb = tvb_new_child_real_data(tvb, tvb_get_ptr(tvb, 0, tvb_reported_length(tvb)),
+                                               tvb_reported_length(tvb), tvb_reported_length(tvb));
+    add_new_data_source(pinfo, l2_tvb, "L2 Message");
+
     /* Protocol column */
     col_clear(pinfo->cinfo, COL_PROTOCOL);
     col_clear(pinfo->cinfo, COL_INFO);
@@ -3184,24 +3189,24 @@ dissect_l2server_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
     col_append_str(pinfo->cinfo, COL_PROTOCOL, "L2Server");
 
     /* Protocol root */
-    root_ti = proto_tree_add_item(tree, proto_l2server, tvb, offset, -1, ENC_NA);
+    root_ti = proto_tree_add_item(tree, proto_l2server, l2_tvb, offset, -1, ENC_NA);
     l2server_tree = proto_item_add_subtree(root_ti, ett_l2server);
 
     /* Header subtree */
-    proto_item *header_ti = proto_tree_add_string_format(l2server_tree, hf_l2server_header, tvb, offset, 8, "", "Header  ");
+    proto_item *header_ti = proto_tree_add_string_format(l2server_tree, hf_l2server_header, l2_tvb, offset, 8, "", "Header  ");
     proto_tree *header_tree = proto_item_add_subtree(header_ti, ett_l2server_header);
 
     /* SAPI */
     guint32 sapi;
-    proto_item *sapi_ti = proto_tree_add_item_ret_uint(header_tree, hf_l2server_sapi, tvb, offset, 2, ENC_LITTLE_ENDIAN, &sapi);
+    proto_item *sapi_ti = proto_tree_add_item_ret_uint(header_tree, hf_l2server_sapi, l2_tvb, offset, 2, ENC_LITTLE_ENDIAN, &sapi);
     offset += 2;
     /* Type */
     guint32 type;
-    proto_item *type_ti = proto_tree_add_item_ret_uint(header_tree, hf_l2server_type, tvb, offset, 2, ENC_LITTLE_ENDIAN, &type);
+    proto_item *type_ti = proto_tree_add_item_ret_uint(header_tree, hf_l2server_type, l2_tvb, offset, 2, ENC_LITTLE_ENDIAN, &type);
     offset += 2;
     /* Len */
     guint32 len;
-    proto_tree_add_item_ret_uint(header_tree, hf_l2server_len, tvb, offset, 4, ENC_LITTLE_ENDIAN, &len);
+    proto_tree_add_item_ret_uint(header_tree, hf_l2server_len, l2_tvb, offset, 4, ENC_LITTLE_ENDIAN, &len);
     offset += 4;
 
     /**********************************/
@@ -3214,7 +3219,7 @@ dissect_l2server_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
     if (sapi2fun == NULL) {
         expert_add_info_format(pinfo, sapi_ti, &ei_l2server_sapi_unknown,
                                "L2Server SAPI not recognised (%u)", sapi);
-        return tvb_captured_length(tvb);
+        return tvb_captured_length(l2_tvb);
     }
     else {
         /* Lookup dissector function from type (for this SAPI) */
@@ -3222,7 +3227,7 @@ dissect_l2server_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
         if (type2fun == NULL) {
             expert_add_info_format(pinfo, type_ti, &ei_l2server_sapi_unknown,
                                    "L2Server Type (%u) not recognised for SAPI %u", type, sapi);
-            return tvb_captured_length(tvb);
+            return tvb_captured_length(l2_tvb);
         }
 
         /* Header summary */
@@ -3241,7 +3246,7 @@ dissect_l2server_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
 
         /* Call dissector function for this sapi/type? */
         if (type2fun->prim_fun) {
-                (*type2fun->prim_fun)(l2server_tree, tvb, pinfo, 8, len);
+                (*type2fun->prim_fun)(l2server_tree, l2_tvb, pinfo, 8, len);
         }
         //col_append_fstr(pinfo->cinfo, COL_INFO, " - %s", type2fun->prim_name);
         proto_item_append_text(type_ti, " (%s)", type2fun->prim_name);
