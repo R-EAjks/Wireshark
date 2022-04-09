@@ -3171,6 +3171,7 @@ dissect_l2server_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
     gint offset = 0;
 
     /* Create a data source just for L2 payload.  This makes it easier to spot offsets inside message */
+    /* TODO: there must be a more elegant way to do this? */
     tvbuff_t *l2_tvb = tvb_new_child_real_data(tvb, tvb_get_ptr(tvb, 0, tvb_reported_length(tvb)),
                                                tvb_reported_length(tvb), tvb_reported_length(tvb));
     add_new_data_source(pinfo, l2_tvb, "L2 Message");
