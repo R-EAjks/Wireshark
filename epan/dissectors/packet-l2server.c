@@ -316,6 +316,7 @@ static int hf_l2server_nbdlbwpidtodel = -1;
 
 static int hf_l2server_sibfilterflag = -1;
 
+static int hf_l2server_num_pdcp_actions = -1;
 
 static const value_string lch_vals[] =
 {
@@ -2734,6 +2735,29 @@ static void dissect_sib_filter_act_act_nak(proto_tree *tree, tvbuff_t *tvb, pack
     offset += 2;
 }
 
+/* nr5g_l2_Srv_REEST_PREPAREt from nr5g-l2_Srv.h */
+static void dissect_reest_prepare_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                      guint offset, guint len _U_)
+{
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* Num PdcpAction_t (to up 32) */
+    guint32 num_pdcp_actions;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_num_pdcp_actions, tvb, offset, 4, ENC_LITTLE_ENDIAN, &num_pdcp_actions);
+    offset += 4;
+
+    for (guint n=0; n < num_pdcp_actions) {
+        // Entry is of type nr5g_pdcp_Com_Action_t
+
+        // RbType
+        // Rbid
+        // Action
+
+        offset += sizeof(nr5g_pdcp_Com_Action_t);
+    }
+}
 
 /************************************************************************************/
 
@@ -2807,6 +2831,9 @@ static TYPE_FUN om_type_funs[] =
         { nr5g_l2_Srv_RCP_UE_SET_INDEX_CMD,     "nr5g_l2_Srv_RCP_UE_SET_INDEX_CMD",       dissect_rcp_set_ue_index_cmd },
         { nr5g_l2_Srv_RCP_UE_SET_INDEX_ACK,     "nr5g_l2_Srv_RCP_UE_SET_INDEX_ACK",       dissect_rcp_set_ue_index_ack },
         { nr5g_l2_Srv_RCP_UE_SET_INDEX_NAK,     "nr5g_l2_Srv_RCP_UE_SET_INDEX_NAK",       dissect_sapi_type_dummy },
+
+        { nr5g_l2_Srv_REEST_PREPARE_CMD,        "nr5g_l2_Srv_REEST_PREPARE_CMD",          dissect_reest_prepare_cmd },
+        { nr5g_l2_Srv_REEST_PREPARE_ACK,        "nr5g_l2_Srv_REEST_PREPARE_ACL",          dissect_sapi_type_dummy },
 
         { nr5g_l2_Srv_HANDOVER_CMD,     "nr5g_l2_Srv_HANDOVER_CMD",       dissect_handover_cmd },
         /* TODO: what types are these? */
@@ -4027,6 +4054,9 @@ proto_register_l2server(void)
         { "SibFilterFlag", "l2server.sib-filter-flag", FT_UINT32, BASE_DEC,
           VALS(sib_folder_flag_vals), 0x0, NULL, HFILL }},
 
+      { &hf_l2server_num_pdcp_actions,
+        { "Number of PDCP Actions", "l2server.num-pdcp-actions", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {

@@ -100,6 +100,11 @@ typedef unsigned char uchar;
 #define nr5g_l2_Srv_RCP_UE_SET_INDEX_ACK    (nr5g_l2_Srv_RCP_UE_SET_INDEX_CMD | TYPE_ACK)
 #define nr5g_l2_Srv_RCP_UE_SET_INDEX_NAK    (nr5g_l2_Srv_RCP_UE_SET_INDEX_CMD | TYPE_NAK)
 
+/* Indicate re-establish procedure phase 1 (Suspend and New Target Cell Indication) */
+#define  nr5g_l2_Srv_REEST_PREPARE_CMD    (nr5g_l2_Srv_BASE_TYPE + 26)
+#define  nr5g_l2_Srv_REEST_PREPARE_ACK    (256 + nr5g_l2_Srv_REEST_PREPARE_CMD)
+#define  nr5g_l2_Srv_REEST_PREPARE_NAK    (512 + nr5g_l2_Srv_REEST_PREPARE_CMD)
+
 #define  nr5g_l2_Srv_HANDOVER_CMD      nr5g_l2_Srv_BASE_TYPE + 18
 #define  nr5g_l2_Srv_HANDOVER_ACK      (256 + nr5g_l2_Srv_HANDOVER_CMD)
 #define  nr5g_l2_Srv_HANDOVER_NAK      (512 + nr5g_l2_Srv_HANDOVER_CMD)
