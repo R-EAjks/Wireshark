@@ -2748,14 +2748,17 @@ static void dissect_reest_prepare_cmd(proto_tree *tree, tvbuff_t *tvb, packet_in
     proto_tree_add_item_ret_uint(tree, hf_l2server_num_pdcp_actions, tvb, offset, 4, ENC_LITTLE_ENDIAN, &num_pdcp_actions);
     offset += 4;
 
-    for (guint n=0; n < num_pdcp_actions) {
+    for (guint n=0; n < num_pdcp_actions; n++) {
         // Entry is of type nr5g_pdcp_Com_Action_t
 
         // RbType
+        offset += 1;
         // Rbid
+        offset += 1;
         // Action
+        offset += 1;
 
-        offset += sizeof(nr5g_pdcp_Com_Action_t);
+        //offset += sizeof(nr5g_pdcp_Com_Action_t);
     }
 }
 
