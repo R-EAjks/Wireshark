@@ -606,6 +606,40 @@ gather_tshark_runtime_info(feature_list l)
     epan_gather_runtime_info(l);
 }
 
+static gboolean
+_compile_dfilter(const char *text, dfilter_t **dfp, const char *caller)
+{
+    gboolean ok;
+    dfilter_loc_t err_loc;
+    char *err_msg = NULL;
+    char *err_off;
+    char *expanded;
+
+    expanded = dfilter_expand(text, &err_msg);
+    if (expanded == NULL) {
+        cmdarg_err("%s", err_msg);
+        g_free(err_msg);
+        return FALSE;
+    }
+
+    ok = dfilter_compile_real(expanded, dfp, &err_msg, &err_loc, caller, FALSE, FALSE);
+    if (!ok ) {
+        cmdarg_err("%s", err_msg);
+        g_free(err_msg);
+        if (err_loc.col_start >= 0) {
+            err_off = ws_strdup_underline(NULL, err_loc.col_start, err_loc.col_len);
+            cmdarg_err_cont("    %s", expanded);
+            cmdarg_err_cont("    %s", err_off);
+            g_free(err_off);
+        }
+    }
+
+    g_free(expanded);
+    return ok;
+}
+
+#define compile_dfilter(text, dfp)      _compile_dfilter(text, dfp, __func__)
+
 static void
 about_folders(void)
 {
@@ -2013,9 +2047,7 @@ main(int argc, char *argv[])
 
     if (rfilter != NULL) {
         ws_debug("Compiling read filter: '%s'", rfilter);
-        if (!dfilter_compile(rfilter, &rfcode, &err_msg)) {
-            cmdarg_err("%s", err_msg);
-            g_free(err_msg);
+        if (!compile_dfilter(rfilter, &rfcode)) {
             epan_cleanup();
             extcap_cleanup();
 
@@ -2040,9 +2072,7 @@ main(int argc, char *argv[])
 
     if (dfilter != NULL) {
         ws_debug("Compiling display filter: '%s'", dfilter);
-        if (!dfilter_compile(dfilter, &dfcode, &err_msg)) {
-            cmdarg_err("%s", err_msg);
-            g_free(err_msg);
+        if (!compile_dfilter(dfilter, &dfcode)) {
             epan_cleanup();
             extcap_cleanup();
 
