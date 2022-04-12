@@ -910,10 +910,8 @@ static void dissect_rlcmac_data_req(proto_tree *tree, tvbuff_t *tvb, packet_info
     }
     // TODO: need more prefs...
     else if (p_pdcp_nr_info->plane == NR_SIGNALING_PLANE) {
-        printf("%u: calling pdcp for signalling & UL\n", pinfo->num);
         tvbuff_t *pdcp_tvb = tvb_new_subset_remaining(tvb, offset);
         p_pdcp_nr_info->pdu_length = tvb_reported_length(pdcp_tvb);
-        printf("Calling with length %u\n", p_pdcp_nr_info->pdu_length);
         call_dissector_only(pdcp_nr_handle, pdcp_tvb, pinfo, tree, NULL);
 
         proto_item_set_hidden(pdcp_ti);
