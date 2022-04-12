@@ -91,6 +91,7 @@ InterfaceFrame::InterfaceFrame(QWidget * parent)
     QList<InterfaceTreeColumns> columns;
     columns.append(IFTREE_COL_EXTCAP);
     columns.append(IFTREE_COL_DISPLAY_NAME);
+    columns.append(IFTREE_COL_IP_ADDRESSES);
     columns.append(IFTREE_COL_STATS);
     proxy_model_.setColumns(columns);
     proxy_model_.setStoreOnChange(true);
@@ -351,6 +352,7 @@ void InterfaceFrame::resetInterfaceTreeDisplay()
         ui->interfaceTree->resizeColumnToContents(proxy_model_.mapSourceToColumn(IFTREE_COL_EXTCAP));
         ui->interfaceTree->resizeColumnToContents(proxy_model_.mapSourceToColumn(IFTREE_COL_DISPLAY_NAME));
         ui->interfaceTree->resizeColumnToContents(proxy_model_.mapSourceToColumn(IFTREE_COL_STATS));
+        ui->interfaceTree->resizeColumnToContents(proxy_model_.mapSourceToColumn(IFTREE_COL_IP_ADDRESSES));
     }
     else
     {

@@ -140,7 +140,31 @@ QVariant InterfaceTreeModel::data(const QModelIndex &index, int role) const
             }
             else if (col == IFTREE_COL_DISPLAY_NAME)
             {
-                return QString(device->display_name);
+                // TODO: Clean this up
+                // TODO: "Show hidden interfaces". Windows, it doesn't work. It's already showing the hidden interfaces
+                // Windows:
+                // device->display_name: 0x000001f24623f470 "Local Area Connection* 8"
+                // device->name: 0x000001f245ef6f50 "\\Device\\NPF_{C46583A9-BF68-4C87-81F2-02F28D38BECD}"
+                // device->friendly_name: 0x000001f24623f650 "Local Area Connection* 8"
+                // device->vendor_description: 0x000001f246116d20 "WAN Miniport (IP)"
+
+                // Linux:
+                // device->display_name: 
+                // device->name: same as display_name
+                // device->friendly_name: null
+                // device->vendor_description: null
+
+                // Mac:
+                // device->display_name: 
+                // device->name: 
+                // device->friendly_name: 
+                // device->vendor_description: 
+
+                static char buffer[5000];
+                sprintf(buffer, "%s\n[%s]\n[%s]\n[%s]", device->display_name, device->name, device->friendly_name, device->vendor_description);
+
+                // return QString(device->display_name);
+                return QString(buffer);
             }
             else if (col == IFTREE_COL_PIPE_PATH)
             {
@@ -197,6 +221,17 @@ QVariant InterfaceTreeModel::data(const QModelIndex &index, int role) const
                 }
 
                 return linkname;
+            }
+            else if (col == IFTREE_COL_IP_ADDRESSES)
+            {
+                if (device->no_addresses > 0)
+                {
+                    return QString(device->addresses);
+                }
+                else
+                {
+                    return QString("<No IP Address>");
+                }
             }
             else
             {
@@ -322,6 +357,10 @@ QVariant InterfaceTreeModel::headerData(int section, Qt::Orientation orientation
             else if (section == IFTREE_COL_CAPTURE_FILTER)
             {
                 return tr("Capture Filter");
+            }
+            else if (section == IFTREE_COL_IP_ADDRESSES)
+            {
+                return tr("IP Addresses");
             }
         }
     }
