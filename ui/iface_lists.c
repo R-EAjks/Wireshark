@@ -123,7 +123,7 @@ get_iface_display_name(const gchar *description, const if_info_t *if_info)
  */
 void
 scan_local_interfaces(void (*update_cb)(void))
-{   
+{
     scan_local_interfaces_filtered((GList *)0, update_cb);
 }
 

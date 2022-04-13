@@ -821,9 +821,6 @@ int main(int argc, char *qt_argv[])
         /* Allow only extcap interfaces to be found */
         GList * filter_list = NULL;
         filter_list = g_list_append(filter_list, GUINT_TO_POINTER((guint) IF_EXTCAP));
-            printf("Filtered List:\n");
-            for (guint i = 0; i < (guint) g_list_length(filter_list); i++)
-                printf(" %d \n", (guint) GPOINTER_TO_UINT(g_list_nth_data(filter_list, i)));
         fill_in_local_interfaces_filtered(filter_list, main_window_update);
         g_list_free(filter_list);
     }

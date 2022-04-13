@@ -102,7 +102,7 @@ public:
 
     void allSystemsGo();
     void emitLocalInterfaceEvent(const char *ifname, int added, int up);
-    
+
     virtual void refreshLocalInterfaces();
 
     struct _e_prefs * readConfigurationFiles(bool reset);
