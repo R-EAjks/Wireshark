@@ -22,12 +22,12 @@ extern "C" {
  * Get the global interface list.  Generate it if we haven't
  * done so already.
  */
-extern void fill_in_local_interfaces(void(*update_cb)(void));
+extern void fill_in_local_interfaces(bool extcap_only, void(*update_cb)(void));
 
 /*
  * Update the global interface list.
  */
-extern void scan_local_interfaces(void (*update_cb)(void));
+extern void scan_local_interfaces(bool extcap_only, void (*update_cb)(void));
 
 /*
  * Hide the interfaces
