@@ -4534,6 +4534,11 @@ static int hf_ieee80211_tag = -1;
 static int hf_ieee80211_tag_number = -1;
 static int hf_ieee80211_tag_length = -1;
 static int hf_ieee80211_tag_data = -1;
+
+static int hf_ieee80211_tag_intolerant_operating_class = -1;
+static int hf_ieee80211_tag_intolerant_channel_list = -1;
+static int hf_ieee80211_tag_intolerant_channel = -1;
+
 static int hf_ieee80211_tag_oui = -1;
 static int hf_ieee80211_tag_oui_wfa_subtype = -1;
 static int hf_ieee80211_tag_oui_wfa_action_type = -1;
@@ -7329,6 +7334,8 @@ static gint ett_wme_ecw = -1;
 static gint ett_wme_qos_info = -1;
 
 static gint ett_update_edca_info = -1;
+
+static gint ett_intolerant_tree = -1;
 
 static gint ett_ht_cap_tree = -1;
 static gint ett_ampduparam_tree = -1;
@@ -22663,6 +22670,33 @@ dissect_20_40_bss_coexistence(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 
   offset += 1;
 
+  return offset;
+}
+
+/* 20/40 BSS Coexistence Intolerant (73) */
+static int
+dissect_20_40_bss_intolerant(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
+{
+  (void)data;
+  proto_item *intolerant_item;
+  proto_tree *intolerant_tree;
+
+  int tag_len = tvb_reported_length(tvb);
+  int offset = 0;
+  int channel_report_size = tag_len - 1; // minus regulator_class field
+
+  if (tag_len < 2) {
+      expert_add_info_format(pinfo, tree, &ei_ieee80211_tag_length, "20/40 BSS intolerant length %u wrong, must > 1", tag_len);
+  }
+  proto_tree_add_item(tree, hf_ieee80211_tag_intolerant_operating_class, tvb, offset, 1, ENC_NA);
+  offset += 1;
+  intolerant_item = proto_tree_add_item(tree, hf_ieee80211_tag_intolerant_channel_list, tvb, offset, channel_report_size, ENC_NA);
+  intolerant_tree = proto_item_add_subtree(intolerant_item, ett_intolerant_tree);
+  for (int i = 0; i < channel_report_size; i++)
+  {
+    proto_tree_add_item(intolerant_tree, hf_ieee80211_tag_intolerant_channel, tvb, offset, 1, ENC_NA);
+    offset += 1;
+  }
   return offset;
 }
 
@@ -41147,6 +41181,18 @@ proto_register_ieee80211(void)
       FT_UINT32, BASE_DEC, NULL, 0,
       "Length of tag", HFILL }},
 
+    {&hf_ieee80211_tag_intolerant_operating_class,
+     {"Intolerant operating class", "wlan.tag.intolerant.operating_class",
+      FT_UINT8, BASE_HEX, NULL, 0, "Intolerant operating class", HFILL }},
+
+    {&hf_ieee80211_tag_intolerant_channel_list,
+     {"Intolerant channel list", "wlan.tag.intolerant.channel_list",
+      FT_UINT8, BASE_HEX, NULL, 0, "Intolerant channel list", HFILL }},
+
+    {&hf_ieee80211_tag_intolerant_channel,
+     {"Intolerant channel", "wlan.tag.intolerant.channel",
+      FT_UINT8, BASE_HEX, NULL, 0, "Intolerant channel", HFILL }},
+
     {&hf_ieee80211_tag_data,
      {"Tag Data", "wlan.tag.data",
       FT_BYTES, BASE_NONE, NULL, 0,
@@ -51044,6 +51090,8 @@ proto_register_ieee80211(void)
 
     &ett_update_edca_info,
 
+    &ett_intolerant_tree,
+
     &ett_ht_cap_tree,
     &ett_ampduparam_tree,
     &ett_mcsset_tree,
@@ -52103,6 +52151,7 @@ proto_reg_handoff_ieee80211(void)
   dissector_add_uint("wlan.tag.number", TAG_RM_ENABLED_CAPABILITY, create_dissector_handle(dissect_rm_enabled_capabilities_ie, -1));
   dissector_add_uint("wlan.tag.number", TAG_MULTIPLE_BSSID, create_dissector_handle(dissect_multiple_bssid_ie, -1));
   dissector_add_uint("wlan.tag.number", TAG_20_40_BSS_CO_EX, create_dissector_handle(dissect_20_40_bss_coexistence, -1));
+  dissector_add_uint("wlan.tag.number", TAG_20_40_BSS_INTOL_CH_REP, create_dissector_handle(dissect_20_40_bss_intolerant, -1));
   dissector_add_uint("wlan.tag.number", TAG_OVERLAP_BSS_SCAN_PAR, create_dissector_handle(dissect_overlap_bss_scan_par, -1));
   dissector_add_uint("wlan.tag.number", TAG_RIC_DESCRIPTOR, create_dissector_handle(dissect_ric_descriptor, -1));
   dissector_add_uint("wlan.tag.number", TAG_MESH_PEERING_MGMT, create_dissector_handle(ieee80211_tag_mesh_peering_mgmt, -1));
