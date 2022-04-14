@@ -1637,6 +1637,53 @@ static void dissect_base_format_1_or_2_byte_data(packet_info* pinfo, proto_tree*
    }
 }
 
+// 3 to 250 Byte Data section, Base Format
+// Note: All data starts from the beginning of the tvb buffer.
+static void dissect_base_format_3_to_250_byte_data(packet_info* pinfo, proto_tree* tree, tvbuff_t* tvb, int io_data_size,
+   gboolean compute_crc, const cip_connection_triad_t* connection_triad)
+{
+   proto_tree_add_item(tree, hf_cipsafety_data, tvb, 0, io_data_size, ENC_NA);
+   dissect_mode_byte(tree, tvb, io_data_size, pinfo);
+   guint mode_byte = tvb_get_guint8(tvb, io_data_size);
+
+   if (compute_crc)
+   {
+      guint16 computed_crc_s3 = compute_crc_s3_base_data(compute_crc_s3_pid(connection_triad),
+         mode_byte & MODE_BYTE_CRC_S3_MASK, tvb_get_ptr(tvb, 0, io_data_size), io_data_size);
+
+      proto_tree_add_checksum(tree, tvb, io_data_size + 1,
+         hf_cipsafety_crc_s3, hf_cipsafety_crc_s3_status, &ei_cipsafety_crc_s3, pinfo,
+         computed_crc_s3, ENC_LITTLE_ENDIAN, PROTO_CHECKSUM_VERIFY);
+   }
+   else
+   {
+      proto_tree_add_checksum(tree, tvb, io_data_size + 1,
+         hf_cipsafety_crc_s3, hf_cipsafety_crc_s3_status, &ei_cipsafety_crc_s3,
+         pinfo, 0, ENC_LITTLE_ENDIAN, PROTO_CHECKSUM_NO_FLAGS);
+   }
+
+   proto_item* complement_item = proto_tree_add_item(tree, hf_cipsafety_complement_data, tvb, io_data_size + 3, io_data_size, ENC_NA);
+   if (!verify_compliment_data(tvb, 0, io_data_size + 3, io_data_size))
+      expert_add_info(pinfo, complement_item, &ei_cipsafety_not_complement_data);
+
+   if (compute_crc)
+   {
+      guint16 computed_crc_s3 = compute_crc_s3_base_data(compute_crc_s3_pid(connection_triad),
+         ((mode_byte ^ 0xFF) & MODE_BYTE_CRC_S3_MASK),
+         tvb_get_ptr(tvb, io_data_size + 3, io_data_size), io_data_size);
+
+      proto_tree_add_checksum(tree, tvb, (io_data_size * 2) + 3,
+         hf_cipsafety_complement_crc_s3, hf_cipsafety_complement_crc_s3_status, &ei_cipsafety_complement_crc_s3, pinfo,
+         computed_crc_s3, ENC_LITTLE_ENDIAN, PROTO_CHECKSUM_VERIFY);
+   }
+   else
+   {
+      proto_tree_add_checksum(tree, tvb, (io_data_size * 2) + 3,
+         hf_cipsafety_complement_crc_s3, hf_cipsafety_complement_crc_s3_status, &ei_cipsafety_complement_crc_s3,
+         pinfo, 0, ENC_LITTLE_ENDIAN, PROTO_CHECKSUM_NO_FLAGS);
+   }
+}
+
 static void
 dissect_cip_safety_data( proto_tree *tree, proto_item *item, tvbuff_t *tvb, int item_length, packet_info *pinfo, cip_safety_info_t* safety_info)
 {
@@ -1745,45 +1792,9 @@ dissect_cip_safety_data( proto_tree *tree, proto_item *item, tvbuff_t *tvb, int 
             }
 
             io_data_size = multicast ? ((item_length-14)/2) : ((item_length-8)/2);
-
-            proto_tree_add_item(tree, hf_cipsafety_data, tvb, 0, io_data_size, ENC_NA);
-            dissect_mode_byte(tree, tvb, io_data_size, pinfo);
             mode_byte = tvb_get_guint8(tvb, io_data_size);
 
-            if (compute_crc)
-            {
-               proto_tree_add_checksum(tree, tvb, io_data_size+1,
-                        hf_cipsafety_crc_s3, hf_cipsafety_crc_s3_status, &ei_cipsafety_crc_s3, pinfo,
-                        compute_crc_s3_base_data(compute_crc_s3_pid(&connection_triad),
-                                mode_byte & MODE_BYTE_CRC_S3_MASK, tvb_get_ptr(tvb, 0, io_data_size), io_data_size),
-                        ENC_LITTLE_ENDIAN, PROTO_CHECKSUM_VERIFY);
-            }
-            else
-            {
-               proto_tree_add_checksum(tree, tvb, io_data_size+1,
-                        hf_cipsafety_crc_s3, hf_cipsafety_crc_s3_status, &ei_cipsafety_crc_s3,
-                        pinfo, 0, ENC_LITTLE_ENDIAN, PROTO_CHECKSUM_NO_FLAGS);
-            }
-
-            complement_item = proto_tree_add_item(tree, hf_cipsafety_complement_data, tvb, io_data_size+3, io_data_size, ENC_NA);
-            if (!verify_compliment_data(tvb, 0, io_data_size+3, io_data_size))
-                expert_add_info(pinfo, complement_item, &ei_cipsafety_not_complement_data);
-
-            if (compute_crc)
-            {
-               proto_tree_add_checksum(tree, tvb, (io_data_size*2)+3,
-                        hf_cipsafety_complement_crc_s3, hf_cipsafety_complement_crc_s3_status, &ei_cipsafety_complement_crc_s3, pinfo,
-                        compute_crc_s3_base_data(compute_crc_s3_pid(&connection_triad),
-                                ((mode_byte ^ 0xFF) & MODE_BYTE_CRC_S3_MASK),
-                                tvb_get_ptr(tvb, io_data_size+3, io_data_size), io_data_size),
-                        ENC_LITTLE_ENDIAN, PROTO_CHECKSUM_VERIFY);
-            }
-            else
-            {
-               proto_tree_add_checksum(tree, tvb, (io_data_size*2)+3,
-                        hf_cipsafety_complement_crc_s3, hf_cipsafety_complement_crc_s3_status, &ei_cipsafety_complement_crc_s3,
-                        pinfo, 0, ENC_LITTLE_ENDIAN, PROTO_CHECKSUM_NO_FLAGS);
-            }
+            dissect_base_format_3_to_250_byte_data(pinfo, tree, tvb, io_data_size, compute_crc, &connection_triad);
             dissect_base_format_time_stamp_section(pinfo, tree, tvb, (io_data_size * 2) + 5, compute_crc, mode_byte, &connection_triad);
 
             if (multicast)
