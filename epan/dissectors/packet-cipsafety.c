@@ -1684,6 +1684,37 @@ static void dissect_base_format_3_to_250_byte_data(packet_info* pinfo, proto_tre
    }
 }
 
+// 1 or 2 Byte Data Section, Extended Format
+// Note: All data starts from the beginning of the tvb buffer.
+static void dissect_extended_format_1_or_2_byte_data(packet_info* pinfo, proto_tree* tree, tvbuff_t* tvb, int io_data_size,
+   gboolean compute_crc, const cip_connection_triad_t* connection_triad, const cip_safety_packet_data_t* packet_data)
+{
+   proto_tree_add_item(tree, hf_cipsafety_data, tvb, 0, io_data_size, ENC_NA);
+   dissect_mode_byte(tree, tvb, io_data_size, pinfo);
+   guint mode_byte = tvb_get_guint8(tvb, io_data_size);
+
+   guint32 crc_s5_0, crc_s5_1, crc_s5_2;
+   proto_tree_add_item_ret_uint(tree, hf_cipsafety_crc_s5_0, tvb, io_data_size + 1, 1, ENC_LITTLE_ENDIAN, &crc_s5_0);
+   proto_tree_add_item_ret_uint(tree, hf_cipsafety_crc_s5_1, tvb, io_data_size + 2, 1, ENC_LITTLE_ENDIAN, &crc_s5_1);
+   proto_tree_add_item(tree, hf_cipsafety_timestamp, tvb, io_data_size + 3, 2, ENC_LITTLE_ENDIAN);
+   proto_tree_add_item_ret_uint(tree, hf_cipsafety_crc_s5_2, tvb, io_data_size + 5, 1, ENC_LITTLE_ENDIAN, &crc_s5_2);
+
+   guint16 timestamp = tvb_get_letohs(tvb, io_data_size + 3);
+
+   guint32 computed_crc_s5 = 0;
+   if (packet_data != NULL)
+   {
+      computed_crc_s5 = compute_crc_s5_short_data(compute_crc_s5_pid(connection_triad),
+         ((timestamp != 0) ? packet_data->rollover_value : 0),
+         mode_byte & MODE_BYTE_CRC_S5_BASE_MASK,
+         timestamp,
+         tvb_get_ptr(tvb, 0, io_data_size),
+         io_data_size);
+   }
+
+   validate_crc_s5(pinfo, tree, tvb, compute_crc, crc_s5_0, crc_s5_1, crc_s5_2, computed_crc_s5);
+}
+
 static void
 dissect_cip_safety_data( proto_tree *tree, proto_item *item, tvbuff_t *tvb, int item_length, packet_info *pinfo, cip_safety_info_t* safety_info)
 {
@@ -1843,27 +1874,7 @@ dissect_cip_safety_data( proto_tree *tree, proto_item *item, tvbuff_t *tvb, int 
 
          if (short_format)
          {
-            /* Short Format (1-2 bytes I/O data) */
-            proto_tree_add_item(tree, hf_cipsafety_data, tvb, 0, io_data_size, ENC_NA);
-            dissect_mode_byte(tree, tvb, io_data_size, pinfo);
-
-            guint32 crc_s5_0, crc_s5_1, crc_s5_2;
-            proto_tree_add_item_ret_uint(tree, hf_cipsafety_crc_s5_0, tvb, io_data_size+1, 1, ENC_LITTLE_ENDIAN, &crc_s5_0);
-            proto_tree_add_item_ret_uint(tree, hf_cipsafety_crc_s5_1, tvb, io_data_size+2, 1, ENC_LITTLE_ENDIAN, &crc_s5_1);
-            proto_tree_add_item(tree, hf_cipsafety_timestamp, tvb, io_data_size+3, 2, ENC_LITTLE_ENDIAN);
-            proto_tree_add_item_ret_uint(tree, hf_cipsafety_crc_s5_2, tvb, io_data_size+5, 1, ENC_LITTLE_ENDIAN, &crc_s5_2);
-
-            guint32 computed_crc_s5 = 0;
-            if (packet_data != NULL)
-            {
-               computed_crc_s5 = compute_crc_s5_short_data(compute_crc_s5_pid(&connection_triad),
-                  ((timestamp != 0) ? packet_data->rollover_value : 0),
-                  mode_byte & MODE_BYTE_CRC_S5_BASE_MASK,
-                  timestamp,
-                  tvb_get_ptr(tvb, 0, io_data_size),
-                  io_data_size);
-            }
-            validate_crc_s5(pinfo, tree, tvb, compute_crc, crc_s5_0, crc_s5_1, crc_s5_2, computed_crc_s5);
+            dissect_extended_format_1_or_2_byte_data(pinfo, tree, tvb, io_data_size, compute_crc, &connection_triad, packet_data);
 
             if (multicast)
             {
