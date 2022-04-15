@@ -142,6 +142,9 @@ QVariant InterfaceTreeModel::data(const QModelIndex &index, int role) const
             {
                 // TODO: Clean this up
                 // TODO: "Show hidden interfaces". Windows, it doesn't work. It's already showing the hidden interfaces
+                // TODO: Make interface box bigger
+                // TODO: Dividing lines between the interfaces
+                // TODO: Bold the first one.
                 // Windows:
                 // device->display_name: 0x000001f24623f470 "Local Area Connection* 8"
                 // device->name: 0x000001f245ef6f50 "\\Device\\NPF_{C46583A9-BF68-4C87-81F2-02F28D38BECD}"
@@ -161,7 +164,10 @@ QVariant InterfaceTreeModel::data(const QModelIndex &index, int role) const
                 // device->vendor_description: 
 
                 static char buffer[5000];
-                sprintf(buffer, "%s\n[%s]\n[%s]\n[%s]", device->display_name, device->name, device->friendly_name, device->vendor_description);
+                if (device->vendor_description)
+                    sprintf(buffer, "%s\n[%s]", device->display_name, device->vendor_description);
+                else
+                    sprintf(buffer, "%s\n", device->display_name);
 
                 // return QString(device->display_name);
                 return QString(buffer);
