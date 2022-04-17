@@ -2449,7 +2449,7 @@ static int dissect_pdcp_nr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
            Call nr-rrc dissector (according to direction and Bearer type) if we have valid data */
         if ((global_pdcp_dissect_signalling_plane_as_rrc) &&
             ((pdu_security == NULL) || (pdu_security->ciphering == nea0) || payload_deciphered ||
-             p_pdcp_info->ciphering_disabled || !pdu_security->seen_next_ul_pdu)) {
+             p_pdcp_info->ciphering_disabled || !pdu_security->seen_next_ul_pdu || pdu_security->dl_after_reest_request)) {
 
             /* Get appropriate dissector handle */
             dissector_handle_t rrc_handle = lookup_rrc_dissector_handle(p_pdcp_info, data_length);
