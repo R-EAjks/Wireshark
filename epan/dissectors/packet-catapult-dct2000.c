@@ -132,6 +132,7 @@ static int hf_catapult_dct2000_rawtraffic_pdu = -1;
 
 
 static int hf_catapult_dct2000_pdcp_nr_context = -1;
+
 /* Variables used for preferences */
 static gboolean catapult_dct2000_try_ipprim_heuristic = TRUE;
 static gboolean catapult_dct2000_try_sctpprim_heuristic = TRUE;
@@ -381,11 +382,6 @@ static void attach_rlc_lte_info(packet_info *pinfo, guint *outhdr_values,
                                 guint outhdr_values_found);
 static void attach_pdcp_lte_info(packet_info *pinfo, guint *outhdr_values,
                                  guint outhdr_values_found);
-
-static void attach_mac_nr_info(packet_info *pinfo, guint *outhdr_values,
-                               guint outhdr_values_found);
-static void attach_rlc_nr_info(packet_info *pinfo, guint *outhdr_values,
-                               guint outhdr_values_found);
 
 
 /* Return the number of bytes used to encode the length field
@@ -913,7 +909,7 @@ static char* get_key(tvbuff_t*tvb, gint offset)
 {
     static gchar key[33];
     for (int n=0; n < 16; n++) {
-        g_snprintf(&key[n*2], 33-(n*2), "%02x", tvb_get_guint8(tvb, offset+n));
+        snprintf(&key[n*2], 33-(n*2), "%02x", tvb_get_guint8(tvb, offset+n));
     }
     return key;
 }
@@ -1111,7 +1107,7 @@ static void dissect_rrc_lte_nr(tvbuff_t *tvb, gint offset,
                                      tvb, offset++, 1, ENC_BIG_ENDIAN, &downlink_sec_mode);
 
         if (len > 2) {
-            tag = tvb_get_guint8(tvb, offset++);  // Should be 0x21 */
+            tag = tvb_get_guint8(tvb, offset++);  /* Should be 0x21 */
             len = tvb_get_guint8(tvb, offset++);
 
             tag = tvb_get_guint8(tvb, offset++);
@@ -3087,7 +3083,7 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
 
                     const char *payload = &start[off+1];
 
-                    // Pad out to nearest 4 bytes if necessary.
+                    /* Pad out to nearest 4 bytes if necessary. */
                     /* Convert data to hex. */
                     #define MAX_NRUP_DATA_LENGTH 200
                     static guint8 nrup_data[MAX_NRUP_DATA_LENGTH];
@@ -3494,18 +3490,18 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                     }
                 }
 
+
+                /* 'raw' (ethernet) frames logged as text comments */
                 int raw_interface;
                 char raw_direction;
                 if (sscanf(string, "RawTraffic: Interface: %d %c $",
                            &raw_interface, &raw_direction) == 2)
                 {
-                    // Interface
-                    //printf("Process RawTraffic (interface=%d, direction=%c)\n", raw_interface, raw_direction);
-
+                    /* Interface */
                     proto_tree_add_uint(tree, hf_catapult_dct2000_rawtraffic_interface,
                                         tvb, 0, 0, raw_interface);
 
-                    // Direction
+                    /* Direction */
                     proto_tree_add_uint(tree, hf_catapult_dct2000_rawtraffic_direction,
                                         tvb, 0, 0, raw_direction == 'r');
 
@@ -3518,22 +3514,22 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                         }
                     }
 
-                    // Convert data to hex.
+                    /* Convert data to hex. */
                     static guint8 eth_data[36000];
                     int idx, m;
-                    for (idx=0, m=data_offset+1; string[m] != '\0'; m+=2, idx++) {
+                    for (idx=0, m=data_offset+1; idx<36000 && string[m] != '\0'; m+=2, idx++) {
                         eth_data[idx] = (hex_from_char(string[m]) << 4) + hex_from_char(string[m+1]);
                     }
 
-                    // Create tvb
+                    /* Create tvb */
                     tvbuff_t *raw_traffic_tvb = tvb_new_real_data(eth_data, idx, idx);
                     add_new_data_source(pinfo, raw_traffic_tvb, "Raw-Traffic Payload");
 
-                    // PDU
+                    /* PDU */
                     proto_tree_add_item(tree, hf_catapult_dct2000_rawtraffic_pdu, raw_traffic_tvb,
                                         0, tvb_reported_length(raw_traffic_tvb), ENC_NA);
 
-                    // Call the dissector!
+                    /* Call the dissector! */
                     sub_dissector_result = call_dissector_only(eth_handle, raw_traffic_tvb, pinfo, tree, NULL);
                 }
 
@@ -3940,6 +3936,8 @@ void proto_reg_handoff_catapult_dct2000(void)
     pdcp_nr_handle = find_dissector("pdcp-nr");
     nrup_handle = find_dissector("nrup");
     ip_handle = find_dissector_add_dependency("ip", proto_pdcp_nr);
+    eth_handle = find_dissector("eth_withoutfcs");
+    nrup_handle = find_dissector("nrup");
     eth_handle = find_dissector("eth_withoutfcs");
     nrup_handle = find_dissector("nrup");
 }
@@ -4415,6 +4413,7 @@ void proto_register_catapult_dct2000(void)
               NULL, HFILL
             }
         },
+
         { &hf_catapult_dct2000_pdcp_nr_context,
             { "PDCP NR Context",
               "dct2000.pdcp-nr-context", FT_STRING, BASE_NONE, NULL, 0x0,
