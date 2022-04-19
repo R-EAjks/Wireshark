@@ -101,6 +101,7 @@ static int hf_l2server_ra_rnti = -1;
 static int hf_l2server_discard_rar_num = -1;
 static int hf_l2server_ul_subcarrier_spacing = -1;
 static int hf_l2server_no_data = -1;
+static int hf_l2server_msg3_data = -1;
 static int hf_l2server_crid = -1;
 static int hf_l2server_rel_cellid = -1;
 static int hf_l2server_add_cellid = -1;
@@ -1257,7 +1258,7 @@ static void dissect_handover_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *p
 }
 
 /* nr5g_rlcmac_Data_RA_REQ in nr5g-rlcmac_Data.h */
-static void dissect_ra_req(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+static void dissect_ra_req(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
                            guint offset, guint len _U_)
 {
     /* Nr5gId (UEId + CellId + BeamIdx) */
@@ -1307,9 +1308,25 @@ static void dissect_ra_req(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _
     proto_tree_add_item(tree, hf_l2server_discard_rar_num, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset++;
     /* NoData */
-    proto_tree_add_item(tree, hf_l2server_no_data, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 nodata;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_no_data, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nodata);
     offset++;
+
     /* Data/msg3... */
+    if (!nodata) {
+        proto_tree_add_string_format(tree, hf_l2server_msg3_data, tvb, offset,
+                                     -1, "", "Msg3");
+
+        /* Don't want RRC dissector to overwrite Info column */
+        col_set_writable(pinfo->cinfo, COL_INFO, FALSE);
+
+        /* Call UL CCCH dissector for these bytes */
+        dissector_handle_t msg3_handle = find_dissector_add_dependency("nr-rrc.ul.ccch", proto_pdcp_nr);
+        tvbuff_t *msg3_payload_tvb = tvb_new_subset_length(tvb, offset, -1);
+        call_dissector_only(msg3_handle, msg3_payload_tvb, pinfo, tree, NULL);
+
+        col_set_writable(pinfo->cinfo, COL_INFO, FALSE);
+    }
 
     // Add rach filter
     proto_item *rach_ti = proto_tree_add_item(tree, hf_l2server_rach, tvb, 0, 0, ENC_NA);
@@ -3474,6 +3491,10 @@ proto_register_l2server(void)
       { &hf_l2server_no_data,
         { "NoData", "l2server.no-data", FT_UINT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_msg3_data,
+        { "NoData", "l2server.msg3-data", FT_STRING, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
       { &hf_l2server_crid,
         { "CRId", "l2server.cr-id", FT_UINT8, BASE_DEC,
           NULL, 0x0, "Contention Resolution Id", HFILL }},
