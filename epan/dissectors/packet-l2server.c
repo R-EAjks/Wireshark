@@ -1256,6 +1256,7 @@ static void dissect_handover_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *p
     offset += 4;
 }
 
+/* nr5g_rlcmac_Data_RA_REQ in nr5g-rlcmac_Data.h */
 static void dissect_ra_req(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                            guint offset, guint len _U_)
 {

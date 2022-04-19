@@ -783,7 +783,7 @@ proto_register_pdcp_uu(void)
     { &hf_pdcp_uu_header_len,
        { "Header Length", "pdcp-uu.header-len", FT_UINT32, BASE_DEC,
          NULL, 0x0, NULL, HFILL}},
-  };
+    };
 
 
     static gint *ett[] = {
@@ -799,7 +799,7 @@ proto_register_pdcp_uu(void)
     proto_register_field_array(proto_pdcp_uu, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
 
-    pdcp_uu_handle = register_dissector("pdcp_uu", dissect_pdcp_uu, proto_pdcp_uu);
+    pdcp_uu_handle = register_dissector("pdcp-uu", dissect_pdcp_uu, proto_pdcp_uu);
 
     /* Preferences */
     pdcp_uu_module = prefs_register_protocol(proto_pdcp_uu, NULL);
