@@ -1810,7 +1810,6 @@ dissect_cip_safety_data( proto_tree *tree, proto_item *item, tvbuff_t *tvb, int 
    enum cip_safety_format_type format = CIP_SAFETY_BASE_FORMAT;
    guint16 timestamp;
    guint8 mode_byte;
-   cip_safety_packet_data_t* packet_data = NULL;
    gboolean short_format = TRUE;
    gboolean compute_crc = ((safety_info != NULL) && (safety_info->compute_crc == TRUE));
    cip_connection_triad_t connection_triad = {0};
@@ -1931,6 +1930,7 @@ dissect_cip_safety_data( proto_tree *tree, proto_item *item, tvbuff_t *tvb, int 
             timestamp = tvb_get_letohs(tvb, (io_data_size*2)+5);
          }
 
+         cip_safety_packet_data_t* packet_data = NULL;
          if (compute_crc)
          {
             packet_data = get_timestamp_packet_data(pinfo, safety_info, timestamp);
@@ -1953,11 +1953,6 @@ dissect_cip_safety_data( proto_tree *tree, proto_item *item, tvbuff_t *tvb, int 
                /* Malformed packet */
                expert_add_info(pinfo, item, &ei_mal_io);
                return;
-            }
-
-            if (compute_crc)
-            {
-               packet_data = get_timestamp_packet_data(pinfo, safety_info, timestamp);
             }
 
             dissect_extended_format_3_to_250_byte_data(pinfo, tree, tvb, io_data_size, compute_crc, &connection_triad, packet_data);
