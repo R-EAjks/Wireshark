@@ -1771,6 +1771,35 @@ static void dissect_extended_format_3_to_250_byte_data(packet_info* pinfo, proto
    validate_crc_s5(pinfo, tree, tvb, compute_crc, crc_s5_0, crc_s5_1, crc_s5_2, computed_crc_s5);
 }
 
+// Note: This updates the running timestamp/rollover data in safety_info during the first pass.
+static cip_safety_packet_data_t* get_timestamp_packet_data(packet_info* pinfo, cip_safety_info_t* safety_info, guint16 timestamp)
+{
+   cip_safety_packet_data_t* packet_data = NULL;
+
+   /* Determine if packet timestamp results in rollover count increment */
+   if (!pinfo->fd->visited)
+   {
+      if ((timestamp != 0) && (timestamp < safety_info->eip_conn_info->safety.running_timestamp_value))
+      {
+         safety_info->eip_conn_info->safety.running_rollover_value++;
+      }
+
+      safety_info->eip_conn_info->safety.running_timestamp_value = timestamp;
+
+      /* Save the rollover value for CRC calculations */
+      packet_data = wmem_new0(wmem_file_scope(), cip_safety_packet_data_t);
+      packet_data->rollover_value = safety_info->eip_conn_info->safety.running_rollover_value;
+
+      p_add_proto_data(wmem_file_scope(), pinfo, proto_cipsafety, 0, packet_data);
+   }
+   else
+   {
+      packet_data = (cip_safety_packet_data_t*)p_get_proto_data(wmem_file_scope(), pinfo, proto_cipsafety, 0);
+   }
+
+   return packet_data;
+}
+
 static void
 dissect_cip_safety_data( proto_tree *tree, proto_item *item, tvbuff_t *tvb, int item_length, packet_info *pinfo, cip_safety_info_t* safety_info)
 {
@@ -1904,26 +1933,7 @@ dissect_cip_safety_data( proto_tree *tree, proto_item *item, tvbuff_t *tvb, int 
 
          if (compute_crc)
          {
-            /* Determine if packet timestamp results in rollover count increment */
-            if (!pinfo->fd->visited)
-            {
-               if ((timestamp != 0) && (timestamp < safety_info->eip_conn_info->safety.running_timestamp_value))
-               {
-                  safety_info->eip_conn_info->safety.running_rollover_value++;
-               }
-
-               safety_info->eip_conn_info->safety.running_timestamp_value = timestamp;
-
-               /* Save the rollover value for CRC calculations */
-               packet_data = wmem_new0(wmem_file_scope(), cip_safety_packet_data_t);
-               packet_data->rollover_value = safety_info->eip_conn_info->safety.running_rollover_value;
-
-               p_add_proto_data(wmem_file_scope(), pinfo, proto_cipsafety, 0, packet_data);
-            }
-            else
-            {
-               packet_data = (cip_safety_packet_data_t*)p_get_proto_data(wmem_file_scope(), pinfo, proto_cipsafety, 0);
-            }
+            packet_data = get_timestamp_packet_data(pinfo, safety_info, timestamp);
          }
 
          if (short_format)
@@ -1947,26 +1957,7 @@ dissect_cip_safety_data( proto_tree *tree, proto_item *item, tvbuff_t *tvb, int 
 
             if (compute_crc)
             {
-               /* Determine if packet timestamp results in rollover count increment */
-               if (!pinfo->fd->visited)
-               {
-                  if ((timestamp != 0) && (timestamp < safety_info->eip_conn_info->safety.running_timestamp_value))
-                  {
-                     safety_info->eip_conn_info->safety.running_rollover_value++;
-                  }
-
-                  safety_info->eip_conn_info->safety.running_timestamp_value = timestamp;
-
-                  /* Save the rollover value for CRC calculations */
-                  packet_data = wmem_new0(wmem_file_scope(), cip_safety_packet_data_t);
-                  packet_data->rollover_value = safety_info->eip_conn_info->safety.running_rollover_value;
-
-                  p_add_proto_data(wmem_file_scope(), pinfo, proto_cipsafety, 0, packet_data);
-               }
-               else
-               {
-                  packet_data = (cip_safety_packet_data_t*)p_get_proto_data(wmem_file_scope(), pinfo, proto_cipsafety, 0);
-               }
+               packet_data = get_timestamp_packet_data(pinfo, safety_info, timestamp);
             }
 
             dissect_extended_format_3_to_250_byte_data(pinfo, tree, tvb, io_data_size, compute_crc, &connection_triad, packet_data);
