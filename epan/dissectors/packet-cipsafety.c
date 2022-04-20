@@ -318,7 +318,6 @@ static dissector_handle_t cipsafety_extended_time_coord_handle;
 
 typedef struct cip_safety_packet_data {
    guint16 rollover_value;
-   guint16 timestamp_value;
 } cip_safety_packet_data_t;
 
 #define MODE_BYTE_CRC_S1_MASK  0xE0
@@ -1705,7 +1704,7 @@ static void dissect_extended_format_1_or_2_byte_data(packet_info* pinfo, proto_t
    if (packet_data != NULL)
    {
       computed_crc_s5 = compute_crc_s5_short_data(compute_crc_s5_pid(connection_triad),
-         ((timestamp != 0) ? packet_data->rollover_value : 0),
+         packet_data->rollover_value,
          mode_byte & MODE_BYTE_CRC_S5_BASE_MASK,
          timestamp,
          tvb_get_ptr(tvb, 0, io_data_size),
@@ -1731,7 +1730,7 @@ static void dissect_extended_format_3_to_250_byte_data(packet_info* pinfo, proto
       if (packet_data != NULL)
       {
          guint16 computed_crc_s3 = compute_crc_s3_extended_data(compute_crc_s3_pid(connection_triad),
-            ((timestamp != 0) ? packet_data->rollover_value : 0),
+            packet_data->rollover_value,
             mode_byte & MODE_BYTE_CRC_S3_MASK,
             tvb_get_ptr(tvb, 0, io_data_size), io_data_size);
 
@@ -1761,7 +1760,7 @@ static void dissect_extended_format_3_to_250_byte_data(packet_info* pinfo, proto
    if (packet_data != NULL)
    {
       computed_crc_s5 = compute_crc_s5_long_data(compute_crc_s5_pid(connection_triad),
-         ((timestamp != 0) ? packet_data->rollover_value : 0),
+         packet_data->rollover_value,
          mode_byte & MODE_BYTE_CRC_S5_EXTENDED_MASK,
          timestamp,
          /* I/O data is duplicated because it will be complemented inline */
@@ -1779,16 +1778,27 @@ static cip_safety_packet_data_t* get_timestamp_packet_data(packet_info* pinfo, c
    /* Determine if packet timestamp results in rollover count increment */
    if (!pinfo->fd->visited)
    {
-      if ((timestamp != 0) && (timestamp < safety_info->eip_conn_info->safety.running_timestamp_value))
-      {
-         safety_info->eip_conn_info->safety.running_rollover_value++;
-      }
-
-      safety_info->eip_conn_info->safety.running_timestamp_value = timestamp;
-
-      /* Save the rollover value for CRC calculations */
       packet_data = wmem_new0(wmem_file_scope(), cip_safety_packet_data_t);
-      packet_data->rollover_value = safety_info->eip_conn_info->safety.running_rollover_value;
+
+      if ((timestamp == 0) && !safety_info->eip_conn_info->safety.seen_non_zero_timestamp)
+      {
+         // The rollover value is zero, until the Time Coordination exchange is done.
+         // When the timestamp is zero, that means we haven't seen the Time Coordination message.
+         packet_data->rollover_value = 0;
+      }
+      else
+      {
+         safety_info->eip_conn_info->safety.seen_non_zero_timestamp = TRUE;
+
+         if (timestamp < safety_info->eip_conn_info->safety.running_timestamp_value)
+         {
+            safety_info->eip_conn_info->safety.running_rollover_value++;
+         }
+
+         /* Save the rollover value for CRC calculations */
+         packet_data->rollover_value = safety_info->eip_conn_info->safety.running_rollover_value;
+         safety_info->eip_conn_info->safety.running_timestamp_value = timestamp;
+      }
 
       p_add_proto_data(wmem_file_scope(), pinfo, proto_cipsafety, 0, packet_data);
    }
