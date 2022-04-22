@@ -3479,7 +3479,7 @@ proto_register_l2server(void)
         { "MaxUpPwr", "l2server.maxuppwr", FT_UINT32, BASE_DEC,
           NULL, 0x0, "Maximum uplink power (in dBm)", HFILL }},
       { &hf_l2server_brsrp,
-        { "BRSRP", "l2server.brsrp", FT_UINT32, BASE_HEX_DEC,
+        { "BRSRP", "l2server.brsrp", FT_UINT32, BASE_HEX,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_ue_category,
         { "UE Category", "l2server.ue-category", FT_UINT32, BASE_DEC,
