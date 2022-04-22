@@ -448,6 +448,13 @@ static const value_string cip_svalidator_type_conn_type_vals[] = {
    { 0,        NULL          }
 };
 
+const range_string safety_max_consumer_numbers[] = {
+   { 1, 1, "Single-cast" },
+   { 2, 15, "Multicast" },
+
+   { 0, 0, NULL }
+};
+
 void cip_safety_128us_fmt(gchar *s, guint32 value)
 {
    // Each tick is 128us.
@@ -2852,7 +2859,7 @@ proto_register_cipsafety(void)
       },
       { &hf_cip_svalidator_max_consumer_num,
         { "Max Consumer Number", "cipsafety.svalidator.max_consumer_num",
-          FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }
+          FT_UINT8, BASE_DEC|BASE_RANGE_STRING, RVALS(safety_max_consumer_numbers), 0, NULL, HFILL }
       },
       { &hf_cip_svalidator_data_conn_inst,
         { "Data Connection Instance", "cipsafety.svalidator.data_conn_inst",
