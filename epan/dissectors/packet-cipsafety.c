@@ -1514,8 +1514,6 @@ static void dissect_base_format_time_correction_message(proto_tree* tree, tvbuff
    proto_tree_add_item(tree, hf_cipsafety_time_correction, tvb, offset + 1, 2, ENC_LITTLE_ENDIAN);
    proto_tree_add_item(tree, hf_cipsafety_mcast_byte2, tvb, offset + 3, 1, ENC_LITTLE_ENDIAN);
    proto_tree_add_item(tree, hf_cipsafety_crc_s3, tvb, offset + 4, 2, ENC_LITTLE_ENDIAN);
-
-   // TODO: Validate CRC S3.
 }
 
 // Extended Format Time Correction Message
