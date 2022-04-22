@@ -404,7 +404,7 @@ static const value_string cip_ssupervisor_device_status_type_vals[] = {
    { 0,        "Undefined" },
    { 1,        "Self-Testing"   },
    { 2,        "Idle"   },
-   { 3,        "Self-Testing Exception"   },
+   { 3,        "Self-Test Exception"   },
    { 4,        "Executing"   },
    { 5,        "Abort"   },
    { 6,        "Critical Fault"   },
