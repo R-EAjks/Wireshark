@@ -176,6 +176,7 @@ static int hf_l2server_rlc_t_status_prohibit = -1;
 static int hf_l2server_spare1 = -1;
 static int hf_l2server_spare2 = -1;
 static int hf_l2server_spare4 = -1;
+static int hf_l2server_spare11 = -1;
 static int hf_l2server_package_type = -1;
 static int hf_l2server_dbeamid = -1;
 static int hf_l2server_dbeam_status = -1;
@@ -602,6 +603,12 @@ static const value_string  sib_folder_flag_vals[] =
 {
     { 0,    "Legacy" },
     { 0,   NULL }
+};
+
+static const true_false_string nodata_data_vals =
+{
+    "No Msg3 bytes present",
+    "Msg3 bytes present"
 };
 
 
@@ -1257,7 +1264,7 @@ static void dissect_handover_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *p
     offset += 4;
 }
 
-/* nr5g_rlcmac_Data_RA_REQ in nr5g-rlcmac_Data.h */
+/* nr5g_rlcmac_Data_RA_REQ_t in nr5g-rlcmac_Data.h */
 static void dissect_ra_req(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
                            guint offset, guint len _U_)
 {
@@ -1295,6 +1302,7 @@ static void dissect_ra_req(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
     proto_tree_add_item(tree, hf_l2server_scgid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     /* Spare 11 bytes */
+    proto_tree_add_item(tree, hf_l2server_spare11, tvb, offset, 11, ENC_LITTLE_ENDIAN);
     offset += 11;
     /* Rt_Preamble */
     offset ++;
@@ -1308,8 +1316,8 @@ static void dissect_ra_req(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
     proto_tree_add_item(tree, hf_l2server_discard_rar_num, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset++;
     /* NoData */
-    guint32 nodata;
-    proto_tree_add_item_ret_uint(tree, hf_l2server_no_data, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nodata);
+    gboolean nodata;
+    proto_tree_add_item_ret_boolean(tree, hf_l2server_no_data, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nodata);
     offset++;
 
     /* Data/msg3... */
@@ -3471,7 +3479,7 @@ proto_register_l2server(void)
         { "MaxUpPwr", "l2server.maxuppwr", FT_UINT32, BASE_DEC,
           NULL, 0x0, "Maximum uplink power (in dBm)", HFILL }},
       { &hf_l2server_brsrp,
-        { "BRSRP", "l2server.brsrp", FT_UINT32, BASE_DEC,
+        { "BRSRP", "l2server.brsrp", FT_UINT32, BASE_HEX_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_ue_category,
         { "UE Category", "l2server.ue-category", FT_UINT32, BASE_DEC,
@@ -3489,8 +3497,8 @@ proto_register_l2server(void)
         { "Discard RAR Num", "l2server.discard-rar-num", FT_UINT8, BASE_DEC,
           VALS(discard_rar_num_vals), 0x0, NULL, HFILL }},
       { &hf_l2server_no_data,
-        { "NoData", "l2server.no-data", FT_UINT8, BASE_DEC,
-          NULL, 0x0, NULL, HFILL }},
+        { "NoData", "l2server.no-data", FT_BOOLEAN, 1,
+          TFS(&nodata_data_vals), 0x0, NULL, HFILL }},
       { &hf_l2server_msg3_data,
         { "NoData", "l2server.msg3-data", FT_STRING, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
@@ -3701,6 +3709,9 @@ proto_register_l2server(void)
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_spare4,
         { "Spare", "l2server.spare", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_spare11,
+        { "Spare", "l2server.spare", FT_BYTES, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_package_type,
