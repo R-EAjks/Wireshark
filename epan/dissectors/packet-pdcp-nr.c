@@ -1745,7 +1745,6 @@ static guint32 calculate_digest(pdu_security_settings_t *pdu_security_settings, 
             }
 #endif
 
-#if GCRYPT_VERSION_NUMBER >= 0x010600 /* 1.6.0 */
         case nia2:
             {
                 /* AES */
@@ -1808,7 +1807,6 @@ static guint32 calculate_digest(pdu_security_settings_t *pdu_security_settings, 
                 *calculated = TRUE;
                 return ((mac[0] << 24) | (mac[1] << 16) | (mac[2] << 8) | mac[3]);
             }
-#endif
 #ifdef HAVE_ZUC
         case nia3:
             {
