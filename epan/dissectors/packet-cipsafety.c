@@ -213,7 +213,7 @@ static int hf_cip_svalidator_state = -1;
 static int hf_cip_svalidator_type = -1;
 static int hf_cip_svalidator_type_pc = -1;
 static int hf_cip_svalidator_type_conn_type = -1;
-static int hf_cip_svalidator_ping_eri = -1;
+static int hf_cip_svalidator_ping_epi = -1;
 static int hf_cip_svalidator_time_coord_msg_min_mult_size = -1;
 static int hf_cip_svalidator_time_coord_msg_min_mult_item = -1;
 static int hf_cip_svalidator_network_time_multiplier_size = -1;
@@ -2120,7 +2120,7 @@ attribute_info_t cip_safety_attribute_vals[] = {
    {0x3A, TRUE, 8, -1, "Safety Connection Fault Count", cip_uint, &hf_cip_svalidator_sconn_fault_count, NULL},
    {0x3A, FALSE, 1, 0, "Safety Validator State", cip_usint, &hf_cip_svalidator_state, NULL},
    {0x3A, FALSE, 2, 1, "Safety Validator Type", cip_dissector_func, NULL, dissect_s_validator_type},
-   {0x3A, FALSE, 3, 2, "Ping Interval ERI Multiplier", cip_uint, &hf_cip_svalidator_ping_eri, NULL},
+   {0x3A, FALSE, 3, 2, "Ping Interval EPI Multiplier", cip_uint, &hf_cip_svalidator_ping_epi, NULL},
    {0x3A, FALSE, 4, 3, "Time Coord Msg Min Multiplier", cip_dissector_func, NULL, dissect_s_validator_time_coord_msg_min_mult},
    {0x3A, FALSE, 5, 4, "Network Time Expectation Multiplier", cip_dissector_func, NULL, dissect_s_validator_network_time_multiplier},
    {0x3A, FALSE, 6, 5, "Timeout Multiplier", cip_dissector_func, NULL, dissect_s_validator_timeout_multiplier},
@@ -2822,8 +2822,8 @@ proto_register_cipsafety(void)
         { "Safety Connection Type", "cipsafety.svalidator.type.conn_type",
           FT_UINT8, BASE_DEC, VALS(cip_svalidator_type_conn_type_vals), 0x7F, NULL, HFILL }
       },
-      { &hf_cip_svalidator_ping_eri,
-        { "Ping Interval EPI Multiplier", "cipsafety.svalidator.ping_eri",
+      { &hf_cip_svalidator_ping_epi,
+        { "Ping Interval EPI Multiplier", "cipsafety.svalidator.ping_epi",
           FT_UINT16, BASE_DEC, NULL, 0, NULL, HFILL }
       },
       { &hf_cip_svalidator_time_coord_msg_min_mult_size,
