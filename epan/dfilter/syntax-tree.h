@@ -15,6 +15,7 @@
 
 #include <wsutil/ws_assert.h>
 #include <wsutil/wslog.h>
+#include <epan/ftypes/ftypes.h>
 
 /** @file
  */

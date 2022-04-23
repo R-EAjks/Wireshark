@@ -15,6 +15,7 @@
 #include <wsutil/str_util.h>
 #include <wsutil/glib-compat.h>
 #include "sttype-test.h"
+#include "sttype-function.h"
 #include "dfilter-int.h"
 
 /* Keep track of sttype_t's via their sttype_id_t number */
@@ -379,6 +380,7 @@ static void
 visit_tree(wmem_strbuf_t *buf, stnode_t *node, int level)
 {
 	stnode_t *left, *right;
+	GSList *params;
 
 	if (stnode_type_id(node) == STTYPE_TEST ||
 			stnode_type_id(node) == STTYPE_ARITHMETIC) {
@@ -397,6 +399,18 @@ visit_tree(wmem_strbuf_t *buf, stnode_t *node, int level)
 		}
 		else if (right) {
 			ws_assert_not_reached();
+		}
+	}
+	else if (stnode_type_id(node) == STTYPE_FUNCTION) {
+		wmem_strbuf_append_printf(buf, "%s:\n", stnode_todebug(node));
+		params = sttype_function_params(node);
+		while (params) {
+			indent(buf, level + 1);
+			visit_tree(buf, params->data, level + 1);
+			if (params->next != NULL) {
+				wmem_strbuf_append_c(buf, '\n');
+			}
+			params = params->next;
 		}
 	}
 	else {

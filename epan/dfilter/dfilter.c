@@ -76,15 +76,14 @@ dfilter_fail(dfwork_t *dfw, stloc_t *loc,
 }
 
 void
-dfilter_fail_throw(dfwork_t *dfw, stloc_t *loc,
-				long code, const char *format, ...)
+dfilter_fail_throw(dfwork_t *dfw, stloc_t *loc, const char *format, ...)
 {
 	va_list	args;
 
 	va_start(args, format);
 	dfilter_vfail(dfw, loc, format, args);
 	va_end(args);
-	THROW(code);
+	THROW(TypeError);
 }
 
 void
@@ -113,12 +112,28 @@ dfilter_resolve_unparsed(dfwork_t *dfw, const char *name)
 	hfinfo = proto_registrar_get_byalias(name);
 	if (hfinfo != NULL) {
 		/* It's an aliased field name */
-		add_deprecated_token(dfw, name);
+		if (dfw)
+			add_deprecated_token(dfw, name);
 		return hfinfo;
 	}
 
 	/* It's not a field. */
 	return NULL;
+}
+
+gboolean
+dfw_resolve_unparsed(dfwork_t *dfw, stnode_t *st)
+{
+	if (stnode_type_id(st) != STTYPE_UNPARSED)
+		return FALSE;
+
+	header_field_info *hfinfo = dfilter_resolve_unparsed(dfw, stnode_data(st));
+	if (hfinfo != NULL) {
+		stnode_replace(st, STTYPE_FIELD, hfinfo);
+		return TRUE;
+	}
+	stnode_replace(st, STTYPE_LITERAL, g_strdup(stnode_data(st)));
+	return FALSE;
 }
 
 /* Initialize the dfilter module */
@@ -173,6 +188,8 @@ dfilter_new(GPtrArray *deprecated)
 	if (deprecated)
 		df->deprecated = g_ptr_array_ref(deprecated);
 
+	df->function_stack = NULL;
+
 	return df;
 }
 
@@ -207,6 +224,11 @@ dfilter_free(dfilter_t *df)
 
 	if (df->deprecated)
 		g_ptr_array_unref(df->deprecated);
+
+	if (df->function_stack != NULL) {
+		ws_critical("Function stack list should be NULL");
+		g_slist_free(df->function_stack);
+	}
 
 	g_free(df->registers);
 	g_free(df->attempted_load);
