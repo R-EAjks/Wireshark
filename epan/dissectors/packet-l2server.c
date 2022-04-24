@@ -229,8 +229,6 @@ static int hf_l2server_sp_cell_cfg_lte_crs_pattern_list1 = -1;
 static int hf_l2server_sp_cell_cfg_lte_crs_pattern_list2 = -1;
 
 
-
-
 static int hf_l2server_serv_cell_idx = -1;
 static int hf_l2server_bwp_inactivity_timer = -1;
 static int hf_l2server_tag_id = -1;
@@ -319,6 +317,12 @@ static int hf_l2server_nbdlbwpidtodel = -1;
 static int hf_l2server_sibfilterflag = -1;
 
 static int hf_l2server_num_pdcp_actions = -1;
+
+static int hf_l2server_ta = -1;
+static int hf_l2server_ra_info_valid = -1;
+static int hf_l2server_rach_probe_req = -1;
+
+
 
 static const value_string lch_vals[] =
 {
@@ -707,6 +711,10 @@ static void dissect_sapi_type_dummy(proto_tree *tree, tvbuff_t *tvb, packet_info
 /* Forward declarations */
 static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                            guint offset, guint len _U_);
+
+static guint dissect_rlcmac_cmac_ra_info(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                        guint offset, guint len _U_, guint32 *bwpid);
+
 
 static void dissect_login_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                               guint offset, guint len)
@@ -1164,23 +1172,32 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
                                     guint offset, guint len _U_)
 {
     // Spare
+    proto_tree_add_item(tree, hf_l2server_spare4, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     // CellId
     proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     // TA
+    proto_tree_add_item(tree, hf_l2server_ta, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // RaInfoValid
-    // RachProbeReq
+    gboolean ra_info_valid;
+    proto_tree_add_item_ret_boolean(tree, hf_l2server_ra_info_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &ra_info_valid);
     offset += 1;
-    // RA_Info
-    // if (ra_info_valid) {
-    //    guint32 bwpid = 0;
-    //    dissect_rlcmac_cmac_ra_info(tree, tvb, pinfo, offset, len, &bwpid);
-    // }
+    // RachProbeReq
+    proto_tree_add_item(tree, hf_l2server_rach_probe_req, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
 
-    // CellCfg (nr5g_rlcmac_Cmac_CellCfg_t)
+    // RA_Info (nr5g_rlcmac_Cmac_RA_Info_t) -> (bb_nr5g_CELL_GROUP_CONFIGt in bb-nr5g_struct.h)
+    if (ra_info_valid) {
+        guint32 bwpid = 0;
+        dissect_rlcmac_cmac_ra_info(tree, tvb, pinfo, offset, len, &bwpid);
+    }
+
+    // CellCfg (nr5g_rlcmac_Cmac_CellCfg_t from nr5g-rlcmac_Cmac.h)
     // TODO:
+    //   PhyCellConfg
+    //   CellCfgCommon
 }
 
 
@@ -1457,7 +1474,7 @@ static guint dissect_rlcmac_cmac_ra_info(proto_tree *tree, tvbuff_t *tvb, packet
     proto_item *ra_info_ti = proto_tree_add_string_format(tree, hf_l2server_ra_info, tvb,
                                                           offset, sizeof(nr5g_rlcmac_Cmac_RA_Info_t),
                                                           "", "RA Info ");
-    proto_tree *ra_info_tree = proto_item_add_subtree(ra_info_ti, ett_l2server_header);
+    proto_tree *ra_info_tree = proto_item_add_subtree(ra_info_ti, ett_l2server_ra_info);
 
     // bwpId
     proto_tree_add_item_ret_int(ra_info_tree, hf_l2server_bwpid, tvb, offset, 4, ENC_LITTLE_ENDIAN, bwpid);
@@ -4090,6 +4107,15 @@ proto_register_l2server(void)
 
       { &hf_l2server_num_pdcp_actions,
         { "Number of PDCP Actions", "l2server.num-pdcp-actions", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ta,
+        { "TA", "l2server.ta", FT_INT8, BASE_DEC,
+          NULL, 0x0, "Timing Advance (-1 for none)", HFILL }},
+      { &hf_l2server_ra_info_valid,
+        { "RA Info Valid", "l2server.ra-info-valid", FT_BOOLEAN, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rach_probe_req,
+        { "RACH Probe Req", "l2server.rach-probe-req", FT_BOOLEAN, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
     };
 
