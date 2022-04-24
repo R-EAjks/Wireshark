@@ -143,7 +143,7 @@ class File:
         if m:
             if m.group(2).lower() in { "bit", "bits", "gb", "kbps", "gig", "mb", "th", "mhz", "v", "hz", "k",
                                        "mbps", "m", "g", "ms", "nd", "nds", "rd", "kb", "kbit",
-                                       "khz", "km", "ms", "usec", "sec", "gbe", "ns", "ksps", "qam" }:
+                                       "khz", "km", "ms", "usec", "sec", "gbe", "ns", "ksps", "qam", "mm" }:
                 return True
         return False
 
@@ -239,7 +239,7 @@ def removeContractions(code_string):
                      "shouldn’t", "didn’t", "wouldn’t", "aren’t", "there’s", "packet’s", "couldn’t", "world’s",
                      "needn’t", "graph’s", "table’s", "parent’s", "entity’s", "server’s", "node’s",
                      "querier’s", "sender’s", "receiver’s", "computer’s", "frame’s", "vendor’s", "system’s",
-                     "we’ll", "asciidoctor’s", "protocol’s", "microsoft’s" ]
+                     "we’ll", "asciidoctor’s", "protocol’s", "microsoft’s", "wasn’t" ]
     for c in contractions:
         code_string = code_string.replace(c, "")
         code_string = code_string.replace(c.capitalize(), "")
@@ -311,10 +311,10 @@ def isGeneratedFile(filename):
 
     # Open file
     f_read = open(os.path.join(filename), 'r')
-    for line_no,line in enumate(f_read):
+    for line_no,line in enumerate(f_read):
         # The comment to say that its generated is near the top, so give up once
         # get a few lines down.
-        if lines_tested > 10:
+        if line_no > 10:
             f_read.close()
             return False
         if (line.find('Generated automatically') != -1 or
