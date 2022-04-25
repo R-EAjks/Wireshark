@@ -715,6 +715,10 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
 static guint dissect_rlcmac_cmac_ra_info(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                         guint offset, guint len _U_, guint32 *bwpid);
 
+static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset);
+
+
 
 static void dissect_login_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                               guint offset, guint len)
@@ -1191,12 +1195,14 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
     // RA_Info (nr5g_rlcmac_Cmac_RA_Info_t) -> (bb_nr5g_CELL_GROUP_CONFIGt in bb-nr5g_struct.h)
     if (ra_info_valid) {
         guint32 bwpid = 0;
-        dissect_rlcmac_cmac_ra_info(tree, tvb, pinfo, offset, len, &bwpid);
+        offset = dissect_rlcmac_cmac_ra_info(tree, tvb, pinfo, offset, len, &bwpid);
     }
 
     // CellCfg (nr5g_rlcmac_Cmac_CellCfg_t from nr5g-rlcmac_Cmac.h)
-    // TODO:
+
     //   PhyCellConfg
+    offset = dissect_ph_cell_config(tree, tvb, pinfo, offset);
+
     //   CellCfgCommon
 }
 
