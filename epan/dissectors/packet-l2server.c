@@ -322,6 +322,7 @@ static int hf_l2server_ta = -1;
 static int hf_l2server_ra_info_valid = -1;
 static int hf_l2server_rach_probe_req = -1;
 
+static int hf_l2server_rrc_state = -1;
 
 
 static const value_string lch_vals[] =
@@ -602,6 +603,14 @@ static const value_string  drx_short_cycle_vals[] =
     { 20,   "ms640" },
     { 0,   NULL }
 };
+
+static const value_string  rrc_state_vals[] =
+{
+    { nr5g_rlcmac_Cmac_Rrc_State_IDLE,       "IDLE" },
+    { nr5g_rlcmac_Cmac_Rrc_State_MAC_RESET,  "MAC_RESET" },
+    { 0,   NULL }
+};
+
 
 static const value_string  sib_folder_flag_vals[] =
 {
@@ -2809,6 +2818,18 @@ static void dissect_reest_prepare_cmd(proto_tree *tree, tvbuff_t *tvb, packet_in
     }
 }
 
+static void dissect_rrc_state_cfg_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                      guint offset, guint len _U_)
+{
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* State */
+    proto_tree_add_item(tree, hf_l2server_rrc_state, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+}
+
+
 /************************************************************************************/
 
 
@@ -3011,7 +3032,7 @@ static TYPE_FUN nr_rlcmac_cmac_type_funs[] =
     { nr5g_rlcmac_Cmac_CONFIG_NAK,     "nr5g_rlcmac_Cmac_CONFIG_NAK",       dissect_sapi_type_dummy /* TODO */},
     { nr5g_rlcmac_Cmac_SEG_CONFIG_REQ, "nr5g_rlcmac_Cmac_SEG_CONFIG_REQ",       dissect_sapi_type_dummy /* TODO */},
 
-    { nr5g_rlcmac_Cmac_RRC_STATE_CFG_CMD, "nr5g_rlcmac_Cmac_RRC_STATE_CFG_CMD",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_RRC_STATE_CFG_CMD, "nr5g_rlcmac_Cmac_RRC_STATE_CFG_CMD",       dissect_rrc_state_cfg_cmd },
     { nr5g_rlcmac_Cmac_RRC_STATE_CFG_ACK, "nr5g_rlcmac_Cmac_RRC_STATE_CFG_ACK",       dissect_sapi_type_dummy /* TODO */},
     { nr5g_rlcmac_Cmac_RRC_STATE_CFG_NAK, "nr5g_rlcmac_Cmac_RRC_STATE_CFG_NAK",       dissect_sapi_type_dummy /* TODO */},
 
@@ -4123,6 +4144,10 @@ proto_register_l2server(void)
       { &hf_l2server_rach_probe_req,
         { "RACH Probe Req", "l2server.rach-probe-req", FT_BOOLEAN, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_rrc_state,
+        { "State", "l2server.rrc-state", FT_UINT8, BASE_DEC,
+          VALS(rrc_state_vals), 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
