@@ -662,6 +662,7 @@ static expert_field ei_l2server_type_unknown = EI_INIT;
 extern int proto_pdcp_nr;
 
 static dissector_handle_t l2server_handle;
+static dissector_handle_t l2server_message_handle;
 static dissector_handle_t pdcp_nr_handle;
 
 void proto_reg_handoff_l2server (void);
@@ -3280,7 +3281,7 @@ dissect_l2server_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
 
     /* Add divider if not first PDU in this frame */
     gboolean *already_set = (gboolean*)p_get_proto_data(wmem_file_scope(), pinfo, proto_l2server, 0);
-    if (*already_set) {
+    if (already_set && *already_set) {
          col_append_str(pinfo->cinfo, COL_PROTOCOL, "|");
          col_append_str(pinfo->cinfo, COL_INFO, "  ||  ");
     }
@@ -4194,6 +4195,7 @@ proto_register_l2server(void)
     expert_l2server = expert_register_protocol(proto_l2server);
     expert_register_field_array(expert_l2server, ei, array_length(ei));
 
+    l2server_message_handle = register_dissector("l2server-message", dissect_l2server_message, proto_l2server);
     l2server_handle = register_dissector("l2server", dissect_l2server, proto_l2server);
 
     /* Preferences */

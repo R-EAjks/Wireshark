@@ -365,6 +365,7 @@ static dissector_handle_t pdcp_nr_handle;
 static dissector_handle_t ip_handle;
 
 static dissector_handle_t eth_handle;
+static dissector_handle_t l2server_handle;
 
 static dissector_handle_t look_for_dissector(const char *protocol_name);
 static guint parse_outhdr_string(const guchar *outhdr_string, gint outhdr_length, guint *outhdr_values);
@@ -3533,6 +3534,29 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                     sub_dissector_result = call_dissector_only(eth_handle, raw_traffic_tvb, pinfo, tree, NULL);
                 }
 
+                /* Look for logged L2 PDUs */
+                const char *l2_pattern = "L2 PDU: ";
+                start = strstr(string, l2_pattern);
+                if (start) {
+                    /* Find $, after which is data */
+                    for (int n=0; string[n]; n++) {
+                        if (string[n] == '$') {
+                            /* Convert string to hex. */
+                            static guint8 l2_data[36000];
+                            int idx, m;
+                            for (idx=0, m=n+1; idx<36000 && string[m] != '\0'; m+=2, idx++) {
+                                l2_data[idx] = (hex_from_char(string[m]) << 4) + hex_from_char(string[m+1]);
+                            }
+
+                            /* Create tvb */
+                            tvbuff_t *l2_traffic_tvb = tvb_new_real_data(l2_data, idx, idx);
+
+                            /* Call the dissector! */
+                            sub_dissector_result = call_dissector_only(l2server_handle, l2_traffic_tvb, pinfo, tree, NULL);
+                            break;
+                        }
+                    }
+                }
                 return tvb_captured_length(tvb);
             }
 
@@ -3940,6 +3964,7 @@ void proto_reg_handoff_catapult_dct2000(void)
     nrup_handle = find_dissector("nrup");
     eth_handle = find_dissector("eth_withoutfcs");
     nrup_handle = find_dissector("nrup");
+    l2server_handle = find_dissector("l2server-message");
 }
 
 /****************************************/
