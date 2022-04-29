@@ -2077,7 +2077,7 @@ static int dissect_rlcmac_drx_config(proto_tree *tree, tvbuff_t *tvb, packet_inf
 }
 
 
-// Type is nr5g_rlcmac_Cmac_CONFIG_CMD_t
+// Type is nr5g_rlcmac_Cmac_CONFIG_CMD_t from nr5g-rlcmac_Cmac.h
 static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                            guint offset, guint len _U_)
 {
@@ -2143,6 +2143,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         proto_tree_add_item_ret_uint(rb_info_tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &rbid);
         offset += 1;
         // reestablishRLC
+        // TODO:
         offset += 1;
         // RbMappingInfo
 
@@ -3988,10 +3989,10 @@ proto_register_l2server(void)
         { "Priority", "l2server.priority", FT_UINT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_prioritized_bit_rate,
-        { "Prioritized bit rate", "l2server.prioritized-bit-rate", FT_UINT32, BASE_DEC,
+        { "Prioritized bit rate", "l2server.prioritized-bit-rate", FT_INT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_bucket_size_duration,
-        { "Bucket Size Duration", "l2server.bucket-size-duration", FT_UINT32, BASE_DEC,
+        { "Bucket Size Duration", "l2server.bucket-size-duration", FT_INT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_allowed_serving_cells,
         { "Allowed Serving Cells", "l2server.allowed-serving-cells", FT_UINT32, BASE_DEC,
@@ -4015,7 +4016,7 @@ proto_register_l2server(void)
         { "Request Duplicates from PDCP", "l2server.request-duplicates-from-pdcp", FT_UINT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_scheduling_request_id,
-        { "Scheduling Request ID", "l2server.scheduling-request-id", FT_UINT32, BASE_DEC,
+        { "Scheduling Request ID", "l2server.scheduling-request-id", FT_INT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_bit_rate_query_prohibit_timer,
         { "Bit Rate Query Prohibit Timer", "l2server.bit-rate-query-prohibit-timer", FT_INT32, BASE_DEC,
