@@ -2944,8 +2944,8 @@ proto_register_cipsafety(void)
    };
 
    static ei_register_info ei[] = {
-      { &ei_cipsafety_tbd_not_complemented, { "cipsafety.tbd_not_complemented", PI_PROTOCOL, PI_WARN, "TBD_2_bit not complemented", EXPFILL }},
-      { &ei_cipsafety_tbd2_not_copied, { "cipsafety.tbd2_not_copied", PI_PROTOCOL, PI_WARN, "TBD bit not copied", EXPFILL }},
+      { &ei_cipsafety_tbd_not_complemented, { "cipsafety.tbd_not_complemented", PI_PROTOCOL, PI_WARN, "TBD bit not complemented", EXPFILL }},
+      { &ei_cipsafety_tbd2_not_copied, { "cipsafety.tbd2_not_copied", PI_PROTOCOL, PI_WARN, "TBD2 bit not copied", EXPFILL }},
       { &ei_cipsafety_run_idle_not_complemented, { "cipsafety.run_idle_not_complemented", PI_PROTOCOL, PI_WARN, "Run/Idle bit not complemented", EXPFILL }},
       { &ei_mal_io, { "cipsafety.malformed.io", PI_MALFORMED, PI_ERROR, "Malformed CIP Safety I/O packet", EXPFILL }},
       { &ei_mal_sercosiii_link_error_count_p1p2, { "cipsafety.malformed.sercosiii_link.error_count_p1p2", PI_MALFORMED, PI_ERROR, "Malformed SERCOS III Attribute 5", EXPFILL }},
