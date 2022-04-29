@@ -1613,8 +1613,51 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     // Pdcch_BlindDetection (1..15)
     offset += 1;
 
-    // TODO lots more...
-    offset += 22;
+    // TODO
+    // Harq_ACK_SpatialBundlingPUCCH_secondaryPUCCHgroup_r16
+    offset += 1;
+    // Harq_ACK_SpatialBundlingPUSCH_secondaryPUCCHgroup_r16
+    offset += 1;
+    // Pdsch_HARQ_ACK_Codebook_secondaryPUCCHgroup_r16
+    offset += 1;
+    // P_NR_FR2_r16
+    offset += 1;
+    // P_UE_FR2_r16
+    offset += 1;
+    // Nrdc_PCmode_FR1_r16
+    offset += 1;
+    // Nrdc_PCmode_FR2_r16
+    offset += 1;
+    // Pdsch_HARQ_ACK_Codebook_r16
+    offset += 1;
+    // Nfi_TotalDAI_Included_r16
+    offset += 1;
+    // Ul_TotalDAI_Included_r16
+    offset += 1;
+    // Pdsch_HARQ_ACK_OneShotFeedback_r16
+    offset += 1;
+    // pdsch_HARQ_ACK_OneShotFeedbackNDI_r16
+    offset += 1;
+    // pdsch_HARQ_ACK_OneShotFeedbackCBG_r16
+    offset += 1;
+    // DownlinkAssignmentIndexDCI_0_2_r16
+    offset += 1;
+    // DownlinkAssignmentIndexDCI_1_2_r16
+    offset += 1;
+    // NbPdsch_HARQ_ACK_CodebookList_r16
+    offset += 1;
+    // AckNackFeedbackMode_r16
+    offset += 1;
+    // Pdcch_BlindDetection2_r16
+    offset += 1;
+    // Pdcch_BlindDetection3_r16
+    offset += 1;
+    // BdFactorR_r16
+    offset += 1;
+    // Pdsch_HARQ_ACK_CodebookList_r16
+    offset += 2;
+    // Pad
+    offset += 1;
 
     if (dcp_config_present) {
         // N.B. Size of this is fixed.
@@ -1819,7 +1862,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         proto_item_set_len(ded_ti, offset-start_offset);
     }
 
-    // UlCellCfgDed (bb_nr5g_UPLINK_DEDICATED_CONFIGt)
+    // UlCellCfgDed (bb_nr5g_UPLINK_DEDICATED_CONFIGt from bb-nr5g_struct.h)
     if (ul_ded_present) {
         guint start_offset = offset;
         proto_item *ded_ti = proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_ul, tvb,
@@ -1848,7 +1891,8 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
 
         // InitialUlBwp
         if (field_mask & bb_nr5g_STRUCT_UPLINK_DEDICATED_CONFIG_INITIAL_UL_BWP_PRESENT) {
-            // TODO:
+            // TODO: bb_nr5g_BWP_UPLINKDEDICATEDt
+            // A lot of FieldMask bits and other types inside here...
         }
 
 
@@ -2336,18 +2380,24 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
 
 
     //---------------------------------------------------------------
-    // L1CellDedicatedConfig (bb_nr5g_CELL_DEDICATED_CONFIGt)
+    // L1CellDedicatedConfig (bb_nr5g_CELL_DEDICATED_CONFIGt from bb-nr5g_struct.h)
     if (l1cell_dedicated_config_len > 0) {
         dedicated_start = offset;
         proto_item *l1_dedicated_config_ti = proto_tree_add_string_format(tree, hf_l2server_l1_cell_dedicated_config, tvb,
                                                               offset, l1cell_dedicated_config_len,
                                                               "", "L1 Cell Dedicated Config");
         proto_tree *l1_dedicated_config_tree = proto_item_add_subtree(l1_dedicated_config_ti, ett_l2server_l1_cell_dedicated_config);
+
         // NbSCellCfgAdd
-        proto_tree_add_item(l1_dedicated_config_tree, hf_l2server_nb_scell_cfg_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        guint32 nbSCellCfgAdd;
+        proto_tree_add_item_ret_uint(l1_dedicated_config_tree, hf_l2server_nb_scell_cfg_add, tvb, offset, 1,
+                                     ENC_LITTLE_ENDIAN, &nbSCellCfgAdd);
         offset += 1;
+
         // NbSCellCfgDel
-        proto_tree_add_item(l1_dedicated_config_tree, hf_l2server_nb_scell_cfg_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        guint32 nbSCellCfgDel;
+        proto_tree_add_item_ret_uint(l1_dedicated_config_tree, hf_l2server_nb_scell_cfg_del, tvb, offset, 1,
+                                     ENC_LITTLE_ENDIAN, &nbSCellCfgDel);
         offset += 1;
         // FieldMask
         proto_tree_add_item(l1_dedicated_config_tree, hf_l2server_field_mask_1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -2360,16 +2410,28 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         offset = dissect_ph_cell_config(l1_dedicated_config_tree, tvb, pinfo, offset);
 
         // TODO: don't understand why we seem to be out here!!!!!????
-        offset += 6;
+        offset += 9;
 
         if (ded_present) {
-        // SpCellCfgDed
+            // SpCellCfgDed. N.B. offset returned here won't be right yet..
             offset = dissect_sp_cell_cfg_ded(l1_dedicated_config_tree, tvb, pinfo, offset);
         }
 
         if (common_present) {
             // SpCellCfgCommon
             offset = dissect_sp_cell_cfg_common(l1_dedicated_config_tree, tvb, pinfo, offset);
+        }
+
+        // SCellCfgAdd
+        for (guint32 n=0; n<nbSCellCfgAdd; n++) {
+            // TODO: dissect bb_nr5g_SCELL_CONFIGt
+            // Type depends upon FieldMask present flags, etc..
+        }
+
+        // SCellCfgDel
+        for (guint32 n=0; n<nbSCellCfgDel; n++) {
+            // TODO: dissect uint32_t
+            offset += 4;
         }
 
         // Skip to pass this.
