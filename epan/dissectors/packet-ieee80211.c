@@ -14697,7 +14697,6 @@ add_ff_s1g_twt_setup(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, int of
   const guint8 ids[] = { TAG_TWT };
   guint start = offset;
 
-  offset += add_ff_dialog_token(tree, tvb, pinfo, offset);
   offset += add_tagged_field(pinfo, tree, tvb, offset, 0, ids, G_N_ELEMENTS(ids), NULL);
 
   return offset - start;
@@ -46062,7 +46061,7 @@ proto_register_ieee80211(void)
       NULL, HFILL }},
 
     {&hf_ieee80211_tag_extended_capabilities_b60,
-     {"Protected QLoad Report", "wlan.extcap.b61",
+     {"Protected QLoad Report", "wlan.extcap.b60",
       FT_BOOLEAN, 8, NULL, 0x10,
       NULL, HFILL }},
 
@@ -46108,7 +46107,7 @@ proto_register_ieee80211(void)
       NULL, HFILL }},
 
     {&hf_ieee80211_tag_extended_capabilities_b60_2,
-     {"Protected QLoad Report", "wlan.extcap.b61",
+     {"Protected QLoad Report", "wlan.extcap.b60",
       FT_BOOLEAN, 16, NULL, 0x10,
       NULL, HFILL }},
 
