@@ -205,6 +205,15 @@ static int hf_l2server_harq_ack_spatial_bundling_pucch = -1;
 static int hf_l2server_harq_ack_spatial_bundling_pusch = -1;
 static int hf_l2server_pmax_nr = -1;
 static int hf_l2server_pdsch_harq_ack_codebook = -1;
+static int hf_l2server_mcs_crnti_valid = -1;
+static int hf_l2server_mcs_crnti = -1;
+static int hf_l2server_pue_fr1 = -1;
+
+static int hf_l2server_tpc_srs_rnti = -1;
+static int hf_l2server_tpc_pucch_rnti = -1;
+static int hf_l2server_tpc_pusch_rnti = -1;
+static int hf_l2server_sp_csi_rnti = -1;
+static int hf_l2server_cs_rnti = -1;
 
 static int hf_l2server_sp_cell_cfg_ded = -1;
 
@@ -1593,21 +1602,28 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     offset += 1;
 
     // McsRntValid
+    proto_tree_add_item(config_tree, hf_l2server_mcs_crnti_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // McsCRnti
+    proto_tree_add_item(config_tree, hf_l2server_mcs_crnti, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
-
     // PUE_FR1 [30..33]
+    proto_tree_add_item(config_tree, hf_l2server_pue_fr1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // TpcSrsRNTI
+    proto_tree_add_item(config_tree, hf_l2server_tpc_srs_rnti, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     // TpcPucchRNTI
+    proto_tree_add_item(config_tree, hf_l2server_tpc_pucch_rnti, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     // TpcPuschRNTI
+    proto_tree_add_item(config_tree, hf_l2server_tpc_pusch_rnti, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     // SpCsiRNTI
+    proto_tree_add_item(config_tree, hf_l2server_sp_csi_rnti, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     // CsRNTI
+    proto_tree_add_item(config_tree, hf_l2server_cs_rnti, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 
     // Pdcch_BlindDetection (1..15)
@@ -3891,16 +3907,41 @@ proto_register_l2server(void)
         { "PDCCh Blind Detection Present", "l2server.field-mask.pdcch-blind-detection-present", FT_BOOLEAN, 8,
           NULL, bb_nr5g_STRUCT_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_PRESENT, NULL, HFILL }},
       { &hf_l2server_harq_ack_spatial_bundling_pucch,
-        { "HARQ ACK Spacial Bundling PUCCH", "l2server.harq-ack-spatial-bundling-pucch", FT_UINT8, BASE_DEC,
+        { "HARQ ACK Spacial Bundling PUCCH", "l2server.harq-ack-spatial-bundling-pucch", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_harq_ack_spatial_bundling_pusch,
-        { "HARQ ACK Spacial Bundling PUSCH", "l2server.harq-ack-spatial-bundling-pusch", FT_UINT8, BASE_DEC,
+        { "HARQ ACK Spacial Bundling PUSCH", "l2server.harq-ack-spatial-bundling-pusch", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_pmax_nr,
         { "pMax NR", "l2server.pmax-nr", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_pdsch_harq_ack_codebook,
         { "PDSCH HARQ ACK Codebook", "l2server.pdsch-harq-ack-codebook", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_mcs_crnti_valid,
+        { "MCS CRNTI Valid", "l2server.mcs-crnti-valid", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_mcs_crnti,
+        { "MCS CRNTI", "l2server.mcs-crnti", FT_UINT16, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pue_fr1,
+        { "PUE FR1", "l2server.pue-fr1", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_tpc_srs_rnti,
+        { "TPC SRS RNTI", "l2server.tpc-srs-rnti", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_tpc_pucch_rnti,
+        { "TPC PUCCH RNTI", "l2server.tpc-pucch-rnti", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_tpc_pusch_rnti,
+        { "TPC PUSCH RNTI", "l2server.tpc-pusch-rnti", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sp_csi_rnti,
+        { "SP CSI RNTI", "l2server.sp-csi-rnti", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_cs_rnti,
+        { "CS RNTI", "l2server.cs-rnti", FT_INT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_sp_cell_cfg_ded,
@@ -4048,7 +4089,7 @@ proto_register_l2server(void)
         { "Logical Channel Group", "l2server.lcg", FT_UINT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_priority,
-        { "Priority", "l2server.priority", FT_UINT8, BASE_DEC,
+        { "Priority", "l2server.priority", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_prioritized_bit_rate,
         { "Prioritized bit rate", "l2server.prioritized-bit-rate", FT_INT32, BASE_DEC,
