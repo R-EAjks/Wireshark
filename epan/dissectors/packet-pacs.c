@@ -1202,7 +1202,7 @@ proto_register_cdd(void)
         // N.B. These modifiers are only for flow frame generation.
         // Not client frame generation.
         { &hf_cdd_u,
-            {   "Data Modifier", "cdd.utype", FT_STRING, BASE_NONE,
+            {   "Data Modifier", "cdd.data-modifier", FT_STRING, BASE_NONE,
                 NULL, 0x0, NULL, HFILL }
         },
         { &hf_cdd_utype,

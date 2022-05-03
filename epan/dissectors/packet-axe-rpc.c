@@ -1413,7 +1413,7 @@ proto_register_axe_rpc(void)
         { &hf_axe_rpc_chassis_service_part_code_phy_elems, {
             "Phy Elems", "axe-rpc.service.part-code.phy-elems", FT_UINT8, BASE_DEC, NULL, 0xf0, "Number of phy elements in port (e.g. mimo)", HFILL }},
         { &hf_axe_rpc_chassis_service_part_code_phy_caps, {
-            "Phy Caps", "axe-rpc.service.part-code.phy-elems", FT_UINT8, BASE_DEC, VALS(part_code_phy_caps_vals), 0x0f, "Phy compatibility flags", HFILL }},
+            "Phy Caps", "axe-rpc.service.part-code.phy-caps", FT_UINT8, BASE_DEC, VALS(part_code_phy_caps_vals), 0x0f, "Phy compatibility flags", HFILL }},
         { &hf_axe_rpc_chassis_service_part_code_series, {
             "Series", "axe-rpc.service.part-code.series", FT_UINT8, BASE_DEC, VALS(part_code_series_vals), 0x0, "General indication of software platform level", HFILL }},
         { &hf_axe_rpc_chassis_service_part_code_gen_caps, {

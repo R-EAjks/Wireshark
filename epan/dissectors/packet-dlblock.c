@@ -555,7 +555,7 @@ proto_register_dlblock(void)
           FT_UINT8, BASE_DEC, NULL, 0x0,
           NULL, HFILL  }},
         { &hf_dlblock_max_ldpc_iterations,
-          { "Max LDPC Iterations", "dlblock.ldpc-iterations",
+          { "Max LDPC Iterations", "dlblock.max-ldpc-iterations",
           FT_UINT8, BASE_DEC, NULL, 0x0,
           NULL, HFILL  }},
 
