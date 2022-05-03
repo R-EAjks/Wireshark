@@ -214,6 +214,7 @@ static int hf_l2server_tpc_pucch_rnti = -1;
 static int hf_l2server_tpc_pusch_rnti = -1;
 static int hf_l2server_sp_csi_rnti = -1;
 static int hf_l2server_cs_rnti = -1;
+static int hf_l2server_pdcch_blind_detection = -1;
 
 static int hf_l2server_sp_cell_cfg_ded = -1;
 
@@ -1627,8 +1628,8 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     offset += 4;
 
     // Pdcch_BlindDetection (1..15)
+    proto_tree_add_item(config_tree, hf_l2server_pdcch_blind_detection, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
-
     // TODO
     // Harq_ACK_SpatialBundlingPUCCH_secondaryPUCCHgroup_r16
     offset += 1;
@@ -2764,8 +2765,8 @@ static void dissect_setparm_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
 
 
 
-static void dissect_rlcmac_error(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
-                                 guint offset, guint len _U_)
+static void dissect_rlcmac_error_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                     guint offset, guint len _U_)
 {
     /* Log filter */
     proto_item *log_ti = proto_tree_add_item(tree, hf_l2server_log, tvb, 0, 0, ENC_NA);
@@ -3091,7 +3092,9 @@ static value_string  nr_rlcmac_l1_test_type_vals[MAX_NR_RLCMAC_L1_TEST_TYPE_VALS
 
 static TYPE_FUN nr_rlcmac_error_type_funs[] =
 {
-    { nr5g_rlcmac_Cmac_STAT_UE_LO_IND,    "lte_l2_Sap_NR_RLCMAC_ERROR",     dissect_rlcmac_error},
+    // TODO: these Type values are probably not right...
+    { nr5g_rlcmac_Cmac_STAT_UE_HI_IND,    "lte_l2_Sap_NR_RLCMAC_ERROR",     dissect_sapi_type_dummy},
+    { nr5g_rlcmac_Cmac_STAT_UE_LO_IND,    "lte_l2_Sap_NR_RLCMAC_ERROR",     dissect_rlcmac_error_ind},
     { 0x00,                               NULL,                             NULL }
 };
 #define MAX_NR_RLCMAC_ERROR_TYPE_VALS      array_length(nr_rlcmac_error_type_funs)
@@ -3943,6 +3946,10 @@ proto_register_l2server(void)
       { &hf_l2server_cs_rnti,
         { "CS RNTI", "l2server.cs-rnti", FT_INT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pdcch_blind_detection,
+        { "PDCCH Blind Detection", "l2server.pdcch-blind-detection", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
 
       { &hf_l2server_sp_cell_cfg_ded,
         { "SP Cell Cfg Dedicated", "l2server.sp-cell-cfg-ded", FT_STRING, BASE_NONE,
