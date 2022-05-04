@@ -334,6 +334,7 @@ static int hf_l2server_rach_probe_req = -1;
 
 static int hf_l2server_rrc_state = -1;
 
+static int hf_l2server_cell_config_cellcfg = -1;
 
 static const value_string lch_vals[] =
 {
@@ -665,6 +666,8 @@ static gint ett_l2server_sp_cell_cfg_dormantbwp = -1;
 static gint ett_l2server_sp_cell_cfg_lte_crs_pattern_list1 = -1;
 static gint ett_l2server_sp_cell_cfg_lte_crs_pattern_list2 = -1;
 
+static gint ett_l2server_cell_config_cellcfg = -1;
+
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
 static expert_field ei_l2server_type_unknown = EI_INIT;
@@ -741,6 +744,8 @@ static guint dissect_rlcmac_cmac_ra_info_empty(proto_tree *tree, tvbuff_t *tvb, 
 static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset);
 
+static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                      guint offset);
 
 
 static void dissect_login_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -1222,15 +1227,40 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
     }
     else {
         // Still there, but skip.
-        dissect_rlcmac_cmac_ra_info_empty(tree, tvb, pinfo, offset, len, FALSE);
+        offset = dissect_rlcmac_cmac_ra_info_empty(tree, tvb, pinfo, offset, len, FALSE);
     }
 
-    // CellCfg (nr5g_rlcmac_Cmac_CellCfg_t from nr5g-rlcmac_Cmac.h)
 
-    //   PhyCellConfg
-    offset = dissect_ph_cell_config(tree, tvb, pinfo, offset);
+    // CellCfg (nr5g_rlcmac_Cmac_CellCfg_t from nr5g-rlcmac_Cmac.h ->
+    //          bb_nr5g_CELL_GROUP_CONFIGt from bb-nr5g_struct_macro.h)
+    gint start_offset = offset;
+    proto_item *cellcfg_ti = proto_tree_add_string_format(tree, hf_l2server_cell_config_cellcfg, tvb,
+                                                          offset, 4,
+                                                          "", "CellCfg ");
+    proto_tree *cellcfg_tree = proto_item_add_subtree(cellcfg_ti, ett_l2server_cell_config_cellcfg);
 
-    //   CellCfgCommon
+
+    // FieldMask
+    guint32 fieldmask;
+    proto_tree_add_item_ret_uint(cellcfg_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                 ENC_LITTLE_ENDIAN, &fieldmask);
+    offset += 4;
+
+    if (fieldmask & bb_nr5g_STRUCT_CELL_GROUP_CONFIG_PHY_CELL_CONF_PRESENT) {
+        // PhyCellConf
+        offset = dissect_ph_cell_config(cellcfg_tree, tvb, pinfo, offset);
+    }
+
+    if (fieldmask & bb_nr5g_STRUCT_CELL_GROUP_CONFIG_CELL_CFG_COMMON_PRESENT) {
+        // CellCfgCommon
+        offset = dissect_sp_cell_cfg_common(cellcfg_tree, tvb, pinfo, offset);
+    }
+
+    // NbAggrCellCfgCommon (number of valid elements)
+
+    // AggrCellCfgCommon (elements in array)
+
+    proto_item_set_len(cellcfg_ti, offset-start_offset);
 }
 
 
@@ -4267,6 +4297,10 @@ proto_register_l2server(void)
       { &hf_l2server_rrc_state,
         { "State", "l2server.rrc-state", FT_UINT8, BASE_DEC,
           VALS(rrc_state_vals), 0x0, NULL, HFILL }},
+
+      { &hf_l2server_cell_config_cellcfg,
+        { "CellCfg", "l2server.cell-config.cellcfg", FT_STRING, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }}
     };
 
     static gint *ett[] = {
@@ -4296,7 +4330,8 @@ proto_register_l2server(void)
         &ett_l2server_sp_cell_cfg_lte_crs_tomatcharound,
         &ett_l2server_sp_cell_cfg_dormantbwp,
         &ett_l2server_sp_cell_cfg_lte_crs_pattern_list1,
-        &ett_l2server_sp_cell_cfg_lte_crs_pattern_list2
+        &ett_l2server_sp_cell_cfg_lte_crs_pattern_list2,
+        &ett_l2server_cell_config_cellcfg
     };
 
     static ei_register_info ei[] = {

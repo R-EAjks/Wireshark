@@ -638,5 +638,8 @@ typedef struct {
 } nr5g_pdcp_Ctrl_SIB_FILTER_NAKt;
 
 
+#define bb_nr5g_STRUCT_CELL_GROUP_CONFIG_PHY_CELL_CONF_PRESENT   0x0001
+#define bb_nr5g_STRUCT_CELL_GROUP_CONFIG_CELL_CFG_COMMON_PRESENT   0x0002
+
 #pragma pack()
 #endif
