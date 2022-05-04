@@ -735,6 +735,9 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
 static guint dissect_rlcmac_cmac_ra_info(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                         guint offset, guint len _U_, guint32 *bwpid);
 
+static guint dissect_rlcmac_cmac_ra_info_empty(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                               guint offset _U_, guint len _U_, gboolean from_bwp_mask);
+
 static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset);
 
@@ -1217,6 +1220,10 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
         guint32 bwpid = 0;
         offset = dissect_rlcmac_cmac_ra_info(tree, tvb, pinfo, offset, len, &bwpid);
     }
+    else {
+        // Still there, but skip.
+        dissect_rlcmac_cmac_ra_info_empty(tree, tvb, pinfo, offset, len, FALSE);
+    }
 
     // CellCfg (nr5g_rlcmac_Cmac_CellCfg_t from nr5g-rlcmac_Cmac.h)
 
@@ -1552,7 +1559,7 @@ static guint dissect_rlcmac_cmac_ra_info(proto_tree *tree, tvbuff_t *tvb, packet
 }
 
 static guint dissect_rlcmac_cmac_ra_info_empty(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
-                                               guint offset _U_, guint len _U_)
+                                               guint offset _U_, guint len _U_, gboolean from_bwp_mask)
 {
     int ra_start = offset;
 
@@ -1562,7 +1569,7 @@ static guint dissect_rlcmac_cmac_ra_info_empty(proto_tree *tree, tvbuff_t *tvb, 
                                                           "", "RA Info ");
     //proto_tree *ra_info_tree = proto_item_add_subtree(ra_info_ti, ett_l2server_header);
 
-    proto_item_append_text(ra_info_ti, " (Not in bwpMask)");
+    proto_item_append_text(ra_info_ti, (from_bwp_mask) ? " (Not in bwpMask)" : " (Not present)");
 
     // Move to start of next one..
     offset = ra_start + sizeof(nr5g_rlcmac_Cmac_RA_Info_t);
@@ -2177,7 +2184,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
             proto_item_append_text(params_ti, " RAInfo(BwpId=%u)", bwpid);
         }
         else {
-            offset = dissect_rlcmac_cmac_ra_info_empty(params_tree, tvb, pinfo, offset, len);
+            offset = dissect_rlcmac_cmac_ra_info_empty(params_tree, tvb, pinfo, offset, len, TRUE);
             //offset += sizeof(nr5g_rlcmac_Cmac_RA_Info_t);
         }
     }
