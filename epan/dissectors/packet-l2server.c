@@ -336,6 +336,8 @@ static int hf_l2server_rrc_state = -1;
 
 static int hf_l2server_cell_config_cellcfg = -1;
 
+static int hf_l2server_nb_aggr_cell_cfg_common = -1;
+
 static const value_string lch_vals[] =
 {
     { 0x0,   "SPARE" },
@@ -746,6 +748,7 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
 
 static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                       guint offset);
+
 
 
 static void dissect_login_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -1257,8 +1260,20 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
     }
 
     // NbAggrCellCfgCommon (number of valid elements)
+    gint32 nb;
+    proto_tree_add_item_ret_int(cellcfg_tree, hf_l2server_nb_aggr_cell_cfg_common, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb);
+    offset += 1;
 
     // AggrCellCfgCommon (elements in array)
+    if (nb == -1) {
+        nb = 0;
+    }
+    for (gint32 n=0; n < nb; ++n) {
+        // TODO: bb_nr5g_SERV_CELL_CONFIG_COMMONt
+        // (ServingCellConfigCommon from RRC!).
+        // contains several present flags + variable arrays.
+        offset = dissect_sp_cell_cfg_common(cellcfg_tree, tvb, pinfo, offset);
+    }
 
     proto_item_set_len(cellcfg_ti, offset-start_offset);
 }
@@ -4300,7 +4315,10 @@ proto_register_l2server(void)
 
       { &hf_l2server_cell_config_cellcfg,
         { "CellCfg", "l2server.cell-config.cellcfg", FT_STRING, BASE_NONE,
-          NULL, 0x0, NULL, HFILL }}
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_aggr_cell_cfg_common,
+        { "NbAggrCellCfgCommon", "l2server.number-of-nb-aggr-cell-cfg-common", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
