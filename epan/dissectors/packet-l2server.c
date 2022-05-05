@@ -3946,10 +3946,10 @@ proto_register_l2server(void)
           NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_nb_scell_cfg_add,
-        { "NbSCellCfgAdd", "l2server.number-scell-cfg-add", FT_UINT8, BASE_HEX,
+        { "NbSCellCfgAdd", "l2server.number-scell-cfg-add", FT_UINT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_nb_scell_cfg_del,
-        { "NbSCellCfgDel", "l2server.number-scell-cfg-del", FT_UINT8, BASE_HEX,
+        { "NbSCellCfgDel", "l2server.number-scell-cfg-del", FT_UINT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_ph_cell_config,
