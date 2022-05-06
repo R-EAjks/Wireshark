@@ -3717,7 +3717,7 @@ proto_register_l2server(void)
         { "Preamble Receive Target Power", "l2server.preamble-receive-target-power", FT_INT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_rsrp_thresholdssb,
-        { "RSRP ThresholdSSB", "l2server.rsrp-threshold-ssb", FT_UINT32, BASE_DEC,
+        { "RSRP ThresholdSSB", "l2server.rsrp-threshold-ssb", FT_INT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_csirs_threshold,
         { "CSIRS Threshold", "l2server.csirs-threshold", FT_INT32, BASE_DEC,
