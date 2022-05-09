@@ -338,6 +338,17 @@ static int hf_l2server_cell_config_cellcfg = -1;
 
 static int hf_l2server_nb_aggr_cell_cfg_common = -1;
 
+static int hf_l2server_dlfreq_0 = -1;
+static int hf_l2server_dlfreq_1 = -1;
+static int hf_l2server_dl_earfcn_0 = -1;
+static int hf_l2server_dl_earfcn_1 = -1;
+static int hf_l2server_ulfreq_0 = -1;
+static int hf_l2server_ulfreq_1 = -1;
+static int hf_l2server_ul_earfcn_0 = -1;
+static int hf_l2server_ul_earfcn_1 = -1;
+static int hf_l2server_ssb_arfcn = -1;
+static int hf_l2server_num_dbeam = -1;
+
 static const value_string lch_vals[] =
 {
     { 0x0,   "SPARE" },
@@ -384,6 +395,12 @@ static const value_string discard_rar_num_vals[] =
     { 2,     "Discard 2 RARs"},
     { 3,     "Discard 3 RARs"},
     { 4,     "Discard 4 RARs"},
+    { 5,     "Discard 5 RARs"},
+    { 6,     "Discard 6 RARs"},
+    { 7,     "Discard 7 RARs"},
+    { 8,     "Discard 8 RARs"},
+    { 9,     "Discard 9 RARs"},
+    { 10,    "Discard 10 RARs"},
     /* TODO: more if see them IRL */
     { 0xFF,  "Discard all RARs"},
     { 0x0,   NULL }
@@ -799,6 +816,7 @@ static void dissect_cell_parm_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *
     proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
 }
 
+// nr5g_l2_Srv_CELL_PARM_ACKt from L2ServerMessages.h
 static void dissect_cell_parm_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset, guint len _U_)
 {
@@ -808,24 +826,48 @@ static void dissect_cell_parm_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *
 
     /**********************************/
     /* Parm (nr5g_l2_Srv_Cell_Parm_t) */
-    /* TODO: add parm subtree */
     /* phy_cell_id */
     proto_tree_add_item(tree, hf_l2server_physical_cellid, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
+
+    /* TODO: */
     /* dlFreq[2] */
-    offset += 8;
+    proto_tree_add_item(tree, hf_l2server_dlfreq_0, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    proto_tree_add_item(tree, hf_l2server_dlfreq_1, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
     /* dlEarfcn[2]*/
-    offset += 8;
+    proto_tree_add_item(tree, hf_l2server_dl_earfcn_0, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    proto_tree_add_item(tree, hf_l2server_dl_earfcn_0, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
     /* ulFreq[2] */
-    offset += 8;
+    proto_tree_add_item(tree, hf_l2server_ulfreq_0, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    proto_tree_add_item(tree, hf_l2server_ulfreq_1, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
     /* ulEarfcn[2] */
-    offset += 8;
+    proto_tree_add_item(tree, hf_l2server_ul_earfcn_0, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    proto_tree_add_item(tree, hf_l2server_ul_earfcn_0, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
     /* SsbArfcn */
+    proto_tree_add_item(tree, hf_l2server_ssb_arfcn, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 
     /* NumDbeam */
+    proto_tree_add_item(tree, hf_l2server_num_dbeam, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     /* Dbeam */
+    for (int n=0; n < nr5g_MaxDbeam; n++) {
+        /* Ppu (comgen_qnxPPUIDt from qnx_gen.h)*/
+        /* DbeamId */
+        offset += 2;
+    }
 }
 
 /* This is nr5g_l2_Srv_RCP_LOADt from nr5g-l2_Srv.h */
@@ -896,12 +938,14 @@ static void dissect_rlcmac_data_req(proto_tree *tree, tvbuff_t *tvb, packet_info
     else {
         p_pdcp_nr_info->seqnum_length = 12;
 
-        // TODO: switch with all types (allowed in this direction).
-        if (lch == 0x4) {
-            p_pdcp_nr_info->bearerType = Bearer_CCCH;
-        }
-        else {
-            p_pdcp_nr_info->bearerType = Bearer_DCCH;
+        // TODO: switch on all types (allowed in this direction).
+        switch (lch) {
+            case 0x4:
+                p_pdcp_nr_info->bearerType = Bearer_CCCH;
+                break;
+            default:
+                p_pdcp_nr_info->bearerType = Bearer_DCCH;
+                break;
         }
     }
 
@@ -4319,6 +4363,37 @@ proto_register_l2server(void)
       { &hf_l2server_nb_aggr_cell_cfg_common,
         { "NbAggrCellCfgCommon", "l2server.number-of-nb-aggr-cell-cfg-common", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_dlfreq_0,
+        { "DL Freq[0]", "l2server.dl-freq-0", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_dlfreq_1,
+        { "DL Freq[1]", "l2server.dl-freq-1", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_dl_earfcn_0,
+        { "DL Earfcn[0]", "l2server.dl-earfcn-0", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_dl_earfcn_1,
+        { "DL Earfcn[1]", "l2server.dl-earfcn-1", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ulfreq_0,
+        { "UL Freq[0]", "l2server.ul-freq-0", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ulfreq_1,
+        { "UL Freq[1]", "l2server.ul-freq-1", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_earfcn_0,
+        { "UL Earfcn[0]", "l2server.ul-earfcn-0", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_earfcn_1,
+        { "UL Earfcn[1]", "l2server.ul-earfcn-1", FT_INT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ssb_arfcn,
+        { "SSB Arfcn", "l2server.ssb-arfcn", FT_INT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_num_dbeam,
+        { "Num Dbeam", "l2server.num-dbeam", FT_INT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
