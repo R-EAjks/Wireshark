@@ -119,9 +119,18 @@ static int hf_l2server_csirs_threshold = -1;
 static int hf_l2server_sul_rsrp_threshold = -1;
 static int hf_l2server_ra_preambleindex = -1;
 static int hf_l2server_preamble_power_ramping_step = -1;
-static int hf_l2server_ra_ssb_occassion_mask_index = -1;
+static int hf_l2server_ra_ssb_occasion_mask_index = -1;
 static int hf_l2server_preamble_tx_max = -1;
 static int hf_l2server_totalnumberofra_preambles = -1;
+
+static int hf_l2server_ssb_perrach_occasion = -1;
+static int hf_l2server_cb_preamblesperssb = -1;
+static int hf_l2server_ra_msg3sizegroupa = -1;
+static int hf_l2server_numberofra_preamblesgroupa = -1;
+static int hf_l2server_delta_preamble_msg3 = -1;
+static int hf_l2server_message_power_offset_groupb = -1;
+static int hf_l2server_ra_responsewindow = -1;
+static int hf_l2server_ra_contentionresolutiontimer = -1;
 
 static int hf_l2server_l1cell_dedicated_config_len = -1;
 static int hf_l2server_l2_test_mode = -1;
@@ -648,11 +657,25 @@ static const value_string  sib_folder_flag_vals[] =
     { 0,   NULL }
 };
 
+static const value_string ssb_perrach_occasion_vals[] = {
+    { nr5g_lc_Cmac_oneEighth,  "oneEighth" },
+    { nr5g_lc_Cmac_oneFourth,  "oneFourth" },
+    { nr5g_lc_Cmac_oneHalf,    "oneHalf" },
+    { nr5g_lc_Cmac_one,        "one" },
+    { nr5g_lc_Cmac_two,        "two" },
+    { nr5g_lc_Cmac_four,       "four" },
+    { nr5g_lc_Cmac_eight,      "eight" },
+    { nr5g_lc_Cmac_sixteen,    "sixteen" },
+    { 0,   NULL }
+};
+
+
 static const true_false_string nodata_data_vals =
 {
     "No Msg3 bytes present",
     "Msg3 bytes present"
 };
+
 
 
 /* Subtrees */
@@ -830,7 +853,6 @@ static void dissect_cell_parm_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *
     proto_tree_add_item(tree, hf_l2server_physical_cellid, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
 
-    /* TODO: */
     /* dlFreq[2] */
     proto_tree_add_item(tree, hf_l2server_dlfreq_0, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -864,6 +886,7 @@ static void dissect_cell_parm_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *
     offset += 4;
     /* Dbeam */
     for (int n=0; n < nr5g_MaxDbeam; n++) {
+        /* TODO: */
         /* Ppu (comgen_qnxPPUIDt from qnx_gen.h)*/
         /* DbeamId */
         offset += 2;
@@ -1623,8 +1646,8 @@ static guint dissect_rlcmac_cmac_ra_info(proto_tree *tree, tvbuff_t *tvb, packet
     // preamblePowerRampingStep
     proto_tree_add_item(ra_info_tree, hf_l2server_preamble_power_ramping_step, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
-    // ra_ssb_OccassionMaskIndex
-    proto_tree_add_item(ra_info_tree, hf_l2server_ra_ssb_occassion_mask_index, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    // ra_ssb_OccasionMaskIndex
+    proto_tree_add_item(ra_info_tree, hf_l2server_ra_ssb_occasion_mask_index, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     // preambleTxMax
     proto_tree_add_item(ra_info_tree, hf_l2server_preamble_tx_max, tvb, offset, 4, ENC_LITTLE_ENDIAN);
@@ -1633,6 +1656,32 @@ static guint dissect_rlcmac_cmac_ra_info(proto_tree *tree, tvbuff_t *tvb, packet
     gint32 num_preambles;
     proto_tree_add_item_ret_int(ra_info_tree, hf_l2server_totalnumberofra_preambles, tvb, offset, 1, ENC_LITTLE_ENDIAN, &num_preambles);
     offset++;
+    // ssb_perRACH_Occasion
+    proto_tree_add_item(ra_info_tree, hf_l2server_ssb_perrach_occasion, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+    // CB_PreamblesPerSSB
+    proto_tree_add_item(ra_info_tree, hf_l2server_cb_preamblesperssb, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // groupBconfigured
+    //   ra_Msg3SizeGroupA
+    proto_tree_add_item(ra_info_tree, hf_l2server_ra_msg3sizegroupa, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    //   numberofRA_PreamblesGroupA
+    proto_tree_add_item(ra_info_tree, hf_l2server_numberofra_preamblesgroupa, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+    //   deltaPreambleMsg3
+    proto_tree_add_item(ra_info_tree, hf_l2server_delta_preamble_msg3, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+    //   messagePowerOffsetGroupB
+    proto_tree_add_item(ra_info_tree, hf_l2server_message_power_offset_groupb, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // ra_ResponseWindow
+    proto_tree_add_item(ra_info_tree, hf_l2server_ra_responsewindow, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // ra_ContentionResolutionTimer
+    proto_tree_add_item(ra_info_tree, hf_l2server_ra_contentionresolutiontimer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
 
     // Add rach filter
     proto_item *rach_ti = proto_tree_add_item(ra_info_tree, hf_l2server_rach, tvb, 0, 0, ENC_NA);
@@ -3775,8 +3824,8 @@ proto_register_l2server(void)
       { &hf_l2server_preamble_power_ramping_step,
          { "Preamble Power Ramping Step", "l2server.preamble-power-ramping-step", FT_INT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
-      { &hf_l2server_ra_ssb_occassion_mask_index,
-         { "RA SSB Occassion Mask Index", "l2server.ra-ssb-occassion-mask-index", FT_INT32, BASE_DEC,
+      { &hf_l2server_ra_ssb_occasion_mask_index,
+         { "RA SSB Occasion Mask Index", "l2server.ra-ssb-occasion-mask-index", FT_INT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_preamble_tx_max,
          { "Preamble Tx Max", "l2server.preamble-tx-max", FT_UINT32, BASE_DEC,
@@ -3784,6 +3833,31 @@ proto_register_l2server(void)
       { &hf_l2server_totalnumberofra_preambles,
         { "totalNumberOfRA-Preambles", "l2server.totalnumberofra-preambles", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ssb_perrach_occasion,
+        { "ssb perRACH Occasion", "l2server.ssb-perrach-occasion", FT_INT8, BASE_DEC,
+          VALS(ssb_perrach_occasion_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_cb_preamblesperssb,
+        { "CB PreamblesPerSSB", "l2server.cb-preambles-per-ssb", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ra_msg3sizegroupa,
+        { "Msg3 Size Group A", "l2server.msg3-size-groupa", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_numberofra_preamblesgroupa,
+        { "NumberofRA Preambles GroupA", "l2server.numberofra-preambles-groupa", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_delta_preamble_msg3,
+        { "Delta Preamble Msg3", "l2server.delta-preamble-msg3", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_message_power_offset_groupb,
+        { "Message Power Offset GroupB", "l2server.message-power-offset-groupb", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ra_responsewindow,
+        { "RA ResponseWindow", "l2server.ra-response-window", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ra_contentionresolutiontimer,
+        { "RA ContentionResolutionTimer", "l2server.ra-contention-resolution-timer", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
       { &hf_l2server_l1cell_dedicated_config_len,
         { "L1CellDedicatedConfig-Len", "l2server.l1cell-dedicated-config-len", FT_INT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
