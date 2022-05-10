@@ -767,7 +767,7 @@ dissect_isns_attr_port(tvbuff_t *tvb, guint offset, proto_tree *tree, int hf_ind
                 &pinfo->src, &pinfo->dst, et, port, 0, NO_PORT_B);
         if (conversation == NULL) {
             conversation = conversation_new(pinfo->num,
-                    &pinfo->src, &pinfo->dst, et, port, 0, NO_PORT2_FORCE);
+                    &pinfo->src, &pinfo->dst, et, port, 0, NO_PORT2);
             conversation_set_dissector(conversation, handle);
         }
     }

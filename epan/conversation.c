@@ -615,7 +615,7 @@ conversation_new(const guint32 setup_frame, const address *addr1, const address 
         const endpoint_type etype, const guint32 port1, const guint32 port2, const guint options)
 {
     /*
-       DISSECTOR_ASSERT(!(options | CONVERSATION_TEMPLATE) || ((options | (NO_ADDR2 | NO_PORT2 | NO_PORT2_FORCE))) &&
+       DISSECTOR_ASSERT(!(options | CONVERSATION_TEMPLATE) || ((options | (NO_ADDR2 | NO_PORT2))) &&
        "A conversation template may not be constructed without wildcard options");
      */
     wmem_map_t* hashtable;
@@ -712,13 +712,13 @@ conversation_new(const guint32 setup_frame, const address *addr1, const address 
 #endif
 
     if (options & NO_ADDR2) {
-        if (options & (NO_PORT2|NO_PORT2_FORCE)) {
+        if (options & (NO_PORT2)) {
             hashtable = conversation_hashtable_no_addr2_or_port2;
         } else {
             hashtable = conversation_hashtable_no_addr2;
         }
     } else {
-        if (options & (NO_PORT2|NO_PORT2_FORCE)) {
+        if (options & (NO_PORT2)) {
             hashtable = conversation_hashtable_no_port2;
         } else {
             hashtable = conversation_hashtable_exact;
@@ -783,7 +783,7 @@ conversation_set_port2(conversation_t *conv, const guint32 port)
     /*
      * If the port 2 value is not wildcarded, don't set it.
      */
-    if ((!(conv->options & NO_PORT2)) || (conv->options & NO_PORT2_FORCE))
+    if (!(conv->options & NO_PORT2))
         return;
 
     DINDENT();

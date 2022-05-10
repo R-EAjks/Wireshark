@@ -36,7 +36,6 @@ extern "C" {
  */
 #define NO_ADDR2 0x01
 #define NO_PORT2 0x02
-#define NO_PORT2_FORCE 0x04
 #define CONVERSATION_TEMPLATE 0x08
 
 /*
