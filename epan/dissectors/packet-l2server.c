@@ -1373,6 +1373,15 @@ static void dissect_create_ue_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 }
 
+// TODO: can't find full description
+static void dissect_create_ue_nak(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset, guint len _U_)
+{
+    /* UeId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    /* 2 more bytes */
+}
+
 static void dissect_delete_ue_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset, guint len _U_)
 {
@@ -1389,6 +1398,14 @@ static void dissect_delete_ue_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *
     offset += 4;
 }
 
+// TODO: can't find full description
+static void dissect_delete_ue_nak(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset, guint len _U_)
+{
+    /* UeId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    /* 2 more bytes */
+}
 
 
 static void dissect_handover_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -3115,11 +3132,11 @@ static TYPE_FUN om_type_funs[] =
 
         { nr5g_l2_Srv_CREATE_UE_CMD,            "nr5g_l2_Srv_CREATE_UE_CMD",       dissect_create_ue_cmd },
         { nr5g_l2_Srv_CREATE_UE_ACK,            "nr5g_l2_Srv_CREATE_UE_ACK",       dissect_create_ue_ack },
-        { nr5g_l2_Srv_CREATE_UE_NAK,            "nr5g_l2_Srv_CREATE_UE_NAK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_CREATE_UE_NAK,            "nr5g_l2_Srv_CREATE_UE_NAK",       dissect_create_ue_nak },
 
         { lte_l2_Srv_DELETE_UE_CMD,            "nr5g_l2_Srv_DELETE_UE_CMD",       dissect_delete_ue_cmd },
         { lte_l2_Srv_DELETE_UE_ACK,            "nr5g_l2_Srv_DELETE_UE_ACK",       dissect_delete_ue_ack },
-        { lte_l2_Srv_DELETE_UE_NAK,            "nr5g_l2_Srv_DELETE_UE_NAK",       dissect_sapi_type_dummy },
+        { lte_l2_Srv_DELETE_UE_NAK,            "nr5g_l2_Srv_DELETE_UE_NAK",       dissect_delete_ue_nak },
 
         { nr5g_l2_Srv_RCP_UE_SET_GROUP_CMD,     "nr5g_l2_Srv_RCP_UE_SET_GROUP_CMD",       dissect_rcp_ue_set_group_cmd },
         { nr5g_l2_Srv_RCP_UE_SET_GROUP_ACK,     "nr5g_l2_Srv_RCP_UE_SET_GROUP_ACK",       dissect_rcp_ue_set_group_ack },
