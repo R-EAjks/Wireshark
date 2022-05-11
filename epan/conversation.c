@@ -935,7 +935,7 @@ conversation_t *
 find_conversation(const guint32 frame_num, const address *addr_a, const address *addr_b, const endpoint_type etype,
         const guint32 port_a, const guint32 port_b, const guint options)
 {
-    conversation_t *conversation;
+    conversation_t *conversation = NULL;
 
     DINSTR(gchar *addr_a_str = address_to_str(NULL, addr_a));
     DINSTR(gchar *addr_b_str = address_to_str(NULL, addr_b));
@@ -1021,16 +1021,15 @@ find_conversation(const guint32 frame_num, const address *addr_a, const address 
              * address, unless the CONVERSATION_TEMPLATE option is set.)
              */
             DPRINT(("wildcarded dest address match found"));
-            if (!(conversation->options & NO_ADDR_B) && etype != ENDPOINT_UDP)
+            if (!(options & NO_ADDR_B) && etype != ENDPOINT_UDP)
             {
-                if (!(conversation->options & CONVERSATION_TEMPLATE))
+                if (conversation->options & CONVERSATION_TEMPLATE)
                 {
-                    conversation_set_addr2(conversation, addr_b);
+                    conversation = conversation_create_from_template(conversation, addr_b, 0);
                 }
                 else
                 {
-                    conversation =
-                        conversation_create_from_template(conversation, addr_b, 0);
+                    conversation_set_addr2(conversation, addr_b);
                 }
             }
             goto end;
@@ -1119,16 +1118,15 @@ find_conversation(const guint32 frame_num, const address *addr_a, const address 
              * unless the CONVERSATION_TEMPLATE option is set.)
              */
             DPRINT(("match found"));
-            if (!(conversation->options & NO_PORT_B) && etype != ENDPOINT_UDP)
+            if (!(options & NO_PORT_B) && etype != ENDPOINT_UDP)
             {
-                if (!(conversation->options & CONVERSATION_TEMPLATE))
+                if (options & CONVERSATION_TEMPLATE)
                 {
-                    conversation_set_port2(conversation, port_b);
+                    conversation = conversation_create_from_template(conversation, 0, port_b);
                 }
                 else
                 {
-                    conversation =
-                        conversation_create_from_template(conversation, 0, port_b);
+                    conversation_set_port2(conversation, port_b);
                 }
             }
             goto end;
@@ -1206,17 +1204,20 @@ find_conversation(const guint32 frame_num, const address *addr_a, const address 
         DPRINT(("match found"));
         if (etype != ENDPOINT_UDP)
         {
-            if (!(conversation->options & CONVERSATION_TEMPLATE))
+            if (conversation->options & CONVERSATION_TEMPLATE)
             {
-                if (!(conversation->options & NO_ADDR_B))
-                    conversation_set_addr2(conversation, addr_b);
-                if (!(conversation->options & NO_PORT_B))
-                    conversation_set_port2(conversation, port_b);
+                conversation = conversation_create_from_template(conversation, addr_b, port_b);
             }
             else
             {
-                conversation =
-                    conversation_create_from_template(conversation, addr_b, port_b);
+                if (!(options & NO_ADDR_B))
+                {
+                    conversation_set_addr2(conversation, addr_b);
+                }
+                if (!(options & NO_PORT_B))
+                {
+                    conversation_set_port2(conversation, port_b);
+                }
             }
         }
         goto end;
