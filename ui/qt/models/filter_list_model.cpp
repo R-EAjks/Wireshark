@@ -71,18 +71,26 @@ void FilterListModel::reload()
     /* Still can use the model, just have to start from an empty set */
     if (! file.open(QIODevice::ReadOnly | QIODevice::Text))
         return;
-
+    
     QTextStream in(&file);
-    QRegularExpression rx("\\s*\\\"(.*?)\\\"\\s(.*)");
+    QRegularExpression rx("\\s*\\\"\\s*(.*?)\\s*\\\"\\s(.*)");
     while (!in.atEnd())
     {
-        QString line = in.readLine().trimmed();
-        if (line.startsWith("#") || line.indexOf("\"") <= -1)
+        QString data = in.readLine().trimmed();
+        /* Filter out lines that do not contain content:
+        *  - Starting with # is a comment
+        *  - Does not start with a quoted string
+        */ 
+        if (data.startsWith("#") || ! data.trimmed().startsWith("\""))
             continue;
-
-        QRegularExpressionMatch match = rx.match(line);
-        if (match.hasMatch()) {
-            addFilter(match.captured(1), match.captured(2));
+        
+        QStringList content = data.split(QChar('\n'));
+        foreach (QString line, content)
+        {
+            QRegularExpressionMatch match = rx.match(line);
+            if (match.hasMatch()) {
+                addFilter(match.captured(1).trimmed(), match.captured(2).trimmed());
+            }
         }
     }
 }
@@ -233,15 +241,10 @@ void FilterListModel::saveList()
     QTextStream out(&file);
     for (int row = 0; row < rowCount(); row++)
     {
-        QString line = QString("\"%1\"").arg(index(row, ColumnName).data().toString());
+        QString line = QString("\"%1\"").arg(index(row, ColumnName).data().toString().trimmed());
         line.append(QString(" %1").arg(index(row, ColumnExpression).data().toString()));
 
-#ifdef _WIN32
-        line = line.append("\r\n");
-#else
-        line = line.append("\n");
-#endif
-        out << line;
+        out << line << Qt::endl;
     }
 
     file.close();
