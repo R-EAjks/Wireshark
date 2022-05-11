@@ -71,7 +71,7 @@ void FilterListModel::reload()
     /* Still can use the model, just have to start from an empty set */
     if (! file.open(QIODevice::ReadOnly | QIODevice::Text))
         return;
-    
+
     QTextStream in(&file);
     QRegularExpression rx("\\s*\\\"\\s*(.*?)\\s*\\\"\\s(.*)");
     while (!in.atEnd())
@@ -83,7 +83,7 @@ void FilterListModel::reload()
         */ 
         if (data.startsWith("#") || ! data.trimmed().startsWith("\""))
             continue;
-        
+
         QStringList content = data.split(QChar('\n'));
         foreach (QString line, content)
         {
