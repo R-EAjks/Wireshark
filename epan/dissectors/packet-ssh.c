@@ -89,6 +89,8 @@ typedef struct {
     guint   length;
 } ssh_bignum;
 
+#define MAX_PACKET_SIZE     32768
+
 #define SSH_KEX_CURVE25519 0x00010000
 #define SSH_KEX_DH_GEX     0x00020000
 #define SSH_KEX_DH_GROUP1  0x00030001
@@ -2948,7 +2950,13 @@ ssh_hmac_init(SSH_HMAC* md, const void * key, gint len, gint algo)
         ssh_debug_printf("ssh_hmac_init(): gcry_md_open failed %s/%s", err_str, err_src);
         return -1;
     }
-    gcry_md_setkey (*(md), key, len);
+    err = gcry_md_setkey (*(md), key, len);
+    if (err != 0) {
+        err_str = gcry_strerror(err);
+        err_src = gcry_strsource(err);
+        ssh_debug_printf("gcry_md_setkey(..., ..., %d): gcry_md_open failed %s/%s", len, err_str, err_src);
+        return -1;
+    }
     return 0;
 }
 
@@ -3255,7 +3263,7 @@ ssh_decrypt_packet(tvbuff_t *tvb, packet_info *pinfo,
             guint message_length_decrypted = pntoh32(plain0);
             guint remaining = tvb_reported_length_remaining(tvb, offset);
 
-            if(message_length_decrypted>32768){
+            if(message_length_decrypted>MAX_PACKET_SIZE){
                 ws_debug("ssh: unreasonable message length %u/%u", message_length_decrypted, message_length);
                 return tvb_captured_length(tvb);
             }else{
