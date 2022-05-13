@@ -57,7 +57,13 @@ PathSelectionEdit::PathSelectionEdit(QWidget *parent) :
 void PathSelectionEdit::setPath(QString newPath)
 {
     _path = newPath;
-    emit pathChanged(newPath);
+    if (!sender()) {
+        _edit->blockSignals(true);
+        _edit->setText(newPath);
+        _edit->blockSignals(false);
+    } else {
+        emit pathChanged(newPath);
+    }
 }
 
 QString PathSelectionEdit::path() const
@@ -85,9 +91,12 @@ void PathSelectionEdit::browseForPath()
         }
     }
 
-    QString fileName = WiresharkFileDialog::getOpenFileName(this, _title, openDir);
-    if (!fileName.isEmpty())
-    {
-        setPath(fileName);
-    }
+    QString newPath;
+    if ( _selectFile )
+        newPath = WiresharkFileDialog::getOpenFileName(this, _title, openDir);
+    else
+        newPath = WiresharkFileDialog::getExistingDirectory(this, _title, openDir);
+
+    if (!newPath.isEmpty())
+        _edit->setText(newPath);
 }

@@ -50,7 +50,7 @@ QWidget *UatDelegate::createEditor(QWidget *parent, const QStyleOptionViewItem &
     case PT_TXTMOD_FILENAME:
         if (index.isValid()) {
             QString filename_old = index.model()->data(index, Qt::EditRole).toString();
-            PathSelectionEdit * pathEdit = new PathSelectionEdit(parent, field->mode == PT_TXTMOD_DIRECTORYNAME, field->title);
+            PathSelectionEdit * pathEdit = new PathSelectionEdit(field->title, QString(), field->mode == PT_TXTMOD_DIRECTORYNAME, parent);
             connect(pathEdit, &PathSelectionEdit::pathChanged, this, &UatDelegate::pathHasChanged);
             return pathEdit;
         }
@@ -203,4 +203,11 @@ void UatDelegate::updateEditorGeometry(QWidget *editor,
     default:
         QStyledItemDelegate::updateEditorGeometry(editor, option, index);
     }
+}
+
+void UatDelegate::pathHasChanged(QString)
+{
+    PathSelectionEdit * editor = qobject_cast<PathSelectionEdit *>(sender());
+    if (editor)
+        emit commitData(editor);
 }
