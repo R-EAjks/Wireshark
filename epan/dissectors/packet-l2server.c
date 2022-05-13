@@ -400,6 +400,26 @@ static int hf_l2server_rest_set_conf = -1;
 static int hf_l2server_msg3_tranform_precoding = -1;
 static int hf_l2server_rsrp_threshold_ssb = -1;
 
+static int hf_l2server_freq_info_dl = -1;
+static int hf_l2server_abs_freq_ssb = -1;
+static int hf_l2server_abs_freq_point_a = -1;
+static int hf_l2server_ssb_subcarrier_offset = -1;
+static int hf_l2server_nb_freq_band_list = -1;
+static int hf_l2server_nb_scs_spec_carrier = -1;
+static int hf_l2server_freq_band_list = -1;
+
+static int hf_l2server_ssb_periodicity_serv_cell = -1;
+static int hf_l2server_dmrs_type_a_pos = -1;
+static int hf_l2server_sub_car_spacing = -1;
+static int hf_l2server_ssb_pos_in_burst_is_valid = -1;
+static int hf_l2server_n_timing_advance_offset = -1;
+static int hf_l2server_ssb_pos_in_burst_short = -1;
+static int hf_l2server_ssb_pos_in_burst_medium = -1;
+static int hf_l2server_ssb_pos_in_burst_long = -1;
+static int hf_l2server_pbch_block_power = -1;
+static int hf_l2server_nb_rate_match_pattern_to_add_mod = -1;
+static int hf_l2server_nb_rate_match_pattern_to_del = -1;
+
 static const value_string lch_vals[] =
 {
     { 0x0,   "SPARE" },
@@ -711,6 +731,14 @@ static const value_string ssb_perrach_occasion_vals[] = {
     { 0,   NULL }
 };
 
+static const value_string ssb_pos_in_burst_vals[] = {
+    { bb_nr5g_SSB_POS_IN_BURST_SHORT,    "Short" },
+    { bb_nr5g_SSB_POS_IN_BURST_MEDIUM,   "Medium" },
+    { bb_nr5g_SSB_POS_IN_BURST_LONG,     "Long" },
+    { bb_nr5g_SSB_POS_IN_BURST_DEFAULT,  "Default" },
+    { 0,   NULL }
+};
+
 
 static const true_false_string nodata_data_vals =
 {
@@ -739,7 +767,6 @@ static gint ett_l2server_tx_lch_info = -1;
 static gint ett_l2server_drx_config = -1;
 static gint ett_l2server_mac_cell_group_config = -1;
 static gint ett_l2server_spcell_config_ded = -1;
-
 static gint ett_l2server_sp_cell_cfg_tdd = -1;
 static gint ett_l2server_sp_cell_cfg_dl = -1;
 static gint ett_l2server_sp_cell_cfg_ul = -1;
@@ -749,16 +776,16 @@ static gint ett_l2server_sp_cell_cfg_lte_crs_tomatcharound = -1;
 static gint ett_l2server_sp_cell_cfg_dormantbwp = -1;
 static gint ett_l2server_sp_cell_cfg_lte_crs_pattern_list1 = -1;
 static gint ett_l2server_sp_cell_cfg_lte_crs_pattern_list2 = -1;
-
 static gint ett_l2server_cell_config_cellcfg = -1;
 static gint ett_l2server_ul_ded_config = -1;
 static gint ett_l2server_initial_ul_bwp = -1;
 static gint ett_l2server_ul_bwp = -1;
 static gint ett_l2server_ul_bwp_common = -1;
 static gint ett_l2server_ul_bwp_common_pdcch = -1;
-
 static gint ett_l2server_rach_common = -1;
 static gint ett_l2server_rach_generic = -1;
+static gint ett_l2server_freq_info_dl = -1;
+
 
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
@@ -1329,6 +1356,7 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
     // CellId
     proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
+
     // TA
     proto_tree_add_item(tree, hf_l2server_ta, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
@@ -1340,6 +1368,7 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
     proto_tree_add_item(tree, hf_l2server_rach_probe_req, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
 
+    // cell RA configuration
     // RA_Info (nr5g_rlcmac_Cmac_RA_Info_t) -> (bb_nr5g_CELL_GROUP_CONFIGt in bb-nr5g_struct.h)
     if (ra_info_valid) {
         guint32 bwpid = 0;
@@ -1359,7 +1388,19 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
                                                           "", "CellCfg ");
     proto_tree *cellcfg_tree = proto_item_add_subtree(cellcfg_ti, ett_l2server_cell_config_cellcfg);
 
+    // PhyCellConf
+    offset = dissect_ph_cell_config(cellcfg_tree, tvb, pinfo, offset);
 
+    // TODO: its a mystery!
+    offset += 2;
+
+    // CellCfgCommon
+    offset = dissect_sp_cell_cfg_common(cellcfg_tree, tvb, pinfo, offset);
+
+    proto_item_set_len(cellcfg_ti, offset-start_offset);
+
+
+#if 0
     // FieldMask
     guint32 fieldmask;
     proto_tree_add_item_ret_uint(cellcfg_tree, hf_l2server_field_mask_4, tvb, offset, 4,
@@ -1393,6 +1434,7 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
     }
 
     proto_item_set_len(cellcfg_ti, offset-start_offset);
+#endif
 }
 
 
@@ -1772,7 +1814,6 @@ static guint dissect_rlcmac_cmac_ra_info_empty(proto_tree *tree, tvbuff_t *tvb, 
     proto_item *ra_info_ti = proto_tree_add_string_format(tree, hf_l2server_ra_info, tvb,
                                                           offset, sizeof(nr5g_rlcmac_Cmac_RA_Info_t),
                                                           "", "RA Info ");
-    //proto_tree *ra_info_tree = proto_item_add_subtree(ra_info_ti, ett_l2server_header);
 
     proto_item_append_text(ra_info_ti, (from_bwp_mask) ? " (Not in bwpMask)" : " (Not present)");
 
@@ -1787,7 +1828,7 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
 {
     guint start_offset = offset;
     proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_ph_cell_config, tvb,
-                                                         offset, sizeof(bb_nr5g_PH_CELL_GROUP_CONFIGt),
+                                                         offset, 0,
                                                           "", "PH Cell Config");
     proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_ph_cell_config);
 
@@ -1798,7 +1839,6 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     gboolean dcp_config_present, pdcch_blind_detection_present;
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_ph_cell_dcp_config_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dcp_config_present);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_ph_pdcch_blind_detection_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &pdcch_blind_detection_present);
-
     offset += 4;
 
     // HarqACKSpatialBundlingPUCCH
@@ -1884,7 +1924,7 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     offset += 1;
     // BdFactorR_r16
     offset += 1;
-    // Pdsch_HARQ_ACK_CodebookList_r16
+    // Pdsch_HARQ_ACK_CodebookList_r16[2]
     offset += 2;
     // Pad
     offset += 1;
@@ -2196,7 +2236,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
 static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                       guint offset)
 {
-    //guint start_offset = offset;
+    guint start_offset = offset;
 
     // Subtree.
     proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_sp_cell_cfg_common, tvb,
@@ -2205,18 +2245,149 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
     proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_sp_cell_cfg_common);
 
     // FieldMask
-    proto_tree_add_item(config_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    guint32 fieldmask;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN, &fieldmask);
     offset += 4;
     // ServCellIdx
     proto_tree_add_item(config_tree, hf_l2server_serv_cell_idx, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
-    // TODO:
     // SsbPeriodicityServCell
+    proto_tree_add_item(config_tree, hf_l2server_ssb_periodicity_serv_cell, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // DmrsTypeAPos
+    proto_tree_add_item(config_tree, hf_l2server_dmrs_type_a_pos, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // SubCarSpacing
+    proto_tree_add_item(config_tree, hf_l2server_sub_car_spacing, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // SsbPosInBurstIsValid
+    gint32 ssb_in_burst_type;
+    proto_tree_add_item_ret_int(config_tree, hf_l2server_ssb_pos_in_burst_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &ssb_in_burst_type);
+    offset += 1;
+    // NTimingAdvanceOffset
+    proto_tree_add_item(config_tree, hf_l2server_n_timing_advance_offset, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
 
-    // TODO: !
+    // Pad
+    offset += 1;
+
+    // SsbPosInBurst (union)
+    switch (ssb_in_burst_type) {
+        case bb_nr5g_SSB_POS_IN_BURST_SHORT:
+            offset += 7;
+            proto_tree_add_item(config_tree, hf_l2server_ssb_pos_in_burst_short, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            break;
+        case bb_nr5g_SSB_POS_IN_BURST_MEDIUM:
+            offset += 7;
+            proto_tree_add_item(config_tree, hf_l2server_ssb_pos_in_burst_medium, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            break;
+        case bb_nr5g_SSB_POS_IN_BURST_LONG:
+            proto_tree_add_item(config_tree, hf_l2server_ssb_pos_in_burst_long, tvb, offset, 8, ENC_LITTLE_ENDIAN);
+            offset += 8;
+            break;
+    }
+
+    // PBCHBlockPower
+    proto_tree_add_item(config_tree, hf_l2server_pbch_block_power, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // NbRateMatchPatternToAddMod
+    proto_tree_add_item(config_tree, hf_l2server_nb_rate_match_pattern_to_add_mod, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // NbRateMatchPatternToDel
+    proto_tree_add_item(config_tree, hf_l2server_nb_rate_match_pattern_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // TODO: think these present flags are always present anyway???
+
+    // FreqInfoDL
+    if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_DL_COMMON_PRESENT) {
+        guint32 freq_info_dl_start = offset;
+
+        // Subtree.
+        proto_item *freq_ti = proto_tree_add_string_format(config_tree, hf_l2server_freq_info_dl, tvb,
+                                                           offset, 0,
+                                                           "", "Freq Info DL ");
+        proto_tree *freq_tree = proto_item_add_subtree(freq_ti, ett_l2server_freq_info_dl);
+
+        // AbsFreqSSB
+        proto_tree_add_item(freq_tree, hf_l2server_abs_freq_ssb, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+        // AbsFreqPointA
+        proto_tree_add_item(freq_tree, hf_l2server_abs_freq_point_a, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+        // SsbSubcarrierOffset
+        proto_tree_add_item(freq_tree, hf_l2server_ssb_subcarrier_offset, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // NbFreqBandList
+        guint32 nb_freq_band_list;
+        proto_tree_add_item_ret_uint(freq_tree, hf_l2server_nb_freq_band_list, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_freq_band_list);
+        offset += 1;
+        // NbScsSpecCarrier
+        proto_tree_add_item(freq_tree, hf_l2server_nb_scs_spec_carrier, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // Spare
+        proto_tree_add_item(freq_tree, hf_l2server_spare1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // FreqBandList
+        for (guint32 n=0; n < bb_nr5g_MAX_NB_MULTIBANDS; n++) {
+            proto_item *ti = proto_tree_add_item(freq_tree, hf_l2server_freq_band_list, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+            if (n > nb_freq_band_list) {
+                proto_item_append_text(ti, " (not set)");
+            }
+            offset += 2;
+        }
+
+        // ScsSpecCarrier
+        offset += (sizeof(bb_nr5g_SCS_SPEC_CARRIERt) * bb_nr5g_MAX_SCS);
+
+        proto_item_set_len(freq_ti, offset-freq_info_dl_start);
+    }
+
+    // InitDLBWP
+    if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_DL_COMMON_PRESENT) {
+        // TODO
+    }
+
+    // FreqInfoUL
+    if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_UL_COMMON_PRESENT) {
+        // TODO
+    }
+
+    // InitULBWP
+    if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_UL_COMMON_PRESENT) {
+        // TODO
+    }
+
+    // FreqInfoSUL
+    if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_SUL_COMMON_PRESENT) {
+        // TODO
+    }
+
+    // InitSULBWP
+    if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_SUL_COMMON_PRESENT) {
+        // TODO
+    }
+
+    // TddDlUlConfCommon
+    if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_TDD_COMMON_PRESENT) {
+        // TODO
+    }
+
+    // RateMatchPatternToDel
+    // RateMatchPatternToAddMod
+
+    // LteCrsToMatchAround
+    if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_COMMON_TOMATCHAROUND_PRESENT) {
+        // TODO
+    }
+    // HighSpeedConfig_r16
+    if (fieldmask & bb_nr5g_STRUCT_HIGH_SPEED_CONFIG_R16_PRESENT) {
+        // TODO
+    }
+
+    proto_item_set_len(config_ti, offset-start_offset);
 
     return offset;
 }
@@ -2969,6 +3140,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         proto_tree_add_item_ret_uint(l1_dedicated_config_tree, hf_l2server_nb_scell_cfg_del, tvb, offset, 1,
                                      ENC_LITTLE_ENDIAN, &nbSCellCfgDel);
         offset += 1;
+
         // FieldMask
         proto_tree_add_item(l1_dedicated_config_tree, hf_l2server_field_mask_1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         gboolean ded_present, common_present;
@@ -2980,7 +3152,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         offset = dissect_ph_cell_config(l1_dedicated_config_tree, tvb, pinfo, offset);
 
         // TODO: don't understand why we seem to be out here!!!!!????
-        offset += 9;
+        offset += 5;
 
         if (ded_present) {
             // SpCellCfgDed. N.B. offset returned here won't be right yet..
@@ -4595,19 +4767,19 @@ proto_register_l2server(void)
         { "ServCellIdx", "l2server.serving-cell-index", FT_INT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_bwp_inactivity_timer,
-        { "BwpInactivityTimer", "l2server.bwp-inactivity-timer", FT_UINT8, BASE_DEC,
+        { "BwpInactivityTimer", "l2server.bwp-inactivity-timer", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_tag_id,
         { "TagId", "l2server.tag-id", FT_UINT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_scell_deact_timer,
-        { "SCell Deact Timer", "l2server.scell-deact-timer", FT_UINT8, BASE_DEC,
+        { "SCell Deact Timer", "l2server.scell-deact-timer", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_pathloss_ref_linking,
-        { "Pathloss Ref Linking", "l2server.pathloss-ref-linking", FT_UINT8, BASE_DEC,
+        { "Pathloss Ref Linking", "l2server.pathloss-ref-linking", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_serv_cell_mo,
-        { "Serv Cell MO", "l2server.serv-cell-mo", FT_UINT8, BASE_DEC,
+        { "Serv Cell MO", "l2server.serv-cell-mo", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_default_dl_bwpid,
         { "Default DL Bwpid", "l2server.default-dl-bwpid", FT_UINT8, BASE_DEC,
@@ -4616,7 +4788,7 @@ proto_register_l2server(void)
         { "Supp UL Rel", "l2server.supp-ul-rel", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_ca_slot_offset_is_valid,
-        { "CA Slot Offset Is Valid", "l2server.ca-slot-offset-is-valid", FT_UINT8, BASE_DEC,
+        { "CA Slot Offset Is Valid", "l2server.ca-slot-offset-is-valid", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_nb_lte_srs_patternlist_1,
         { "Nb LTE SRS PatternList 1", "l2server.nb-lte-srs-patternlist-1", FT_UINT8, BASE_DEC,
@@ -4629,13 +4801,13 @@ proto_register_l2server(void)
           NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_csi_rs_valid_with_dci_r16,
-        { "CsiRsValidWithDCI-r16", "l2server.csi-rs-valid-with-dci-r16", FT_UINT8, BASE_DEC,
+        { "CsiRsValidWithDCI-r16", "l2server.csi-rs-valid-with-dci-r16", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_crs_rate_match_per_coreset_poolidx_r16,
         { "CrsRateMatchPerCORESETPoolIdx-r16", "l2server.crs-rate-match-per-coreset-poolidx-r16", FT_UINT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_first_active_ul_bwp_pcell,
-        { "First Active UL BWP pCell", "l2server.first-active-ul-bwp-pcell", FT_UINT8, BASE_DEC,
+        { "First Active UL BWP pCell", "l2server.first-active-ul-bwp-pcell", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_sp_cell_cfg_common,
@@ -4983,8 +5155,67 @@ proto_register_l2server(void)
         { "Msg3 Transform Precoding", "l2server.msg-transform-precoding", FT_INT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_rsrp_threshold_ssb,
-        { "RSRP Threshold SSB", "l2server.rsrp-threshold_ssb", FT_INT8, BASE_DEC,
+        { "RSRP Threshold SSB", "l2server.rsrp-threshold-ssb", FT_INT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_freq_info_dl,
+        { "Freq Info DL", "l2server.freq-info-dl", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_abs_freq_ssb,
+        { "Abs Freq SSB", "l2server.abs-freq-ssb", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_abs_freq_point_a,
+        { "Abs Freq Point A", "l2server.abs-freq-point-a", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ssb_subcarrier_offset,
+        { "SSB Subcarrier Offset", "l2server.ssb-subcarrier-offset", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_freq_band_list,
+        { "Nb Freq Band List", "l2server.nb-freq-band-list", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_scs_spec_carrier,
+        { "Nb SCS Spec Carrier", "l2server.nb-scs-spec-carrier", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_freq_band_list,
+        { "Freq Band List", "l2server.freq-band-list", FT_INT16, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ssb_periodicity_serv_cell,
+        { "SSB Periodicity Serv Cell", "l2server.ssb-periodicity-serv-cell", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_dmrs_type_a_pos,
+        { "DMRS TypeA Pos", "l2server.dmrs-typea-pos", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sub_car_spacing,
+        { "Sub Car Spacing", "l2server.sub-car-spacing", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ssb_pos_in_burst_is_valid,
+        { "SSB Pos In Burst is valid", "l2server.ssb-pos-in-burst-is-valid", FT_INT8, BASE_DEC,
+           VALS(ssb_pos_in_burst_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_n_timing_advance_offset,
+        { "N Timing Advance Offset", "l2server.n-timing-advance-offset", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ssb_pos_in_burst_short,
+        { "SSB Pos in burst (Short)", "l2server.ssb-pos-in-burst", FT_UINT8, BASE_HEX,
+           NULL, 0x0f, NULL, HFILL }},
+      { &hf_l2server_ssb_pos_in_burst_medium,
+        { "SSB Pos in burst (Medium)", "l2server.ssb-pos-in-burst", FT_UINT8, BASE_HEX,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ssb_pos_in_burst_long,
+        { "SSB Pos in burst (Long)", "l2server.ssb-pos-in-burst", FT_UINT64, BASE_HEX,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pbch_block_power,
+        { "PBCH Block Power", "l2server.pbch-block-power", FT_INT16, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nb_rate_match_pattern_to_add_mod,
+        { "Nb Rate Match Pattern To Add/Mod", "l2server.nb-rate-match-pattern-to-add-mod", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_rate_match_pattern_to_del,
+        { "Nb Rate Match Pattern To Del", "l2server.nb-rate-match-pattern-to-del", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
 
     };
 
@@ -5023,7 +5254,8 @@ proto_register_l2server(void)
         &ett_l2server_ul_bwp_common,
         &ett_l2server_ul_bwp_common_pdcch,
         &ett_l2server_rach_common,
-        &ett_l2server_rach_generic
+        &ett_l2server_rach_generic,
+        &ett_l2server_freq_info_dl
     };
 
     static ei_register_info ei[] = {
