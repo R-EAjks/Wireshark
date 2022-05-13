@@ -9,17 +9,17 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
-#ifndef PATH_CHOOSER_DELEGATE_H_
-#define PATH_CHOOSER_DELEGATE_H_
+#ifndef PATH_SELECTION_DELEGATE_H_
+#define PATH_SELECTION_DELEGATE_H_
 
 #include <QStyledItemDelegate>
 
-class PathChooserDelegate : public QStyledItemDelegate
+class PathSelectionDelegate : public QStyledItemDelegate
 {
     Q_OBJECT
 
 public:
-    PathChooserDelegate(QObject *parent = 0);
+    PathSelectionDelegate(QObject *parent = 0);
 
 protected:
     QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &option, const QModelIndex &idx) const;
@@ -27,8 +27,9 @@ protected:
     void setEditorData(QWidget *editor, const QModelIndex &idx) const;
     void setModelData(QWidget *editor, QAbstractItemModel *model, const QModelIndex &idx) const;
 
-private slots:
-    void browseButtonClicked();
+protected slots:
+    void pathHasChanged(QString newPath);
+
 };
 
-#endif /* PATH_CHOOSER_DELEGATE_H_ */
+#endif /* PATH_SELECTION_DELEGATE_H_ */
