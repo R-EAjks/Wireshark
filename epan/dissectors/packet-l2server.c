@@ -369,6 +369,23 @@ static int hf_l2server_initial_ul_bwp_len = -1;
 static int hf_l2server_ul_bwp = -1;
 static int hf_l2server_ul_bwp_len = -1;
 
+static int hf_l2server_ul_bwp_common = -1;
+
+static int hf_l2server_ul_bwp_common_pdcch = -1;
+static int hf_l2server_ul_bwp_common_search_space_sib1 = -1;
+static int hf_l2server_ul_bwp_common_search_space_sib = -1;
+static int hf_l2server_ul_bwp_common_pag_search_space = -1;
+static int hf_l2server_ul_bwp_common_ra_search_space = -1;
+static int hf_l2server_ul_bwp_common_ra_ctrl_res_set = -1;
+static int hf_l2server_ul_bwp_common_nb_common_ctrl_res_sets = -1;
+static int hf_l2server_ul_bwp_common_nb_common_search_spaces = -1;
+static int hf_l2server_ul_bwp_common_control_resource_set_zero = -1;
+static int hf_l2server_ul_bwp_common_search_space_zero = -1;
+static int hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po_valid = -1;
+static int hf_l2server_ul_bwp_common_nb_first_pdcch_monit_occ_of_po = -1;
+static int hf_l2server_ul_bwp_common_nb_common_search_spaces_ext = -1;
+
+static int hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po = -1;
 
 static const value_string lch_vals[] =
 {
@@ -724,6 +741,10 @@ static gint ett_l2server_cell_config_cellcfg = -1;
 static gint ett_l2server_ul_ded_config = -1;
 static gint ett_l2server_initial_ul_bwp = -1;
 static gint ett_l2server_ul_bwp = -1;
+static gint ett_l2server_ul_bwp_common = -1;
+static gint ett_l2server_ul_bwp_common_pdcch = -1;
+
+
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
 static expert_field ei_l2server_type_unknown = EI_INIT;
@@ -1784,6 +1805,7 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     // McsCRnti
     proto_tree_add_item(config_tree, hf_l2server_mcs_crnti, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
+
     // PUE_FR1 [30..33]
     proto_tree_add_item(config_tree, hf_l2server_pue_fr1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
@@ -1852,11 +1874,13 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     // Pad
     offset += 1;
 
+    // Dcp_Config_r16 (bb_nr5g_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16t)
     if (dcp_config_present) {
         // N.B. Size of this is fixed.
         offset += sizeof(bb_nr5g_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16t);
     }
 
+    // Pdcch_BlindDetectionCA_CombIndicator_r16 (bb_nr5g_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16t)
     if (pdcch_blind_detection_present) {
         // N.B. Size of this is fixed.
         offset += sizeof(bb_nr5g_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16t);
@@ -2557,7 +2581,6 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                                                                   "", "UL Cell Cfg Dedicated");
             proto_tree *ul_ded_config_tree = proto_item_add_subtree(ul_ded_config_ti, ett_l2server_ul_ded_config);
 
-
             // TODO:
 
             // Len
@@ -2569,6 +2592,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
             proto_tree_add_item_ret_uint(ul_ded_config_tree, hf_l2server_field_mask_4, tvb, offset, 4,
                                          ENC_LITTLE_ENDIAN, &ul_fieldmask);
             offset += 4;
+
             // FirstActiveUlBwp
             proto_tree_add_item(ul_ded_config_tree, hf_l2server_first_active_ul_bwp, tvb, offset, 1, ENC_LITTLE_ENDIAN);
             offset += 1;
@@ -2577,6 +2601,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
 
             // NbUlBwpIdToDel
             offset += 1;
+
             // NbUlBwpIdToAdd
             guint32 num_bwpid_to_add;
             proto_tree_add_item_ret_uint(ul_ded_config_tree, hf_l2server_num_ul_bwpid_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &num_bwpid_to_add);
@@ -2585,7 +2610,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
             // UlBwpIdToDel[]
             offset += (1 * bb_nr5g_MAX_NB_BWPS);
 
-            // InitialUlBwp
+            // InitialUlBwp (nr5g_rlcmac_Cmac_BWP_UPLINKDEDICATEDt)
             if (ul_fieldmask & nr5g_rlcmac_Cmac_STRUCT_UPLINK_DEDICATED_CONFIG_INITIAL_UL_BWP_PRESENT) {
 
                 // Subtree.
@@ -2595,7 +2620,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                 proto_tree *initial_ul_bwp_tree = proto_item_add_subtree(initial_ul_bwp_ti, ett_l2server_initial_ul_bwp);
 
 
-                // Type nr5g_rlcmac_Cmac_BWP_UPLINKDEDICATEDt
+                // Len
                 guint32 initial_ul_bwp_len;
                 proto_tree_add_item_ret_uint(initial_ul_bwp_tree, hf_l2server_initial_ul_bwp_len, tvb, offset, 4, ENC_LITTLE_ENDIAN, &initial_ul_bwp_len);
                 offset += 4;
@@ -2627,11 +2652,11 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
 
             // PuschServingCellCfg
             if (ul_fieldmask & nr5g_rlcmac_Cmac_STRUCT_UPLINK_DEDICATED_CONFIG_PUSCH_PRESENT) {
+                // TODO
             }
 
 
-            // UlBwpIdToAdd
-            printf("%u entries\n", num_bwpid_to_add);
+            // UlBwpIdToAdd (entries are nr5g_rlcmac_Cmac_BWP_UPLINKt from nr5g-rlcmac_Cmac-bb.h)
             for (guint32 n=0; n < num_bwpid_to_add; n++) {
                 // Subtree.
                 proto_item *ul_bwp_ti = proto_tree_add_string_format(ul_ded_config_tree, hf_l2server_ul_bwp, tvb,
@@ -2648,64 +2673,118 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                 guint ul_bwp_fieldmask;
                 proto_tree_add_item_ret_uint(ul_bwp_tree, hf_l2server_field_mask_4, tvb, offset, 4,
                                              ENC_LITTLE_ENDIAN, &ul_bwp_fieldmask);
-
                 offset += 4;
+
                 // BwpId
                 proto_tree_add_item(ul_bwp_tree, hf_l2server_bwpid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                 offset += 1;
 
                 // BwpULCommon (nr5g_rlcmac_Cmac_BWP_UPLINKCOMMONt from nr5g-rlcmac_Cmac-bb.h)
                 if (ul_bwp_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_COMMON_CFG_PRESENT) {
-                    // TODO: subtree!
+
+                    // Subtree.
+                    proto_item *common_ti = proto_tree_add_string_format(ul_bwp_tree, hf_l2server_ul_bwp_common, tvb,
+                                                                         offset, 1, "", "Common ");
+                    proto_tree *common_tree = proto_item_add_subtree(common_ti, ett_l2server_ul_bwp_common);
+
                     // Len
                     offset += 4;
+
                     // FieldMask
-                    guint32 common_fieldmask = 0x3;  // TODO: NOOOOOOOOo!!!!!!
+                    guint32 common_fieldmask;
+                    proto_tree_add_item_ret_uint(common_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                                 ENC_LITTLE_ENDIAN, &common_fieldmask);
                     offset += 4;
+
                     // GenBwp (bb_nr5g_BWPt)
                     offset += 4;
 
+                    // RachCfgCommon (bb_nr5g_RACH_CONF_COMMONt)
+                    if (common_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_COMMON_RACH_CFG_PRESENT) {
+                        // TODO
+                    }
+
+                    // PuschCfgCommon (nr5g_rlcmac_Cmac_PUSCH_CONF_COMMONt)
+                    if (common_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_COMMON_PUSCH_CFG_PRESENT) {
+                        // TODO
+                    }
+                }
+
+
+#if 0
                     // PdcchConfCommon (bb_nr5g_PDCCH_CONF_COMMONt)
                     if (common_fieldmask & bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDCCH_CFG_PRESENT) {
-                        // TODO: bytes need to check are in here!!!!!!
+                        gint pdcch_offset = offset;
+
+                        // Subtree.
+                        proto_item *pdcch_ti = proto_tree_add_string_format(common_tree, hf_l2server_ul_bwp_common_pdcch, tvb,
+                                                                            offset, 1, "", "PDCCH ");
+                        proto_tree *pdcch_tree = proto_item_add_subtree(pdcch_ti, ett_l2server_ul_bwp_common_pdcch);
 
                         // SearchSpaceSIB1
+                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_search_space_sib1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                         offset += 1;
                         // SearchSpaceSIB
+                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_search_space_sib, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                         offset += 1;
                         // PagSearchSpace
+                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_pag_search_space, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+                        offset += 1;
+                        // RaSearchSpace
+                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_ra_search_space, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                         offset += 1;
                         // RaCtrlResSet
+                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_ra_ctrl_res_set, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                         offset += 1;
                         // NbCommonCtrlResSets
+                        guint32 nb_common_ctrl_res_sets;
+                        proto_tree_add_item_ret_uint(pdcch_tree, hf_l2server_ul_bwp_common_nb_common_ctrl_res_sets, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_common_ctrl_res_sets);
                         offset += 1;
                         // NbCommonSearchSpaces
+                        guint32 nb_common_search_spaces;
+                        proto_tree_add_item_ret_uint(pdcch_tree, hf_l2server_ul_bwp_common_nb_common_search_spaces, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_common_search_spaces);
                         offset += 1;
                         // ControlResourceSetZero
+                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_control_resource_set_zero, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                         offset += 1;
                         // SearchSpaceZero
+                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_search_space_zero, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                         offset += 1;
                         // FirstPdcchMonitOccOfPOIsValid
+                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                         offset += 1;
                         // NbFirstPdcchMonitOccOfPO
+                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_nb_first_pdcch_monit_occ_of_po, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                         offset += 1;
                         // NbCommonSearchSpacesExt
+                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_nb_common_search_spaces, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+                        offset += 1;
 
                         // CommonCtrlResSets
+                        for (guint32 ccrs=0; ccrs < nb_common_ctrl_res_sets; ccrs++) {
+                            // TODO:
+                            offset += sizeof(bb_nr5g_CTRL_RES_SETt);
+                        }
 
                         // CommonSearchSpaces
+                        for (guint32 ccs=0; ccs < nb_common_search_spaces; ccs++) {
+                            // TODO
+                            offset += sizeof(bb_nr5g_SEARCH_SPACEt);
+                        }
 
                         // FirstPdcchMonitOccOfPO
+                        for (guint32 mon_occ=0; mon_occ < bb_nr5g_MAX_PO_PERPF; mon_occ++) {
+                            proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+                            offset += 2;
+                        }
 
-                        // CommonSearchSpacesExt_r16
-
-
+                        proto_item_set_len(pdcch_ti, offset-pdcch_offset);
                     }
                     // PdschConfCommon
                     if (common_fieldmask & bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDSCH_CFG_PRESENT) {
                     }
-
                 }
+#endif
 
                 // BwpULDed
                 if (ul_bwp_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DEDICATED_CFG_PRESENT) {
@@ -4727,6 +4806,57 @@ proto_register_l2server(void)
       { &hf_l2server_ul_bwp_len,
         { "Len", "l2server.ul-bwp.len", FT_UINT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ul_bwp_common,
+        { "UL BWP Common", "l2server.ul-bwp-common", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ul_bwp_common_pdcch,
+        { "UL BWP Common PDCCH", "l2server.ul-bwp-common-pdcch", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ul_bwp_common_search_space_sib1,
+        { "Search Space SIB1", "l2server.search-space-sib1", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_search_space_sib,
+        { "Search Space SIB", "l2server.search-space-sib", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_pag_search_space,
+        { "Page Search Space", "l2server.pag-search-space", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_ra_search_space,
+        { "RA Search Space", "l2server.ra-search-space", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_ra_ctrl_res_set,
+        { "RA Ctrl Res Set", "l2server.ra-ctrl-res-set", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_nb_common_ctrl_res_sets,
+        { "Nb Common Ctrl Res Sets", "l2server.nb-common-ctrl-res-set", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_nb_common_search_spaces,
+        { "Nb Common Search Spaces", "l2server.nb-common-search-spaces", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_control_resource_set_zero,
+        { "Control Resource Set Zero", "l2server.control-resource-set-zero", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_search_space_zero,
+        { "Search space zero", "l2server.search-space-zero", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po_valid,
+        { "First PDCCH Monitor Occ of Po Valid", "l2server.first-pdcch-monit-of-po-valid", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_nb_first_pdcch_monit_occ_of_po,
+        { "Nb First PDCCH Monitor Occ of Po", "l2server.nb-first-pdcch-monit-of-po", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_nb_common_search_spaces_ext,
+        { "Nb Common Search Spaces Ext", "l2server.nb-common-search-spaces-ext", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po,
+        { "First PDCCH Moni Occ of Po", "l2server.first-pdcch-moni-occ-of-po", FT_UINT16, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+
     };
 
     static gint *ett[] = {
@@ -4760,7 +4890,9 @@ proto_register_l2server(void)
         &ett_l2server_cell_config_cellcfg,
         &ett_l2server_ul_ded_config,
         &ett_l2server_initial_ul_bwp,
-        &ett_l2server_ul_bwp
+        &ett_l2server_ul_bwp,
+        &ett_l2server_ul_bwp_common,
+        &ett_l2server_ul_bwp_common_pdcch
     };
 
     static ei_register_info ei[] = {
