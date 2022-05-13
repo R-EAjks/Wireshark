@@ -97,6 +97,7 @@ void PathSelectionEdit::browseForPath()
     else
         newPath = WiresharkFileDialog::getExistingDirectory(this, _title, openDir);
 
-    if (!newPath.isEmpty())
+    if (!newPath.isEmpty()) {
         _edit->setText(newPath);
+    }
 }
