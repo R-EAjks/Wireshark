@@ -420,6 +420,13 @@ static int hf_l2server_pbch_block_power = -1;
 static int hf_l2server_nb_rate_match_pattern_to_add_mod = -1;
 static int hf_l2server_nb_rate_match_pattern_to_del = -1;
 
+static int hf_l2server_bwp_dl_common = -1;
+static int hf_l2server_freq_info_ul_common = -1;
+static int hf_l2server_bwp_ul_common = -1;
+static int hf_l2server_freq_info_sul_common = -1;
+static int hf_l2server_bwp_sul_common = -1;
+static int hf_l2server_tdd_common = -1;
+
 static const value_string lch_vals[] =
 {
     { 0x0,   "SPARE" },
@@ -786,7 +793,12 @@ static gint ett_l2server_rach_common = -1;
 static gint ett_l2server_rach_generic = -1;
 static gint ett_l2server_freq_info_dl = -1;
 
-
+static gint ett_l2server_bwp_dl_common = -1;
+static gint ett_l2server_freq_info_ul_common = -1;
+static gint ett_l2server_bwp_ul_common = -1;
+static gint ett_l2server_freq_info_sul_common = -1;
+static gint ett_l2server_bwp_sul_common = -1;
+static gint ett_l2server_tdd_common = -1;
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
 static expert_field ei_l2server_type_unknown = EI_INIT;
@@ -2299,7 +2311,7 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
     proto_tree_add_item(config_tree, hf_l2server_nb_rate_match_pattern_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
 
-    // TODO: think these present flags are always present anyway???
+    // TODO: are these present flags are always present anyway???
 
     // FreqInfoDL
     if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_DL_COMMON_PRESENT) {
@@ -2347,32 +2359,63 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
 
     // InitDLBWP
     if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_DL_COMMON_PRESENT) {
-        // TODO
+        // Subtree.
+        proto_item *bwp_dl_common_ti = proto_tree_add_string_format(config_tree, hf_l2server_bwp_dl_common, tvb,
+                                                                    offset, sizeof(bb_nr5g_BWP_DOWNLINKCOMMONt),
+                                                                    "", "BWP DL Common");
+        proto_tree *bwp_dl_common_tree = proto_item_add_subtree(bwp_dl_common_ti, ett_l2server_bwp_dl_common);
+        printf("tree at %p\n", bwp_dl_common_tree);
+        offset += sizeof(bb_nr5g_BWP_DOWNLINKCOMMONt);
     }
 
     // FreqInfoUL
     if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_UL_COMMON_PRESENT) {
-        // TODO
+        proto_item *freq_info_ul_common_ti = proto_tree_add_string_format(config_tree, hf_l2server_freq_info_ul_common, tvb,
+                                                                         offset, sizeof(bb_nr5g_FREQINFO_ULt),
+                                                                         "", "Freq Info UL Common");
+        proto_tree *freq_info_ul_common_tree = proto_item_add_subtree(freq_info_ul_common_ti, ett_l2server_freq_info_ul_common);
+        printf("tree at %p\n", freq_info_ul_common_tree);
+        offset += sizeof(bb_nr5g_FREQINFO_ULt);
     }
 
     // InitULBWP
     if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_UL_COMMON_PRESENT) {
-        // TODO
+        proto_item *initial_ul_bwp_ti = proto_tree_add_string_format(config_tree, hf_l2server_initial_ul_bwp, tvb,
+                                                                     offset, sizeof(bb_nr5g_BWP_UPLINKCOMMONt),
+                                                                     "", "Initial UL BWP");
+        proto_tree *intitial_ul_bwp_tree = proto_item_add_subtree(initial_ul_bwp_ti, ett_l2server_initial_ul_bwp);
+        printf("tree at %p\n", intitial_ul_bwp_tree);
+        offset += sizeof(bb_nr5g_BWP_UPLINKCOMMONt);
     }
 
     // FreqInfoSUL
     if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_SUL_COMMON_PRESENT) {
-        // TODO
+        proto_item *freq_info_sul_common_ti = proto_tree_add_string_format(config_tree, hf_l2server_freq_info_sul_common, tvb,
+                                                                           offset, sizeof(bb_nr5g_FREQINFO_ULt),
+                                                                           "", "Freq Info SUL Common");
+        proto_tree *freq_info_sul_common_tree = proto_item_add_subtree(freq_info_sul_common_ti, ett_l2server_freq_info_sul_common);
+        printf("tree at %p\n", freq_info_sul_common_tree);
+        offset += sizeof(bb_nr5g_FREQINFO_ULt);
     }
 
     // InitSULBWP
     if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_SUL_COMMON_PRESENT) {
-        // TODO
+        proto_item *bwp_sul_common_ti = proto_tree_add_string_format(config_tree, hf_l2server_bwp_sul_common, tvb,
+                                                                           offset, sizeof(bb_nr5g_BWP_UPLINKCOMMONt),
+                                                                           "", "Init BWP SUL Common");
+        proto_tree *bwp_sul_common_tree = proto_item_add_subtree(bwp_sul_common_ti, ett_l2server_bwp_sul_common);
+        printf("tree at %p\n", bwp_sul_common_tree);
+        offset += sizeof(bb_nr5g_BWP_UPLINKCOMMONt);
     }
 
     // TddDlUlConfCommon
     if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_TDD_COMMON_PRESENT) {
-        // TODO
+        proto_item *tdd_ti = proto_tree_add_string_format(config_tree, hf_l2server_tdd_common, tvb,
+                                                          offset, sizeof(bb_nr5g_TDD_UL_DL_CONFIG_COMMONt),
+                                                          "", "TDD DL UL Config Common");
+        proto_tree *tdd_tree = proto_item_add_subtree(tdd_ti, ett_l2server_tdd_common);
+        printf("tree at %p\n", tdd_tree);
+        offset += sizeof(bb_nr5g_TDD_UL_DL_CONFIG_COMMONt);
     }
 
     // RateMatchPatternToDel
@@ -5217,6 +5260,25 @@ proto_register_l2server(void)
            NULL, 0x0, NULL, HFILL }},
 
 
+      { &hf_l2server_bwp_dl_common,
+        { "BWP DL Common", "l2server.bwp-dl-common", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_freq_info_ul_common,
+        { "FreqInfo UL Common", "l2server.freqinfo-ul-common", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_bwp_ul_common,
+        { "BWP UL Common", "l2server.bwp-ul-common", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_freq_info_sul_common,
+        { "FreqInfo SUL Common", "l2server.freqinfo-sul-common", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_bwp_sul_common,
+        { "BWP SUL Common", "l2server.bwp-sul-common", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_tdd_common,
+        { "TDD Common", "l2server.tdd-common", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
     };
 
     static gint *ett[] = {
@@ -5255,7 +5317,13 @@ proto_register_l2server(void)
         &ett_l2server_ul_bwp_common_pdcch,
         &ett_l2server_rach_common,
         &ett_l2server_rach_generic,
-        &ett_l2server_freq_info_dl
+        &ett_l2server_freq_info_dl,
+        &ett_l2server_bwp_dl_common,
+        &ett_l2server_freq_info_ul_common,
+        &ett_l2server_bwp_ul_common,
+        &ett_l2server_freq_info_sul_common,
+        &ett_l2server_bwp_sul_common,
+        &ett_l2server_tdd_common
     };
 
     static ei_register_info ei[] = {
