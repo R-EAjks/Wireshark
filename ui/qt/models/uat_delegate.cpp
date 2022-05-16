@@ -50,7 +50,7 @@ QWidget *UatDelegate::createEditor(QWidget *parent, const QStyleOptionViewItem &
     case PT_TXTMOD_FILENAME:
         if (index.isValid()) {
             QString filename_old = index.model()->data(index, Qt::EditRole).toString();
-            PathSelectionEdit * pathEdit = new PathSelectionEdit(field->title, QString(), field->mode == PT_TXTMOD_DIRECTORYNAME, parent);
+            PathSelectionEdit * pathEdit = new PathSelectionEdit(field->title, QString(), field->mode != PT_TXTMOD_DIRECTORYNAME, parent);
             connect(pathEdit, &PathSelectionEdit::pathChanged, this, &UatDelegate::pathHasChanged);
             return pathEdit;
         }
