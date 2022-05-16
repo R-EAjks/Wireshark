@@ -14,7 +14,7 @@
 #include <QWidget>
 #include <QString>
 #include <QLineEdit>
-#include <QPushButton>
+#include <QToolButton>
 
 class PathSelectionEdit : public QWidget
 {
@@ -42,9 +42,7 @@ private:
     bool _selectFile;
 
     QLineEdit * _edit;
-    QPushButton * _button;
-
-    void updateWidgets();
+    QToolButton * _button;
 };
 
 #endif // PATH_SELECTOR_EDIT_H

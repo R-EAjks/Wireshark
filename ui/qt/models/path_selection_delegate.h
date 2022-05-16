@@ -22,10 +22,10 @@ public:
     PathSelectionDelegate(QObject *parent = 0);
 
 protected:
-    QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &option, const QModelIndex &idx) const;
-    void updateEditorGeometry (QWidget * editor, const QStyleOptionViewItem & option, const QModelIndex & idx) const;
-    void setEditorData(QWidget *editor, const QModelIndex &idx) const;
-    void setModelData(QWidget *editor, QAbstractItemModel *model, const QModelIndex &idx) const;
+    QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &option, const QModelIndex &idx) const override;
+    void updateEditorGeometry (QWidget * editor, const QStyleOptionViewItem & option, const QModelIndex & idx) const override;
+    void setEditorData(QWidget *editor, const QModelIndex &idx) const override;
+    void setModelData(QWidget *editor, QAbstractItemModel *model, const QModelIndex &idx) const override;
 
 protected slots:
     void pathHasChanged(QString newPath);

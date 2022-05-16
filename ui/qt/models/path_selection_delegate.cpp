@@ -15,11 +15,11 @@ PathSelectionDelegate::PathSelectionDelegate(QObject *parent)
     : QStyledItemDelegate(parent)
 {
 }
-
-QWidget* PathSelectionDelegate::createEditor(QWidget *parent, const QStyleOptionViewItem &, const QModelIndex &) const
+#include <QDebug>
+QWidget* PathSelectionDelegate::createEditor(QWidget *parent, const QStyleOptionViewItem &option, const QModelIndex &) const
 {
     PathSelectionEdit * editor = new PathSelectionEdit(tr("Open a pipe"), QString(), true, parent);
-
+    qDebug() << "PathSelectionDelegate::createEditor: " << option.rect;
     connect(editor, &PathSelectionEdit::pathChanged, this, &PathSelectionDelegate::pathHasChanged);
 
     return editor;
@@ -30,11 +30,6 @@ void PathSelectionDelegate::pathHasChanged(QString)
     PathSelectionEdit * editor = qobject_cast<PathSelectionEdit *>(sender());
     if (editor)
         emit commitData(editor);
-}
-
-void PathSelectionDelegate::updateEditorGeometry(QWidget *editor, const QStyleOptionViewItem &option, const QModelIndex &) const
-{
-    editor->setGeometry(option.rect);
 }
 
 void PathSelectionDelegate::setEditorData(QWidget *editor, const QModelIndex &idx) const
@@ -59,4 +54,10 @@ void PathSelectionDelegate::setModelData(QWidget *editor, QAbstractItemModel * m
     {
         QStyledItemDelegate::setModelData(editor, model, idx);
     }
+}
+
+void PathSelectionDelegate::updateEditorGeometry(QWidget *editor, const QStyleOptionViewItem &option, const QModelIndex &/*idx*/) const 
+{
+    qDebug() << "Update editor geometry: " << option.rect << " [" << editor->minimumSizeHint() << "]";
+    editor->setGeometry(option.rect);
 }

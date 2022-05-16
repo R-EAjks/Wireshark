@@ -17,7 +17,7 @@
 #include "ui/qt/widgets/wireshark_file_dialog.h"
 
 #include <QHBoxLayout>
-#include <QPushButton>
+#include <QToolButton>
 #include <QWidget>
 #include <QLineEdit>
 
@@ -31,9 +31,9 @@ PathSelectionEdit::PathSelectionEdit(QString title, QString path, bool selectFil
     _edit->setText(_path);
     connect(_edit, &QLineEdit::textChanged, this, &PathSelectionEdit::setPath);
 
-    _button = new QPushButton(this);
+    _button = new QToolButton(this);
     _button->setText(tr("Browse"));
-    connect(_button, &QPushButton::clicked, this, &PathSelectionEdit::browseForPath);
+    connect(_button, &QToolButton::clicked, this, &PathSelectionEdit::browseForPath);
 
     setContentsMargins(0, 0, 0, 0);
     QHBoxLayout *hbox = new QHBoxLayout(this);
@@ -46,8 +46,6 @@ PathSelectionEdit::PathSelectionEdit(QString title, QString path, bool selectFil
 
     setFocusProxy(_edit);
     setFocusPolicy(_edit->focusPolicy());
-
-    updateWidgets();
 }
 
 PathSelectionEdit::PathSelectionEdit(QWidget *parent) : 
@@ -69,14 +67,6 @@ void PathSelectionEdit::setPath(QString newPath)
 QString PathSelectionEdit::path() const
 {
     return _path;
-}
-
-void PathSelectionEdit::updateWidgets()
-{
-    // Grow the item to match the editor. According to the QAbstractItemDelegate
-    // documenation we're supposed to reimplement sizeHint but this seems to work.
-    //QSize size = option.rect.size();
-    //size.setHeight(qMax(option.rect.height(), hbox->sizeHint().height()));
 }
 
 void PathSelectionEdit::browseForPath()
