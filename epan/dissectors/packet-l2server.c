@@ -197,6 +197,7 @@ static int hf_l2server_ncellnr = -1;
 static int hf_l2server_numltepropdu = -1;
 static int hf_l2server_numnrpropdu = -1;
 static int hf_l2server_cellidlteitem = -1;
+static int hf_l2server_cellidnritem = -1;
 
 static int hf_l2server_field_mask_1 = -1;
 static int hf_l2server_field_mask_1_ded_present = -1;
@@ -814,6 +815,7 @@ void proto_reg_handoff_l2server (void);
 
 /* Preferences */
 static gboolean global_call_pdcp_for_drb = TRUE;
+static gboolean global_call_pdcp_for_srb = TRUE;
 static gboolean global_call_pdcp_for_tm = TRUE;
 
 // Configure number of DRB SN sequence bits?
@@ -1115,8 +1117,7 @@ static void dissect_rlcmac_data_req(proto_tree *tree, tvbuff_t *tvb, packet_info
 
         proto_item_set_hidden(pdcp_ti);
     }
-    // TODO: need more prefs...
-    else if (p_pdcp_nr_info->plane == NR_SIGNALING_PLANE) {
+    else if (global_call_pdcp_for_srb && p_pdcp_nr_info->plane == NR_SIGNALING_PLANE) {
         tvbuff_t *pdcp_tvb = tvb_new_subset_remaining(tvb, offset);
         p_pdcp_nr_info->pdu_length = tvb_reported_length(pdcp_tvb);
         call_dissector_only(pdcp_nr_handle, pdcp_tvb, pinfo, tree, NULL);
@@ -1323,6 +1324,14 @@ static void dissect_rlcmac_data_ind(proto_tree *tree, tvbuff_t *tvb, packet_info
 
         proto_item_set_hidden(pdcp_ti);
     }
+    else if (global_call_pdcp_for_srb && p_pdcp_nr_info->plane == NR_SIGNALING_PLANE) {
+        tvbuff_t *pdcp_tvb = tvb_new_subset_remaining(tvb, offset);
+        p_pdcp_nr_info->pdu_length = tvb_reported_length(pdcp_tvb);
+        call_dissector_only(pdcp_nr_handle, pdcp_tvb, pinfo, tree, NULL);
+
+        proto_item_set_hidden(pdcp_ti);
+    }
+
 
     if (global_call_pdcp_for_tm && (mode == TM)) {
         p_pdcp_nr_info->maci_present = FALSE;
@@ -3404,6 +3413,7 @@ static void dissect_dbeam_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinf
     offset += 4;
 }
 
+/* nr5g_l2_Srv_CELL_PPU_LIST_ACKt */
 static void dissect_ppu_list_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                  guint offset, guint len _U_)
 {
@@ -3418,13 +3428,20 @@ static void dissect_ppu_list_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *p
     proto_tree_add_item_ret_uint(tree, hf_l2server_numltepropdu, tvb, offset, 1, ENC_LITTLE_ENDIAN, &num_lte_pro_pdu);
     offset += 1;
     // NumNrProPdu
-    proto_tree_add_item(tree, hf_l2server_numnrpropdu, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 num_nr_pro_pdu;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_numnrpropdu, tvb, offset, 1, ENC_LITTLE_ENDIAN, &num_nr_pro_pdu);
     offset += 1;
     // CellIdNrList[].
     for (guint32 n=0; n < num_lte_pro_pdu; n++) {
         proto_tree_add_item(tree, hf_l2server_cellidlteitem, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
     }
+    // CellIdNrList[].
+    for (guint32 n=0; n < num_nr_pro_pdu; n++) {
+        proto_tree_add_item(tree, hf_l2server_cellidnritem, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+    }
+
 }
 
 // Showing nr5g_l2_Srv_CFG_02t from L2ServerMesages.h
@@ -4685,6 +4702,9 @@ proto_register_l2server(void)
       { &hf_l2server_cellidlteitem,
         { "CellIdLteItem", "l2server.cellidlteitem", FT_UINT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_cellidnritem,
+        { "CellIdNrItem", "l2server.cellidnritem", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_nb_scell_cfg_add,
         { "NbSCellCfgAdd", "l2server.number-scell-cfg-add", FT_UINT8, BASE_DEC,
@@ -5349,6 +5369,10 @@ proto_register_l2server(void)
     prefs_register_bool_preference(l2server_module, "call_pdcp_drbs", "Call PDCP for DRBs",
         "",
         &global_call_pdcp_for_drb);
+
+    prefs_register_bool_preference(l2server_module, "call_pdcp_srbs", "Call PDCP for SRBs",
+        "",
+        &global_call_pdcp_for_srb);
 
     prefs_register_bool_preference(l2server_module, "call_pdcp_tm", "Call PDCP for TM PDUs",
         "",
