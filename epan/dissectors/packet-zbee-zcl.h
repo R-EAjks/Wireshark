@@ -128,7 +128,7 @@ typedef struct{
 #define ZBEE_ZCL_INVALID_LONG_STR_LENGTH        0xffff
 #define ZBEE_ZCL_NUM_INDIVIDUAL_ETT             2
 #define ZBEE_ZCL_NUM_ATTR_ETT                   64
-//I63736
+
 #define ZBEE_ZCL_NUM_IND_FIELD                  16
 
 #define ZBEE_ZCL_NUM_ARRAY_ELEM_ETT             16

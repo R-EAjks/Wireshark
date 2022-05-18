@@ -39,7 +39,7 @@ static void dissect_zcl_read_report_config_resp (tvbuff_t *tvb, packet_info *pin
 static void dissect_zcl_default_resp (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint *offset);
 static void dissect_zcl_discover_attr (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint *offset);
 static void dissect_zcl_discover_attr_resp (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint *offset, guint16 cluster_id, guint16 mfr_code, gboolean direction);
-/*I63736*/
+
 static void dissect_zcl_read_attr_struct(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, guint* offset, guint16 cluster_id, guint16 mfr_code, gboolean direction);
 static void dissect_zcl_write_attr_struct(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, guint* offset, guint16 cluster_id, guint16 mfr_code, gboolean direction);
 static void dissect_zcl_write_attr_struct_resp(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, guint* offset, guint16 cluster_id, guint16 mfr_code, gboolean direction);
@@ -144,7 +144,7 @@ static int hf_zbee_zcl_attr_bag_elements_num = -1;
 static gint ett_zbee_zcl = -1;
 static gint ett_zbee_zcl_fcf = -1;
 static gint ett_zbee_zcl_attr[ZBEE_ZCL_NUM_ATTR_ETT];
-//I63736
+
 static gint ett_zbee_zcl_sel[ZBEE_ZCL_NUM_IND_FIELD];
 
 static gint ett_zbee_zcl_array_elements[ZBEE_ZCL_NUM_ARRAY_ELEM_ETT];
@@ -1745,7 +1745,7 @@ static void dissect_zcl_discover_attr_resp(tvbuff_t *tvb, packet_info *pinfo _U_
 
 } /* dissect_zcl_discover_attr_resp */
 
-/*I63736*/
+
 static void dissect_zcl_read_attr_struct(tvbuff_t* tvb, packet_info* pinfo _U_, proto_tree* tree, guint* offset,
     guint16 cluster_id, guint16 mfr_code, gboolean direction)
 {
@@ -2788,7 +2788,7 @@ void proto_register_zbee_zcl(void)
         { &hf_zbee_zcl_attr_dir,
             { "Direction", "zbee_zcl.attr.dir", FT_UINT8, BASE_HEX, VALS(zbee_zcl_dir_names),
                 0x0, NULL, HFILL }},
-        //I63736
+        
         { &hf_zbee_zcl_indicator,
             { "Indicator", "zbee_zcl.attr.ind", FT_UINT8, BASE_DEC, NULL, 0X0, NULL, HFILL}},
 
@@ -2804,7 +2804,7 @@ void proto_register_zbee_zcl(void)
         { &hf_zbee_zcl_attr_dis,
             { "Discovery", "zbee_zcl.attr.dis", FT_UINT8, BASE_HEX, VALS(zbee_zcl_dis_names),
                 0x0, NULL, HFILL }},
-        //I63736
+        
         { &hf_zbee_zcl_cmd_start,
             {"Start Command", "zbee_zcl.cmd.start", FT_UINT8, BASE_HEX, NULL, 0X0, NULL, HFILL}},
 
@@ -2874,7 +2874,7 @@ void proto_register_zbee_zcl(void)
         ett[j] = &ett_zbee_zcl_attr[i];
     }
 
-    //I63736
+    
     for(i=0; i<ZBEE_ZCL_NUM_IND_FIELD; i++){
         ett_zbee_zcl_sel[i] = -1;
     }
