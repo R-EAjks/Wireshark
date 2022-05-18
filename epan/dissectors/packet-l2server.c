@@ -165,6 +165,7 @@ static int hf_l2server_traffic_ul = -1;
 static int hf_l2server_traffic_dl = -1;
 static int hf_l2server_traffic_bch = -1;
 
+static int hf_l2server_config = -1;
 
 static int hf_l2server_rach = -1;
 static int hf_l2server_reestablishment = -1;
@@ -1371,6 +1372,10 @@ static void dissect_rlcmac_data_ind_am(proto_tree *tree, tvbuff_t *tvb, packet_i
 static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                     guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     // Spare
     proto_tree_add_item(tree, hf_l2server_spare4, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -1458,7 +1463,13 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
 #endif
 }
 
-
+static void dissect_cell_config_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                    guint offset _U_, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+}
 
 static void dissect_create_ue_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset, guint len _U_)
@@ -2354,7 +2365,7 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
         // FreqBandList
         for (guint32 n=0; n < bb_nr5g_MAX_NB_MULTIBANDS; n++) {
             proto_item *ti = proto_tree_add_item(freq_tree, hf_l2server_freq_band_list, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-            if (n > nb_freq_band_list) {
+            if (n < nb_freq_band_list) {
                 proto_item_append_text(ti, " (not set)");
             }
             offset += 2;
@@ -2580,6 +2591,10 @@ static int dissect_rlcmac_drx_config(proto_tree *tree, tvbuff_t *tvb, packet_inf
 static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                            guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     // UEId
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -3237,6 +3252,10 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
 static void dissect_rlcmac_cmac_config_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                            guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     // UEId
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     //offset += 4;
@@ -3738,7 +3757,7 @@ static TYPE_FUN om_type_funs[] =
         { lte_l2_Srv_GETINFO_NAK,            "lte_l2_Srv_GETINFO_NAK",       dissect_sapi_type_dummy },
 
         { nr5g_l2_Srv_CELL_CONFIG_CMD,       "nr5g_l2_Srv_CELL_CONFIG_CMD",       dissect_cell_config_cmd },
-        { nr5g_l2_Srv_CELL_CONFIG_ACK,       "nr5g_l2_Srv_CELL_CONFIG_ACK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_CELL_CONFIG_ACK,       "nr5g_l2_Srv_CELL_CONFIG_ACK",       dissect_cell_config_ack },
         { nr5g_l2_Srv_CELL_CONFIG_NAK,       "nr5g_l2_Srv_CELL_CONFIG_NAK",       dissect_sapi_type_dummy },
 
         { nr5g_l2_Srv_RCP_LOAD_CMD,       "nr5g_l2_Srv_RCP_LOAD_CMD",       dissect_rcp_load_cmd },
@@ -4593,6 +4612,10 @@ proto_register_l2server(void)
 
       { &hf_l2server_pdcp_pdu,
         { "PDCP PDU", "l2server.pdcp-pdu", FT_BYTES, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_config,
+        { "Config", "l2server.config", FT_NONE, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_rach,
