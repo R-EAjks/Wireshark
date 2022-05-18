@@ -621,7 +621,10 @@ conversation_new(const guint32 setup_frame, const address *addr1, const address 
     wmem_map_t* hashtable;
     conversation_t *conversation=NULL;
     conversation_key_t new_key;
-
+    /*
+     * Verify that the correct options are used, if any.
+     */
+    DISSECTOR_ASSERT_HINT(!(options & NO_MASK_B), "Use NO_ADDR2 and/or NO_PORT2 or NO_PORT2_FORCE as option");
 #ifdef DEBUG_CONVERSATION
     gchar *addr1_str, *addr2_str;
     if (addr1 == NULL) {
@@ -764,6 +767,10 @@ conversation_new(const guint32 setup_frame, const address *addr1, const address 
 conversation_t *
 conversation_new_by_id(const guint32 setup_frame, const endpoint_type etype, const guint32 id, const guint options)
 {
+    /*
+     * Verify that the correct options are used, if any.
+     */
+    DISSECTOR_ASSERT_HINT(!(options & NO_MASK_B), "Use NO_ADDR2 and/or NO_PORT2 or NO_PORT2_FORCE as option");
     /* Force the lack of an address or port 2 */
     return conversation_new(setup_frame, NULL, NULL, etype, id, 0, options | NO_ADDR2 | NO_PORT2);
 }
@@ -939,6 +946,10 @@ find_conversation(const guint32 frame_num, const address *addr_a, const address 
 
     DINSTR(gchar *addr_a_str = address_to_str(NULL, addr_a));
     DINSTR(gchar *addr_b_str = address_to_str(NULL, addr_b));
+    /*
+     * Verify that the correct options are used, if any.
+     */
+    DISSECTOR_ASSERT_HINT((options == 0) || (options & NO_MASK_B), "Use NO_ADDR_B and/or NO_PORT_B as option");
     /*
      * First try an exact match, if we have two addresses and ports.
      */
@@ -1389,8 +1400,12 @@ try_conversation_dissector(const address *addr_a, const address *addr_b, const e
     conversation_t *conversation;
     gboolean dissector_success;
 
-    /* Try each mode based on option flags */
+    /*
+     * Verify that the correct options are used, if any.
+     */
+    DISSECTOR_ASSERT_HINT((options == 0) || (options & NO_MASK_B), "Use NO_ADDR_B and/or NO_PORT_B as option");
 
+    /* Try each mode based on option flags */
     conversation = find_conversation(pinfo->num, addr_a, addr_b, etype, port_a, port_b, 0);
     if (conversation != NULL) {
         if (try_conversation_call_dissector_helper(conversation, &dissector_success, tvb, pinfo, tree, data))
@@ -1471,9 +1486,12 @@ find_conversation_pinfo(packet_info *pinfo, const guint options)
     /* Have we seen this conversation before? */
     if (pinfo->use_endpoint) {
         DISSECTOR_ASSERT(pinfo->conv_endpoint);
+        guint find_options = 0;
+        find_options |= (pinfo->conv_endpoint->options & NO_ADDR2) ? NO_ADDR_B : 0;
+        find_options |= (pinfo->conv_endpoint->options & NO_PORT2) ? NO_PORT_B : 0;
         if ((conv = find_conversation(pinfo->num, &pinfo->conv_endpoint->addr1, &pinfo->conv_endpoint->addr2,
                         pinfo->conv_endpoint->etype, pinfo->conv_endpoint->port1,
-                        pinfo->conv_endpoint->port2, pinfo->conv_endpoint->options)) != NULL) {
+                        pinfo->conv_endpoint->port2, find_options)) != NULL) {
             DPRINT(("found previous conversation for frame #%u (last_frame=%d)",
                         pinfo->num, conv->last_frame));
             if (pinfo->num > conv->last_frame) {
@@ -1543,7 +1561,7 @@ find_or_create_conversation_by_id(packet_info *pinfo, const endpoint_type etype,
 
 void
 conversation_create_endpoint(struct _packet_info *pinfo, address* addr1, address* addr2,
-        endpoint_type etype, guint32 port1, guint32	port2, const guint options)
+        endpoint_type etype, guint32 port1, guint32 port2, const guint options)
 {
     pinfo->conv_endpoint = wmem_new0(pinfo->pool, struct endpoint);
     pinfo->use_endpoint = TRUE;
@@ -1565,7 +1583,7 @@ conversation_create_endpoint_by_id(struct _packet_info *pinfo,
         endpoint_type etype, guint32 id, const guint options)
 {
     /* Force the lack of a address or port B */
-    conversation_create_endpoint(pinfo, &null_address_, &null_address_, etype, id, 0, options|NO_ADDR_B|NO_PORT_B);
+    conversation_create_endpoint(pinfo, &null_address_, &null_address_, etype, id, 0, options|NO_ADDR2|NO_PORT2);
 }
 
 guint32
