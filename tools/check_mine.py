@@ -38,7 +38,7 @@ dissectors = [ 'packet-ulgrant.c', 'packet-l2server.c',  'packet-dlblock.c',
                'packet-pacs.c',    'packet-axe-rpc.c',   'packet-textlogger.c',
                'packet-tlv.c']
 
-tools = ['check_tfs.py', 'check_typed_item_calls.py  --consecutive --label', 'check_static.py', 'check_dissector_urls.py', 'check_spelling.py', 'cppcheck/cppcheck.sh']
+tools = ['check_tfs.py', 'check_typed_item_calls.py  --consecutive --label --mask', 'check_static.py', 'check_dissector_urls.py', 'check_spelling.py', 'cppcheck/cppcheck.sh']
 
 
 def run_check(tool, dissectors):
