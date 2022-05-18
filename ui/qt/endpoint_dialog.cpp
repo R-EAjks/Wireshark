@@ -39,6 +39,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QTextStream>
 
 typedef enum
 {
