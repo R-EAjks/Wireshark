@@ -35,10 +35,10 @@
 #include <QUrl>
 #include <QTemporaryFile>
 
-#include <QJSonDocument>
-#include <QJSonArray>
-#include <QJSonObject>
-#include <QJSonValue>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QJsonValue>
 
 typedef enum
 {
@@ -58,7 +58,7 @@ typedef enum
     ENDP_NUM_GEO_COLUMNS
 } endpoint_column_type_e;
 
-static char *endp_column_titles[ENDP_NUM_GEO_COLUMNS] = {
+static char const *endp_column_titles[ENDP_NUM_GEO_COLUMNS] = {
     "Address",
     "Port",
     "Packets",
@@ -73,7 +73,7 @@ static char *endp_column_titles[ENDP_NUM_GEO_COLUMNS] = {
     "AS Organization"
 };
 
-static char *endp_conn_title = "Connection";
+static char const *endp_conn_title = "Connection";
 
 static const QString table_name_ = QObject::tr("Endpoint");
 EndpointDialog::EndpointDialog(QWidget &parent, CaptureFile &cf, int cli_proto_id, const char *filter) :

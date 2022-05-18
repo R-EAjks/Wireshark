@@ -70,7 +70,7 @@ typedef enum {
     CONV_INDEX_COLUMN = CONV_NUM_COLUMNS
 } conversation_column_type_e;
 
-static char *conv_column_titles[CONV_NUM_COLUMNS] = {
+static char const *conv_column_titles[CONV_NUM_COLUMNS] = {
     "Address A",
     "Port A",
     "Address B",
@@ -87,9 +87,9 @@ static char *conv_column_titles[CONV_NUM_COLUMNS] = {
     "Bits/s B " UTF8_RIGHTWARDS_ARROW " A"
 };
 
-static char *conv_conn_a_title = "Connection A";
-static char *conv_conn_b_title = "Connection B";
-static char *conv_abs_start_title = "Abs Start";
+static char const *conv_conn_a_title = "Connection A";
+static char const *conv_conn_b_title = "Connection B";
+static char const *conv_abs_start_title = "Abs Start";
 
 static const QString table_name_ = QObject::tr("Conversation");
 ConversationDialog::ConversationDialog(QWidget &parent, CaptureFile &cf, int cli_proto_id, const char *filter) :
