@@ -1464,16 +1464,24 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
 }
 
 static void dissect_cell_config_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
-                                    guint offset _U_, guint len _U_)
+                                    guint offset, guint len _U_)
 {
     // Add config filter
     proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
     proto_item_set_hidden(config_ti);
+
+    // CellId
+    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
 }
 
 static void dissect_create_ue_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* UeId */
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -1493,6 +1501,10 @@ static void dissect_create_ue_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *
 static void dissect_create_ue_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* UeId */
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 }
@@ -1509,6 +1521,10 @@ static void dissect_create_ue_nak(proto_tree *tree, tvbuff_t *tvb, packet_info *
 static void dissect_delete_ue_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* UeId */
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -1517,6 +1533,10 @@ static void dissect_delete_ue_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *
 static void dissect_delete_ue_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* UeId */
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -1562,6 +1582,10 @@ static void dissect_handover_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *p
 static void dissect_handover_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                  guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* UeId */
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
