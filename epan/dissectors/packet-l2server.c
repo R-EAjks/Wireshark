@@ -62,6 +62,8 @@ static int hf_l2server_enablecapstest = -1;
 
 static int hf_l2server_client_name = -1;
 static int hf_l2server_start_cmd_type = -1;
+
+static int hf_l2server_nr5gid = -1;
 static int hf_l2server_ueid = -1;
 static int hf_l2server_beamidx = -1;
 static int hf_l2server_rbtype = -1;
@@ -760,6 +762,7 @@ static const true_false_string nodata_data_vals =
 /* Subtrees */
 static gint ett_l2server = -1;
 static gint ett_l2server_header = -1;
+static gint ett_l2server_nr5gid = -1;
 static gint ett_l2server_ra_info = -1;
 static gint ett_l2server_params = -1;
 static gint ett_l2server_l2_cell_dedicated_config = -1;
@@ -1002,6 +1005,27 @@ static void dissect_rcp_load_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *p
     proto_tree_add_item(tree, hf_l2server_fname, tvb, offset, -1, ENC_NA);
 }
 
+/* Nr5gId (UEId + CellId + BeamIdx) */
+static guint dissect_nr5gid(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset, guint32 *ueid)
+{
+    proto_item *nr5gid_ti = proto_tree_add_string_format(tree, hf_l2server_nr5gid, tvb,
+                                                          offset, 12,
+                                                          "", "Nr5gId ");
+    proto_tree *nr5gid_tree = proto_item_add_subtree(nr5gid_ti, ett_l2server_nr5gid);
+
+    proto_tree_add_item_ret_int(nr5gid_tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN, ueid);
+    offset += 4;
+    gint32 cellid;
+    proto_tree_add_item_ret_int(nr5gid_tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN, &cellid);
+    offset += 4;
+    gint beamidx;
+    proto_tree_add_item_ret_int(nr5gid_tree, hf_l2server_beamidx, tvb, offset, 4, ENC_LITTLE_ENDIAN, &beamidx);
+    offset += 4;
+
+    proto_item_append_text(nr5gid_ti, "(UeId=%u, cellId=%d, beamIdx=%d)", *ueid, cellid, beamidx);
+    return offset;
+}
+
 
 typedef enum rlc_mode_e { TM, UM, AM } rlc_mode_e;
 
@@ -1020,13 +1044,7 @@ static void dissect_rlcmac_data_req(proto_tree *tree, tvbuff_t *tvb, packet_info
     p_pdcp_nr_info->direction = PDCP_NR_DIRECTION_UPLINK;
 
     /* Nr5gId (UEId + CellId + BeamIdx) */
-    proto_tree_add_item_ret_int(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN,
-                                 (uint32_t*)&p_pdcp_nr_info->ueid);
-    offset += 4;
-    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
-    proto_tree_add_item(tree, hf_l2server_beamidx, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, (guint32*)&p_pdcp_nr_info->ueid);
 
     /* RbType */
     guint32 rbtype;
@@ -1152,13 +1170,8 @@ static void dissect_rlcmac_data_cnf(proto_tree *tree, tvbuff_t *tvb, packet_info
                                     guint offset, guint len _U_)
 {
     /* Nr5gId (UEId + CellId + BeamIdx) */
-    // TODO: add/use helper that create nice subtree/summary.
-    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
-    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
-    proto_tree_add_item(tree, hf_l2server_beamidx, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
+    guint32 ueid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid);
 
     /* RbType */
     proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -1202,13 +1215,7 @@ static void dissect_rlcmac_data_ind(proto_tree *tree, tvbuff_t *tvb, packet_info
     p_pdcp_nr_info->direction = PDCP_NR_DIRECTION_DOWNLINK;
 
     /* Nr5gId (UEId + CellId + BeamIdx) */
-    proto_tree_add_item_ret_int(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN,
-                                (uint32_t*)&p_pdcp_nr_info->ueid);
-    offset += 4;
-    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
-    proto_tree_add_item(tree, hf_l2server_beamidx, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, (uint32_t*)&p_pdcp_nr_info->ueid);
 
     /* RbType */
     guint32 rbtype;
@@ -1596,12 +1603,8 @@ static void dissect_ra_req(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
                            guint offset, guint len _U_)
 {
     /* Nr5gId (UEId + CellId + BeamIdx) */
-    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
-    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
-    proto_tree_add_item(tree, hf_l2server_beamidx, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
+    guint32 ueid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid);
 
     /* RbType */
     proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -1672,12 +1675,8 @@ static void dissect_ra_cnf(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _
                            guint offset, guint len _U_)
 {
     /* Nr5gId (UEId + CellId + BeamIdx) */
-    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
-    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
-    proto_tree_add_item(tree, hf_l2server_beamidx, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
+    guint32 ueid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid);
 
     /* Result code */
     proto_tree_add_item(tree, hf_l2server_result_code, tvb, offset, 2, ENC_LITTLE_ENDIAN);
@@ -1704,12 +1703,8 @@ static void dissect_ra_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _
                            guint offset, guint len _U_)
 {
     /* Nr5gId (UEId + CellId + BeamIdx) */
-    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
-    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
-    proto_tree_add_item(tree, hf_l2server_beamidx, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
+    guint32 ueid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid);
 
     /* Result code */
     proto_tree_add_item(tree, hf_l2server_result_code, tvb, offset, 2, ENC_LITTLE_ENDIAN);
@@ -1732,12 +1727,8 @@ static void dissect_re_est_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pin
                                guint offset, guint len _U_)
 {
     /* Nr5gId (UEId + CellId + BeamIdx) */
-    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
-    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
-    proto_tree_add_item(tree, hf_l2server_beamidx, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
+    guint32 ueid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid);
 
     /* RbType */
     proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -3291,12 +3282,8 @@ static void dissect_cmac_rach_cfg_cmd(proto_tree *tree, tvbuff_t *tvb, packet_in
                                       guint offset, guint len _U_)
 {
     /* Nr5gId (UEId + CellId + BeamIdx) */
-    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
-    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
-    proto_tree_add_item(tree, hf_l2server_beamidx, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
+    guint32 ueid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid);
 
     // RA_Info
     guint32 bwpid;
@@ -4347,6 +4334,10 @@ proto_register_l2server(void)
         { "Type", "l2server.start-cmd-type", FT_UINT16, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
 
+      { &hf_l2server_nr5gid,
+        { "Nr5gId", "l2server.nr5gid", FT_STRING, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
       { &hf_l2server_ueid,
         { "UeId", "l2server.UeId", FT_INT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
@@ -5351,6 +5342,7 @@ proto_register_l2server(void)
     static gint *ett[] = {
         &ett_l2server,
         &ett_l2server_header,
+        &ett_l2server_nr5gid,
         &ett_l2server_ra_info,
         &ett_l2server_params,
         &ett_l2server_l2_cell_dedicated_config,
