@@ -403,6 +403,15 @@ static int hf_l2server_msg1_subcarrier_spacing = -1;
 static int hf_l2server_rest_set_conf = -1;
 static int hf_l2server_msg3_tranform_precoding = -1;
 static int hf_l2server_rsrp_threshold_ssb = -1;
+static int hf_l2server_rsrp_threshold_ssb_sul = -1;
+static int hf_l2server_prach_root_seq_index_is_valid = -1;
+static int hf_l2server_ssb_per_rach_is_valid = -1;
+static int hf_l2server_prach_root_seq_index = -1;
+static int hf_l2server_ssb_per_rach = -1;
+// TODO: break down and add fields
+//static int hf_l2server_group_b_configured = -1;
+static int hf_l2server_ra_contention_resolution_timer = -1;
+
 
 static int hf_l2server_freq_info_dl = -1;
 static int hf_l2server_abs_freq_ssb = -1;
@@ -1549,7 +1558,7 @@ static void dissect_delete_ue_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *
     offset += 4;
 }
 
-// TODO: can't find full description
+// : can't find full description
 static void dissect_delete_ue_nak(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset, guint len _U_)
 {
@@ -1582,7 +1591,8 @@ static void dissect_handover_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *p
     proto_tree_add_item_ret_uint(tree, hf_l2server_mac_config_len,
                                  tvb, offset, 4, ENC_LITTLE_ENDIAN, &mac_config_len);
     offset += 4;
-    /* TODO: put inside a subtree? */
+
+    /* The rest of the message is CMAC_Config_cmd body */
     dissect_rlcmac_cmac_config_cmd(tree, tvb, pinfo, offset, mac_config_len);
 }
 
@@ -2095,7 +2105,6 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_tdd);
 
         // NbSlotSpecCfgAddMod
-        // TODO: add field!!!! - getting huge values...
         uint32_t nbSlotSpecCfgAddMod;
         proto_tree_add_item_ret_uint(ded_tree, hf_l2server_nbslotspeccfg_addmod, tvb, offset, 2, ENC_LITTLE_ENDIAN, &nbSlotSpecCfgAddMod);
         offset += 2;
@@ -2136,8 +2145,6 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         guint32 nbDlBwpIdToAdd;
         proto_tree_add_item_ret_uint(ded_tree, hf_l2server_nbdlbwpidtoadd, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nbDlBwpIdToAdd);
         offset += 1;
-//    }
-#if 1
         // NbDlBwpScsSpecCarrier
         guint8 nbDlBwpScsSpecCarrier = tvb_get_guint8(tvb, offset);
         offset += 1;
@@ -2152,7 +2159,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         // DlBwpIdToDel
         offset += (1 * bb_nr5g_MAX_NB_BWPS);
 
-
+        // Optional fields.
         if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_INITIAL_DL_BWP_PRESENT) {
             // TODO: has several present flags and Nb fields...
             offset += sizeof(bb_nr5g_BWP_DOWNLINKDEDICATEDt);
@@ -2275,7 +2282,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
 
     //proto_item_set_len(config_ti, offset-start_offset);
     proto_item_set_len(config_ti, sizeof(bb_nr5g_SERV_CELL_CONFIGt));
-#endif
+
     return offset;
 }
 
@@ -2784,7 +2791,6 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
     offset += 4;
     //---------------------------------------------------------------
     // L2CellDedicatedConfig (nr5g_rlcmac_Cmac_CELL_DEDICATED_CONFIGt)
-    // TODO: get length from Len field.
     guint32 dedicated_start = offset;
 
     guint32 l2_len = tvb_get_guint32(tvb, offset, ENC_LITTLE_ENDIAN);
@@ -2849,8 +2855,6 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                                                                   "", "UL Cell Cfg Dedicated");
             proto_tree *ul_ded_config_tree = proto_item_add_subtree(ul_ded_config_ti, ett_l2server_ul_ded_config);
 
-            // TODO:
-
             // Len
             guint32 ul_len;
             proto_tree_add_item_ret_uint(ul_ded_config_tree, hf_l2server_ul_cell_cfg_ded_len, tvb, offset, 4, ENC_LITTLE_ENDIAN, &ul_len);
@@ -2866,6 +2870,8 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
             offset += 1;
             // Spare
             offset += 1;
+
+            // TODO:
 
             // NbUlBwpIdToDel
             offset += 1;
@@ -3027,19 +3033,25 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                         // TODO: add fields for these!
 
                         // RsrpThresholdSsbSul
+                        proto_tree_add_item(rach_tree, hf_l2server_rsrp_threshold_ssb_sul, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                         offset += 1;
                         // PrachRootSeqIndexIsValid
+                        proto_tree_add_item(rach_tree, hf_l2server_prach_root_seq_index_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                         offset += 1;
                         // SsbPerRachIsValid
+                        proto_tree_add_item(rach_tree, hf_l2server_ssb_per_rach_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                         offset += 1;
                         // PrachRootSeqIndex
+                        proto_tree_add_item(rach_tree, hf_l2server_prach_root_seq_index, tvb, offset, 2, ENC_LITTLE_ENDIAN);
                         offset += 2;
-
                         // SsbPerRach
+                        proto_tree_add_item(rach_tree, hf_l2server_ssb_per_rach, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                         offset += 1;
                         // GroupBconfigure
+                        // TODO:
                         offset += 3;
                         // Ra_ContentionResolutionTimer
+                        proto_tree_add_item(rach_tree, hf_l2server_ra_contention_resolution_timer, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                         offset += 1;
                         // Pad
                         offset += 1;
@@ -5257,6 +5269,25 @@ proto_register_l2server(void)
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_rsrp_threshold_ssb,
         { "RSRP Threshold SSB", "l2server.rsrp-threshold-ssb", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rsrp_threshold_ssb_sul,
+        { "RSRP Threshold SSB SUL", "l2server.rsrp-threshold-ssb-sul", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_prach_root_seq_index_is_valid,
+        { "PRACHSeqRootIndexIsValid", "l2server.prach-root-seq-index-is-valid", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ssb_per_rach_is_valid,
+        { "SSBPerRACH", "l2server.ssb-per-rach", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_prach_root_seq_index,
+        { "PRACHSeqRootIndex", "l2server.prach-root-seq-index", FT_INT16, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ssb_per_rach,
+        { "SSBPerRACH", "l2server.ssb-per-rach", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      // TODO: hf_l2server_group_b_configured
+      { &hf_l2server_ra_contention_resolution_timer,
+        { "RA-ContentionResolutionTimer", "l2server.ca-contention-resolution-timer", FT_INT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_freq_info_dl,
