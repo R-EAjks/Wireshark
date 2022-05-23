@@ -3286,6 +3286,8 @@ static void dissect_rlcmac_cmac_config_ack(proto_tree *tree, tvbuff_t *tvb, pack
     // UEId
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     //offset += 4;
+
+    // TODO: another 8 bytes.
 }
 
 
@@ -3775,6 +3777,7 @@ static TYPE_FUN om_type_funs[] =
         { nr5g_l2_Srv_OPEN_CELL_ACK,         "NR5G_L2_SRV_OPEN_CELL_ACK",       dissect_open_cell_ack /* TODO */},
         { nr5g_l2_Srv_OPEN_CELL_NAK,         "NR5G_L2_SRV_OPEN_CELL_NAK",       dissect_sapi_type_dummy },
 
+        // N.B. we send fix bytes ("buffer from log shared by Rocco")
         { lte_l2_Srv_GETINFO_CMD,            "lte_l2_Srv_GETINFO_CMD",       dissect_sapi_type_dummy },
         { lte_l2_Srv_GETINFO_ACK,            "lte_l2_Srv_GETINFO_ACK",       dissect_sapi_type_dummy },
         { lte_l2_Srv_GETINFO_NAK,            "lte_l2_Srv_GETINFO_NAK",       dissect_sapi_type_dummy },
