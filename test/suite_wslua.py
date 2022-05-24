@@ -257,10 +257,6 @@ class case_wslua(subprocesstest.SubprocessTestCase):
             '-X', 'lua_script1:' + os.path.join(dirs.lua_dir, 'globals_2.2.txt'),
         )
 
-    def test_wslua_struct(self, check_lua_script):
-        '''wslua struct'''
-        check_lua_script(self, 'struct.lua', empty_pcap, True)
-
     def test_wslua_tvb_tree(self, check_lua_script):
         '''wslua tvb with a tree'''
         check_lua_script(self, 'tvb.lua', dns_port_pcap, True, '-V')
