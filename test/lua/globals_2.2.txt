@@ -936,27 +936,6 @@
         ["unpack"] = '<function 357>',
         ["upper"] = '<function 358>'
     },
-    ["Struct"] = {
-        ["fromhex"] = '<function 359>',
-        ["pack"] = '<function 360>',
-        ["size"] = '<function 361>',
-        ["tohex"] = '<function 362>',
-        ["__typeof"] = "Struct",
-        ["unpack"] = '<function 363>',
-        ["values"] = '<function 364>',
-        ['<metatable>'] = {
-            ["__getters"] = {
-                ["__typeof"] = "getter"
-            },
-            ["__index"] = '<filtered>',
-            ["__methods"] = '<table 27>',
-            ["__newindex"] = '<function 365>',
-            ["__setters"] = {
-                ["__typeof"] = "setter"
-            },
-            ["__typeof"] = "Struct"
-        }
-    },
     ["table"] = {
         ["concat"] = '<function 366>',
         ["insert"] = '<function 367>',

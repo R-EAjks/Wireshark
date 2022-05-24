@@ -31,7 +31,6 @@ set(WSLUA_MODULES
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_proto.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_proto_expert.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_proto_field.c
-	${CMAKE_CURRENT_SOURCE_DIR}/wslua_struct.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_tree.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_tvb.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_util.c
