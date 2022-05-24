@@ -442,6 +442,21 @@ static int hf_l2server_tdd_common = -1;
 
 static int hf_l2server_beamid = -1;
 
+static int hf_l2server_rlcmac_verbosity = -1;
+static int hf_l2server_dl_harq_mode = -1;
+static int hf_l2server_ul_fs_advance = -1;
+static int hf_l2server_max_rach = -1;
+static int hf_l2server_num_nr_cell = -1;
+
+static int hf_l2server_num_up_stk_ppu = -1;
+static int hf_l2server_num_dwn_stk_ppu = -1;
+static int hf_l2server_num_nr_pro_ppu = -1;
+
+static int hf_l2server_up_stk_ppu = -1;
+static int hf_l2server_dwn_stk_ppu = -1;
+static int hf_l2server_nr_pro_ppu = -1;
+
+
 static const value_string lch_vals[] =
 {
     { 0x0,   "SPARE" },
@@ -3612,7 +3627,90 @@ static void dissect_setparm_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
     proto_tree_add_item(tree, hf_l2server_max_cntr, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 
-    // TODO: more fields
+    // Verbosity
+    offset += 4;
+    // L2_nr5g_RlcMac_Verbosity
+    proto_tree_add_item(tree, hf_l2server_rlcmac_verbosity, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // L2_nr5g_pdcp_Verbosity
+    offset += 4;
+
+    // BeamChangeTimer
+    offset += 2;
+    // FieldTestMode
+    offset += 1;
+
+    // DlHarqMode
+    proto_tree_add_item(tree, hf_l2server_dl_harq_mode, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // MeasMode
+    offset += 1;
+    // UlFsAdvance
+    proto_tree_add_item(tree, hf_l2server_ul_fs_advance, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // DeltaNumLdpcIteration
+    offset += 1;
+    // DlSoftCombining
+    offset += 1;
+    // MaxRach
+    proto_tree_add_item(tree, hf_l2server_max_rach, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // SpareC
+    offset += 3;
+    // Spare
+    offset += (19*4);
+
+    // NumUpStkPpu
+    guint numUpStkPpu;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_num_up_stk_ppu, tvb, offset, 1, ENC_LITTLE_ENDIAN, &numUpStkPpu);
+    offset += 1;
+    // NumDwnStkPpu
+    guint numDwnStkPpu;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_num_dwn_stk_ppu, tvb, offset, 1, ENC_LITTLE_ENDIAN, &numDwnStkPpu);
+    offset += 1;
+    // NumLteProPpu
+    offset += 1;
+    // NumNrProPpu
+    guint numNrProPpu;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_num_nr_pro_ppu, tvb, offset, 1, ENC_LITTLE_ENDIAN, &numNrProPpu);
+    offset += 1;
+
+    // NumLteCell
+    offset += 1;
+    // NumNrCell
+    guint32 numNrCell;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_num_nr_cell, tvb, offset, 1, ENC_LITTLE_ENDIAN, &numNrCell);
+    offset += 1;
+
+    //--------------------------------------------
+    // Variable-sized array items.
+
+    // numUpStkPpu
+    for (guint n=0; n < numUpStkPpu; n++) {
+        proto_tree_add_item(tree, hf_l2server_up_stk_ppu, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
+
+    // numDwnStkPpu
+    for (guint n=0; n < numDwnStkPpu; n++) {
+        proto_tree_add_item(tree, hf_l2server_dwn_stk_ppu, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
+
+    // NumNrProPpu
+    for (guint n=0; n < numNrProPpu; n++) {
+        proto_tree_add_item(tree, hf_l2server_nr_pro_ppu, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
+
+
+    // NrCellIdList
+    for (guint n=0; n < numNrCell; n++) {
+        proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+    }
 }
 
 
@@ -5396,6 +5494,46 @@ proto_register_l2server(void)
 
       { &hf_l2server_beamid,
         { "BeamId", "l2server.beamid", FT_INT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+
+
+      { &hf_l2server_rlcmac_verbosity,
+        { "RLCMAC Verbosity", "l2server.rlcmac-verbosity", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_dl_harq_mode,
+        { "DL HARQ Mode", "l2server.dl-harq-mode", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ul_fs_advance,
+        { "UL FS Advance", "l2server.ul-fs-advance", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_max_rach,
+        { "Max RACH", "l2server.max-rach", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_num_nr_cell,
+        { "Num Nr Cells", "l2server.num-nr-cells", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_num_up_stk_ppu,
+        { "Num Up Stk PPUs", "l2server.num-up-stk-ppu", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_num_dwn_stk_ppu,
+        { "Num Dwn Stk PPUs", "l2server.num-dwn-stk-ppu", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_num_nr_pro_ppu,
+        { "Num Nr Pro PPUs", "l2server.num-nr-pro-ppu", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_up_stk_ppu,
+        { "Up Stk PPU", "l2server.up-stk-ppu", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_dwn_stk_ppu,
+        { "Dwn Stk PPU", "l2server.dwn-stk-ppu", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nr_pro_ppu,
+        { "NR Pro PPU", "l2server.nr-pro-ppu", FT_UINT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
     };
 
