@@ -440,6 +440,8 @@ static int hf_l2server_freq_info_sul_common = -1;
 static int hf_l2server_bwp_sul_common = -1;
 static int hf_l2server_tdd_common = -1;
 
+static int hf_l2server_beamid = -1;
+
 static const value_string lch_vals[] =
 {
     { 0x0,   "SPARE" },
@@ -1828,6 +1830,7 @@ static guint dissect_rlcmac_cmac_ra_info(proto_tree *tree, tvbuff_t *tvb, packet
     // CB_PreamblesPerSSB
     proto_tree_add_item(ra_info_tree, hf_l2server_cb_preamblesperssb, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
+
     // groupBconfigured
     //   ra_Msg3SizeGroupA
     proto_tree_add_item(ra_info_tree, hf_l2server_ra_msg3sizegroupa, tvb, offset, 4, ENC_LITTLE_ENDIAN);
@@ -1940,6 +1943,7 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     // Pdcch_BlindDetection (1..15)
     proto_tree_add_item(config_tree, hf_l2server_pdcch_blind_detection, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
+
     // TODO
     // Harq_ACK_SpatialBundlingPUCCH_secondaryPUCCHgroup_r16
     offset += 1;
@@ -2078,6 +2082,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
     // CsiRsValidWithDCI_r16
     proto_tree_add_item(config_tree, hf_l2server_csi_rs_valid_with_dci_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
+    // TODO:
     // CrsRateMatchPerCORESETPoolIdx_r16
     offset += 1;
     // EnableTwoDefaultTCIStates_r16
@@ -2145,6 +2150,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         guint32 nbDlBwpIdToAdd;
         proto_tree_add_item_ret_uint(ded_tree, hf_l2server_nbdlbwpidtoadd, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nbDlBwpIdToAdd);
         offset += 1;
+        // TODO:
         // NbDlBwpScsSpecCarrier
         guint8 nbDlBwpScsSpecCarrier = tvb_get_guint8(tvb, offset);
         offset += 1;
@@ -2201,6 +2207,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         proto_tree_add_item_ret_uint(ded_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN, &field_mask);
         offset += 4;
         // FirstActiveUlBwp
+        proto_tree_add_item(ded_tree, hf_l2server_first_active_ul_bwp, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
         // PowerBoostPi2BPSK
         offset += 1;
@@ -2407,6 +2414,8 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
                                                                     "", "BWP DL Common");
         proto_tree *bwp_dl_common_tree = proto_item_add_subtree(bwp_dl_common_ti, ett_l2server_bwp_dl_common);
         printf("tree at %p\n", bwp_dl_common_tree);
+
+        // TODO:
         offset += sizeof(bb_nr5g_BWP_DOWNLINKCOMMONt);
     }
 
@@ -2417,6 +2426,8 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
                                                                          "", "Freq Info UL Common");
         proto_tree *freq_info_ul_common_tree = proto_item_add_subtree(freq_info_ul_common_ti, ett_l2server_freq_info_ul_common);
         printf("tree at %p\n", freq_info_ul_common_tree);
+
+        // TODO:
         offset += sizeof(bb_nr5g_FREQINFO_ULt);
     }
 
@@ -2427,6 +2438,8 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
                                                                      "", "Initial UL BWP");
         proto_tree *intitial_ul_bwp_tree = proto_item_add_subtree(initial_ul_bwp_ti, ett_l2server_initial_ul_bwp);
         printf("tree at %p\n", intitial_ul_bwp_tree);
+
+        // TODO:
         offset += sizeof(bb_nr5g_BWP_UPLINKCOMMONt);
     }
 
@@ -2437,6 +2450,8 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
                                                                            "", "Freq Info SUL Common");
         proto_tree *freq_info_sul_common_tree = proto_item_add_subtree(freq_info_sul_common_ti, ett_l2server_freq_info_sul_common);
         printf("tree at %p\n", freq_info_sul_common_tree);
+
+        // TODO:
         offset += sizeof(bb_nr5g_FREQINFO_ULt);
     }
 
@@ -2447,6 +2462,8 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
                                                                            "", "Init BWP SUL Common");
         proto_tree *bwp_sul_common_tree = proto_item_add_subtree(bwp_sul_common_ti, ett_l2server_bwp_sul_common);
         printf("tree at %p\n", bwp_sul_common_tree);
+
+        // TODO:
         offset += sizeof(bb_nr5g_BWP_UPLINKCOMMONt);
     }
 
@@ -2457,6 +2474,8 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
                                                           "", "TDD DL UL Config Common");
         proto_tree *tdd_tree = proto_item_add_subtree(tdd_ti, ett_l2server_tdd_common);
         printf("tree at %p\n", tdd_tree);
+
+        // TODO:
         offset += sizeof(bb_nr5g_TDD_UL_DL_CONFIG_COMMONt);
     }
 
@@ -2481,11 +2500,12 @@ static guint dissect_tx_lch_info(proto_tree *tree, tvbuff_t *tvb, packet_info *p
                                  guint offset)
 {
     guint start_offset = offset;
+
+    // Subtree.
     proto_item *lch_info_ti = proto_tree_add_string_format(tree, hf_l2server_tx_lch_info, tvb,
                                                           offset, sizeof(nr5g_rlcmac_Cmac_TxLchInfo_t),
                                                           "", "TxLchInfo ");
     proto_tree *lch_info_tree = proto_item_add_subtree(lch_info_ti, ett_l2server_tx_lch_info);
-
 
     // logicalChannelIdentity
     proto_tree_add_item(lch_info_tree, hf_l2server_lcid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -2540,11 +2560,12 @@ static guint dissect_rx_lch_info(proto_tree *tree, tvbuff_t *tvb, packet_info *p
                                  guint offset)
 {
     guint start_offset = offset;
+
+    // Subtree
     proto_item *lch_info_ti = proto_tree_add_string_format(tree, hf_l2server_rx_lch_info, tvb,
                                                           offset, sizeof(nr5g_rlcmac_Cmac_RxLchInfo_t),
                                                           "", "RxLchInfo ");
     proto_tree *lch_info_tree = proto_item_add_subtree(lch_info_ti, ett_l2server_rx_lch_info);
-
 
     // logicalChannelIdentity
     proto_tree_add_item(lch_info_tree, hf_l2server_lcid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -2557,6 +2578,7 @@ static int dissect_rlcmac_drx_config(proto_tree *tree, tvbuff_t *tvb, packet_inf
 {
     int start_offset = offset;
 
+    // Subtree
     proto_item *drx_ti = proto_tree_add_string_format(tree, hf_l2server_drx_config, tvb,
                                                           offset, sizeof(nr5g_rlcmac_Cmac_DRX_CONFIGt),
                                                           "", "DRX Config ");
@@ -2631,6 +2653,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
     proto_tree *params_tree = proto_item_add_subtree(params_ti, ett_l2server_params);
 
     // Beam Id
+    proto_tree_add_item(params_tree, hf_l2server_drx_slot_offset, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     // Crnti
     gint32 crnti;
@@ -5371,6 +5394,9 @@ proto_register_l2server(void)
         { "TDD Common", "l2server.tdd-common", FT_STRING, BASE_NONE,
            NULL, 0x0, NULL, HFILL }},
 
+      { &hf_l2server_beamid,
+        { "BeamId", "l2server.beamid", FT_INT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
