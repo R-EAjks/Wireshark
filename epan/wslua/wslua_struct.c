@@ -353,14 +353,6 @@ WSLUA_CONSTRUCTOR Struct_pack (lua_State *L) {
         putinteger(L, &b, arg++, h.endian, (int)size);
         break;
       }
-      case 'e': {
-        Int64_pack(L, &b, arg++, h.endian == LITTLE);
-        break;
-      }
-      case 'E': {
-        UInt64_pack(L, &b, arg++, h.endian == LITTLE);
-        break;
-      }
       case 'x': case 'X': {
         size_t len = size;
         while (len-- > 0)
@@ -472,14 +464,6 @@ WSLUA_CONSTRUCTOR Struct_unpack (lua_State *L) {
         int issigned = g_ascii_islower(opt);
         lua_Number res = getinteger(data+pos, h.endian, issigned, (int)size);
         lua_pushnumber(L, res);
-        break;
-      }
-      case 'e': {
-        Int64_unpack(L, data+pos, h.endian == LITTLE);
-        break;
-      }
-      case 'E': {
-        UInt64_unpack(L, data+pos, h.endian == LITTLE);
         break;
       }
       case 'x': case 'X': {
