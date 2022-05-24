@@ -22,9 +22,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <lua.h>
-#include <lualib.h>
-#include <lauxlib.h>
+#include "lua.h"
+#include "lualib.h"
+#include "lauxlib.h"
 
 #include <ws_log_defs.h>
 

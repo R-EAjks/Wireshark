@@ -68,7 +68,6 @@
 #endif
 
 #ifdef HAVE_LUA
-#include <lua.h>
 #include <wslua/wslua.h>
 #endif
 
