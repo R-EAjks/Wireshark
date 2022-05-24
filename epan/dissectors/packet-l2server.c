@@ -776,6 +776,10 @@ static const value_string ssb_pos_in_burst_vals[] = {
     { 0,   NULL }
 };
 
+static const value_string scg_type_vals[] = {
+    { 1,    "SCG NR" },
+    { 0,   NULL }
+};
 
 static const true_false_string nodata_data_vals =
 {
@@ -2668,7 +2672,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
     proto_tree *params_tree = proto_item_add_subtree(params_ti, ett_l2server_params);
 
     // Beam Id
-    proto_tree_add_item(params_tree, hf_l2server_drx_slot_offset, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(params_tree, hf_l2server_beamid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     // Crnti
     gint32 crnti;
@@ -3941,7 +3945,7 @@ static TYPE_FUN om_type_funs[] =
         { nr5g_l2_Srv_HANDOVER_CMD,     "nr5g_l2_Srv_HANDOVER_CMD",       dissect_handover_cmd },
         /* TODO: what types are these? */
         { nr5g_l2_Srv_HANDOVER_ACK,     "nr5g_l2_Srv_HANDOVER_ACK",       dissect_handover_ack },
-        { nr5g_l2_Srv_HANDOVER_NAK,     "nr5g_l2_Srv_HANDOVER_NAK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_HANDOVER_NAK,     "nr5g_l2_Srv_HANDOVER_NAK",       dissect_handover_ack },
 
 
         { 0x00,                               NULL,                             NULL }
@@ -4061,9 +4065,9 @@ static TYPE_FUN nr_rlcmac_cmac_type_funs[] =
 {
     { nr5g_rlcmac_Cmac_DBEAM_IND,    "nr5g_rlcmac_Cmac_DBEAM_IND",       dissect_dbeam_ind },
 
-    { nr5g_rlcmac_Cmac_CONFIG_CMD,     "nr5g_rlcmac_Cmac_CONFIG_CMD",       dissect_rlcmac_cmac_config_cmd},
-    { nr5g_rlcmac_Cmac_CONFIG_ACK,     "nr5g_rlcmac_Cmac_CONFIG_ACK",       dissect_rlcmac_cmac_config_ack},
-    { nr5g_rlcmac_Cmac_CONFIG_NAK,     "nr5g_rlcmac_Cmac_CONFIG_NAK",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_CONFIG_CMD,     "nr5g_rlcmac_Cmac_CONFIG_CMD",       dissect_rlcmac_cmac_config_cmd },
+    { nr5g_rlcmac_Cmac_CONFIG_ACK,     "nr5g_rlcmac_Cmac_CONFIG_ACK",       dissect_rlcmac_cmac_config_ack },
+    { nr5g_rlcmac_Cmac_CONFIG_NAK,     "nr5g_rlcmac_Cmac_CONFIG_NAK",       dissect_rlcmac_cmac_config_ack },
     { nr5g_rlcmac_Cmac_SEG_CONFIG_REQ, "nr5g_rlcmac_Cmac_SEG_CONFIG_REQ",       dissect_sapi_type_dummy /* TODO */},
 
     { nr5g_rlcmac_Cmac_RRC_STATE_CFG_CMD, "nr5g_rlcmac_Cmac_RRC_STATE_CFG_CMD",       dissect_rrc_state_cfg_cmd },
@@ -4596,7 +4600,7 @@ proto_register_l2server(void)
           NULL, 0x0, "Cell Identifier for addition", HFILL }},
       { &hf_l2server_scg_type,
         { "SCG Type", "l2server.scg-type", FT_UINT32, BASE_DEC,
-          NULL, 0x0, NULL, HFILL }},
+          VALS(scg_type_vals), 0x0, NULL, HFILL }},
       { &hf_l2server_drb_continue_rohc,
         { "drb-ContinueROHC", "l2server.drb-continue-rohc", FT_UINT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
