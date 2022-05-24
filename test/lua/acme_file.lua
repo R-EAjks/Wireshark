@@ -439,7 +439,7 @@ function State:get_timestamp(line, file_position, seeking)
     self.packets[file_position][TTIME] = self.nstime
 
     timet = timet + (milli/1000)
-    dprint2("found time of ", os.date("%c",timet), " with value=",timet)
+    dprint2("found time with value=",timet)
 
     return self.nstime, line_pos
 end
