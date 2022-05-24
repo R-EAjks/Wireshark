@@ -60,23 +60,17 @@ test("class4",type(lib.size) == 'function')
 local val1 = "\42\00\00\00\00\00\00\01\00\00\00\02\00\00\00\03\00\00\00\04"
 local fmt1_le = "<!4biii4i4"
 local fmt1_be = ">!4biii4i4"
-local fmt1_64le = "<!4ieE"
-local fmt1_64be = ">!4ieE"
 local fmt2_be = ">!4bi(ii4)i"
 
 testing("basic size")
 
 test("basic_size1", lib.size(fmt1_le) == string.len(val1))
 test("basic_size2", lib.size(fmt1_le) == Struct.size(fmt1_be))
-test("basic_size3", lib.size(fmt1_le) == Struct.size(fmt1_64le))
-test("basic_size4", lib.size(fmt2_be) == Struct.size(fmt1_64le))
 
 testing("basic values")
 
 test("basic_values1", lib.values(fmt1_le) == 5)
 test("basic_values2", lib.values(fmt1_be) == lib.values(fmt1_le))
-test("basic_values3", lib.values(fmt1_64le) == 3)
-test("basic_values4", lib.values(fmt2_be) == lib.values(fmt1_64le))
 test("basic_values4", lib.values(" (I)  s x i XxX c0") == 3)
 
 testing("tohex")
@@ -101,17 +95,6 @@ ret1, ret2, ret3, ret4, ret5, pos = lib.unpack(fmt1_be, val1)
 test("basic_unpack2", ret1 == 42 and ret2 == 1 and ret3 == 2 and ret4 == 3 and ret5 == 4)
 test("basic_unpack_position2", pos == string.len(val1) + 1)
 
-ret1, ret2, ret3, pos = lib.unpack(fmt1_64le, val1)
-test("basic_unpack3", ret1 == 42 and ret2 == Int64.new( 0x01000000, 0x02000000) and ret3 == UInt64.new( 0x03000000, 0x04000000))
-print(typeof(ret2),typeof(ret3))
-test("basic_unpack3b", typeof(ret2) == "Int64" and typeof(ret3) == "UInt64")
-test("basic_unpack_position3", pos == string.len(val1) + 1)
-
-ret1, ret2, ret3, pos = lib.unpack(fmt1_64be, val1)
-test("basic_unpack4", ret1 == 0x2A000000 and ret2 == Int64.new( 2, 1) and ret3 == UInt64.new( 4, 3))
-test("basic_unpack4b", typeof(ret2) == "Int64" and typeof(ret3) == "UInt64")
-test("basic_unpack_position4", pos == string.len(val1) + 1)
-
 ret1, ret2, ret3, pos = lib.unpack(fmt2_be, val1)
 test("basic_unpack5", ret1 == 42 and ret2 == 1 and ret3 == 4)
 test("basic_unpack_position5", pos == string.len(val1) + 1)
@@ -120,8 +103,6 @@ testing("basic pack")
 local pval1 = lib.pack(fmt1_le, lib.unpack(fmt1_le, val1))
 test("basic_pack1", pval1 == val1)
 test("basic_pack2", val1 == lib.pack(fmt1_be, lib.unpack(fmt1_be, val1)))
-test("basic_pack3", val1 == lib.pack(fmt1_64le, lib.unpack(fmt1_64le, val1)))
-test("basic_pack4", val1 == lib.pack(fmt1_64be, lib.unpack(fmt1_64be, val1)))
 test("basic_pack5", lib.pack(fmt2_be, lib.unpack(fmt1_be, val1)) == lib.pack(">!4biiii", 42, 1, 0, 0, 2))
 
 ----------------------------------

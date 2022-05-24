@@ -23,7 +23,6 @@ set(WSLUA_MODULES
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_file_handler.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_frame_info.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_gui.c
-	${CMAKE_CURRENT_SOURCE_DIR}/wslua_int64.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_internals.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_listener.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_nstime.c
