@@ -3409,6 +3409,10 @@ static void dissect_crlc_am_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
 static void dissect_crlc_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                       guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* UEId */
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -3449,6 +3453,10 @@ static void dissect_crlc_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
 static void dissect_crlc_config_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                     guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* UEId */
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
