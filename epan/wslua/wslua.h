@@ -22,9 +22,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <lua.h>
-#include <lualib.h>
-#include <lauxlib.h>
+#include "lua.h"
+#include "lualib.h"
+#include "lauxlib.h"
 
 #include <ws_log_defs.h>
 
@@ -766,11 +766,6 @@ extern int Proto_commit(lua_State* L);
 extern TreeItem create_TreeItem(proto_tree* tree, proto_item* item);
 
 extern void clear_outstanding_FuncSavers(void);
-
-extern void Int64_pack(lua_State* L, luaL_Buffer *b, gint idx, gboolean asLittleEndian);
-extern int Int64_unpack(lua_State* L, const gchar *buff, gboolean asLittleEndian);
-extern void UInt64_pack(lua_State* L, luaL_Buffer *b, gint idx, gboolean asLittleEndian);
-extern int UInt64_unpack(lua_State* L, const gchar *buff, gboolean asLittleEndian);
 
 extern Tvb* push_Tvb(lua_State* L, tvbuff_t* tvb);
 extern int push_wsluaTvb(lua_State* L, Tvb t);

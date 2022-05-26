@@ -15,7 +15,7 @@
 #include "config.h"
 
 #include "wslua_file_common.h"
-#include <lua.h>
+
 
 
 /* WSLUA_CONTINUE_MODULE File */

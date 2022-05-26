@@ -214,10 +214,6 @@ class case_wslua(subprocesstest.SubprocessTestCase):
             '-Y', 'test.filtered==1',
         )
 
-    def test_wslua_int64(self, check_lua_script):
-        '''wslua int64'''
-        check_lua_script(self, 'int64.lua', empty_pcap, True)
-
     def test_wslua_args_1(self, check_lua_script):
         '''wslua args 1'''
         check_lua_script(self, 'script_args.lua', empty_pcap, True,
@@ -260,10 +256,6 @@ class case_wslua(subprocesstest.SubprocessTestCase):
             '-X', 'lua_script1:' + os.path.join(dirs.lua_dir, ''),
             '-X', 'lua_script1:' + os.path.join(dirs.lua_dir, 'globals_2.2.txt'),
         )
-
-    def test_wslua_struct(self, check_lua_script):
-        '''wslua struct'''
-        check_lua_script(self, 'struct.lua', empty_pcap, True)
 
     def test_wslua_tvb_tree(self, check_lua_script):
         '''wslua tvb with a tree'''

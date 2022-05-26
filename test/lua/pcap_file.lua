@@ -36,10 +36,6 @@ if major and tonumber(major) <= 1 and ((tonumber(minor) <= 10) or (tonumber(mino
                 "This script needs " .. wireshark_name .. "version 1.12 or higher.\n" )
 end
 
--- verify we have the Struct library in wireshark
--- technically we should be able to do this with 'require', but Struct is a built-in
-assert(Struct.unpack, wireshark_name .. " does not have the Struct library!")
-
 --------------------------------------------------------------------------------
 -- early definitions
 -- throughout most of this file I try to pre-declare things to help ease
@@ -66,7 +62,7 @@ local default_settings =
     endianess       = ENC_BIG_ENDIAN,
     time_precision  = wtap_tsprecs.USEC,
     rec_hdr_len     = 16,            -- default size of record header
-    rec_hdr_patt    = "I4 I4 I4 I4", -- pattern for Struct to use
+    rec_hdr_patt    = "I4 I4 I4 I4", -- pattern for pack/unpack to use
     num_rec_fields  = 4,             -- number of vars in pattern
 }
 
@@ -278,7 +274,7 @@ end
 
 ----------------------------------------
 -- here are the "structs" we're going to parse, of the various records in a pcap file
--- these pattern string gets used in calls to Struct.unpack()
+-- these pattern string gets used in calls to string.unpack()
 --
 -- we will prepend a '<' or '>' later, once we figure out what endian-ess the files are in
 --
@@ -287,8 +283,7 @@ local FILE_HDR_LEN = 24
 -- a pcap file header struct
 -- this is: magic, version_major, version_minor, timezone, sigfigs, snaplen, encap type
 local FILE_HEADER_PATT = "I4 I2 I2 i4 I4 I4 I4"
--- it's too bad Struct doesn't have a way to get the number of vars the pattern holds
--- another thing to add to my to-do list?
+
 local NUM_HDR_FIELDS = 7
 
 -- these will hold the '<'/'>' prepended version of above
@@ -398,11 +393,11 @@ local function set_magic_file_settings(magic)
     else
         file_settings.file_hdr_patt = '<' .. FILE_HEADER_PATT
         file_settings.rec_hdr_patt  = '<' .. file_settings.rec_hdr_patt
-        local m = Struct.pack(">I4", magic)
-        file_settings.corrected_magic = Struct.unpack("<I4", m)
+        local m = string.pack(">I4", magic)
+        file_settings.corrected_magic = string.unpack("<I4", m)
     end
 
-    file_settings.rec_hdr_len = Struct.size(file_settings.rec_hdr_patt)
+    file_settings.rec_hdr_len = string.packsize(file_settings.rec_hdr_patt)
 
     return file_settings
 end
@@ -424,10 +419,8 @@ parse_file_header = function(file)
     -- file's not for us, so return false
     if not line then return false end
 
-    dprint2("parse_file_header: got this line:\n'", Struct.tohex(line,false,":"), "'")
-
     -- let's peek at the magic int32, assuming it's big-endian
-    local magic = Struct.unpack(">I4", line)
+    local magic = string.unpack(">I4", line)
 
     local file_settings = set_magic_file_settings(magic)
 
@@ -437,9 +430,9 @@ parse_file_header = function(file)
     end
 
     -- this is: magic, version_major, version_minor, timezone, sigfigs, snaplen, encap type
-    local fields = { Struct.unpack(file_settings.file_hdr_patt, line) }
+    local fields = { string.unpack(file_settings.file_hdr_patt, line) }
 
-    -- sanity check; also note that Struct.unpack() returns the fields plus
+    -- sanity check; also note that string.unpack() returns the fields plus
     -- a number of where in the line it stopped reading (i.e., the end in this case)
     -- so we got back number of fields + 1
     if #fields ~= NUM_HDR_FIELDS + 1 then
@@ -541,9 +534,9 @@ parse_rec_header = function(funcname, file, file_settings, frame)
     if not line then return false end
 
     -- this is: time_sec, time_usec, capture_len, original_len
-    local fields = { Struct.unpack(file_settings.rec_hdr_patt, line) }
+    local fields = { string.unpack(file_settings.rec_hdr_patt, line) }
 
-    -- sanity check; also note that Struct.unpack() returns the fields plus
+    -- sanity check; also note that string.unpack() returns the fields plus
     -- a number of where in the line it stopped reading (i.e., the end in this case)
     -- so we got back number of fields + 1
     if #fields ~= file_settings.num_rec_fields + 1 then
@@ -629,11 +622,11 @@ local function create_writer_file_settings()
     else
         file_settings.file_hdr_patt = '<' .. FILE_HEADER_PATT
         file_settings.rec_hdr_patt  = '<' .. file_settings.rec_hdr_patt
-        local m = Struct.pack(">I4", file_settings.magic)
-        file_settings.corrected_magic = Struct.unpack("<I4", m)
+        local m = string.pack(">I4", file_settings.magic)
+        file_settings.corrected_magic = string.unpack("<I4", m)
     end
 
-    file_settings.rec_hdr_len = Struct.size(file_settings.rec_hdr_patt)
+    file_settings.rec_hdr_len = string.packsize(file_settings.rec_hdr_patt)
 
     return file_settings
 end
@@ -653,7 +646,7 @@ local function write_open(file, capture)
     local file_settings = create_writer_file_settings()
 
     -- write out file header
-    local hdr = Struct.pack(file_settings.file_hdr_patt,
+    local hdr = string.pack(file_settings.file_hdr_patt,
                             file_settings.corrected_magic,
                             file_settings.version_major,
                             file_settings.version_minor,
@@ -666,8 +659,6 @@ local function write_open(file, capture)
         dprint("write_open: error generating file header")
         return false
     end
-
-    dprint2("write_open generating:", Struct.tohex(hdr))
 
     if not file:write(hdr) then
         dprint("write_open: error writing file header to file")
@@ -704,7 +695,7 @@ local function write(file, capture, frame)
         nsecs = nsecs / 1000000
     end
 
-    local hdr = Struct.pack(file_settings.rec_hdr_patt,
+    local hdr = string.pack(file_settings.rec_hdr_patt,
                             nstime.secs,
                             nsecs,
                             frame.captured_length,

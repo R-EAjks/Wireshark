@@ -10,7 +10,6 @@
 add_subdirectory(lrexlib)
 
 set(WSLUA_MODULES
-	${CMAKE_CURRENT_SOURCE_DIR}/lua_bitop.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_address.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_byte_array.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_capture_info.c
@@ -24,7 +23,6 @@ set(WSLUA_MODULES
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_file_handler.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_frame_info.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_gui.c
-	${CMAKE_CURRENT_SOURCE_DIR}/wslua_int64.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_internals.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_listener.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_nstime.c
@@ -33,7 +31,6 @@ set(WSLUA_MODULES
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_proto.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_proto_expert.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_proto_field.c
-	${CMAKE_CURRENT_SOURCE_DIR}/wslua_struct.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_tree.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_tvb.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_util.c
