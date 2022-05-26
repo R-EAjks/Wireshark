@@ -4126,7 +4126,7 @@ static TYPE_FUN nr_rlcmac_crlc_type_funs[] =
 {
     { nr5g_rlcmac_Crlc_CONFIG_CMD,         "nr5g_rlcmac_Crlc_CONFIG_CMD",       dissect_crlc_config_cmd },
     { nr5g_rlcmac_Crlc_CONFIG_ACK,         "nr5g_rlcmac_Crlc_CONFIG_ACK",       dissect_crlc_config_ack },
-    { nr5g_rlcmac_Crlc_CONFIG_NAK,         "nr5g_rlcmac_Crlc_CONFIG_NAK",       dissect_sapi_type_dummy },
+    { nr5g_rlcmac_Crlc_CONFIG_NAK,         "nr5g_rlcmac_Crlc_CONFIG_NAK",       dissect_crlc_config_ack },
 
     { 0x00,                               NULL,                             NULL }
 };
