@@ -649,7 +649,7 @@ extern int wslua_reg_attributes(lua_State *L, const wslua_attribute_table *t, gb
 
 #define WSLUA_REG_GLOBAL_BOOL(L,n,v) { lua_pushboolean(L,v); lua_setglobal(L,n); }
 #define WSLUA_REG_GLOBAL_STRING(L,n,v) { lua_pushstring(L,v); lua_setglobal(L,n); }
-#define WSLUA_REG_GLOBAL_NUMBER(L,n,v) { lua_pushnumber(L,v); lua_setglobal(L,n); }
+#define WSLUA_REG_GLOBAL_NUMBER(L,n,v) { lua_pushinteger(L,v); lua_setglobal(L,n); }
 
 #define WSLUA_RETURN(i) return (i)
 

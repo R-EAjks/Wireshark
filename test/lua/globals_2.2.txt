@@ -140,7 +140,7 @@
         ["upvaluejoin"] = '<function 64>'
     },
     ["deregister_filehandler"] = '<function 65>',
-    ["DESEGMENT_ONE_MORE_SEGMENT"] = 268435455,0,
+    ["DESEGMENT_ONE_MORE_SEGMENT"] = 268435455,
     ["Dir"] = {
         ["close"] = '<function 66>',
         ["exists"] = '<function 67>',
