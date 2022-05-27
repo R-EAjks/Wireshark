@@ -158,7 +158,9 @@ function(_lua_find_header)
     # It is also consistent with previous versions of FindLua
     foreach (subdir IN LISTS _lua_include_subdirs)
       find_path(LUA_INCLUDE_DIR lua.h
-        HINTS ENV LUA_DIR
+        HINTS
+          ENV LUA_DIR
+          ${LUA_HINTS}
         PATH_SUFFIXES ${subdir}
         )
       if (LUA_INCLUDE_DIR)
@@ -207,6 +209,7 @@ find_library(LUA_LIBRARY
   NAMES_PER_DIR
   HINTS
     ENV LUA_DIR
+    ${LUA_HINTS}
   PATH_SUFFIXES lib
 )
 unset(_lua_library_names)
