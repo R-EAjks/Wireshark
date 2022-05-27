@@ -656,7 +656,7 @@
         ["min"] = '<function 217>',
         ["mininteger"] = -9223372036854775808,
         ["modf"] = '<function 218>',
-        ["pi"] = 3,1415926535898,
+        ["pi"] = 3.1415926535898,
         ["rad"] = '<function 219>',
         ["random"] = '<function 220>',
         ["randomseed"] = '<function 221>',
