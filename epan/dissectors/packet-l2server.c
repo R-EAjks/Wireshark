@@ -188,7 +188,7 @@ static int hf_l2server_rlc_t_status_prohibit = -1;
 static int hf_l2server_spare1 = -1;
 static int hf_l2server_spare2 = -1;
 static int hf_l2server_spare4 = -1;
-static int hf_l2server_spare11 = -1;
+static int hf_l2server_spare = -1;
 static int hf_l2server_package_type = -1;
 static int hf_l2server_dbeamid = -1;
 static int hf_l2server_dbeam_status = -1;
@@ -458,6 +458,7 @@ static int hf_l2server_nr_pro_ppu = -1;
 
 static int hf_l2server_setup_reconf = -1;
 
+static int hf_l2server_mac_config = -1;
 
 static const value_string lch_vals[] =
 {
@@ -796,6 +797,11 @@ static const true_false_string nodata_data_vals =
     "Msg3 bytes present"
 };
 
+static const true_false_string continue_rohc_vls =
+{
+    "true",
+    "Not configured/false"
+};
 
 
 /* Subtrees */
@@ -843,6 +849,7 @@ static gint ett_l2server_bwp_ul_common = -1;
 static gint ett_l2server_freq_info_sul_common = -1;
 static gint ett_l2server_bwp_sul_common = -1;
 static gint ett_l2server_tdd_common = -1;
+static gint ett_l2server_mac_config = -1;
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
 static expert_field ei_l2server_type_unknown = EI_INIT;
@@ -1597,7 +1604,7 @@ static void dissect_delete_ue_nak(proto_tree *tree, tvbuff_t *tvb, packet_info *
     /* 2 more bytes */
 }
 
-
+// nr5g_l2_Srv_SCG_REL_AND_ADDt (nr5g_l2_Srv_HANDOVERt) from L2ServerMessages.h
 static void dissect_handover_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                  guint offset, guint len _U_)
 {
@@ -1623,7 +1630,11 @@ static void dissect_handover_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *p
     offset += 4;
 
     /* The rest of the message is CMAC_Config_cmd body */
-    dissect_rlcmac_cmac_config_cmd(tree, tvb, pinfo, offset, mac_config_len);
+    proto_item *mac_ti = proto_tree_add_string_format(tree, hf_l2server_mac_config, tvb,
+                                                          offset, mac_config_len,
+                                                          "", "MAC Config ");
+    proto_tree *mac_tree = proto_item_add_subtree(mac_ti, ett_l2server_mac_config);
+    dissect_rlcmac_cmac_config_cmd(mac_tree, tvb, pinfo, offset, mac_config_len);
 }
 
 static void dissect_handover_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -1672,7 +1683,7 @@ static void dissect_ra_req(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
     proto_tree_add_item(tree, hf_l2server_scgid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     /* Spare 11 bytes */
-    proto_tree_add_item(tree, hf_l2server_spare11, tvb, offset, 11, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_spare, tvb, offset, 11, ENC_LITTLE_ENDIAN);
     offset += 11;
     /* Rt_Preamble */
     offset ++;
@@ -2835,16 +2846,19 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
     offset += 1;
 
     // Spare1[2]
+    proto_tree_add_item(tree, hf_l2server_spare2, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
     // Spare[3]
+    proto_tree_add_item(tree, hf_l2server_spare, tvb, offset, 3*4, ENC_LITTLE_ENDIAN);
     offset += (3*4);
 
     // L1CellDedicatedConfig_Len (apparently not set in rrcCOM.c)
     int l1cell_dedicated_config_len;
     proto_tree_add_item_ret_int(tree, hf_l2server_l1cell_dedicated_config_len, tvb, offset, 4, ENC_LITTLE_ENDIAN, &l1cell_dedicated_config_len);
     offset += 4;
+
     //---------------------------------------------------------------
-    // L2CellDedicatedConfig (nr5g_rlcmac_Cmac_CELL_DEDICATED_CONFIGt)
+    // L2CellDedicatedConfig (nr5g_rlcmac_Cmac_CELL_DEDICATED_CONFIGt from nr5g-rlcmac_Cmac-bb.h)
     guint32 dedicated_start = offset;
 
     guint32 l2_len = tvb_get_guint32(tvb, offset, ENC_LITTLE_ENDIAN);
@@ -2862,10 +2876,19 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
     offset += 2;
 
     // NbSCellCfgDel
+    guint32 nbSCellCfgAdd;
+    proto_tree_add_item_ret_uint(l2_dedicated_config_tree, hf_l2server_nb_scell_cfg_add, tvb, offset, 1,
+                                 ENC_LITTLE_ENDIAN, &nbSCellCfgAdd);
     offset += 1;
+
     // NbSCellCgDel
+    guint32 nbSCellCfgDel;
+    proto_tree_add_item_ret_uint(l2_dedicated_config_tree, hf_l2server_nb_scell_cfg_del, tvb, offset, 1,
+                                 ENC_LITTLE_ENDIAN, &nbSCellCfgDel);
     offset += 1;
+
     // PhyCellConfig (CsRNTI)
+    proto_tree_add_item(l2_dedicated_config_tree, hf_l2server_cs_rnti, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 
     // SpCellCfgDed (nr5g_rlcmac_Cmac_SERV_CELL_CONFIGt from nr5g-rlcmac_Cmac-bb.h)
@@ -2898,6 +2921,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         proto_tree_add_item(spcell_config_ded_tree, hf_l2server_supp_ul_rel, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
         // Spare
+        proto_tree_add_item(spcell_config_ded_tree, hf_l2server_spare2, tvb, offset, 2, ENC_LITTLE_ENDIAN);
         offset += 2;
 
         // UlCellCfgDed (nr5g_rlcmac_Cmac_UPLINK_DEDICATED_CONFIGt from nr5g-rlcmac_Cmac-bb.h)
@@ -3278,15 +3302,10 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         proto_tree *l1_dedicated_config_tree = proto_item_add_subtree(l1_dedicated_config_ti, ett_l2server_l1_cell_dedicated_config);
 
         // NbSCellCfgAdd
-        guint32 nbSCellCfgAdd;
-        proto_tree_add_item_ret_uint(l1_dedicated_config_tree, hf_l2server_nb_scell_cfg_add, tvb, offset, 1,
-                                     ENC_LITTLE_ENDIAN, &nbSCellCfgAdd);
+        proto_tree_add_item(l1_dedicated_config_tree, hf_l2server_nb_scell_cfg_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
-
         // NbSCellCfgDel
-        guint32 nbSCellCfgDel;
-        proto_tree_add_item_ret_uint(l1_dedicated_config_tree, hf_l2server_nb_scell_cfg_del, tvb, offset, 1,
-                                     ENC_LITTLE_ENDIAN, &nbSCellCfgDel);
+        proto_tree_add_item(l1_dedicated_config_tree, hf_l2server_nb_scell_cfg_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
 
         // FieldMask
@@ -3302,9 +3321,6 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
 
         // PhyCellCnf (bb_nr5g_PH_CELL_GROUP_CONFIGt from bb-nr5g_struct.h)
         offset = dissect_ph_cell_config(l1_dedicated_config_tree, tvb, pinfo, offset);
-
-        // TODO: don't understand why we seem to be out here!!!!!????
-        //offset += 5;
 
         if (ded_present) {
             // SpCellCfgDed. N.B. offset returned here won't be right yet..
@@ -4631,8 +4647,8 @@ proto_register_l2server(void)
         { "SCG Type", "l2server.scg-type", FT_UINT32, BASE_DEC,
           VALS(scg_type_vals), 0x0, NULL, HFILL }},
       { &hf_l2server_drb_continue_rohc,
-        { "drb-ContinueROHC", "l2server.drb-continue-rohc", FT_UINT8, BASE_DEC,
-          NULL, 0x0, NULL, HFILL }},
+        { "drb-ContinueROHC", "l2server.drb-continue-rohc", FT_BOOLEAN, 1,
+          TFS(&continue_rohc_vls), 0x0, NULL, HFILL }},
       { &hf_l2server_mac_config_len,
         { "MacConfig Length", "l2server.mac-config-len", FT_UINT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
@@ -4854,7 +4870,7 @@ proto_register_l2server(void)
       { &hf_l2server_spare4,
         { "Spare", "l2server.spare", FT_INT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
-      { &hf_l2server_spare11,
+      { &hf_l2server_spare,
         { "Spare", "l2server.spare", FT_BYTES, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
 
@@ -5571,6 +5587,11 @@ proto_register_l2server(void)
       { &hf_l2server_setup_reconf,
         { "Setup/Reconf", "l2server.setup-reconf", FT_UINT8, BASE_DEC,
            VALS(setup_reconf_vals), 0x0, NULL, HFILL }},
+
+      { &hf_l2server_mac_config,
+        { "MAC Config", "l2server.mac-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
     };
 
     static gint *ett[] = {
@@ -5616,7 +5637,8 @@ proto_register_l2server(void)
         &ett_l2server_bwp_ul_common,
         &ett_l2server_freq_info_sul_common,
         &ett_l2server_bwp_sul_common,
-        &ett_l2server_tdd_common
+        &ett_l2server_tdd_common,
+        &ett_l2server_mac_config
     };
 
     static ei_register_info ei[] = {
