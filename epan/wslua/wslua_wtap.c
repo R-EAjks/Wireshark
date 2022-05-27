@@ -148,7 +148,7 @@ WSLUA_INTERNAL_FUNCTION wslua_get_wtap_filetypes(lua_State* LS) {
          * it.
          */
         lua_pushstring(LS, entry->name);
-        lua_pushnumber(LS, entry->ft);
+        lua_pushinteger(LS, entry->ft);
         /*
          * The -3 is the index, relative to the top of the stack, of
          * the table; the two elements on top of it are the ft and
