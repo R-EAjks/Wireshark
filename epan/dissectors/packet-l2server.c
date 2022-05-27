@@ -456,6 +456,8 @@ static int hf_l2server_up_stk_ppu = -1;
 static int hf_l2server_dwn_stk_ppu = -1;
 static int hf_l2server_nr_pro_ppu = -1;
 
+static int hf_l2server_setup_reconf = -1;
+
 
 static const value_string lch_vals[] =
 {
@@ -780,6 +782,13 @@ static const value_string scg_type_vals[] = {
     { 1,    "SCG NR" },
     { 0,   NULL }
 };
+
+static const value_string setup_reconf_vals[] = {
+    { 1,    "RRC-setup" },
+    { 2,    "RRC-Reconfiguration" },
+    { 0,   NULL }
+};
+
 
 static const true_false_string nodata_data_vals =
 {
@@ -1906,6 +1915,8 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
                                   guint offset)
 {
     guint start_offset = offset;
+
+    // Subtree.
     proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_ph_cell_config, tvb,
                                                          offset, 0,
                                                           "", "PH Cell Config");
@@ -1940,7 +1951,7 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     proto_tree_add_item(config_tree, hf_l2server_mcs_crnti, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
 
-    // PUE_FR1 [30..33]
+    // PUE_FR1 [-30..33]
     proto_tree_add_item(config_tree, hf_l2server_pue_fr1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // TpcSrsRNTI
@@ -2009,17 +2020,20 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     // Pad
     offset += 1;
 
+    // It look as though these are included (0xff) in message even if not present!!
+
     // Dcp_Config_r16 (bb_nr5g_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16t)
     if (dcp_config_present) {
         // N.B. Size of this is fixed.
-        offset += sizeof(bb_nr5g_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16t);
     }
+    offset += sizeof(bb_nr5g_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16t);
+
 
     // Pdcch_BlindDetectionCA_CombIndicator_r16 (bb_nr5g_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16t)
     if (pdcch_blind_detection_present) {
         // N.B. Size of this is fixed.
-        offset += sizeof(bb_nr5g_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16t);
     }
+    offset += sizeof(bb_nr5g_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16t);
 
     proto_item_set_len(config_ti, offset-start_offset);
 
@@ -2030,7 +2044,7 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
 static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset)
 {
-    //guint start_offset = offset;
+    guint start_spcell_cfg_ded_offset = offset;
 
     // Subtree.
     proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_sp_cell_cfg_ded, tvb,
@@ -2305,9 +2319,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         offset += sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt);
     }
 
-
-    //proto_item_set_len(config_ti, offset-start_offset);
-    proto_item_set_len(config_ti, sizeof(bb_nr5g_SERV_CELL_CONFIGt));
+    proto_item_set_len(config_ti, offset-start_spcell_cfg_ded_offset);
 
     return offset;
 }
@@ -3284,11 +3296,15 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         proto_tree_add_item_ret_boolean(l1_dedicated_config_tree, hf_l2server_field_mask_1_common_present, tvb, offset, 1, ENC_LITTLE_ENDIAN, &common_present);
         offset += 1;
 
-        // PhyCellCnf (bb_nr5g_PH_CELL_GROUP_CONFIGt)
+        // SetupReconf
+        proto_tree_add_item(l1_dedicated_config_tree, hf_l2server_setup_reconf, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+
+        // PhyCellCnf (bb_nr5g_PH_CELL_GROUP_CONFIGt from bb-nr5g_struct.h)
         offset = dissect_ph_cell_config(l1_dedicated_config_tree, tvb, pinfo, offset);
 
         // TODO: don't understand why we seem to be out here!!!!!????
-        offset += 5;
+        //offset += 5;
 
         if (ded_present) {
             // SpCellCfgDed. N.B. offset returned here won't be right yet..
@@ -5547,6 +5563,10 @@ proto_register_l2server(void)
       { &hf_l2server_nr_pro_ppu,
         { "NR Pro PPU", "l2server.nr-pro-ppu", FT_UINT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_setup_reconf,
+        { "Setup/Reconf", "l2server.setup-reconf", FT_UINT8, BASE_DEC,
+           VALS(setup_reconf_vals), 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
