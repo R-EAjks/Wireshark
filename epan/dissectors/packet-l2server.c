@@ -3891,7 +3891,12 @@ static void dissect_rrc_state_cfg_cmd(proto_tree *tree, tvbuff_t *tvb, packet_in
 
 /************************************************************************************/
 
-
+/* SRV Error */
+static TYPE_FUN srv_error_type_funs[] =
+{
+        { 0x0402,                            "UNKNOWN_ERROR_IND",               dissect_sapi_type_dummy },
+        { 0x00,                               NULL,                             NULL }
+};
 
 /* OM */
 static TYPE_FUN om_type_funs[] =
@@ -4170,7 +4175,7 @@ static value_string  lte_pdcp_ctrl_type_vals[MAX_LTE_PDCP_CTRL_TYPE_VALS];
 
 static SAPI_FUN sapi_fun_vals[] = {
     /* Server */
-    { lte_l2_Sap_SRV_ERROR,         "SRV ERROR", NULL },
+    { lte_l2_Sap_SRV_ERROR,         "SRV ERROR", srv_error_type_funs },
     { lte_l2_Sap_OM,                "OM", om_type_funs  },
     { lte_l2_Sap_LIC,               "LIC", NULL  },
     { lte_l2_Sap_OM_TM,             "OM TM", NULL  },
@@ -5494,12 +5499,11 @@ proto_register_l2server(void)
            NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_nb_rate_match_pattern_to_add_mod,
-        { "Nb Rate Match Pattern To Add/Mod", "l2server.nb-rate-match-pattern-to-add-mod", FT_UINT8, BASE_DEC,
+        { "Nb Rate Match Pattern To Add/Mod", "l2server.nb-rate-match-pattern-to-add-mod", FT_INT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_nb_rate_match_pattern_to_del,
-        { "Nb Rate Match Pattern To Del", "l2server.nb-rate-match-pattern-to-del", FT_UINT8, BASE_DEC,
+        { "Nb Rate Match Pattern To Del", "l2server.nb-rate-match-pattern-to-del", FT_INT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
-
 
       { &hf_l2server_bwp_dl_common,
         { "BWP DL Common", "l2server.bwp-dl-common", FT_STRING, BASE_NONE,
