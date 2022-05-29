@@ -14350,7 +14350,7 @@ text-decoration: underline;
     <message>
         <source>Quit &amp;without Saving</source>
         <oldsource>Quit without Saving</oldsource>
-        <translation>&amp;Ohne speichern beenden</translation>
+        <translation>&amp;Ohne Speichern beenden</translation>
     </message>
     <message>
         <source>There is no &quot;rtp.ssrc&quot; field in this version of Wireshark.</source>
