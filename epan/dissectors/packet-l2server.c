@@ -189,6 +189,8 @@ static int hf_l2server_spare1 = -1;
 static int hf_l2server_spare2 = -1;
 static int hf_l2server_spare4 = -1;
 static int hf_l2server_spare = -1;
+static int hf_l2server_pad = -1;
+
 static int hf_l2server_package_type = -1;
 static int hf_l2server_dbeamid = -1;
 static int hf_l2server_dbeam_status = -1;
@@ -459,6 +461,29 @@ static int hf_l2server_nr_pro_ppu = -1;
 static int hf_l2server_setup_reconf = -1;
 
 static int hf_l2server_mac_config = -1;
+
+static int hf_l2server_lch_basedprioritization_r16 = -1;
+
+static int hf_l2server_initial_dl_bwp_present = -1;
+static int hf_l2server_pdsch_present = -1;
+static int hf_l2server_pdcch_present = -1;
+static int hf_l2server_csi_meas_config_present = -1;
+
+static int hf_l2server_first_active_dl_bwp = -1;
+static int hf_l2server_nb_dl_bwp_scs_spec_carrier = -1;
+static int hf_l2server_dl_bwp_id_to_del = -1;
+
+static int hf_l2server_bwp_dl_dedicated = -1;
+static int hf_l2server_nb_sps_conf_to_add_r16 = -1;
+static int hf_l2server_nb_config_deactivation_state_r16 = -1;
+
+static int hf_l2server_pdsch_serving_cell = -1;
+static int hf_l2server_xoverhead = -1;
+static int hf_l2server_nb_code_block_group_transmission_r16 = -1;
+
+static int hf_l2server_pdcch_serving_cell = -1;
+
+static int hf_l2server_csi_meas_config = -1;
 
 static const value_string lch_vals[] =
 {
@@ -790,6 +815,12 @@ static const value_string setup_reconf_vals[] = {
     { 0,   NULL }
 };
 
+static const value_string xoverhead_vals[] = {
+    { 0,    "x0h6" },
+    { 1,    "x0h12" },
+    { 2,    "x0h18" },
+    { 0,   NULL }
+};
 
 static const true_false_string nodata_data_vals =
 {
@@ -850,6 +881,11 @@ static gint ett_l2server_freq_info_sul_common = -1;
 static gint ett_l2server_bwp_sul_common = -1;
 static gint ett_l2server_tdd_common = -1;
 static gint ett_l2server_mac_config = -1;
+static gint ett_l2server_bwp_dl_dedicated = -1;
+static gint ett_l2server_pdsch_serving_cell = -1;
+static gint ett_l2server_pdcch_serving_cell = -1;
+static gint ett_l2server_csi_meas_config = -1;
+
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
 static expert_field ei_l2server_type_unknown = EI_INIT;
@@ -2029,9 +2065,10 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     // Pdsch_HARQ_ACK_CodebookList_r16[2]
     offset += 2;
     // Pad
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
 
-    // It look as though these are included (0xff) in message even if not present!!
+    // It look as though these are included (0xff) in message even if not present!!?
 
     // Dcp_Config_r16 (bb_nr5g_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16t)
     if (dcp_config_present) {
@@ -2048,6 +2085,234 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
 
     proto_item_set_len(config_ti, offset-start_offset);
 
+    return offset;
+}
+
+// bb_nr5g_BWP_DOWNLINKDEDICATEDt from bb-nr5g_struct.h
+static int dissect_bwp_dl_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                    guint offset, const char *title)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_bwp_dl_dedicated, tvb,
+                                                         offset, 0,
+                                                          "", "%s", title);
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_bwp_dl_dedicated);
+
+    // FieldMask
+    guint32 field_mask;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN, &field_mask);
+    // TODO: add individual flag fields.
+    offset += 4;
+
+    // NbSpsConfToAdd_r16
+    guint32 nb_sps_conf_to_add_r16;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_sps_conf_to_add_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_sps_conf_to_add_r16);
+    offset += 1;
+
+    // NbConfigDeactivationState_r16
+    guint32 nb_config_deactivation_state_r16;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_config_deactivation_state_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_config_deactivation_state_r16);
+    offset += 1;
+
+    // Pad[2]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+
+    // PdcchConfDed
+    if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDCCH_CFG_PRESENT) {
+        // TODO:
+    }
+    // PdschConfDed
+    if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDSCH_CFG_PRESENT) {
+        // TODO:
+    }
+    // SpsConfDed
+    if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_SPS_CFG_PRESENT) {
+        // TODO:
+    }
+    // SpsConfToDel_r16
+    if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_SPS_CFG_R16_PRESENT) {
+        // TODO:
+    }
+    // PdcchConfDedR16
+    if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_R16_PRESENT) {
+        // TODO:
+    }
+
+    // TODO
+    // SpsConfToAdd_r16
+    for (guint n=0; n < nb_sps_conf_to_add_r16; n++) {
+        // TODO:
+    }
+    // ConfigDeactivationState_r16
+    for (guint n=0; n < nb_config_deactivation_state_r16; n++) {
+        // TODO:
+    }
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_PDSCH_SERVING_CELL_CFGt from bb-nr5g_struct.h
+static int dissect_pdsch_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                   guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_pdsch_serving_cell,  tvb,
+                                                         offset, 0,
+                                                          "", "PDSCH Serving Cell");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_pdsch_serving_cell);
+
+    // xOverhead
+    proto_tree_add_item(config_tree, hf_l2server_xoverhead, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // NbHarqProcessesForPDSCH
+    offset += 1;
+    // PucchCell
+    offset += 2;
+    // MaxMimoLayers
+    offset += 1;
+    // ProcessingType2Enabled
+    offset += 1;
+
+    // NbCodeBlockGroupTransmission_r16
+    guint32 nb_code_block_group_transmission_r16;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_code_block_group_transmission_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN,
+                                 &nb_code_block_group_transmission_r16);
+    offset += 1;
+
+    // Pad
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+
+    // CodeBlockGroupTrans (bb_nr5g_PDSCH_CODEBLOCKGROUPTRANSMt)
+    offset += 4;
+
+    // CodeBlockGroupTransmissionList_r16 (bb_nr5g_PDSCH_CODEBLOCKGROUPTRANSMt)
+    for (guint n=0; n < nb_code_block_group_transmission_r16; n++) {
+        offset += sizeof(bb_nr5g_PDSCH_CODEBLOCKGROUPTRANSMt);
+    }
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_PDCCH_SERVING_CELL_CFGt (-> bb_nr5g_SLOT_FMT_INDICATORt) from bb-nr5g_struct.h
+static int dissect_pdcch_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                   guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_pdcch_serving_cell,  tvb,
+                                                         offset, 0,
+                                                          "", "PDCCH Serving Cell");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_pdcch_serving_cell);
+
+    // DciPayloadSize
+    offset += 1;
+    // NbSlotFormatCombToAdd
+    guint32 nb_slot_format_comb_to_add = tvb_get_guint8(tvb, offset);
+    offset += 1;
+    // NbSlotFormatCombToDel
+    guint32 nb_slot_format_comb_to_del = tvb_get_guint8(tvb, offset);
+    offset += 1;
+
+    // Pad
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // Rnti
+    offset += 2;
+
+    // SlotFormatCombToDel
+    offset += (nb_slot_format_comb_to_del & sizeof(uint32_t));
+    // slotFormatCombToAdd
+    offset += (nb_slot_format_comb_to_add & sizeof(bb_nr5g_SLOT_FMT_COMBSPERCELLt));
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+
+// bb_nr5g_CSI_MEAS_CFGt from bb-nr5g_struct.h
+static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                   guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_csi_meas_config,  tvb,
+                                                         offset, 0,
+                                                          "", "CSI Meas Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_meas_config);
+
+    // NbNzpCsiRsResToAdd
+    offset += 1;
+    // NbNzpCsiRsResToDel
+    offset += 1;
+    // NbNzpCsiRsResSetToAdd
+    offset += 1;
+    // NbNzpCsiRsResSetToDel
+    offset += 1;
+    // NbCsiImResToAdd
+    offset += 1;
+    // NbCsiImResToDel
+    offset += 1;
+    // NbCsiImResSetToAdd
+    offset += 1;
+    // NbCsiImResSetToDel
+    offset += 1;
+    // NbCsiSsbResSetToAdd
+    offset += 1;
+    // NbCsiSsbResSetToDel
+    offset += 1;
+    // NbCsiResCfgToAdd
+    offset += 1;
+    // NbCsiResCfgToDel
+    offset += 1;
+    // NbCsiRepCfgToAdd
+    offset += 1;
+    // NbCsiRepCfgToDel
+    offset += 1;
+    // NbAperTriggerStateList
+    offset += 1;
+    // NbSPOnPuschTriggerStateList
+    offset += 1;
+    // ReportTriggerSize
+    offset += 1;
+    // ReportTriggerSizeDCI02_r16
+    offset += 1;
+
+    // Pad[2]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // TODO:
+
+    // NzpCsiRsResToAdd
+    // NzpCsiRsResSetToAdd
+    // CsiImResToAdd
+    // CsiImResSetToAdd
+    // CsiSsbResSetToAdd
+    // CsiResCfgToAdd
+    // CsiRepCfgToAdd
+    // AperTriggerStateList
+    // SPOnPuschTriggerStateList
+    // NzpCsiRsResToDel
+    // NzpCsiRsResSetToDel
+    // CsiImResToDel
+    // CsiImResSetToDel
+    // CsiSsbResSetToDel
+    // CsiResCfgToDel
+    // CsiRepCfgToDel
+
+    proto_item_set_len(config_ti, offset-start_offset);
     return offset;
 }
 
@@ -2169,7 +2434,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         proto_item_set_len(ded_ti, offset-start_offset);
     }
 
-    // DlCellCfgDed (bb_nr5g_DOWNLINK_DEDICATED_CONFIGt)
+    // DlCellCfgDed (bb_nr5g_DOWNLINK_DEDICATED_CONFIGt from bb-nr5g_struct.h)
     if (dl_ded_present) {
         guint start_offset = offset;
         proto_item *ded_ti = proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_dl, tvb,
@@ -2180,12 +2445,19 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         // FieldMask
         guint32 field_mask;
         proto_tree_add_item_ret_uint(ded_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN, &field_mask);
+        proto_tree_add_item(ded_tree, hf_l2server_initial_dl_bwp_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(ded_tree, hf_l2server_pdsch_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(ded_tree, hf_l2server_pdcch_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(ded_tree, hf_l2server_csi_meas_config_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
         offset += 4;
 
         // FirstActiveDlBwp
+        proto_tree_add_item(ded_tree, hf_l2server_first_active_dl_bwp, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
         // DefaultDlBwp
+        proto_tree_add_item(ded_tree, hf_l2server_default_dl_bwpid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
+
         // NbDlBwpIdToDel
         guint32 nbDlBwpIdToDel;
         proto_tree_add_item_ret_uint(ded_tree, hf_l2server_nbdlbwpidtodel, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nbDlBwpIdToDel);
@@ -2194,36 +2466,50 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         guint32 nbDlBwpIdToAdd;
         proto_tree_add_item_ret_uint(ded_tree, hf_l2server_nbdlbwpidtoadd, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nbDlBwpIdToAdd);
         offset += 1;
-        // TODO:
         // NbDlBwpScsSpecCarrier
-        guint8 nbDlBwpScsSpecCarrier = tvb_get_guint8(tvb, offset);
+        guint32 nbDlBwpScsSpecCarrier;
+        proto_tree_add_item_ret_uint(ded_tree, hf_l2server_nb_dl_bwp_scs_spec_carrier, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nbDlBwpScsSpecCarrier);
         offset += 1;
+
         // NbRateMatchPatternDedToAdd
-        guint32 nbRateMatchPatternDedToAdd = tvb_get_guint8(tvb, offset);
+        gint32 nbRateMatchPatternDedToAdd;
+        proto_tree_add_item_ret_int(ded_tree, hf_l2server_nb_rate_match_pattern_to_add_mod, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nbRateMatchPatternDedToAdd);
         offset += 1;
         // NbRateMatchPatternDedToDel
-        guint32 nbRateMatchPatternDedToDel = tvb_get_guint8(tvb, offset);
+        gint32 nbRateMatchPatternDedToDel;
+        proto_tree_add_item_ret_int(ded_tree, hf_l2server_nb_rate_match_pattern_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nbRateMatchPatternDedToDel);
         offset += 1;
+
         // Pad
+        proto_tree_add_item(ded_tree, hf_l2server_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
+
         // DlBwpIdToDel
-        offset += (1 * bb_nr5g_MAX_NB_BWPS);
+        for (guint n=0; n < bb_nr5g_MAX_NB_BWPS; n++) {
+            proto_item *del_ti = proto_tree_add_item(ded_tree, hf_l2server_dl_bwp_id_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            if (n >= nbDlBwpIdToDel) {
+                proto_item_append_text(del_ti, " (not in use)");
+            }
+            offset++;
+        }
 
         // Optional fields.
+
+        // InitialDlBwp
         if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_INITIAL_DL_BWP_PRESENT) {
-            // TODO: has several present flags and Nb fields...
-            offset += sizeof(bb_nr5g_BWP_DOWNLINKDEDICATEDt);
+            offset = dissect_bwp_dl_dedicated(ded_tree, tvb, pinfo, offset, "Initial DL BWP");
         }
+        // PdschServingCellCfg
         if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDSCH_PRESENT) {
-            // TODO: contains a list..
-            offset += sizeof(bb_nr5g_PDSCH_SERVING_CELL_CFGt);
+            offset = dissect_pdsch_dedicated(ded_tree, tvb, pinfo, offset);
         }
+        // PdcchServingCellCfg
         if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDCCH_PRESENT) {
-            offset += sizeof(bb_nr5g_PDCCH_SERVING_CELL_CFGt);
+            offset = dissect_pdcch_dedicated(ded_tree, tvb, pinfo, offset);
         }
+        // CsiMeasCfg
         if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_CSI_MEAS_CFG_PRESENT) {
-            // TODO: a lot more to do in here...
-            offset += sizeof(bb_nr5g_CSI_MEAS_CFGt);
+            offset = dissect_csi_meas_config(ded_tree, tvb, pinfo, offset);
         }
 
         // DlBwpIdToAdd
@@ -2262,6 +2548,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         // NbUlBwpScsSpecCarrier
         offset += 1;
         // Pad
+        proto_tree_add_item(ded_tree, hf_l2server_pad, tvb, offset, 3, ENC_LITTLE_ENDIAN);
         offset += 3;
         // UlBwpIdToDel
         offset += (bb_nr5g_MAX_NB_BWPS * 1);
@@ -2372,6 +2659,7 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
     offset += 1;
 
     // Pad
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
 
     // SsbPosInBurst (union)
@@ -3132,6 +3420,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                         proto_tree_add_item(rach_tree, hf_l2server_ra_contention_resolution_timer, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                         offset += 1;
                         // Pad
+                        proto_tree_add_item(rach_tree, hf_l2server_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                         offset += 1;
 
                         // RaPrioritizationForAccessIdentity_r16 (bb_nr5g_RA_PRIO_FOR_ACCESS_ID_R16t)
@@ -3255,7 +3544,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         offset = ded_start_offset + ded_len;
     }
 
-    // MAC_CellGroupConfig(nr5g_rlcmac_Cmac_MAC_CELL_GROUP_CONFIGt)
+    // MAC_CellGroupConfig (nr5g_rlcmac_Cmac_MAC_CELL_GROUP_CONFIGt)
     // TODO: field_mask not as expected!!!!!
     if (field_mask & nr5g_rlcmac_Cmac_STRUCT_MAC_CELL_GROUP_CONFIG_PRESENT) {
         proto_item *mac_cell_group_ti = proto_tree_add_string_format(l2_dedicated_config_tree, hf_l2server_mac_cell_group_config, tvb,
@@ -3268,14 +3557,19 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         proto_tree_add_item_ret_uint(mac_cell_group_tree, hf_l2server_mac_cell_group_len, tvb, offset, 4,
                                      ENC_LITTLE_ENDIAN, &mac_cell_group_len);
         offset += 4;
+
         // FieldMask
         guint32 field_mask_4;
         proto_tree_add_item_ret_uint(mac_cell_group_tree, hf_l2server_field_mask_4, tvb, offset, 4,
                                      ENC_LITTLE_ENDIAN, &field_mask_4);
         offset += 4;
+
         // lch_BasedPrioritization_r16
+        proto_tree_add_item(mac_cell_group_tree, hf_l2server_lch_basedprioritization_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+
         offset += 1;
         // Spare[3]
+        proto_tree_add_item(mac_cell_group_tree, hf_l2server_spare, tvb, offset, 3, ENC_LITTLE_ENDIAN);
         offset += 3;
 
         //------------------------------------
@@ -4873,6 +5167,9 @@ proto_register_l2server(void)
       { &hf_l2server_spare,
         { "Spare", "l2server.spare", FT_BYTES, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pad,
+        { "Pad", "l2server.pad", FT_BYTES, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_package_type,
         { "PackageType", "l2server.package-type", FT_UINT8, BASE_DEC,
@@ -5068,7 +5365,7 @@ proto_register_l2server(void)
         { "Serv Cell MO", "l2server.serv-cell-mo", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_default_dl_bwpid,
-        { "Default DL Bwpid", "l2server.default-dl-bwpid", FT_UINT8, BASE_DEC,
+        { "Default DL Bwpid", "l2server.default-dl-bwpid", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_supp_ul_rel,
         { "Supp UL Rel", "l2server.supp-ul-rel", FT_INT8, BASE_DEC,
@@ -5592,6 +5889,62 @@ proto_register_l2server(void)
         { "MAC Config", "l2server.mac-config", FT_STRING, BASE_NONE,
            NULL, 0x0, NULL, HFILL }},
 
+      { &hf_l2server_lch_basedprioritization_r16,
+        { "LCH-based Prioritization R16", "l2server.lch-based-prioritization-r16", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_first_active_dl_bwp,
+        { "First active DL BWP", "l2server.first-active-dl-bwp", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_dl_bwp_scs_spec_carrier,
+        { "Nb DL BWP Scs Spec Carriers", "l2server.nb-bwp-scs-spec-carrier", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_dl_bwp_id_to_del,
+        { "DL BwpId to Delete", "l2server.dl-bwpid-to-del", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+
+      { &hf_l2server_initial_dl_bwp_present,
+        { "Initial DL BWP Present", "l2server.initial-dl-bwp-present", FT_BOOLEAN, 32,
+           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_INITIAL_DL_BWP_PRESENT, NULL, HFILL }},
+      { &hf_l2server_pdsch_present,
+        { "PDSCH Present", "l2server.pdsch-present", FT_BOOLEAN, 32,
+           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDSCH_PRESENT, NULL, HFILL }},
+      { &hf_l2server_pdcch_present,
+        { "PDCCH Present", "l2server.pdcch-present", FT_BOOLEAN, 32,
+           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDCCH_PRESENT, NULL, HFILL }},
+      { &hf_l2server_csi_meas_config_present,
+        { "CSI Meas Config Present", "l2server.csi-meas-config-present", FT_BOOLEAN, 32,
+           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_CSI_MEAS_CFG_PRESENT, NULL, HFILL }},
+
+      { &hf_l2server_bwp_dl_dedicated,
+        { "BWP DL Dedicated", "l2server.bwp-dl-dedicated", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nb_sps_conf_to_add_r16,
+        { "Nb SPS Conf to add (r16)", "l2server.nb-sps-conf-to-add-r16", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_config_deactivation_state_r16,
+        { "Nb Config Deactivation State r16", "l2server.nb-config-deactivation-state-r16", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_pdsch_serving_cell,
+        { "PDSCH ServingCell", "l2server.pdsch-serving-cell", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_xoverhead,
+        { "XOverhead", "l2server.xoverhead", FT_UINT8, BASE_DEC,
+           VALS(xoverhead_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_code_block_group_transmission_r16,
+        { "Nb code block group transmission r16", "l2server.nb-code-block-group-transmission-r16", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_pdcch_serving_cell,
+        { "PDCCH ServingCell", "l2server.pdcch-serving-cell", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_csi_meas_config,
+        { "CSI Meas Config", "l2server.csi-meas-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
@@ -5638,7 +5991,11 @@ proto_register_l2server(void)
         &ett_l2server_freq_info_sul_common,
         &ett_l2server_bwp_sul_common,
         &ett_l2server_tdd_common,
-        &ett_l2server_mac_config
+        &ett_l2server_mac_config,
+        &ett_l2server_bwp_dl_dedicated,
+        &ett_l2server_pdsch_serving_cell,
+        &ett_l2server_pdcch_serving_cell,
+        &ett_l2server_csi_meas_config,
     };
 
     static ei_register_info ei[] = {
