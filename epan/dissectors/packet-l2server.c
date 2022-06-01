@@ -479,6 +479,8 @@ static int hf_l2server_nb_config_deactivation_state_r16 = -1;
 
 static int hf_l2server_pdsch_serving_cell = -1;
 static int hf_l2server_xoverhead = -1;
+static int hf_l2server_nb_harq_processes_for_pdsch = -1;
+
 static int hf_l2server_nb_code_block_group_transmission_r16 = -1;
 
 static int hf_l2server_pdcch_serving_cell = -1;
@@ -502,6 +504,24 @@ static int hf_l2server_nb_aper_trigger_state_list = -1;
 static int hf_l2server_nb_sp_on_pusch_trigger_state = -1;
 static int hf_l2server_report_trigger_size = -1;
 static int hf_l2server_report_trigger_size_dci02_r16 = -1;
+
+static int hf_l2server_nzp_csi_rs_res_config = -1;
+static int hf_l2server_resource_id = -1;
+static int hf_l2server_power_control_offset = -1;
+static int hf_l2server_power_control_offset_ss = -1;
+static int hf_l2server_qcl_info_periodic_csi_rs = -1;
+static int hf_l2server_scramblingid = -1;
+
+static int hf_l2server_nzp_csi_rs_res_set_config = -1;
+static int hf_l2server_resource_set_id = -1;
+static int hf_l2server_repetition = -1;
+static int hf_l2server_aper_trigger_offset = -1;
+static int hf_l2server_trs_info = -1;
+static int hf_l2server_aper_trigger_offset_r16 = -1;
+
+
+static int hf_l2server_nb_nzp_csi_rs_res_lis = -1;
+static int hf_l2server_nzp_csi_rs_res_list = -1;
 
 static const value_string lch_vals[] =
 {
@@ -903,7 +923,8 @@ static gint ett_l2server_bwp_dl_dedicated = -1;
 static gint ett_l2server_pdsch_serving_cell = -1;
 static gint ett_l2server_pdcch_serving_cell = -1;
 static gint ett_l2server_csi_meas_config = -1;
-
+static gint ett_l2server_nzp_csi_rs_res_config = -1;
+static gint ett_l2server_nzp_csi_rs_res_set_config = -1;
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
 static expert_field ei_l2server_type_unknown = EI_INIT;
@@ -2189,6 +2210,7 @@ static int dissect_pdsch_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info 
     proto_tree_add_item(config_tree, hf_l2server_xoverhead, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbHarqProcessesForPDSCH
+    proto_tree_add_item(config_tree, hf_l2server_nb_harq_processes_for_pdsch, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // PucchCell
     offset += 2;
@@ -2212,6 +2234,8 @@ static int dissect_pdsch_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info 
     offset += 4;
 
     // CodeBlockGroupTransmissionList_r16 (bb_nr5g_PDSCH_CODEBLOCKGROUPTRANSMt)
+    // TODO: this is a hack
+    nb_code_block_group_transmission_r16 = 4;
     for (guint n=0; n < nb_code_block_group_transmission_r16; n++) {
         offset += sizeof(bb_nr5g_PDSCH_CODEBLOCKGROUPTRANSMt);
     }
@@ -2258,6 +2282,101 @@ static int dissect_pdcch_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info 
 }
 
 
+// bb_nr5g_NZP_CSI_RS_RES_CFGt
+static int dissect_nzp_csi_rs_res_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                         guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_nzp_csi_rs_res_config,  tvb,
+                                                         offset, 0,
+                                                          "", "NZP CSI RS Res Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_nzp_csi_rs_res_config);
+
+    // ResourceId
+    guint32 resource_id;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_resource_id, tvb, offset, 1, ENC_LITTLE_ENDIAN, &resource_id);
+    offset += 1;
+    // PwrCtrlOffset
+    proto_tree_add_item(config_tree, hf_l2server_power_control_offset, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // PwrCtrlOffsetSS
+    proto_tree_add_item(config_tree, hf_l2server_power_control_offset_ss, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // QclInfoPeriodicCsiRs
+    proto_tree_add_item(config_tree, hf_l2server_qcl_info_periodic_csi_rs, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // ScramblingID
+    proto_tree_add_item(config_tree, hf_l2server_scramblingid, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // Pad[2]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+
+    // TODO:
+    // ResourceMapping
+    offset += sizeof(bb_nr5g_CSI_RS_RES_MAPPINGt);
+    // PeriodicityAndOffset
+    offset += sizeof(bb_nr5g_CSI_RES_PERIODICITYANDOFFSETt);
+
+    proto_item_append_text(config_ti, " (resourceId=%u)", resource_id);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_NZP_CSI_RS_RES_SET_CFGt
+static int dissect_nzp_csi_rs_res_set_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                             guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_nzp_csi_rs_res_set_config,  tvb,
+                                                         offset, 0,
+                                                          "", "NZP CSI RS Res Set Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_nzp_csi_rs_res_set_config);
+
+    // ResSetId
+    guint32 resource_set_id;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_resource_set_id, tvb, offset, 1, ENC_LITTLE_ENDIAN, &resource_set_id);
+    offset += 1;
+    // Repetition
+    proto_tree_add_item(config_tree, hf_l2server_repetition, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // AperTriggerOffset
+    proto_tree_add_item(config_tree, hf_l2server_aper_trigger_offset, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // TrsInfo
+    proto_tree_add_item(config_tree, hf_l2server_trs_info, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // AperTriggerOffset_r16
+    proto_tree_add_item(config_tree, hf_l2server_aper_trigger_offset_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // Pad[2]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+
+    // NbNzpCsiRsResLis.
+    guint32 nb_nzp_csi_rs_res_lis;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_nzp_csi_rs_res_lis, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_nzp_csi_rs_res_lis);
+    offset += 1;
+    // NzpCsiRsResList
+    for (guint n=0; n < nb_nzp_csi_rs_res_lis; n++) {
+        proto_tree_add_item(config_tree, hf_l2server_nzp_csi_rs_res_list, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+    }
+    // Unset items (but still encoded).
+    offset += (bb_nr5g_MAX_NB_NZP_CSI_RS_RESOURCES_PER_SET-nb_nzp_csi_rs_res_lis);
+
+    proto_item_append_text(config_ti, " (resourceSetId=%u)", resource_set_id);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+
+
 // bb_nr5g_CSI_MEAS_CFGt from bb-nr5g_struct.h
 static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                    guint offset)
@@ -2273,13 +2392,15 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     // TODO: get counts from nb fields so can dissect/skip arrays below.
 
     // NbNzpCsiRsResToAdd
-    proto_tree_add_item(config_tree, hf_l2server_nb_nzp_csi_rs_res_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 nb_nzp_csi_rs_res_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_nzp_csi_rs_res_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_nzp_csi_rs_res_to_add);
     offset += 1;
     // NbNzpCsiRsResToDel
     proto_tree_add_item(config_tree, hf_l2server_nb_nzp_csi_rs_res_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbNzpCsiRsResSetToAdd
-    proto_tree_add_item(config_tree, hf_l2server_nb_nzp_csi_rs_res_set_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 nb_nzp_csi_rs_res_set_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_nzp_csi_rs_res_set_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_nzp_csi_rs_res_set_to_add);
     offset += 1;
     // NbNzpCsiRsResSetToDel
     proto_tree_add_item(config_tree, hf_l2server_nb_nzp_csi_rs_res_set_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -2291,7 +2412,8 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     proto_tree_add_item(config_tree, hf_l2server_nb_csi_im_res_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbCsiImResSetToAdd
-    proto_tree_add_item(config_tree, hf_l2server_nb_csi_im_res_set_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 nb_csi_im_res_set_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_im_res_set_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_im_res_set_to_add);
     offset += 1;
     // NbCsiImResSetToDel
     proto_tree_add_item(config_tree, hf_l2server_nb_csi_im_res_set_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -2303,7 +2425,8 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     proto_tree_add_item(config_tree, hf_l2server_nb_csi_ssb_res_set_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbCsiResCfgToAdd
-    proto_tree_add_item(config_tree, hf_l2server_nb_csi_res_cfg_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 nb_csi_res_cfg_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_res_cfg_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_res_cfg_to_add);
     offset += 1;
     // NbCsiResCfgToDel
     proto_tree_add_item(config_tree, hf_l2server_nb_csi_res_cfg_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -2315,7 +2438,8 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     proto_tree_add_item(config_tree, hf_l2server_nb_csi_rep_cfg_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbAperTriggerStateList
-    proto_tree_add_item(config_tree, hf_l2server_nb_aper_trigger_state_list, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 nb_aper_trigger_state_list;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_aper_trigger_state_list, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_aper_trigger_state_list);
     offset += 1;
     // NbSPOnPuschTriggerStateList
     proto_tree_add_item(config_tree, hf_l2server_nb_sp_on_pusch_trigger_state, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -2329,18 +2453,31 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
 
     // Pad[2]
     proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-    offset += 1;
+    offset += 2;
 
-    // TODO:
+    // TODO: only setting counts that have seen as non-zero.
 
     // NzpCsiRsResToAdd
+    for (guint n=0; n < nb_nzp_csi_rs_res_to_add; n++) {
+        offset = dissect_nzp_csi_rs_res_config(config_tree, tvb, pinfo, offset);
+    }
     // NzpCsiRsResSetToAdd
+    for (guint n=0; n < nb_nzp_csi_rs_res_set_to_add; n++) {
+        offset = dissect_nzp_csi_rs_res_set_config(config_tree, tvb, pinfo, offset);
+    }
+
+
+
+    //offset += (nb_nzp_csi_rs_res_set_to_add * sizeof(bb_nr5g_NZP_CSI_RS_RES_SET_CFGt));
     // CsiImResToAdd
     // CsiImResSetToAdd
+    offset += (nb_csi_im_res_set_to_add * sizeof(bb_nr5g_CSI_IM_RES_SET_CFGt));
     // CsiSsbResSetToAdd
     // CsiResCfgToAdd
+    offset += (nb_csi_res_cfg_to_add * sizeof(bb_nr5g_CSI_RESOURCE_CFGt));
     // CsiRepCfgToAdd
     // AperTriggerStateList
+    offset += (nb_aper_trigger_state_list * sizeof(bb_nr5g_CSI_APERIODIC_TRIGGER_STATE_CFGt));
     // SPOnPuschTriggerStateList
     // NzpCsiRsResToDel
     // NzpCsiRsResSetToDel
@@ -2544,9 +2681,13 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         // PdcchServingCellCfg
         if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDCCH_PRESENT) {
             offset = dissect_pdcch_dedicated(ded_tree, tvb, pinfo, offset);
+
         }
         // CsiMeasCfg
         if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_CSI_MEAS_CFG_PRESENT) {
+            // TODO: sad hack to try to get back in line!
+            offset += 42;
+
             offset = dissect_csi_meas_config(ded_tree, tvb, pinfo, offset);
         }
 
@@ -5972,9 +6113,15 @@ proto_register_l2server(void)
       { &hf_l2server_xoverhead,
         { "XOverhead", "l2server.xoverhead", FT_UINT8, BASE_DEC,
            VALS(xoverhead_vals), 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nb_harq_processes_for_pdsch,
+        { "Nb HARQ Processes for PDSCH", "l2server.nb-harq-processes-for-pdsch", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
       { &hf_l2server_nb_code_block_group_transmission_r16,
         { "Nb code block group transmission r16", "l2server.nb-code-block-group-transmission-r16", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
+
 
       { &hf_l2server_pdcch_serving_cell,
         { "PDCCH ServingCell", "l2server.pdcch-serving-cell", FT_STRING, BASE_NONE,
@@ -6039,6 +6186,50 @@ proto_register_l2server(void)
         { "Report Trigger Size DCI02-r16", "l2server.report-trigger-size-dci02-r16", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
 
+      { &hf_l2server_nzp_csi_rs_res_config,
+        { "NZP CSO RS Res Config", "l2server.nzp-csi-rs-res-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_resource_id,
+        { "Resource Id", "l2server.resource-id", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_power_control_offset,
+        { "Power Control Offset", "l2server.power-control-offset", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_power_control_offset_ss,
+        { "Power Control Offset SS", "l2server.power-control-offset-SS", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_qcl_info_periodic_csi_rs,
+        { "QCL Info Periodic CSI RS", "l2server.qcl-info-periodic-csi-rs", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_scramblingid,
+        { "ScramblingId", "l2server.scrambling-id", FT_UINT16, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nzp_csi_rs_res_set_config,
+        { "NZP CSO RS Res Set Config", "l2server.nzp-csi-rs-res-set-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_resource_set_id,
+        { "Resource Set Id", "l2server.resource-set-id", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_repetition,
+        { "Repetition", "l2server.repetition", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_aper_trigger_offset,
+        { "Aper Trigger Offset", "l2server.aper-trigger-offset", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_trs_info,
+        { "TRS Info", "l2server.trs-info", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_aper_trigger_offset_r16,
+        { "Aper Trigger Offset r16", "l2server.aper-trigger-offset-r16", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nb_nzp_csi_rs_res_lis,
+        { "Nb NZP CSI RS Res Lis", "l2server.nb-nzp-csi-rs-res-lis", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nzp_csi_rs_res_list,
+        { "Nb NZP CSI RS Res", "l2server.nb-nzp-csi-rs-res-lis", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
@@ -6090,6 +6281,8 @@ proto_register_l2server(void)
         &ett_l2server_pdsch_serving_cell,
         &ett_l2server_pdcch_serving_cell,
         &ett_l2server_csi_meas_config,
+        &ett_l2server_nzp_csi_rs_res_config,
+        &ett_l2server_nzp_csi_rs_res_set_config
     };
 
     static ei_register_info ei[] = {
