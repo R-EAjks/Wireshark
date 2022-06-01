@@ -20,41 +20,25 @@ local filter = {
     "NSTime",
     "Proto",
     'Listener["<metatable>"].__index',
-    ".__index"
+    ".__index",
+
+    -- Skip invalid UTF-8
+    "utf8.charpattern",
  }
 
 -- the following items don't have to exist
 local ignore = {
-    -- not sure why this was removed in wireshark 1.11, but it was
-    "TreeItem.set_expert_flags",
 
-    -- in Lua 5.1 only
-    "debug.getfenv",
-    "debug.setfenv",
-    "gcinfo",
-    "getfenv",
-    "io.gfind",
-    "setfenv",
-    "math.mod",
-    "newproxy",
-    "string.gfind",
-    "table.foreach",
-    "table.foreachi",
-    "table.getn",
-    "table.setn",
-
-    -- in Lua 5.2+ only
+    -- Lua 5.2 compatibility functions
     "bit32",
-    "debug.getuservalu",
-    "debug.setuservalu",
-    "debug.upvalueid",
-    "debug.upvaluejoin",
-    "package.searchers",
-    "package.searchpath",
-    "rawlen",
-    "table.pack",
-    "table.unpack",
-
+    "math.atan2",
+    "math.cosh",
+    "math.frexp",
+    "math.ldexp",
+    "math.log10",
+    "math.pow",
+    "math.sinh",
+    "math.tanh",
 }
 
 

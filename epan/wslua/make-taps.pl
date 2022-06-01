@@ -19,39 +19,39 @@ use warnings;
 my %types = %{{
 	'gchar[]' => 'lua_pushstring(L,(const char*)v->STR);',
 	'gchar*' => 'lua_pushstring(L,(const char*)v->STR);',
-	'guint' => 'lua_pushnumber(L,(lua_Number)v->STR);',
-	'guint8' => 'lua_pushnumber(L,(lua_Number)v->STR);',
-	'guint16' => 'lua_pushnumber(L,(lua_Number)v->STR);',
-	'guint32' => 'lua_pushnumber(L,(lua_Number)v->STR);',
-	'gint' => 'lua_pushnumber(L,(lua_Number)v->STR);',
-	'gint8' => 'lua_pushnumber(L,(lua_Number)v->STR);',
-	'gint16' => 'lua_pushnumber(L,(lua_Number)v->STR);',
-	'gint32' => 'lua_pushnumber(L,(lua_Number)v->STR);',
+	'guint' => 'lua_pushinteger(L,(lua_Integer)v->STR);',
+	'guint8' => 'lua_pushinteger(L,(lua_Integer)v->STR);',
+	'guint16' => 'lua_pushinteger(L,(lua_Integer)v->STR);',
+	'guint32' => 'lua_pushinteger(L,(lua_Integer)v->STR);',
+	'gint' => 'lua_pushinteger(L,(lua_Integer)v->STR);',
+	'gint8' => 'lua_pushinteger(L,(lua_Integer)v->STR);',
+	'gint16' => 'lua_pushinteger(L,(lua_Integer)v->STR);',
+	'gint32' => 'lua_pushinteger(L,(lua_Integer)v->STR);',
 	'gboolean' => 'lua_pushboolean(L,(int)v->STR);',
 	'address' => '{ Address a = (Address)g_malloc(sizeof(address)); copy_address(a, &(v->STR)); pushAddress(L,a); }',
 	'address*' => '{ Address a = (Address)g_malloc(sizeof(address)); copy_address(a, v->STR); pushAddress(L,a); }',
-	'int' => 'lua_pushnumber(L,(lua_Number)v->STR);',
-	'nstime_t' => 'lua_pushnumber(L,(lua_Number)nstime_to_sec(&(v->STR)));',
-	'nstime_t*' => 'lua_pushnumber(L,(lua_Number)nstime_to_sec(v->STR));'
+	'int' => 'lua_pushinteger(L,(lua_Integer)v->STR);',
+	'nstime_t' => 'lua_pushinteger(L,(lua_Integer)nstime_to_sec(&(v->STR)));',
+	'nstime_t*' => 'lua_pushinteger(L,(lua_Integer)nstime_to_sec(v->STR));'
 }};
 
 my %comments = %{{
 	'gchar[]' => 'string',
 	'gchar*' => 'string',
-	'guint' => 'number',
-	'guint8' => 'number',
-	'guint16' => 'number',
-	'guint32' => 'number',
-	'gint' => 'number',
-	'gint8' => 'number',
-	'gint16' => 'number',
-	'gint32' => 'number',
+	'guint' => 'integer',
+	'guint8' => 'integer',
+	'guint16' => 'integer',
+	'guint32' => 'integer',
+	'gint' => 'integer',
+	'gint8' => 'integer',
+	'gint16' => 'integer',
+	'gint32' => 'integer',
 	'gboolean' => 'boolean',
 	'address' => 'Address',
 	'address*' => 'Address',
-	'int' => 'number',
-	'nstime_t' => 'number (seconds, since 1-1-1970 if absolute)',
-	'nstime_t*' => 'number (seconds, since 1-1-1970 if absolute)',
+	'int' => 'integer',
+	'nstime_t' => 'integer (seconds, since 1-1-1970 if absolute)',
+	'nstime_t*' => 'integer (seconds, since 1-1-1970 if absolute)',
 }};
 
 
@@ -77,7 +77,7 @@ sub dotap {
 
 		my $enumre = "typedef\\s+enum[^{]*{([^}]*)}[\\s\\n]*" . ${ename} . "[\\s\\n]*;";
 		if ($buf =~ s/$enumre//ms ) {
-			$types{$ename} = "lua_pushnumber(L,(lua_Number)v->STR); /* $ename */";
+			$types{$ename} = "lua_pushinteger(L,(lua_Integer)v->STR); /* $ename */";
 			my $ebody = $1;
 			$ebody =~ s/\s+//msg;
 			$comments{$ename} = "$ename: { $ebody }";
@@ -191,9 +191,9 @@ for my $ename (sort keys %enums) {
 	print CFILE  "\n\t/*\n\t * $ename\n\t */\n\tlua_newtable(L);\n";
 	for my $a (@{$enums{$ename}}) {
 		print CFILE  <<"ENUMELEM";
-	lua_pushnumber(L,(lua_Number)$a);
+	lua_pushinteger(L,(lua_Integer)$a);
 	lua_setglobal(L,"$a");
-	lua_pushnumber(L,(lua_Number)$a);
+	lua_pushinteger(L,(lua_Integer)$a);
 	lua_pushstring(L,"$a");
 	lua_settable(L,-3);
 ENUMELEM

@@ -203,11 +203,6 @@ static int File_read_line(lua_State *L, FILE_T ft) {
  */
 #define WSLUA_BUFFERSIZE 1024
 
-/* Lua 5.1 used lua_objlen() instead of lua_rawlen() */
-#if LUA_VERSION_NUM == 501
-#define lua_rawlen lua_objlen
-#endif
-
 /**
  * Reads some data and returns the number of bytes read.
  * The actual data (possibly an empty string) is pushed on the Lua stack.
@@ -338,7 +333,7 @@ WSLUA_METHOD File_seek(lua_State* L) {
     static const char *const modenames[] = {"set", "cur", "end", NULL};
     File f = checkFile(L,1);
     int op = luaL_checkoption(L, 2, "cur", modenames);
-    gint64 offset = (gint64) luaL_optlong(L, 3, 0);
+    gint64 offset = (gint64) luaL_optinteger(L, 3, 0);
     int err;
 
 

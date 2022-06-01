@@ -414,14 +414,9 @@ static const char *getF(lua_State *LS _U_, void *ud, size_t *size)
 }
 
 static int error_handler_with_callback(lua_State *LS) {
-#if LUA_VERSION_NUM >= 502
     const char *msg = lua_tostring(LS, 1);
     luaL_traceback(LS, LS, msg, 1);     /* push message with traceback.  */
     lua_remove(LS, -2);                 /* remove original msg */
-#else
-    /* Return error message, unmodified */
-    (void)LS;
-#endif
     return 1;
 }
 
@@ -495,11 +490,8 @@ static void set_file_environment(const gchar* filename, const gchar* dirname) {
 
     lua_newtable(L); /* new metatable */
 
-#if LUA_VERSION_NUM >= 502
     lua_pushglobaltable(L);
-#else
-    lua_pushvalue(L, LUA_GLOBALSINDEX);
-#endif
+
     /* prepend the directory name to _G.package.path */
     lua_getfield(L, -1, "package"); /* get the package table from the global table */
     lua_getfield(L, -1, "path");    /* get the path field from the package table */
@@ -515,11 +507,7 @@ static void set_file_environment(const gchar* filename, const gchar* dirname) {
 
     lua_setmetatable(L, -2); /* pop metatable, set it as metatable of environment */
 
-#if LUA_VERSION_NUM >= 502
     lua_setupvalue(L, -2, 1); /* pop environment and assign it to upvalue 1 */
-#else
-    lua_setfenv(L, -2); /* pop environment and set it as the func's environment */
-#endif
 }
 
 
@@ -544,11 +532,7 @@ static gboolean lua_load_script(const gchar* filename, const gchar* dirname, con
     /* The source argument should start with '@' to indicate a file. */
     lua_pushfstring(L, "@%s", filename);
 
-#if LUA_VERSION_NUM >= 502
     error = lua_load(L, getF, file, lua_tostring(L, -1), NULL);
-#else
-    error = lua_load(L, getF, file, lua_tostring(L, -1));
-#endif
 
     switch (error) {
         case 0: /* LUA_OK */
@@ -959,14 +943,6 @@ void wslua_init(register_cb cb, gpointer client_data) {
     }
 
     WSLUA_INIT(L);
-
-#if LUA_VERSION_NUM == 501
-    /* table.unpack was introduced with Lua 5.2, alias it to unpack. */
-    lua_getglobal(L, "table");
-    lua_getglobal(L, "unpack");
-    lua_setfield(L, -2, "unpack");
-    lua_pop(L, 1);
-#endif
 
     if (first_time) {
         proto_lua = proto_register_protocol("Lua Dissection", "Lua Dissection", "_ws.lua");

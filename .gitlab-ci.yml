@@ -103,6 +103,8 @@ variables:
     paths:
       - ccache/
   before_script:
+    - apt-get update -qq
+    - apt-get install liblua5.3-dev -y
     - useradd user
     - export LANG=en_US.UTF-8
     - export PYTEST_ADDOPTS=--skip-missing-programs=dumpcap,rawshark

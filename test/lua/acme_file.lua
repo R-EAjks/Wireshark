@@ -30,7 +30,6 @@
     -has to guess sometimes, though it hasn't guessed wrong yet as far as I know
 
     To-do:
-    - make it use Struct.tohex/fromhex now that we have the Struct library in Wireshark
     - make it use a linux cooked-mode pseudo-header (see https://gitlab.com/wireshark/wireshark/-/wikis/SLL)
     - make it use preferences, once I write C-code for Wireshark to do that :)
     - rewrite some of the pattern searches to use real regex/PCRE instead?
@@ -284,12 +283,12 @@ local floor = math.floor
 -- takes a Lua number and converts it into a 2-byte string binary (network order)
 
 local function dec2bin16(num)
-    return Struct.pack(">I2",num)
+    return string.pack(">I2",num)
 end
 
 -- takes a Lua number and converts it into a 4-byte string binary (network order)
 local function dec2bin32(num)
-    return Struct.pack(">I4",num)
+    return string.pack(">I4",num)
 end
 
 
@@ -439,7 +438,7 @@ function State:get_timestamp(line, file_position, seeking)
     self.packets[file_position][TTIME] = self.nstime
 
     timet = timet + (milli/1000)
-    dprint2("found time of ", os.date("%c",timet), " with value=",timet)
+    dprint2("found time with value=",timet)
 
     return self.nstime, line_pos
 end
