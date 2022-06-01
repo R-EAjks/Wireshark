@@ -518,10 +518,17 @@ static int hf_l2server_repetition = -1;
 static int hf_l2server_aper_trigger_offset = -1;
 static int hf_l2server_trs_info = -1;
 static int hf_l2server_aper_trigger_offset_r16 = -1;
-
-
 static int hf_l2server_nb_nzp_csi_rs_res_lis = -1;
 static int hf_l2server_nzp_csi_rs_res_list = -1;
+
+static int hf_l2server_csi_im_res_config = -1;
+
+static int hf_l2server_csi_im_res_set_config = -1;
+static int hf_l2server_res_set_id = -1;
+static int hf_l2server_csi_im_res_list = -1;
+
+static int hf_l2server_csi_ssb_res_set_config = -1;
+static int hf_l2server_csi_ssb_res_list = -1;
 
 static const value_string lch_vals[] =
 {
@@ -925,6 +932,10 @@ static gint ett_l2server_pdcch_serving_cell = -1;
 static gint ett_l2server_csi_meas_config = -1;
 static gint ett_l2server_nzp_csi_rs_res_config = -1;
 static gint ett_l2server_nzp_csi_rs_res_set_config = -1;
+static gint ett_l2server_csi_im_res_config = -1;
+static gint ett_l2server_csi_im_res_set_config = -1;
+static gint ett_l2server_csi_ssb_res_set_config = -1;
+
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
 static expert_field ei_l2server_type_unknown = EI_INIT;
@@ -2376,6 +2387,109 @@ static int dissect_nzp_csi_rs_res_set_config(proto_tree *tree, tvbuff_t *tvb, pa
 }
 
 
+// bb_nr5g_CSI_IM_RES_CFGt
+static int dissect_csi_im_res_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                     guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_nzp_csi_rs_res_set_config,  tvb,
+                                                         offset, 0,
+                                                          "", "CSI IM Res Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_im_res_config);
+
+    // ResourceId
+    guint32 resource_id;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_resource_id, tvb, offset, 1, ENC_LITTLE_ENDIAN, &resource_id);
+    offset += 1;
+
+    // Pad[3]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+    offset += 3;
+
+    // ResElemPattern
+    offset += sizeof(bb_nr5g_CSI_IM_RES_ELEM_PATTERN_CFGt);
+    // FreqBand
+    offset += sizeof(bb_nr5g_CSI_FREQUENCY_OCCt);
+    // PeriodicityAndOffset
+    offset += sizeof(bb_nr5g_CSI_RES_PERIODICITYANDOFFSETt);
+
+    proto_item_append_text(config_ti, " (resourceId=%u)", resource_id);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_CSI_IM_RES_SET_CFGt
+static int dissect_csi_im_res_set_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                         guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_nzp_csi_rs_res_set_config,  tvb,
+                                                         offset, 0,
+                                                          "", "CSI IM Res Set Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_im_res_set_config);
+
+    // ResSetId
+    guint32 res_set_id;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_res_set_id, tvb, offset, 1, ENC_LITTLE_ENDIAN, &res_set_id);
+    offset += 1;
+
+    // NbCsiImResList
+    guint32 nb_csi_im_res_list;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_csi_im_res_list, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_im_res_list);
+    offset += 1;
+
+    // Pad[2]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+
+    // CsiImResList
+    offset += (nb_csi_im_res_list);
+    offset += (bb_nr5g_MAX_NB_CSI_IM_RESOURCES_PER_SET-nb_csi_im_res_list);
+
+    proto_item_append_text(config_ti, " (resourceSetId=%u)", res_set_id);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_CSI_SSB_RES_SET_CFGt
+static int dissect_csi_ssb_res_set_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                         guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_csi_ssb_res_set_config,  tvb,
+                                                         offset, 0,
+                                                          "", "CSI SSB Res Set Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_ssb_res_set_config);
+
+    // ResSetId
+    guint32 res_set_id;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_res_set_id, tvb, offset, 1, ENC_LITTLE_ENDIAN, &res_set_id);
+    offset += 1;
+
+    // NbCsiSsbResList
+    guint32 nb_csi_ssb_res_list;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_csi_ssb_res_list, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_ssb_res_list);
+    offset += 1;
+
+    // Pad[2]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+
+    // CsiSsbResList
+    offset += (nb_csi_ssb_res_list);
+    offset += (bb_nr5g_MAX_NB_CSI_SSB_RESOURCES_PER_SET-nb_csi_ssb_res_list);
+
+    proto_item_append_text(config_ti, " (resourceSetId=%u)", res_set_id);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
 
 // bb_nr5g_CSI_MEAS_CFGt from bb-nr5g_struct.h
 static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -2406,7 +2520,8 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     proto_tree_add_item(config_tree, hf_l2server_nb_nzp_csi_rs_res_set_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbCsiImResToAdd
-    proto_tree_add_item(config_tree, hf_l2server_nb_csi_im_res_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint nb_csi_im_res_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_im_res_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_im_res_to_add);
     offset += 1;
     // NbCsiImResToDel
     proto_tree_add_item(config_tree, hf_l2server_nb_csi_im_res_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -2419,7 +2534,8 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     proto_tree_add_item(config_tree, hf_l2server_nb_csi_im_res_set_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbCsiSsbResSetToAdd
-    proto_tree_add_item(config_tree, hf_l2server_nb_csi_ssb_res_set_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 nb_csi_ssb_res_set_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_ssb_res_set_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_ssb_res_set_to_add);
     offset += 1;
     // NbCsiSsbResSetToDel
     proto_tree_add_item(config_tree, hf_l2server_nb_csi_ssb_res_set_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -2466,13 +2582,22 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
         offset = dissect_nzp_csi_rs_res_set_config(config_tree, tvb, pinfo, offset);
     }
 
-
-
-    //offset += (nb_nzp_csi_rs_res_set_to_add * sizeof(bb_nr5g_NZP_CSI_RS_RES_SET_CFGt));
     // CsiImResToAdd
+    for (guint n=0; n < nb_csi_im_res_to_add; n++) {
+        offset = dissect_csi_im_res_config(config_tree, tvb, pinfo, offset);
+    }
+
     // CsiImResSetToAdd
-    offset += (nb_csi_im_res_set_to_add * sizeof(bb_nr5g_CSI_IM_RES_SET_CFGt));
+    for (guint n=0; n < nb_csi_ssb_res_set_to_add; n++) {
+        offset = dissect_csi_im_res_set_config(config_tree, tvb, pinfo, offset);
+    }
+
     // CsiSsbResSetToAdd
+    for (guint n=0; n < nb_csi_ssb_res_set_to_add; n++) {
+        offset = dissect_csi_ssb_res_set_config(config_tree, tvb, pinfo, offset);
+    }
+
+
     // CsiResCfgToAdd
     offset += (nb_csi_res_cfg_to_add * sizeof(bb_nr5g_CSI_RESOURCE_CFGt));
     // CsiRepCfgToAdd
@@ -6230,6 +6355,28 @@ proto_register_l2server(void)
       { &hf_l2server_nzp_csi_rs_res_list,
         { "Nb NZP CSI RS Res", "l2server.nb-nzp-csi-rs-res-lis", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_csi_im_res_config,
+        { "CSI IM Res Config", "l2server.csi-im-res-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_csi_im_res_set_config,
+        { "CSI IM Res Set Config", "l2server.csi-im-res-set-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_res_set_id,
+        { "Res Set Id", "l2server.res-set-id", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_im_res_list,
+        { "CSI IM Res List", "l2server.csi-im-res-list", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_csi_ssb_res_set_config,
+        { "CSI SSB Res Set Config", "l2server.csi-ssb-res-set-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_ssb_res_list,
+        { "CSI SSB Res List", "l2server.csi-ssb-res-list", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
     };
 
     static gint *ett[] = {
@@ -6282,7 +6429,10 @@ proto_register_l2server(void)
         &ett_l2server_pdcch_serving_cell,
         &ett_l2server_csi_meas_config,
         &ett_l2server_nzp_csi_rs_res_config,
-        &ett_l2server_nzp_csi_rs_res_set_config
+        &ett_l2server_nzp_csi_rs_res_set_config,
+        &ett_l2server_csi_im_res_config,
+        &ett_l2server_csi_im_res_set_config,
+        &ett_l2server_csi_ssb_res_set_config
     };
 
     static ei_register_info ei[] = {
