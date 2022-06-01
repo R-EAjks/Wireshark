@@ -484,6 +484,24 @@ static int hf_l2server_nb_code_block_group_transmission_r16 = -1;
 static int hf_l2server_pdcch_serving_cell = -1;
 
 static int hf_l2server_csi_meas_config = -1;
+static int hf_l2server_nb_nzp_csi_rs_res_to_add = -1;
+static int hf_l2server_nb_nzp_csi_rs_res_to_del = -1;
+static int hf_l2server_nb_nzp_csi_rs_res_set_to_add = -1;
+static int hf_l2server_nb_nzp_csi_rs_res_set_to_del = -1;
+static int hf_l2server_nb_csi_im_res_to_add = -1;
+static int hf_l2server_nb_csi_im_res_to_del = -1;
+static int hf_l2server_nb_csi_im_res_set_to_add = -1;
+static int hf_l2server_nb_csi_im_res_set_to_del = -1;
+static int hf_l2server_nb_csi_ssb_res_set_to_add = -1;
+static int hf_l2server_nb_csi_ssb_res_set_to_del = -1;
+static int hf_l2server_nb_csi_res_cfg_to_add = -1;
+static int hf_l2server_nb_csi_res_cfg_to_del = -1;
+static int hf_l2server_nb_csi_rep_cfg_to_add = -1;
+static int hf_l2server_nb_csi_rep_cfg_to_del = -1;
+static int hf_l2server_nb_aper_trigger_state_list = -1;
+static int hf_l2server_nb_sp_on_pusch_trigger_state = -1;
+static int hf_l2server_report_trigger_size = -1;
+static int hf_l2server_report_trigger_size_dci02_r16 = -1;
 
 static const value_string lch_vals[] =
 {
@@ -2252,41 +2270,61 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
                                                           "", "CSI Meas Config");
     proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_meas_config);
 
+    // TODO: get counts from nb fields so can dissect/skip arrays below.
+
     // NbNzpCsiRsResToAdd
+    proto_tree_add_item(config_tree, hf_l2server_nb_nzp_csi_rs_res_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbNzpCsiRsResToDel
+    proto_tree_add_item(config_tree, hf_l2server_nb_nzp_csi_rs_res_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbNzpCsiRsResSetToAdd
+    proto_tree_add_item(config_tree, hf_l2server_nb_nzp_csi_rs_res_set_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbNzpCsiRsResSetToDel
+    proto_tree_add_item(config_tree, hf_l2server_nb_nzp_csi_rs_res_set_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbCsiImResToAdd
+    proto_tree_add_item(config_tree, hf_l2server_nb_csi_im_res_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbCsiImResToDel
+    proto_tree_add_item(config_tree, hf_l2server_nb_csi_im_res_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbCsiImResSetToAdd
+    proto_tree_add_item(config_tree, hf_l2server_nb_csi_im_res_set_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbCsiImResSetToDel
+    proto_tree_add_item(config_tree, hf_l2server_nb_csi_im_res_set_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbCsiSsbResSetToAdd
+    proto_tree_add_item(config_tree, hf_l2server_nb_csi_ssb_res_set_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbCsiSsbResSetToDel
+    proto_tree_add_item(config_tree, hf_l2server_nb_csi_ssb_res_set_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbCsiResCfgToAdd
+    proto_tree_add_item(config_tree, hf_l2server_nb_csi_res_cfg_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbCsiResCfgToDel
+    proto_tree_add_item(config_tree, hf_l2server_nb_csi_res_cfg_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbCsiRepCfgToAdd
+    proto_tree_add_item(config_tree, hf_l2server_nb_csi_rep_cfg_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbCsiRepCfgToDel
+    proto_tree_add_item(config_tree, hf_l2server_nb_csi_rep_cfg_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbAperTriggerStateList
+    proto_tree_add_item(config_tree, hf_l2server_nb_aper_trigger_state_list, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbSPOnPuschTriggerStateList
+    proto_tree_add_item(config_tree, hf_l2server_nb_sp_on_pusch_trigger_state, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // ReportTriggerSize
+    proto_tree_add_item(config_tree, hf_l2server_report_trigger_size, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // ReportTriggerSizeDCI02_r16
+    proto_tree_add_item(config_tree, hf_l2server_report_trigger_size_dci02_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
 
     // Pad[2]
@@ -5945,6 +5983,62 @@ proto_register_l2server(void)
       { &hf_l2server_csi_meas_config,
         { "CSI Meas Config", "l2server.csi-meas-config", FT_STRING, BASE_NONE,
            NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nb_nzp_csi_rs_res_to_add,
+        { "Nb NZP CSI RS Res To Add", "l2server.nb-nzp-csi-rs-res-to-add", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_nzp_csi_rs_res_to_del,
+        { "Nb NZP CSI RS Res To Del", "l2server.nb-nzp-csi-rs-res-to-del", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_nzp_csi_rs_res_set_to_add,
+        { "Nb NZP CSI RS Res Set To Add", "l2server.nb-nzp-rs-csi-rs-res-set-to-add", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_nzp_csi_rs_res_set_to_del,
+        { "Nb NZP CSI RS Res Set To Del", "l2server.nb-nzp-rs-csi-rs-res-set-to-del", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_im_res_to_add,
+        { "Nb CSI Im Res To Add", "l2server.nb-csi-im-res-to-add", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_im_res_to_del,
+        { "Nb CSI Im Res To Del", "l2server.nb-csi-im-res-to-del", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_im_res_set_to_add,
+        { "Nb CSI Im Res Set To Add", "l2server.nb-csi-im-res-set-to-add", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_im_res_set_to_del,
+        { "Nb CSI Im Res Set To Del", "l2server.nb-csi-im-res-set-to-del", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_ssb_res_set_to_add,
+        { "Nb CSI SSB Res Set To Add", "l2server.nb-csi-ssb-res-set-to-add", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_ssb_res_set_to_del,
+        { "Nb CSI SSB Res Set To Del", "l2server.nb-csi-ssb-res-set-to-del", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_res_cfg_to_add,
+        { "Nb CSI Res Cfg To Add", "l2server.nb-csi-res-cfg-to-add", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_res_cfg_to_del,
+        { "Nb CSI Res Cfg To Del", "l2server.nb-csi-res-cfg-to-del", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_rep_cfg_to_add,
+        { "Nb CSI Rep Cfg To Add", "l2server.nb-csi-rep-cfg-to-add", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_rep_cfg_to_del,
+        { "Nb CSI Rep Cfg To Del", "l2server.nb-csi-rep-cfg-to-del", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_aper_trigger_state_list,
+        { "Nb Aper Trigger State List", "l2server.nb-aper-trigger-state-list", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_sp_on_pusch_trigger_state,
+        { "Nb SP On PUSCH Trigger State", "l2server.nb-sp-on-pusch-trigger-state", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_report_trigger_size,
+        { "Report Trigger Size", "l2server.report-trigger-size", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_report_trigger_size_dci02_r16,
+        { "Report Trigger Size DCI02-r16", "l2server.report-trigger-size-dci02-r16", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
     };
 
     static gint *ett[] = {
