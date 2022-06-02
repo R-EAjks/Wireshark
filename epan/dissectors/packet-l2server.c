@@ -530,6 +530,13 @@ static int hf_l2server_csi_im_res_list = -1;
 static int hf_l2server_csi_ssb_res_set_config = -1;
 static int hf_l2server_csi_ssb_res_list = -1;
 
+static int hf_l2server_csi_res_config = -1;
+static int hf_l2server_csi_res_id = -1;
+static int hf_l2server_csi_rs_res_set_list_is_valid = -1;
+
+static int hf_l2server_csi_rep_config = -1;
+static int hf_l2server_csi_rep_config_id = -1;
+
 static const value_string lch_vals[] =
 {
     { 0x0,   "SPARE" },
@@ -867,6 +874,13 @@ static const value_string xoverhead_vals[] = {
     { 0,   NULL }
 };
 
+static const value_string csi_rs_res_set_list_is_valid_vals[] = {
+    { bb_nr5g_CSI_RESOURCE_CFG_RES_SET_LIST_NZP_CSI_RS_SSB,    "NZP CSI RS SSB" },
+    { bb_nr5g_CSI_RESOURCE_CFG_RES_SET_LIST_CSI_IM,            "CSI IM" },
+    { bb_nr5g_CSI_RESOURCE_CFG_RES_SET_LIST_DEFAULT,           "DEFAULT" },
+    { 0,   NULL }
+};
+
 static const true_false_string nodata_data_vals =
 {
     "No Msg3 bytes present",
@@ -935,7 +949,8 @@ static gint ett_l2server_nzp_csi_rs_res_set_config = -1;
 static gint ett_l2server_csi_im_res_config = -1;
 static gint ett_l2server_csi_im_res_set_config = -1;
 static gint ett_l2server_csi_ssb_res_set_config = -1;
-
+static gint ett_l2server_csi_res_config = -1;
+static gint ett_l2server_csi_rep_config = -1;
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
 static expert_field ei_l2server_type_unknown = EI_INIT;
@@ -2491,6 +2506,120 @@ static int dissect_csi_ssb_res_set_config(proto_tree *tree, tvbuff_t *tvb, packe
 }
 
 
+// bb_nr5g_CSI_RESOURCE_CFGt
+static int dissect_csi_res_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_csi_res_config,  tvb,
+                                                         offset, 0,
+                                                          "", "CSI Res Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_res_config);
+
+    // CsiResId
+    guint32 csi_res_id;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_csi_res_id, tvb, offset, 1, ENC_LITTLE_ENDIAN, &csi_res_id);
+    offset += 1;
+
+    // BwpId
+    gint32 bwpid;
+    proto_tree_add_item_ret_int(config_tree, hf_l2server_bwpid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &bwpid);
+    offset += 1;
+
+    // CsiResType
+    offset += 1;
+
+    // CsiRsResSetListIsValid
+    guint32 csi_rs_res_set_list_is_valid;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_csi_rs_res_set_list_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &csi_rs_res_set_list_is_valid);
+    offset += 1;
+
+    // CsiRsResSetListType
+    switch (csi_rs_res_set_list_is_valid) {
+        case bb_nr5g_CSI_RESOURCE_CFG_RES_SET_LIST_NZP_CSI_RS_SSB:
+            // NzpCsiRsSsbResSetType
+            offset += sizeof(bb_nr5g_CSI_RESOURCE_CFG_NZP_CSI_RS_SSBt);
+            break;
+        case  bb_nr5g_CSI_RESOURCE_CFG_RES_SET_LIST_CSI_IM:
+            // CsiImResSetType
+            offset += sizeof(bb_nr5g_CSI_RESOURCE_CFG_CSI_IMt);
+            break;
+    }
+
+    proto_item_append_text(config_ti, " (CsiResId=%u, BwpId=%d)", csi_res_id, bwpid);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_CSI_REPORT_CFGt
+static int dissect_csi_rep_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_csi_rep_config,  tvb,
+                                                         offset, 0,
+                                                          "", "CSI Report Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_rep_config);
+
+    // FieldMask
+    offset += 4;
+
+    // CsiRepConfigId
+    guint32 csi_rep_config_id;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_csi_rep_config_id, tvb, offset, 1, ENC_LITTLE_ENDIAN, &csi_rep_config_id);
+    offset += 1;
+
+    // ResForChannelMeas
+    offset += 1;
+    // CsiIMResForInterference
+    offset += 1;
+    // NzpCsiRSResForInterference
+    offset += 1;
+    // Carrier
+    offset += 1;
+    // TimeRestForChannelMeas
+    offset += 1;
+    // TimeRestForInterferenceMeas
+    offset += 1;
+    // NrOfCQIsPerReport
+    offset += 1;
+    // GroupBasedBeamRepIsValid
+    offset += 1;
+    // GroupBasedBeamRepValue
+    offset += 1;
+    // CqiTable
+    offset += 1;
+    // SubBandSize
+    offset += 1;
+    // NbNonPmiPortInd
+    offset += 1;
+    // ReportConfigTypeIsValid
+    offset += 1;
+    // ReportQuantityIsValid
+    offset += 1;
+
+    // ReportQuantity (union)
+    offset += 1;
+
+    // TODO: ReportConfigType
+
+    // RepFreqCfg
+    offset += sizeof(bb_nr5g_CSI_REPORT_FREQ_CFGt);
+    // CodebookCfg (variable size...)
+    offset += sizeof(bb_nr5g_CODEBOOK_CFGt);
+
+
+    proto_item_append_text(config_ti, " (CsiRepConfigId=%u)", csi_rep_config_id);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+
+
 // bb_nr5g_CSI_MEAS_CFGt from bb-nr5g_struct.h
 static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                    guint offset)
@@ -2548,7 +2677,8 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     proto_tree_add_item(config_tree, hf_l2server_nb_csi_res_cfg_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbCsiRepCfgToAdd
-    proto_tree_add_item(config_tree, hf_l2server_nb_csi_rep_cfg_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 nb_csi_rep_cfg_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_rep_cfg_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_rep_cfg_to_add);
     offset += 1;
     // NbCsiRepCfgToDel
     proto_tree_add_item(config_tree, hf_l2server_nb_csi_rep_cfg_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -2597,12 +2727,19 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
         offset = dissect_csi_ssb_res_set_config(config_tree, tvb, pinfo, offset);
     }
 
-
     // CsiResCfgToAdd
-    offset += (nb_csi_res_cfg_to_add * sizeof(bb_nr5g_CSI_RESOURCE_CFGt));
+    for (guint n=0; n < nb_csi_res_cfg_to_add; n++) {
+        offset = dissect_csi_res_config(config_tree, tvb, pinfo, offset);
+    }
+
     // CsiRepCfgToAdd
+    for (guint n=0; n < nb_csi_rep_cfg_to_add; n++) {
+        offset = dissect_csi_rep_config(config_tree, tvb, pinfo, offset);
+    }
+
     // AperTriggerStateList
     offset += (nb_aper_trigger_state_list * sizeof(bb_nr5g_CSI_APERIODIC_TRIGGER_STATE_CFGt));
+
     // SPOnPuschTriggerStateList
     // NzpCsiRsResToDel
     // NzpCsiRsResSetToDel
@@ -6377,6 +6514,22 @@ proto_register_l2server(void)
         { "CSI SSB Res List", "l2server.csi-ssb-res-list", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
 
+      { &hf_l2server_csi_res_config,
+        { "CSI Res Config", "l2server.csi-res-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_res_id,
+        { "CSI Res Id", "l2server.csi-res-id", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_rs_res_set_list_is_valid,
+        { "CSI Res Type", "l2server.csi-res-type", FT_UINT8, BASE_DEC,
+           VALS(csi_rs_res_set_list_is_valid_vals), 0x0, NULL, HFILL }},
+
+      { &hf_l2server_csi_rep_config,
+        { "CSI Report Config", "l2server.csi-rep-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_rep_config_id,
+        { "CSI Report Config Id", "l2server.csi-rep-config-id", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
@@ -6432,7 +6585,9 @@ proto_register_l2server(void)
         &ett_l2server_nzp_csi_rs_res_set_config,
         &ett_l2server_csi_im_res_config,
         &ett_l2server_csi_im_res_set_config,
-        &ett_l2server_csi_ssb_res_set_config
+        &ett_l2server_csi_ssb_res_set_config,
+        &ett_l2server_csi_res_config,
+        &ett_l2server_csi_rep_config
     };
 
     static ei_register_info ei[] = {
