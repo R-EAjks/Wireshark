@@ -1548,7 +1548,6 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
     proto_tree_add_item(tree, hf_l2server_rach_probe_req, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
 
-    // cell RA configuration
     // RA_Info (nr5g_rlcmac_Cmac_RA_Info_t) -> (bb_nr5g_CELL_GROUP_CONFIGt in bb-nr5g_struct.h)
     if (ra_info_valid) {
         guint32 bwpid = 0;
@@ -1568,13 +1567,10 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
                                                           "", "CellCfg ");
     proto_tree *cellcfg_tree = proto_item_add_subtree(cellcfg_ti, ett_l2server_cell_config_cellcfg);
 
-    // PhyCellConf
+    //     PhyCellConf
     offset = dissect_ph_cell_config(cellcfg_tree, tvb, pinfo, offset);
 
-    // TODO: its a mystery!
-    offset += 2;
-
-    // CellCfgCommon
+    //     CellCfgCommon
     offset = dissect_sp_cell_cfg_common(cellcfg_tree, tvb, pinfo, offset);
 
     proto_item_set_len(cellcfg_ti, offset-start_offset);
@@ -2133,11 +2129,12 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
 
-    // It look as though these are included (0xff) in message even if not present!!?
+    // These 2 are included (0xff) in message even present flags not set..
 
     // Dcp_Config_r16 (bb_nr5g_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16t)
     if (dcp_config_present) {
         // N.B. Size of this is fixed.
+        // TODO:
     }
     offset += sizeof(bb_nr5g_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16t);
 
@@ -2145,11 +2142,11 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     // Pdcch_BlindDetectionCA_CombIndicator_r16 (bb_nr5g_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16t)
     if (pdcch_blind_detection_present) {
         // N.B. Size of this is fixed.
+        // TODO:
     }
     offset += sizeof(bb_nr5g_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16t);
 
     proto_item_set_len(config_ti, offset-start_offset);
-
     return offset;
 }
 
@@ -3080,8 +3077,8 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
     proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN, &fieldmask);
     offset += 4;
     // ServCellIdx
-    proto_tree_add_item(config_tree, hf_l2server_serv_cell_idx, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
+    proto_tree_add_item(config_tree, hf_l2server_serv_cell_idx, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
     // SsbPeriodicityServCell
     proto_tree_add_item(config_tree, hf_l2server_ssb_periodicity_serv_cell, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
@@ -5681,7 +5678,7 @@ proto_register_l2server(void)
         { "DCP Config Present", "l2server.field-mask.dcp-config-present", FT_BOOLEAN, 8,
           NULL, bb_nr5g_STRUCT_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16_PRESENT, NULL, HFILL }},
       { &hf_l2server_ph_pdcch_blind_detection_present,
-        { "PDCCh Blind Detection Present", "l2server.field-mask.pdcch-blind-detection-present", FT_BOOLEAN, 8,
+        { "PDCCH Blind Detection Present", "l2server.field-mask.pdcch-blind-detection-present", FT_BOOLEAN, 8,
           NULL, bb_nr5g_STRUCT_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_PRESENT, NULL, HFILL }},
       { &hf_l2server_harq_ack_spatial_bundling_pucch,
         { "HARQ ACK Spacial Bundling PUCCH", "l2server.harq-ack-spatial-bundling-pucch", FT_INT8, BASE_DEC,
