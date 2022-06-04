@@ -537,6 +537,15 @@ static int hf_l2server_csi_rs_res_set_list_is_valid = -1;
 static int hf_l2server_csi_rep_config = -1;
 static int hf_l2server_csi_rep_config_id = -1;
 
+static int hf_l2server_nb_mon_pmi_port_ind = -1;
+
+static int hf_l2server_report_quantity_is_valid = -1;
+
+static int hf_l2server_semipersistent_on_pucch = -1;
+
+static int hf_l2server_codebook_config = -1;
+static int hf_l2server_code_book_type_is_valid = -1;
+
 static const value_string lch_vals[] =
 {
     { 0x0,   "SPARE" },
@@ -881,6 +890,24 @@ static const value_string csi_rs_res_set_list_is_valid_vals[] = {
     { 0,   NULL }
 };
 
+
+static const value_string report_quantity_is_valid_vals[] = {
+    { bb_nr5g_CSI_REPORT_CFG_TYPE_PERIODIC,                    "Periodic" },
+    { bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUCCH,      "Semi-persistent-on-pucch" },
+    { bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUSCH,      "Semi-persistent-on-pusch" },
+    { bb_nr5g_CSI_REPORT_CFG_TYPE_APERIODIC,                   "Aperiodic" },
+    { bb_nr5g_CSI_REPORT_CFG_TYPE_DEFAULT,                     "Default" },
+    { 0,   NULL }
+};
+
+
+static const value_string codebook_type_is_valid_vals[] = {
+    { bb_nr5g_CODEBOOK_TYPE_1,    "Type 1" },
+    { bb_nr5g_CODEBOOK_TYPE_2,    "Type 2" },
+    { 0,   NULL }
+};
+
+
 static const true_false_string nodata_data_vals =
 {
     "No Msg3 bytes present",
@@ -951,6 +978,8 @@ static gint ett_l2server_csi_im_res_set_config = -1;
 static gint ett_l2server_csi_ssb_res_set_config = -1;
 static gint ett_l2server_csi_res_config = -1;
 static gint ett_l2server_csi_rep_config = -1;
+static gint ett_l2server_semipersistent_on_pucch = -1;
+static gint ett_l2server_codebook_config = -1;
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
 static expert_field ei_l2server_type_unknown = EI_INIT;
@@ -2550,7 +2579,78 @@ static int dissect_csi_res_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     return offset;
 }
 
-// bb_nr5g_CSI_REPORT_CFGt
+// bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUCCHt
+static int dissect_semipersistent_on_pucch(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                           guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_semipersistent_on_pucch,  tvb,
+                                                         offset, 0,
+                                                          "", "Semi-persistent on PUCCH");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_semipersistent_on_pucch);
+
+    // NbPucchCsiResList
+    offset += 1;
+
+    // Pad[3]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+    offset += 3;
+
+    // RepSlotCfg
+    offset += sizeof(bb_nr5g_CSI_REPORT_PERIODICITYANDOFFSETt);
+
+    // PucchCsiResList
+    offset += (bb_nr5g_MAX_NB_BWPS * sizeof(bb_nr5g_PUCCH_CSI_RESOURCEt));
+
+    // TODO: dissect fields
+    //offset += sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUCCHt);
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_CODEBOOK_CFGt
+static int dissect_codebook_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                   guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_codebook_config,  tvb,
+                                                         offset, 0,
+                                                          "", "Codebook Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_codebook_config);
+
+    // CodeBookTypeIsValid
+    guint32 code_book_type_is_valid;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_code_book_type_is_valid, tvb, offset, 1,
+                                 ENC_LITTLE_ENDIAN, &code_book_type_is_valid);
+    offset += 1;
+
+    // Pad[3]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+    offset += 3;
+
+    // CodebookType
+    switch (code_book_type_is_valid) {
+        case bb_nr5g_CODEBOOK_TYPE_1:
+            // TODO: bb_nr5g_CODEBOOK_TYPE1_CFGt
+            break;
+        case bb_nr5g_CODEBOOK_TYPE_2:
+            // TODO: bb_nr5g_CODEBOOK_TYPE2_CFGt
+            break;
+        default:
+            // TODO: error?
+            break;
+    }
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_CSI_REPORT_CFGt (from bb-nr5g_struct.h)
 static int dissect_csi_rep_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset)
 {
@@ -2563,6 +2663,9 @@ static int dissect_csi_rep_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_rep_config);
 
     // FieldMask
+    guint32 fieldmask;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                 ENC_LITTLE_ENDIAN, &fieldmask);
     offset += 4;
 
     // CsiRepConfigId
@@ -2593,22 +2696,69 @@ static int dissect_csi_rep_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     // SubBandSize
     offset += 1;
     // NbNonPmiPortInd
+    guint32 nb_mon_pmi_port_ind;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_mon_pmi_port_ind, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_mon_pmi_port_ind);
     offset += 1;
     // ReportConfigTypeIsValid
     offset += 1;
     // ReportQuantityIsValid
+    guint32 report_quantity_is_valid;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_report_quantity_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &report_quantity_is_valid);
     offset += 1;
 
     // ReportQuantity (union)
     offset += 1;
 
     // TODO: ReportConfigType
+    switch (report_quantity_is_valid) {
+        case bb_nr5g_CSI_REPORT_CFG_TYPE_PERIODIC:
+            offset += sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_PERIODICt);
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUCCH:
+            offset = dissect_semipersistent_on_pucch(config_tree, tvb, pinfo, offset);
+            //offset += sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUCCHt);
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUSCH:
+            offset += sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUSCHt);
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_TYPE_APERIODIC:
+            offset += sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_APERIODICt);
+            break;
+        default:
+            // TODO: error?
+            break;
+    }
 
     // RepFreqCfg
     offset += sizeof(bb_nr5g_CSI_REPORT_FREQ_CFGt);
-    // CodebookCfg (variable size...)
-    offset += sizeof(bb_nr5g_CODEBOOK_CFGt);
 
+    // CodebookCfg (variable size...)
+    offset = dissect_codebook_config(config_tree, tvb, pinfo, offset);
+    //offset += sizeof(bb_nr5g_CODEBOOK_CFGt);
+
+    // SemiPersistentOnPUSCH_v1530
+    if (fieldmask & bb_nr5g_STRUCT_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUSCH_v1530_PRESENT) {
+        offset += sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUSCH_v1530t);
+    }
+
+    // SemiPersistentOnPUSCH_v1610
+    if (fieldmask & bb_nr5g_STRUCT_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUSCH_v1610_PRESENT) {
+        offset += sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUSCH_v1610t);
+    }
+
+    // Aperiodic_v1610
+    if (fieldmask & bb_nr5g_STRUCT_CSI_REPORT_CFG_TYPE_APERIODIC_v1610_PRESENT) {
+        // TODO: wrong type at bb-nr5g_struct.h:2696 ?
+        offset += sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUSCH_v1610t);
+    }
+
+    // CodebookType2Cfg_r16
+    if (fieldmask & bb_nr5g_STRUCT_CODEBOOK_CFG_TYPE2_R16_PRESENT) {
+        offset += sizeof(bb_nr5g_CODEBOOK_TYPE2_CFG_R16t);
+    }
+
+    // NonPmiPortInd
+    offset += (nb_mon_pmi_port_ind * sizeof(bb_nr5g_PORT_INDEX_FOR8RANKSt));
 
     proto_item_append_text(config_ti, " (CsiRepConfigId=%u)", csi_rep_config_id);
     proto_item_set_len(config_ti, offset-start_offset);
@@ -6527,6 +6677,24 @@ proto_register_l2server(void)
       { &hf_l2server_csi_rep_config_id,
         { "CSI Report Config Id", "l2server.csi-rep-config-id", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_mon_pmi_port_ind,
+        { "Nb Mon PMI Port Ind", "l2server.nb-mon-pmi-port-ind", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_report_quantity_is_valid,
+        { "Report Quantity Is Valid", "l2server.report-quantity-is-valid", FT_UINT8, BASE_DEC,
+           VALS(report_quantity_is_valid_vals), 0x0, NULL, HFILL }},
+
+      { &hf_l2server_semipersistent_on_pucch,
+        { "Semi-persistent on PUCCH", "l2server.semi-persistent", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_codebook_config,
+        { "Codebook Config", "l2server.codebook-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_code_book_type_is_valid,
+        { "Codebook Type Is Valid", "l2server.codebook-type-is-valid", FT_UINT8, BASE_DEC,
+           VALS(codebook_type_is_valid_vals), 0x0, NULL, HFILL }},
+
     };
 
     static gint *ett[] = {
@@ -6584,7 +6752,9 @@ proto_register_l2server(void)
         &ett_l2server_csi_im_res_set_config,
         &ett_l2server_csi_ssb_res_set_config,
         &ett_l2server_csi_res_config,
-        &ett_l2server_csi_rep_config
+        &ett_l2server_csi_rep_config,
+        &ett_l2server_semipersistent_on_pucch,
+        &ett_l2server_codebook_config
     };
 
     static ei_register_info ei[] = {
