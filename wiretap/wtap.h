@@ -753,6 +753,7 @@ struct ieee_802_11_phdr {
     /* Which of this information is present? */
     guint    has_channel:1;
     guint    has_frequency:1;
+    guint    has_bandwidth:1;
     guint    has_data_rate:1;
     guint    has_signal_percent:1;
     guint    has_noise_percent:1;
@@ -766,6 +767,7 @@ struct ieee_802_11_phdr {
 
     guint16  channel;                     /* Channel number */
     guint32  frequency;                   /* Channel center frequency */
+    guint8   bandwidth;                   /* Bandwidth = 20 MHz, 40 MHz, etc. */
     guint16  data_rate;                   /* Data rate, in .5 Mb/s units */
     guint8   signal_percent;              /* Signal level, as a percentage */
     guint8   noise_percent;               /* Noise level, as a percentage */
