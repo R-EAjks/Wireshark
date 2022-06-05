@@ -545,13 +545,22 @@ static int hf_l2server_report_quantity_is_valid = -1;
 static int hf_l2server_semipersistent_on_pucch = -1;
 
 static int hf_l2server_codebook_config = -1;
-static int hf_l2server_code_book_type_is_valid = -1;
+static int hf_l2server_codebook_type_is_valid = -1;
+
+static int hf_l2server_codebook_config_type1 = -1;
+static int hf_l2server_codebook_subtype1_is_valid = -1;
 
 static int hf_l2server_aperiodic = -1;
 static int hf_l2server_nb_rep_slow_offset_list = -1;
 static int hf_l2server_nb_rep_slow_offset = -1;
 
 static int hf_l2server_csi_report_freq_config = -1;
+static int hf_l2server_cqi_cmd_indicator = -1;
+static int hf_l2server_pmi_cmd_indicator = -1;
+static int hf_l2server_csi_reporting_band_is_valid = -1;
+static int hf_l2server_csi_reporting_band = -1;
+
+
 
 static const value_string lch_vals[] =
 {
@@ -928,6 +937,49 @@ static const value_string codebook_type_is_valid_vals[] = {
     { 0,   NULL }
 };
 
+static const value_string cqi_fmt_indicator_vals[] = {
+    { 0,    "widebandCQI" },
+    { 1,    "subbandCQI" },
+    { 0,   NULL }
+};
+
+static const value_string pmi_fmt_indicator_vals[] = {
+    { 0,    "widebandPMI" },
+    { 1,    "subbandPMI" },
+    { 0,   NULL }
+};
+
+
+static const value_string csi_reporting_band_id_valid_vals[] = {
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_3,       "subband3" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_4,       "subband4" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_5,       "subband5" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_6,       "subband6" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_7,       "subband7" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_8,       "subband8" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_9,       "subband9" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_10,      "subband10" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_11,      "subband11" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_12,      "subband12" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_13,      "subband13" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_14,      "subband14" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_15,      "subband15" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_16,      "subband16" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_17,      "subband17" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_18,      "subband18" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_19,      "subband19" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_DEFAULT, "DEFAULT" },
+    { 0,   NULL }
+};
+
+static const value_string subtype1_is_valid_vals[] = {
+    { bb_nr5g_CODEBOOK_TYPE1_SUBTYPE_I_SINGLE_PANEL,    "Single Panel" },
+    { bb_nr5g_CODEBOOK_TYPE1_SUBTYPE_I_MULTI_PANEL,     "Multi Panel" },
+    { bb_nr5g_CODEBOOK_TYPE1_SUBTYPE_DEFAULT,           "DEFAULT" },
+    { 0,   NULL }
+};
+
+
 
 static const true_false_string nodata_data_vals =
 {
@@ -1001,6 +1053,7 @@ static gint ett_l2server_csi_res_config = -1;
 static gint ett_l2server_csi_rep_config = -1;
 static gint ett_l2server_semipersistent_on_pucch = -1;
 static gint ett_l2server_codebook_config = -1;
+static gint ett_l2server_codebook_config_type1 = -1;
 static gint ett_l2server_aperiodic = -1;
 static gint ett_l2server_csi_report_freq_config = -1;
 
@@ -2666,7 +2719,45 @@ static int dissect_aperiodic(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo
     return offset;
 }
 
+// bb_nr5g_CODEBOOK_TYPE1_CFGt
+static int dissect_codebook_type_1(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset)
+{
+    guint start_offset = offset;
 
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_codebook_config_type1,  tvb,
+                                                         offset, 0,
+                                                          "", "Codebook Type 1");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_codebook_config_type1);
+
+    // CodeBookSubType1IsValid
+    guint32 codebook_subtype1_is_valid;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_codebook_subtype1_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &codebook_subtype1_is_valid);
+    offset += 1;
+
+    // CodebookMode
+    offset += 1;
+
+    // Pad[2]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+
+    // CodeBookSubType1 (union)
+    switch (codebook_subtype1_is_valid) {
+        case bb_nr5g_CODEBOOK_TYPE1_SUBTYPE_I_SINGLE_PANEL:
+            offset += sizeof(bb_nr5g_CODEBOOK_SUBTYPE1_SINGLE_PANEL_CFGt);
+            break;
+        case bb_nr5g_CODEBOOK_TYPE1_SUBTYPE_I_MULTI_PANEL:
+            offset += sizeof(bb_nr5g_CODEBOOK_SUBTYPE1_MULTI_PANEL_CFGt);
+            break;
+
+        case bb_nr5g_CODEBOOK_TYPE1_SUBTYPE_DEFAULT:
+            break;
+    }
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
 
 // bb_nr5g_CODEBOOK_CFGt
 static int dissect_codebook_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -2681,9 +2772,9 @@ static int dissect_codebook_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_codebook_config);
 
     // CodeBookTypeIsValid
-    guint32 code_book_type_is_valid;
-    proto_tree_add_item_ret_uint(config_tree, hf_l2server_code_book_type_is_valid, tvb, offset, 1,
-                                 ENC_LITTLE_ENDIAN, &code_book_type_is_valid);
+    guint32 codebook_type_is_valid;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_codebook_type_is_valid, tvb, offset, 1,
+                                 ENC_LITTLE_ENDIAN, &codebook_type_is_valid);
     offset += 1;
 
     // Pad[3]
@@ -2691,9 +2782,10 @@ static int dissect_codebook_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     offset += 3;
 
     // CodebookType
-    switch (code_book_type_is_valid) {
+    switch (codebook_type_is_valid) {
         case bb_nr5g_CODEBOOK_TYPE_1:
             // TODO: bb_nr5g_CODEBOOK_TYPE1_CFGt (variable size)
+            dissect_codebook_type_1(config_tree, tvb, pinfo, offset);
             break;
         case bb_nr5g_CODEBOOK_TYPE_2:
             // TODO: bb_nr5g_CODEBOOK_TYPE2_CFGt
@@ -2721,10 +2813,13 @@ static int dissect_rep_freq_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_report_freq_config);
 
     // CqiFmtIndicator
+    proto_tree_add_item(config_tree, hf_l2server_cqi_cmd_indicator, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // PmiFmtIndicator
+    proto_tree_add_item(config_tree, hf_l2server_pmi_cmd_indicator, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // CsiReportingBandIsValid
+    proto_tree_add_item(config_tree, hf_l2server_csi_reporting_band_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
 
     // Pad
@@ -2732,6 +2827,7 @@ static int dissect_rep_freq_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     offset += 1;
 
     // CsiReportingBand
+    proto_tree_add_item(config_tree, hf_l2server_csi_reporting_band, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 
     proto_item_set_len(config_ti, offset-start_offset);
@@ -2815,20 +2911,20 @@ static int dissect_csi_rep_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
             break;
         case bb_nr5g_CSI_REPORT_CFG_TYPE_APERIODIC:
             offset = dissect_aperiodic(config_tree, tvb, pinfo, offset);
+            // TODO: need to skip length of longest part of union?
+            offset += 16;
             break;
         default:
             // TODO: error?
-            printf("Unknow report config type (%u)\n", report_config_type_is_valid);
+            printf("Unknown report config type (%u)\n", report_config_type_is_valid);
             break;
     }
 
-    // RepFreqCfg
-    //offset += sizeof(bb_nr5g_CSI_REPORT_FREQ_CFGt);
+    // RepFreqCfg (bb_nr5g_CSI_REPORT_FREQ_CFGt)
     offset = dissect_rep_freq_config(config_tree, tvb, pinfo, offset);
 
-    // CodebookCfg (variable size...)
+    // CodebookCfg (bb_nr5g_CODEBOOK_CFGt, variable size...)
     offset = dissect_codebook_config(config_tree, tvb, pinfo, offset);
-    //offset += sizeof(bb_nr5g_CODEBOOK_CFGt);
 
     // SemiPersistentOnPUSCH_v1530
     if (fieldmask & bb_nr5g_STRUCT_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUSCH_v1530_PRESENT) {
@@ -6788,9 +6884,17 @@ proto_register_l2server(void)
       { &hf_l2server_codebook_config,
         { "Codebook Config", "l2server.codebook-config", FT_STRING, BASE_NONE,
            NULL, 0x0, NULL, HFILL }},
-      { &hf_l2server_code_book_type_is_valid,
+      { &hf_l2server_codebook_type_is_valid,
         { "Codebook Type Is Valid", "l2server.codebook-type-is-valid", FT_UINT8, BASE_DEC,
            VALS(codebook_type_is_valid_vals), 0x0, NULL, HFILL }},
+
+      { &hf_l2server_codebook_config_type1,
+        { "Codebook Config Type1", "l2server.codebook-config-type1", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_codebook_subtype1_is_valid,
+        { "Codebook Type1 Is Valid", "l2server.codebook-subtype1-is-valid", FT_UINT8, BASE_DEC,
+           VALS(subtype1_is_valid_vals), 0x0, NULL, HFILL }},
+
 
       { &hf_l2server_aperiodic,
         { "APeriodic", "l2server.aperiodic", FT_STRING, BASE_NONE,
@@ -6804,6 +6908,19 @@ proto_register_l2server(void)
 
       { &hf_l2server_csi_report_freq_config,
         { "Report Freq Config", "l2server.report-freq-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_cqi_cmd_indicator,
+        { "CQI Cmd Indicator", "l2server.qci-cmd-indicator", FT_UINT8, BASE_DEC,
+           VALS(cqi_fmt_indicator_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_pmi_cmd_indicator,
+        { "PMI Cmd Indicator", "l2server.pmi-cmd-indicator", FT_UINT8, BASE_DEC,
+           VALS(pmi_fmt_indicator_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_reporting_band_is_valid,
+        { "CSI Reporting Band is valid", "l2server.csi-reporting-band-is-valid", FT_UINT8, BASE_DEC,
+           VALS(csi_reporting_band_id_valid_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_reporting_band,
+        { "CSI Reporting Band", "l2server.csi-reporting-band", FT_UINT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
     };
 
@@ -6865,6 +6982,7 @@ proto_register_l2server(void)
         &ett_l2server_csi_rep_config,
         &ett_l2server_semipersistent_on_pucch,
         &ett_l2server_codebook_config,
+        &ett_l2server_codebook_config_type1,
         &ett_l2server_aperiodic,
         &ett_l2server_csi_report_freq_config
     };
