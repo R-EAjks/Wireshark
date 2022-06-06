@@ -532,15 +532,18 @@ static int hf_l2server_csi_ssb_res_list = -1;
 
 static int hf_l2server_csi_res_config = -1;
 static int hf_l2server_csi_res_id = -1;
+static int hf_l2server_csi_res_type = -1;
 static int hf_l2server_csi_rs_res_set_list_is_valid = -1;
 
 static int hf_l2server_csi_rep_config = -1;
+static int hf_l2server_carrier = -1;
 static int hf_l2server_csi_rep_config_id = -1;
 
 static int hf_l2server_nb_mon_pmi_port_ind = -1;
 
 static int hf_l2server_report_config_type_is_valid = -1;
 static int hf_l2server_report_quantity_is_valid = -1;
+static int hf_l2server_cri_ri_pmi_cqi = -1;
 
 static int hf_l2server_semipersistent_on_pucch = -1;
 
@@ -925,7 +928,7 @@ static const value_string report_quantity_is_valid_vals[] = {
     { bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RSRP,                "CRI RSRP" },
     { bb_nr5g_CSI_REPORT_CFG_QUANTITY_SSBINDEX_RSRP,           "SSBINDEX RSRP" },
     { bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_LII_PMI_CQI,      "RI LTI PMI CQI" },
-    { bb_nr5g_CSI_REPORT_CFG_QUANTITY_R16_CRI_SINR,            "R16 SINR" },
+    { bb_nr5g_CSI_REPORT_CFG_QUANTITY_R16_CRI_SINR,            "R16 CRI SINR" },
     { bb_nr5g_CSI_REPORT_CFG_QUANTITY_R16_SSB_INDEX_SINR,      "R16 SSB Index SINR" },
     { bb_nr5g_CSI_REPORT_CFG_QUANTITY_DEFAULT,                 "Default" },
     { 0,   NULL }
@@ -948,7 +951,6 @@ static const value_string pmi_fmt_indicator_vals[] = {
     { 1,    "subbandPMI" },
     { 0,   NULL }
 };
-
 
 static const value_string csi_reporting_band_id_valid_vals[] = {
     { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_3,       "subband3" },
@@ -976,6 +978,13 @@ static const value_string subtype1_is_valid_vals[] = {
     { bb_nr5g_CODEBOOK_TYPE1_SUBTYPE_I_SINGLE_PANEL,    "Single Panel" },
     { bb_nr5g_CODEBOOK_TYPE1_SUBTYPE_I_MULTI_PANEL,     "Multi Panel" },
     { bb_nr5g_CODEBOOK_TYPE1_SUBTYPE_DEFAULT,           "DEFAULT" },
+    { 0,   NULL }
+};
+
+static const value_string csi_res_type_vals[] = {
+    { 0,    "Aperiodic" },
+    { 1,    "Semi-persistent" },
+    { 2,    "Periodic" },
     { 0,   NULL }
 };
 
@@ -2632,6 +2641,7 @@ static int dissect_csi_res_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     offset += 1;
 
     // CsiResType
+    proto_tree_add_item(config_tree, hf_l2server_csi_res_type, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
 
     // CsiRsResSetListIsValid
@@ -2827,6 +2837,7 @@ static int dissect_rep_freq_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     offset += 1;
 
     // CsiReportingBand
+    // TODO: need to infer how many bits and shift/mask to get encoded value...
     proto_tree_add_item(config_tree, hf_l2server_csi_reporting_band, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 
@@ -2866,7 +2877,8 @@ static int dissect_csi_rep_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     // NzpCsiRSResForInterference
     offset += 1;
 
-    // Carrier
+    // Carrier (serving cell identifier)
+    proto_tree_add_item(config_tree, hf_l2server_carrier, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // TimeRestForChannelMeas
     offset += 1;
@@ -2896,6 +2908,31 @@ static int dissect_csi_rep_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     offset += 1;
 
     // ReportQuantity (union)
+    switch (report_quantity_is_valid) {
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_NONE:
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_PMI_CQI:
+            proto_tree_add_item(config_tree, hf_l2server_cri_ri_pmi_cqi, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_I1:
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_I1_CQI:
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_CQI:
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RSRP:
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_SSBINDEX_RSRP:
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_LII_PMI_CQI:
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_R16_CRI_SINR:
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_R16_SSB_INDEX_SINR:
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_DEFAULT:
+            break;
+    }
     offset += 1;
 
     // ReportConfigType
@@ -3077,6 +3114,7 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     // AperTriggerStateList
     offset += (nb_aper_trigger_state_list * sizeof(bb_nr5g_CSI_APERIODIC_TRIGGER_STATE_CFGt));
 
+    // TODO:
     // SPOnPuschTriggerStateList
     // NzpCsiRsResToDel
     // NzpCsiRsResSetToDel
@@ -6857,12 +6895,18 @@ proto_register_l2server(void)
       { &hf_l2server_csi_res_id,
         { "CSI Res Id", "l2server.csi-res-id", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_res_type,
+        { "CSI Res Type", "l2server.csi-res-type", FT_UINT8, BASE_DEC,
+           VALS(csi_res_type_vals), 0x0, NULL, HFILL }},
       { &hf_l2server_csi_rs_res_set_list_is_valid,
         { "CSI Res Type", "l2server.csi-res-type", FT_UINT8, BASE_DEC,
            VALS(csi_rs_res_set_list_is_valid_vals), 0x0, NULL, HFILL }},
 
       { &hf_l2server_csi_rep_config,
         { "CSI Report Config", "l2server.csi-rep-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_carrier,
+        { "Carrier", "l2server.carrier", FT_INT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_csi_rep_config_id,
         { "CSI Report Config Id", "l2server.csi-rep-config-id", FT_UINT8, BASE_DEC,
@@ -6876,6 +6920,9 @@ proto_register_l2server(void)
       { &hf_l2server_report_quantity_is_valid,
         { "Report Quantity Is Valid", "l2server.report-quantity-is-valid", FT_UINT8, BASE_DEC,
            VALS(report_quantity_is_valid_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_cri_ri_pmi_cqi,
+        { "CRI CI PCI CQI", "l2server.cri-ri-pmi-cqi", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_semipersistent_on_pucch,
         { "Semi-persistent on PUCCH", "l2server.semi-persistent", FT_STRING, BASE_NONE,
