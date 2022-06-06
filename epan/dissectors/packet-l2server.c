@@ -2910,25 +2910,35 @@ static int dissect_csi_rep_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     // ReportQuantity (union)
     switch (report_quantity_is_valid) {
         case bb_nr5g_CSI_REPORT_CFG_QUANTITY_NONE:
+            // None
             break;
         case bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_PMI_CQI:
+            // CriRiPmiCqi
             proto_tree_add_item(config_tree, hf_l2server_cri_ri_pmi_cqi, tvb, offset, 1, ENC_LITTLE_ENDIAN);
             break;
         case bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_I1:
+            // CriRiI1
             break;
         case bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_I1_CQI:
+            // CriRiI1Cqi
             break;
         case bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_CQI:
+            // CriRiCqi
             break;
         case bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RSRP:
+            // CriRsrp
             break;
         case bb_nr5g_CSI_REPORT_CFG_QUANTITY_SSBINDEX_RSRP:
+            // SsbIdxRsrp
             break;
         case bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_LII_PMI_CQI:
+            // CriRiLiPmiCqi
             break;
         case bb_nr5g_CSI_REPORT_CFG_QUANTITY_R16_CRI_SINR:
+            // CriSinr_r16
             break;
         case bb_nr5g_CSI_REPORT_CFG_QUANTITY_R16_SSB_INDEX_SINR:
+            // IndexSinr_r16
             break;
         case bb_nr5g_CSI_REPORT_CFG_QUANTITY_DEFAULT:
             break;
