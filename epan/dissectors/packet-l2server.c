@@ -563,7 +563,8 @@ static int hf_l2server_pmi_cmd_indicator = -1;
 static int hf_l2server_csi_reporting_band_is_valid = -1;
 static int hf_l2server_csi_reporting_band = -1;
 
-
+static int hf_l2server_ul_am_cnf_frame = -1;
+static int hf_l2server_ul_am_req_frame = -1;
 
 static const value_string lch_vals[] =
 {
@@ -1002,6 +1003,19 @@ static const true_false_string continue_rohc_vls =
     "Not configured/false"
 };
 
+//--------------------------------------------------------------------------------
+// Want to check for UL AM frames that have no CNF
+static gpointer mui_key(guint16 ueid, guint8 cellid _U_, guint8 rbid, guint8 lct, guint mui)
+{
+    // cellid not being set in CNF...
+    return GUINT_TO_POINTER(ueid | /*(cellid << 12) |*/ (rbid<<18) | (lct<<26) | (guint64)mui<<32);
+}
+
+// Both tables are from mui_key -> frame_number
+static wmem_map_t *ul_req_table = NULL;
+static wmem_map_t *ul_cnf_table = NULL;
+
+
 
 /* Subtrees */
 static gint ett_l2server = -1;
@@ -1069,6 +1083,9 @@ static gint ett_l2server_csi_report_freq_config = -1;
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
 static expert_field ei_l2server_type_unknown = EI_INIT;
+static expert_field ei_l2server_ul_no_cnf = EI_INIT;
+static expert_field ei_l2server_ul_no_req = EI_INIT;
+
 
 extern int proto_pdcp_nr;
 
@@ -1268,7 +1285,7 @@ static void dissect_rcp_load_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *p
 }
 
 /* Nr5gId (UEId + CellId + BeamIdx) */
-static guint dissect_nr5gid(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset, guint32 *ueid)
+static guint dissect_nr5gid(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset, guint32 *ueid, guint32 *cellid)
 {
     proto_item *nr5gid_ti = proto_tree_add_string_format(tree, hf_l2server_nr5gid, tvb,
                                                           offset, 12,
@@ -1277,14 +1294,13 @@ static guint dissect_nr5gid(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo 
 
     proto_tree_add_item_ret_int(nr5gid_tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN, ueid);
     offset += 4;
-    gint32 cellid;
-    proto_tree_add_item_ret_int(nr5gid_tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN, &cellid);
+    proto_tree_add_item_ret_int(nr5gid_tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN, cellid);
     offset += 4;
     gint beamidx;
     proto_tree_add_item_ret_int(nr5gid_tree, hf_l2server_beamidx, tvb, offset, 4, ENC_LITTLE_ENDIAN, &beamidx);
     offset += 4;
 
-    proto_item_append_text(nr5gid_ti, "(UeId=%u, cellId=%d, beamIdx=%d)", *ueid, cellid, beamidx);
+    proto_item_append_text(nr5gid_ti, "(UeId=%u, cellId=%d, beamIdx=%d)", *ueid, *cellid, beamidx);
     return offset;
 }
 
@@ -1306,7 +1322,8 @@ static void dissect_rlcmac_data_req(proto_tree *tree, tvbuff_t *tvb, packet_info
     p_pdcp_nr_info->direction = PDCP_NR_DIRECTION_UPLINK;
 
     /* Nr5gId (UEId + CellId + BeamIdx) */
-    offset = dissect_nr5gid(tree, tvb, pinfo, offset, (guint32*)&p_pdcp_nr_info->ueid);
+    guint32 cellid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, (guint32*)&p_pdcp_nr_info->ueid, &cellid);
 
     /* RbType */
     guint32 rbtype;
@@ -1348,7 +1365,8 @@ static void dissect_rlcmac_data_req(proto_tree *tree, tvbuff_t *tvb, packet_info
     proto_tree_add_item(tree, hf_l2server_ref, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     /* MUI */
-    proto_tree_add_item(tree, hf_l2server_mui, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 mui;
+    proto_item *mui_ti = proto_tree_add_item_ret_uint(tree, hf_l2server_mui, tvb, offset, 1, ENC_LITTLE_ENDIAN, &mui);
     offset += 1;
     /* DataVolume */
     proto_tree_add_item(tree, hf_l2server_datavolume, tvb, offset, 4, ENC_LITTLE_ENDIAN);
@@ -1362,6 +1380,27 @@ static void dissect_rlcmac_data_req(proto_tree *tree, tvbuff_t *tvb, packet_info
     /* UlLogRef */
     proto_tree_add_item(tree, hf_l2server_ullogref, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
+
+    // Store these on first pass.
+    if ((mode == AM) && !PINFO_FD_VISITED(pinfo)) {
+        wmem_map_insert(ul_req_table,
+                        mui_key(p_pdcp_nr_info->ueid, cellid, p_pdcp_nr_info->bearerId, lch, mui),
+                        GUINT_TO_POINTER(pinfo->num));
+    }
+    // Look up CNF on further passes.
+    else {
+        guint32 *cnf_frame = (guint32*)wmem_map_lookup(ul_cnf_table,
+                                                       mui_key(p_pdcp_nr_info->ueid, cellid, p_pdcp_nr_info->bearerId, lch, mui));
+        if (cnf_frame) {
+            proto_tree_add_uint(tree, hf_l2server_ul_am_cnf_frame,
+                                tvb, 0, 0, GPOINTER_TO_UINT(cnf_frame));
+        }
+        else {
+            // Add expert info
+            expert_add_info_format(pinfo, mui_ti, &ei_l2server_ul_no_cnf,
+                                   "No CNF received for MUI (%u)", mui);
+        }
+    }
 
     /* Traffic filter */
     proto_item *traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic, tvb, 0, 0, ENC_NA);
@@ -1432,17 +1471,17 @@ static void dissect_rlcmac_data_cnf(proto_tree *tree, tvbuff_t *tvb, packet_info
                                     guint offset, guint len _U_)
 {
     /* Nr5gId (UEId + CellId + BeamIdx) */
-    guint32 ueid;
-    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid);
+    guint32 ueid, cellid, rbid, lct;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid, &cellid);
 
     /* RbType */
     proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     /* RbId */
-    proto_tree_add_item(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item_ret_uint(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &rbid);
     offset++;
     /* LCH */
-    proto_tree_add_item(tree, hf_l2server_lch, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item_ret_uint(tree, hf_l2server_lch, tvb, offset, 1, ENC_LITTLE_ENDIAN, &lct);
     offset += 1;
     /* Ref(erence for CNF) */
     proto_tree_add_item(tree, hf_l2server_ref, tvb, offset, 4, ENC_LITTLE_ENDIAN);
@@ -1451,8 +1490,30 @@ static void dissect_rlcmac_data_cnf(proto_tree *tree, tvbuff_t *tvb, packet_info
     proto_tree_add_item(tree, hf_l2server_scgid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     /* MUI */
-    proto_tree_add_item(tree, hf_l2server_mui, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 mui;
+    proto_item *mui_ti = proto_tree_add_item_ret_uint(tree, hf_l2server_mui, tvb, offset, 1, ENC_LITTLE_ENDIAN, &mui);
     offset += 1;
+
+    // Store these on first pass.
+    if (!PINFO_FD_VISITED(pinfo)) {
+        wmem_map_insert(ul_cnf_table,
+                        mui_key(ueid, cellid, rbid, lct, mui),
+                        GUINT_TO_POINTER(pinfo->num));
+    }
+    // Look up REQ on further passes.
+    else {
+        guint32 *req_frame = (guint32*)wmem_map_lookup(ul_req_table,
+                                                       mui_key(ueid, cellid, rbid, lct, mui));
+        if (req_frame) {
+            proto_tree_add_uint(tree, hf_l2server_ul_am_req_frame,
+                                tvb, 0, 0, GPOINTER_TO_UINT(req_frame));
+        }
+        else {
+            // Add expert info
+            expert_add_info_format(pinfo, mui_ti, &ei_l2server_ul_no_req,
+                                   "No REQ received for MUI (%u) see in CNF", mui);
+        }
+    }
 
     /* Traffic filters */
     proto_item *traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic, tvb, 0, 0, ENC_NA);
@@ -1477,7 +1538,8 @@ static void dissect_rlcmac_data_ind(proto_tree *tree, tvbuff_t *tvb, packet_info
     p_pdcp_nr_info->direction = PDCP_NR_DIRECTION_DOWNLINK;
 
     /* Nr5gId (UEId + CellId + BeamIdx) */
-    offset = dissect_nr5gid(tree, tvb, pinfo, offset, (uint32_t*)&p_pdcp_nr_info->ueid);
+    guint32 cellid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, (uint32_t*)&p_pdcp_nr_info->ueid, &cellid);
 
     /* RbType */
     guint32 rbtype;
@@ -1866,8 +1928,8 @@ static void dissect_ra_req(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
                            guint offset, guint len _U_)
 {
     /* Nr5gId (UEId + CellId + BeamIdx) */
-    guint32 ueid;
-    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid);
+    guint32 ueid, cellid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid, &cellid);
 
     /* RbType */
     proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -1938,8 +2000,8 @@ static void dissect_ra_cnf(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _
                            guint offset, guint len _U_)
 {
     /* Nr5gId (UEId + CellId + BeamIdx) */
-    guint32 ueid;
-    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid);
+    guint32 ueid, cellid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid, &cellid);
 
     /* Result code */
     proto_tree_add_item(tree, hf_l2server_result_code, tvb, offset, 2, ENC_LITTLE_ENDIAN);
@@ -1966,8 +2028,8 @@ static void dissect_ra_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _
                            guint offset, guint len _U_)
 {
     /* Nr5gId (UEId + CellId + BeamIdx) */
-    guint32 ueid;
-    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid);
+    guint32 ueid, cellid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid, &cellid);
 
     /* Result code */
     proto_tree_add_item(tree, hf_l2server_result_code, tvb, offset, 2, ENC_LITTLE_ENDIAN);
@@ -1990,8 +2052,8 @@ static void dissect_re_est_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pin
                                guint offset, guint len _U_)
 {
     /* Nr5gId (UEId + CellId + BeamIdx) */
-    guint32 ueid;
-    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid);
+    guint32 ueid, cellid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid, &cellid);
 
     /* RbType */
     proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -4490,8 +4552,8 @@ static void dissect_cmac_rach_cfg_cmd(proto_tree *tree, tvbuff_t *tvb, packet_in
                                       guint offset, guint len _U_)
 {
     /* Nr5gId (UEId + CellId + BeamIdx) */
-    guint32 ueid;
-    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid);
+    guint32 ueid, cellid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid, &cellid);
 
     // RA_Info
     guint32 bwpid;
@@ -6979,6 +7041,13 @@ proto_register_l2server(void)
       { &hf_l2server_csi_reporting_band,
         { "CSI Reporting Band", "l2server.csi-reporting-band", FT_UINT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ul_am_cnf_frame,
+        { "CNF Frame", "l2server.ul-am-cnf-frame", FT_FRAMENUM, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_am_req_frame,
+        { "REQ Frame", "l2server.ul-am-req-frame", FT_FRAMENUM, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
@@ -7047,6 +7116,8 @@ proto_register_l2server(void)
     static ei_register_info ei[] = {
         { &ei_l2server_sapi_unknown, { "l2server.sapi-unknown", PI_UNDECODED, PI_WARN, "Unknown SAPI", EXPFILL }},
         { &ei_l2server_type_unknown, { "l2server.type-unknown", PI_UNDECODED, PI_WARN, "Unknown Type for SAPI", EXPFILL }},
+        { &ei_l2server_ul_no_cnf,    { "l2server.ul-no-cnf", PI_SEQUENCE, PI_WARN, "No CNF for UL AM PDU", EXPFILL }},
+        { &ei_l2server_ul_no_req,    { "l2server.ul-no-req", PI_SEQUENCE, PI_WARN, "No REQ for UL AM PDU CNF", EXPFILL }},
     };
 
     module_t *l2server_module;
@@ -7080,6 +7151,9 @@ proto_register_l2server(void)
         "PDCP SN bits for DRB PDUs",
         "",
         &global_pdcp_drb_sn_length, pdcp_drb_col_vals, FALSE);
+
+    ul_req_table = wmem_map_new_autoreset(wmem_epan_scope(), wmem_file_scope(), g_direct_hash, g_direct_equal);
+    ul_cnf_table = wmem_map_new_autoreset(wmem_epan_scope(), wmem_file_scope(), g_direct_hash, g_direct_equal);
 }
 
 static void
