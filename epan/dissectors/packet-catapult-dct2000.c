@@ -3134,7 +3134,6 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                     }
                     else if (!PINFO_FD_VISITED(pinfo) && sscanf(string, "NRPDCP: RRCPRIM:ueId=   %u;setThreadCryptKey: UP id=%u alg %u key: ", &ue_id, &id, &alg) == 3) {
                         char *key = g_strdup(strstr(string, "key: ")+5);
-                        printf("%u: calling set_pdcp_nr_up_ciphering_key()!", pinfo->num);
                         set_pdcp_nr_up_ciphering_key(ue_id, key, pinfo->num);
                         g_free(key);
                     }
