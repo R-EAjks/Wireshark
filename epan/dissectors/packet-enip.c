@@ -5072,6 +5072,9 @@ int dissect_lldp_cip_tlv(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
          proto_tree_add_item(tree, hf_elink_interface_label, tvb, offset, string_len, ENC_ASCII | ENC_NA);
          break;
       }
+
+      default:
+         break;
    }
 
    return tvb_reported_length(tvb);
