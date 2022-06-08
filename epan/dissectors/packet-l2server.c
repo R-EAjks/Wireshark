@@ -307,6 +307,7 @@ static int hf_l2server_max_cntr = -1;
 static int hf_l2server_mac_cell_group_len = -1;
 
 static int hf_l2server_cmac_status = -1;
+static int hf_l2server_cmac_cell_status = -1;
 
 static int hf_l2server_drx_config = -1;
 static int hf_l2server_drx_len = -1;
@@ -988,6 +989,14 @@ static const value_string csi_res_type_vals[] = {
     { 2,    "Periodic" },
     { 0,   NULL }
 };
+
+static const value_string cmac_cell_status_vals[] = {
+    { nr5g_rlcmac_Cmac_CELL_STATUS_NONE,                "NONE" },
+    { nr5g_rlcmac_Cmac_CELL_STATUS_IN_SERVICE,          "In Service" },
+    { nr5g_rlcmac_Cmac_CELL_STATUS_RACH_PROBE_FAILURE,  "RACH Probe Failure" },
+    { 0,   NULL }
+};
+
 
 
 
@@ -4980,6 +4989,28 @@ static void dissect_cmac_status_ind(proto_tree *tree, tvbuff_t *tvb, packet_info
     col_set_str(pinfo->cinfo, COL_INFO, val_to_str_const(status, cmac_status_vals, "Unknown"));
 }
 
+
+static void dissect_cmac_cell_status_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                         guint offset, guint len _U_)
+{
+    /* Spare */
+    proto_tree_add_item(tree, hf_l2server_spare4, tvb, offset, 4, ENC_NA);
+    offset += 4;
+
+    /* cellid */
+    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* Cell Status. */
+    guint32 status;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_cmac_cell_status, tvb, offset, 1, ENC_LITTLE_ENDIAN, &status);
+    offset += 1;
+
+    col_set_str(pinfo->cinfo, COL_INFO, "CMAC Cell Status Ind - ");
+    col_set_str(pinfo->cinfo, COL_INFO, val_to_str_const(status, cmac_cell_status_vals, "Unknown"));
+}
+
+
 static void dissect_rcp_ue_set_group_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                          guint offset, guint len _U_)
 {
@@ -5317,7 +5348,7 @@ static TYPE_FUN nr_rlcmac_cmac_type_funs[] =
     { nr5g_rlcmac_Cmac_STATUS_IND, "nr5g_rlcmac_Cmac_STATUS_IND",       dissect_cmac_status_ind},
     { nr5g_rlcmac_Cmac_CELL_STATUS_REQ, "nr5g_rlcmac_Cmac_CELL_STATUS_REQ",       dissect_sapi_type_dummy /* TODO */},
     { nr5g_rlcmac_Cmac_CELL_STATUS_CNF, "nr5g_rlcmac_Cmac_CELL_STATUS_CNF",       dissect_sapi_type_dummy /* TODO */},
-    { nr5g_rlcmac_Cmac_CELL_STATUS_IND, "nr5g_rlcmac_Cmac_CELL_STATUS_IND",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_CELL_STATUS_IND, "nr5g_rlcmac_Cmac_CELL_STATUS_IND",       dissect_cmac_cell_status_ind },
     { nr5g_rlcmac_Cmac_STATUS_CNF, "nr5g_rlcmac_Cmac_STATUS_CNF",       dissect_sapi_type_dummy /* TODO */},
     { nr5g_rlcmac_Cmac_DBEAM_IND, "nr5g_rlcmac_Cmac_DBEAM_IND",       dissect_sapi_type_dummy /* TODO */},
     { nr5g_rlcmac_Cmac_DCI_IND, "nr5g_rlcmac_Cmac_DCI_IND",       dissect_sapi_type_dummy /* TODO */},
@@ -6377,6 +6408,11 @@ proto_register_l2server(void)
       { &hf_l2server_cmac_status,
         { "CMAC Status", "l2server.cmac-status", FT_UINT8, BASE_DEC,
           VALS(cmac_status_vals), 0x0, NULL, HFILL }},
+
+      { &hf_l2server_cmac_cell_status,
+        { "CMAC Cell Status", "l2server.cmac-cell-status", FT_UINT8, BASE_DEC,
+          VALS(cmac_cell_status_vals), 0x0, NULL, HFILL }},
+
 
       /* DRX config */
       { &hf_l2server_drx_config,
