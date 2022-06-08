@@ -2866,7 +2866,7 @@ static int dissect_codebook_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     switch (codebook_type_is_valid) {
         case bb_nr5g_CODEBOOK_TYPE_1:
             // TODO: bb_nr5g_CODEBOOK_TYPE1_CFGt (variable size)
-            dissect_codebook_type_1(config_tree, tvb, pinfo, offset);
+            offset = dissect_codebook_type_1(config_tree, tvb, pinfo, offset);
             break;
         case bb_nr5g_CODEBOOK_TYPE_2:
             // TODO: bb_nr5g_CODEBOOK_TYPE2_CFGt
@@ -3030,7 +3030,7 @@ static int dissect_csi_rep_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
         case bb_nr5g_CSI_REPORT_CFG_TYPE_APERIODIC:
             offset = dissect_aperiodic(config_tree, tvb, pinfo, offset);
             // TODO: need to skip length of longest part of union?
-            offset += 16;
+            offset += 32;
             break;
         default:
             // TODO: error?
@@ -3087,63 +3087,79 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
                                                           "", "CSI Meas Config");
     proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_meas_config);
 
-    // TODO: get counts from nb fields so can dissect/skip arrays below.
+
+    // Counts
 
     // NbNzpCsiRsResToAdd
     guint32 nb_nzp_csi_rs_res_to_add;
     proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_nzp_csi_rs_res_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_nzp_csi_rs_res_to_add);
     offset += 1;
     // NbNzpCsiRsResToDel
-    proto_tree_add_item(config_tree, hf_l2server_nb_nzp_csi_rs_res_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 nb_nzp_csi_rs_res_to_del;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_nzp_csi_rs_res_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_nzp_csi_rs_res_to_del);
     offset += 1;
+
     // NbNzpCsiRsResSetToAdd
     guint32 nb_nzp_csi_rs_res_set_to_add;
     proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_nzp_csi_rs_res_set_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_nzp_csi_rs_res_set_to_add);
     offset += 1;
     // NbNzpCsiRsResSetToDel
-    proto_tree_add_item(config_tree, hf_l2server_nb_nzp_csi_rs_res_set_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 nb_nzp_csi_rs_res_set_to_del;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_nzp_csi_rs_res_set_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_nzp_csi_rs_res_set_to_del);
     offset += 1;
+
     // NbCsiImResToAdd
     guint nb_csi_im_res_to_add;
     proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_im_res_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_im_res_to_add);
     offset += 1;
     // NbCsiImResToDel
-    proto_tree_add_item(config_tree, hf_l2server_nb_csi_im_res_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint nb_csi_im_res_to_del;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_im_res_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_im_res_to_del);
     offset += 1;
+
     // NbCsiImResSetToAdd
     guint32 nb_csi_im_res_set_to_add;
     proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_im_res_set_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_im_res_set_to_add);
     offset += 1;
     // NbCsiImResSetToDel
-    proto_tree_add_item(config_tree, hf_l2server_nb_csi_im_res_set_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 nb_csi_im_res_set_to_del;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_im_res_set_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_im_res_set_to_del);
     offset += 1;
+
     // NbCsiSsbResSetToAdd
     guint32 nb_csi_ssb_res_set_to_add;
     proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_ssb_res_set_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_ssb_res_set_to_add);
     offset += 1;
     // NbCsiSsbResSetToDel
-    proto_tree_add_item(config_tree, hf_l2server_nb_csi_ssb_res_set_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 nb_csi_ssb_res_set_to_del;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_ssb_res_set_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_ssb_res_set_to_del);
     offset += 1;
+
     // NbCsiResCfgToAdd
     guint32 nb_csi_res_cfg_to_add;
     proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_res_cfg_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_res_cfg_to_add);
     offset += 1;
     // NbCsiResCfgToDel
-    proto_tree_add_item(config_tree, hf_l2server_nb_csi_res_cfg_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 nb_csi_res_cfg_to_del;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_res_cfg_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_res_cfg_to_del);
     offset += 1;
+
     // NbCsiRepCfgToAdd
     guint32 nb_csi_rep_cfg_to_add;
     proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_rep_cfg_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_rep_cfg_to_add);
     offset += 1;
     // NbCsiRepCfgToDel
-    proto_tree_add_item(config_tree, hf_l2server_nb_csi_rep_cfg_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 nb_csi_rep_cfg_to_del;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_rep_cfg_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_rep_cfg_to_del);
     offset += 1;
+
     // NbAperTriggerStateList
     guint32 nb_aper_trigger_state_list;
     proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_aper_trigger_state_list, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_aper_trigger_state_list);
     offset += 1;
     // NbSPOnPuschTriggerStateList
-    proto_tree_add_item(config_tree, hf_l2server_nb_sp_on_pusch_trigger_state, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 nb_sp_on_pusch_trigger_state_list;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_sp_on_pusch_trigger_state, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_sp_on_pusch_trigger_state_list);
     offset += 1;
     // ReportTriggerSize
     proto_tree_add_item(config_tree, hf_l2server_report_trigger_size, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -3156,7 +3172,8 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
 
-    // TODO: only setting counts that have seen as non-zero.
+    //========================================================================================
+    // Added items
 
     // NzpCsiRsResToAdd
     for (guint n=0; n < nb_nzp_csi_rs_res_to_add; n++) {
@@ -3197,13 +3214,34 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
 
     // TODO:
     // SPOnPuschTriggerStateList
+    offset += (nb_sp_on_pusch_trigger_state_list * sizeof(bb_nr5g_CSI_SEMIPERSISTENT_ONPUSCH_TRIGGER_STATE_CFGt));
+    //-----------------------------------------------------------------------------------------
+
+
+    //-----------------------------------------------------------------------------------------
+    // Deleted items
+
     // NzpCsiRsResToDel
+    offset += (nb_nzp_csi_rs_res_to_del * 4);
+
     // NzpCsiRsResSetToDel
+    offset += (nb_nzp_csi_rs_res_set_to_del * 4);
+
     // CsiImResToDel
+    offset += (nb_csi_im_res_to_del * 4);
+
     // CsiImResSetToDel
+    offset += (nb_csi_im_res_set_to_del * 4);
+
     // CsiSsbResSetToDel
+    offset += (nb_csi_ssb_res_set_to_del * 4);
+
     // CsiResCfgToDel
+    offset += (nb_csi_res_cfg_to_del * 4);
+
     // CsiRepCfgToDel
+    offset += (nb_csi_rep_cfg_to_del * 4);
+    //-----------------------------------------------------------------------------------------
 
     proto_item_set_len(config_ti, offset-start_offset);
     return offset;
@@ -3409,7 +3447,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
             offset = dissect_csi_meas_config(ded_tree, tvb, pinfo, offset);
         }
 
-        // DlBwpIdToAdd
+        // DlBwpIdToAdd. TODO: not fixed size!!!!!
         offset += (nbDlBwpIdToAdd * sizeof(bb_nr5g_BWP_DOWNLINKt));
         // DlChannelBwPerScs
         offset += (nbDlBwpScsSpecCarrier * sizeof(bb_nr5g_SCS_SPEC_CARRIERt));
