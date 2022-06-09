@@ -567,6 +567,14 @@ static int hf_l2server_csi_reporting_band = -1;
 static int hf_l2server_ul_am_cnf_frame = -1;
 static int hf_l2server_ul_am_req_frame = -1;
 
+static int hf_l2server_nzp_csi_rs_res_to_del = -1;
+static int hf_l2server_nzp_csi_rs_res_set_to_del = -1;
+static int hf_l2server_csi_im_res_to_del = -1;
+static int hf_l2server_csi_im_res_set_to_del = -1;
+static int hf_l2server_csi_ssb_res_set_to_del = -1;
+static int hf_l2server_csi_res_cfg_to_del = -1;
+static int hf_l2server_csi_rep_cfg_to_del = -1;
+
 static const value_string lch_vals[] =
 {
     { 0x0,   "SPARE" },
@@ -3087,7 +3095,6 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
                                                           "", "CSI Meas Config");
     proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_meas_config);
 
-
     // Counts
 
     // NbNzpCsiRsResToAdd
@@ -3213,7 +3220,7 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     offset += (nb_aper_trigger_state_list * sizeof(bb_nr5g_CSI_APERIODIC_TRIGGER_STATE_CFGt));
 
     // TODO:
-    // SPOnPuschTriggerStateList
+    // SPOnPuschTriggerStateList (fixed size)
     offset += (nb_sp_on_pusch_trigger_state_list * sizeof(bb_nr5g_CSI_SEMIPERSISTENT_ONPUSCH_TRIGGER_STATE_CFGt));
     //-----------------------------------------------------------------------------------------
 
@@ -3222,25 +3229,46 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     // Deleted items
 
     // NzpCsiRsResToDel
-    offset += (nb_nzp_csi_rs_res_to_del * 4);
+    for (guint n=0; n < nb_nzp_csi_rs_res_to_del; n++) {
+        proto_tree_add_item(config_tree, hf_l2server_nzp_csi_rs_res_to_del, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
 
     // NzpCsiRsResSetToDel
-    offset += (nb_nzp_csi_rs_res_set_to_del * 4);
+    for (guint n=0; n < nb_nzp_csi_rs_res_set_to_del; n++) {
+        proto_tree_add_item(config_tree, hf_l2server_nzp_csi_rs_res_set_to_del, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
 
     // CsiImResToDel
-    offset += (nb_csi_im_res_to_del * 4);
+    for (guint n=0; n < nb_csi_im_res_to_del; n++) {
+        proto_tree_add_item(config_tree, hf_l2server_csi_im_res_to_del, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
 
     // CsiImResSetToDel
-    offset += (nb_csi_im_res_set_to_del * 4);
+    for (guint n=0; n < nb_csi_im_res_set_to_del; n++) {
+        proto_tree_add_item(config_tree, hf_l2server_csi_im_res_set_to_del, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
 
     // CsiSsbResSetToDel
-    offset += (nb_csi_ssb_res_set_to_del * 4);
+    for (guint n=0; n < nb_csi_ssb_res_set_to_del; n++) {
+        proto_tree_add_item(config_tree, hf_l2server_csi_ssb_res_set_to_del, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
 
     // CsiResCfgToDel
-    offset += (nb_csi_res_cfg_to_del * 4);
+    for (guint n=0; n < nb_csi_res_cfg_to_del; n++) {
+        proto_tree_add_item(config_tree, hf_l2server_csi_res_cfg_to_del, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
 
     // CsiRepCfgToDel
-    offset += (nb_csi_rep_cfg_to_del * 4);
+    for (guint n=0; n < nb_csi_rep_cfg_to_del; n++) {
+        proto_tree_add_item(config_tree, hf_l2server_csi_rep_cfg_to_del, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
     //-----------------------------------------------------------------------------------------
 
     proto_item_set_len(config_ti, offset-start_offset);
@@ -3447,6 +3475,8 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
             offset = dissect_csi_meas_config(ded_tree, tvb, pinfo, offset);
         }
 
+        // TODO: still quite a lot to do here...
+
         // DlBwpIdToAdd. TODO: not fixed size!!!!!
         offset += (nbDlBwpIdToAdd * sizeof(bb_nr5g_BWP_DOWNLINKt));
         // DlChannelBwPerScs
@@ -3459,8 +3489,10 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         proto_item_set_len(ded_ti, offset-start_offset);
     }
 
+    // N.B. Can't start UL config yet as offset after DL won't be correct yet!!!!!!
+
     // UlCellCfgDed (bb_nr5g_UPLINK_DEDICATED_CONFIGt from bb-nr5g_struct.h)
-    if (ul_ded_present) {
+    if (false && ul_ded_present) {
         guint start_offset = offset;
         proto_item *ded_ti = proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_ul, tvb,
                                                               offset, sizeof(bb_nr5g_UPLINK_DEDICATED_CONFIGt),
@@ -7121,6 +7153,28 @@ proto_register_l2server(void)
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_ul_am_req_frame,
         { "REQ Frame", "l2server.ul-am-req-frame", FT_FRAMENUM, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nzp_csi_rs_res_to_del,
+        { "NZP CSI RS Resource to delete", "l2server.nzp-csi-rs-res-to-del", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nzp_csi_rs_res_set_to_del,
+        { "NZP CSI RS Resource Set to delete", "l2server.nzp-csi-rs-res-set-to-del", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_im_res_to_del,
+        { "CSI IM Resource to delete", "l2server.csi-im-res-to-del", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_im_res_set_to_del,
+        { "CSI IM Resource Set to delete", "l2server.csi-im-res-set-to-del", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_ssb_res_set_to_del,
+        { "CSI SSB Resource Set to delete", "l2server.csi-ssb-res-set-to-del", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_res_cfg_to_del,
+        { "CSI Res Config to delete", "l2server.csi-res-cfg-to-del", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_rep_cfg_to_del,
+        { "CSI Rep Config to delete", "l2server.csi-rep-cfg-to-del", FT_UINT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
     };
 
