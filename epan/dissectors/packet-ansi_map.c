@@ -1461,7 +1461,7 @@ dissect_ansi_map_digits_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
                 return;
             offset++;
             proto_tree_add_item_ret_string(subtree, hf_ansi_map_ia5_digits, tvb, offset, tvb_reported_length_remaining(tvb,offset),
-                                            ENC_ASCII|ENC_NA, pinfo->pool, &digits);
+                                            ENC_ASCII, pinfo->pool, &digits);
             proto_item_append_text(actx->created_item, " - %s", digits);
             }
             break;
@@ -1497,7 +1497,7 @@ dissect_ansi_map_digits_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
             const guint8* digits;
             /* IA5 Coding */
             proto_tree_add_item_ret_string(subtree, hf_ansi_map_ia5_digits, tvb, offset, tvb_reported_length_remaining(tvb,offset),
-                                            ENC_ASCII|ENC_NA, pinfo->pool, &digits);
+                                            ENC_ASCII, pinfo->pool, &digits);
             proto_item_append_text(actx->created_item, " - %s", digits);
             }
             break;

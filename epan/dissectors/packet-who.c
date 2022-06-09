@@ -108,7 +108,7 @@ dissect_who(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 	}
 	offset += 4;
 
-	server_name = tvb_get_stringzpad(pinfo->pool, tvb, offset, 32, ENC_ASCII|ENC_NA);
+	server_name = tvb_get_stringzpad(pinfo->pool, tvb, offset, 32, ENC_ASCII);
 	proto_tree_add_string(who_tree, hf_who_hostname, tvb, offset, 32, server_name);
 	offset += 32;
 
@@ -164,12 +164,12 @@ dissect_whoent(packet_info *pinfo, tvbuff_t *tvb, int offset, proto_tree *tree)
 		    line_offset, SIZE_OF_WHOENT, ENC_NA);
 		whoent_tree = proto_item_add_subtree(whoent_ti, ett_whoent);
 
-		out_line = tvb_get_stringzpad(pinfo->pool, tvb, line_offset, 8, ENC_ASCII|ENC_NA);
+		out_line = tvb_get_stringzpad(pinfo->pool, tvb, line_offset, 8, ENC_ASCII);
 		proto_tree_add_string(whoent_tree, hf_who_tty, tvb, line_offset,
 		    8, out_line);
 		line_offset += 8;
 
-		out_name = tvb_get_stringzpad(pinfo->pool, tvb, line_offset, 8, ENC_ASCII|ENC_NA);
+		out_name = tvb_get_stringzpad(pinfo->pool, tvb, line_offset, 8, ENC_ASCII);
 		proto_tree_add_string(whoent_tree, hf_who_uid, tvb, line_offset,
 		    8, out_name);
 		line_offset += 8;

@@ -71,7 +71,7 @@ dissect_gdb_token(void *tvbparse_data, const void *wanted_data, tvbparse_elem_t 
     switch (token) {
         case GDB_TOK_ACK:
             proto_tree_add_item(tree, hf_gdb_ack,
-                    tok->tvb, tok->offset, tok->len, ENC_ASCII|ENC_NA);
+                    tok->tvb, tok->offset, tok->len, ENC_ASCII);
             break;
         case GDB_TOK_START:
             proto_tree_add_item(tree, hf_gdb_start,

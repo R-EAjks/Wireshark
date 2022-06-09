@@ -6850,7 +6850,7 @@ ssl_dissect_hnd_ext_delegated_credentials(ssl_common_dissect_t *hf, tvbuff_t *tv
         }
         offset += 2;
         proto_tree_add_item(tree, hf->hf.hs_cred_signature,
-                            tvb, offset, sign_length, ENC_ASCII|ENC_NA);
+                            tvb, offset, sign_length, ENC_ASCII);
         offset += sign_length;
 
         return offset;
@@ -6900,7 +6900,7 @@ ssl_dissect_hnd_hello_ext_alps(ssl_common_dissect_t *hf, tvbuff_t *tvb,
             offset++;
 
             proto_tree_add_item(alps_tree, hf->hf.hs_ext_alps_alpn_str,
-                                tvb, offset, name_length, ENC_ASCII|ENC_NA);
+                                tvb, offset, name_length, ENC_ASCII);
             offset += name_length;
         }
 
@@ -6909,7 +6909,7 @@ ssl_dissect_hnd_hello_ext_alps(ssl_common_dissect_t *hf, tvbuff_t *tvb,
     case SSL_HND_ENCRYPTED_EXTS:
 	/* Opaque blob */
         proto_tree_add_item(tree, hf->hf.hs_ext_alps_settings,
-                            tvb, offset, offset_end - offset, ENC_ASCII|ENC_NA);
+                            tvb, offset, offset_end - offset, ENC_ASCII);
         break;
     }
 
@@ -6958,7 +6958,7 @@ ssl_dissect_hnd_hello_ext_alpn(ssl_common_dissect_t *hf, tvbuff_t *tvb,
         offset++;
 
         proto_tree_add_item(alpn_tree, hf->hf.hs_ext_alpn_str,
-                            tvb, offset, name_length, ENC_ASCII|ENC_NA);
+                            tvb, offset, name_length, ENC_ASCII);
         /* Remember first ALPN ProtocolName entry for server. */
         if (hnd_type == SSL_HND_SERVER_HELLO || hnd_type == SSL_HND_ENCRYPTED_EXTENSIONS) {
             /* '\0'-terminated string for dissector table match and prefix
@@ -7043,7 +7043,7 @@ ssl_dissect_hnd_hello_ext_npn(ssl_common_dissect_t *hf, tvbuff_t *tvb,
         offset++;
 
         proto_tree_add_item(npn_tree, hf->hf.hs_ext_npn_str,
-                            tvb, offset, npn_length, ENC_ASCII|ENC_NA);
+                            tvb, offset, npn_length, ENC_ASCII);
         offset += npn_length;
     }
 
@@ -7509,7 +7509,7 @@ ssl_dissect_hnd_hello_ext_server_name(ssl_common_dissect_t *hf, tvbuff_t *tvb,
         offset += 2;
 
         proto_tree_add_item(server_name_tree, hf->hf.hs_ext_server_name,
-                            tvb, offset, server_name_length, ENC_ASCII|ENC_NA);
+                            tvb, offset, server_name_length, ENC_ASCII);
         offset += server_name_length;
     }
     return offset;
@@ -7904,7 +7904,7 @@ ssl_dissect_hnd_hello_ext_quic_transport_parameters(ssl_common_dissect_t *hf, tv
             break;
             case SSL_HND_QUIC_TP_GOOGLE_USER_AGENT:
                 proto_tree_add_item(parameter_tree, hf->hf.hs_ext_quictp_parameter_google_user_agent_id,
-                                    tvb, offset, parameter_length, ENC_ASCII|ENC_NA);
+                                    tvb, offset, parameter_length, ENC_ASCII);
                 offset += parameter_length;
             break;
             case SSL_HND_QUIC_TP_GOOGLE_KEY_UPDATE_NOT_YET_SUPPORTED:
@@ -8376,7 +8376,7 @@ ssl_dissect_hnd_hello_ext_srp(ssl_common_dissect_t *hf, tvbuff_t *tvb,
     offset++;
 
     proto_tree_add_item(tree, hf->hf.hs_ext_srp_username,
-                        tvb, offset, username_len, ENC_UTF_8|ENC_NA);
+                        tvb, offset, username_len, ENC_UTF_8);
     offset += username_len;
 
     return offset;
@@ -9575,7 +9575,7 @@ ssl_dissect_hnd_cert_url(ssl_common_dissect_t *hf, tvbuff_t *tvb, proto_tree *tr
         offset += 2;
 
         proto_tree_add_item(urlhash_tree, hf->hf.hs_ext_cert_url_url,
-                            tvb, offset, url_len, ENC_ASCII|ENC_NA);
+                            tvb, offset, url_len, ENC_ASCII);
         offset += url_len;
 
         proto_tree_add_item(urlhash_tree, hf->hf.hs_ext_cert_url_padding,

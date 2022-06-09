@@ -249,7 +249,7 @@ tvbuff_t * dissect_cbs_data(guint8 sms_encoding, tvbuff_t *tvb, proto_tree *tree
       /*
        * XXX - encoding is "user-defined".  Have a preference?
        */
-      text = tvb_get_string_enc(pinfo->pool, tvb, offset, length, ENC_ASCII|ENC_NA);
+      text = tvb_get_string_enc(pinfo->pool, tvb, offset, length, ENC_ASCII);
       tvb_out = tvb_new_child_real_data(tvb, text, (guint)strlen(text), (guint)strlen(text));
       add_new_data_source(pinfo, tvb_out, "8 bit data");
       break;
@@ -386,7 +386,7 @@ int dissect_umts_cell_broadcast_message(tvbuff_t *tvb, packet_info *pinfo, proto
    msg_len = tvb_reported_length(cbs_msg_tvb);
    cbs_subtree = proto_tree_add_subtree_format(cbs_tree, tvb, offset, -1,
                     ett_cbs_msg, NULL, "Cell Broadcast Message Contents (length: %d)", msg_len);
-   msg = tvb_get_string_enc(pinfo->pool, cbs_msg_tvb, 0, msg_len, ENC_UTF_8|ENC_NA);
+   msg = tvb_get_string_enc(pinfo->pool, cbs_msg_tvb, 0, msg_len, ENC_UTF_8);
    proto_tree_add_string_format(cbs_subtree, hf_gsm_cbs_message_content, cbs_msg_tvb, 0, -1, msg, "%s", msg);
    return tvb_captured_length(tvb);
 }

@@ -73,7 +73,7 @@ dissect_whois(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
          */
         linelen = tvb_find_line_end(tvb, 0, -1, NULL, FALSE);
         if (linelen != -1)
-            whois_trans->query = tvb_get_string_enc(wmem_file_scope(), tvb, 0, linelen, ENC_ASCII|ENC_NA);
+            whois_trans->query = tvb_get_string_enc(wmem_file_scope(), tvb, 0, linelen, ENC_ASCII);
         conversation_add_proto_data(conversation, proto_whois, whois_trans);
     }
 

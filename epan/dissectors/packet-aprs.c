@@ -807,7 +807,7 @@ dissect_aprs_weather(	tvbuff_t   *tvb,
 					 * See http://www.aprs.org/aprs12/utf-8.txt
 					 */
 					if ( ((lr < 3) || (lr > 5)) ||
-						( lr != strspn( tvb_get_string_enc( wmem_packet_scope(), tvb, offset, lr, ENC_ASCII|ENC_NA ), "a-zA-Z0-9-_" ) ) )
+						( lr != strspn( tvb_get_string_enc( wmem_packet_scope(), tvb, offset, lr, ENC_ASCII ), "a-zA-Z0-9-_" ) ) )
 						{
 						new_offset = offset;  /* Assume rest is a comment: force exit from while */
 						break;  /* from switch */
@@ -943,7 +943,7 @@ aprs_item( proto_tree *aprs_tree, tvbuff_t *tvb, int offset )
 	 * XXX - ASCII or UTF-8?
 	 * See http://www.aprs.org/aprs12/utf-8.txt
 	 */
-	info_buffer = tvb_get_string_enc( wmem_packet_scope(), tvb, offset, data_len, ENC_ASCII|ENC_NA );
+	info_buffer = tvb_get_string_enc( wmem_packet_scope(), tvb, offset, data_len, ENC_ASCII );
 
 	ch_ptr = strchr( info_buffer, '!' );
 	if ( ch_ptr != NULL )
@@ -998,7 +998,7 @@ aprs_default_string( proto_tree *aprs_tree, tvbuff_t *tvb, int offset, int data_
 			return offset;  /* there's no data */
 #endif
 		}
-	proto_tree_add_item( aprs_tree, hfindex, tvb, offset, data_len, ENC_ASCII|ENC_NA );
+	proto_tree_add_item( aprs_tree, hfindex, tvb, offset, data_len, ENC_ASCII );
 	return offset + data_len;
 }
 

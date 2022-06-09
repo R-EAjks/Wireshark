@@ -1221,16 +1221,16 @@ decode_ip_device_routing(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
                         proto_tree_add_item(ua3g_param_tree, hf_ua3g_ip_device_routing_reset_parameter_bad_sec_mode, tvb, offset, 1, ENC_BIG_ENDIAN);
                         break;
                     case 0x02: /* Cust_Name */
-                        proto_tree_add_item(ua3g_param_tree, hf_ua3g_ip_device_routing_reset_parameter_cust_name, tvb, offset, parameter_length, ENC_NA|ENC_ASCII);
+                        proto_tree_add_item(ua3g_param_tree, hf_ua3g_ip_device_routing_reset_parameter_cust_name, tvb, offset, parameter_length, ENC_ASCII);
                         break;
                     case 0x03: /* L10N_Name */
-                        proto_tree_add_item(ua3g_param_tree, hf_ua3g_ip_device_routing_reset_parameter_l10n_name, tvb, offset, parameter_length, ENC_NA|ENC_ASCII);
+                        proto_tree_add_item(ua3g_param_tree, hf_ua3g_ip_device_routing_reset_parameter_l10n_name, tvb, offset, parameter_length, ENC_ASCII);
                         break;
                     case 0x04: /* Appl_Mode */
                         proto_tree_add_item(ua3g_param_tree, hf_ua3g_ip_device_routing_reset_parameter_appl_mode, tvb, offset, 1, ENC_BIG_ENDIAN);
                         break;
                     case 0x05: /* SIP_Name */
-                        proto_tree_add_item(ua3g_param_tree, hf_ua3g_ip_device_routing_reset_parameter_sip_name, tvb, offset, parameter_length, ENC_NA|ENC_ASCII);
+                        proto_tree_add_item(ua3g_param_tree, hf_ua3g_ip_device_routing_reset_parameter_sip_name, tvb, offset, parameter_length, ENC_ASCII);
                         break;
                     case 0x06: /* Appl_Mode */
                         proto_tree_add_item(ua3g_param_tree, hf_ua3g_ip_device_routing_reset_parameter_reset_mac, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -1596,7 +1596,7 @@ decode_ip_device_routing(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
                     case 0x0A: /* ERR STRING CONNECTED */
                     case 0x0B: /* ERR STRING RESET */
                     case 0x0C: /* ERR STRING DUPLICATE IP ADDRESS */
-                        proto_tree_add_item(ua3g_param_tree, hf_ua3g_ip_device_routing_set_param_req_parameter_err_string, tvb, offset, parameter_length, ENC_NA|ENC_ASCII);
+                        proto_tree_add_item(ua3g_param_tree, hf_ua3g_ip_device_routing_set_param_req_parameter_err_string, tvb, offset, parameter_length, ENC_ASCII);
                         break;
                     case 0x0F: /* TFTP BACKUP IP ADDR */
                         proto_tree_add_item(ua3g_param_tree, hf_ua3g_ip_device_routing_set_param_req_parameter_tftp_backup_ip, tvb, offset, 4, ENC_BIG_ENDIAN);
@@ -1617,7 +1617,7 @@ decode_ip_device_routing(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
                         proto_tree_add_item(ua3g_param_tree, hf_ua3g_ip_device_routing_set_param_req_parameter_skin_id, tvb, offset, 1, ENC_BIG_ENDIAN);
                         break;
                     case 0x1C: /* Set Language Identifier */
-                        proto_tree_add_item(ua3g_param_tree, hf_ua3g_ip_device_routing_set_param_req_parameter_language_id, tvb, offset, 2, ENC_NA|ENC_ASCII);
+                        proto_tree_add_item(ua3g_param_tree, hf_ua3g_ip_device_routing_set_param_req_parameter_language_id, tvb, offset, 2, ENC_ASCII);
                         break;
                     case 0x1E: /* USB Boost */
                         proto_tree_add_item(ua3g_param_tree, hf_ua3g_ip_device_routing_set_param_req_parameter_usb_boost, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -1903,7 +1903,7 @@ static void
 decode_debug_in_line(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
              guint offset, guint length)
 {
-    proto_tree_add_item(tree, hf_ua3g_debug_in_line, tvb, offset, length, ENC_NA|ENC_ASCII);
+    proto_tree_add_item(tree, hf_ua3g_debug_in_line, tvb, offset, length, ENC_ASCII);
 }
 
 
@@ -3420,12 +3420,12 @@ decode_cs_ip_device_routing(proto_tree *tree _U_, tvbuff_t *tvb,
                         {
                             if (parameter_length == 2) {
                                 proto_tree_add_item(ua3g_param_tree, hf_ua3g_cs_ip_device_routing_cmd02_parameter_eth_driver_config_port_lan_speed, tvb, offset, 1, ENC_BIG_ENDIAN);
-                                proto_tree_add_item(ua3g_param_tree, hf_ua3g_cs_ip_device_routing_cmd02_parameter_eth_driver_config_port_lan_duplex, tvb, offset+1, 1, ENC_NA|ENC_ASCII);
+                                proto_tree_add_item(ua3g_param_tree, hf_ua3g_cs_ip_device_routing_cmd02_parameter_eth_driver_config_port_lan_duplex, tvb, offset+1, 1, ENC_ASCII);
                             } else if (parameter_length == 4) {
                                 proto_tree_add_item(ua3g_param_tree, hf_ua3g_cs_ip_device_routing_cmd02_parameter_eth_driver_config_port_lan_speed, tvb, offset, 1, ENC_BIG_ENDIAN);
-                                proto_tree_add_item(ua3g_param_tree, hf_ua3g_cs_ip_device_routing_cmd02_parameter_eth_driver_config_port_lan_duplex, tvb, offset+1, 1, ENC_NA|ENC_ASCII);
+                                proto_tree_add_item(ua3g_param_tree, hf_ua3g_cs_ip_device_routing_cmd02_parameter_eth_driver_config_port_lan_duplex, tvb, offset+1, 1, ENC_ASCII);
                                 proto_tree_add_item(ua3g_param_tree, hf_ua3g_cs_ip_device_routing_cmd02_parameter_eth_driver_config_port_pc_speed, tvb, offset+2, 1, ENC_BIG_ENDIAN);
-                                proto_tree_add_item(ua3g_param_tree, hf_ua3g_cs_ip_device_routing_cmd02_parameter_eth_driver_config_port_pc_duplex, tvb, offset+3, 1, ENC_NA|ENC_ASCII);
+                                proto_tree_add_item(ua3g_param_tree, hf_ua3g_cs_ip_device_routing_cmd02_parameter_eth_driver_config_port_pc_duplex, tvb, offset+3, 1, ENC_ASCII);
                             } else {
                                 proto_tree_add_item(ua3g_param_tree, hf_ua3g_cs_ip_device_routing_cmd02_parameter_value, tvb, offset, parameter_length, ENC_NA);
                             }
@@ -3479,7 +3479,7 @@ decode_cs_ip_device_routing(proto_tree *tree _U_, tvbuff_t *tvb,
                             break;
                         case 0x0A: /* Local ID */
                         case 0x0B: /* Remote ID */
-                            proto_tree_add_item(ua3g_param_tree, hf_ua3g_cs_ip_device_routing_cmd03_parameter_string, tvb, offset, parameter_length, ENC_NA|ENC_ASCII);
+                            proto_tree_add_item(ua3g_param_tree, hf_ua3g_cs_ip_device_routing_cmd03_parameter_string, tvb, offset, parameter_length, ENC_ASCII);
                             break;
                         case 0x0F: /* Codec */
                             proto_tree_add_item(ua3g_param_tree, hf_ua3g_cs_ip_device_routing_cmd03_parameter_codec, tvb, offset, 1, ENC_BIG_ENDIAN);

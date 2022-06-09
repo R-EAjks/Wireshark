@@ -3112,15 +3112,15 @@ dissect_magic(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
       offset += 7;
 
       /* Device Type Name string */
-      proto_tree_add_item_ret_length(magic_tree, hf_magic_reply_device_type_name, tvb, offset, 1, ENC_NA|ENC_ASCII, &str_len);
+      proto_tree_add_item_ret_length(magic_tree, hf_magic_reply_device_type_name, tvb, offset, 1, ENC_ASCII, &str_len);
       offset += str_len;
 
       /* Default Name string */
-      proto_tree_add_item_ret_length(magic_tree, hf_magic_reply_default_name, tvb, offset, 1, ENC_NA|ENC_ASCII, &str_len);
+      proto_tree_add_item_ret_length(magic_tree, hf_magic_reply_default_name, tvb, offset, 1, ENC_ASCII, &str_len);
       offset += str_len;
 
       /* User Name string */
-      proto_tree_add_item_ret_length(magic_tree, hf_magic_reply_user_name, tvb, offset, 1, ENC_NA|ENC_ASCII, &str_len);
+      proto_tree_add_item_ret_length(magic_tree, hf_magic_reply_user_name, tvb, offset, 1, ENC_ASCII, &str_len);
       offset += str_len;
       break;
 
@@ -3156,15 +3156,15 @@ dissect_magic(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
       offset += 7;
 
       /* Device Type Name string */
-      proto_tree_add_item_ret_length(magic_tree, hf_magic_reply_device_type_name, tvb, offset, 1, ENC_NA|ENC_ASCII, &str_len);
+      proto_tree_add_item_ret_length(magic_tree, hf_magic_reply_device_type_name, tvb, offset, 1, ENC_ASCII, &str_len);
       offset += str_len;
 
       /* Default Name string */
-      proto_tree_add_item_ret_length(magic_tree, hf_magic_reply_default_name, tvb, offset, 1, ENC_NA|ENC_ASCII, &str_len);
+      proto_tree_add_item_ret_length(magic_tree, hf_magic_reply_default_name, tvb, offset, 1, ENC_ASCII, &str_len);
       offset += str_len;
 
       /* User Name string */
-      proto_tree_add_item_ret_length(magic_tree, hf_magic_reply_user_name, tvb, offset, 1, ENC_NA|ENC_ASCII, &str_len);
+      proto_tree_add_item_ret_length(magic_tree, hf_magic_reply_user_name, tvb, offset, 1, ENC_ASCII, &str_len);
       offset += str_len;
       break;
 

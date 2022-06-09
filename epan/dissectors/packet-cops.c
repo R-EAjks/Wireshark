@@ -1724,7 +1724,7 @@ static int dissect_cops_pr_object_data(tvbuff_t *tvb, packet_info *pinfo, guint3
                 break;
 
             case FT_STRING:
-                proto_tree_add_item(asn_tree,hfid,tvb,offset,ber_length,ENC_ASCII|ENC_NA);
+                proto_tree_add_item(asn_tree,hfid,tvb,offset,ber_length,ENC_ASCII);
                 break;
 
             default:

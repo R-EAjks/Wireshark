@@ -712,7 +712,7 @@ dissect_megaco_text(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* d
     }
 
     megaco_tree_add_string(megaco_tree, hf_megaco_start, tvb, 0, tvb_previous_offset+1,
-                    tvb_get_string_enc(wmem_packet_scope(), tvb, 0, tvb_previous_offset, ENC_UTF_8|ENC_NA));
+                    tvb_get_string_enc(wmem_packet_scope(), tvb, 0, tvb_previous_offset, ENC_UTF_8));
 
     /* skip / */
     tvb_previous_offset++;
@@ -726,7 +726,7 @@ dissect_megaco_text(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* d
     }
 
     megaco_tree_add_string(megaco_tree, hf_megaco_version, tvb, tvb_previous_offset, tvb_current_offset - tvb_previous_offset,
-                    tvb_get_string_enc(wmem_packet_scope(), tvb, tvb_previous_offset, tvb_current_offset - tvb_previous_offset, ENC_UTF_8|ENC_NA));
+                    tvb_get_string_enc(wmem_packet_scope(), tvb, tvb_previous_offset, tvb_current_offset - tvb_previous_offset, ENC_UTF_8));
 
     tvb_previous_offset = tvb_current_offset;
     tvb_current_offset = megaco_tvb_skip_wsp(tvb, tvb_previous_offset);
@@ -762,7 +762,7 @@ dissect_megaco_text(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* d
     * or to the next character after white space SEP
     */
     megaco_tree_add_string(megaco_tree, hf_megaco_mId, tvb, tvb_previous_offset, tvb_current_offset - tvb_previous_offset,
-                    tvb_get_string_enc(wmem_packet_scope(), tvb, tvb_previous_offset, tvb_current_offset - tvb_previous_offset, ENC_UTF_8|ENC_NA));
+                    tvb_get_string_enc(wmem_packet_scope(), tvb, tvb_previous_offset, tvb_current_offset - tvb_previous_offset, ENC_UTF_8));
 
     col_clear(pinfo->cinfo, COL_INFO);
     do{

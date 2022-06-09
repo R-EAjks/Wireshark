@@ -2057,7 +2057,7 @@ dissect_z3950_printable_OCTET_STRING(gboolean implicit_tag _U_, tvbuff_t *tvb _U
         if (next_tvb &&
             tvb_ascii_isprint(next_tvb, 0, tvb_reported_length(next_tvb))) {
                 proto_tree_add_item(tree, hf_alternate, next_tvb,
-                    0, tvb_reported_length(next_tvb), ENC_ASCII|ENC_NA);
+                    0, tvb_reported_length(next_tvb), ENC_ASCII);
         }
         else {
             offset = dissect_ber_octet_string(implicit_tag, actx, tree, tvb,
@@ -12734,7 +12734,7 @@ dissect_marc_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void * 
 
     marc_value_str = NULL;
     item = proto_tree_add_item_ret_string(leader_tree,
-                      hf_marc_leader_length, tvb, offset, 5, ENC_ASCII|ENC_NA,
+                      hf_marc_leader_length, tvb, offset, 5, ENC_ASCII,
                       pinfo->pool,&marc_value_str);
     offset += 5;
 
@@ -12803,7 +12803,7 @@ dissect_marc_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void * 
     }
 
     item = proto_tree_add_item_ret_string(leader_tree, hf_marc_leader_data_offset,
-               tvb, offset, 5, ENC_ASCII|ENC_NA,
+               tvb, offset, 5, ENC_ASCII,
                pinfo->pool,&marc_value_str);
     offset += 5;
     if (marc_value_str) {

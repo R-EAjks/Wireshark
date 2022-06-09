@@ -584,7 +584,7 @@ aim_get_buddyname(wmem_allocator_t *pool, guint8 **name, tvbuff_t *tvb, int offs
 
 	buddyname_length = tvb_get_guint8(tvb, offset);
 
-	*name = tvb_get_string_enc(pool, tvb, offset + 1, buddyname_length, ENC_UTF_8|ENC_NA);
+	*name = tvb_get_string_enc(pool, tvb, offset + 1, buddyname_length, ENC_UTF_8);
 
 	return buddyname_length;
 }
@@ -1186,7 +1186,7 @@ dissect_aim_tlv_value_string (proto_item *ti, guint16 valueid _U_, tvbuff_t *tvb
 	gint string_len;
 
 	string_len = tvb_reported_length(tvb);
-	buf = tvb_get_string_enc(pinfo->pool, tvb, 0, string_len, ENC_UTF_8|ENC_NA);
+	buf = tvb_get_string_enc(pinfo->pool, tvb, 0, string_len, ENC_UTF_8);
 	proto_item_set_text(ti, "Value: %s", format_text(pinfo->pool, buf, string_len));
 
 	return string_len;
@@ -1203,7 +1203,7 @@ dissect_aim_tlv_value_string08_array (proto_item *ti, guint16 valueid _U_, tvbuf
 	while (tvb_reported_length_remaining(tvb, offset) > 1)
 	{
 		guint8 string_len = tvb_get_guint8(tvb, offset);
-		proto_tree_add_item(entry, hf_aim_string08, tvb, offset, 1, ENC_UTF_8|ENC_NA);
+		proto_tree_add_item(entry, hf_aim_string08, tvb, offset, 1, ENC_UTF_8);
 		offset += (string_len+1);
 	}
 
@@ -1304,7 +1304,7 @@ dissect_aim_tlv_value_messageblock (proto_item *ti, guint16 valueid _U_, tvbuff_
 		offset += 2;
 
 		/* The actual message */
-		buf = tvb_get_string_enc(pinfo->pool, tvb, offset, blocklen - 4, ENC_ASCII|ENC_NA);
+		buf = tvb_get_string_enc(pinfo->pool, tvb, offset, blocklen - 4, ENC_ASCII);
 		proto_item_append_text(ti, "Message: %s ",
 				    format_text(pinfo->pool, buf, blocklen - 4));
 		proto_tree_add_item(entry, hf_aim_messageblock_message, tvb,

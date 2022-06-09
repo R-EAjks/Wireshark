@@ -2169,7 +2169,7 @@ static const value_string param_subcategory_vals[] = {
 static inline const gchar *format_param_str(tvbuff_t *tvb, int offset, int len) {
     char *param_str;
 
-    param_str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, len, ENC_UTF_8|ENC_NA);
+    param_str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, len, ENC_UTF_8);
 
     if (len < 2) {
         return param_str;

@@ -1772,7 +1772,7 @@ void wimax_error_parameter_set_decoder(tvbuff_t *tvb, packet_info *pinfo, proto_
 				add_tlv_subtree(&tlv_info, ceps_tree, hf_cst_error_set_error_code, tvb, offset, ENC_BIG_ENDIAN);
 			break;
 			case CST_ERROR_SET_ERROR_MSG:
-				add_tlv_subtree(&tlv_info, ceps_tree, hf_cst_error_set_error_msg, tvb, offset, ENC_ASCII|ENC_NA);
+				add_tlv_subtree(&tlv_info, ceps_tree, hf_cst_error_set_error_msg, tvb, offset, ENC_ASCII);
 			break;
 		}
 		offset += (tlv_len+get_tlv_value_offset(&tlv_info));
@@ -2194,7 +2194,7 @@ void wimax_service_flow_encodings_decoder(tvbuff_t *tvb, packet_info *pinfo, pro
 				add_tlv_subtree(&tlv_info, tree, hf_sfe_cid, tvb, offset-tlv_value_offset, ENC_BIG_ENDIAN);
 			break;
 			case SFE_SERVICE_CLASS_NAME:
-				add_tlv_subtree(&tlv_info, tree, hf_sfe_service_class_name, tvb, offset-tlv_value_offset, ENC_ASCII|ENC_NA);
+				add_tlv_subtree(&tlv_info, tree, hf_sfe_service_class_name, tvb, offset-tlv_value_offset, ENC_ASCII);
 			break;
 			case SFE_MBS_SERVICE:
 				add_tlv_subtree(&tlv_info, tree, hf_sfe_mbs_service, tvb, offset-tlv_value_offset, ENC_BIG_ENDIAN);
@@ -2354,7 +2354,7 @@ void wimax_service_flow_encodings_decoder(tvbuff_t *tvb, packet_info *pinfo, pro
 				add_tlv_subtree(&tlv_info, tree, hf_sfe_reserved_34, tvb, offset-tlv_value_offset, ENC_BIG_ENDIAN);
 			break;
 			case SFE_GLOBAL_SERVICE_CLASS_NAME:
-				add_tlv_subtree(&tlv_info, tree, hf_sfe_global_service_class_name, tvb, offset-tlv_value_offset, ENC_ASCII|ENC_NA);
+				add_tlv_subtree(&tlv_info, tree, hf_sfe_global_service_class_name, tvb, offset-tlv_value_offset, ENC_ASCII);
 			break;
 /* 36 reserved */
 			case SFE_RESERVED_36:
@@ -2758,7 +2758,7 @@ void wimax_pkm_tlv_encoded_attributes_decoder(tvbuff_t *tvb, packet_info *pinfo,
 		switch (tlv_type)
 		{
 			case PKM_ATTR_DISPLAY_STRING:
-				add_tlv_subtree(&tlv_info, tree, hf_pkm_msg_attr_display, tvb, offset-tlv_value_offset, ENC_ASCII|ENC_NA);
+				add_tlv_subtree(&tlv_info, tree, hf_pkm_msg_attr_display, tvb, offset-tlv_value_offset, ENC_ASCII);
 			break;
 			case PKM_ATTR_AUTH_KEY:
 				add_tlv_subtree(&tlv_info, tree, hf_pkm_msg_attr_auth_key, tvb, offset-tlv_value_offset, ENC_NA);

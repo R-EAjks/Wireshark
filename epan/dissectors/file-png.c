@@ -330,7 +330,7 @@ dissect_png(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void *da
 
         type = tvb_get_ntohl(tvb, offset+4);
         type_str = tvb_get_string_enc(pinfo->pool,
-                tvb, offset+4, 4, ENC_ASCII|ENC_NA);
+                tvb, offset+4, 4, ENC_ASCII);
 
         /* 4 byte len field, 4 byte chunk type, 4 byte CRC */
         chunk_tree = proto_tree_add_subtree_format(tree, tvb, offset, 4+4+len_field+4, ett_png_chunk, NULL,

@@ -379,7 +379,7 @@ dissect_collectd_string (tvbuff_t *tvb, packet_info *pinfo, gint type_hf,
 
 	proto_tree_add_uint (pt, hf_collectd_type, tvb, offset, 2, type);
 	proto_tree_add_uint (pt, hf_collectd_length, tvb, offset + 2, 2, length);
-	proto_tree_add_item_ret_string (pt, type_hf, tvb, *ret_offset, *ret_length, ENC_ASCII|ENC_NA, wmem_packet_scope(), ret_string);
+	proto_tree_add_item_ret_string (pt, type_hf, tvb, *ret_offset, *ret_length, ENC_ASCII, wmem_packet_scope(), ret_string);
 
 	proto_item_append_text(pt, "\"%s\"", *ret_string);
 

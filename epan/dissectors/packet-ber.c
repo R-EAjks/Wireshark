@@ -1679,7 +1679,7 @@ proto_tree_add_debug_text(tree, "OCTET STRING dissect_ber_octet_string(%s) enter
              *
              * If we've been provided with a non-zero encoding, use
              * that; otherwise, calculate it based on the tag.  (A
-             * zero encoding is ENC_ASCII|ENC_NA/ENC_BIG_ENDIAN, which
+             * zero encoding is ENC_ASCII/ENC_BIG_ENDIAN, which
              * is the default, so it's OK to use here; this is for
              * protcols such as LDAP that use OCTET STRING for UTF-8
              * strings.)
@@ -1691,7 +1691,7 @@ proto_tree_add_debug_text(tree, "OCTET STRING dissect_ber_octet_string(%s) enter
                     /*
                      * UTF-8, obviously.
                      */
-                    encoding = ENC_UTF_8|ENC_NA;
+                    encoding = ENC_UTF_8;
                     break;
 
                 case BER_UNI_TAG_NumericString:
@@ -1702,7 +1702,7 @@ proto_tree_add_debug_text(tree, "OCTET STRING dissect_ber_octet_string(%s) enter
                      * (Subsets of) Boring Old ASCII, with no(?) ISO 2022
                      * escape sequences.
                      */
-                    encoding = ENC_ASCII|ENC_NA;
+                    encoding = ENC_ASCII;
                     break;
 
                 case BER_UNI_TAG_TeletexString:
@@ -1722,7 +1722,7 @@ proto_tree_add_debug_text(tree, "OCTET STRING dissect_ber_octet_string(%s) enter
                      *
                      * XXX - treat as ASCII for now.
                      */
-                    encoding = ENC_ASCII|ENC_NA;
+                    encoding = ENC_ASCII;
                     break;
 
                 case BER_UNI_TAG_UniversalString:
@@ -1737,7 +1737,7 @@ proto_tree_add_debug_text(tree, "OCTET STRING dissect_ber_octet_string(%s) enter
                      * XXX - what's the transfer syntax?
                      * Treat as ASCII for now.
                      */
-                    encoding = ENC_ASCII|ENC_NA;
+                    encoding = ENC_ASCII;
                     break;
 
                 case BER_UNI_TAG_BMPString:

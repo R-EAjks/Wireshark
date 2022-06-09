@@ -315,7 +315,7 @@ static const value_string datarate_scale_vals[] = {
 			val_to_str_const(poe_tag, vspec_tag_vals, "Unknown"), poe_tag_length, #relation, length); \
 		} else { \
 			proto_tree_add_item(pppoe_tree, hf_var, tvb, \
-				tagstart+2, poe_tag_length, ENC_ASCII|ENC_NA); \
+				tagstart+2, poe_tag_length, ENC_ASCII); \
 		} \
 	break;
 
@@ -474,7 +474,7 @@ dissect_pppoe_tags(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tr
 					{
 					const guint8* str;
 					proto_tree_add_item_ret_string(pppoe_tree, hf_pppoed_tag_ac_name, tvb,
-					                    tagstart+4, poe_tag_length, ENC_ASCII|ENC_NA, pinfo->pool, &str);
+					                    tagstart+4, poe_tag_length, ENC_ASCII, pinfo->pool, &str);
 					/* Show AC-Name in info column */
 					col_append_fstr(pinfo->cinfo, COL_INFO, " AC-Name='%s'", str);
 					}

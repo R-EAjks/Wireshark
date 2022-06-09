@@ -279,7 +279,7 @@ dissect_proxy_v1_header(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     if (!proxy_v1_get_token_length(tvb, pinfo, proxy_tree, offset, header_length, buffer, &token_length)) {
         return tvb_captured_length(tvb);
     }
-    proto_tree_add_item(proxy_tree, hf_proxy1_proto, tvb, offset, token_length, ENC_NA|ENC_ASCII);
+    proto_tree_add_item(proxy_tree, hf_proxy1_proto, tvb, offset, token_length, ENC_ASCII);
     if (token_length == 4) {
         if (memcmp(buffer, "TCP4", 4) == 0) {
             tcp_ip_version = 4;
@@ -343,7 +343,7 @@ dissect_proxy_v1_header(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         break;
 
     default:
-        proto_tree_add_item(proxy_tree, hf_proxy1_unknown, tvb, offset, header_length - 2 - offset, ENC_NA|ENC_ASCII);
+        proto_tree_add_item(proxy_tree, hf_proxy1_unknown, tvb, offset, header_length - 2 - offset, ENC_ASCII);
         return tvb_captured_length(tvb);
     }
 

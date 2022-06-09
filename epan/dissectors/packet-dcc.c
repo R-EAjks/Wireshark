@@ -91,7 +91,7 @@ static expert_field ei_dcc_len = EI_INIT;
 		tvb_find_line_end(tvb, offset, left, &next_offset, \
 		    FALSE); \
 		proto_tree_add_item(dcc_optree, hf_label, tvb, offset, \
-			next_offset - offset, ENC_ASCII|ENC_NA); \
+			next_offset - offset, ENC_ASCII); \
 		offset = next_offset; \
 	} \
 }

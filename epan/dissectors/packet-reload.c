@@ -1035,7 +1035,7 @@ dissect_opaque_string_or_data(tvbuff_t *tvb, packet_info *pinfo,proto_tree *tree
 
   if (is_string) {
     hf_data = hf_reload_opaque_string;
-    hf_data_encoding = ENC_ASCII|ENC_NA;
+    hf_data_encoding = ENC_ASCII;
   }
 
   switch (length_size) {

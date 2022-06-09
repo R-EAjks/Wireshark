@@ -3405,7 +3405,7 @@ dissect_media_tlv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		/* Figure out the length of the hardware revision field */
 		if (tlvLen > 0)
 		{
-			proto_tree_add_item(tree, hf_media_hardware, tvb, offset, tlvLen, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(tree, hf_media_hardware, tvb, offset, tlvLen, ENC_ASCII);
 		}
 
 		break;
@@ -3415,7 +3415,7 @@ dissect_media_tlv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		/* Figure out the length of the firmware revision field */
 		if (tlvLen > 0)
 		{
-			proto_tree_add_item(tree, hf_media_firmware, tvb, offset, tlvLen, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(tree, hf_media_firmware, tvb, offset, tlvLen, ENC_ASCII);
 		}
 
 		break;
@@ -3425,7 +3425,7 @@ dissect_media_tlv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		/* Figure out the length of the software revision field */
 		if (tlvLen > 0)
 		{
-			proto_tree_add_item(tree, hf_media_software, tvb, offset, tlvLen, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(tree, hf_media_software, tvb, offset, tlvLen, ENC_ASCII);
 		}
 
 		break;
@@ -3435,7 +3435,7 @@ dissect_media_tlv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		/* Figure out the length of the serial number field */
 		if (tlvLen > 0)
 		{
-			proto_tree_add_item(tree, hf_media_sn, tvb, offset, tlvLen, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(tree, hf_media_sn, tvb, offset, tlvLen, ENC_ASCII);
 		}
 
 		break;
@@ -3445,7 +3445,7 @@ dissect_media_tlv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		/* Figure out the length of the manufacturer name field */
 		if (tlvLen > 0)
 		{
-			proto_tree_add_item(tree, hf_media_manufacturer, tvb, offset, tlvLen, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(tree, hf_media_manufacturer, tvb, offset, tlvLen, ENC_ASCII);
 		}
 
 		break;
@@ -3455,7 +3455,7 @@ dissect_media_tlv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		/* Figure out the length of the model name field */
 		if (tlvLen > 0)
 		{
-			proto_tree_add_item(tree, hf_media_model, tvb, offset, tlvLen, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(tree, hf_media_model, tvb, offset, tlvLen, ENC_ASCII);
 		}
 
 		break;
@@ -3465,7 +3465,7 @@ dissect_media_tlv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		/* Figure out the length of the asset id field */
 		if (tlvLen > 0)
 		{
-			proto_tree_add_item(tree, hf_media_asset, tvb, offset, tlvLen, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(tree, hf_media_asset, tvb, offset, tlvLen, ENC_ASCII);
 		}
 
 		break;

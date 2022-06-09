@@ -2339,7 +2339,7 @@ dissect_opt_lio(tvbuff_t *tvb, gint offset, packet_info *pinfo _U_, proto_tree *
         /* XXX Add expert info */
         lid_len = opt_len - 1;
     }
-    proto_tree_add_item(opt_tree, hf_ipv6_opt_lio_id, tvb, offset, lid_len, ENC_BIG_ENDIAN|ENC_ASCII);
+    proto_tree_add_item(opt_tree, hf_ipv6_opt_lio_id, tvb, offset, lid_len, ENC_ASCII);
     offset += lid_len;
 
     return offset;

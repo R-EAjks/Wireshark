@@ -2139,7 +2139,7 @@ inflate_http2_header_block(tvbuff_t *tvb, packet_info *pinfo, guint offset, prot
         hoffset += 4;
 
         /* Add header name. */
-        proto_tree_add_item_ret_string(header_tree, hf_http2_header_name, header_tvb, hoffset, header_name_length, ENC_ASCII|ENC_NA, pinfo->pool, &header_name);
+        proto_tree_add_item_ret_string(header_tree, hf_http2_header_name, header_tvb, hoffset, header_name_length, ENC_ASCII, pinfo->pool, &header_name);
         hoffset += header_name_length;
 
         /* header value length */
@@ -2147,7 +2147,7 @@ inflate_http2_header_block(tvbuff_t *tvb, packet_info *pinfo, guint offset, prot
         hoffset += 4;
 
         /* Add header value. */
-        proto_tree_add_item_ret_string(header_tree, hf_http2_header_value, header_tvb, hoffset, header_value_length, ENC_ASCII|ENC_NA, pinfo->pool, &header_value);
+        proto_tree_add_item_ret_string(header_tree, hf_http2_header_value, header_tvb, hoffset, header_value_length, ENC_ASCII, pinfo->pool, &header_value);
         // check if field is http2 header https://tools.ietf.org/html/rfc7541#appendix-A
         try_add_named_header_field(header_tree, header_tvb, hoffset, header_value_length, header_name, header_value);
 

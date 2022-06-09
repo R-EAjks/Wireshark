@@ -1567,7 +1567,7 @@ static int dissect_l2tp_cisco_avps(tvbuff_t *tvb, packet_info *pinfo _U_, proto_
         proto_tree_add_item(l2tp_avp_tree, hf_l2tp_cisco_assigned_cookie, tvb, offset, avp_len, ENC_NA);
         break;
     case CISCO_REMOTE_END_ID:
-        proto_tree_add_item(l2tp_avp_tree, hf_l2tp_cisco_remote_end_id, tvb, offset, avp_len, ENC_NA|ENC_ASCII);
+        proto_tree_add_item(l2tp_avp_tree, hf_l2tp_cisco_remote_end_id, tvb, offset, avp_len, ENC_ASCII);
         break;
     case CISCO_PW_TYPE:
         proto_tree_add_item(l2tp_avp_tree, hf_l2tp_cisco_pseudowire_type, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -2154,11 +2154,11 @@ static void process_control_avps(tvbuff_t *tvb,
             break;
 
         case HOST_NAME:
-            proto_tree_add_item(l2tp_avp_tree, hf_l2tp_avp_host_name, tvb, idx, avp_len, ENC_NA|ENC_ASCII);
+            proto_tree_add_item(l2tp_avp_tree, hf_l2tp_avp_host_name, tvb, idx, avp_len, ENC_ASCII);
             break;
 
         case VENDOR_NAME:
-            proto_tree_add_item(l2tp_avp_tree, hf_l2tp_avp_vendor_name, tvb, idx, avp_len, ENC_NA|ENC_ASCII);
+            proto_tree_add_item(l2tp_avp_tree, hf_l2tp_avp_vendor_name, tvb, idx, avp_len, ENC_ASCII);
             break;
 
         case ASSIGNED_TUNNEL_ID:
@@ -2193,7 +2193,7 @@ static void process_control_avps(tvbuff_t *tvb,
 
             if (avp_len == 0)
                 break;
-            proto_tree_add_item(l2tp_avp_tree, hf_l2tp_avp_advisory_msg, tvb, idx, avp_len, ENC_NA|ENC_ASCII);
+            proto_tree_add_item(l2tp_avp_tree, hf_l2tp_avp_advisory_msg, tvb, idx, avp_len, ENC_ASCII);
             break;
 
         case CHALLENGE_RESPONSE:
@@ -2243,7 +2243,7 @@ static void process_control_avps(tvbuff_t *tvb,
         case SUB_ADDRESS:
             if (avp_len == 0)
                 break;
-            proto_tree_add_item(l2tp_avp_tree, hf_l2tp_avp_sub_address, tvb, idx, avp_len, ENC_NA|ENC_ASCII);
+            proto_tree_add_item(l2tp_avp_tree, hf_l2tp_avp_sub_address, tvb, idx, avp_len, ENC_ASCII);
             break;
 
         case TX_CONNECT_SPEED:
@@ -2283,7 +2283,7 @@ static void process_control_avps(tvbuff_t *tvb,
         case PROXY_AUTHEN_NAME:
             if (avp_len == 0)
                 break;
-            proto_tree_add_item(l2tp_avp_tree, hf_l2tp_avp_proxy_authen_name, tvb, idx, avp_len, ENC_NA|ENC_ASCII);
+            proto_tree_add_item(l2tp_avp_tree, hf_l2tp_avp_proxy_authen_name, tvb, idx, avp_len, ENC_ASCII);
             break;
 
         case PROXY_AUTHEN_CHALLENGE:
@@ -2393,7 +2393,7 @@ static void process_control_avps(tvbuff_t *tvb,
 
             if (avp_len == 0)
                 break;
-            proto_tree_add_item(l2tp_avp_tree, hf_l2tp_avp_cause_code_message, tvb, idx, avp_len, ENC_NA|ENC_ASCII);
+            proto_tree_add_item(l2tp_avp_tree, hf_l2tp_avp_cause_code_message, tvb, idx, avp_len, ENC_ASCII);
             break;
 
         case MESSAGE_DIGEST:
@@ -2440,7 +2440,7 @@ static void process_control_avps(tvbuff_t *tvb,
             session = store_cookie_len(session, avp_len, msg_type);
             break;
         case REMOTE_END_ID:
-            proto_tree_add_item(l2tp_avp_tree, hf_l2tp_avp_remote_end_id, tvb, idx, avp_len, ENC_NA|ENC_ASCII);
+            proto_tree_add_item(l2tp_avp_tree, hf_l2tp_avp_remote_end_id, tvb, idx, avp_len, ENC_ASCII);
             break;
         case PW_TYPE:
             proto_tree_add_item(l2tp_avp_tree, hf_l2tp_avp_pseudowire_type, tvb, idx, 2, ENC_BIG_ENDIAN);
@@ -2458,7 +2458,7 @@ static void process_control_avps(tvbuff_t *tvb,
             proto_tree_add_item(l2tp_avp_tree, hf_l2tp_avp_circuit_type, tvb, idx, 2, ENC_BIG_ENDIAN);
             break;
         case PREFERRED_LANGUAGE:
-            proto_tree_add_item(l2tp_avp_tree, hf_l2tp_avp_preferred_language, tvb, idx, avp_len, ENC_NA|ENC_ASCII);
+            proto_tree_add_item(l2tp_avp_tree, hf_l2tp_avp_preferred_language, tvb, idx, avp_len, ENC_ASCII);
             break;
         case CTL_MSG_AUTH_NONCE:
             proto_tree_add_item(l2tp_avp_tree, hf_l2tp_avp_nonce, tvb, idx, avp_len, ENC_NA);

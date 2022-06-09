@@ -415,7 +415,7 @@ atmarpnum_to_str(tvbuff_t *tvb, int offset, int ad_tl)
     /*
      * I'm assuming this means it's an ASCII (IA5) string.
      */
-    return (gchar *) tvb_get_string_enc(wmem_packet_scope(), tvb, offset, ad_len, ENC_ASCII|ENC_NA);
+    return (gchar *) tvb_get_string_enc(wmem_packet_scope(), tvb, offset, ad_len, ENC_ASCII);
   } else {
     /*
      * NSAP.

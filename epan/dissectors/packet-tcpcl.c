@@ -2001,7 +2001,7 @@ static gint dissect_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                 return offset;
             }
 
-            proto_tree_add_item(tree_chdr, hf_tcpclv3_chdr_local_eid, tvb, offset, eid_length, ENC_NA|ENC_ASCII);
+            proto_tree_add_item(tree_chdr, hf_tcpclv3_chdr_local_eid, tvb, offset, eid_length, ENC_ASCII);
             offset += eid_length;
 
             // assumed parameters

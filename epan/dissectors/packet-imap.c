@@ -462,7 +462,7 @@ dissect_imap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
        * Add the line as request or reply data.
        */
       if (linelen != 0) {
-        proto_tree_add_item(reqresp_tree, (is_request) ? hf_imap_request : hf_imap_response, tvb, offset, linelen, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(reqresp_tree, (is_request) ? hf_imap_request : hf_imap_response, tvb, offset, linelen, ENC_ASCII);
       }
 
       /*
@@ -493,7 +493,7 @@ dissect_imap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
         tokenbuf = wmem_ascii_strdown(pinfo->pool, tokenbuf, tokenlen);
 
         if (is_request && !tvb_strncaseeql(tvb, offset, "UID", tokenlen)) {
-          proto_tree_add_item(reqresp_tree, hf_imap_request_uid, tvb, offset, tokenlen, ENC_ASCII|ENC_NA);
+          proto_tree_add_item(reqresp_tree, hf_imap_request_uid, tvb, offset, tokenlen, ENC_ASCII);
           /*
            * UID is a precursor to a command, if following the tag,
            * so move to next token to grab the actual command.
@@ -521,7 +521,7 @@ dissect_imap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
           /*
            * Not a UID request so perform normal parsing.
            */
-          proto_tree_add_item(reqresp_tree, (is_request) ? hf_imap_request_command : hf_imap_response_status, tvb, offset, tokenlen, ENC_ASCII|ENC_NA);
+          proto_tree_add_item(reqresp_tree, (is_request) ? hf_imap_request_command : hf_imap_response_status, tvb, offset, tokenlen, ENC_ASCII);
           if (is_request) {
             hidden_item = proto_tree_add_item(reqresp_tree, hf_imap_command, tvb, offset, tokenlen, ENC_ASCII | ENC_NA);
             proto_item_set_hidden(hidden_item);

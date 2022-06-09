@@ -1247,7 +1247,7 @@ dissect_ipxsap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _
 				s_tree = proto_item_add_subtree(ti, ett_ipxsap_server);
 
 				proto_tree_add_item(s_tree, hf_sap_server_type, tvb, cursor, 2, ENC_BIG_ENDIAN);
-				proto_tree_add_item_ret_string(s_tree, hf_sap_server_name, tvb, cursor+2, 48, ENC_ASCII|ENC_NA, pinfo->pool, &server_name);
+				proto_tree_add_item_ret_string(s_tree, hf_sap_server_name, tvb, cursor+2, 48, ENC_ASCII, pinfo->pool, &server_name);
 				proto_item_append_text(ti, ": %s", server_name);
 				proto_tree_add_item(s_tree, hf_sap_server_network, tvb, cursor+50, 4, ENC_NA);
 				proto_tree_add_item(s_tree, hf_sap_server_node, tvb, cursor+54, 6, ENC_NA);

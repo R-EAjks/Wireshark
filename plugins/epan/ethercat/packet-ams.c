@@ -780,7 +780,7 @@ static gint dissect_ams_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                   proto_tree_add_item(ams_adstree, hf_ams_adsversionbuild, tvb, offset, (int)sizeof(guint16), ENC_LITTLE_ENDIAN);
                   offset+=(int)sizeof(guint16);
 
-                  proto_tree_add_item(ams_adstree, hf_ams_adsdevicename, tvb, offset, ams_length-offset, ENC_ASCII|ENC_NA);
+                  proto_tree_add_item(ams_adstree, hf_ams_adsdevicename, tvb, offset, ams_length-offset, ENC_ASCII);
                }
             }
          }

@@ -500,7 +500,7 @@ dissect_dhcpfo_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 			 */
 			proto_tree_add_item_ret_string(option_tree,
 			    hf_dhcpfo_client_identifier, tvb, offset,
-			    option_length, ENC_ASCII|ENC_NA, pinfo->pool, &identifier);
+			    option_length, ENC_ASCII, pinfo->pool, &identifier);
 
 			proto_item_append_text(oi,", \"%s\"", identifier);
 			}

@@ -703,7 +703,7 @@ dissect_prism(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
     offset += 4;
 
     /* Device Name */
-    proto_tree_add_item_ret_string(prism_tree, hf_ieee80211_prism_devname, tvb, offset, 16, ENC_ASCII|ENC_NA, wmem_packet_scope(), &devname_p);
+    proto_tree_add_item_ret_string(prism_tree, hf_ieee80211_prism_devname, tvb, offset, 16, ENC_ASCII, wmem_packet_scope(), &devname_p);
     offset += 16;
 
     col_add_fstr(pinfo->cinfo, COL_INFO, "Device: %s, Message 0x%x, Length %d", devname_p, msgcode, msglen);

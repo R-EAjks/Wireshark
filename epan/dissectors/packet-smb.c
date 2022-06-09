@@ -8234,7 +8234,7 @@ dissect_tree_connect_andx_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree 
 	an_len = tvb_strsize(tvb, offset);
 	CHECK_BYTE_COUNT(an_len);
 	proto_tree_add_item_ret_string(tree, hf_smb_service, tvb,
-		offset, an_len, ENC_ASCII|ENC_NA, wmem_packet_scope(), &an);
+		offset, an_len, ENC_ASCII, wmem_packet_scope(), &an);
 	COUNT_BYTES(an_len);
 
 	END_OF_SMB
@@ -8340,7 +8340,7 @@ dissect_tree_connect_andx_response(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 	an_len = tvb_strsize(tvb, offset);
 	CHECK_BYTE_COUNT(an_len);
 	proto_tree_add_item_ret_string(tree, hf_smb_service, tvb,
-		offset, an_len, ENC_ASCII|ENC_NA, wmem_packet_scope(), &an);
+		offset, an_len, ENC_ASCII, wmem_packet_scope(), &an);
 	COUNT_BYTES(an_len);
 
 	/* Now when we know the service type, store it so that we know it for later commands down
@@ -11578,7 +11578,7 @@ dissect_transaction2_request_parameters(tvbuff_t *tvb, packet_info *pinfo,
 		COUNT_BYTES_TRANS(4);
 
 		/* file name */
-		fn = tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &fn_len, (si->unicode ? ENC_UTF_16|ENC_LITTLE_ENDIAN : ENC_ASCII|ENC_NA));
+		fn = tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &fn_len, (si->unicode ? ENC_UTF_16|ENC_LITTLE_ENDIAN : ENC_ASCII));
 
 		CHECK_STRING_TRANS(fn);
 		proto_tree_add_string(tree, hf_smb_file_name, tvb, offset, fn_len,
@@ -12468,7 +12468,7 @@ dissect_4_2_16_2(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
 		CHECK_BYTE_COUNT_SUBR(name_len + 1);
 		proto_tree_add_item_ret_display_string(
 			subtree, hf_smb_ea_name, tvb, offset, name_len + 1,
-			ENC_ASCII|ENC_NA,
+			ENC_ASCII,
 			wmem_packet_scope(), &display_string);
 		proto_item_append_text(item, ": %s", display_string);
 		COUNT_BYTES_SUBR(name_len + 1);

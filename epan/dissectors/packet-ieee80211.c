@@ -9484,7 +9484,7 @@ dissect_nai_realm_list(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, int 
       break;
     }
     proto_tree_add_item_ret_string(realm_tree, hf_ieee80211_ff_anqp_nai_realm,
-                        tvb, offset, nai_len, ENC_ASCII|ENC_NA, wmem_packet_scope(), &realm);
+                        tvb, offset, nai_len, ENC_ASCII, wmem_packet_scope(), &realm);
     if (realm) {
       proto_item_append_text(r_item, " (%s)", realm);
     }
@@ -9732,7 +9732,7 @@ dissect_hs20_anqp_operator_friendly_name(proto_tree *tree, tvbuff_t *tvb,
       break;
     }
     proto_tree_add_item(ofn_tree, hf_array[1],
-                        tvb, offset, 3, ENC_ASCII|ENC_NA);
+                        tvb, offset, 3, ENC_ASCII);
     proto_tree_add_item(ofn_tree, hf_array[2],
                         tvb, offset + 3, vlen - 3, ENC_UTF_8);
     offset += vlen;
@@ -17898,7 +17898,7 @@ dissect_vendor_ie_aruba(proto_item *item, proto_tree *ietree,
     tag_len -= 1;
 
     proto_tree_add_item_ret_string(ietree, hf_ieee80211_vs_aruba_apname, tvb,
-                         offset, tag_len, ENC_ASCII|ENC_NA, wmem_packet_scope(), &name);
+                         offset, tag_len, ENC_ASCII, wmem_packet_scope(), &name);
     proto_item_append_text(item, " (%s)", name);
     break;
 
@@ -18005,7 +18005,7 @@ dissect_vendor_ie_aerohive(proto_item *item _U_, proto_tree *ietree,
         length = tag_len;
       }
 
-      proto_tree_add_item_ret_string(ietree, hf_ieee80211_vs_aerohive_hostname, tvb, offset, length, ENC_ASCII|ENC_NA, wmem_packet_scope(), &hostname);
+      proto_tree_add_item_ret_string(ietree, hf_ieee80211_vs_aerohive_hostname, tvb, offset, length, ENC_ASCII, wmem_packet_scope(), &hostname);
       proto_item_append_text(item, " (%s)", hostname);
 
     break;
@@ -18039,7 +18039,7 @@ dissect_vendor_ie_mist(proto_item *item _U_, proto_tree *ietree,
             proto_item_append_text(item, ": %s", val_to_str_const(type, ieee80211_vs_mist_type_vals, "Unknown"));
 
             length = tag_len;
-            proto_tree_add_item_ret_string(ietree, hf_ieee80211_vs_mist_ap_name, tvb, offset, length, ENC_ASCII|ENC_NA, wmem_packet_scope(), &apname);
+            proto_tree_add_item_ret_string(ietree, hf_ieee80211_vs_mist_ap_name, tvb, offset, length, ENC_ASCII, wmem_packet_scope(), &apname);
             proto_item_append_text(item, " (%s)", apname);
 
             break;
@@ -18073,7 +18073,7 @@ dissect_vendor_ie_ruckus(proto_item *item _U_, proto_tree *ietree,
             proto_item_append_text(item, ": %s", val_to_str_const(type, ieee80211_vs_ruckus_type_vals, "Unknown"));
 
             length = tag_len;
-            proto_tree_add_item_ret_string(ietree, hf_ieee80211_vs_ruckus_ap_name, tvb, offset, length, ENC_ASCII|ENC_NA, wmem_packet_scope(), &apname);
+            proto_tree_add_item_ret_string(ietree, hf_ieee80211_vs_ruckus_ap_name, tvb, offset, length, ENC_ASCII, wmem_packet_scope(), &apname);
             proto_item_append_text(item, " (%s)", apname);
 
             break;
@@ -18162,9 +18162,9 @@ dissect_vendor_ie_sgdsn(proto_item *item _U_, proto_tree *ietree,
           const guint8* string1;
           const guint8* string2;
           const guint8* string3;
-          proto_tree_add_item_ret_string(tree, hf_ieee80211_vs_sgdsn_manufacturer, tvb, offset, 3, ENC_ASCII|ENC_NA, wmem_packet_scope(), &string1);
-          proto_tree_add_item_ret_string(tree, hf_ieee80211_vs_sgdsn_model, tvb, offset+3, 3, ENC_ASCII|ENC_NA, wmem_packet_scope(), &string2);
-          proto_tree_add_item_ret_string(tree, hf_ieee80211_vs_sgdsn_serialnumber, tvb, offset+6, tlv_len-6, ENC_ASCII|ENC_NA, wmem_packet_scope(), &string3);
+          proto_tree_add_item_ret_string(tree, hf_ieee80211_vs_sgdsn_manufacturer, tvb, offset, 3, ENC_ASCII, wmem_packet_scope(), &string1);
+          proto_tree_add_item_ret_string(tree, hf_ieee80211_vs_sgdsn_model, tvb, offset+3, 3, ENC_ASCII, wmem_packet_scope(), &string2);
+          proto_tree_add_item_ret_string(tree, hf_ieee80211_vs_sgdsn_serialnumber, tvb, offset+6, tlv_len-6, ENC_ASCII, wmem_packet_scope(), &string3);
           proto_item_append_text(tree, ": %s %s %s", string1, string2, string3);
         } else {
           expert_add_info_format(pinfo, tree, &ei_ieee80211_tag_length, "Value length must be 30");
@@ -18177,7 +18177,7 @@ dissect_vendor_ie_sgdsn(proto_item *item _U_, proto_tree *ietree,
           const guint8* icao_mfr_code;
           guint32 sn_len;
           const guint8* serial_number;
-          proto_tree_add_item_ret_string(tree, hf_ieee80211_vs_sgdsn_icaomfrcode, tvb, offset, 4, ENC_ASCII|ENC_NA, wmem_packet_scope(), &icao_mfr_code);
+          proto_tree_add_item_ret_string(tree, hf_ieee80211_vs_sgdsn_icaomfrcode, tvb, offset, 4, ENC_ASCII, wmem_packet_scope(), &icao_mfr_code);
           proto_tree_add_item_ret_uint(tree, hf_ieee80211_vs_sgdsn_serialnumber_len, tvb, offset+4, 1, ENC_NA, &sn_len);
           if(sn_len < 0x30 || (sn_len > 0x39 && sn_len < 0x41) || sn_len > 0x46) {
             expert_add_info_format(pinfo, tree, &ei_ieee80211_vs_sgdsn_serialnumber_invalid_len_val, "Serial Number Length must be '0' to '9', or 'A' to 'F'");
@@ -18186,7 +18186,7 @@ dissect_vendor_ie_sgdsn(proto_item *item _U_, proto_tree *ietree,
             // We suppressed the minus 5 in the check above to avoid a compilation warning
             expert_add_info_format(pinfo, tree, &ei_ieee80211_vs_sgdsn_serialnumber_unexpected_len_val, "Expected %d byte(s), got %d byte(s)", tlv_len-5, (sn_len>0x39?sn_len-0x37:sn_len-0x30));
           }
-          proto_tree_add_item_ret_string(tree, hf_ieee80211_vs_sgdsn_serialnumber, tvb, offset+5, tlv_len-5, ENC_ASCII|ENC_NA, wmem_packet_scope(), &serial_number);
+          proto_tree_add_item_ret_string(tree, hf_ieee80211_vs_sgdsn_serialnumber, tvb, offset+5, tlv_len-5, ENC_ASCII, wmem_packet_scope(), &serial_number);
           proto_item_append_text(tree, ": %s %s", icao_mfr_code, serial_number);
         } else {
           expert_add_info_format(pinfo, tree, &ei_ieee80211_tag_length, "Value length must be between 6 and 20");
@@ -18455,21 +18455,21 @@ dissect_vendor_ie_fortinet(proto_item *item, proto_tree *ietree,
         case FORTINET_SYSTEM_APNAME:{
           const guint8* name;
           proto_tree_add_item_ret_string(ietree, hf_ieee80211_vs_fortinet_system_apname, tvb,
-                               offset, system_length, ENC_ASCII|ENC_NA, wmem_packet_scope(), &name);
+                               offset, system_length, ENC_ASCII, wmem_packet_scope(), &name);
           proto_item_append_text(item, " %s", name);
         }
         break;
         case FORTINET_SYSTEM_APMODEL:{
           const guint8* model;
           proto_tree_add_item_ret_string(ietree, hf_ieee80211_vs_fortinet_system_apmodel, tvb,
-                               offset, system_length, ENC_ASCII|ENC_NA, wmem_packet_scope(), &model);
+                               offset, system_length, ENC_ASCII, wmem_packet_scope(), &model);
           proto_item_append_text(item, " %s", model);
         }
         break;
         case FORTINET_SYSTEM_APSERIAL:{
           const guint8* serial;
           proto_tree_add_item_ret_string(ietree, hf_ieee80211_vs_fortinet_system_apserial, tvb,
-                               offset, system_length, ENC_ASCII|ENC_NA, wmem_packet_scope(), &serial);
+                               offset, system_length, ENC_ASCII, wmem_packet_scope(), &serial);
           proto_item_append_text(item, " %s", serial);
         }
         break;
@@ -25310,7 +25310,7 @@ ieee80211_tag_country_info(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
 
   /* FIXME: If environment is 'X', the only allowed CC is "XX" */
   proto_tree_add_item_ret_string(tree, hf_ieee80211_tag_country_info_code,
-                      tvb, offset, 2, ENC_ASCII|ENC_NA, wmem_packet_scope(), &country_code);
+                      tvb, offset, 2, ENC_ASCII, wmem_packet_scope(), &country_code);
   proto_item_append_text(field_data->item_tag, ": Country Code %s", country_code);
   offset += 2;
 
@@ -28726,7 +28726,7 @@ dissect_password_identifier(tvbuff_t *tvb, packet_info *pinfo _U_,
   proto_tree *tree, int offset, int len _U_)
 {
   proto_tree_add_item(tree, hf_ieee80211_sae_password_identifier, tvb, offset,
-                      len, ENC_NA|ENC_ASCII);
+                      len, ENC_ASCII);
   offset += len;
 
   return offset;
@@ -29570,7 +29570,7 @@ ieee80211_tag_mesh_id(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void*
   int tag_len = tvb_reported_length(tvb);
   const guint8* mesh_id;
 
-  proto_tree_add_item_ret_string(tree, hf_ieee80211_mesh_id, tvb, offset, tag_len, ENC_ASCII|ENC_NA, wmem_packet_scope(), &mesh_id);
+  proto_tree_add_item_ret_string(tree, hf_ieee80211_mesh_id, tvb, offset, tag_len, ENC_ASCII, wmem_packet_scope(), &mesh_id);
   if (tag_len > 0) {
     gchar* s = format_text(wmem_packet_scope(), mesh_id, tag_len);
     col_append_fstr(pinfo->cinfo, COL_INFO, ", MESHID=%s", s);

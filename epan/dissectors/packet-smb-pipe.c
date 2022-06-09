@@ -287,7 +287,7 @@ add_bytes_param(tvbuff_t *tvb, int offset, int count, packet_info *pinfo _U_,
 
 		case FT_STRING:
 			proto_tree_add_item(tree, hf_index, tvb, offset, count,
-			    ENC_ASCII|ENC_NA);	/* XXX - code page? */
+			    ENC_ASCII);	/* XXX - code page? */
 			break;
 
 		default:
@@ -315,7 +315,7 @@ add_string_param_update_parent(tvbuff_t *tvb, int offset, int count, packet_info
 
 	DISSECTOR_ASSERT(hf_index != -1);
 	ti = proto_tree_add_item_ret_string(tree, hf_index, tvb, offset,
-	    count, ENC_ASCII|ENC_NA, pinfo->pool, &str);
+	    count, ENC_ASCII, pinfo->pool, &str);
 	    /* XXX - code page? */
 	parent_ti = proto_item_get_parent(ti);
 	proto_item_append_text(parent_ti, ": %s",
@@ -356,9 +356,9 @@ add_string_param(tvbuff_t *tvb, int offset, int count _U_,
 	string_len = tvb_strsize(tvb, offset);
 	if (hf_index != -1) {
 		proto_tree_add_item(tree, hf_index, tvb, offset, string_len,
-		    ENC_ASCII|ENC_NA);	/* XXX - code page? */
+		    ENC_ASCII);	/* XXX - code page? */
 	} else {
-		proto_tree_add_item(tree, hf_smb_pipe_string_param, tvb, offset, string_len, ENC_NA|ENC_ASCII);
+		proto_tree_add_item(tree, hf_smb_pipe_string_param, tvb, offset, string_len, ENC_ASCII);
 	}
 	offset += string_len;
 	return offset;
@@ -401,9 +401,9 @@ add_stringz_pointer_param(tvbuff_t *tvb, int offset, int count _U_,
 	if (string != NULL) {
 		if (hf_index != -1) {
 			proto_tree_add_item(tree, hf_index, tvb, cptr,
-			    string_len, ENC_ASCII|ENC_NA);	/* XXX - code page? */
+			    string_len, ENC_ASCII);	/* XXX - code page? */
 		} else {
-			proto_tree_add_item(tree, hf_smb_pipe_stringz_param, tvb, cptr, string_len, ENC_NA|ENC_ASCII);
+			proto_tree_add_item(tree, hf_smb_pipe_stringz_param, tvb, cptr, string_len, ENC_ASCII);
 		}
 	} else {
 		if (hf_index != -1) {

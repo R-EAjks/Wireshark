@@ -842,7 +842,7 @@ static guint32 vsip_ValueTypeString(proto_tree *tree, packet_info *pinfo _U_, tv
 
    if (length > 0)
    {
-       proto_tree_add_item(tree, hf_string, tvb, offset, length, ENC_ASCII|ENC_NA);
+       proto_tree_add_item(tree, hf_string, tvb, offset, length, ENC_ASCII);
        offset += length;
    }
 

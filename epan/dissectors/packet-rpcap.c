@@ -612,7 +612,7 @@ dissect_rpcap_findalldevs_if (tvbuff_t *tvb, packet_info *pinfo _U_,
 
   if (namelen) {
     const guint8* name;
-    proto_tree_add_item_ret_string(tree, hf_if_name, tvb, offset, namelen, ENC_ASCII|ENC_NA, pinfo->pool, &name);
+    proto_tree_add_item_ret_string(tree, hf_if_name, tvb, offset, namelen, ENC_ASCII, pinfo->pool, &name);
     proto_item_append_text (ti, ": %s", name);
     offset += namelen;
   }
@@ -779,10 +779,10 @@ dissect_rpcap_auth_request (tvbuff_t *tvb, packet_info *pinfo _U_,
   } else if (type == RPCAP_RMTAUTH_PWD) {
     const guint8 *username, *password;
 
-    proto_tree_add_item_ret_string(tree, hf_auth_username, tvb, offset, slen1, ENC_ASCII|ENC_NA, pinfo->pool, &username);
+    proto_tree_add_item_ret_string(tree, hf_auth_username, tvb, offset, slen1, ENC_ASCII, pinfo->pool, &username);
     offset += slen1;
 
-    proto_tree_add_item_ret_string(tree, hf_auth_password, tvb, offset, slen2, ENC_ASCII|ENC_NA, pinfo->pool, &password);
+    proto_tree_add_item_ret_string(tree, hf_auth_password, tvb, offset, slen2, ENC_ASCII, pinfo->pool, &password);
     offset += slen2;
 
     proto_item_append_text (ti, " (%s/%s)", username, password);

@@ -536,7 +536,7 @@ static const gchar* dissect_fields_desea(packet_info* pinfo, tvbuff_t *tvb, prot
      * XXX - section 7.4.14 "E.164 address" of Q.2630.3 seems to
      * indicate that this is BCD, not ASCII.
      */
-    e164->E164_number_str = (gchar*)tvb_get_string_enc(pinfo->pool,tvb,offset+1,len,ENC_ASCII|ENC_NA);
+    e164->E164_number_str = (gchar*)tvb_get_string_enc(pinfo->pool,tvb,offset+1,len,ENC_ASCII);
     e164->E164_number_length = len-1;
 
     dissect_e164_number(tvb, tree, offset-1, len, *e164);
@@ -566,7 +566,7 @@ static const gchar* dissect_fields_oesea(packet_info* pinfo, tvbuff_t *tvb, prot
      * XXX - section 7.4.14 "E.164 address" of Q.2630.3 seems to
      * indicate that this is BCD, not ASCII.
      */
-    e164->E164_number_str = (gchar*)tvb_get_string_enc(pinfo->pool,tvb,offset+1,len,ENC_ASCII|ENC_NA);
+    e164->E164_number_str = (gchar*)tvb_get_string_enc(pinfo->pool,tvb,offset+1,len,ENC_ASCII);
     e164->E164_number_length = len-1;
 
     dissect_e164_number(tvb, tree, offset-1, len, *e164);

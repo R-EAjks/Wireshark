@@ -626,7 +626,7 @@ proto_item* parseString(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
     }
     else if (iLen > 0)
     {
-        item = proto_tree_add_item(tree, hfIndex, tvb, iOffset, iLen, ENC_UTF_8|ENC_NA);
+        item = proto_tree_add_item(tree, hfIndex, tvb, iOffset, iLen, ENC_UTF_8);
         iOffset += iLen; /* eat the whole string */
     }
     else

@@ -3276,7 +3276,7 @@ dissect_dhcpopt_avaya_ip_telephone(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 		expert_add_info_format(pinfo, tree, &ei_dhcp_bad_length, "Avaya IP Telephone option length isn't >= 5");
 		return 1;
 	}
-	avaya_ti = proto_tree_add_item_ret_string(tree, hf_dhcp_option242_avaya, tvb, offset, tvb_reported_length(tvb), ENC_ASCII|ENC_NA, wmem_packet_scope(), (const guint8 **)&avaya_option);
+	avaya_ti = proto_tree_add_item_ret_string(tree, hf_dhcp_option242_avaya, tvb, offset, tvb_reported_length(tvb), ENC_ASCII, wmem_packet_scope(), (const guint8 **)&avaya_option);
 	o242avaya_v_tree = proto_item_add_subtree(avaya_ti, ett_dhcp_option242_suboption);
 	avaya_param_buf = wmem_strbuf_new(wmem_packet_scope(), "");
 	gchar **fields = wmem_strsplit(wmem_packet_scope(), avaya_option, ",", -1);
@@ -4633,7 +4633,7 @@ dissect_vendor_bsdp_suboption(packet_info *pinfo, proto_item *v_ti, proto_tree *
 	switch(subopt)
 	{
 		case 1:
-			proto_tree_add_item(o43bsdp_v_tree, hf_dhcp_option43_bsdp_message_type, tvb, suboptoff, subopt_len, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(o43bsdp_v_tree, hf_dhcp_option43_bsdp_message_type, tvb, suboptoff, subopt_len, ENC_ASCII);
 			break;
 		case 2:
 			proto_tree_add_item(o43bsdp_v_tree, hf_dhcp_option43_bsdp_version, tvb, suboptoff, subopt_len, ENC_BIG_ENDIAN);
@@ -5918,7 +5918,7 @@ dissect_packetcable_mta_vendor_id_heur( tvbuff_t *tvb, packet_info *pinfo, proto
 		return FALSE;
 	}
 
-	vendor_id = tvb_get_string_enc(wmem_packet_scope(), tvb, 0, 8, ENC_ASCII|ENC_NA);
+	vendor_id = tvb_get_string_enc(wmem_packet_scope(), tvb, 0, 8, ENC_ASCII);
 	if ((strcmp((const char*)vendor_id, PACKETCABLE_MTA_CAP10) == 0) ||
 		(strcmp((const char*)vendor_id, PACKETCABLE_MTA_CAP15) == 0) ||
 		(strcmp((const char*)vendor_id, PACKETCABLE_MTA_CAP20) == 0)) {
@@ -6529,7 +6529,7 @@ dissect_packetcable_cm_vendor_id_heur( tvbuff_t *tvb, packet_info *pinfo _U_, pr
 		return FALSE;
 	}
 
-	vendor_id = tvb_get_string_enc(wmem_packet_scope(), tvb, 0, 10, ENC_ASCII|ENC_NA);
+	vendor_id = tvb_get_string_enc(wmem_packet_scope(), tvb, 0, 10, ENC_ASCII);
 	if ((strcmp((const char*)vendor_id, PACKETCABLE_CM_CAP11) == 0) ||
 		(strcmp((const char*)vendor_id, PACKETCABLE_CM_CAP20) == 0)) {
 		dissect_docsis_cm_cap(tree, tvb, 0, tvb_reported_length(tvb), FALSE);

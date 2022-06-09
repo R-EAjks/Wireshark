@@ -1050,7 +1050,7 @@ ssh_tree_add_hostkey(tvbuff_t *tvb, int offset, proto_tree *parent_tree,
     /* Read the key type before creating the tree so we can append it as info. */
     type_len = tvb_get_ntohl(tvb, offset);
     offset += 4;
-    key_type = (char *) tvb_get_string_enc(wmem_packet_scope(), tvb, offset, type_len, ENC_ASCII|ENC_NA);
+    key_type = (char *) tvb_get_string_enc(wmem_packet_scope(), tvb, offset, type_len, ENC_ASCII);
 
     tree_title = wmem_strdup_printf(wmem_packet_scope(), "%s (type: %s)", tree_name, key_type);
     tree = proto_tree_add_subtree(parent_tree, tvb, last_offset, key_len + 4, ett_idx, NULL,
@@ -1114,7 +1114,7 @@ ssh_tree_add_hostsignature(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_
     /* Read the signature type before creating the tree so we can append it as info. */
     type_len = tvb_get_ntohl(tvb, offset);
     offset += 4;
-    sig_type = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, type_len, ENC_ASCII|ENC_NA);
+    sig_type = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, type_len, ENC_ASCII);
 
     tree_title = wmem_strdup_printf(wmem_packet_scope(), "%s (type: %s)", tree_name, sig_type);
     tree = proto_tree_add_subtree(parent_tree, tvb, last_offset, sig_len + 4, ett_idx, NULL,
@@ -3619,7 +3619,7 @@ ssh_dissect_userauth_generic(tvbuff_t *packet_tvb, packet_info *pinfo,
                 proto_tree_add_item(msg_type_tree, hf_ssh_userauth_method_name, packet_tvb, offset, slen, ENC_ASCII);
 
                 guint8* key_type;
-                key_type = tvb_get_string_enc(wmem_packet_scope(), packet_tvb, offset, slen, ENC_ASCII|ENC_NA);
+                key_type = tvb_get_string_enc(wmem_packet_scope(), packet_tvb, offset, slen, ENC_ASCII);
                 offset += slen;
                 if (0 == strcmp(key_type, "none")) {
                 }else if (0 == strcmp(key_type, "publickey")) {
@@ -3778,7 +3778,7 @@ ssh_dissect_connection_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
                 slen = tvb_get_ntohl(packet_tvb, offset) ;
                 proto_tree_add_item(msg_type_tree, hf_ssh_channel_request_name_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
                 offset += 4;
-                request_name = tvb_get_string_enc(wmem_packet_scope(), packet_tvb, offset, slen, ENC_ASCII|ENC_NA);
+                request_name = tvb_get_string_enc(wmem_packet_scope(), packet_tvb, offset, slen, ENC_ASCII);
                 proto_tree_add_item(msg_type_tree, hf_ssh_channel_request_name, packet_tvb, offset, slen, ENC_UTF_8);
                 offset += slen;
                 proto_tree_add_item(msg_type_tree, hf_ssh_channel_request_want_reply, packet_tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -3787,7 +3787,7 @@ ssh_dissect_connection_specific(tvbuff_t *packet_tvb, packet_info *pinfo,
                         slen = tvb_get_ntohl(packet_tvb, offset) ;
                         proto_tree_add_item(msg_type_tree, hf_ssh_subsystem_name_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
                         offset += 4;
-                        guint8* subsystem_name = tvb_get_string_enc(wmem_packet_scope(), packet_tvb, offset, slen, ENC_ASCII|ENC_NA);
+                        guint8* subsystem_name = tvb_get_string_enc(wmem_packet_scope(), packet_tvb, offset, slen, ENC_ASCII);
                         set_subdissector_for_channel(peer_data, uiNumChannel, subsystem_name);
                         proto_tree_add_item(msg_type_tree, hf_ssh_subsystem_name, packet_tvb, offset, slen, ENC_UTF_8);
                         offset += slen;
@@ -3851,7 +3851,7 @@ ssh_dissect_connection_generic(tvbuff_t *packet_tvb, packet_info *pinfo,
                 slen = tvb_get_ntohl(packet_tvb, offset) ;
                 proto_tree_add_item(msg_type_tree, hf_ssh_global_request_name_len, packet_tvb, offset, 4, ENC_BIG_ENDIAN);
                 offset += 4;
-                request_name = tvb_get_string_enc(wmem_packet_scope(), packet_tvb, offset, slen, ENC_ASCII|ENC_NA);
+                request_name = tvb_get_string_enc(wmem_packet_scope(), packet_tvb, offset, slen, ENC_ASCII);
                 proto_tree_add_item(msg_type_tree, hf_ssh_global_request_name, packet_tvb, offset, slen, ENC_ASCII);
                 offset += slen;
                 proto_tree_add_item(msg_type_tree, hf_ssh_global_request_want_reply, packet_tvb, offset, 1, ENC_BIG_ENDIAN);

@@ -2267,7 +2267,7 @@ dissect_mip6_opt_mnid(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void*
     offset++;
 
     if (option_len - offset > 0) {
-        proto_tree_add_item_ret_string(opt_tree, hf_mip6_mnid_identifier, tvb, offset, option_len - 1, ENC_UTF_8|ENC_NA, pinfo->pool, &str);
+        proto_tree_add_item_ret_string(opt_tree, hf_mip6_mnid_identifier, tvb, offset, option_len - 1, ENC_UTF_8, pinfo->pool, &str);
         proto_item_append_text(ti, ": %s", str);
     }
 

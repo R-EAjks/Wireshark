@@ -421,7 +421,7 @@ decode_string_attribute(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, pro
 		return;
 	}
 
-	proto_tree_add_item(tree, *hfValue, tvb, offset+4, length-4, ENC_ASCII|ENC_NA);
+	proto_tree_add_item(tree, *hfValue, tvb, offset+4, length-4, ENC_ASCII);
 }
 
 

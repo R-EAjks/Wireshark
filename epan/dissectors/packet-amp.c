@@ -420,7 +420,7 @@ dissect_amp_as_subtree(tvbuff_t *tvb,  packet_info *pinfo, proto_tree *tree, int
             tmpObj = cbor_info(tvb, offset); // Should come back a CBOR text string if some length.
             offset += tmpObj.size;
             proto_tree_add_item(amp_register_tree, hf_amp_agent_name, tvb, offset,
-                                (int) tmpObj.uint, ENC_ASCII|ENC_NA);
+                                (int) tmpObj.uint, ENC_ASCII);
             old_offset = offset;
             offset += (int) tmpObj.uint;
             if (offset < old_offset) {
@@ -444,7 +444,7 @@ dissect_amp_as_subtree(tvbuff_t *tvb,  packet_info *pinfo, proto_tree *tree, int
                 tmpObj2 = cbor_info(tvb, offset); // Should be text string of some size
                 offset += tmpObj2.size;
                 proto_tree_add_item(amp_report_set_tree, hf_amp_rx_name, tvb, offset,
-                                    (int) tmpObj2.uint, ENC_ASCII|ENC_NA);
+                                    (int) tmpObj2.uint, ENC_ASCII);
                 old_offset = offset;
                 offset += (int) tmpObj2.uint;
                 if (offset < old_offset) {

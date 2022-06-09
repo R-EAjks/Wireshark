@@ -1351,17 +1351,17 @@ dissect_diameter_3gpp_rai(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tre
 
     if(length==12) {
         diam_sub_dis->avp_str = wmem_strdup_printf(pinfo->pool, "MCC %s, MNC %s, LAC 0x%s, RAC 0x%s",
-            tvb_get_string_enc(pinfo->pool, tvb,  0, 3, ENC_UTF_8|ENC_NA), /* MCC 3 digits */
-            tvb_get_string_enc(pinfo->pool, tvb,  3, 3, ENC_UTF_8|ENC_NA), /* MNC 3 digits */
-            tvb_get_string_enc(pinfo->pool, tvb,  6, 4, ENC_UTF_8|ENC_NA), /* LCC 4 digits */
-            tvb_get_string_enc(pinfo->pool, tvb, 10, 2, ENC_UTF_8|ENC_NA)  /* RAC 2 digits */
+            tvb_get_string_enc(pinfo->pool, tvb,  0, 3, ENC_UTF_8), /* MCC 3 digits */
+            tvb_get_string_enc(pinfo->pool, tvb,  3, 3, ENC_UTF_8), /* MNC 3 digits */
+            tvb_get_string_enc(pinfo->pool, tvb,  6, 4, ENC_UTF_8), /* LCC 4 digits */
+            tvb_get_string_enc(pinfo->pool, tvb, 10, 2, ENC_UTF_8)  /* RAC 2 digits */
             );
     } else {
         diam_sub_dis->avp_str = wmem_strdup_printf(pinfo->pool, "MCC %s, MNC %s, LAC 0x%s, RAC 0x%s",
-            tvb_get_string_enc(pinfo->pool, tvb,  0, 3, ENC_UTF_8|ENC_NA), /* MCC 3 digits */
-            tvb_get_string_enc(pinfo->pool, tvb,  3, 2, ENC_UTF_8|ENC_NA), /* MNC 2 digits */
-            tvb_get_string_enc(pinfo->pool, tvb,  5, 4, ENC_UTF_8|ENC_NA), /* LCC 4 digits */
-            tvb_get_string_enc(pinfo->pool, tvb,  9, 2, ENC_UTF_8|ENC_NA)  /* RAC 2 digits */
+            tvb_get_string_enc(pinfo->pool, tvb,  0, 3, ENC_UTF_8), /* MCC 3 digits */
+            tvb_get_string_enc(pinfo->pool, tvb,  3, 2, ENC_UTF_8), /* MNC 2 digits */
+            tvb_get_string_enc(pinfo->pool, tvb,  5, 4, ENC_UTF_8), /* LCC 4 digits */
+            tvb_get_string_enc(pinfo->pool, tvb,  9, 2, ENC_UTF_8)  /* RAC 2 digits */
             );
     }
 

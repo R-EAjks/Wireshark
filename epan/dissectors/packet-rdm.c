@@ -1612,7 +1612,7 @@ static void
 rdm_proto_tree_add_ascii_item(proto_tree *tree, int hfindex, tvbuff_t *tvb, guint *offset_ptr, gint len)
 {
   guint offset = *offset_ptr;
-  proto_tree_add_item(tree, hfindex, tvb, offset, len, ENC_ASCII|ENC_NA);
+  proto_tree_add_item(tree, hfindex, tvb, offset, len, ENC_ASCII);
   *offset_ptr += len;
 }
 

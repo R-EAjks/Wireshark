@@ -444,7 +444,7 @@ static void dissect_cimd_parameter(tvbuff_t *tvb, proto_tree *tree, gint pindex,
   proto_tree_add_item(param_tree, hf_cimd_pcode_indicator, tvb,
     startOffset + 1, CIMD_PC_LENGTH, ENC_ASCII);
   proto_tree_add_item(param_tree, (*vals_hdr_PC[pindex].hf_p), tvb,
-    startOffset + 1 + CIMD_PC_LENGTH + 1, endOffset - (startOffset + 1 + CIMD_PC_LENGTH + 1), ENC_ASCII|ENC_NA);
+    startOffset + 1 + CIMD_PC_LENGTH + 1, endOffset - (startOffset + 1 + CIMD_PC_LENGTH + 1), ENC_ASCII);
 }
 
 static void dissect_cimd_ud(tvbuff_t *tvb, proto_tree *tree, gint pindex, gint startOffset, gint endOffset)

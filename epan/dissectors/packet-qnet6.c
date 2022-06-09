@@ -1581,7 +1581,7 @@ dissect_qnet6_lr(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, gint * 
                                          tvb,
                                          addr_data_offset,
                                          len,
-                                         ENC_ASCII|ENC_NA);
+                                         ENC_ASCII);
                 ti = proto_tree_add_string(sstree, hf_index, tvb, addr_data_offset, len, name[i]);
                 proto_item_set_generated(ti);
             }
@@ -3272,7 +3272,7 @@ qos_tcs_init_addtree(tvbuff_t * tvb, proto_tree * tree, gint * poffset, guint en
         }
       if (i <= rlen)
         {
-          ti = proto_tree_add_item(tree, hf_generated, tvb, name_start + off, i - off, ENC_ASCII|ENC_NA);
+          ti = proto_tree_add_item(tree, hf_generated, tvb, name_start + off, i - off, ENC_ASCII);
           proto_item_set_generated(ti);
         }
 

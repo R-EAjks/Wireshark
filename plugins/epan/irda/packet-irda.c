@@ -590,8 +590,8 @@ static void dissect_iap_request(tvbuff_t* tvb, packet_info* pinfo, proto_tree* r
                 iap_conv->pattr_dissector = NULL;
             }
 
-            char   *class_name = (char *) tvb_get_string_enc(pinfo->pool, tvb, offset + 1 + 1, clen, ENC_ASCII|ENC_NA);
-            char   *attr_name = (char *) tvb_get_string_enc(pinfo->pool, tvb, offset + 1 + 1 + clen + 1, alen, ENC_ASCII|ENC_NA);
+            char   *class_name = (char *) tvb_get_string_enc(pinfo->pool, tvb, offset + 1 + 1, clen, ENC_ASCII);
+            char   *attr_name = (char *) tvb_get_string_enc(pinfo->pool, tvb, offset + 1 + 1 + clen + 1, alen, ENC_ASCII);
 
             col_add_fstr(pinfo->cinfo, COL_INFO, "GetValueByClass: \"%s\" \"%s\"",
                 format_text(pinfo->pool, (guchar *) class_name, strlen(class_name)),
@@ -1605,7 +1605,7 @@ static void dissect_xid(tvbuff_t* tvb, packet_info* pinfo, proto_tree* root, pro
                 switch (cset) {
 
                 case LMP_CHARSET_ASCII:
-                    encoding = ENC_ASCII|ENC_NA;
+                    encoding = ENC_ASCII;
                     have_encoding = TRUE;
                     break;
 
@@ -1705,7 +1705,7 @@ static void dissect_log(tvbuff_t* tvb, packet_info* pinfo, proto_tree* root)
         char   *buf;
 
         length = tvb_captured_length(tvb);
-        buf = (char *) tvb_get_string_enc(pinfo->pool, tvb, 0, length, ENC_ASCII|ENC_NA);
+        buf = (char *) tvb_get_string_enc(pinfo->pool, tvb, 0, length, ENC_ASCII);
         if (length > 0 && buf[length-1] == '\n')
             buf[length-1] = 0;
         else if (length > 1 && buf[length-2] == '\n')
@@ -1722,7 +1722,7 @@ static void dissect_log(tvbuff_t* tvb, packet_info* pinfo, proto_tree* root)
         if (pinfo->pseudo_header->irda.pkttype == IRDA_MISSED_MSG)
             proto_tree_add_item(tree, hf_log_missed, tvb, 0, 0, ENC_NA);
         else
-            proto_tree_add_item(tree, hf_log_msg, tvb, 0, -1, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(tree, hf_log_msg, tvb, 0, -1, ENC_ASCII);
     }
 }
 

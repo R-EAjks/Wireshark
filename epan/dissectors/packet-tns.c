@@ -590,7 +590,7 @@ static void dissect_tns_data(tvbuff_t *tvb, int offset, packet_info *pinfo, prot
 				}
 				offset += 1; /* skip the 0 terminator */
 				proto_item_set_end(ti, tvb, offset);
-				proto_tree_add_item_ret_length(data_tree, hf_tns_data_setp_banner, tvb, offset, -1, ENC_ASCII|ENC_NA, &len);
+				proto_tree_add_item_ret_length(data_tree, hf_tns_data_setp_banner, tvb, offset, -1, ENC_ASCII, &len);
 				offset += len;
 			}
 			break;

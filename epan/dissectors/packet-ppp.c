@@ -3898,7 +3898,7 @@ dissect_cbcp_callback_opt_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
             expert_add_info(pinfo, ti, &ei_cbcp_address);
             break;
         }
-        proto_tree_add_item(addr_tree, hf_cbcp_address, tvb, offset, addr_len, ENC_NA|ENC_ASCII);
+        proto_tree_add_item(addr_tree, hf_cbcp_address, tvb, offset, addr_len, ENC_ASCII);
         offset += addr_len;
         length -= addr_len;
     }
@@ -4161,7 +4161,7 @@ dissect_bap_phone_delta_opt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
             break;
         case BAP_PHONE_DELTA_SUBOPT_SUBSC_NUM:
             if (subopt_len > 2) {
-                proto_tree_add_item(suboption_tree, hf_bap_subscriber_number, tvb, offset + 2, subopt_len - 2, ENC_NA|ENC_ASCII);
+                proto_tree_add_item(suboption_tree, hf_bap_subscriber_number, tvb, offset + 2, subopt_len - 2, ENC_ASCII);
             } else {
                 expert_add_info_format(pinfo, ti, &ei_bap_sub_option_length,
                     "Invalid suboption length: %u (must be > 2)", subopt_len);
@@ -4169,7 +4169,7 @@ dissect_bap_phone_delta_opt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
             break;
         case BAP_PHONE_DELTA_SUBOPT_PHONENUM_SUBADDR:
             if (subopt_len > 2) {
-                proto_tree_add_item(suboption_tree, hf_bap_phone_number_sub_address, tvb, offset + 2, subopt_len - 2, ENC_NA|ENC_ASCII);
+                proto_tree_add_item(suboption_tree, hf_bap_phone_number_sub_address, tvb, offset + 2, subopt_len - 2, ENC_ASCII);
             } else {
                 expert_add_info_format(pinfo, ti, &ei_bap_sub_option_length,
                     "Invalid suboption length: %u (must be > 2)", subopt_len);
@@ -4213,7 +4213,7 @@ dissect_bap_reason_opt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
                                   &field_tree, &tf))
         return tvb_captured_length(tvb);
 
-    proto_tree_add_item(field_tree, hf_bap_reason, tvb, offset+2, length-2, ENC_NA|ENC_ASCII);
+    proto_tree_add_item(field_tree, hf_bap_reason, tvb, offset+2, length-2, ENC_ASCII);
     return tvb_captured_length(tvb);
 }
 

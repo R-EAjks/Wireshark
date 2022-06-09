@@ -3283,7 +3283,7 @@ dissect_subtlv_interface_parameters(tvbuff_t *tvb, guint offset, proto_tree *tre
         break;
     case FEC_VC_INTERFACEPARAM_DESCRIPTION:
         proto_item_append_text(ti,": Description");
-        proto_tree_add_item(vcintparam_tree,*interface_parameters_hf[5],tvb, offset+2, (intparam_len -2), ENC_ASCII|ENC_NA);
+        proto_tree_add_item(vcintparam_tree,*interface_parameters_hf[5],tvb, offset+2, (intparam_len -2), ENC_ASCII);
         break;
     case FEC_VC_INTERFACEPARAM_CEPBYTES:
         proto_item_append_text(ti,": CEP/TDM Payload Bytes %u", tvb_get_ntohs(tvb,offset+2));

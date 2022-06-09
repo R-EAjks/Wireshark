@@ -2177,7 +2177,7 @@ dissect_tds_type_varbyte(tvbuff_t *tvb, guint *offset, packet_info *pinfo, proto
                     case TDS_DATA_TYPE_BIGVARCHR: /* VarChar */
                         proto_tree_add_item_ret_string(sub_tree,
                             hf_tds_type_varbyte_data_string,
-                            combined_chunks_tvb, 0, combined_length, ENC_ASCII|ENC_NA,
+                            combined_chunks_tvb, 0, combined_length, ENC_ASCII,
                             wmem_packet_scope(), &strval);
                         if (strval) {
                             proto_item_append_text(item, " (%s)", strval);
@@ -2731,7 +2731,7 @@ dissect_tds_type_varbyte(tvbuff_t *tvb, guint *offset, packet_info *pinfo, proto
                     case TDS_DATA_TYPE_BIGVARCHR: /* VarChar */
                     case TDS_DATA_TYPE_BIGCHAR:   /* Char */
                         proto_tree_add_item_ret_string(sub_tree, hf_tds_type_varbyte_data_string,
-                            tvb, *offset, length, ENC_ASCII|ENC_NA,
+                            tvb, *offset, length, ENC_ASCII,
                             wmem_packet_scope(), &strval);
                         if (strval) {
                             proto_item_append_text(item, " (%s)", strval);
@@ -2826,7 +2826,7 @@ dissect_tds_query_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, td
     if (TDS_PROTO_LESS_THAN_TDS7(tds_info) ||
         (!TDS_PROTO_TDS7(tds_info) &&
          ((len < 2) || tvb_get_guint8(tvb, offset+1) != 0)))
-        string_encoding = ENC_ASCII|ENC_NA;
+        string_encoding = ENC_ASCII;
 
     proto_tree_add_item(query_tree, hf_tds_query, tvb, offset, len, string_encoding);
     /* offset += len; */

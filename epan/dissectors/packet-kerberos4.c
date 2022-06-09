@@ -93,7 +93,7 @@ static int
 dissect_krb4_string(packet_info *pinfo _U_, int hf_index, proto_tree *tree, tvbuff_t *tvb, int offset)
 {
 	gint length;
-	proto_tree_add_item_ret_length(tree, hf_index, tvb, offset, -1, ENC_ASCII|ENC_NA, &length);
+	proto_tree_add_item_ret_length(tree, hf_index, tvb, offset, -1, ENC_ASCII, &length);
 
 	return offset + length;
 }

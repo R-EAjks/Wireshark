@@ -764,7 +764,7 @@ static guint dissect_string(tvbuff_t *tvb, proto_tree *tree, guint offset, int h
   guint32 prop_len;
 
   proto_tree_add_item_ret_uint(tree, hf_len, tvb, offset, 2, ENC_BIG_ENDIAN, &prop_len);
-  proto_tree_add_item(tree, hf_value, tvb, offset + 2, prop_len, ENC_UTF_8|ENC_NA);
+  proto_tree_add_item(tree, hf_value, tvb, offset + 2, prop_len, ENC_UTF_8);
 
   return 2 + prop_len;
 }
@@ -1158,7 +1158,7 @@ static int dissect_mqtt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
       if (mqtt_str_len > 0)
       {
         /* 'topic_regex' requires topic_str to be valid UTF-8. */
-        proto_tree_add_item_ret_string(mqtt_tree, hf_mqtt_topic, tvb, offset, mqtt_str_len, ENC_UTF_8|ENC_NA,
+        proto_tree_add_item_ret_string(mqtt_tree, hf_mqtt_topic, tvb, offset, mqtt_str_len, ENC_UTF_8,
                                        wmem_packet_scope(), &topic_str);
         offset += mqtt_str_len;
       }
@@ -1263,7 +1263,7 @@ static int dissect_mqtt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 
         if (mqtt_str_len > 0)
         {
-          proto_tree_add_item_ret_string(mqtt_tree, hf_mqtt_topic, tvb, offset, mqtt_str_len, ENC_UTF_8|ENC_NA,
+          proto_tree_add_item_ret_string(mqtt_tree, hf_mqtt_topic, tvb, offset, mqtt_str_len, ENC_UTF_8,
                                          wmem_epan_scope(), &topic_str);
           offset += mqtt_str_len;
         }

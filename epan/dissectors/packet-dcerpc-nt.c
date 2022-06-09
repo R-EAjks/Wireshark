@@ -97,7 +97,7 @@ dissect_null_term_string(tvbuff_t *tvb, int offset,
 	guint len;
 
 	len = tvb_strsize(tvb, offset);
-	proto_tree_add_item(tree, hf_index, tvb, offset, len, ENC_ASCII|ENC_NA);
+	proto_tree_add_item(tree, hf_index, tvb, offset, len, ENC_ASCII);
 
 	return offset + len;
 }
