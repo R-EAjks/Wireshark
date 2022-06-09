@@ -51,6 +51,8 @@
 #include <wsutil/crash_info.h>
 #include <wsutil/epochs.h>
 
+#include <epan/dissectors/packet-eth.h>
+
 /* Ptvcursor limits */
 #define SUBTREE_ONCE_ALLOCATION_NUMBER 8
 #define SUBTREE_MAX_LEVELS 256
@@ -3053,6 +3055,9 @@ proto_tree_new_item(field_info *new_fi, proto_tree *tree,
 		detect_trailing_stray_characters(encoding, stringval, length, pi);
 		break;
 
+	case FT_ETHER:
+		eth_dissect_subfields(pi, new_fi->hfinfo->id, tvb, start, length, tvb_get_ptr(tvb, start, FT_ETHER_LEN));
+
 	default:
 		break;
 	}
@@ -3981,7 +3986,14 @@ ptvcursor_add(ptvcursor_t *ptvc, int hfindex, gint length,
 	CHECK_FOR_NULL_TREE(ptvc->tree);
 
 	/* Coast clear. Try and fake it */
-	TRY_TO_FAKE_THIS_ITEM(ptvc->tree, hfindex, hfinfo);
+	TRY_TO_FAKE_THIS_ITEM_OR_FREE(ptvc->tree, hfindex, hfinfo, {
+		if (hfinfo->type == FT_ETHER) {
+			/* If the item is faked, we still need to attach the
+			 * subfields so filtering will work.
+			 */
+			eth_dissect_subfields(ptvc->tree, hfindex, ptvc->tvb, offset, length, tvb_get_ptr(ptvc->tvb, offset, FT_ETHER_LEN));
+		}
+	});
 
 	new_fi = new_field_info(ptvc->tree, hfinfo, ptvc->tvb, offset, item_length);
 
@@ -4005,7 +4017,14 @@ proto_tree_add_item_new(proto_tree *tree, header_field_info *hfinfo, tvbuff_t *t
 
 	CHECK_FOR_NULL_TREE(tree);
 
-	TRY_TO_FAKE_THIS_ITEM(tree, hfinfo->id, hfinfo);
+	TRY_TO_FAKE_THIS_ITEM_OR_FREE(tree, hfinfo->id, hfinfo, {
+		if (hfinfo->type == FT_ETHER) {
+			/* If the item is faked, we still need to attach the
+			 * subfields so filtering will work.
+			 */
+			eth_dissect_subfields(tree, hfinfo->id, tvb, start, length, tvb_get_ptr(tvb, start, FT_ETHER_LEN));
+		}
+	});
 
 	new_fi = new_field_info(tree, hfinfo, tvb, start, item_length);
 
@@ -4059,6 +4078,12 @@ proto_tree_add_item_new_ret_length(proto_tree *tree, header_field_info *hfinfo,
 		 */
 		*lenretval = get_full_length(hfinfo, tvb, start, length,
 		    item_length, encoding);
+		if (hfinfo->type == FT_ETHER) {
+			/* If the item is faked, we still need to attach the
+			 * subfields so filtering will work.
+			 */
+			eth_dissect_subfields(tree, hfinfo->id, tvb, start, length, tvb_get_ptr(tvb, start, FT_ETHER_LEN));
+		}
 	});
 
 	new_fi = new_field_info(tree, hfinfo, tvb, start, item_length);
@@ -5093,12 +5118,18 @@ proto_tree_add_ether(proto_tree *tree, int hfindex, tvbuff_t *tvb, gint start,
 
 	CHECK_FOR_NULL_TREE(tree);
 
-	TRY_TO_FAKE_THIS_ITEM(tree, hfindex, hfinfo);
+	TRY_TO_FAKE_THIS_ITEM_OR_FREE(tree, hfindex, hfinfo, {
+		/* If the item is faked, we still need to attach the
+		 * subfields so filtering will work.
+		 */
+		eth_dissect_subfields(tree, hfindex, tvb, start, length, value);
+	});
 
 	DISSECTOR_ASSERT_FIELD_TYPE(hfinfo, FT_ETHER);
 
 	pi = proto_tree_add_pi(tree, hfinfo, tvb, start, &length);
 	proto_tree_set_ether(PNODE_FINFO(pi), value);
+	eth_dissect_subfields(pi, hfindex, tvb, start, length, value);
 
 	return pi;
 }

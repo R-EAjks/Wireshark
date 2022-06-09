@@ -308,6 +308,71 @@ capture_eth(const guchar *pd, int offset, int len, capture_packet_info_t *cpinfo
 
 static gboolean check_is_802_2(tvbuff_t *tvb, int fcs_len);
 
+void
+eth_dissect_subfields(proto_item *addr_item, const int hfindex, tvbuff_t *tvb, gint start, gint length, const guint8 *addr)
+{
+  const char        *addr_name;
+  tvbuff_t          *oui_tvb;
+  const gchar       *oui_name;
+  proto_tree        *addr_tree;
+  gboolean           hidden = FALSE;
+
+  /* Avoid infinite recursion */
+  if (hfindex == hf_eth_addr) {
+    return;
+  }
+
+  /* eth_dst and eth_src have their own breakouts for the IG and LG bits,
+     so hide the universal ones as before. */
+  if (hfindex == hf_eth_dst || hfindex == hf_eth_src) {
+    hidden = TRUE;
+  }
+
+  addr_name = get_ether_name(addr);
+  if (! (addr_tree = proto_item_get_subtree(addr_item))) {
+    addr_tree = proto_item_add_subtree(addr_item, ett_addr);
+  }
+
+  proto_tree_add_ether(addr_tree, hf_eth_addr, tvb, start, length, addr);
+  addr_item = proto_tree_add_string(addr_tree, hf_eth_addr_resolved, tvb, start, length, addr_name);
+  proto_item_set_generated(addr_item);
+  proto_item_set_hidden(addr_item);
+
+  if (length != FT_ETHER_LEN || tvb_memeql(tvb, start, addr, FT_ETHER_LEN)) {
+  /* We were called from proto_tree_add_ether and the bytes are not located
+   * in the tvb in the normal way, e.g. DVB-DATA MPE. We'll lose highlighting
+   * in the GUI.
+   */
+    oui_tvb = tvb_new_child_real_data(tvb, addr, FT_ETHER_LEN, FT_ETHER_LEN);
+  } else {
+    oui_tvb = tvb_new_subset_length(tvb, start, FT_ETHER_LEN);
+  }
+
+  /* XXX: Eventually this should handle 28 (MA-M) and 36 (MA-S) bit OUIs
+   * (Issue #15300), but that requires changes to BASE_OUI and elsewhere
+   * in the API. */
+  addr_item = proto_tree_add_item(addr_tree, hf_eth_addr_oui, oui_tvb, 0, 3, ENC_NA);
+  proto_item_set_generated(addr_item);
+  proto_item_set_hidden(addr_item);
+
+  oui_name = tvb_get_manuf_name_if_known(oui_tvb, 0);
+  if (oui_name != NULL) {
+    addr_item = proto_tree_add_string(addr_tree, hf_eth_addr_oui_resolved, tvb, start, length, oui_name);
+    proto_item_set_generated(addr_item);
+    proto_item_set_hidden(addr_item);
+  }
+
+  addr_item = proto_tree_add_item(addr_tree, hf_eth_lg, oui_tvb, 0, 3, ENC_BIG_ENDIAN);
+  if (hidden) {
+    proto_item_set_hidden(addr_item);
+  }
+  addr_item = proto_tree_add_item(addr_tree, hf_eth_ig, oui_tvb, 0, 3, ENC_BIG_ENDIAN);
+  if (hidden) {
+    proto_item_set_hidden(addr_item);
+  }
+
+}
+
 static void
 dissect_address_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean check_group)
 {
@@ -324,7 +389,9 @@ dissect_address_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboole
   src_addr_name = get_ether_name(src_addr);
 
   addr_item = proto_tree_add_ether(tree, hf_eth_dst, tvb, 0, 6, dst_addr);
-  addr_tree = proto_item_add_subtree(addr_item, ett_addr);
+  if (! (addr_tree = proto_item_get_subtree(addr_item))) {
+    addr_tree = proto_item_add_subtree(addr_item, ett_addr);
+  }
 
   addr_item = proto_tree_add_string(addr_tree, hf_eth_dst_resolved, tvb, 0, 6,
     dst_addr_name);
@@ -342,31 +409,13 @@ dissect_address_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboole
     PROTO_ITEM_SET_HIDDEN(addr_item);
   }
 
-  proto_tree_add_ether(addr_tree, hf_eth_addr, tvb, 0, 6, dst_addr);
-  addr_item = proto_tree_add_string(addr_tree, hf_eth_addr_resolved, tvb, 0, 6,
-    dst_addr_name);
-  proto_item_set_generated(addr_item);
-  proto_item_set_hidden(addr_item);
-
-  addr_item = proto_tree_add_item(addr_tree, hf_eth_addr_oui, tvb, 0, 3, ENC_NA);
-  PROTO_ITEM_SET_GENERATED(addr_item);
-  PROTO_ITEM_SET_HIDDEN(addr_item);
-
-  if (dst_oui_name != NULL) {
-    addr_item = proto_tree_add_string(addr_tree, hf_eth_addr_oui_resolved, tvb, 0, 6, dst_oui_name);
-    PROTO_ITEM_SET_GENERATED(addr_item);
-    PROTO_ITEM_SET_HIDDEN(addr_item);
-  }
-
   proto_tree_add_item(addr_tree, hf_eth_dst_lg, tvb, 0, 3, ENC_BIG_ENDIAN);
-  addr_item = proto_tree_add_item(addr_tree, hf_eth_lg, tvb, 0, 3, ENC_BIG_ENDIAN);
-  proto_item_set_hidden(addr_item);
   proto_tree_add_item(addr_tree, hf_eth_dst_ig, tvb, 0, 3, ENC_BIG_ENDIAN);
-  addr_item = proto_tree_add_item(addr_tree, hf_eth_ig, tvb, 0, 3, ENC_BIG_ENDIAN);
-  proto_item_set_hidden(addr_item);
 
   addr_item = proto_tree_add_ether(tree, hf_eth_src, tvb, 6, 6, src_addr);
-  addr_tree = proto_item_add_subtree(addr_item, ett_addr);
+  if (! (addr_tree = proto_item_get_subtree(addr_item))) {
+    addr_tree = proto_item_add_subtree(addr_item, ett_addr);
+  }
   if (check_group) {
     if (tvb_get_guint8(tvb, 6) & 0x01) {
       expert_add_info(pinfo, addr_item, &ei_eth_src_not_group);
@@ -388,28 +437,8 @@ dissect_address_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboole
     PROTO_ITEM_SET_HIDDEN(addr_item);
   }
 
-  proto_tree_add_ether(addr_tree, hf_eth_addr, tvb, 6, 6, src_addr);
-  addr_item = proto_tree_add_string(addr_tree, hf_eth_addr_resolved, tvb, 6, 6,
-    src_addr_name);
-  proto_item_set_generated(addr_item);
-  proto_item_set_hidden(addr_item);
-
-  addr_item = proto_tree_add_item(addr_tree, hf_eth_addr_oui, tvb, 6, 3, ENC_NA);
-  PROTO_ITEM_SET_GENERATED(addr_item);
-  PROTO_ITEM_SET_HIDDEN(addr_item);
-
-  if (src_oui_name != NULL) {
-    addr_item = proto_tree_add_string(addr_tree, hf_eth_addr_oui_resolved, tvb, 6, 6, src_oui_name);
-    PROTO_ITEM_SET_GENERATED(addr_item);
-    PROTO_ITEM_SET_HIDDEN(addr_item);
-  }
-
   proto_tree_add_item(addr_tree, hf_eth_src_lg, tvb, 6, 3, ENC_BIG_ENDIAN);
-  addr_item = proto_tree_add_item(addr_tree, hf_eth_lg, tvb, 6, 3, ENC_BIG_ENDIAN);
-  proto_item_set_hidden(addr_item);
   proto_tree_add_item(addr_tree, hf_eth_src_ig, tvb, 6, 3, ENC_BIG_ENDIAN);
-  addr_item = proto_tree_add_item(addr_tree, hf_eth_ig, tvb, 6, 3, ENC_BIG_ENDIAN);
-  proto_item_set_hidden(addr_item);
 }
 
 static void
@@ -979,11 +1008,11 @@ proto_register_eth(void)
 
     { &hf_eth_addr,
       { "Address", "eth.addr", FT_ETHER, BASE_NONE, NULL, 0x0,
-        "Source or Destination Hardware Address", HFILL }},
+        "MAC Address / EUI-48", HFILL }},
 
     { &hf_eth_addr_resolved,
       { "Address (resolved)", "eth.addr_resolved", FT_STRING, BASE_NONE,
-        NULL, 0x0, "Source or Destination Hardware Address (resolved)",
+        NULL, 0x0, "MAC Address (resolved)",
         HFILL }},
 
     { &hf_eth_addr_oui,

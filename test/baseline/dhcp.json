@@ -23,29 +23,29 @@
         "eth": {
           "eth.dst": "ff:ff:ff:ff:ff:ff",
           "eth.dst_tree": {
-            "eth.dst_resolved": "Broadcast",
-            "eth.dst.oui": "16777215",
             "eth.addr": "ff:ff:ff:ff:ff:ff",
             "eth.addr_resolved": "Broadcast",
             "eth.addr.oui": "16777215",
-            "eth.dst.lg": "1",
             "eth.lg": "1",
-            "eth.dst.ig": "1",
-            "eth.ig": "1"
+            "eth.ig": "1",
+            "eth.dst_resolved": "Broadcast",
+            "eth.dst.oui": "16777215",
+            "eth.dst.lg": "1",
+            "eth.dst.ig": "1"
           },
           "eth.src": "00:0b:82:01:fc:42",
           "eth.src_tree": {
-            "eth.src_resolved": "Grandstr_01:fc:42",
-            "eth.src.oui": "2946",
-            "eth.src.oui_resolved": "Grandstream Networks, Inc.",
             "eth.addr": "00:0b:82:01:fc:42",
             "eth.addr_resolved": "Grandstr_01:fc:42",
             "eth.addr.oui": "2946",
             "eth.addr.oui_resolved": "Grandstream Networks, Inc.",
-            "eth.src.lg": "0",
             "eth.lg": "0",
-            "eth.src.ig": "0",
-            "eth.ig": "0"
+            "eth.ig": "0",
+            "eth.src_resolved": "Grandstr_01:fc:42",
+            "eth.src.oui": "2946",
+            "eth.src.oui_resolved": "Grandstream Networks, Inc.",
+            "eth.src.lg": "0",
+            "eth.src.ig": "0"
           },
           "eth.type": "0x0800"
         },
@@ -111,6 +111,14 @@
           "dhcp.ip.server": "0.0.0.0",
           "dhcp.ip.relay": "0.0.0.0",
           "dhcp.hw.mac_addr": "00:0b:82:01:fc:42",
+          "dhcp.hw.mac_addr_tree": {
+            "eth.addr": "00:0b:82:01:fc:42",
+            "eth.addr_resolved": "Grandstr_01:fc:42",
+            "eth.addr.oui": "2946",
+            "eth.addr.oui_resolved": "Grandstream Networks, Inc.",
+            "eth.lg": "0",
+            "eth.ig": "0"
+          },
           "dhcp.hw.addr_padding": "00:00:00:00:00:00:00:00:00:00",
           "dhcp.server": "",
           "dhcp.file": "",
@@ -126,7 +134,15 @@
             "dhcp.option.length": "7",
             "dhcp.option.value": "01:00:0b:82:01:fc:42",
             "dhcp.hw.type": "0x01",
-            "dhcp.hw.mac_addr": "00:0b:82:01:fc:42"
+            "dhcp.hw.mac_addr": "00:0b:82:01:fc:42",
+            "dhcp.hw.mac_addr_tree": {
+              "eth.addr": "00:0b:82:01:fc:42",
+              "eth.addr_resolved": "Grandstr_01:fc:42",
+              "eth.addr.oui": "2946",
+              "eth.addr.oui_resolved": "Grandstream Networks, Inc.",
+              "eth.lg": "0",
+              "eth.ig": "0"
+            }
           },
           "dhcp.option.type": "50",
           "dhcp.option.type_tree": {
@@ -176,31 +192,31 @@
         "eth": {
           "eth.dst": "00:0b:82:01:fc:42",
           "eth.dst_tree": {
-            "eth.dst_resolved": "Grandstr_01:fc:42",
-            "eth.dst.oui": "2946",
-            "eth.dst.oui_resolved": "Grandstream Networks, Inc.",
             "eth.addr": "00:0b:82:01:fc:42",
             "eth.addr_resolved": "Grandstr_01:fc:42",
             "eth.addr.oui": "2946",
             "eth.addr.oui_resolved": "Grandstream Networks, Inc.",
-            "eth.dst.lg": "0",
             "eth.lg": "0",
-            "eth.dst.ig": "0",
-            "eth.ig": "0"
+            "eth.ig": "0",
+            "eth.dst_resolved": "Grandstr_01:fc:42",
+            "eth.dst.oui": "2946",
+            "eth.dst.oui_resolved": "Grandstream Networks, Inc.",
+            "eth.dst.lg": "0",
+            "eth.dst.ig": "0"
           },
           "eth.src": "00:08:74:ad:f1:9b",
           "eth.src_tree": {
-            "eth.src_resolved": "Dell_ad:f1:9b",
-            "eth.src.oui": "2164",
-            "eth.src.oui_resolved": "Dell Inc.",
             "eth.addr": "00:08:74:ad:f1:9b",
             "eth.addr_resolved": "Dell_ad:f1:9b",
             "eth.addr.oui": "2164",
             "eth.addr.oui_resolved": "Dell Inc.",
-            "eth.src.lg": "0",
             "eth.lg": "0",
-            "eth.src.ig": "0",
-            "eth.ig": "0"
+            "eth.ig": "0",
+            "eth.src_resolved": "Dell_ad:f1:9b",
+            "eth.src.oui": "2164",
+            "eth.src.oui_resolved": "Dell Inc.",
+            "eth.src.lg": "0",
+            "eth.src.ig": "0"
           },
           "eth.type": "0x0800"
         },
@@ -266,6 +282,14 @@
           "dhcp.ip.server": "192.168.0.1",
           "dhcp.ip.relay": "0.0.0.0",
           "dhcp.hw.mac_addr": "00:0b:82:01:fc:42",
+          "dhcp.hw.mac_addr_tree": {
+            "eth.addr": "00:0b:82:01:fc:42",
+            "eth.addr_resolved": "Grandstr_01:fc:42",
+            "eth.addr.oui": "2946",
+            "eth.addr.oui_resolved": "Grandstream Networks, Inc.",
+            "eth.lg": "0",
+            "eth.ig": "0"
+          },
           "dhcp.hw.addr_padding": "00:00:00:00:00:00:00:00:00:00",
           "dhcp.server": "",
           "dhcp.file": "",
@@ -339,29 +363,29 @@
         "eth": {
           "eth.dst": "ff:ff:ff:ff:ff:ff",
           "eth.dst_tree": {
-            "eth.dst_resolved": "Broadcast",
-            "eth.dst.oui": "16777215",
             "eth.addr": "ff:ff:ff:ff:ff:ff",
             "eth.addr_resolved": "Broadcast",
             "eth.addr.oui": "16777215",
-            "eth.dst.lg": "1",
             "eth.lg": "1",
-            "eth.dst.ig": "1",
-            "eth.ig": "1"
+            "eth.ig": "1",
+            "eth.dst_resolved": "Broadcast",
+            "eth.dst.oui": "16777215",
+            "eth.dst.lg": "1",
+            "eth.dst.ig": "1"
           },
           "eth.src": "00:0b:82:01:fc:42",
           "eth.src_tree": {
-            "eth.src_resolved": "Grandstr_01:fc:42",
-            "eth.src.oui": "2946",
-            "eth.src.oui_resolved": "Grandstream Networks, Inc.",
             "eth.addr": "00:0b:82:01:fc:42",
             "eth.addr_resolved": "Grandstr_01:fc:42",
             "eth.addr.oui": "2946",
             "eth.addr.oui_resolved": "Grandstream Networks, Inc.",
-            "eth.src.lg": "0",
             "eth.lg": "0",
-            "eth.src.ig": "0",
-            "eth.ig": "0"
+            "eth.ig": "0",
+            "eth.src_resolved": "Grandstr_01:fc:42",
+            "eth.src.oui": "2946",
+            "eth.src.oui_resolved": "Grandstream Networks, Inc.",
+            "eth.src.lg": "0",
+            "eth.src.ig": "0"
           },
           "eth.type": "0x0800"
         },
@@ -427,6 +451,14 @@
           "dhcp.ip.server": "0.0.0.0",
           "dhcp.ip.relay": "0.0.0.0",
           "dhcp.hw.mac_addr": "00:0b:82:01:fc:42",
+          "dhcp.hw.mac_addr_tree": {
+            "eth.addr": "00:0b:82:01:fc:42",
+            "eth.addr_resolved": "Grandstr_01:fc:42",
+            "eth.addr.oui": "2946",
+            "eth.addr.oui_resolved": "Grandstream Networks, Inc.",
+            "eth.lg": "0",
+            "eth.ig": "0"
+          },
           "dhcp.hw.addr_padding": "00:00:00:00:00:00:00:00:00:00",
           "dhcp.server": "",
           "dhcp.file": "",
@@ -442,7 +474,15 @@
             "dhcp.option.length": "7",
             "dhcp.option.value": "01:00:0b:82:01:fc:42",
             "dhcp.hw.type": "0x01",
-            "dhcp.hw.mac_addr": "00:0b:82:01:fc:42"
+            "dhcp.hw.mac_addr": "00:0b:82:01:fc:42",
+            "dhcp.hw.mac_addr_tree": {
+              "eth.addr": "00:0b:82:01:fc:42",
+              "eth.addr_resolved": "Grandstr_01:fc:42",
+              "eth.addr.oui": "2946",
+              "eth.addr.oui_resolved": "Grandstream Networks, Inc.",
+              "eth.lg": "0",
+              "eth.ig": "0"
+            }
           },
           "dhcp.option.type": "50",
           "dhcp.option.type_tree": {
@@ -498,31 +538,31 @@
         "eth": {
           "eth.dst": "00:0b:82:01:fc:42",
           "eth.dst_tree": {
-            "eth.dst_resolved": "Grandstr_01:fc:42",
-            "eth.dst.oui": "2946",
-            "eth.dst.oui_resolved": "Grandstream Networks, Inc.",
             "eth.addr": "00:0b:82:01:fc:42",
             "eth.addr_resolved": "Grandstr_01:fc:42",
             "eth.addr.oui": "2946",
             "eth.addr.oui_resolved": "Grandstream Networks, Inc.",
-            "eth.dst.lg": "0",
             "eth.lg": "0",
-            "eth.dst.ig": "0",
-            "eth.ig": "0"
+            "eth.ig": "0",
+            "eth.dst_resolved": "Grandstr_01:fc:42",
+            "eth.dst.oui": "2946",
+            "eth.dst.oui_resolved": "Grandstream Networks, Inc.",
+            "eth.dst.lg": "0",
+            "eth.dst.ig": "0"
           },
           "eth.src": "00:08:74:ad:f1:9b",
           "eth.src_tree": {
-            "eth.src_resolved": "Dell_ad:f1:9b",
-            "eth.src.oui": "2164",
-            "eth.src.oui_resolved": "Dell Inc.",
             "eth.addr": "00:08:74:ad:f1:9b",
             "eth.addr_resolved": "Dell_ad:f1:9b",
             "eth.addr.oui": "2164",
             "eth.addr.oui_resolved": "Dell Inc.",
-            "eth.src.lg": "0",
             "eth.lg": "0",
-            "eth.src.ig": "0",
-            "eth.ig": "0"
+            "eth.ig": "0",
+            "eth.src_resolved": "Dell_ad:f1:9b",
+            "eth.src.oui": "2164",
+            "eth.src.oui_resolved": "Dell Inc.",
+            "eth.src.lg": "0",
+            "eth.src.ig": "0"
           },
           "eth.type": "0x0800"
         },
@@ -588,6 +628,14 @@
           "dhcp.ip.server": "0.0.0.0",
           "dhcp.ip.relay": "0.0.0.0",
           "dhcp.hw.mac_addr": "00:0b:82:01:fc:42",
+          "dhcp.hw.mac_addr_tree": {
+            "eth.addr": "00:0b:82:01:fc:42",
+            "eth.addr_resolved": "Grandstr_01:fc:42",
+            "eth.addr.oui": "2946",
+            "eth.addr.oui_resolved": "Grandstream Networks, Inc.",
+            "eth.lg": "0",
+            "eth.ig": "0"
+          },
           "dhcp.hw.addr_padding": "00:00:00:00:00:00:00:00:00:00",
           "dhcp.server": "",
           "dhcp.file": "",

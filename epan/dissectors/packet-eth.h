@@ -16,6 +16,9 @@ typedef struct _eth_hdr {
 	guint16 type;
 } eth_hdr;
 
+void
+eth_dissect_subfields(proto_item *addr_item, const int hfindex, tvbuff_t *tvb, gint start _U_, gint length _U_, const guint8 *addr);
+
 void add_ethernet_trailer(packet_info *pinfo, proto_tree *tree, proto_tree *fh_tree,
 			  int trailer_id, tvbuff_t *tvb, tvbuff_t *trailer_tvb,
 			  int fcs_len);

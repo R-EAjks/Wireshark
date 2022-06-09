@@ -121,20 +121,6 @@
             29
           ],
           "eth.dst_tree": {
-            "eth.dst_resolved_raw": [
-              "ffffffffffff",
-              0,
-              6,
-              0,
-              26
-            ],
-            "eth.dst.oui_raw": [
-              "ffffff",
-              0,
-              3,
-              0,
-              6
-            ],
             "eth.addr_raw": [
               "ffffffffffff",
               0,
@@ -156,13 +142,6 @@
               0,
               6
             ],
-            "eth.dst.lg_raw": [
-              "1",
-              0,
-              3,
-              131072,
-              2
-            ],
             "eth.lg_raw": [
               "1",
               0,
@@ -170,14 +149,35 @@
               131072,
               2
             ],
-            "eth.dst.ig_raw": [
+            "eth.ig_raw": [
               "1",
               0,
               3,
               65536,
               2
             ],
-            "eth.ig_raw": [
+            "eth.dst_resolved_raw": [
+              "ffffffffffff",
+              0,
+              6,
+              0,
+              26
+            ],
+            "eth.dst.oui_raw": [
+              "ffffff",
+              0,
+              3,
+              0,
+              6
+            ],
+            "eth.dst.lg_raw": [
+              "1",
+              0,
+              3,
+              131072,
+              2
+            ],
+            "eth.dst.ig_raw": [
               "1",
               0,
               3,
@@ -193,27 +193,6 @@
             29
           ],
           "eth.src_tree": {
-            "eth.src_resolved_raw": [
-              "000b8201fc42",
-              6,
-              6,
-              0,
-              26
-            ],
-            "eth.src.oui_raw": [
-              "000b82",
-              6,
-              3,
-              0,
-              6
-            ],
-            "eth.src.oui_resolved_raw": [
-              "000b8201fc42",
-              6,
-              6,
-              0,
-              26
-            ],
             "eth.addr_raw": [
               "000b8201fc42",
               6,
@@ -242,13 +221,6 @@
               0,
               26
             ],
-            "eth.src.lg_raw": [
-              "0",
-              6,
-              3,
-              131072,
-              2
-            ],
             "eth.lg_raw": [
               "0",
               6,
@@ -256,14 +228,42 @@
               131072,
               2
             ],
-            "eth.src.ig_raw": [
+            "eth.ig_raw": [
               "0",
               6,
               3,
               65536,
               2
             ],
-            "eth.ig_raw": [
+            "eth.src_resolved_raw": [
+              "000b8201fc42",
+              6,
+              6,
+              0,
+              26
+            ],
+            "eth.src.oui_raw": [
+              "000b82",
+              6,
+              3,
+              0,
+              6
+            ],
+            "eth.src.oui_resolved_raw": [
+              "000b8201fc42",
+              6,
+              6,
+              0,
+              26
+            ],
+            "eth.src.lg_raw": [
+              "0",
+              6,
+              3,
+              131072,
+              2
+            ],
+            "eth.src.ig_raw": [
               "0",
               6,
               3,
@@ -656,6 +656,50 @@
             0,
             29
           ],
+          "dhcp.hw.mac_addr_tree": {
+            "eth.addr_raw": [
+              "000b8201fc42",
+              70,
+              6,
+              0,
+              29
+            ],
+            "eth.addr_resolved_raw": [
+              "000b8201fc42",
+              70,
+              6,
+              0,
+              26
+            ],
+            "eth.addr.oui_raw": [
+              "000b82",
+              70,
+              3,
+              0,
+              6
+            ],
+            "eth.addr.oui_resolved_raw": [
+              "000b8201fc42",
+              70,
+              6,
+              0,
+              26
+            ],
+            "eth.lg_raw": [
+              "0",
+              70,
+              3,
+              131072,
+              2
+            ],
+            "eth.ig_raw": [
+              "0",
+              70,
+              3,
+              65536,
+              2
+            ]
+          },
           "dhcp.hw.addr_padding_raw": [
             "00000000000000000000",
             76,
@@ -749,7 +793,51 @@
               6,
               0,
               29
-            ]
+            ],
+            "dhcp.hw.mac_addr_tree": {
+              "eth.addr_raw": [
+                "000b8201fc42",
+                288,
+                6,
+                0,
+                29
+              ],
+              "eth.addr_resolved_raw": [
+                "000b8201fc42",
+                288,
+                6,
+                0,
+                26
+              ],
+              "eth.addr.oui_raw": [
+                "000b82",
+                288,
+                3,
+                0,
+                6
+              ],
+              "eth.addr.oui_resolved_raw": [
+                "000b8201fc42",
+                288,
+                6,
+                0,
+                26
+              ],
+              "eth.lg_raw": [
+                "0",
+                288,
+                3,
+                131072,
+                2
+              ],
+              "eth.ig_raw": [
+                "0",
+                288,
+                3,
+                65536,
+                2
+              ]
+            }
           },
           "dhcp.option.type_raw": [
             "320400000000",
@@ -981,6 +1069,48 @@
             29
           ],
           "eth.dst_tree": {
+            "eth.addr_raw": [
+              "000b8201fc42",
+              0,
+              6,
+              0,
+              29
+            ],
+            "eth.addr_resolved_raw": [
+              "000b8201fc42",
+              0,
+              6,
+              0,
+              26
+            ],
+            "eth.addr.oui_raw": [
+              "000b82",
+              0,
+              3,
+              0,
+              6
+            ],
+            "eth.addr.oui_resolved_raw": [
+              "000b8201fc42",
+              0,
+              6,
+              0,
+              26
+            ],
+            "eth.lg_raw": [
+              "0",
+              0,
+              3,
+              131072,
+              2
+            ],
+            "eth.ig_raw": [
+              "0",
+              0,
+              3,
+              65536,
+              2
+            ],
             "eth.dst_resolved_raw": [
               "000b8201fc42",
               0,
@@ -1002,34 +1132,6 @@
               0,
               26
             ],
-            "eth.addr_raw": [
-              "000b8201fc42",
-              0,
-              6,
-              0,
-              29
-            ],
-            "eth.addr_resolved_raw": [
-              "000b8201fc42",
-              0,
-              6,
-              0,
-              26
-            ],
-            "eth.addr.oui_raw": [
-              "000b82",
-              0,
-              3,
-              0,
-              6
-            ],
-            "eth.addr.oui_resolved_raw": [
-              "000b8201fc42",
-              0,
-              6,
-              0,
-              26
-            ],
             "eth.dst.lg_raw": [
               "0",
               0,
@@ -1037,21 +1139,7 @@
               131072,
               2
             ],
-            "eth.lg_raw": [
-              "0",
-              0,
-              3,
-              131072,
-              2
-            ],
             "eth.dst.ig_raw": [
-              "0",
-              0,
-              3,
-              65536,
-              2
-            ],
-            "eth.ig_raw": [
               "0",
               0,
               3,
@@ -1067,6 +1155,48 @@
             29
           ],
           "eth.src_tree": {
+            "eth.addr_raw": [
+              "000874adf19b",
+              6,
+              6,
+              0,
+              29
+            ],
+            "eth.addr_resolved_raw": [
+              "000874adf19b",
+              6,
+              6,
+              0,
+              26
+            ],
+            "eth.addr.oui_raw": [
+              "000874",
+              6,
+              3,
+              0,
+              6
+            ],
+            "eth.addr.oui_resolved_raw": [
+              "000874adf19b",
+              6,
+              6,
+              0,
+              26
+            ],
+            "eth.lg_raw": [
+              "0",
+              6,
+              3,
+              131072,
+              2
+            ],
+            "eth.ig_raw": [
+              "0",
+              6,
+              3,
+              65536,
+              2
+            ],
             "eth.src_resolved_raw": [
               "000874adf19b",
               6,
@@ -1088,34 +1218,6 @@
               0,
               26
             ],
-            "eth.addr_raw": [
-              "000874adf19b",
-              6,
-              6,
-              0,
-              29
-            ],
-            "eth.addr_resolved_raw": [
-              "000874adf19b",
-              6,
-              6,
-              0,
-              26
-            ],
-            "eth.addr.oui_raw": [
-              "000874",
-              6,
-              3,
-              0,
-              6
-            ],
-            "eth.addr.oui_resolved_raw": [
-              "000874adf19b",
-              6,
-              6,
-              0,
-              26
-            ],
             "eth.src.lg_raw": [
               "0",
               6,
@@ -1123,21 +1225,7 @@
               131072,
               2
             ],
-            "eth.lg_raw": [
-              "0",
-              6,
-              3,
-              131072,
-              2
-            ],
             "eth.src.ig_raw": [
-              "0",
-              6,
-              3,
-              65536,
-              2
-            ],
-            "eth.ig_raw": [
               "0",
               6,
               3,
@@ -1530,6 +1618,50 @@
             0,
             29
           ],
+          "dhcp.hw.mac_addr_tree": {
+            "eth.addr_raw": [
+              "000b8201fc42",
+              70,
+              6,
+              0,
+              29
+            ],
+            "eth.addr_resolved_raw": [
+              "000b8201fc42",
+              70,
+              6,
+              0,
+              26
+            ],
+            "eth.addr.oui_raw": [
+              "000b82",
+              70,
+              3,
+              0,
+              6
+            ],
+            "eth.addr.oui_resolved_raw": [
+              "000b8201fc42",
+              70,
+              6,
+              0,
+              26
+            ],
+            "eth.lg_raw": [
+              "0",
+              70,
+              3,
+              131072,
+              2
+            ],
+            "eth.ig_raw": [
+              "0",
+              70,
+              3,
+              65536,
+              2
+            ]
+          },
           "dhcp.hw.addr_padding_raw": [
             "00000000000000000000",
             76,
@@ -1887,20 +2019,6 @@
             29
           ],
           "eth.dst_tree": {
-            "eth.dst_resolved_raw": [
-              "ffffffffffff",
-              0,
-              6,
-              0,
-              26
-            ],
-            "eth.dst.oui_raw": [
-              "ffffff",
-              0,
-              3,
-              0,
-              6
-            ],
             "eth.addr_raw": [
               "ffffffffffff",
               0,
@@ -1922,13 +2040,6 @@
               0,
               6
             ],
-            "eth.dst.lg_raw": [
-              "1",
-              0,
-              3,
-              131072,
-              2
-            ],
             "eth.lg_raw": [
               "1",
               0,
@@ -1936,14 +2047,35 @@
               131072,
               2
             ],
-            "eth.dst.ig_raw": [
+            "eth.ig_raw": [
               "1",
               0,
               3,
               65536,
               2
             ],
-            "eth.ig_raw": [
+            "eth.dst_resolved_raw": [
+              "ffffffffffff",
+              0,
+              6,
+              0,
+              26
+            ],
+            "eth.dst.oui_raw": [
+              "ffffff",
+              0,
+              3,
+              0,
+              6
+            ],
+            "eth.dst.lg_raw": [
+              "1",
+              0,
+              3,
+              131072,
+              2
+            ],
+            "eth.dst.ig_raw": [
               "1",
               0,
               3,
@@ -1959,27 +2091,6 @@
             29
           ],
           "eth.src_tree": {
-            "eth.src_resolved_raw": [
-              "000b8201fc42",
-              6,
-              6,
-              0,
-              26
-            ],
-            "eth.src.oui_raw": [
-              "000b82",
-              6,
-              3,
-              0,
-              6
-            ],
-            "eth.src.oui_resolved_raw": [
-              "000b8201fc42",
-              6,
-              6,
-              0,
-              26
-            ],
             "eth.addr_raw": [
               "000b8201fc42",
               6,
@@ -2008,13 +2119,6 @@
               0,
               26
             ],
-            "eth.src.lg_raw": [
-              "0",
-              6,
-              3,
-              131072,
-              2
-            ],
             "eth.lg_raw": [
               "0",
               6,
@@ -2022,14 +2126,42 @@
               131072,
               2
             ],
-            "eth.src.ig_raw": [
+            "eth.ig_raw": [
               "0",
               6,
               3,
               65536,
               2
             ],
-            "eth.ig_raw": [
+            "eth.src_resolved_raw": [
+              "000b8201fc42",
+              6,
+              6,
+              0,
+              26
+            ],
+            "eth.src.oui_raw": [
+              "000b82",
+              6,
+              3,
+              0,
+              6
+            ],
+            "eth.src.oui_resolved_raw": [
+              "000b8201fc42",
+              6,
+              6,
+              0,
+              26
+            ],
+            "eth.src.lg_raw": [
+              "0",
+              6,
+              3,
+              131072,
+              2
+            ],
+            "eth.src.ig_raw": [
               "0",
               6,
               3,
@@ -2422,6 +2554,50 @@
             0,
             29
           ],
+          "dhcp.hw.mac_addr_tree": {
+            "eth.addr_raw": [
+              "000b8201fc42",
+              70,
+              6,
+              0,
+              29
+            ],
+            "eth.addr_resolved_raw": [
+              "000b8201fc42",
+              70,
+              6,
+              0,
+              26
+            ],
+            "eth.addr.oui_raw": [
+              "000b82",
+              70,
+              3,
+              0,
+              6
+            ],
+            "eth.addr.oui_resolved_raw": [
+              "000b8201fc42",
+              70,
+              6,
+              0,
+              26
+            ],
+            "eth.lg_raw": [
+              "0",
+              70,
+              3,
+              131072,
+              2
+            ],
+            "eth.ig_raw": [
+              "0",
+              70,
+              3,
+              65536,
+              2
+            ]
+          },
           "dhcp.hw.addr_padding_raw": [
             "00000000000000000000",
             76,
@@ -2515,7 +2691,51 @@
               6,
               0,
               29
-            ]
+            ],
+            "dhcp.hw.mac_addr_tree": {
+              "eth.addr_raw": [
+                "000b8201fc42",
+                288,
+                6,
+                0,
+                29
+              ],
+              "eth.addr_resolved_raw": [
+                "000b8201fc42",
+                288,
+                6,
+                0,
+                26
+              ],
+              "eth.addr.oui_raw": [
+                "000b82",
+                288,
+                3,
+                0,
+                6
+              ],
+              "eth.addr.oui_resolved_raw": [
+                "000b8201fc42",
+                288,
+                6,
+                0,
+                26
+              ],
+              "eth.lg_raw": [
+                "0",
+                288,
+                3,
+                131072,
+                2
+              ],
+              "eth.ig_raw": [
+                "0",
+                288,
+                3,
+                65536,
+                2
+              ]
+            }
           },
           "dhcp.option.type_raw": [
             "3204c0a8000a",
@@ -2777,6 +2997,48 @@
             29
           ],
           "eth.dst_tree": {
+            "eth.addr_raw": [
+              "000b8201fc42",
+              0,
+              6,
+              0,
+              29
+            ],
+            "eth.addr_resolved_raw": [
+              "000b8201fc42",
+              0,
+              6,
+              0,
+              26
+            ],
+            "eth.addr.oui_raw": [
+              "000b82",
+              0,
+              3,
+              0,
+              6
+            ],
+            "eth.addr.oui_resolved_raw": [
+              "000b8201fc42",
+              0,
+              6,
+              0,
+              26
+            ],
+            "eth.lg_raw": [
+              "0",
+              0,
+              3,
+              131072,
+              2
+            ],
+            "eth.ig_raw": [
+              "0",
+              0,
+              3,
+              65536,
+              2
+            ],
             "eth.dst_resolved_raw": [
               "000b8201fc42",
               0,
@@ -2798,34 +3060,6 @@
               0,
               26
             ],
-            "eth.addr_raw": [
-              "000b8201fc42",
-              0,
-              6,
-              0,
-              29
-            ],
-            "eth.addr_resolved_raw": [
-              "000b8201fc42",
-              0,
-              6,
-              0,
-              26
-            ],
-            "eth.addr.oui_raw": [
-              "000b82",
-              0,
-              3,
-              0,
-              6
-            ],
-            "eth.addr.oui_resolved_raw": [
-              "000b8201fc42",
-              0,
-              6,
-              0,
-              26
-            ],
             "eth.dst.lg_raw": [
               "0",
               0,
@@ -2833,21 +3067,7 @@
               131072,
               2
             ],
-            "eth.lg_raw": [
-              "0",
-              0,
-              3,
-              131072,
-              2
-            ],
             "eth.dst.ig_raw": [
-              "0",
-              0,
-              3,
-              65536,
-              2
-            ],
-            "eth.ig_raw": [
               "0",
               0,
               3,
@@ -2863,6 +3083,48 @@
             29
           ],
           "eth.src_tree": {
+            "eth.addr_raw": [
+              "000874adf19b",
+              6,
+              6,
+              0,
+              29
+            ],
+            "eth.addr_resolved_raw": [
+              "000874adf19b",
+              6,
+              6,
+              0,
+              26
+            ],
+            "eth.addr.oui_raw": [
+              "000874",
+              6,
+              3,
+              0,
+              6
+            ],
+            "eth.addr.oui_resolved_raw": [
+              "000874adf19b",
+              6,
+              6,
+              0,
+              26
+            ],
+            "eth.lg_raw": [
+              "0",
+              6,
+              3,
+              131072,
+              2
+            ],
+            "eth.ig_raw": [
+              "0",
+              6,
+              3,
+              65536,
+              2
+            ],
             "eth.src_resolved_raw": [
               "000874adf19b",
               6,
@@ -2884,34 +3146,6 @@
               0,
               26
             ],
-            "eth.addr_raw": [
-              "000874adf19b",
-              6,
-              6,
-              0,
-              29
-            ],
-            "eth.addr_resolved_raw": [
-              "000874adf19b",
-              6,
-              6,
-              0,
-              26
-            ],
-            "eth.addr.oui_raw": [
-              "000874",
-              6,
-              3,
-              0,
-              6
-            ],
-            "eth.addr.oui_resolved_raw": [
-              "000874adf19b",
-              6,
-              6,
-              0,
-              26
-            ],
             "eth.src.lg_raw": [
               "0",
               6,
@@ -2919,21 +3153,7 @@
               131072,
               2
             ],
-            "eth.lg_raw": [
-              "0",
-              6,
-              3,
-              131072,
-              2
-            ],
             "eth.src.ig_raw": [
-              "0",
-              6,
-              3,
-              65536,
-              2
-            ],
-            "eth.ig_raw": [
               "0",
               6,
               3,
@@ -3326,6 +3546,50 @@
             0,
             29
           ],
+          "dhcp.hw.mac_addr_tree": {
+            "eth.addr_raw": [
+              "000b8201fc42",
+              70,
+              6,
+              0,
+              29
+            ],
+            "eth.addr_resolved_raw": [
+              "000b8201fc42",
+              70,
+              6,
+              0,
+              26
+            ],
+            "eth.addr.oui_raw": [
+              "000b82",
+              70,
+              3,
+              0,
+              6
+            ],
+            "eth.addr.oui_resolved_raw": [
+              "000b8201fc42",
+              70,
+              6,
+              0,
+              26
+            ],
+            "eth.lg_raw": [
+              "0",
+              70,
+              3,
+              131072,
+              2
+            ],
+            "eth.ig_raw": [
+              "0",
+              70,
+              3,
+              65536,
+              2
+            ]
+          },
           "dhcp.hw.addr_padding_raw": [
             "00000000000000000000",
             76,
