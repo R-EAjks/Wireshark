@@ -386,6 +386,8 @@ void proto_report_dissector_bug(const char *format, ...)
 #define ENC_ISO_646_IRV                   ENC_ASCII   /* ISO 646 International Reference Version = ASCII */
 #define ENC_UTF_8                         0x00000002
 #define ENC_UTF_16                        0x00000004
+#define ENC_UTF_16BE                      (ENC_UTF_16|ENC_BIG_ENDIAN)
+#define ENC_UTF_16LE                      (ENC_UTF_16|ENC_LITTLE_ENDIAN)
 #define ENC_UCS_2                         0x00000006
 #define ENC_UCS_4                         0x00000008
 #define ENC_ISO_8859_1                    0x0000000A

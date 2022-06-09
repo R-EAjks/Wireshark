@@ -150,6 +150,8 @@ static ws_enum_t all_enums[] = {
     ENUM(ENC_UCS_2),
     ENUM(ENC_UCS_4),
     ENUM(ENC_UTF_16),
+    ENUM(ENC_UTF_16BE),
+    ENUM(ENC_UTF_16LE),
     ENUM(ENC_UTF_8),
     ENUM(ENC_VARINT_MASK),
     ENUM(ENC_VARINT_PROTOBUF),
