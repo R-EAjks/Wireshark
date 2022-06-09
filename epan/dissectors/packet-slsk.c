@@ -591,7 +591,7 @@ static int dissect_slsk_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
               add_new_data_source(pinfo, uncompr_tvb, "Uncompressed SoulSeek data");
               uncompr_tvb_offset = 0;
               if (check_slsk_format(uncompr_tvb, uncompr_tvb_offset, "sii*")) {
-                proto_tree_add_item_ret_length(slsk_compr_packet_tree, hf_slsk_username, uncompr_tvb, uncompr_tvb_offset, 4, ENC_ASCII|ENC_NA, &str_len);
+                proto_tree_add_item_ret_length(slsk_compr_packet_tree, hf_slsk_username, uncompr_tvb, uncompr_tvb_offset, 4, ENC_ASCII, &str_len);
                 uncompr_tvb_offset += str_len;
                 proto_tree_add_item(slsk_compr_packet_tree, hf_slsk_token, uncompr_tvb, uncompr_tvb_offset, 4, ENC_LITTLE_ENDIAN);
                 uncompr_tvb_offset += 4;

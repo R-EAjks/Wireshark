@@ -3754,7 +3754,7 @@ dissect_dvbci_payload_ami(guint32 tag, gint len_field _U_,
                     tvb, offset, 1, ENC_BIG_ENDIAN);
             offset++;
             proto_tree_add_item_ret_string(tree, hf_dvbci_app_dom_id,
-                    tvb, offset, app_dom_id_len, ENC_ASCII|ENC_NA, pinfo->pool, &app_dom_id);
+                    tvb, offset, app_dom_id_len, ENC_ASCII, pinfo->pool, &app_dom_id);
             if (app_dom_id) {
                 col_append_sep_fstr(pinfo->cinfo, COL_INFO, " ",
                         "for %s", app_dom_id);

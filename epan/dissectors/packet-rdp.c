@@ -1303,10 +1303,10 @@ dissect_rdp_fields(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *tr
         if (c->flags & RDP_FI_UNICODE)
           encoding = ENC_UTF_16|ENC_LITTLE_ENDIAN;
         else if (c->flags & RDP_FI_ANSI)
-          encoding = ENC_ASCII|ENC_NA;  /* XXX - code page */
+          encoding = ENC_ASCII;  /* XXX - code page */
         else {
           /* Could be Unicode, could be ANSI, based on INFO_UNICODE flag */
-          encoding = (info_flags & INFO_UNICODE) ? ENC_UTF_16|ENC_LITTLE_ENDIAN : ENC_ASCII|ENC_NA;  /* XXX - code page */
+          encoding = (info_flags & INFO_UNICODE) ? ENC_UTF_16|ENC_LITTLE_ENDIAN : ENC_ASCII;  /* XXX - code page */
         }
       } else
         encoding = ENC_LITTLE_ENDIAN;
@@ -2874,7 +2874,7 @@ dissect_rdp_cr(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void*
     /* XXX - distinguish between routing token and cookie? */
     linelen = tvb_find_line_end(tvb, offset, -1, &next_offset, TRUE);
     proto_tree_add_item_ret_string(tree, hf_rdp_rt_cookie, tvb, offset,
-                                   linelen, ENC_ASCII|ENC_NA,
+                                   linelen, ENC_ASCII,
                                    pinfo->pool, &stringval);
     offset = (linelen == -1) ? (gint)tvb_captured_length(tvb) : next_offset;
     col_append_str(pinfo->cinfo, COL_INFO, format_text(pinfo->pool, stringval, strlen(stringval)));

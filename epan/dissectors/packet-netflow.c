@@ -7015,7 +7015,7 @@ dissect_v9_v10_pdu_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pdutree, 
             {
                 const guint8 *string;
                 ti = proto_tree_add_item_ret_string(pdutree, hf_cflow_information_element_name,
-                                         tvb, offset, length, ENC_UTF_8|ENC_NA, pinfo->pool, &string);
+                                         tvb, offset, length, ENC_UTF_8, pinfo->pool, &string);
                 /* Add name of element to root for this flow */
                 proto_item_append_text(pdutree, " [%s]", string);
             }
@@ -8787,7 +8787,7 @@ dissect_v9_v10_pdu_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pdutree, 
         case (NTOP_BASE + 204):           /* ORACLE_QUERY_DURATION */
         case ((VENDOR_NTOP << 16) | 204): /* ORACLE_QUERY_DURATION */
             ti = proto_tree_add_item(pdutree, hf_pie_ntop_oracle_query_duration,
-                                     tvb, offset, length, ENC_ASCII|ENC_NA);
+                                     tvb, offset, length, ENC_ASCII);
             break;
 
         case (NTOP_BASE + 205):           /* DNS_QUERY */
@@ -10218,7 +10218,7 @@ dissect_v9_v10_pdu_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pdutree, 
             {
             const guint8 *string;
             ti = proto_tree_add_item_ret_string(pdutree, hf_pie_ixia_l7_application_name,
-                                     tvb, offset, length, ENC_ASCII|ENC_NA, pinfo->pool, &string);
+                                     tvb, offset, length, ENC_ASCII, pinfo->pool, &string);
             proto_item_append_text(pdutree, " (%s)", string);
             }
 
@@ -10463,15 +10463,15 @@ dissect_v9_v10_pdu_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pdutree, 
             break;
         case ((VENDOR_IXIA << 16) | 216):
             ti = proto_tree_add_item(pdutree, hf_pie_ixia_radius_filter_id,
-                                     tvb, offset, length, ENC_NA|ENC_ASCII);
+                                     tvb, offset, length, ENC_ASCII);
             break;
         case ((VENDOR_IXIA << 16) | 217):
             ti = proto_tree_add_item(pdutree, hf_pie_ixia_radius_reply_message,
-                                     tvb, offset, length, ENC_NA|ENC_ASCII);
+                                     tvb, offset, length, ENC_ASCII);
             break;
         case ((VENDOR_IXIA << 16) | 218):
             ti = proto_tree_add_item(pdutree, hf_pie_ixia_radius_called_station_id,
-                                     tvb, offset, length, ENC_NA|ENC_ASCII);
+                                     tvb, offset, length, ENC_ASCII);
             break;
         case ((VENDOR_IXIA << 16) | 219):
             ti = proto_tree_add_item(pdutree, hf_pie_ixia_http_connection,
@@ -10499,7 +10499,7 @@ dissect_v9_v10_pdu_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pdutree, 
             break;
         case ((VENDOR_IXIA << 16) | 225):
             ti = proto_tree_add_item(pdutree, hf_pie_ixia_radius_calling_station_id,
-                                     tvb, offset, length, ENC_NA|ENC_ASCII);
+                                     tvb, offset, length, ENC_ASCII);
             break;
         case ((VENDOR_IXIA << 16) | 226):
             ti = proto_tree_add_item(pdutree, hf_pie_ixia_http_content_length,

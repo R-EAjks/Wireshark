@@ -211,11 +211,11 @@ dissect_exported_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
         switch(tag) {
             case EXP_PDU_TAG_PROTO_NAME:
                 next_proto_type = EXPORTED_PDU_NEXT_PROTO_STR;
-                proto_tree_add_item_ret_string(tag_tree, hf_exported_pdu_prot_name, tvb, offset, tag_len, ENC_UTF_8|ENC_NA, pinfo->pool, &proto_name);
+                proto_tree_add_item_ret_string(tag_tree, hf_exported_pdu_prot_name, tvb, offset, tag_len, ENC_UTF_8, pinfo->pool, &proto_name);
                 break;
             case EXP_PDU_TAG_HEUR_PROTO_NAME:
                 next_proto_type = EXPORTED_PDU_NEXT_HEUR_PROTO_STR;
-                proto_tree_add_item_ret_string(tag_tree, hf_exported_pdu_heur_prot_name, tvb, offset, tag_len, ENC_UTF_8|ENC_NA, pinfo->pool, &proto_name);
+                proto_tree_add_item_ret_string(tag_tree, hf_exported_pdu_heur_prot_name, tvb, offset, tag_len, ENC_UTF_8, pinfo->pool, &proto_name);
                 break;
             case EXP_PDU_TAG_DISSECTOR_TABLE_NAME:
                 next_proto_type = EXPORTED_PDU_NEXT_DIS_TABLE_STR;

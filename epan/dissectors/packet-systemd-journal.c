@@ -364,7 +364,7 @@ dissect_systemd_journal_line_entry(tvbuff_t *tvb, packet_info *pinfo _U_, proto_
                     dissect_sjle_int(sje_tree, hf_idx, tvb, eq_off, val_len);
                     break;
                 case FT_STRING:
-                    proto_tree_add_item(sje_tree, jf_to_hf[i].hfid, tvb, eq_off, val_len, ENC_UTF_8|ENC_NA);
+                    proto_tree_add_item(sje_tree, jf_to_hf[i].hfid, tvb, eq_off, val_len, ENC_UTF_8);
                     break;
                 default:
                 {

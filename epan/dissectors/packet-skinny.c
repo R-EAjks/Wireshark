@@ -2251,7 +2251,7 @@ dissect_skinny_xml(ptvcursor_t *cursor, int hfindex, packet_info *pinfo, guint32
     length = maxlength;
   }
 
-  ptvcursor_add_no_advance(cursor, hfindex, length, ENC_ASCII|ENC_NA);
+  ptvcursor_add_no_advance(cursor, hfindex, length, ENC_ASCII);
 
   item = proto_tree_add_item(tree, hf_skinny_xmlData, tvb, offset, length, ENC_ASCII);
   subtree = proto_item_add_subtree(item, 0);

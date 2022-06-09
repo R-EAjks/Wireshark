@@ -1353,7 +1353,7 @@ tele_param_cb_num(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint len
 
         offset += 1;
 
-        poctets = tvb_get_string_enc(pinfo->pool, tvb, offset, num_fields, ENC_ASCII|ENC_NA);
+        poctets = tvb_get_string_enc(pinfo->pool, tvb, offset, num_fields, ENC_ASCII);
 
         proto_tree_add_string_format(tree, hf_ansi_637_tele_cb_num_number, tvb, offset, num_fields,
             (gchar *) poctets,

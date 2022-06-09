@@ -1689,7 +1689,7 @@ WLAN-Identifiers-r16/ssid-r16 TYPE=FT_STRING DISPLAY=BASE_NONE
   tvbuff_t *ssid_tvb = NULL;
 
 %(DEFAULT_BODY)s
-  actx->created_item = proto_tree_add_item(tree, hf_index, ssid_tvb, 0, -1, ENC_ASCII|ENC_NA);
+  actx->created_item = proto_tree_add_item(tree, hf_index, ssid_tvb, 0, -1, ENC_ASCII);
 
 #.TYPE_ATTR
 WLAN-Identifiers-r16/bssid-r16 TYPE=FT_ETHER

@@ -994,7 +994,7 @@ parse_arg(tvbuff_t      *tvb,
 
         /* Extract signature from tvb and return to caller. */
         /* XXX should this extract "length - 1" since we always expect /0? */
-        proto_tree_add_item_ret_string(field_tree, hf_alljoyn_mess_body_signature, tvb, offset, length, ENC_ASCII|ENC_NA, pinfo->pool, signature);
+        proto_tree_add_item_ret_string(field_tree, hf_alljoyn_mess_body_signature, tvb, offset, length, ENC_ASCII, pinfo->pool, signature);
         *signature_length = length;
 
         if(HDR_SIGNATURE == field_code) {
@@ -1086,7 +1086,7 @@ parse_arg(tvbuff_t      *tvb,
         length += 1;    /* Include the '\0'. */
         offset += 4;
 
-        proto_tree_add_item_ret_string(field_tree, hf_alljoyn_string_data, tvb, offset, length, ENC_UTF_8|ENC_NA, pinfo->pool, &member_name);
+        proto_tree_add_item_ret_string(field_tree, hf_alljoyn_string_data, tvb, offset, length, ENC_UTF_8, pinfo->pool, &member_name);
 
         if(HDR_MEMBER == field_code) {
             col_append_fstr(pinfo->cinfo, COL_INFO, " %s", member_name);
@@ -1164,7 +1164,7 @@ parse_arg(tvbuff_t      *tvb,
             offset += 1;
 
             tree = proto_item_add_subtree(item, ett_alljoyn_mess_body_parameters);
-            proto_tree_add_item_ret_string(tree, hf_alljoyn_mess_body_signature, tvb, offset, length, ENC_ASCII|ENC_NA, pinfo->pool, &sig_saved);
+            proto_tree_add_item_ret_string(tree, hf_alljoyn_mess_body_signature, tvb, offset, length, ENC_ASCII, pinfo->pool, &sig_saved);
 
             offset += length;
             sig_pointer = sig_saved;
@@ -1558,7 +1558,7 @@ handle_message_header_body(tvbuff_t    *tvb,
     header_item = proto_tree_add_item(message_tree, hf_alljoyn_mess_header, tvb, offset, MESSAGE_HEADER_LENGTH, ENC_NA);
     header_tree = proto_item_add_subtree(header_item, ett_alljoyn_header);
 
-    proto_tree_add_item(header_tree, hf_alljoyn_mess_header_endian, tvb, offset + ENDIANNESS_OFFSET, 1, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(header_tree, hf_alljoyn_mess_header_endian, tvb, offset + ENDIANNESS_OFFSET, 1, ENC_ASCII);
     proto_tree_add_item(header_tree, hf_alljoyn_mess_header_type, tvb, offset + TYPE_OFFSET, 1, ENC_NA);
 
     /* The flags byte. */

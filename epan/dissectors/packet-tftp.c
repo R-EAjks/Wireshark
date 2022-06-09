@@ -437,7 +437,7 @@ static void dissect_tftp_message(tftp_conv_info_t *tftp_info,
   case TFTP_RRQ:
     i1 = tvb_strsize(tvb, offset);
     proto_tree_add_item_ret_string(tftp_tree, hf_tftp_source_file,
-                        tvb, offset, i1, ENC_ASCII|ENC_NA, wmem_file_scope(), &tftp_info->source_file);
+                        tvb, offset, i1, ENC_ASCII, wmem_file_scope(), &tftp_info->source_file);
 
     /* we either have a source file name (for read requests) or a
        destination file name (for write requests)
@@ -466,7 +466,7 @@ static void dissect_tftp_message(tftp_conv_info_t *tftp_info,
   case TFTP_WRQ:
     i1 = tvb_strsize(tvb, offset);
     proto_tree_add_item_ret_string(tftp_tree, hf_tftp_destination_file,
-                        tvb, offset, i1, ENC_ASCII|ENC_NA, wmem_file_scope(), &tftp_info->destination_file);
+                        tvb, offset, i1, ENC_ASCII, wmem_file_scope(), &tftp_info->destination_file);
 
     tftp_info->source_file = NULL; /* see above */
     tftp_info->request_frame = pinfo->num;

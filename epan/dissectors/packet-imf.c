@@ -585,7 +585,7 @@ dissect_imf_siolabel(tvbuff_t *tvb, int offset, int length, proto_item *item, pa
 
     if (tvb_strneql(tvb, item_offset, "marking", 7) == 0) {
       const guint8* marking;
-      proto_tree_add_item_ret_string(tree, hf_imf_siolabel_marking, tvb, value_offset, value_length, ENC_ASCII|ENC_NA, pinfo->pool, &marking);
+      proto_tree_add_item_ret_string(tree, hf_imf_siolabel_marking, tvb, value_offset, value_length, ENC_ASCII, pinfo->pool, &marking);
       proto_item_append_text(item, ": %s", marking);
 
     } else if (tvb_strneql(tvb, item_offset, "fgcolor", 7) == 0) {
@@ -658,14 +658,14 @@ dissect_imf_content_type(tvbuff_t *tvb, packet_info *pinfo, int offset, int leng
     ct_tree = proto_item_add_subtree(item, ett_imf_content_type);
 
     len = first_colon - offset;
-    proto_tree_add_item_ret_string(ct_tree, hf_imf_content_type_type, tvb, offset, len, ENC_ASCII|ENC_NA, pinfo->pool, type);
+    proto_tree_add_item_ret_string(ct_tree, hf_imf_content_type_type, tvb, offset, len, ENC_ASCII, pinfo->pool, type);
     end_offset = imf_find_field_end (tvb, first_colon + 1, offset + length, NULL);
     if (end_offset == -1) {
        /* No end found */
        return;
     }
     len = end_offset - (first_colon + 1) - 2;  /* Do not include the last CRLF */
-    proto_tree_add_item_ret_string(ct_tree, hf_imf_content_type_parameters, tvb, first_colon + 1, len, ENC_ASCII|ENC_NA, pinfo->pool, parameters);
+    proto_tree_add_item_ret_string(ct_tree, hf_imf_content_type_parameters, tvb, first_colon + 1, len, ENC_ASCII, pinfo->pool, parameters);
   }
 }
 
@@ -832,7 +832,7 @@ dissect_imf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 
       } else {
         /* remove 2 bytes to take off the final CRLF to make things a little prettier */
-        item = proto_tree_add_item(tree, hf_id, tvb, value_offset, end_offset - value_offset - 2, ENC_ASCII|ENC_NA);
+        item = proto_tree_add_item(tree, hf_id, tvb, value_offset, end_offset - value_offset - 2, ENC_ASCII);
       }
       if(f_info->add_to_col_info) {
 
@@ -842,9 +842,9 @@ dissect_imf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
         /* if sender or subject, store for sending to the tap */
         if (eo_info && have_tap_listener(imf_eo_tap)) {
           if (*f_info->hf_id == hf_imf_from) {
-            eo_info->sender_data = tvb_get_string_enc(pinfo->pool, tvb, value_offset, end_offset - value_offset - 2, ENC_ASCII|ENC_NA);
+            eo_info->sender_data = tvb_get_string_enc(pinfo->pool, tvb, value_offset, end_offset - value_offset - 2, ENC_ASCII);
           } else if(*f_info->hf_id == hf_imf_subject) {
-            eo_info->subject_data = tvb_get_string_enc(pinfo->pool, tvb, value_offset, end_offset - value_offset - 2, ENC_ASCII|ENC_NA);
+            eo_info->subject_data = tvb_get_string_enc(pinfo->pool, tvb, value_offset, end_offset - value_offset - 2, ENC_ASCII);
           }
         }
       }

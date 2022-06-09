@@ -1874,9 +1874,9 @@ dissect_load_format_storage(proto_tree *tn3270_tree, tvbuff_t *tvb, gint offset,
     { &hf_tn3270_load_format_storage_flags1,    NULL,  1, NULL, ENC_BIG_ENDIAN },
     { &hf_tn3270_load_format_storage_flags2,    NULL,  1, NULL, ENC_BIG_ENDIAN },
     { &hf_tn3270_load_format_storage_operand,   NULL,  1, NULL, ENC_BIG_ENDIAN },
-    { &hf_tn3270_load_format_storage_localname, NULL,  8, NULL, ENC_EBCDIC|ENC_NA },
-    { &hf_tn3270_format_group,                  NULL,  6, NULL, ENC_EBCDIC|ENC_NA },
-    { &hf_tn3270_format_name,                   NULL, 16, NULL, ENC_EBCDIC|ENC_NA },
+    { &hf_tn3270_load_format_storage_localname, NULL,  8, NULL, ENC_EBCDIC },
+    { &hf_tn3270_format_group,                  NULL,  6, NULL, ENC_EBCDIC },
+    { &hf_tn3270_format_name,                   NULL, 16, NULL, ENC_EBCDIC },
     { NULL, NULL, 0, NULL, 0 }
   };
 
@@ -2626,8 +2626,8 @@ dissect_exception_or_status_sd_parms(proto_tree *tn3270_tree, tvbuff_t *tvb, gin
   static const hf_items sdp3[] = {
     { &hf_tn3270_sdp_ln,       NULL,  1, NULL, ENC_BIG_ENDIAN },
     { &hf_tn3270_sdp_id,       NULL,  1, NULL, ENC_BIG_ENDIAN },
-    { &hf_tn3270_format_group, NULL, 16, NULL, ENC_EBCDIC|ENC_NA },
-    { &hf_tn3270_format_name,  NULL, 16, NULL, ENC_EBCDIC|ENC_NA },
+    { &hf_tn3270_format_group, NULL, 16, NULL, ENC_EBCDIC },
+    { &hf_tn3270_format_name,  NULL, 16, NULL, ENC_EBCDIC },
     { NULL, NULL, 0, NULL, 0 }
   };
 
@@ -2644,7 +2644,7 @@ dissect_exception_or_status_sd_parms(proto_tree *tn3270_tree, tvbuff_t *tvb, gin
   static const hf_items sdp5[] = {
     { &hf_tn3270_sdp_ln,       NULL,  1, NULL, ENC_BIG_ENDIAN },
     { &hf_tn3270_sdp_id,       NULL,  1, NULL, ENC_BIG_ENDIAN },
-    { &hf_tn3270_format_group, NULL, 16, NULL, ENC_EBCDIC|ENC_NA },
+    { &hf_tn3270_format_group, NULL, 16, NULL, ENC_EBCDIC },
     { &hf_tn3270_sdp_nml,      NULL,  2, NULL, ENC_BIG_ENDIAN },
     { NULL, NULL, 0, NULL, 0 }
   };
@@ -2753,7 +2753,7 @@ dissect_inbound_3270ds(proto_tree *tn3270_tree, tvbuff_t *tvb, gint offset,
   };
 
   hf_items fields2[] = {
-    { &hf_tn3270_field_data,     NULL, sf_body_length - 4, NULL, ENC_EBCDIC|ENC_NA },
+    { &hf_tn3270_field_data,     NULL, sf_body_length - 4, NULL, ENC_EBCDIC },
     { NULL, NULL, 0, NULL, 0 }
   };
 
@@ -3792,8 +3792,8 @@ dissect_query_reply_oem_auxiliary_device(proto_tree *tn3270_tree, tvbuff_t *tvb,
   static const hf_items fields[] = {
     { &hf_tn3270_resbyte,   NULL, 1, NULL, ENC_BIG_ENDIAN },
     { &hf_tn3270_oem_dsref, NULL, 1, NULL, ENC_BIG_ENDIAN },
-    { &hf_tn3270_oem_dtype, NULL, 8, NULL, ENC_EBCDIC|ENC_NA },
-    { &hf_tn3270_oem_uname, NULL, 8, NULL, ENC_EBCDIC|ENC_NA },
+    { &hf_tn3270_oem_dtype, NULL, 8, NULL, ENC_EBCDIC },
+    { &hf_tn3270_oem_uname, NULL, 8, NULL, ENC_EBCDIC },
     { NULL, NULL, 0, NULL, 0 }
   };
 
@@ -3932,7 +3932,7 @@ dissect_query_reply_rpq_names(proto_tree *tn3270_tree, tvbuff_t *tvb, gint offse
   gint rpql;
 
   static const hf_items fields[] = {
-    { &hf_tn3270_rpq_device, NULL, 4, NULL, ENC_EBCDIC|ENC_NA },
+    { &hf_tn3270_rpq_device, NULL, 4, NULL, ENC_EBCDIC },
     { &hf_tn3270_rpq_mid,    NULL, 4, NULL, ENC_BIG_ENDIAN },
     { NULL, NULL, 0, NULL, 0 }
   };

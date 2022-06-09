@@ -1898,7 +1898,7 @@ dissect_browsing(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                     proto_tree_add_item(ptree, hf_btavrcp_folder_name_length, tvb, offset, 2, ENC_BIG_ENDIAN);
                     folder_name_length = tvb_get_ntohs(tvb, offset);
                     offset += 2;
-                    proto_tree_add_item_ret_string(ptree, hf_btavrcp_folder_name, tvb, offset, folder_name_length, ENC_ASCII|ENC_NA, wmem_packet_scope(), &folder_name);
+                    proto_tree_add_item_ret_string(ptree, hf_btavrcp_folder_name, tvb, offset, folder_name_length, ENC_ASCII, wmem_packet_scope(), &folder_name);
                     offset += folder_name_length;
                     proto_item_append_text(pitem, "%s/", folder_name);
                     col_append_fstr(pinfo->cinfo, COL_INFO, "%s/", folder_name);

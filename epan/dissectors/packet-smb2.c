@@ -1857,7 +1857,7 @@ dissect_smb2_olb_off_string(packet_info *pinfo, proto_tree *parent_tree, tvbuff_
 		break;
 	case OLB_TYPE_ASCII_STRING:
 		item = proto_tree_add_item_ret_string(parent_tree,
-		    olb->hfindex, tvb, off, len, ENC_ASCII|ENC_NA,
+		    olb->hfindex, tvb, off, len, ENC_ASCII,
 		    pinfo->pool, &name);
 		tree = proto_item_add_subtree(item, ett_smb2_olb);
 		break;
@@ -3065,7 +3065,7 @@ dissect_smb2_file_full_ea_info(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pa
 		/* ea name */
 		if (ea_name_len) {
 			proto_tree_add_item_ret_display_string(ea_tree, hf_smb2_ea_name,
-				tvb, offset, ea_name_len, ENC_ASCII|ENC_NA,
+				tvb, offset, ea_name_len, ENC_ASCII,
 				pinfo->pool, &name);
 		}
 

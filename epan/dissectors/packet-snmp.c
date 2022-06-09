@@ -651,7 +651,7 @@ dissect_snmp_variable_date_and_time(proto_tree *tree, packet_info *pinfo, int hf
 			 minutes,
 			 seconds,
 			 deci_seconds,
-			 tvb_get_string_enc(pinfo->pool,tvb,offset+8,1,ENC_ASCII|ENC_NA),
+			 tvb_get_string_enc(pinfo->pool,tvb,offset+8,1,ENC_ASCII),
 			 hour_from_utc,
 			 min_from_utc);
 	}else{

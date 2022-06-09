@@ -1494,7 +1494,7 @@ static guint32 dissect_ies(tvbuff_t *tvb, packet_info *pinfo, guint32 offset,
 
             case FT_STRING:
             case FT_STRINGZ:
-                ie_item = proto_tree_add_item(ies_tree, ie_hf, tvb, offset + 2, ies_len, ENC_UTF_8|ENC_NA);
+                ie_item = proto_tree_add_item(ies_tree, ie_hf, tvb, offset + 2, ies_len, ENC_UTF_8);
                 break;
 
             default:

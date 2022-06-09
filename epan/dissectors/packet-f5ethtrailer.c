@@ -2584,7 +2584,7 @@ dissect_dpt_trailer_noise_low(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
                 expert_add_info(pinfo, pi, &ei_f5eth_undecoded);
             }
             proto_tree_add_item(ti, field_name_len_idx, data_tvb, data_off + 1, 1, ENC_BIG_ENDIAN);
-            proto_tree_add_item(ti, field_name_idx, data_tvb, data_off + 2, l, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(ti, field_name_idx, data_tvb, data_off + 2, l, ENC_ASCII);
             if (t == 0 && l > 0 && have_tap_listener(tap_f5ethtrailer)) {
                 tdata->virtual_name = text;
             }

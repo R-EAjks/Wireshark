@@ -814,7 +814,7 @@ dissect_ipdc_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* d
 			/* simple IPDC_ASCII strings */
 			case IPDC_ASCII:
 				if (len <= IPDC_STR_LEN) {
-					tmp_tag_text = (char *) tvb_get_string_enc(pinfo->pool, tvb, offset+2, len, ENC_ASCII|ENC_NA);
+					tmp_tag_text = (char *) tvb_get_string_enc(pinfo->pool, tvb, offset+2, len, ENC_ASCII);
 					proto_tree_add_string_format(tag_tree, hf_ipdc_ascii, tvb, offset,
 								     len + 2, tmp_tag_text, "%s (0x%2.2x): %s", des, tag,
 								     tmp_tag_text);

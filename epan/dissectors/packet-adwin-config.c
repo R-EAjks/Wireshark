@@ -196,13 +196,13 @@ dissect_UDPExtStatus(packet_info *pinfo, tvbuff_t *tvb, proto_tree *adwin_tree)
 	/* add the processor type raw values to the tree, to allow filtering */
 	proto_tree_add_item(adwin_tree, hf_adwin_config_processor_type_raw, tvb, 64, 2, ENC_ASCII);
 	/* add the processor type as a pretty printed string */
-	processor_type = tvb_get_string_enc(pinfo->pool, tvb, 64, 2, ENC_ASCII|ENC_NA);
+	processor_type = tvb_get_string_enc(pinfo->pool, tvb, 64, 2, ENC_ASCII);
 	processor_type = str_to_str(processor_type, processor_type_mapping, "Unknown (%s)");
 	proto_tree_add_string(adwin_tree, hf_adwin_config_processor_type, tvb, 64, 2, processor_type);
 
 	/* add system type as raw value and pretty printed string */
 	proto_tree_add_item(adwin_tree, hf_adwin_config_system_type_raw, tvb, 66, 2, ENC_ASCII);
-	system_type = tvb_get_string_enc(pinfo->pool, tvb, 66, 2, ENC_ASCII|ENC_NA);
+	system_type = tvb_get_string_enc(pinfo->pool, tvb, 66, 2, ENC_ASCII);
 	system_type = str_to_str(system_type, system_type_mapping, "Unknown (%s)");
 	proto_tree_add_string(adwin_tree, hf_adwin_config_system_type, tvb, 66, 2, system_type);
 
@@ -239,13 +239,13 @@ dissect_UDPMessage(packet_info *pinfo, tvbuff_t *tvb, proto_tree *adwin_tree)
 	/* add the processor type raw values to the tree, to allow filtering */
 	proto_tree_add_item(adwin_tree, hf_adwin_config_processor_type_raw, tvb, 96,  2, ENC_ASCII);
 	/* add the processor type as a pretty printed string */
-	processor_type = tvb_get_string_enc(pinfo->pool, tvb, 96, 2, ENC_ASCII|ENC_NA);
+	processor_type = tvb_get_string_enc(pinfo->pool, tvb, 96, 2, ENC_ASCII);
 	processor_type = str_to_str(processor_type, processor_type_mapping, "Unknown");
 	proto_tree_add_string(adwin_tree, hf_adwin_config_processor_type, tvb, 96, 2, processor_type);
 
 	/* add system type as raw value and pretty printed string */
 	proto_tree_add_item(adwin_tree, hf_adwin_config_system_type_raw, tvb, 98,  2, ENC_ASCII);
-	system_type = tvb_get_string_enc(pinfo->pool, tvb, 98, 2, ENC_ASCII|ENC_NA);
+	system_type = tvb_get_string_enc(pinfo->pool, tvb, 98, 2, ENC_ASCII);
 	system_type = str_to_str(system_type, system_type_mapping, "Unknown");
 	proto_tree_add_string(adwin_tree, hf_adwin_config_system_type, tvb, 98, 2, system_type);
 }
@@ -323,7 +323,7 @@ dissect_TCPFlashUpdate(tvbuff_t *tvb,  packet_info *pinfo, proto_tree *tree, voi
 	proto_tree_add_item(adwin_tree, hf_adwin_config_stream_length, tvb, 0, 4, ENC_BIG_ENDIAN);
 	offset = 4;
 	length = tvb_strnlen(tvb, offset, -1) + 1;
-	filename = tvb_get_string_enc(pinfo->pool, tvb, offset, length, ENC_ASCII|ENC_NA);
+	filename = tvb_get_string_enc(pinfo->pool, tvb, offset, length, ENC_ASCII);
 	if (strncmp(filename, "eeprom_on", length) == 0) {
 		proto_tree_add_boolean(adwin_tree, hf_adwin_config_eeprom_support, tvb, offset, length, TRUE);
 		return offset+length;

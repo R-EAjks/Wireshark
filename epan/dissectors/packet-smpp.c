@@ -1596,7 +1596,7 @@ smpp_handle_tlv(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, int *offset
             case 0x060D:        /* source_network_id */
                 if (length)
                     proto_tree_add_item(sub_tree, hf_smpp_source_network_id,
-                        tvb, *offset, length, ENC_NA|ENC_ASCII);
+                        tvb, *offset, length, ENC_ASCII);
                 (*offset) += length;
                 break;
             case 0x060E:        /* dest_network_id */

@@ -1672,7 +1672,7 @@ dissect_ulp_T_requestorId(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U
         break;
       case 2: /* UTF-8 */
         actx->created_item = proto_tree_add_item(tree, hf_index, val_tvb, 0,
-                                                 tvb_reported_length(val_tvb), ENC_UTF_8|ENC_NA);
+                                                 tvb_reported_length(val_tvb), ENC_UTF_8);
         break;
       default:
         actx->created_item = proto_tree_add_string(tree, hf_index, val_tvb, 0,
@@ -1734,7 +1734,7 @@ dissect_ulp_T_clientName(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_
         break;
       case 2: /* UTF-8 */
         actx->created_item = proto_tree_add_item(tree, hf_index, val_tvb, 0,
-                                                 tvb_reported_length(val_tvb), ENC_UTF_8|ENC_NA);
+                                                 tvb_reported_length(val_tvb), ENC_UTF_8);
         break;
       default:
         actx->created_item = proto_tree_add_string(tree, hf_index, val_tvb, 0,
@@ -4097,7 +4097,7 @@ dissect_ulp_T_apSSID(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, pr
                                        1, 32, FALSE, &ssid_tvb);
 
   if (ssid_tvb) {
-    actx->created_item = proto_tree_add_item(tree, hf_index, ssid_tvb, 0, -1, ENC_ASCII|ENC_NA);
+    actx->created_item = proto_tree_add_item(tree, hf_index, ssid_tvb, 0, -1, ENC_ASCII);
   }
 
 

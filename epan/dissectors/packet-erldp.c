@@ -345,7 +345,7 @@ static gint dissect_etf_dist_header(packet_info *pinfo _U_, tvbuff_t *tvb, gint 
       proto_tree_add_item_ret_uint(acr_tree, hf_erldp_atom_length, tvb, offset, 1, ENC_BIG_ENDIAN, &atom_txt_len);
       offset++;
     }
-    proto_tree_add_item_ret_string(acr_tree, hf_erldp_atom_text, tvb, offset, atom_txt_len, ENC_NA|ENC_ASCII, wmem_packet_scope(), &str);
+    proto_tree_add_item_ret_string(acr_tree, hf_erldp_atom_text, tvb, offset, atom_txt_len, ENC_ASCII, wmem_packet_scope(), &str);
     proto_item_append_text(ti_acr, " - '%s'", str);
     offset += atom_txt_len;
     proto_item_set_len(ti_acr, offset - acr_offset);
@@ -461,7 +461,7 @@ static gint dissect_etf_type_content(guint8 tag, packet_info *pinfo, tvbuff_t *t
     }
 
     case FLOAT_EXT:
-      proto_tree_add_item_ret_string(tree, hf_erldp_float_ext, tvb, offset, 31, ENC_NA|ENC_UTF_8, wmem_packet_scope(), &str_val);
+      proto_tree_add_item_ret_string(tree, hf_erldp_float_ext, tvb, offset, 31, ENC_UTF_8, wmem_packet_scope(), &str_val);
       offset += 31;
       if (value_str)
         *value_str = (const gchar *)str_val;
@@ -479,7 +479,7 @@ static gint dissect_etf_type_content(guint8 tag, packet_info *pinfo, tvbuff_t *t
     case ATOM_UTF8_EXT:
       proto_tree_add_item_ret_uint(tree, hf_erldp_atom_length2, tvb, offset, 2, ENC_BIG_ENDIAN, &len);
       offset += 2;
-      proto_tree_add_item_ret_string(tree, hf_erldp_atom_text, tvb, offset, len, ENC_NA|ENC_UTF_8, wmem_packet_scope(), &str_val);
+      proto_tree_add_item_ret_string(tree, hf_erldp_atom_text, tvb, offset, len, ENC_UTF_8, wmem_packet_scope(), &str_val);
       offset += len;
       if (value_str)
         *value_str = (const gchar *)str_val;
@@ -488,7 +488,7 @@ static gint dissect_etf_type_content(guint8 tag, packet_info *pinfo, tvbuff_t *t
     case SMALL_ATOM_UTF8_EXT:
       proto_tree_add_item_ret_uint(tree, hf_erldp_atom_length, tvb, offset, 1, ENC_BIG_ENDIAN, &len);
       offset++;
-      proto_tree_add_item_ret_string(tree, hf_erldp_atom_text, tvb, offset, len, ENC_NA|ENC_UTF_8, wmem_packet_scope(), &str_val);
+      proto_tree_add_item_ret_string(tree, hf_erldp_atom_text, tvb, offset, len, ENC_UTF_8, wmem_packet_scope(), &str_val);
       offset += len;
       if (value_str)
         *value_str = (const gchar *)str_val;
@@ -814,7 +814,7 @@ static void dissect_erldp_handshake(tvbuff_t *tvb, packet_info *pinfo, proto_tre
 
   proto_tree_add_item(tree, hf_erldp_length_2, tvb, offset, 2, ENC_BIG_ENDIAN);
   offset += 2;
-  proto_tree_add_item_ret_uint(tree, hf_erldp_tag, tvb, offset, 1, ENC_ASCII|ENC_NA, &tag);
+  proto_tree_add_item_ret_uint(tree, hf_erldp_tag, tvb, offset, 1, ENC_ASCII, &tag);
   offset++;
 
   switch (tag) {
@@ -835,7 +835,7 @@ static void dissect_erldp_handshake(tvbuff_t *tvb, packet_info *pinfo, proto_tre
         offset += 4;
       }
       str_len = tvb_captured_length_remaining(tvb, offset);
-      proto_tree_add_item_ret_string(tree, hf_erldp_name, tvb, offset, str_len, ENC_ASCII|ENC_NA, wmem_packet_scope(), &str);
+      proto_tree_add_item_ret_string(tree, hf_erldp_name, tvb, offset, str_len, ENC_ASCII, wmem_packet_scope(), &str);
       col_add_fstr(pinfo->cinfo, COL_INFO, "%s %s", (is_challenge) ? "SEND_CHALLENGE" : "SEND_NAME", str);
       break;
 
@@ -856,7 +856,7 @@ static void dissect_erldp_handshake(tvbuff_t *tvb, packet_info *pinfo, proto_tre
       offset += 4;
       proto_tree_add_item_ret_uint(tree, hf_erldp_nlen, tvb, offset, 2, ENC_BIG_ENDIAN, &str_len);
       offset += 2;
-      proto_tree_add_item_ret_string(tree, hf_erldp_name, tvb, offset, str_len, ENC_ASCII|ENC_NA, wmem_packet_scope(), &str);
+      proto_tree_add_item_ret_string(tree, hf_erldp_name, tvb, offset, str_len, ENC_ASCII, wmem_packet_scope(), &str);
       col_add_fstr(pinfo->cinfo, COL_INFO, "%s %s", (is_challenge) ? "SEND_CHALLENGE" : "SEND_NAME", str);
       break;
 
@@ -876,7 +876,7 @@ static void dissect_erldp_handshake(tvbuff_t *tvb, packet_info *pinfo, proto_tre
 
     case 's' :
       str_len = tvb_captured_length_remaining(tvb, offset);
-      proto_tree_add_item_ret_string(tree, hf_erldp_status, tvb, offset, str_len, ENC_ASCII|ENC_NA, wmem_packet_scope(), &str);
+      proto_tree_add_item_ret_string(tree, hf_erldp_status, tvb, offset, str_len, ENC_ASCII, wmem_packet_scope(), &str);
       col_add_fstr(pinfo->cinfo, COL_INFO, "SEND_STATUS %s", str);
       break;
   }

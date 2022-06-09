@@ -4799,7 +4799,7 @@ de_sm_pco(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 				break;
 			case 0x0027:
 				if (link_dir == P2P_DIR_DL && e_len > 0) {
-					proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_acs_info, tvb, curr_offset, e_len, ENC_NA|ENC_UTF_8);
+					proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_acs_info, tvb, curr_offset, e_len, ENC_UTF_8);
 				}
 				break;
 			case 0x0028:
@@ -4830,7 +4830,7 @@ de_sm_pco(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 							break;
 						case 2:
 							{
-								guint8 *str = tvb_get_string_enc(pinfo->pool, tvb, curr_offset+1, e_len-1, ENC_ASCII|ENC_NA);
+								guint8 *str = tvb_get_string_enc(pinfo->pool, tvb, curr_offset+1, e_len-1, ENC_ASCII);
 								guint str_offset = 0;
 
 								while (str_offset < (e_len-1))

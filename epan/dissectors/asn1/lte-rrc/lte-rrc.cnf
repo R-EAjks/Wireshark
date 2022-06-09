@@ -1508,7 +1508,7 @@ SystemInformationBlockType9/hnb-Name TYPE=FT_STRING DISPLAY=BASE_NONE
   tvbuff_t *hnb_name_tvb = NULL;
 
 %(DEFAULT_BODY)s
-  actx->created_item = proto_tree_add_item(tree, hf_index, hnb_name_tvb, 0, -1, ENC_UTF_8|ENC_NA);
+  actx->created_item = proto_tree_add_item(tree, hf_index, hnb_name_tvb, 0, -1, ENC_UTF_8);
 
 #.TYPE_ATTR
 SystemInformationBlockType10/messageIdentifier TYPE=FT_UINT16 DISPLAY=BASE_DEC|BASE_EXT_STRING STRINGS=&lte_rrc_messageIdentifier_vals_ext
@@ -1744,7 +1744,7 @@ WLAN-Identifiers-r12/ssid-r12 TYPE=FT_STRING DISPLAY=BASE_NONE
   tvbuff_t *ssid_tvb = NULL;
 
 %(DEFAULT_BODY)s
-  actx->created_item = proto_tree_add_item(tree, hf_index, ssid_tvb, 0, -1, ENC_ASCII|ENC_NA);
+  actx->created_item = proto_tree_add_item(tree, hf_index, ssid_tvb, 0, -1, ENC_ASCII);
 
 #.TYPE_ATTR
 WLAN-Identifiers-r12/bssid-r12 TYPE=FT_ETHER

@@ -960,7 +960,7 @@ WSLUA_METHOD TvbRange_string(lua_State* L) {
     /* Obtain a string from a <<lua_class_TvbRange,`TvbRange`>>. */
 #define WSLUA_OPTARG_TvbRange_string_ENCODING 2 /* The encoding to use. Defaults to ENC_ASCII. */
     TvbRange tvbr = checkTvbRange(L,1);
-    guint encoding = (guint)luaL_optinteger(L,WSLUA_OPTARG_TvbRange_string_ENCODING, ENC_ASCII|ENC_NA);
+    guint encoding = (guint)luaL_optinteger(L,WSLUA_OPTARG_TvbRange_string_ENCODING, ENC_ASCII);
     char * str;
 
     if ( !(tvbr && tvbr->tvb)) return 0;
@@ -1008,7 +1008,7 @@ WSLUA_METHOD TvbRange_stringz(lua_State* L) {
     /* Obtain a zero terminated string from a <<lua_class_TvbRange,`TvbRange`>>. */
 #define WSLUA_OPTARG_TvbRange_stringz_ENCODING 2 /* The encoding to use. Defaults to ENC_ASCII. */
     TvbRange tvbr = checkTvbRange(L,1);
-    guint encoding = (guint)luaL_optinteger(L,WSLUA_OPTARG_TvbRange_stringz_ENCODING, ENC_ASCII|ENC_NA);
+    guint encoding = (guint)luaL_optinteger(L,WSLUA_OPTARG_TvbRange_stringz_ENCODING, ENC_ASCII);
     gint offset;
     gunichar2 uchar;
     gchar *str;
@@ -1059,7 +1059,7 @@ WSLUA_METHOD TvbRange_strsize(lua_State* L) {
     */
 #define WSLUA_OPTARG_TvbRange_strsize_ENCODING 2 /* The encoding to use. Defaults to ENC_ASCII. */
     TvbRange tvbr = checkTvbRange(L,1);
-    guint encoding = (guint)luaL_optinteger(L,WSLUA_OPTARG_TvbRange_strsize_ENCODING, ENC_ASCII|ENC_NA);
+    guint encoding = (guint)luaL_optinteger(L,WSLUA_OPTARG_TvbRange_strsize_ENCODING, ENC_ASCII);
     gint offset;
     gunichar2 uchar;
 

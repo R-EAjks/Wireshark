@@ -480,7 +480,7 @@ static int dissect_tnef(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
   gint        offset, start_offset;
   tvbuff_t   *next_tvb;
   guint64     oem_code_page;
-  guint       oem_encoding = ENC_ASCII|ENC_NA;
+  guint       oem_encoding = ENC_ASCII;
 
   if(tree){
     item = proto_tree_add_item(tree, proto_tnef, tvb, 0, -1, ENC_NA);
@@ -556,7 +556,7 @@ static int dissect_tnef(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
         break;
 
       default:
-        oem_encoding = ENC_ASCII|ENC_NA; /* XXX - support more code pages */
+        oem_encoding = ENC_ASCII; /* XXX - support more code pages */
         break;
       }
       break;

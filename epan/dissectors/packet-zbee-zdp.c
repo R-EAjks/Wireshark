@@ -986,7 +986,7 @@ zdp_parse_complex_desc(packet_info *pinfo, proto_tree *tree, gint ettindex, tvbu
     else {
         gchar *str;
 
-        str = (gchar *) tvb_get_string_enc(pinfo->pool, tvb, *offset+1, length-1, ENC_ASCII|ENC_NA);
+        str = (gchar *) tvb_get_string_enc(pinfo->pool, tvb, *offset+1, length-1, ENC_ASCII);
         /* Handles all string type XML tags. */
         if (tag <= tag_icon_url) {
             snprintf(complex, max_len, "<%s>%s</%s>", tag_name[tag], str, tag_name[tag]);

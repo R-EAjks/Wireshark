@@ -2054,7 +2054,7 @@ ndps_string(tvbuff_t* tvb, int hfinfo, proto_tree *ndps_tree, int offset, char *
         /*
          * ASCII.
          */
-        string = tvb_get_string_enc(wmem_packet_scope(), tvb, foffset, str_length, ENC_ASCII|ENC_NA); /* XXX - extended ASCII? */;
+        string = tvb_get_string_enc(wmem_packet_scope(), tvb, foffset, str_length, ENC_ASCII); /* XXX - extended ASCII? */;
     } else {
         /*
          * Unicode.

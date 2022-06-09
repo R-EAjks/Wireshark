@@ -617,7 +617,7 @@ dissect_mailslot_browse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 		proto_tree_add_item(tree,
 			(cmd==BROWSE_DOMAIN_ANNOUNCEMENT)?
 			    hf_mb_server_name : hf_server_comment,
-			tvb, offset, namelen, ENC_ASCII|ENC_NA);
+			tvb, offset, namelen, ENC_ASCII);
 		break;
 	}
 	case BROWSE_REQUEST_ANNOUNCE: {

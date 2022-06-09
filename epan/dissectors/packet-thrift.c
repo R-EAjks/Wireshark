@@ -192,7 +192,7 @@ static expert_field ei_thrift_protocol_exception = EI_INIT;
 static expert_field ei_thrift_too_many_subtypes = EI_INIT;
 
 static const thrift_member_t thrift_exception[] = {
-    { &hf_thrift_exception_message, 1, TRUE, DE_THRIFT_T_BINARY, NULL, { .encoding = ENC_UTF_8|ENC_NA } },
+    { &hf_thrift_exception_message, 1, TRUE, DE_THRIFT_T_BINARY, NULL, { .encoding = ENC_UTF_8 } },
     { &hf_thrift_exception_type, 2, FALSE, DE_THRIFT_T_I32, TMFILL },
     { NULL, 0, FALSE, DE_THRIFT_T_STOP, TMFILL }
 };
@@ -1095,7 +1095,7 @@ dissect_thrift_t_binary(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
 int
 dissect_thrift_t_string(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset, thrift_option_data_t *thrift_opt, gboolean is_field, int field_id, gint hf_id)
 {
-    return dissect_thrift_t_string_enc(tvb, pinfo, tree, offset, thrift_opt, is_field, field_id, hf_id, ENC_UTF_8|ENC_NA);
+    return dissect_thrift_t_string_enc(tvb, pinfo, tree, offset, thrift_opt, is_field, field_id, hf_id, ENC_UTF_8);
 }
 
 int
@@ -2580,7 +2580,7 @@ dissect_thrift_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int o
         if (tvb_reported_length_remaining(tvb, offset) < str_len) {
             goto add_expert_and_reassemble;
         }
-        method_str = tvb_get_string_enc(pinfo->pool, tvb, offset, str_len, ENC_UTF_8|ENC_NA);
+        method_str = tvb_get_string_enc(pinfo->pool, tvb, offset, str_len, ENC_UTF_8);
         offset += str_len;
     } else if (thrift_opt->tprotocol & PROTO_THRIFT_STRICT) {
         if (remaining < TBP_THRIFT_STRICT_MIN_MESSAGE_LEN) {
@@ -2597,7 +2597,7 @@ dissect_thrift_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int o
             goto add_expert_and_reassemble;
         }
         offset += TBP_THRIFT_VERSION_LEN + TBP_THRIFT_LENGTH_LEN;
-        method_str = tvb_get_string_enc(pinfo->pool, tvb, offset, str_len, ENC_UTF_8|ENC_NA);
+        method_str = tvb_get_string_enc(pinfo->pool, tvb, offset, str_len, ENC_UTF_8);
         offset += str_len;
 
         seq_id = tvb_get_ntohil(tvb, offset);
@@ -2616,7 +2616,7 @@ dissect_thrift_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int o
             goto add_expert_and_reassemble;
         }
         offset += TBP_THRIFT_LENGTH_LEN;
-        method_str = tvb_get_string_enc(pinfo->pool, tvb, offset, str_len, ENC_UTF_8|ENC_NA);
+        method_str = tvb_get_string_enc(pinfo->pool, tvb, offset, str_len, ENC_UTF_8);
         offset += str_len;
         mtype = tvb_get_guint8(tvb, offset + TBP_THRIFT_LENGTH_LEN + str_len) & THRIFT_BINARY_MESSAGE_MASK;
         offset += TBP_THRIFT_TYPE_LEN;

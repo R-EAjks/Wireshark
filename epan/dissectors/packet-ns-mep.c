@@ -493,19 +493,19 @@ dissect_ns_mep_v02xx(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			offset += 1;
 			offset += 2; /* Skip reserved */
 
-			proto_tree_add_item(ns_mep_di_tree, hf_ns_gslbDomName, tvb, offset, domainlen, ENC_NA|ENC_ASCII);
+			proto_tree_add_item(ns_mep_di_tree, hf_ns_gslbDomName, tvb, offset, domainlen, ENC_ASCII);
 			offset += domainlen;
 			if (cookiedomlen)
 			{
-				proto_tree_add_item(ns_mep_di_tree, hf_ns_gslbCookieDomName, tvb, offset, cookiedomlen, ENC_NA|ENC_ASCII);
+				proto_tree_add_item(ns_mep_di_tree, hf_ns_gslbCookieDomName, tvb, offset, cookiedomlen, ENC_ASCII);
 				offset += cookiedomlen;
 			}
 
-			proto_tree_add_item(ns_mep_di_tree, hf_ns_gslbVs, tvb, offset, vidlen, ENC_NA|ENC_ASCII);
+			proto_tree_add_item(ns_mep_di_tree, hf_ns_gslbVs, tvb, offset, vidlen, ENC_ASCII);
 			offset += vidlen;
 			if (prefixlen)
 			{
-				proto_tree_add_item(ns_mep_di_tree, hf_ns_gslbPrefix, tvb, offset, prefixlen, ENC_NA|ENC_ASCII);
+				proto_tree_add_item(ns_mep_di_tree, hf_ns_gslbPrefix, tvb, offset, prefixlen, ENC_ASCII);
 				offset += prefixlen;
 			}
 			proto_item_set_len(tf, offset-start_offset);
@@ -534,7 +534,7 @@ dissect_ns_mep_v02xx(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 			proto_tree_add_item_ret_uint(ns_mep_di_tree, hf_ns_gslbDomNamelen, tvb, offset, 1, ENC_LITTLE_ENDIAN, &domainlen);
 			offset += 1;
-			proto_tree_add_item(ns_mep_di_tree, hf_ns_gslbDomName, tvb, offset, domainlen, ENC_NA|ENC_ASCII);
+			proto_tree_add_item(ns_mep_di_tree, hf_ns_gslbDomName, tvb, offset, domainlen, ENC_ASCII);
 			offset += domainlen;
 
 			proto_item_set_len(tf, offset-start_offset);
@@ -581,7 +581,7 @@ dissect_ns_mep_v02xx(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 		proto_tree_add_item_ret_uint(ns_mep_di_tree, hf_ns_gslbDomNamelen, tvb, offset, 1, ENC_LITTLE_ENDIAN, &domainlen);
 		offset += 1;
-		proto_tree_add_item(ns_mep_di_tree, hf_ns_gslbDomName, tvb, offset, domainlen, ENC_NA|ENC_ASCII);
+		proto_tree_add_item(ns_mep_di_tree, hf_ns_gslbDomName, tvb, offset, domainlen, ENC_ASCII);
 		offset += domainlen;
 
 		proto_item_set_len(tf, start_offset - offset);
@@ -610,7 +610,7 @@ dissect_ns_mep_v02xx(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		offset += 1;
 		proto_tree_add_item(ns_mep_di_tree, hf_ns_siteDomTTL, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 		offset += 4;
-		proto_tree_add_item(ns_mep_di_tree, hf_ns_gslbDomName, tvb, offset, domainlen, ENC_NA|ENC_ASCII);
+		proto_tree_add_item(ns_mep_di_tree, hf_ns_gslbDomName, tvb, offset, domainlen, ENC_ASCII);
 		offset += domainlen;
 
 		proto_item_set_len(tf, start_offset - offset);

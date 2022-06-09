@@ -3040,7 +3040,7 @@ process_header(tvbuff_t *tvb, int offset, int next_offset,
 		} else {
 			hf_index = hf_http_unknown_header;
 		}
-		it = proto_tree_add_item(tree, hf_index, tvb, offset, len, ENC_NA|ENC_ASCII);
+		it = proto_tree_add_item(tree, hf_index, tvb, offset, len, ENC_ASCII);
 		proto_item_set_text(it, "%s", format_text(wmem_packet_scope(), line, len));
 		expert_add_info(pinfo, it, &ei_http_bad_header_name);
 		return;
@@ -3094,7 +3094,7 @@ process_header(tvbuff_t *tvb, int offset, int next_offset,
 						hf_http_response_line :
 						hf_http_request_line,
 						tvb, offset, len,
-						ENC_NA|ENC_ASCII);
+						ENC_ASCII);
 					proto_item_set_text(it, "%s",
 							format_text(wmem_packet_scope(), line, len));
 				} else {
@@ -3114,7 +3114,7 @@ process_header(tvbuff_t *tvb, int offset, int next_offset,
 						hf_http_response_line :
 						hf_http_request_line,
 						tvb, offset, len,
-						ENC_NA|ENC_ASCII);
+						ENC_ASCII);
 					proto_item_set_text(it, "%s",
 							format_text(wmem_packet_scope(), line, len));
 					proto_item_set_hidden(it);
@@ -3149,7 +3149,7 @@ process_header(tvbuff_t *tvb, int offset, int next_offset,
 						hf_http_response_line :
 						hf_http_request_line,
 						tvb, offset, len,
-						ENC_NA|ENC_ASCII);
+						ENC_ASCII);
 					proto_item_set_text(it, "%d", tmp);
 					proto_item_set_hidden(it);
 				}
@@ -3165,7 +3165,7 @@ process_header(tvbuff_t *tvb, int offset, int next_offset,
 						hf_http_response_line :
 						hf_http_request_line,
 						tvb, offset, len,
-						ENC_NA|ENC_ASCII);
+						ENC_ASCII);
 					proto_item_set_text(it, "%s",
 							format_text(wmem_packet_scope(), line, len));
 					proto_item_set_hidden(it);
@@ -3325,7 +3325,7 @@ process_header(tvbuff_t *tvb, int offset, int next_offset,
 
 					/* finally add cookie to tree */
 					proto_tree_add_item(cookie_tree, hf_http_cookie_pair,
-						tvb, value_offset + i, part_len, ENC_NA|ENC_ASCII);
+						tvb, value_offset + i, part_len, ENC_ASCII);
 					i += part_len;
 				}
 			}

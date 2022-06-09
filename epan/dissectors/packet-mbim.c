@@ -4880,7 +4880,7 @@ mbim_dissect_sms_cdma_record(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *
     }
     if (timestamp_offset && timestamp_size) {
         it = proto_tree_add_item(tree, hf_mbim_sms_cdma_record_timestamp, tvb, base_offset + timestamp_offset,
-                                 timestamp_size, ENC_NA|ENC_ASCII);
+                                 timestamp_size, ENC_ASCII);
         if (timestamp_size > 21) {
             expert_add_info(pinfo, it, &ei_mbim_oversized_string);
         }

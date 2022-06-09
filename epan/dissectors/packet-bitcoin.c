@@ -440,7 +440,7 @@ create_data_tree(proto_tree *tree, int hfindex, tvbuff_t *tvb, guint32* offset)
 
   /* data */
   proto_tree_add_item(subtree, hf_data_value, tvb, *offset, data_length,
-                      ENC_ASCII|ENC_NA);
+                      ENC_ASCII);
   *offset += data_length;
 
   return subtree;
@@ -1174,7 +1174,7 @@ dissect_bitcoin_msg_merkleblock(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tre
   offset += length;
 
   /* The cast to guint is save because bitcoin messages are always smaller than 0x02000000 bytes. */
-  proto_tree_add_item(subtree, hf_msg_merkleblock_flags_data, tvb, offset, (guint)count, ENC_ASCII|ENC_NA);
+  proto_tree_add_item(subtree, hf_msg_merkleblock_flags_data, tvb, offset, (guint)count, ENC_ASCII);
   offset += (guint32)count;
 
   return offset;
@@ -1203,7 +1203,7 @@ static int dissect_bitcoin_tcp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 
   /* add basic protocol data */
   proto_tree_add_item(tree, hf_bitcoin_magic,   tvb,  0,  4, ENC_BIG_ENDIAN);
-  proto_tree_add_item_ret_string(tree, hf_bitcoin_command, tvb,  4, 12, ENC_ASCII|ENC_NA, pinfo->pool, &command);
+  proto_tree_add_item_ret_string(tree, hf_bitcoin_command, tvb,  4, 12, ENC_ASCII, pinfo->pool, &command);
   proto_tree_add_item(tree, hf_bitcoin_length,  tvb, 16,  4, ENC_LITTLE_ENDIAN);
   proto_tree_add_checksum(tree, tvb, 20, hf_bitcoin_checksum, -1, NULL, pinfo, 0, ENC_BIG_ENDIAN, PROTO_CHECKSUM_NO_FLAGS);
 

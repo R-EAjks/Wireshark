@@ -816,7 +816,7 @@ ucp_handle_string(proto_tree *tree, tvbuff_t *tvb, int field, int *offset)
     } else
         len = idx - *offset;
     if (len > 0)
-        proto_tree_add_item(tree, field, tvb, *offset, len, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(tree, field, tvb, *offset, len, ENC_ASCII);
     *offset += len;
     if (idx != -1)
         *offset += 1;   /* skip terminating '/' */
@@ -964,7 +964,7 @@ ucp_handle_data_string(proto_tree *tree, tvbuff_t *tvb, int field, int *offset)
         ;
     if ((tmpoff - *offset) > 1)
         proto_tree_add_item(tree, field, tvb, *offset,
-                            tmpoff - *offset - 1, ENC_ASCII|ENC_NA);
+                            tmpoff - *offset - 1, ENC_ASCII);
     *offset = tmpoff;
 }
 

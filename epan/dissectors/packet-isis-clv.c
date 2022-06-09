@@ -245,7 +245,7 @@ void
 isis_dissect_hostname_clv(tvbuff_t *tvb, proto_tree *tree, int offset,
     int length, int tree_id)
 {
-    proto_item* ti = proto_tree_add_item( tree, tree_id, tvb, offset, length, ENC_ASCII|ENC_NA);
+    proto_item* ti = proto_tree_add_item( tree, tree_id, tvb, offset, length, ENC_ASCII);
     if ( length == 0 ) {
         proto_item_append_text(ti, "--none--" );
     }

@@ -1013,7 +1013,7 @@ process_vendor(proto_tree *tree, gint hfindex, tvbuff_t *tvb, gint offset)
 	proto_item *ti;
 
 	if (tree) {
-		ti = proto_tree_add_item_ret_string(tree, hfindex, tvb, offset, 4, ENC_ASCII|ENC_NA, wmem_packet_scope(), &vendor);
+		ti = proto_tree_add_item_ret_string(tree, hfindex, tvb, offset, 4, ENC_ASCII, wmem_packet_scope(), &vendor);
 
 		if(g_ascii_strcasecmp(vendor, "STDV") == 0)
 			proto_item_append_text(ti, " (Standard VNC vendor)");
@@ -1043,7 +1043,7 @@ process_tight_capabilities(proto_tree *tree,
 
 		offset = process_vendor(tree, vendor_index, tvb, offset);
 
-		proto_tree_add_item(tree, name_index, tvb, offset, 8, ENC_ASCII|ENC_NA);
+		proto_tree_add_item(tree, name_index, tvb, offset, 8, ENC_ASCII);
 		offset += 8;
 	}
 
@@ -1323,7 +1323,7 @@ vnc_startup_messages(tvbuff_t *tvb, packet_info *pinfo, gint offset,
 		vendor = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 4, ENC_ASCII);
 		process_vendor(tree, hf_vnc_tight_server_vendor, tvb, offset);
 		offset += 4;
-		proto_tree_add_item_ret_string(tree, hf_vnc_tight_signature, tvb, offset, 8, ENC_ASCII|ENC_NA, wmem_packet_scope(), &signature);
+		proto_tree_add_item_ret_string(tree, hf_vnc_tight_signature, tvb, offset, 8, ENC_ASCII, wmem_packet_scope(), &signature);
 
 		switch(auth_code) {
 			case VNC_SECURITY_TYPE_NONE:

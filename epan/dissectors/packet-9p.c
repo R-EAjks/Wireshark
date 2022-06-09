@@ -1188,7 +1188,7 @@ static guint _9p_dissect_string(tvbuff_t *tvb, proto_tree *ninep_tree,
 
 	_9p_len = tvb_get_letohs(tvb, offset);
 	ti = proto_tree_add_item(ninep_tree, hf_string, tvb, offset + 2,
-			_9p_len, ENC_UTF_8|ENC_NA);
+			_9p_len, ENC_UTF_8);
 	sub_tree = proto_item_add_subtree(ti, ett_string);
 	proto_tree_add_item(sub_tree, hf_9P_parmsz, tvb, offset, 2, ENC_LITTLE_ENDIAN);
 
@@ -1248,7 +1248,7 @@ static int dissect_9P_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 
 		if (!pinfo->fd->visited) {
 			_9p_len = tvb_get_letohs(tvb, offset);
-			tvb_s = (char *)tvb_get_string_enc(pinfo->pool, tvb, offset+2, _9p_len, ENC_UTF_8|ENC_NA);
+			tvb_s = (char *)tvb_get_string_enc(pinfo->pool, tvb, offset+2, _9p_len, ENC_UTF_8);
 
 			if (!strcmp(tvb_s, "9P2000.L")) {
 				u32 = _9P2000_L;
@@ -1318,7 +1318,7 @@ static int dissect_9P_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 
 		if(!pinfo->fd->visited) {
 			_9p_len = tvb_get_letohs(tvb, offset);
-			tvb_s = (char*)tvb_get_string_enc(pinfo->pool, tvb, offset+2, _9p_len, ENC_UTF_8|ENC_NA);
+			tvb_s = (char*)tvb_get_string_enc(pinfo->pool, tvb, offset+2, _9p_len, ENC_UTF_8);
 			conv_set_fid(pinfo, fid, tvb_s, _9p_len+1);
 		}
 		offset += _9p_dissect_string(tvb, ninep_tree, offset, hf_9P_aname, ett_9P_aname);
@@ -1353,7 +1353,7 @@ static int dissect_9P_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 		for(i = 0 ; i < u16; i++) {
 			if (!pinfo->fd->visited) {
 				_9p_len = tvb_get_letohs(tvb, offset);
-				tvb_s = (char*)tvb_get_string_enc(pinfo->pool, tvb, offset+2, _9p_len, ENC_UTF_8|ENC_NA);
+				tvb_s = (char*)tvb_get_string_enc(pinfo->pool, tvb, offset+2, _9p_len, ENC_UTF_8);
 				wmem_strbuf_append_c(tmppath, '/');
 				wmem_strbuf_append(tmppath, tvb_s);
 			}
@@ -1433,7 +1433,7 @@ static int dissect_9P_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 			tmppath = wmem_strbuf_sized_new(pinfo->pool, 0, MAXPATHLEN);
 			wmem_strbuf_append(tmppath, fid_path);
 			wmem_strbuf_append_c(tmppath, '/');
-			tvb_s = (char*)tvb_get_string_enc(pinfo->pool, tvb, offset+2, _9p_len, ENC_UTF_8|ENC_NA);
+			tvb_s = (char*)tvb_get_string_enc(pinfo->pool, tvb, offset+2, _9p_len, ENC_UTF_8);
 			wmem_strbuf_append(tmppath, tvb_s);
 		}
 		offset += _9p_dissect_string(tvb, ninep_tree, offset, hf_9P_filename, ett_9P_filename);
@@ -1466,7 +1466,7 @@ static int dissect_9P_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 			tmppath = wmem_strbuf_sized_new(pinfo->pool, 0, MAXPATHLEN);
 			wmem_strbuf_append(tmppath, fid_path);
 			wmem_strbuf_append_c(tmppath, '/');
-			tvb_s = (char*)tvb_get_string_enc(pinfo->pool, tvb, offset+2, _9p_len, ENC_UTF_8|ENC_NA);
+			tvb_s = (char*)tvb_get_string_enc(pinfo->pool, tvb, offset+2, _9p_len, ENC_UTF_8);
 			wmem_strbuf_append(tmppath, tvb_s);
 		}
 		offset += _9p_dissect_string(tvb, ninep_tree, offset, hf_9P_filename, ett_9P_filename);
@@ -1812,7 +1812,7 @@ static int dissect_9P_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 			wmem_strbuf_append(tmppath, conv_get_fid(pinfo, dfid));
 			wmem_strbuf_append_c(tmppath, '/');
 
-			tvb_s = (char*)tvb_get_string_enc(pinfo->pool, tvb, offset+2, _9p_len, ENC_UTF_8|ENC_NA);
+			tvb_s = (char*)tvb_get_string_enc(pinfo->pool, tvb, offset+2, _9p_len, ENC_UTF_8);
 			wmem_strbuf_append(tmppath, tvb_s);
 
 			conv_set_fid(pinfo, fid, wmem_strbuf_get_str(tmppath), wmem_strbuf_get_len(tmppath)+1);

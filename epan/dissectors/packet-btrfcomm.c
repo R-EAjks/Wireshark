@@ -1216,7 +1216,7 @@ dissect_btdun(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
                      (pinfo->p2p_dir == P2P_DIR_SENT) ? "Sent" : "Rcvd",
                      tvb_format_text(pinfo->pool, tvb, 0, length));
 
-           proto_tree_add_item(st, hf_dun_at_cmd, tvb, 0, tvb_reported_length(tvb), ENC_ASCII|ENC_NA);
+           proto_tree_add_item(st, hf_dun_at_cmd, tvb, 0, tvb_reported_length(tvb), ENC_ASCII);
     }
     else {
         /* ... or raw PPP */

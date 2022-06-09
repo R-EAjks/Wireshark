@@ -3301,14 +3301,14 @@ dissect_create_window(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offset)
     { &hf_tn5250_wdsf_cw_bp_flag1, ett_tn5250_wdsf_cw_bp_mask, 1, cw_bp_flag1, 0 },
     { &hf_tn5250_wdsf_cw_bp_mba, 0, 1, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_wdsf_cw_bp_cba, 0, 1, 0, ENC_BIG_ENDIAN },
-    { &hf_tn5250_wdsf_cw_bp_ulbc, 0, 1, 0, ENC_EBCDIC|ENC_NA },
-    { &hf_tn5250_wdsf_cw_bp_tbc, 0, 1, 0, ENC_EBCDIC|ENC_NA },
-    { &hf_tn5250_wdsf_cw_bp_urbc, 0, 1, 0, ENC_EBCDIC|ENC_NA },
-    { &hf_tn5250_wdsf_cw_bp_lbc, 0, 1, 0, ENC_EBCDIC|ENC_NA },
-    { &hf_tn5250_wdsf_cw_bp_rbc, 0, 1, 0, ENC_EBCDIC|ENC_NA },
-    { &hf_tn5250_wdsf_cw_bp_llbc, 0, 1, 0, ENC_EBCDIC|ENC_NA },
-    { &hf_tn5250_wdsf_cw_bp_bbc, 0, 1, 0, ENC_EBCDIC|ENC_NA },
-    { &hf_tn5250_wdsf_cw_bp_lrbc, 0, 1, 0, ENC_EBCDIC|ENC_NA },
+    { &hf_tn5250_wdsf_cw_bp_ulbc, 0, 1, 0, ENC_EBCDIC },
+    { &hf_tn5250_wdsf_cw_bp_tbc, 0, 1, 0, ENC_EBCDIC },
+    { &hf_tn5250_wdsf_cw_bp_urbc, 0, 1, 0, ENC_EBCDIC },
+    { &hf_tn5250_wdsf_cw_bp_lbc, 0, 1, 0, ENC_EBCDIC },
+    { &hf_tn5250_wdsf_cw_bp_rbc, 0, 1, 0, ENC_EBCDIC },
+    { &hf_tn5250_wdsf_cw_bp_llbc, 0, 1, 0, ENC_EBCDIC },
+    { &hf_tn5250_wdsf_cw_bp_bbc, 0, 1, 0, ENC_EBCDIC },
+    { &hf_tn5250_wdsf_cw_bp_lrbc, 0, 1, 0, ENC_EBCDIC },
     { NULL, 0, 0, 0, 0 }
   };
 
@@ -3411,8 +3411,8 @@ dissect_define_selection(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offset)
     { &hf_tn5250_wdsf_ds_rows, 0, 1, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_wdsf_ds_columns, 0, 1, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_wdsf_ds_padding, 0, 1, 0, ENC_BIG_ENDIAN },
-    { &hf_tn5250_wdsf_ds_numeric_sep, 0, 1, 0, ENC_EBCDIC|ENC_NA },
-    { &hf_tn5250_wdsf_ds_country_sel, 0, 1, 0, ENC_EBCDIC|ENC_NA },
+    { &hf_tn5250_wdsf_ds_numeric_sep, 0, 1, 0, ENC_EBCDIC },
+    { &hf_tn5250_wdsf_ds_country_sel, 0, 1, 0, ENC_EBCDIC },
     { &hf_tn5250_wdsf_ds_cancel_aid, 0, 1, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_wdsf_ds_totalrows, 0, 4, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_wdsf_ds_sliderpos, 0, 4, 0, ENC_BIG_ENDIAN },
@@ -3468,7 +3468,7 @@ dissect_define_selection(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offset)
     { &hf_tn5250_wdsf_ds_mbs_start_column, 0, 1, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_wdsf_ds_mbs_monochrome_sep, 0, 1, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_wdsf_ds_mbs_color_sep, 0, 1, 0, ENC_BIG_ENDIAN },
-    { &hf_tn5250_wdsf_ds_mbs_sep_char, 0, 1, 0, ENC_EBCDIC|ENC_NA },
+    { &hf_tn5250_wdsf_ds_mbs_sep_char, 0, 1, 0, ENC_EBCDIC },
     { NULL, 0, 0, 0, 0 }
   };
 
@@ -3510,9 +3510,9 @@ dissect_define_selection(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offset)
     { &hf_tn5250_length, 0, 1, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_wdsf_ds_minor_type, 0, 1, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_wdsf_ds_ci_flag1, ett_tn5250_wdsf_ds_ci_mask, 1, ds_ci_flag, 0 },
-    { &hf_tn5250_wdsf_ds_ci_left_push, 0, 1, 0, ENC_EBCDIC|ENC_NA },
-    { &hf_tn5250_wdsf_ds_ci_right_push, 0, 1, 0, ENC_EBCDIC|ENC_NA },
-    { &hf_tn5250_wdsf_ds_ci_first_choice, 0, 1, 0, ENC_EBCDIC|ENC_NA },
+    { &hf_tn5250_wdsf_ds_ci_left_push, 0, 1, 0, ENC_EBCDIC },
+    { &hf_tn5250_wdsf_ds_ci_right_push, 0, 1, 0, ENC_EBCDIC },
+    { &hf_tn5250_wdsf_ds_ci_first_choice, 0, 1, 0, ENC_EBCDIC },
     { NULL, 0, 0, 0, 0 }
   };
 
@@ -3529,10 +3529,10 @@ dissect_define_selection(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offset)
     { &hf_tn5250_wdsf_ds_sbi_color_top_highlight, 0, 1, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_wdsf_ds_sbi_monochrome_top_highlight_shaft, 0, 1, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_wdsf_ds_sbi_color_top_highlight_shaft, 0, 1, 0, ENC_BIG_ENDIAN },
-    { &hf_tn5250_wdsf_ds_sbi_top_character, 0, 1, 0, ENC_EBCDIC|ENC_NA },
-    { &hf_tn5250_wdsf_ds_sbi_bottom_character, 0, 1, 0, ENC_EBCDIC|ENC_NA },
-    { &hf_tn5250_wdsf_ds_sbi_empty_character, 0, 1, 0, ENC_EBCDIC|ENC_NA },
-    { &hf_tn5250_wdsf_ds_sbi_slider_character, 0, 1, 0, ENC_EBCDIC|ENC_NA },
+    { &hf_tn5250_wdsf_ds_sbi_top_character, 0, 1, 0, ENC_EBCDIC },
+    { &hf_tn5250_wdsf_ds_sbi_bottom_character, 0, 1, 0, ENC_EBCDIC },
+    { &hf_tn5250_wdsf_ds_sbi_empty_character, 0, 1, 0, ENC_EBCDIC },
+    { &hf_tn5250_wdsf_ds_sbi_slider_character, 0, 1, 0, ENC_EBCDIC },
     { NULL, 0, 0, 0, 0 }
   };
 
@@ -3622,10 +3622,10 @@ dissect_define_scrollbar(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offset)
     { &hf_tn5250_wdsf_ds_sbi_color_top_highlight, 0, 1, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_wdsf_ds_sbi_monochrome_top_highlight_shaft, 0, 1, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_wdsf_ds_sbi_color_top_highlight_shaft, 0, 1, 0, ENC_BIG_ENDIAN },
-    { &hf_tn5250_wdsf_ds_sbi_top_character, 0, 1, 0, ENC_EBCDIC|ENC_NA },
-    { &hf_tn5250_wdsf_ds_sbi_bottom_character, 0, 1, 0, ENC_EBCDIC|ENC_NA },
-    { &hf_tn5250_wdsf_ds_sbi_empty_character, 0, 1, 0, ENC_EBCDIC|ENC_NA },
-    { &hf_tn5250_wdsf_ds_sbi_slider_character, 0, 1, 0, ENC_EBCDIC|ENC_NA },
+    { &hf_tn5250_wdsf_ds_sbi_top_character, 0, 1, 0, ENC_EBCDIC },
+    { &hf_tn5250_wdsf_ds_sbi_bottom_character, 0, 1, 0, ENC_EBCDIC },
+    { &hf_tn5250_wdsf_ds_sbi_empty_character, 0, 1, 0, ENC_EBCDIC },
+    { &hf_tn5250_wdsf_ds_sbi_slider_character, 0, 1, 0, ENC_EBCDIC },
     { NULL, 0, 0, 0, 0 }
   };
 
@@ -4290,7 +4290,7 @@ dissect_write_structured_field(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offs
 
   hf_items dawt_fields[] = {
     { &hf_tn5250_dawt_length, 0, 1, 0, ENC_BIG_ENDIAN },
-    { &hf_tn5250_dawt_char, 0, 1, 0, ENC_EBCDIC|ENC_NA },
+    { &hf_tn5250_dawt_char, 0, 1, 0, ENC_EBCDIC },
     { NULL, 0, 0, 0, 0 }
   };
 
@@ -4337,7 +4337,7 @@ dissect_write_structured_field(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offs
     { &hf_tn5250_dpo_partition, 0, 1, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_dpo_flag1, ett_tn5250_wsf_dpo_mask, 1, dpo_byte1, 0 },
     { &hf_tn5250_dpo_flag2, ett_tn5250_wsf_dpo_mask, 1, dpo_byte2, 0 },
-    { &hf_tn5250_dpo_displace_characters, 0, 3, 0, ENC_EBCDIC|ENC_NA },
+    { &hf_tn5250_dpo_displace_characters, 0, 3, 0, ENC_EBCDIC },
     { &hf_tn5250_dpo_start_location_row, 0, 2, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_dpo_start_location_col, 0, 2, 0, ENC_BIG_ENDIAN },
     { NULL, 0, 0, 0, 0 }
@@ -4492,7 +4492,7 @@ dissect_write_structured_field(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offs
     { &hf_tn5250_reserved, 0, 1, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_reserved, 0, 1, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_dsc_sk, 0, 1, 0, ENC_BIG_ENDIAN },
-    { &hf_tn5250_dsc_ev, 0, 1, 0, ENC_EBCDIC|ENC_NA },
+    { &hf_tn5250_dsc_ev, 0, 1, 0, ENC_EBCDIC },
     { NULL, 0, 0, 0, 0 }
   };
 
@@ -4790,8 +4790,8 @@ dissect_query_reply(proto_tree *tn5250_tree, tvbuff_t *tvb, gint offset)
     { &hf_tn5250_reserved, 0, 1, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_reserved, 0, 1, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_qr_dt, 0, 1, 0, ENC_BIG_ENDIAN },
-    { &hf_tn5250_qr_dtc, 0, 4, 0, ENC_EBCDIC|ENC_NA },
-    { &hf_tn5250_qr_dm, 0, 3, 0, ENC_EBCDIC|ENC_NA },
+    { &hf_tn5250_qr_dtc, 0, 4, 0, ENC_EBCDIC },
+    { &hf_tn5250_qr_dm, 0, 3, 0, ENC_EBCDIC },
     { &hf_tn5250_qr_ki, 0, 1, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_qr_eki, 0, 1, 0, ENC_BIG_ENDIAN },
     { &hf_tn5250_reserved, 0, 1, 0, ENC_BIG_ENDIAN },

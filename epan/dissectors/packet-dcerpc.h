@@ -36,7 +36,7 @@ extern "C" {
  * Data representation to (octet-string) character encoding.
  */
 #define DREP_ENC_CHAR(drep)	\
-	(((drep)[0] & DREP_EBCDIC) ? ENC_EBCDIC|ENC_NA : ENC_ASCII|ENC_NA)
+	(((drep)[0] & DREP_EBCDIC) ? ENC_EBCDIC : ENC_ASCII)
 
 #ifdef PT_R4
 /* now glib always includes signal.h and on linux PPC

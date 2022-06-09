@@ -1850,7 +1850,7 @@ dissect_dcm_assoc_user_identify(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
     offset += 2;
 
     proto_tree_add_item(assoc_item_user_identify_tree, hf_dcm_info_user_identify_primary_field, tvb, offset, primary_field_length, ENC_UTF_8);
-    proto_item_append_text(assoc_item_user_identify_item, ": %s", tvb_get_string_enc(pinfo->pool, tvb, offset, primary_field_length, ENC_UTF_8|ENC_NA));
+    proto_item_append_text(assoc_item_user_identify_item, ": %s", tvb_get_string_enc(pinfo->pool, tvb, offset, primary_field_length, ENC_UTF_8));
     offset += primary_field_length;
 
     if (type == 2) {
@@ -1859,7 +1859,7 @@ dissect_dcm_assoc_user_identify(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
         offset += 2;
 
         proto_tree_add_item(assoc_item_user_identify_tree, hf_dcm_info_user_identify_secondary_field, tvb, offset, secondary_field_length, ENC_UTF_8);
-        proto_item_append_text(assoc_item_user_identify_item, ", %s", tvb_get_string_enc(pinfo->pool, tvb, offset, secondary_field_length, ENC_UTF_8|ENC_NA));
+        proto_item_append_text(assoc_item_user_identify_item, ", %s", tvb_get_string_enc(pinfo->pool, tvb, offset, secondary_field_length, ENC_UTF_8));
     }
 }
 

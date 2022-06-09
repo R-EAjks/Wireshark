@@ -1107,7 +1107,7 @@ dissect_parse_hart_cmds(proto_tree *body_tree, tvbuff_t *tvb, guint8 cmd,
   case 22:
     if (bodylen >= 32) {
       proto_tree_add_item(body_tree, hf_hartip_pt_rsp_tag, tvb, offset, 32,
-                          ENC_ASCII|ENC_NA);
+                          ENC_ASCII);
       return 32;
     }
     break;

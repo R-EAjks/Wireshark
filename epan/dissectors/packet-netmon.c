@@ -1683,7 +1683,7 @@ dissect_netmon_process(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
 							hf_netmon_process_user_sid_subauth_count, hf_netmon_process_user_sid_id, hf_netmon_process_user_sid_authority,
 							&ei_netmon_process_user_sid, FALSE);
 			length = tvb_strsize(tvb, offset);
-			proto_tree_add_item_ret_string(process_tree, hf_netmon_process_image_file_name, tvb, offset, length, ENC_NA|ENC_ASCII,
+			proto_tree_add_item_ret_string(process_tree, hf_netmon_process_image_file_name, tvb, offset, length, ENC_ASCII,
 							pinfo->pool, &filename);
 			col_add_fstr(pinfo->cinfo, COL_INFO, "Filename: %s", filename);
 			offset += length;
@@ -1711,7 +1711,7 @@ dissect_netmon_process(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
 							hf_netmon_process_user_sid_subauth_count, hf_netmon_process_user_sid_id, hf_netmon_process_user_sid_authority,
 							&ei_netmon_process_user_sid, FALSE);
 			length = tvb_strsize(tvb, offset);
-			proto_tree_add_item_ret_string(process_tree, hf_netmon_process_image_file_name, tvb, offset, length, ENC_NA|ENC_ASCII,
+			proto_tree_add_item_ret_string(process_tree, hf_netmon_process_image_file_name, tvb, offset, length, ENC_ASCII,
 							pinfo->pool, &filename);
 			col_add_fstr(pinfo->cinfo, COL_INFO, "Filename: %s", filename);
 			offset += length;
@@ -1749,7 +1749,7 @@ dissect_netmon_process(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
 							hf_netmon_process_user_sid_subauth_count, hf_netmon_process_user_sid_id, hf_netmon_process_user_sid_authority,
 							&ei_netmon_process_user_sid, FALSE);
 			length = tvb_strsize(tvb, offset);
-			proto_tree_add_item_ret_string(process_tree, hf_netmon_process_image_file_name, tvb, offset, length, ENC_NA|ENC_ASCII,
+			proto_tree_add_item_ret_string(process_tree, hf_netmon_process_image_file_name, tvb, offset, length, ENC_ASCII,
 							pinfo->pool, &filename);
 			col_add_fstr(pinfo->cinfo, COL_INFO, "Filename: %s", filename);
 			offset += length;
@@ -1832,7 +1832,7 @@ dissect_netmon_process(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
 							hf_netmon_process_user_sid_subauth_count, hf_netmon_process_user_sid_id, hf_netmon_process_user_sid_authority,
 							&ei_netmon_process_user_sid, FALSE);
 			length = tvb_strsize(tvb, offset);
-			proto_tree_add_item_ret_string(process_tree, hf_netmon_process_image_file_name, tvb, offset, length, ENC_NA|ENC_ASCII,
+			proto_tree_add_item_ret_string(process_tree, hf_netmon_process_image_file_name, tvb, offset, length, ENC_ASCII,
 							pinfo->pool, &filename);
 			col_add_fstr(pinfo->cinfo, COL_INFO, "Filename: %s", filename);
 			offset += length;

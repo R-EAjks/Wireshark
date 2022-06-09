@@ -318,7 +318,7 @@ dissect_xml(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 
     current_frame->ns = root_ns;
 
-    current_frame->item = proto_tree_add_item(tree, current_frame->ns->hf_tag, decoded, 0, -1, ENC_UTF_8|ENC_NA);
+    current_frame->item = proto_tree_add_item(tree, current_frame->ns->hf_tag, decoded, 0, -1, ENC_UTF_8);
     current_frame->tree = proto_item_add_subtree(current_frame->item, current_frame->ns->ett);
     current_frame->last_item = current_frame->item;
 
@@ -435,7 +435,7 @@ static void after_token(void *tvbparse_data, const void *wanted_data _U_, tvbpar
         hfid = xml_ns.hf_cdata;
     }
 
-    pi = proto_tree_add_item(current_frame->tree, hfid, tok->tvb, tok->offset, tok->len, ENC_UTF_8|ENC_NA);
+    pi = proto_tree_add_item(current_frame->tree, hfid, tok->tvb, tok->offset, tok->len, ENC_UTF_8);
 
     proto_item_set_text(pi, "%s",
                         tvb_format_text(wmem_packet_scope(), tok->tvb, tok->offset, tok->len));
@@ -480,7 +480,7 @@ static void before_xmpli(void *tvbparse_data, const void *wanted_data _U_, tvbpa
         ett = ns->ett;
     }
 
-    pi = proto_tree_add_item(current_frame->tree, hf_tag, tok->tvb, tok->offset, tok->len, ENC_UTF_8|ENC_NA);
+    pi = proto_tree_add_item(current_frame->tree, hf_tag, tok->tvb, tok->offset, tok->len, ENC_UTF_8);
 
     proto_item_set_text(pi, "%s", tvb_format_text(wmem_packet_scope(), tok->tvb, tok->offset, (name_tok->offset - tok->offset) + name_tok->len));
 
@@ -569,7 +569,7 @@ static void before_tag(void *tvbparse_data, const void *wanted_data _U_, tvbpars
         }
     }
 
-    pi = proto_tree_add_item(current_frame->tree, ns->hf_tag, tok->tvb, tok->offset, tok->len, ENC_UTF_8|ENC_NA);
+    pi = proto_tree_add_item(current_frame->tree, ns->hf_tag, tok->tvb, tok->offset, tok->len, ENC_UTF_8);
     proto_item_set_text(pi, "%s", tvb_format_text(wmem_packet_scope(), tok->tvb,
                                                   tok->offset,
                                                   (name_tok->offset - tok->offset) + name_tok->len));
@@ -722,7 +722,7 @@ static void after_attrib(void *tvbparse_data, const void *wanted_data _U_, tvbpa
         value = tok;
     }
 
-    pi = proto_tree_add_item(current_frame->tree, hfid, value->tvb, value->offset, value->len, ENC_UTF_8|ENC_NA);
+    pi = proto_tree_add_item(current_frame->tree, hfid, value->tvb, value->offset, value->len, ENC_UTF_8);
     proto_item_set_text(pi, "%s", tvb_format_text(wmem_packet_scope(), tok->tvb, tok->offset, tok->len));
 
     current_frame->last_item = pi;

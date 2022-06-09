@@ -391,7 +391,7 @@ dissect_tacplus_args_list( tvbuff_t *tvb, proto_tree *tree, int data_off, int le
 		len=tvb_get_guint8(tvb,len_off+i);
 		proto_tree_add_uint_format(tree, hf_tacplus_arg_length, tvb, len_off+i, 1, len,
 									"Arg[%d] length: %d", i, len);
-		value=tvb_get_string_enc(wmem_packet_scope(), tvb, data_off, len, ENC_ASCII|ENC_NA);
+		value=tvb_get_string_enc(wmem_packet_scope(), tvb, data_off, len, ENC_ASCII);
 		proto_tree_add_string_format(tree, hf_tacplus_arg_value, tvb, data_off, len, value,
 									"Arg[%d] value: %s", i, value);
 		data_off+=len;

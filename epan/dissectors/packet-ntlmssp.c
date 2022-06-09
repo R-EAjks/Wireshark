@@ -1103,7 +1103,7 @@ dissect_ntlmssp_string (tvbuff_t *tvb, int offset,
   }
   tf = proto_tree_add_item_ret_string(ntlmssp_tree, string_hf, tvb,
                            string_offset, string_length,
-                           unicode_strings ? ENC_UTF_16|ENC_LITTLE_ENDIAN : ENC_ASCII|ENC_NA,
+                           unicode_strings ? ENC_UTF_16|ENC_LITTLE_ENDIAN : ENC_ASCII,
                            wmem_packet_scope(), stringp);
   tree = proto_item_add_subtree(tf, ett_ntlmssp_string);
   proto_tree_add_uint(tree, hf_ntlmssp_string_len,

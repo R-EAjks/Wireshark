@@ -1243,7 +1243,7 @@ static int dissect_spdy_header_payload(
     }
     header_name = (gchar *)tvb_get_string_enc(pinfo->pool, header_tvb,
                                                     hdr_offset,
-                                                    header_name_length, ENC_ASCII|ENC_NA);
+                                                    header_name_length, ENC_ASCII);
     hdr_offset += header_name_length;
 
     /* Get header value details. */
@@ -1262,7 +1262,7 @@ static int dissect_spdy_header_payload(
     }
     header_value = (gchar *)tvb_get_string_enc(pinfo->pool,header_tvb,
                                                      hdr_offset,
-                                                     header_value_length, ENC_ASCII|ENC_NA);
+                                                     header_value_length, ENC_ASCII);
     hdr_offset += header_value_length;
 
     /* Populate tree with header name/value details. */

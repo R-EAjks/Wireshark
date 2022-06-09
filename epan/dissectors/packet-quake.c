@@ -140,7 +140,7 @@ dissect_quake_CCREQ_CONNECT
 	gint item_len;
 
 	proto_tree_add_item_ret_length(tree, hf_quake_CCREQ_CONNECT_game,
-			tvb, offset, -1, ENC_ASCII|ENC_NA, &item_len);
+			tvb, offset, -1, ENC_ASCII, &item_len);
 	offset += item_len;
 
 	proto_tree_add_item(tree, hf_quake_CCREQ_CONNECT_version,
@@ -156,7 +156,7 @@ dissect_quake_CCREQ_SERVER_INFO
 	gint item_len;
 
 	proto_tree_add_item_ret_length(tree, hf_quake_CCREQ_SERVER_INFO_game,
-			tvb, offset, -1, ENC_ASCII|ENC_NA, &item_len);
+			tvb, offset, -1, ENC_ASCII, &item_len);
 	offset += item_len;
 	proto_tree_add_item(tree, hf_quake_CCREQ_SERVER_INFO_version,
 			tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -215,17 +215,17 @@ dissect_quake_CCREP_SERVER_INFO
 
 	proto_tree_add_item_ret_length(tree,
 			hf_quake_CCREP_SERVER_INFO_address, tvb, offset, -1,
-			ENC_ASCII|ENC_NA, &item_len);
+			ENC_ASCII, &item_len);
 	offset += item_len;
 
 	proto_tree_add_item_ret_length(tree,
 			hf_quake_CCREP_SERVER_INFO_server, tvb, offset, -1,
-			ENC_ASCII|ENC_NA, &item_len);
+			ENC_ASCII, &item_len);
 	offset += item_len;
 
 	proto_tree_add_item_ret_length(tree,
 			hf_quake_CCREP_SERVER_INFO_map, tvb, offset, -1,
-			ENC_ASCII|ENC_NA, &item_len);
+			ENC_ASCII, &item_len);
 	offset += item_len;
 
 	proto_tree_add_item(tree, hf_quake_CCREP_SERVER_INFO_num_player,
@@ -256,7 +256,7 @@ dissect_quake_CCREP_PLAYER_INFO
 	offset += 1;
 
 	proto_tree_add_item_ret_length(tree, hf_quake_CCREP_PLAYER_INFO_name,
-			tvb, offset, -1, ENC_ASCII|ENC_NA, &item_len);
+			tvb, offset, -1, ENC_ASCII, &item_len);
 	offset += item_len;
 
 	colors       = tvb_get_letohl(tvb, offset + 0);
@@ -297,7 +297,7 @@ dissect_quake_CCREP_RULE_INFO
 	if (tvb_reported_length(tvb) == 0) return;
 
 	proto_tree_add_item_ret_length(tree, hf_quake_CCREP_RULE_INFO_rule,
-			tvb, offset, -1, ENC_ASCII|ENC_NA, &item_len);
+			tvb, offset, -1, ENC_ASCII, &item_len);
 	offset += item_len;
 
 	proto_tree_add_item(tree, hf_quake_CCREP_RULE_INFO_value,

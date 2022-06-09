@@ -275,7 +275,7 @@ dissect_pop(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
                         (is_request) ?
                             hf_pop_request_command :
                             hf_pop_response_indicator,
-                        tvb, offset, tokenlen, ENC_ASCII|ENC_NA);
+                        tvb, offset, tokenlen, ENC_ASCII);
 
     if (data_val) {
       if (is_request) {
@@ -335,11 +335,11 @@ dissect_pop(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
                         (is_request) ?
                             hf_pop_request_parameter :
                             hf_pop_response_description,
-                        tvb, offset, linelen, ENC_ASCII|ENC_NA);
+                        tvb, offset, linelen, ENC_ASCII);
     switch (pop_arg_type) {
       case pop_arg_type_username:
         if (!data_val->username && linelen > 0) {
-          data_val->username = tvb_get_string_enc(wmem_file_scope(), tvb, offset, linelen, ENC_NA|ENC_ASCII);;
+          data_val->username = tvb_get_string_enc(wmem_file_scope(), tvb, offset, linelen, ENC_ASCII);;
           data_val->username_num = pinfo->num;
         }
         break;

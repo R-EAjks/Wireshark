@@ -905,7 +905,7 @@ dissect_rfc4675_egress_vlan_name(proto_tree *tree, tvbuff_t *tvb, packet_info *p
 	proto_tree_add_item(tree, hf_radius_egress_vlan_name_tag, tvb, 0, 1, ENC_BIG_ENDIAN);
 	tag = tvb_get_guint8(tvb, 0);
 	len -= 1;
-	proto_tree_add_item_ret_string(tree, hf_radius_egress_vlan_name, tvb, 1, len, ENC_ASCII|ENC_NA, wmem_packet_scope(), &name);
+	proto_tree_add_item_ret_string(tree, hf_radius_egress_vlan_name, tvb, 1, len, ENC_ASCII, wmem_packet_scope(), &name);
 
 	return wmem_strdup_printf(wmem_packet_scope(), "%s, Vlan Name: %s",
 				   val_to_str_const(tag, egress_vlan_tag_vals, "Unknown"), name);
@@ -1055,7 +1055,7 @@ radius_string(radius_attr_info_t *a, proto_tree *tree, packet_info *pinfo _U_, t
 	switch (a->encrypt) {
 
 	case 0: /* not encrypted */
-		proto_tree_add_item(tree, a->hf, tvb, offset, len, ENC_UTF_8|ENC_NA);
+		proto_tree_add_item(tree, a->hf, tvb, offset, len, ENC_UTF_8);
 		proto_item_append_text(avp_item, "%s", tvb_format_text(pinfo->pool, tvb, offset, len));
 		break;
 

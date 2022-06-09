@@ -180,7 +180,7 @@ dissect_hpfeeds_publish_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     offset += 1;
 
     /* get the channel name as ephemeral string to pass it to the heuristic decoders */
-    proto_tree_add_item_ret_string(tree, hf_hpfeeds_channel, tvb, offset, len, ENC_ASCII|ENC_NA,
+    proto_tree_add_item_ret_string(tree, hf_hpfeeds_channel, tvb, offset, len, ENC_ASCII,
         wmem_packet_scope(), &channelname);
     offset += len;
 

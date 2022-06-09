@@ -550,7 +550,7 @@ icqv5_decode_msgType(proto_tree *tree, tvbuff_t *tvb, int offset, int size,
                 sz = left;
             }
             if (sz != 0) {
-                proto_tree_add_item(subtree, *url_field_descr[n], tvb, offset, sz, ENC_ASCII|ENC_NA);
+                proto_tree_add_item(subtree, *url_field_descr[n], tvb, offset, sz, ENC_ASCII);
             } else {
                 proto_tree_add_string_format_value(subtree, *url_field_descr[n], tvb, offset, 0,
                             "", "(empty)");
@@ -568,7 +568,7 @@ icqv5_decode_msgType(proto_tree *tree, tvbuff_t *tvb, int offset, int size,
             sz = left;
         }
         if (sz != 0) {
-            proto_tree_add_item(subtree, *email_field_descr[n], tvb, offset, sz, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(subtree, *email_field_descr[n], tvb, offset, sz, ENC_ASCII);
         } else {
             proto_tree_add_string_format_value(subtree, *email_field_descr[n], tvb, offset, 0,
                         "", "(empty)");
@@ -600,7 +600,7 @@ icqv5_decode_msgType(proto_tree *tree, tvbuff_t *tvb, int offset, int size,
                 sz = left;
             }
             if (sz != 0) {
-                proto_tree_add_item(subtree, *auth_req_field_descr[n], tvb, offset, sz, ENC_ASCII|ENC_NA);
+                proto_tree_add_item(subtree, *auth_req_field_descr[n], tvb, offset, sz, ENC_ASCII);
             } else {
                 proto_tree_add_string_format_value(subtree, *auth_req_field_descr[n], tvb, offset, 0,
                         "", "(empty)");
@@ -618,7 +618,7 @@ icqv5_decode_msgType(proto_tree *tree, tvbuff_t *tvb, int offset, int size,
             sz = left;
         }
         if (sz != 0) {
-            proto_tree_add_item(subtree, *user_added_field_descr[n], tvb, offset, sz, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(subtree, *user_added_field_descr[n], tvb, offset, sz, ENC_ASCII);
         } else {
             proto_tree_add_string_format_value(subtree, *user_added_field_descr[n], tvb, offset, 0,
                         "", "(empty)");

@@ -2687,7 +2687,7 @@ static void setOfPointerEvent(tvbuff_t *tvb, int *offsetp, proto_tree *t,
 static void string8(tvbuff_t *tvb, int *offsetp, proto_tree *t,
     int hf, guint length)
 {
-      proto_tree_add_item(t, hf, tvb, *offsetp, length, ENC_NA|ENC_ASCII);
+      proto_tree_add_item(t, hf, tvb, *offsetp, length, ENC_ASCII);
       *offsetp += length;
 }
 
