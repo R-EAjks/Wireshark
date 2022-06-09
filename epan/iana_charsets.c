@@ -97,10 +97,10 @@ mibenum_charset_to_encoding (guint charset)
             return ENC_BIG_ENDIAN|ENC_UCS_4;
 
         case 1013:
-            return ENC_BIG_ENDIAN|ENC_UTF_16;
+            return ENC_UTF_16BE;
 
         case 1014:
-            return ENC_LITTLE_ENDIAN|ENC_UTF_16;
+            return ENC_UTF_16LE;
 
         case 1015:
             /* XXX - UTF-16 with a BOM at the beginning */
