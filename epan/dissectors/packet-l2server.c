@@ -394,6 +394,9 @@ static int hf_l2server_ul_bwp_common_nb_common_search_spaces_ext = -1;
 
 static int hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po = -1;
 
+static int hf_l2server_ul_bwp_common_pdsch = -1;
+
+
 static int hf_l2server_rach_common = -1;
 
 static int hf_l2server_rach_generic = -1;
@@ -574,6 +577,19 @@ static int hf_l2server_csi_im_res_set_to_del = -1;
 static int hf_l2server_csi_ssb_res_set_to_del = -1;
 static int hf_l2server_csi_res_cfg_to_del = -1;
 static int hf_l2server_csi_rep_cfg_to_del = -1;
+
+static int hf_l2server_control_res_set = -1;
+static int hf_l2server_control_res_set_id = -1;
+static int hf_l2server_control_res_set_duration = -1;
+static int hf_l2server_prec_granualarity = -1;
+static int hf_l2server_cce_reg_map_type = -1;
+static int hf_l2server_reg_bundle_size = -1;
+static int hf_l2server_interleave_size = -1;
+static int hf_l2server_shift_index = -1;
+static int hf_l2server_freq_dom_res = -1;
+
+static int hf_l2server_search_space = -1;
+static int hf_l2server_search_space_id = -1;
 
 static const value_string lch_vals[] =
 {
@@ -1005,7 +1021,18 @@ static const value_string cmac_cell_status_vals[] = {
     { 0,   NULL }
 };
 
-
+static const value_string pdcch_moni_occ_of_po_valid_vals[] = {
+    { bb_nr5g_FIRST_PDCCH_MON_OCC_SCS15KHZoneT,                "SCS15KHZoneT" },
+    { bb_nr5g_FIRST_PDCCH_MON_OCC_SCS30KHZoneT_SCS15KHZhalfT,  "SCS30KHZoneT_SCS15KHZhalfT" },
+    { bb_nr5g_FIRST_PDCCH_MON_OCC_SCS60KHZoneT_SCS30KHZhalfT_SCS15KHZquarterT,                "SCS60KHZoneT_SCS30KHZhalfT_SCS15KHZquarterT" },
+    { bb_nr5g_FIRST_PDCCH_MON_OCC_SCS120KHZoneT_SCS60KHZhalfT_SCS30KHZquarterT_SCS15KHZoneEighthT,                "SCS120KHZoneT_SCS60KHZhalfT_SCS30KHZquarterT_SCS15KHZoneEighthT" },
+    { bb_nr5g_FIRST_PDCCH_MON_OCC_SCS120KHZhalfT_SCS60KHZquarterT_SCS30KHZoneEighthT_SCS15KHZoneSixteenthT,                "SCS120KHZhalfT_SCS60KHZquarterT_SCS30KHZoneEighthT_SCS15KHZoneSixteenthT" },
+    { bb_nr5g_FIRST_PDCCH_MON_OCC_SCS120KHZquarterT_SCS60KHZoneEighthT_SCS30KHZoneSixteenthT,                "SCS120KHZquarterT_SCS60KHZoneEighthT_SCS30KHZoneSixteenthT" },
+    { bb_nr5g_FIRST_PDCCH_MON_OCC_SCS120KHZoneEighthT_SCS60KHZoneSixteenthT,                "SCS120KHZoneEighthT_SCS60KHZoneSixteenthT" },
+    { bb_nr5g_FIRST_PDCCH_MON_OCC_SCS120KHZoneSixteenthT,                "SCS120KHZoneSixteenthT" },
+    { bb_nr5g_FIRST_PDCCH_MON_OCC_DEFAULT,                "DEFAULT" },
+    { 0,   NULL }
+};
 
 
 static const true_false_string nodata_data_vals =
@@ -1069,6 +1096,7 @@ static gint ett_l2server_initial_ul_bwp = -1;
 static gint ett_l2server_ul_bwp = -1;
 static gint ett_l2server_ul_bwp_common = -1;
 static gint ett_l2server_ul_bwp_common_pdcch = -1;
+static gint ett_l2server_ul_bwp_common_pdsch = -1;
 static gint ett_l2server_rach_common = -1;
 static gint ett_l2server_rach_generic = -1;
 static gint ett_l2server_freq_info_dl = -1;
@@ -1096,6 +1124,8 @@ static gint ett_l2server_codebook_config = -1;
 static gint ett_l2server_codebook_config_type1 = -1;
 static gint ett_l2server_aperiodic = -1;
 static gint ett_l2server_csi_report_freq_config = -1;
+static gint ett_l2server_control_res_set = -1;
+static gint ett_l2server_search_space = -1;
 
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
@@ -2378,23 +2408,23 @@ static int dissect_bwp_dl_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info
 
     // PdcchConfDed
     if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDCCH_CFG_PRESENT) {
-        // TODO:
+        // TODO: bb_nr5g_PDCCH_CONF_DEDICATEDt
     }
-    // PdschConfDed
+    // PdschConfDed (bb_nr5g_PDSCH_CONF_DEDICATEDt)
     if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDSCH_CFG_PRESENT) {
         // TODO:
     }
     // SpsConfDed
     if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_SPS_CFG_PRESENT) {
-        // TODO:
+        // TODO: (bb_nr5g_SPS_CONF_DEDICATEDt)
     }
     // SpsConfToDel_r16
     if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_SPS_CFG_R16_PRESENT) {
-        // TODO:
+        // TODO: (bb_nr5g_SPS_CONFIG_INDEXt)
     }
     // PdcchConfDedR16
     if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_R16_PRESENT) {
-        // TODO:
+        // TODO: (bb_nr5g_PDCCH_CONF_DEDICATED_R16t)
     }
 
     // TODO
@@ -2920,6 +2950,131 @@ static int dissect_rep_freq_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     proto_tree_add_item(config_tree, hf_l2server_csi_reporting_band, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_CTRL_RES_SETt
+static int dissect_control_res_set(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                   guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_control_res_set,  tvb,
+                                                         offset, 0,
+                                                          "", "Control Res Set");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_control_res_set);
+
+    // CtrlResSetId
+    guint32 ctrl_res_set_id;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_control_res_set_id, tvb, offset, 1, ENC_LITTLE_ENDIAN, &ctrl_res_set_id);
+    offset += 1;
+    // CtrlResSetDuration
+    proto_tree_add_item(config_tree, hf_l2server_control_res_set_duration, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // PrecGranularity
+    proto_tree_add_item(config_tree, hf_l2server_prec_granualarity, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // CceRegMapType
+    proto_tree_add_item(config_tree, hf_l2server_cce_reg_map_type, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // RegBundleSize
+    proto_tree_add_item(config_tree, hf_l2server_reg_bundle_size, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // InterleaverSize
+    proto_tree_add_item(config_tree, hf_l2server_interleave_size, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // ShiftIndex
+    proto_tree_add_item(config_tree, hf_l2server_shift_index, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // FreqDomRes
+    proto_tree_add_item(config_tree, hf_l2server_freq_dom_res, tvb, offset, 8, ENC_LITTLE_ENDIAN);
+    offset += 8;
+    // PdcchDMRSScramblingId
+    offset += 2;
+    // PdcchDMRSScramblingIdIsValid
+    offset += 1;
+
+    // TciPresentInDci
+    offset += 1;
+    // NbTciStates
+    offset += 1;
+    // RbOffset_r16
+    offset += 1;
+    // TciPresentDCI_r16
+    offset += 1;
+    // CoresetPoolIndex_r16
+    offset += 1;
+    // TciStates
+    offset += (bb_nr5g_MAX_NB_TCI_STATES_PDCCH);
+
+    proto_item_append_text(config_ti, " (id=%u)", ctrl_res_set_id);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+
+// bb_nr5g_SEARCH_SPACEt
+// N.B. sertialization is just to memcpy whole struct...
+static int dissect_search_space(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_search_space,  tvb,
+                                                         offset, 0,
+                                                          "", "Search Space");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_search_space);
+
+    // SearchSpaceId
+    guint32 search_space_id;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_search_space_id, tvb, offset, 1, ENC_LITTLE_ENDIAN, &search_space_id);
+    offset += 1;
+
+    // CtrlResSetId
+    offset += 1;
+
+    // MonitorSymbsInSlot
+    offset += 2;
+
+    // MonitorSlotIsValid
+    offset += 1;
+
+    // SearchSpaceTypeIsValid
+    guint32 search_space_type_is_valid = tvb_get_guint8(tvb, offset);
+    offset += 1;
+
+    // MonitorSlot (union)
+    offset += 2;
+
+    // NbCandidates
+    offset += sizeof(bb_nr5g_MONITOR_NBCANDIDATESt);
+
+    // SearchSpaceType
+    switch (search_space_type_is_valid) {
+        case bb_nr5g_SEARCH_SPACE_TYPE_COMMON:
+            //offset += sizeof(bb_nr5g_SEARCH_SPACETYPE_COMMONt);
+            break;
+        case bb_nr5g_SEARCH_SPACE_TYPE_DEDICATED:
+            //offset += sizeof(bb_nr5g_SEARCH_SPACETYPE_DEDICATEDt);
+            break;
+        case bb_nr5g_SEARCH_SPACE_TYPE_DEFAULT:
+            // Error/absent?
+            break;
+    }
+    offset += MAX(sizeof(bb_nr5g_SEARCH_SPACETYPE_COMMONt),
+                         sizeof(bb_nr5g_SEARCH_SPACETYPE_DEDICATEDt));
+
+    // SearchSpaceDuration
+    offset += 2;
+
+    // Pad[2]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+
+    proto_item_append_text(config_ti, " (id=%u)", search_space_id);
     proto_item_set_len(config_ti, offset-start_offset);
     return offset;
 }
@@ -3703,7 +3858,7 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
         proto_item_set_len(freq_ti, offset-freq_info_dl_start);
     }
 
-    // InitDLBWP
+    // InitDLBWP (bb_nr5g_BWP_DOWNLINKCOMMONt)
     if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_DL_COMMON_PRESENT) {
         // Subtree.
         proto_item *bwp_dl_common_ti = proto_tree_add_string_format(config_tree, hf_l2server_bwp_dl_common, tvb,
@@ -3712,20 +3867,151 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
         proto_tree *bwp_dl_common_tree = proto_item_add_subtree(bwp_dl_common_ti, ett_l2server_bwp_dl_common);
         printf("tree at %p\n", bwp_dl_common_tree);
 
-        // TODO:
-        offset += sizeof(bb_nr5g_BWP_DOWNLINKCOMMONt);
+        // FieldMask
+        guint32 field_mask_4;
+        proto_tree_add_item_ret_uint(bwp_dl_common_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                     ENC_LITTLE_ENDIAN, &field_mask_4);
+        offset += 4;
+
+        // GenBwp (bb_nr5g_BWPt, fixed size)
+        offset += sizeof(bb_nr5g_BWPt);
+
+        // PdcchConfCommon (bb_nr5g_PDCCH_CONF_COMMONt)
+        if (field_mask_4 & bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDCCH_CFG_PRESENT) {
+            gint pdcch_offset = offset;
+
+            // Subtree.
+            proto_item *pdcch_ti = proto_tree_add_string_format(bwp_dl_common_tree, hf_l2server_ul_bwp_common_pdcch, tvb,
+                                                                offset, 1, "", "PDCCH ");
+            proto_tree *pdcch_tree = proto_item_add_subtree(pdcch_ti, ett_l2server_ul_bwp_common_pdcch);
+
+            // SearchSpaceSIB1
+            proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_search_space_sib1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            // SearchSpaceSIB
+            proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_search_space_sib, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            // PagSearchSpace
+            proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_pag_search_space, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            // RaSearchSpace
+            proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_ra_search_space, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            // RaCtrlResSet
+            proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_ra_ctrl_res_set, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            // NbCommonCtrlResSets
+            guint32 nb_common_ctrl_res_sets;
+            proto_tree_add_item_ret_uint(pdcch_tree, hf_l2server_ul_bwp_common_nb_common_ctrl_res_sets, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_common_ctrl_res_sets);
+            offset += 1;
+            // NbCommonSearchSpaces
+            guint32 nb_common_search_spaces;
+            proto_tree_add_item_ret_uint(pdcch_tree, hf_l2server_ul_bwp_common_nb_common_search_spaces, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_common_search_spaces);
+            offset += 1;
+            // ControlResourceSetZero
+            proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_control_resource_set_zero, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            // SearchSpaceZero
+            proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_search_space_zero, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            // FirstPdcchMonitOccOfPOIsValid
+            guint32 first_pdcch_moni_occ_of_po_valid;
+            proto_tree_add_item_ret_uint(pdcch_tree, hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &first_pdcch_moni_occ_of_po_valid);
+            offset += 1;
+            // NbFirstPdcchMonitOccOfPO
+            guint32 nb_first_pdcch_moni_occ_of_po;
+            proto_tree_add_item_ret_uint(pdcch_tree, hf_l2server_ul_bwp_common_nb_first_pdcch_monit_occ_of_po, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_first_pdcch_moni_occ_of_po);
+            offset += 1;
+            // NbCommonSearchSpacesExt
+            guint32 nb_common_search_spaces_ext;
+            proto_tree_add_item_ret_uint(pdcch_tree, hf_l2server_ul_bwp_common_nb_common_search_spaces_ext, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_common_search_spaces_ext);
+            offset += 1;
+
+            // CommonCtrlResSets
+            for (guint32 ccrs=0; ccrs < nb_common_ctrl_res_sets; ccrs++) {
+                offset = dissect_control_res_set(pdcch_tree, tvb, pinfo, offset);
+            }
+
+            // CommonSearchSpaces
+            for (guint32 ccs=0; ccs < nb_common_search_spaces; ccs++) {
+                // bb_nr5g_SEARCH_SPACEt
+                offset = dissect_search_space(pdcch_tree, tvb, pinfo, offset);
+            }
+
+            // FirstPdcchMonitOccOfPO
+            for (guint32 mon_occ=0; mon_occ < nb_first_pdcch_moni_occ_of_po; mon_occ++) {
+                proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+                offset += 2;
+            }
+
+            // CommonSearchSpacesExt_r16
+            for (guint32 ss_ext=0; ss_ext < nb_common_search_spaces_ext; ss_ext++) {
+                proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+                // TODO: not fixed size
+                offset += sizeof(bb_nr5g_SEARCH_SPACE_EXTt);
+            }
+
+            proto_item_set_len(pdcch_ti, offset-pdcch_offset);
+        }
+
+        // TODO: undo sad hack!
+        offset += (15*16) + 4;
+
+        // PdschConfCommon (bb_nr5g_PDSCH_CONF_COMMONt) (apparently present regardless!)
+        if (field_mask_4 & bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDSCH_CFG_PRESENT) {
+            gint pdsch_offset = offset;
+
+            // Subtree.
+            proto_item *pdsch_ti = proto_tree_add_string_format(bwp_dl_common_tree, hf_l2server_ul_bwp_common_pdsch, tvb,
+                                                                offset, 1, "", "PDSCH ");
+            proto_tree *pdsch_tree = proto_item_add_subtree(pdsch_ti, ett_l2server_ul_bwp_common_pdsch);
+
+            // NbPdschAlloc
+            guint32 nb_pdsch_alloc = tvb_get_guint8(tvb, offset);
+            offset += 1;
+
+            // Spare[3]
+            proto_tree_add_item(pdsch_tree, hf_l2server_spare, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+            offset += 3;
+
+            // PdschAlloc
+            offset += (nb_pdsch_alloc * sizeof(bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt));
+
+            proto_item_set_len(pdsch_ti, offset-pdsch_offset);
+        }
+
     }
 
-    // FreqInfoUL
+    // FreqInfoUL (bb_nr5g_FREQINFO_ULt). Just memcpy'd by serialization.
     if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_UL_COMMON_PRESENT) {
+        gint pdsch_offset = offset;
+
         proto_item *freq_info_ul_common_ti = proto_tree_add_string_format(config_tree, hf_l2server_freq_info_ul_common, tvb,
                                                                          offset, sizeof(bb_nr5g_FREQINFO_ULt),
                                                                          "", "Freq Info UL Common");
         proto_tree *freq_info_ul_common_tree = proto_item_add_subtree(freq_info_ul_common_ti, ett_l2server_freq_info_ul_common);
-        printf("tree at %p\n", freq_info_ul_common_tree);
 
-        // TODO:
-        offset += sizeof(bb_nr5g_FREQINFO_ULt);
+        // AbsFreqPointA
+        offset += 4;
+        // AddSpectrumEmission
+        offset += 1;
+        // FreqShift7p5khz
+        offset += 1;
+        // PMax
+        offset += 1;
+        // NbFreqBandList
+        offset += 1;
+        // NbScsSpecCarrier
+        offset += 1;
+        // Spare[3]
+        proto_tree_add_item(freq_info_ul_common_tree, hf_l2server_spare, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+        offset += 3;
+        // FreqBandList
+        offset += (bb_nr5g_MAX_NB_MULTIBANDS * 2);
+        // ScsSpecCarrier
+        offset += (bb_nr5g_MAX_SCS * sizeof(bb_nr5g_SCS_SPEC_CARRIERt));
+
+        proto_item_set_len(freq_info_ul_common_ti, offset-pdsch_offset);
     }
 
     // InitULBWP
@@ -4412,83 +4698,9 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                     }
                 }
 
-#if 0
-                    // PdcchConfCommon (bb_nr5g_PDCCH_CONF_COMMONt)
-                    if (common_fieldmask & bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDCCH_CFG_PRESENT) {
-                        gint pdcch_offset = offset;
-
-                        // Subtree.
-                        proto_item *pdcch_ti = proto_tree_add_string_format(common_tree, hf_l2server_ul_bwp_common_pdcch, tvb,
-                                                                            offset, 1, "", "PDCCH ");
-                        proto_tree *pdcch_tree = proto_item_add_subtree(pdcch_ti, ett_l2server_ul_bwp_common_pdcch);
-
-                        // SearchSpaceSIB1
-                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_search_space_sib1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-                        offset += 1;
-                        // SearchSpaceSIB
-                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_search_space_sib, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-                        offset += 1;
-                        // PagSearchSpace
-                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_pag_search_space, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-                        offset += 1;
-                        // RaSearchSpace
-                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_ra_search_space, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-                        offset += 1;
-                        // RaCtrlResSet
-                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_ra_ctrl_res_set, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-                        offset += 1;
-                        // NbCommonCtrlResSets
-                        guint32 nb_common_ctrl_res_sets;
-                        proto_tree_add_item_ret_uint(pdcch_tree, hf_l2server_ul_bwp_common_nb_common_ctrl_res_sets, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_common_ctrl_res_sets);
-                        offset += 1;
-                        // NbCommonSearchSpaces
-                        guint32 nb_common_search_spaces;
-                        proto_tree_add_item_ret_uint(pdcch_tree, hf_l2server_ul_bwp_common_nb_common_search_spaces, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_common_search_spaces);
-                        offset += 1;
-                        // ControlResourceSetZero
-                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_control_resource_set_zero, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-                        offset += 1;
-                        // SearchSpaceZero
-                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_search_space_zero, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-                        offset += 1;
-                        // FirstPdcchMonitOccOfPOIsValid
-                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-                        offset += 1;
-                        // NbFirstPdcchMonitOccOfPO
-                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_nb_first_pdcch_monit_occ_of_po, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-                        offset += 1;
-                        // NbCommonSearchSpacesExt
-                        proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_nb_common_search_spaces, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-                        offset += 1;
-
-                        // CommonCtrlResSets
-                        for (guint32 ccrs=0; ccrs < nb_common_ctrl_res_sets; ccrs++) {
-                            // TODO:
-                            offset += sizeof(bb_nr5g_CTRL_RES_SETt);
-                        }
-
-                        // CommonSearchSpaces
-                        for (guint32 ccs=0; ccs < nb_common_search_spaces; ccs++) {
-                            // TODO
-                            offset += sizeof(bb_nr5g_SEARCH_SPACEt);
-                        }
-
-                        // FirstPdcchMonitOccOfPO
-                        for (guint32 mon_occ=0; mon_occ < bb_nr5g_MAX_PO_PERPF; mon_occ++) {
-                            proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-                            offset += 2;
-                        }
-
-                        proto_item_set_len(pdcch_ti, offset-pdcch_offset);
-                    }
-                    // PdschConfCommon
-                    if (common_fieldmask & bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDSCH_CFG_PRESENT) {
-                    }
-                }
-#endif
-
                 // BwpULDed
                 if (ul_bwp_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DEDICATED_CFG_PRESENT) {
+                    // TODO:
                 }
 
                 proto_item_set_len(ul_bwp_ti, bwp_uplink_len);
@@ -6662,16 +6874,16 @@ proto_register_l2server(void)
            NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_ul_bwp_common_search_space_sib1,
-        { "Search Space SIB1", "l2server.search-space-sib1", FT_UINT8, BASE_DEC,
+        { "Search Space SIB1", "l2server.search-space-sib1", FT_INT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_ul_bwp_common_search_space_sib,
-        { "Search Space SIB", "l2server.search-space-sib", FT_UINT8, BASE_DEC,
+        { "Search Space SIB", "l2server.search-space-sib", FT_INT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_ul_bwp_common_pag_search_space,
-        { "Page Search Space", "l2server.pag-search-space", FT_UINT8, BASE_DEC,
+        { "Page Search Space", "l2server.pag-search-space", FT_INT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_ul_bwp_common_ra_search_space,
-        { "RA Search Space", "l2server.ra-search-space", FT_UINT8, BASE_DEC,
+        { "RA Search Space", "l2server.ra-search-space", FT_INT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_ul_bwp_common_ra_ctrl_res_set,
         { "RA Ctrl Res Set", "l2server.ra-ctrl-res-set", FT_UINT8, BASE_DEC,
@@ -6683,14 +6895,14 @@ proto_register_l2server(void)
         { "Nb Common Search Spaces", "l2server.nb-common-search-spaces", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_ul_bwp_common_control_resource_set_zero,
-        { "Control Resource Set Zero", "l2server.control-resource-set-zero", FT_UINT8, BASE_DEC,
+        { "Control Resource Set Zero", "l2server.control-resource-set-zero", FT_INT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_ul_bwp_common_search_space_zero,
-        { "Search space zero", "l2server.search-space-zero", FT_UINT8, BASE_DEC,
+        { "Search space zero", "l2server.search-space-zero", FT_INT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po_valid,
         { "First PDCCH Monitor Occ of Po Valid", "l2server.first-pdcch-monit-of-po-valid", FT_UINT8, BASE_DEC,
-           NULL, 0x0, NULL, HFILL }},
+           VALS(pdcch_moni_occ_of_po_valid_vals), 0x0, NULL, HFILL }},
       { &hf_l2server_ul_bwp_common_nb_first_pdcch_monit_occ_of_po,
         { "Nb First PDCCH Monitor Occ of Po", "l2server.nb-first-pdcch-monit-of-po", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
@@ -6700,6 +6912,10 @@ proto_register_l2server(void)
 
       { &hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po,
         { "First PDCCH Moni Occ of Po", "l2server.first-pdcch-moni-occ-of-po", FT_UINT16, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ul_bwp_common_pdsch,
+        { "UL BWP Common PDSCH", "l2server.ul-bwp-common-pdsch", FT_STRING, BASE_NONE,
            NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_rach_common,
@@ -7176,6 +7392,41 @@ proto_register_l2server(void)
       { &hf_l2server_csi_rep_cfg_to_del,
         { "CSI Rep Config to delete", "l2server.csi-rep-cfg-to-del", FT_UINT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_control_res_set,
+        { "Control Res Set", "l2server.control-res-set", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_control_res_set_id,
+        { "Control Res Set Id", "l2server.control-res-set-id", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_control_res_set_duration,
+        { "Control Res Set Duration", "l2server.control-res-set-duration", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_prec_granualarity,
+        { "Prec Granularity", "l2server.prec-granularity", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_cce_reg_map_type,
+        { "CCE Reg Map Type", "l2server.cce-reg-map-type", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_reg_bundle_size,
+        { "Reg Bundle Size", "l2server.reg-bundle-size", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_interleave_size,
+        { "Interleave Size", "l2server.interleave-size", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_shift_index,
+        { "Shift Index", "l2server.shift-index", FT_UINT16, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_freq_dom_res,
+        { "Freq Dom Res", "l2server.freq-dom-res", FT_UINT64, BASE_HEX,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_search_space,
+        { "Search Space", "l2server.search-space", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_search_space_id,
+        { "Search Space Id", "l2server.search-space-id", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
@@ -7213,6 +7464,7 @@ proto_register_l2server(void)
         &ett_l2server_ul_bwp,
         &ett_l2server_ul_bwp_common,
         &ett_l2server_ul_bwp_common_pdcch,
+        &ett_l2server_ul_bwp_common_pdsch,
         &ett_l2server_rach_common,
         &ett_l2server_rach_generic,
         &ett_l2server_freq_info_dl,
@@ -7238,7 +7490,9 @@ proto_register_l2server(void)
         &ett_l2server_codebook_config,
         &ett_l2server_codebook_config_type1,
         &ett_l2server_aperiodic,
-        &ett_l2server_csi_report_freq_config
+        &ett_l2server_csi_report_freq_config,
+        &ett_l2server_control_res_set,
+        &ett_l2server_search_space
     };
 
     static ei_register_info ei[] = {
