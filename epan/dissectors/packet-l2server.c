@@ -557,6 +557,9 @@ static int hf_l2server_codebook_type_is_valid = -1;
 static int hf_l2server_codebook_config_type1 = -1;
 static int hf_l2server_codebook_subtype1_is_valid = -1;
 
+static int hf_l2server_codebook_config_type1_single_panel = -1;
+static int hf_l2server_nb_of_ant_ports_is_valid = -1;
+
 static int hf_l2server_aperiodic = -1;
 static int hf_l2server_nb_rep_slow_offset_list = -1;
 static int hf_l2server_nb_rep_slow_offset = -1;
@@ -590,6 +593,8 @@ static int hf_l2server_freq_dom_res = -1;
 
 static int hf_l2server_search_space = -1;
 static int hf_l2server_search_space_id = -1;
+
+static int hf_l2server_n1n2 = -1;
 
 static const value_string lch_vals[] =
 {
@@ -1034,6 +1039,14 @@ static const value_string pdcch_moni_occ_of_po_valid_vals[] = {
     { 0,   NULL }
 };
 
+static const value_string nb_of_ant_ports_is_valid_vals[] = {
+    { bb_nr5g_CODEBOOK_SUBTYPE1_NB_ANT_PORTS_TWO,          "Two" },
+    { bb_nr5g_CODEBOOK_SUBTYPE1_NB_ANT_PORTS_MORETHANTWO,  "More Than Two" },
+    { bb_nr5g_CODEBOOK_SUBTYPE1_NB_ANT_PORTS_DEFAULT,      "Default" },
+    { 0,   NULL }
+};
+
+
 
 static const true_false_string nodata_data_vals =
 {
@@ -1122,6 +1135,7 @@ static gint ett_l2server_csi_rep_config = -1;
 static gint ett_l2server_semipersistent_on_pucch = -1;
 static gint ett_l2server_codebook_config = -1;
 static gint ett_l2server_codebook_config_type1 = -1;
+static gint ett_l2server_codebook_config_type1_single_panel = -1;
 static gint ett_l2server_aperiodic = -1;
 static gint ett_l2server_csi_report_freq_config = -1;
 static gint ett_l2server_control_res_set = -1;
@@ -2807,7 +2821,7 @@ static int dissect_semipersistent_on_pucch(proto_tree *tree, tvbuff_t *tvb, pack
 }
 
 
-// bb_nr5g_CSI_REPORT_CFG_TYPE_APERIODICt
+// bb_nr5g_CSI_REPORT_CFG_TYPE_APERIODICt. Just memcpy'd in serialization.
 static int dissect_aperiodic(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset)
 {
     guint start_offset = offset;
@@ -2830,8 +2844,70 @@ static int dissect_aperiodic(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo
     // RepSlotOffsetList (bb_nr5g_MAX_NB_UL_ALLOCS entries?)
     // TODO: nb_rep_slow_offset_list elements instead?
     for (guint n=0; n < bb_nr5g_MAX_NB_UL_ALLOCS; n++) {
-        proto_tree_add_item(config_tree, hf_l2server_nb_rep_slow_offset, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        proto_item *ti = proto_tree_add_item(config_tree, hf_l2server_nb_rep_slow_offset, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        if (n >= nb_rep_slow_offset_list) {
+            proto_item_append_text(ti, " (no in use)");
+        }
         offset++;
+    }
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_CODEBOOK_SUBTYPE1_MORETHANTWO_ANT_PORTS_CFGt
+static int dissect_and_ports_more_than_two(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.  TODO: own subtree item/ett!
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_codebook_config_type1_single_panel,  tvb,
+                                                         offset, 0,
+                                                          "", "More than 2 Ants");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_codebook_config_type1_single_panel);
+
+    // N1N2IsValid
+    offset += 1;
+    // TypeISinglePanelCodebookSubsetRestrI2IsValid
+    offset += 1;
+    // TypeISinglePanelCodebookSubsetRestrI2
+    offset += 2;
+    // N1N2[32]
+    proto_tree_add_item(config_tree, hf_l2server_n1n2, tvb, offset, 32, ENC_LITTLE_ENDIAN);
+    offset += 32;
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_CODEBOOK_SUBTYPE1_SINGLE_PANEL_CFGt
+static int dissect_codebook_type_1_single_panel(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_codebook_config_type1_single_panel,  tvb,
+                                                         offset, 0,
+                                                          "", "Single Panel");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_codebook_config_type1_single_panel);
+
+    // NbOfAntPortsIsValid
+    guint32 nb_of_ant_ports_is_valid;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_of_ant_ports_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_of_ant_ports_is_valid);
+    offset += 1;
+    // TypeISinglePanelRiRestr
+    offset += 1;
+    // Pad[2]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+
+    switch (nb_of_ant_ports_is_valid) {
+        case bb_nr5g_CODEBOOK_SUBTYPE1_NB_ANT_PORTS_TWO:
+            // TODO:
+            break;
+        case bb_nr5g_CODEBOOK_SUBTYPE1_NB_ANT_PORTS_MORETHANTWO:
+            dissect_and_ports_more_than_two(config_tree, tvb, pinfo, offset);
+            break;
     }
 
     proto_item_set_len(config_ti, offset-start_offset);
@@ -2864,7 +2940,7 @@ static int dissect_codebook_type_1(proto_tree *tree, tvbuff_t *tvb, packet_info 
     // CodeBookSubType1 (union)
     switch (codebook_subtype1_is_valid) {
         case bb_nr5g_CODEBOOK_TYPE1_SUBTYPE_I_SINGLE_PANEL:
-            offset += sizeof(bb_nr5g_CODEBOOK_SUBTYPE1_SINGLE_PANEL_CFGt);
+            offset = dissect_codebook_type_1_single_panel(config_tree, tvb, pinfo, offset);
             break;
         case bb_nr5g_CODEBOOK_TYPE1_SUBTYPE_I_MULTI_PANEL:
             offset += sizeof(bb_nr5g_CODEBOOK_SUBTYPE1_MULTI_PANEL_CFGt);
@@ -3180,6 +3256,7 @@ static int dissect_csi_rep_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     offset += 1;
 
     // ReportConfigType
+    guint report_config_type_offset = offset;
     switch (report_config_type_is_valid) {
         case bb_nr5g_CSI_REPORT_CFG_TYPE_PERIODIC:
             offset += sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_PERIODICt);
@@ -3192,14 +3269,22 @@ static int dissect_csi_rep_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
             break;
         case bb_nr5g_CSI_REPORT_CFG_TYPE_APERIODIC:
             offset = dissect_aperiodic(config_tree, tvb, pinfo, offset);
-            // TODO: need to skip length of longest part of union?
-            offset += 32;
             break;
         default:
             // TODO: error?
             printf("Unknown report config type (%u)\n", report_config_type_is_valid);
             break;
     }
+
+    // Serialization skips to write next at &out->RepFreqCfg
+    // Advance by larges part of (anonymous) union.
+    guint report_config_type_len = MAX(sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_PERIODICt),
+                                       sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUCCHt));
+    report_config_type_len = MAX(report_config_type_len,
+                                 sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUSCHt));
+    report_config_type_len = MAX(report_config_type_len,
+                                 sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_APERIODICt));
+    offset = report_config_type_offset + report_config_type_len;
 
     // RepFreqCfg (bb_nr5g_CSI_REPORT_FREQ_CFGt)
     offset = dissect_rep_freq_config(config_tree, tvb, pinfo, offset);
@@ -3846,7 +3931,7 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
         // FreqBandList
         for (guint32 n=0; n < bb_nr5g_MAX_NB_MULTIBANDS; n++) {
             proto_item *ti = proto_tree_add_item(freq_tree, hf_l2server_freq_band_list, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-            if (n < nb_freq_band_list) {
+            if (n >= nb_freq_band_list) {
                 proto_item_append_text(ti, " (not set)");
             }
             offset += 2;
@@ -7336,6 +7421,12 @@ proto_register_l2server(void)
         { "Codebook Type1 Is Valid", "l2server.codebook-subtype1-is-valid", FT_UINT8, BASE_DEC,
            VALS(subtype1_is_valid_vals), 0x0, NULL, HFILL }},
 
+      { &hf_l2server_codebook_config_type1_single_panel,
+        { "Single Panel", "l2server.codebook-config-type1-single-panel", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_of_ant_ports_is_valid,
+        { "Nb Of Ant Posts Is Valid", "l2server.nb-of-ant-ports-is-valid", FT_UINT8, BASE_DEC,
+           VALS(nb_of_ant_ports_is_valid_vals), 0x0, NULL, HFILL }},
 
       { &hf_l2server_aperiodic,
         { "APeriodic", "l2server.aperiodic", FT_STRING, BASE_NONE,
@@ -7427,6 +7518,10 @@ proto_register_l2server(void)
       { &hf_l2server_search_space_id,
         { "Search Space Id", "l2server.search-space-id", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_n1n2,
+        { "NIN2", "l2server.n1n2", FT_BYTES, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
@@ -7489,6 +7584,7 @@ proto_register_l2server(void)
         &ett_l2server_semipersistent_on_pucch,
         &ett_l2server_codebook_config,
         &ett_l2server_codebook_config_type1,
+        &ett_l2server_codebook_config_type1_single_panel,
         &ett_l2server_aperiodic,
         &ett_l2server_csi_report_freq_config,
         &ett_l2server_control_res_set,
