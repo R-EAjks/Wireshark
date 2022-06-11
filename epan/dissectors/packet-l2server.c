@@ -2994,6 +2994,47 @@ static int dissect_codebook_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     return offset;
 }
 
+// bb_nr5g_BWP_DOWNLINKt
+static int dissect_bwp_downlink(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                   guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.  TODO: own subtree item & ett
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_codebook_config,  tvb,
+                                                         offset, 0,
+                                                          "", "BWP Downlink");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_codebook_config);
+
+    // BwpId
+    gint32 bwpid;
+    proto_tree_add_item_ret_int(config_tree, hf_l2server_bwpid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &bwpid);
+    offset += 1;
+    // Spare
+    proto_tree_add_item(config_tree, hf_l2server_spare1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // Fieldmask
+    guint32 field_mask;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_2, tvb, offset, 2, ENC_LITTLE_ENDIAN, &field_mask);
+    offset += 2;
+
+    // BwpDLCommon
+    if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_CFG_PRESENT) {
+        // TODO: bb_nr5g_BWP_DOWNLINKCOMMONt
+    }
+
+    // BwpDLDed
+    if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DEDICATED_CFG_PRESENT) {
+        // TODO: bb_nr5g_BWP_DOWNLINKDEDICATEDt
+    }
+
+    proto_item_append_text(config_ti, " (bwpId=%d)", bwpid);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+
+
 
 // bb_nr5g_CSI_REPORT_FREQ_CFGt
 static int dissect_rep_freq_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -3457,7 +3498,10 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     }
 
     // AperTriggerStateList
-    offset += (nb_aper_trigger_state_list * sizeof(bb_nr5g_CSI_APERIODIC_TRIGGER_STATE_CFGt));
+    for (guint n=0; n < nb_aper_trigger_state_list; n++) {
+        // TODO: not fixed sized...
+        offset += (nb_aper_trigger_state_list * sizeof(bb_nr5g_CSI_APERIODIC_TRIGGER_STATE_CFGt));
+    }
 
     // TODO:
     // SPOnPuschTriggerStateList (fixed size)
@@ -3718,10 +3762,14 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         // TODO: still quite a lot to do here...
 
         // DlBwpIdToAdd. TODO: not fixed size!!!!!
-        offset += (nbDlBwpIdToAdd * sizeof(bb_nr5g_BWP_DOWNLINKt));
-        // DlChannelBwPerScs
+        for (guint n=0; n < nbDlBwpIdToAdd; n++) {
+            // TODO: bb_nr5g_BWP_DOWNLINKt
+            offset = dissect_bwp_downlink(ded_tree, tvb, pinfo, offset);
+        }
+
+        // DlChannelBwPerScs (fixed size)
         offset += (nbDlBwpScsSpecCarrier * sizeof(bb_nr5g_SCS_SPEC_CARRIERt));
-        // RateMatchPatternDedToAdd
+        // RateMatchPatternDedToAdd (fixed size)
         offset += (nbRateMatchPatternDedToAdd * sizeof(bb_nr5g_RATE_MATCH_PATTERNt));
         // RateMatchPatternDedToDel
         offset += (nbRateMatchPatternDedToDel * sizeof(uint32_t));
