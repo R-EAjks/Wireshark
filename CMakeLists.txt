@@ -1720,7 +1720,6 @@ set(DOXYGEN_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 set(CFG_OUT_FILES
 	doxygen.cfg
-	packaging/macosx/LogwolfInfo.plist
 	packaging/macosx/osx-app.sh
 	packaging/macosx/osx-dmg.sh
 	packaging/macosx/wireshark-app.dmgbuild
@@ -1731,11 +1730,20 @@ set(CFG_OUT_FILES
 	resources/libwireshark.rc
 	resources/libwiretap.rc
 	resources/libwsutil.rc
-	resources/logwolf.exe.manifest
 	resources/wireshark.exe.manifest
 	resources/wireshark.rc
 	wireshark.pc
 )
+
+if(BUILD_logwolf)
+	list(APPEND CFG_OUT_FILES
+		packaging/macosx/LogwolfInfo.plist
+		packaging/macosx/logwolf-app.dmgbuild
+		packaging/macosx/logwolf-dsym.dmgbuild
+		resources/logwolf.exe.manifest
+	)
+endif()
+
 foreach( _cfg_file ${CFG_OUT_FILES} )
 	configure_file( ${CMAKE_SOURCE_DIR}/${_cfg_file}.in ${CMAKE_BINARY_DIR}/${_cfg_file} @ONLY )
 endforeach()
@@ -3394,14 +3402,14 @@ if(ENABLE_APPLICATION_BUNDLE AND BUILD_logwolf)
 	add_custom_target(logwolf_dmg_readmes DEPENDS ${_logwolf_read_me_first} ${_logwolf_dsym_installation} )
 	add_dependencies(logwolf_dmg_prep logwolf_dmg_readmes)
 
-	# ADD_CUSTOM_TARGET( logwolf_dmg
-	# 	COMMAND bash -x ${CMAKE_BINARY_DIR}/packaging/macosx/osx-dmg.sh
-	# 	# Unlike wireshark_nsis_prep + wireshark_nsis, we can add a direct
-	# 	# dependency here.
-	# 	DEPENDS wireshark_dmg_prep
-	# 	# We create Wireshark.app in "run". Do our work there.
-	# 	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/run
-	# )
+	ADD_CUSTOM_TARGET( logwolf_dmg
+		COMMAND bash -x ${CMAKE_BINARY_DIR}/packaging/macosx/osx-dmg.sh --app-name Logwolf
+		# Unlike wireshark_nsis_prep + wireshark_nsis, we can add a direct
+		# dependency here.
+		DEPENDS logwolf_dmg_prep
+		# We create Wireshark.app in "run". Do our work there.
+		WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/run
+	)
 
 endif()
 
@@ -3538,7 +3546,7 @@ if(RPMBUILD_EXECUTABLE)
 		COMMAND cp ${CMAKE_BINARY_DIR}/wireshark*tar* ${CMAKE_BINARY_DIR}/packaging/rpm/SOURCES/
 		DEPENDS dist
 	)
-	add_custom_target(rpm-package
+	add_custom_target(wireshark_rpm
 		COMMAND ${RPMBUILD_EXECUTABLE}
 			--define "_topdir ${CMAKE_BINARY_DIR}/packaging/rpm"
 			--define "_prefix ${CMAKE_INSTALL_PREFIX}"
@@ -3556,20 +3564,20 @@ if(LINUXDEPLOYQT_EXECUTABLE AND APPIMAGETOOL_EXECUTABLE)
 	# CMAKE_INSTALL_PREFIX=/usr. I (gcc) also had to set
 	# CMAKE_INSTALL_LIBDIR=/usr/lib.
 	if (CMAKE_BUILD_TYPE STREQUAL "Release" AND CMAKE_INSTALL_PREFIX STREQUAL "/usr" AND CMAKE_INSTALL_LIBDIR STREQUAL "/usr/lib" )
-		add_custom_target(appimage-prerequisites)
-		add_dependencies(appimage-prerequisites ${PROGLIST})
+		add_custom_target(wireshark_appimage_prerequisites)
+		add_dependencies(wireshark_appimage_prerequisites ${PROGLIST})
 	else()
-		add_custom_target(appimage-prerequisites
+		add_custom_target(wireshark_appimage_prerequisites
 			COMMAND echo "CMAKE_BUILD_TYPE isn't Release or CMAKE_INSTALL_PREFIX isn't /usr or CMAKE_INSTALL_LIBDIR isn't /usr/lib."
 			COMMAND false
 		)
 	endif()
 	set (_ai_appdir "${CMAKE_BINARY_DIR}/packaging/appimage/appdir")
-	add_custom_target(appimage-appdir
+	add_custom_target(wireshark_appimage_appdir
 		COMMAND ${CMAKE_COMMAND} -E make_directory "${_ai_appdir}"
 		COMMAND env DESTDIR=${_ai_appdir}
 			${CMAKE_COMMAND} --build . --target install
-		DEPENDS appimage-prerequisites
+		DEPENDS wireshark_appimage_prerequisites
 	)
 	set(_exe_args)
 	foreach(_prog ${PROGLIST})
@@ -3581,7 +3589,7 @@ if(LINUXDEPLOYQT_EXECUTABLE AND APPIMAGETOOL_EXECUTABLE)
 	# When that's fixed we will no longer need appimagetool. Until
 	# then, we need to prep and package in two steps:
 	# https://github.com/probonopd/linuxdeployqt/wiki/Custom-wrapper-script-instead-of-AppRun
-	add_custom_target(appimage-prep
+	add_custom_target(wireshark_appimage_prep
 		COMMAND ${LINUXDEPLOYQT_EXECUTABLE}
 			"${_ai_appdir}/usr/share/applications/org.wireshark.Wireshark.desktop"
 			${_exe_args}
@@ -3589,12 +3597,12 @@ if(LINUXDEPLOYQT_EXECUTABLE AND APPIMAGETOOL_EXECUTABLE)
 		COMMAND install
 			"${CMAKE_SOURCE_DIR}/packaging/appimage/AppRun"
 			"${_ai_appdir}/AppRun"
-		DEPENDS appimage-appdir
+		DEPENDS wireshark_appimage_appdir
 	)
-	add_custom_target(appimage
+	add_custom_target(wireshark_appimage
 		COMMAND env VERSION=${PROJECT_VERSION} ${APPIMAGETOOL_EXECUTABLE} appdir
 		WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/packaging/appimage"
-		DEPENDS appimage-prep
+		DEPENDS wireshark_appimage_prep
 	)
 endif()
 
