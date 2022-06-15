@@ -15,9 +15,11 @@
 
 #include <wsutil/utf8_entities.h>
 #include <wsutil/filesystem.h>
+#include <wsutil/str_util.h>
 
 #include "ui/recent.h"
 
+#include <ui/qt/utils/qt_ui_utils.h>
 #include <ui/qt/main_application.h>
 #include <ui/qt/main_window.h>
 #include <ui/qt/filter_action.h>
@@ -25,7 +27,6 @@
 #include <ui/qt/utils/variant_pointer.h>
 #include <ui/qt/widgets/traffic_tree.h>
 
-#include <QVector>
 #include <QStringList>
 #include <QTreeView>
 #include <QList>
@@ -51,7 +52,7 @@ TrafficTree::TrafficTree(QString baseName, QWidget *parent) :
     setRootIsDecorated(false);
     setSortingEnabled(true);
     setContextMenuPolicy(Qt::CustomContextMenu);
-    
+
     connect(this, &QTreeView::customContextMenuRequested, this, &TrafficTree::customContextMenu);
 }
 
