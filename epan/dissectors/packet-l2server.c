@@ -2397,7 +2397,7 @@ static int dissect_bwp_dl_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info
     // Subtree.
     proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_bwp_dl_dedicated, tvb,
                                                          offset, 0,
-                                                          "", "%s", title);
+                                                          "Initial DL BWP", "%s", title);
     proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_bwp_dl_dedicated);
 
     // FieldMask
@@ -2420,18 +2420,24 @@ static int dissect_bwp_dl_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info
     proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
 
+    // N.B. These 3 appear regardless of flag!!!!!
     // PdcchConfDed
-    if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDCCH_CFG_PRESENT) {
+    //if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDCCH_CFG_PRESENT) {
         // TODO: bb_nr5g_PDCCH_CONF_DEDICATEDt
-    }
+        offset += sizeof(bb_nr5g_PDCCH_CONF_DEDICATEDt);
+    //}
     // PdschConfDed (bb_nr5g_PDSCH_CONF_DEDICATEDt)
-    if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDSCH_CFG_PRESENT) {
+    //if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDSCH_CFG_PRESENT) {
         // TODO:
-    }
+        offset += sizeof(bb_nr5g_PDSCH_CONF_DEDICATEDt);
+    //}
     // SpsConfDed
-    if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_SPS_CFG_PRESENT) {
+    //if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_SPS_CFG_PRESENT) {
         // TODO: (bb_nr5g_SPS_CONF_DEDICATEDt)
-    }
+        offset += sizeof(bb_nr5g_SPS_CONF_DEDICATEDt);
+    //}
+
+
     // SpsConfToDel_r16
     if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_SPS_CFG_R16_PRESENT) {
         // TODO: (bb_nr5g_SPS_CONFIG_INDEXt)
