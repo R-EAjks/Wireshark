@@ -1479,6 +1479,31 @@ he_sig_b_symbols_custom(gchar *result, guint32 value)
 	snprintf(result, ITEM_LABEL_LENGTH, "%d", value+1);
 }
 
+/*
+ * Get rate from rate_list, according to IEEE Std 802.11-2020 Table 17-6.
+ * The index of the rate_list is R4-R1, however the index of Table 17-6 is R1-R4.
+ */
+static void
+l_sig_rate_custom(gchar *result, guint32 value)
+{
+	guint8 rate = IEEE80211_RADIOTAP_L_SIG_RATE_MASK & value;
+	guint8 rate_list[0x10] = {
+		[0xB] = 6,
+		[0xF] = 9,
+		[0xA] = 12,
+		[0xE] = 18,
+		[0x9] = 24,
+		[0xD] = 36,
+		[0x8] = 48,
+		[0xC] = 54
+	};
+
+	if (rate_list[rate])
+		snprintf(result, ITEM_LABEL_LENGTH, "%u (%u Mbps)", rate, rate_list[rate]);
+	else
+		snprintf(result, ITEM_LABEL_LENGTH, "%u (Unknown rate)", rate);
+}
+
 static void
 dissect_radiotap_he_mu_info(tvbuff_t *tvb, packet_info *pinfo _U_,
 		proto_tree *tree, int offset, gboolean is_tlv)
@@ -5573,7 +5598,7 @@ void proto_register_radiotap(void)
 
 		{&hf_radiotap_l_sig_rate,
 		 {"rate", "radiotap.l_sig.rate",
-		  FT_UINT16, BASE_DEC, NULL,
+		  FT_UINT16, BASE_CUSTOM, CF_FUNC(l_sig_rate_custom),
 		  IEEE80211_RADIOTAP_L_SIG_RATE_MASK, NULL, HFILL}},
 
 		{&hf_radiotap_l_sig_length,

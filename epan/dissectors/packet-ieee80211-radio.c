@@ -71,6 +71,7 @@ static int hf_wlan_radio_11ac_p_aid = -1;
 static int hf_wlan_radio_data_rate = -1;
 static int hf_wlan_radio_channel = -1;
 static int hf_wlan_radio_frequency = -1;
+static int hf_wlan_radio_bandwidth = -1;
 static int hf_wlan_radio_short_preamble = -1;
 static int hf_wlan_radio_signal_percent = -1;
 static int hf_wlan_radio_signal_db = -1;
@@ -513,6 +514,25 @@ static float ieee80211_he_ofdm_rate(guint nsts, guint mcs, guint bw, guint gi)
   return rate;
 }
 
+static guint he_su_bandwidth_tab[HE_SU_MAX_BW] = {
+  PHDR_802_11_BANDWIDTH_20_MHZ,
+  PHDR_802_11_BANDWIDTH_40_MHZ,
+  PHDR_802_11_BANDWIDTH_80_MHZ,
+  PHDR_802_11_BANDWIDTH_160_MHZ
+};
+
+/*
+ * Calculates 802.11ax HE SU data bandwidth corresponding to a given 802.11ax ru.
+ */
+static guint ieee80211_he_su_bandwidth(guint ru)
+{
+  guint bw = 0xFF;
+  if (ru < HE_SU_MAX_BW) {
+    bw = he_su_bandwidth_tab[ru];
+  }
+  return bw;
+}
+
 /*
  * HE MU OFDMA MCS rate table converted from http://mcsindex.com/
  * indexed by (NSTS,MCS,RU,GI)
@@ -882,6 +902,8 @@ dissect_wlan_radio_phdr(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, 
           proto_tree_add_boolean(radio_tree, hf_wlan_radio_short_preamble, tvb, 0, 0,
                    short_preamble);
         }
+        phdr->has_bandwidth = TRUE;
+        phdr->bandwidth = PHDR_802_11_BANDWIDTH_20_MHZ;
         break;
       }
 
@@ -897,6 +919,8 @@ dissect_wlan_radio_phdr(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, 
           proto_tree_add_uint(radio_tree, hf_wlan_radio_11a_turbo_type, tvb, 0, 0,
                    info_a->turbo_type);
         }
+        phdr->has_bandwidth = TRUE;
+        phdr->bandwidth = PHDR_802_11_BANDWIDTH_20_MHZ;
         break;
       }
 
@@ -908,6 +932,8 @@ dissect_wlan_radio_phdr(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, 
           proto_tree_add_uint(radio_tree, hf_wlan_radio_11g_mode, tvb, 0, 0,
                    info_g->mode);
         }
+        phdr->has_bandwidth = TRUE;
+        phdr->bandwidth = PHDR_802_11_BANDWIDTH_20_MHZ;
         break;
       }
 
@@ -936,6 +962,8 @@ dissect_wlan_radio_phdr(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, 
           }
 
           if (info_n->has_bandwidth) {
+            phdr->has_bandwidth = info_n->has_bandwidth;
+            phdr->bandwidth = info_n->bandwidth;
             proto_tree_add_uint(radio_tree, hf_wlan_radio_11n_bandwidth, tvb, 0, 0,
                      info_n->bandwidth);
           }
@@ -980,6 +1008,8 @@ dissect_wlan_radio_phdr(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, 
           }
 
           if (info_ac->has_bandwidth) {
+            phdr->has_bandwidth = info_ac->has_bandwidth;
+            phdr->bandwidth = info_ac->bandwidth;
             proto_tree_add_uint(radio_tree, hf_wlan_radio_11ac_bandwidth, tvb, 0, 0, info_ac->bandwidth);
             if (info_ac->bandwidth < G_N_ELEMENTS(ieee80211_vht_bw2rate_index))
               bandwidth = ieee80211_vht_bw2rate_index[info_ac->bandwidth];
@@ -1083,6 +1113,9 @@ dissect_wlan_radio_phdr(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, 
         if (info_ax->has_gi && info_ax->has_bwru && info_ax->has_mcs_index) {
           if (info_ax->bwru < HE_SU_MAX_BW) {
             data_rate = ieee80211_he_ofdm_rate(info_ax->nsts,info_ax->mcs,info_ax->bwru,info_ax->gi);
+            phdr->bandwidth = ieee80211_he_su_bandwidth(info_ax->bwru);
+            if (0xFF != phdr->bandwidth)
+              phdr->has_bandwidth = TRUE;
           } else {
             data_rate = ieee80211_he_mu_ofdma_rate(info_ax->nsts,info_ax->mcs,info_ax->bwru,info_ax->gi);
           }
@@ -1111,6 +1144,10 @@ dissect_wlan_radio_phdr(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, 
   if (phdr->has_frequency) {
     col_add_fstr(pinfo->cinfo, COL_FREQ_CHAN, "%u MHz", phdr->frequency);
     proto_tree_add_uint(radio_tree, hf_wlan_radio_frequency, tvb, 0, 0, phdr->frequency);
+  }
+
+  if (phdr->has_bandwidth) {
+    proto_tree_add_uint(radio_tree, hf_wlan_radio_bandwidth, tvb, 0, 0, phdr->bandwidth);
   }
 
   if (phdr->has_signal_percent) {
@@ -1669,6 +1706,10 @@ void proto_register_ieee80211_radio(void)
     {&hf_wlan_radio_frequency,
      {"Frequency", "wlan_radio.frequency", FT_UINT16, BASE_DEC|BASE_UNIT_STRING, &units_mhz, 0,
       "Center frequency of the 802.11 channel that this frame was sent/received on", HFILL }},
+
+    {&hf_wlan_radio_bandwidth,
+     {"Bandwidth", "wlan_radio.bandwidth", FT_UINT32, BASE_DEC, VALS(bandwidth_vals), 0,
+      NULL, HFILL }},
 
     {&hf_wlan_radio_short_preamble,
      {"Short preamble", "wlan_radio.short_preamble", FT_BOOLEAN, BASE_NONE, NULL, 0,
