@@ -68,6 +68,7 @@ static int hf_l2server_ueid = -1;
 static int hf_l2server_beamidx = -1;
 static int hf_l2server_rbtype = -1;
 static int hf_l2server_rbid = -1;
+static int hf_l2server_reestablish_rlc = -1;
 static int hf_l2server_lch = -1;
 static int hf_l2server_ref = -1;
 static int hf_l2server_mui = -1;
@@ -595,6 +596,10 @@ static int hf_l2server_search_space = -1;
 static int hf_l2server_search_space_id = -1;
 
 static int hf_l2server_n1n2 = -1;
+
+static int hf_l2server_scellindex = -1;
+static int hf_l2server_lsucellid = -1;
+
 
 static const value_string lch_vals[] =
 {
@@ -1140,6 +1145,8 @@ static gint ett_l2server_aperiodic = -1;
 static gint ett_l2server_csi_report_freq_config = -1;
 static gint ett_l2server_control_res_set = -1;
 static gint ett_l2server_search_space = -1;
+static gint ett_l2server_scell_list = -1;
+
 
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
@@ -4424,7 +4431,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         proto_tree_add_item_ret_uint(rb_info_tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &rbid);
         offset += 1;
         // reestablishRLC
-        // TODO:
+        proto_tree_add_item(rb_info_tree, hf_l2server_reestablish_rlc, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
         // RbMappingInfo
 
@@ -4498,10 +4505,50 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
     offset += sizeof(nr5g_rlcmac_Cmac_SpCellConfig_t);
 
     // sCellList
-    proto_tree_add_string_format(params_tree, hf_l2server_scell_list, tvb,
-                                 offset, sizeof(nr5g_rlcmac_Cmac_SCellList_t),
-                                 "", "sCell List");
-    offset += sizeof(nr5g_rlcmac_Cmac_SCellList_t);
+    {
+        // subtree
+        proto_item *scell_list_ti = proto_tree_add_string_format(params_tree, hf_l2server_scell_list, tvb,
+                                                              offset, sizeof(nr5g_rlcmac_Cmac_SCellList_t),
+                                                              "", "sCell List");
+        proto_tree *scell_list_tree = proto_item_add_subtree(scell_list_ti, ett_l2server_scell_list);
+
+        guint32 nbSCellCfgAdd;
+        proto_tree_add_item_ret_uint(scell_list_tree, hf_l2server_nb_scell_cfg_add, tvb, offset, 1,
+                                     ENC_LITTLE_ENDIAN, &nbSCellCfgAdd);
+        offset += 1;
+
+        // SCellConfig
+        for (guint n=0; n < nr5g_rlcmac_Com_MaxNumSCells; n++) {
+            if (n <= nbSCellCfgAdd) {
+                // ScellIndex
+                proto_tree_add_item(scell_list_tree, hf_l2server_scellindex, tvb, offset, 1,
+                                    ENC_LITTLE_ENDIAN);
+                offset += 1;
+                // LsuCellId
+                proto_tree_add_item(scell_list_tree, hf_l2server_scellindex, tvb, offset, 1,
+                                    ENC_LITTLE_ENDIAN);
+                offset += 1;
+                // PCMAXc
+                offset += 4;
+                // PCMAXc_SUL
+                offset += 4;
+            }
+            else {
+                offset += sizeof(nr5g_rlcmac_Cmac_SCellConfig_t);
+            }
+        }
+
+        // NumOfScellRel
+        guint32 nbSCellCfgDel;
+        proto_tree_add_item_ret_uint(scell_list_tree, hf_l2server_nb_scell_cfg_del, tvb, offset, 1,
+                                     ENC_LITTLE_ENDIAN, &nbSCellCfgDel);
+        // SCellRel
+        offset += nr5g_rlcmac_Com_MaxNumSCells;
+
+        //offset += sizeof(nr5g_rlcmac_Cmac_SCellList_t);
+    }
+
+    // At the end of params now.
     offset = params_offset + sizeof(nr5g_rlcmac_Cmac_CfgParams_t);
 
     //------------------------------------------------------------------
@@ -6169,6 +6216,9 @@ proto_register_l2server(void)
       { &hf_l2server_rbid,
         { "RbId", "l2server.RbId", FT_UINT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_reestablish_rlc,
+        { "Reestablish RLC", "l2server.reestablish-rlc", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_lch,
         { "Logical Channel Type", "l2server.Lch", FT_UINT32, BASE_DEC,
           VALS(lch_vals), 0x0, NULL, HFILL }},
@@ -7576,6 +7626,14 @@ proto_register_l2server(void)
       { &hf_l2server_n1n2,
         { "NIN2", "l2server.n1n2", FT_BYTES, BASE_NONE,
            NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_scellindex,
+        { "SCellIndex", "l2server.scellindex", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_lsucellid,
+        { "LsuCellId", "l2server.lsucellid", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
     };
 
     static gint *ett[] = {
@@ -7642,7 +7700,8 @@ proto_register_l2server(void)
         &ett_l2server_aperiodic,
         &ett_l2server_csi_report_freq_config,
         &ett_l2server_control_res_set,
-        &ett_l2server_search_space
+        &ett_l2server_search_space,
+        &ett_l2server_scell_list
     };
 
     static ei_register_info ei[] = {
