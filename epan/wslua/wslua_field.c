@@ -487,24 +487,46 @@ WSLUA_FUNCTION wslua_all_field_infos(lua_State* L) {
     the packet that simply aren't being filled in because at this time they're not needed for anything.
     This function only gets what the C-side code has currently populated, not the full list.
     */
-    GPtrArray* found;
+
+#define WSLUA_ARG_all_field_infos_FIELD 1 /* id or filter name of the field that the selection will be limited to. If nil all field infos will be obtained. */
+
+    int argument_count = 0;
+    GPtrArray *found = NULL;
     int items_found = 0;
-    guint i;
+    guint i = 0;
 
     if (! lua_tree || ! lua_tree->tree ) {
         WSLUA_ERROR(wslua_all_field_infos,"Cannot be called outside a listener or dissector");
         return 0;
     }
 
-    found = proto_all_finfos(lua_tree->tree);
+    argument_count = lua_gettop(L);
+
+    if (argument_count == 0) {
+        found = proto_all_finfos(lua_tree->tree);
+    }
+    else if (argument_count == 1) {
+        if (lua_type(L, WSLUA_ARG_all_field_infos_FIELD) == LUA_TNIL) {
+            found = proto_all_finfos(lua_tree->tree);
+        }
+        else if (lua_type(L, WSLUA_ARG_all_field_infos_FIELD) == LUA_TNUMBER) {
+            int id = (int)luaL_checkinteger(L, WSLUA_ARG_all_field_infos_FIELD);
+            found = proto_find_finfo(lua_tree->tree, id);
+        }
+        else {
+            const char* filter_name = luaL_checkstring(L, WSLUA_ARG_all_field_infos_FIELD);
+            int id = proto_registrar_get_id_byname(filter_name);
+            found = proto_find_finfo(lua_tree->tree, id);
+        }
+    }
 
     if (found) {
-        for (i=0; i<found->len; i++) {
-            push_FieldInfo(L, (field_info *)g_ptr_array_index(found,i));
+        for (i = 0; i < found->len; i++) {
+            push_FieldInfo(L, (field_info*)g_ptr_array_index(found, i));
             items_found++;
         }
 
-        g_ptr_array_free(found,TRUE);
+        g_ptr_array_free(found, TRUE);
     }
 
     return items_found;
@@ -651,6 +673,28 @@ WSLUA_CONSTRUCTOR Field_list(lua_State *L) {
     WSLUA_RETURN(1); /* The array table of field filter names */
 }
 
+WSLUA_CONSTRUCTOR Field_get_id(lua_State *L)
+{
+    /* Gets the id of the field with given filter name.
+
+       @since 3.7.1
+     */
+
+#define WSLUA_ARG_Field_get_id_ID 1 /* filter name of the field. */
+
+    const char *filter_name = luaL_checkstring(L, WSLUA_ARG_Field_get_id_ID);
+    int id = proto_registrar_get_id_byname(filter_name);
+
+    if (id < 0) {
+        lua_pushnil(L);
+    }
+    else {
+        lua_pushnumber(L, id);
+    }
+
+    WSLUA_RETURN(1); /* The id of field or nil */
+}
+
 /* the following is used in Field_get_xxx functions later. If called early
  * (wanted_fields is not NULL), it will try to retrieve information directly.
  * Otherwise it uses a cached field that was loaded in lua_prime_all_fields. */
@@ -784,6 +828,7 @@ WSLUA_ATTRIBUTES Field_attributes[] = {
 WSLUA_METHODS Field_methods[] = {
     WSLUA_CLASS_FNREG(Field,new),
     WSLUA_CLASS_FNREG(Field,list),
+    WSLUA_CLASS_FNREG(Field,get_id),
     { NULL, NULL }
 };
 
