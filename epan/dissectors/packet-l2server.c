@@ -653,6 +653,7 @@ static int hf_l2server_pucch_group_hop = -1;
 static int hf_l2server_pucch_hopping_id = -1;
 static int hf_l2server_p0_nom = -1;
 
+static int hf_l2server_ref_sub_car_spacing;
 
 static const value_string lch_vals[] =
 {
@@ -3033,86 +3034,95 @@ static int dissect_codebook_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
 
 // bb_nr5g_BWP_DOWNLINKCOMMONt
 static int dissect_bwp_downlinkcommon(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
-                                      guint offset, const char* label, gboolean serialized _U_)
+                                      guint offset, const char* label, gboolean present, gboolean serialized _U_)
 {
+    gint start_offset = offset;
+
     // Subtree.
     proto_item *bwp_dl_common_ti = proto_tree_add_string(tree, hf_l2server_bwp_dl_common, tvb,
                                                                 offset, sizeof(bb_nr5g_BWP_DOWNLINKCOMMONt),
                                                                 label);
     proto_tree *bwp_dl_common_tree = proto_item_add_subtree(bwp_dl_common_ti, ett_l2server_bwp_dl_common);
 
-    // FieldMask
-    guint32 field_mask_4;
-    proto_tree_add_item_ret_uint(bwp_dl_common_tree, hf_l2server_field_mask_4, tvb, offset, 4,
-                                 ENC_LITTLE_ENDIAN, &field_mask_4);
-    offset += 4;
+    if (present) {
 
-    // GenBwp (bb_nr5g_BWPt)
-    offset = dissect_genbwp(bwp_dl_common_tree, tvb, pinfo, offset);
+        // FieldMask
+        guint32 field_mask_4;
+        proto_tree_add_item_ret_uint(bwp_dl_common_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                     ENC_LITTLE_ENDIAN, &field_mask_4);
+        offset += 4;
 
-    // PdcchConfCommon (bb_nr5g_PDCCH_CONF_COMMONt)
-    if (field_mask_4 & bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDCCH_CFG_PRESENT) {
-        offset = dissect_pdcch_conf_common(bwp_dl_common_tree, tvb, pinfo, offset, FALSE);
-    }
+        // GenBwp (bb_nr5g_BWPt)
+        offset = dissect_genbwp(bwp_dl_common_tree, tvb, pinfo, offset);
 
-    // PdschConfCommon (bb_nr5g_PDSCH_CONF_COMMONt) (apparently present regardless!)
-    if (field_mask_4 & bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDSCH_CFG_PRESENT) {
-        gint pdsch_offset = offset;
-
-        // Subtree.
-        proto_item *pdsch_ti = proto_tree_add_string_format(bwp_dl_common_tree, hf_l2server_bwp_common_pdsch, tvb,
-                                                            offset, 1, "", "PDSCH ");
-        proto_tree *pdsch_tree = proto_item_add_subtree(pdsch_ti, ett_l2server_bwp_common_pdsch);
-
-        // NbPdschAlloc
-        guint32 nb_pdsch_alloc;
-        proto_tree_add_item_ret_uint(pdsch_tree, hf_l2server_nb_pdsch_alloc, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_pdsch_alloc);
-
-        offset += 1;
-
-        // Spare[3]
-        proto_tree_add_item(pdsch_tree, hf_l2server_spare, tvb, offset, 3, ENC_LITTLE_ENDIAN);
-        offset += 3;
-
-        // PdschAlloc (bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt)
-        for (guint n=0; n < bb_nr5g_MAX_NB_DL_ALLOCS; n++) {
-            // Subtree.
-            proto_item *pdsch_alloc_ti = proto_tree_add_string_format(pdsch_tree, hf_l2server_pdsch_alloc, tvb,
-                                                                      offset, sizeof(bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt),
-                                                                      "", "PdschAlloc ");
-            proto_tree *pdsch_alloc_tree = proto_item_add_subtree(pdsch_alloc_ti, ett_l2server_pdsch_alloc);
-
-            if (n < nb_pdsch_alloc) {
-                // K0
-                proto_tree_add_item(pdsch_alloc_tree, hf_l2server_k0, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-                offset += 1;
-                // MappingType
-                proto_tree_add_item(pdsch_alloc_tree, hf_l2server_mapping_type, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-                offset += 1;
-                // StartSymAndLen
-                guint32 start_symbol_and_length;
-                proto_tree_add_item_ret_uint(pdsch_alloc_tree, hf_l2server_start_sym_and_len, tvb, offset, 1, ENC_LITTLE_ENDIAN, &start_symbol_and_length);
-                offset += 1;
-                // Spare
-                proto_tree_add_item(pdsch_alloc_tree, hf_l2server_spare1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-                offset += 1;
-
-                proto_item_append_text(pdsch_alloc_ti, " (StartSymAndLen=%u)", start_symbol_and_length);
-            }
-            else {
-                offset += sizeof(bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt);
-                proto_item_append_text(pdsch_alloc_ti, " (not set)");
-            }
+        // PdcchConfCommon (bb_nr5g_PDCCH_CONF_COMMONt)
+        if (field_mask_4 & bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDCCH_CFG_PRESENT) {
+            offset = dissect_pdcch_conf_common(bwp_dl_common_tree, tvb, pinfo, offset, FALSE);
         }
-        proto_item_set_len(pdsch_ti, offset-pdsch_offset);
+
+        // PdschConfCommon (bb_nr5g_PDSCH_CONF_COMMONt) (apparently present regardless!)
+        if (field_mask_4 & bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDSCH_CFG_PRESENT) {
+            gint pdsch_offset = offset;
+
+            // Subtree.
+            proto_item *pdsch_ti = proto_tree_add_string_format(bwp_dl_common_tree, hf_l2server_bwp_common_pdsch, tvb,
+                                                                offset, 1, "", "PDSCH ");
+            proto_tree *pdsch_tree = proto_item_add_subtree(pdsch_ti, ett_l2server_bwp_common_pdsch);
+
+            // NbPdschAlloc
+            guint32 nb_pdsch_alloc;
+            proto_tree_add_item_ret_uint(pdsch_tree, hf_l2server_nb_pdsch_alloc, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_pdsch_alloc);
+
+            offset += 1;
+
+            // Spare[3]
+            proto_tree_add_item(pdsch_tree, hf_l2server_spare, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+            offset += 3;
+
+            // PdschAlloc (bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt)
+            for (guint n=0; n < bb_nr5g_MAX_NB_DL_ALLOCS; n++) {
+                // Subtree.
+                proto_item *pdsch_alloc_ti = proto_tree_add_string_format(pdsch_tree, hf_l2server_pdsch_alloc, tvb,
+                                                                          offset, sizeof(bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt),
+                                                                          "", "PdschAlloc ");
+                proto_tree *pdsch_alloc_tree = proto_item_add_subtree(pdsch_alloc_ti, ett_l2server_pdsch_alloc);
+
+                if (n < nb_pdsch_alloc) {
+                    // K0
+                    proto_tree_add_item(pdsch_alloc_tree, hf_l2server_k0, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+                    offset += 1;
+                    // MappingType
+                    proto_tree_add_item(pdsch_alloc_tree, hf_l2server_mapping_type, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+                    offset += 1;
+                    // StartSymAndLen
+                    guint32 start_symbol_and_length;
+                    proto_tree_add_item_ret_uint(pdsch_alloc_tree, hf_l2server_start_sym_and_len, tvb, offset, 1, ENC_LITTLE_ENDIAN, &start_symbol_and_length);
+                    offset += 1;
+                    // Spare
+                    proto_tree_add_item(pdsch_alloc_tree, hf_l2server_spare1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+                    offset += 1;
+
+                    proto_item_append_text(pdsch_alloc_ti, " (StartSymAndLen=%u)", start_symbol_and_length);
+                }
+                else {
+                    offset += sizeof(bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt);
+                    proto_item_append_text(pdsch_alloc_ti, " (not set)");
+                }
+            }
+            proto_item_set_len(pdsch_ti, offset-pdsch_offset);
+        }
     }
+    else {
+        offset += sizeof(bb_nr5g_BWP_DOWNLINKCOMMONt);
+    }
+
+    proto_item_set_len(bwp_dl_common_ti, offset-start_offset);
 
     return offset;
 }
 
 // bb_nr5g_BWP_DOWNLINKt
-static int dissect_bwp_downlink(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
-                                   guint offset)
+static int dissect_bwp_downlink(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset)
 {
     guint start_offset = offset;
 
@@ -3136,7 +3146,7 @@ static int dissect_bwp_downlink(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
 
     // BwpDLCommon (bb_nr5g_BWP_DOWNLINKCOMMONt)
     if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_CFG_PRESENT) {
-        offset = dissect_bwp_downlinkcommon(config_tree, tvb, pinfo, offset, "BWP DL Common", FALSE);
+        offset = dissect_bwp_downlinkcommon(config_tree, tvb, pinfo, offset, "BWP DL Common", TRUE, FALSE);
     }
 
     // BwpDLDed
@@ -4394,7 +4404,8 @@ static int dissect_pucch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_inf
 
 // bb_nr5g_BWP_UPLINKCOMMONt (from bb-nr5g_struct.h)
 static int dissect_bwp_uplinkcommon(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
-                                    guint offset, const char *label, gboolean serialize _U_)
+                                    guint offset, const char *label,
+                                    gboolean present, gboolean serialize _U_)
 {
     gint ul_bwp_start = offset;
 
@@ -4404,35 +4415,105 @@ static int dissect_bwp_uplinkcommon(proto_tree *tree, tvbuff_t *tvb, packet_info
                                                           label);
     proto_tree *ul_bwp_tree = proto_item_add_subtree(ul_bwp_ti, ett_l2server_initial_ul_bwp);
 
-    // FieldMask
-    guint32 init_ul_bwp_fieldmask;
-    proto_tree_add_item_ret_uint(ul_bwp_tree, hf_l2server_field_mask_4, tvb, offset, 4,
-                                 ENC_LITTLE_ENDIAN, &init_ul_bwp_fieldmask);
-    offset += 4;
-    // UseInterlacePUCCH_PUSCH_r16
-    offset += 1;
-    // Pad[3]
-    proto_tree_add_item(ul_bwp_tree, hf_l2server_pad, tvb, offset, 3, ENC_LITTLE_ENDIAN);
-    offset += 3;
+    if (present) {
 
-    // GenBwp (bb_nr5g_BWPt)
-    offset = dissect_genbwp(ul_bwp_tree, tvb, pinfo, offset);
+        // FieldMask
+        guint32 init_ul_bwp_fieldmask;
+        proto_tree_add_item_ret_uint(ul_bwp_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                     ENC_LITTLE_ENDIAN, &init_ul_bwp_fieldmask);
+        offset += 4;
+        // UseInterlacePUCCH_PUSCH_r16
+        offset += 1;
+        // Pad[3]
+        proto_tree_add_item(ul_bwp_tree, hf_l2server_pad, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+        offset += 3;
 
-    // Serialize just writes all of these..
+        // GenBwp (bb_nr5g_BWPt)
+        offset = dissect_genbwp(ul_bwp_tree, tvb, pinfo, offset);
 
-    // RachCfgCommon (bb_nr5g_RACH_CONF_COMMONt)
-    offset = dissect_rach_conf_common(ul_bwp_tree, tvb, pinfo, offset);
+        // Serialize just writes all of these..
 
-    // PuschCfgCommon (tm_bb_nr5g_PUSCH_CONF_COMMONt)
-    offset = dissect_pusch_conf_common(ul_bwp_tree, tvb, pinfo, offset);
+        // RachCfgCommon (bb_nr5g_RACH_CONF_COMMONt)
+        offset = dissect_rach_conf_common(ul_bwp_tree, tvb, pinfo, offset);
 
-    // PucchCfgCommon (bb_nr5g_PUCCH_CONF_COMMONt)
-    offset = dissect_pucch_conf_common(ul_bwp_tree, tvb, pinfo, offset);
+        // PuschCfgCommon (tm_bb_nr5g_PUSCH_CONF_COMMONt)
+        offset = dissect_pusch_conf_common(ul_bwp_tree, tvb, pinfo, offset);
+
+        // PucchCfgCommon (bb_nr5g_PUCCH_CONF_COMMONt)
+        offset = dissect_pucch_conf_common(ul_bwp_tree, tvb, pinfo, offset);
+    }
+    else {
+        offset += sizeof(bb_nr5g_BWP_UPLINKCOMMONt);
+        proto_item_append_text(ul_bwp_ti, " (not set)");
+    }
 
     proto_item_set_len(ul_bwp_ti, offset-ul_bwp_start);
 
     return offset;
 }
+
+
+// bb_nr5g_FREQINFO_ULt (from bb-nr5g_struct.h)
+static int dissect_freqinfo_ul(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                               guint offset, const char *label, gboolean present, gboolean serialize _U_)
+{
+    gint freq_info_ul_offset = offset;
+
+    // Subtree.
+    proto_item *freq_info_ul_common_ti = proto_tree_add_string(tree, hf_l2server_freq_info_ul_common, tvb,
+                                                               offset, sizeof(bb_nr5g_FREQINFO_ULt),
+                                                               label);
+    proto_tree *freq_info_ul_common_tree = proto_item_add_subtree(freq_info_ul_common_ti, ett_l2server_freq_info_ul_common);
+
+    if (present) {
+        // AbsFreqPointA
+        proto_tree_add_item(freq_info_ul_common_ti, hf_l2server_abs_freq_point_a, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+        // AddSpectrumEmission
+        proto_tree_add_item(freq_info_ul_common_ti, hf_l2server_add_spectrum_emission, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // FreqShift7p5khz
+        proto_tree_add_item(freq_info_ul_common_ti, hf_l2server_freq_shift_7p5khz, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // PMax
+        proto_tree_add_item(freq_info_ul_common_ti, hf_l2server_pmax, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // NbFreqBandList
+        guint32 nb_freq_band_list;
+        proto_tree_add_item_ret_uint(freq_info_ul_common_ti, hf_l2server_nb_freq_band_list, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_freq_band_list);
+        offset += 1;
+        // NbScsSpecCarrier
+        gint32 nb_scs_spec_carrier;
+        proto_tree_add_item_ret_int(freq_info_ul_common_ti, hf_l2server_nb_scs_spec_carrier, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_scs_spec_carrier);
+        offset += 1;
+        // Spare[3]
+        proto_tree_add_item(freq_info_ul_common_tree, hf_l2server_spare, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+        offset += 3;
+
+        // FreqBandList
+        for (guint n=0; n < bb_nr5g_MAX_NB_MULTIBANDS; n++) {
+            proto_item *ti = proto_tree_add_item(freq_info_ul_common_ti, hf_l2server_freq_band, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+            if (n >= nb_freq_band_list) {
+                proto_item_append_text(ti, " (not set)");
+            }
+            offset += 2;
+        }
+
+        // ScsSpecCarrier
+        for (gint n=0; n < bb_nr5g_MAX_SCS; n++) {
+            offset = dissect_scs_spec_carrier(freq_info_ul_common_tree, tvb, pinfo, offset, n<nb_scs_spec_carrier);
+        }
+    }
+    else {
+        proto_item_append_text(freq_info_ul_common_ti, " (not set)");
+        offset += sizeof(bb_nr5g_FREQINFO_ULt);
+    }
+
+    proto_item_set_len(freq_info_ul_common_ti, offset-freq_info_ul_offset);
+
+    return offset;
+}
+
 
 // bb_nr5g_SERV_CELL_CONFIG_COMMONt (from bb-nr5g_struct.h)
 static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -4509,7 +4590,7 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
         // Subtree.
         proto_item *freq_ti = proto_tree_add_string_format(config_tree, hf_l2server_freq_info_dl, tvb,
                                                            offset, 0,
-                                                           "", "Freq Info DL ");
+                                                           "", "Freq Info DL");
         proto_tree *freq_tree = proto_item_add_subtree(freq_ti, ett_l2server_freq_info_dl);
 
         if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_DL_COMMON_PRESENT) {
@@ -4557,111 +4638,93 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
         proto_item_set_len(freq_ti, offset-freq_info_dl_start);
     }
 
-    // InitDLBWP (bb_nr5g_BWP_DOWNLINKCOMMONt). Is serialized, but obviously not for mac_config..
-    if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_DL_COMMON_PRESENT) {
-        offset = dissect_bwp_downlinkcommon(config_tree, tvb, pinfo, offset, "INIT DL BWP Common", FALSE);
+    // InitDLBWP (bb_nr5g_BWP_DOWNLINKCOMMONt).
+    if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_DL_COMMON_PRESENT)) {
+        offset = dissect_bwp_downlinkcommon(config_tree, tvb, pinfo, offset, "INIT DL BWP Common",
+                                            fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_DL_COMMON_PRESENT,
+                                            serialize);
     }
 
     // FreqInfoUL (bb_nr5g_FREQINFO_ULt). Just memcpy'd by serialization.
-    if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_UL_COMMON_PRESENT) {
-        gint pdsch_offset = offset;
-
-        proto_item *freq_info_ul_common_ti = proto_tree_add_string_format(config_tree, hf_l2server_freq_info_ul_common, tvb,
-                                                                         offset, sizeof(bb_nr5g_FREQINFO_ULt),
-                                                                         "", "Freq Info UL Common");
-        proto_tree *freq_info_ul_common_tree = proto_item_add_subtree(freq_info_ul_common_ti, ett_l2server_freq_info_ul_common);
-
-        // AbsFreqPointA
-        proto_tree_add_item(freq_info_ul_common_ti, hf_l2server_abs_freq_point_a, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-        offset += 4;
-        // AddSpectrumEmission
-        proto_tree_add_item(freq_info_ul_common_ti, hf_l2server_add_spectrum_emission, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-        offset += 1;
-        // FreqShift7p5khz
-        proto_tree_add_item(freq_info_ul_common_ti, hf_l2server_freq_shift_7p5khz, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-        offset += 1;
-        // PMax
-        proto_tree_add_item(freq_info_ul_common_ti, hf_l2server_pmax, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-        offset += 1;
-        // NbFreqBandList
-        guint32 nb_freq_band_list;
-        proto_tree_add_item_ret_uint(freq_info_ul_common_ti, hf_l2server_nb_freq_band_list, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_freq_band_list);
-        offset += 1;
-        // NbScsSpecCarrier
-        gint32 nb_scs_spec_carrier;
-        proto_tree_add_item_ret_int(freq_info_ul_common_ti, hf_l2server_nb_scs_spec_carrier, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_scs_spec_carrier);
-        offset += 1;
-        // Spare[3]
-        proto_tree_add_item(freq_info_ul_common_tree, hf_l2server_spare, tvb, offset, 3, ENC_LITTLE_ENDIAN);
-        offset += 3;
-
-        // FreqBandList
-        for (guint n=0; n < bb_nr5g_MAX_NB_MULTIBANDS; n++) {
-            proto_item *ti = proto_tree_add_item(freq_info_ul_common_ti, hf_l2server_freq_band, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-            if (n >= nb_freq_band_list) {
-                proto_item_append_text(ti, " (not set)");
-            }
-            offset += 2;
-        }
-
-        // ScsSpecCarrier
-        for (gint n=0; n < bb_nr5g_MAX_SCS; n++) {
-            offset = dissect_scs_spec_carrier(freq_info_ul_common_tree, tvb, pinfo, offset, n<nb_scs_spec_carrier);
-        }
-
-        proto_item_set_len(freq_info_ul_common_ti, offset-pdsch_offset);
+    if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_UL_COMMON_PRESENT)) {
+        offset = dissect_freqinfo_ul(config_tree, tvb, pinfo, offset,
+                                     "Freq Info UL Common",
+                                     fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_UL_COMMON_PRESENT,
+                                     serialize);
     }
 
     // InitULBWP (bb_nr5g_BWP_UPLINKCOMMONt)
-    if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_UL_COMMON_PRESENT) {
+    if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_UL_COMMON_PRESENT)) {
         offset = dissect_bwp_uplinkcommon(config_tree, tvb, pinfo, offset,
-                                          "Initial UL BWP", serialize);
+                                          "Initial UL BWP",
+                                          fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_UL_COMMON_PRESENT,
+                                          serialize);
     }
 
     // FreqInfoSUL (bb_nr5g_FREQINFO_ULt)
-    if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_SUL_COMMON_PRESENT) {
-        proto_item *freq_info_sul_common_ti = proto_tree_add_string_format(config_tree, hf_l2server_freq_info_sul_common, tvb,
-                                                                           offset, sizeof(bb_nr5g_FREQINFO_ULt),
-                                                                           "", "Freq Info SUL Common");
-        proto_tree *freq_info_sul_common_tree = proto_item_add_subtree(freq_info_sul_common_ti, ett_l2server_freq_info_sul_common);
-        printf("tree at %p\n", freq_info_sul_common_tree);
-
-        // TODO:
-        offset += sizeof(bb_nr5g_FREQINFO_ULt);
+    if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_SUL_COMMON_PRESENT)) {
+        offset = dissect_freqinfo_ul(config_tree, tvb, pinfo, offset,
+                                     "Freq Info SUL Common",
+                                     fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_SUL_COMMON_PRESENT,
+                                     serialize);
     }
 
     // InitSULBWP (bb_nr5g_BWP_UPLINKCOMMONt)
-    if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_SUL_COMMON_PRESENT) {
+    if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_SUL_COMMON_PRESENT)) {
         offset = dissect_bwp_uplinkcommon(config_tree, tvb, pinfo, offset,
-                                          "Initial BWP SUL Common", serialize);
+                                          "Initial BWP SUL Common",
+                                          fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_SUL_COMMON_PRESENT,
+                                          serialize);
     }
 
     // TddDlUlConfCommon (bb_nr5g_TDD_UL_DL_CONFIG_COMMONt)
-    if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_TDD_COMMON_PRESENT) {
+    if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_TDD_COMMON_PRESENT)) {
+        gint tdd_offset = offset;
+
         proto_item *tdd_ti = proto_tree_add_string_format(config_tree, hf_l2server_tdd_common, tvb,
-                                                          offset, sizeof(bb_nr5g_TDD_UL_DL_CONFIG_COMMONt),
+                                                          offset, 1,
                                                           "", "TDD DL UL Config Common");
         proto_tree *tdd_tree = proto_item_add_subtree(tdd_ti, ett_l2server_tdd_common);
-        printf("tree at %p\n", tdd_tree);
 
-        // TODO:
-        offset += sizeof(bb_nr5g_TDD_UL_DL_CONFIG_COMMONt);
+        // RefSubCarSpacing
+        proto_tree_add_item(tdd_tree, hf_l2server_ref_sub_car_spacing, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // Pad
+        proto_tree_add_item(tdd_tree, hf_l2server_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // FieldMask
+        guint32 tdd_fieldmask;
+        proto_tree_add_item_ret_uint(tdd_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                     ENC_LITTLE_ENDIAN, &tdd_fieldmask);
+
+        // Pattern1
+        if (!serialize || (tdd_fieldmask & bb_nr5g_STRUCT_TDD_UL_DL_CONFIG_COMMON_PATT1_PRESENT)) {
+            offset += sizeof(bb_nr5g_TDD_UL_DL_PATTERNt);
+        }
+
+        // Pattern2
+        if (!serialize || (tdd_fieldmask & bb_nr5g_STRUCT_TDD_UL_DL_CONFIG_COMMON_PATT2_PRESENT)) {
+            offset += sizeof(bb_nr5g_TDD_UL_DL_PATTERNt);
+        }
+
+        proto_item_set_len(tdd_ti, offset-tdd_offset);
     }
 
     // RateMatchPatternToDel
+    offset += (bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS * 1);
     // RateMatchPatternToAddMod
+    offset += (bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS * sizeof(bb_nr5g_RATE_MATCH_PATTERNt));
 
     // LteCrsToMatchAround
-    if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_COMMON_TOMATCHAROUND_PRESENT) {
-        // TODO
+    if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_COMMON_TOMATCHAROUND_PRESENT)) {
+        offset += sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt);
     }
     // HighSpeedConfig_r16
-    if (fieldmask & bb_nr5g_STRUCT_HIGH_SPEED_CONFIG_R16_PRESENT) {
-        // TODO
+    if (!serialize || (fieldmask & bb_nr5g_STRUCT_HIGH_SPEED_CONFIG_R16_PRESENT)) {
+        offset += sizeof(bb_nr5g_HIGH_SPEED_CONFIG_R16t);
     }
 
     proto_item_set_len(config_ti, offset-start_offset);
-
     return offset;
 }
 
@@ -8123,6 +8186,10 @@ proto_register_l2server(void)
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_p0_nom,
        { "P0-nom", "l2server.p0-nom", FT_UINT16, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ref_sub_car_spacing,
+       { "Ref Sub Carrier Spacing", "l2server.ref-sub-car-spacing", FT_INT8, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
     };
 
