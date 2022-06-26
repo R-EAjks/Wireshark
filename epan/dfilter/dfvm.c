@@ -661,7 +661,7 @@ GSList *
 filter_refs_fvalues(GPtrArray *refs_array, drange_t *range)
 {
 	int length; /* maximum proto layer number. The numbers are sequential. */
-	df_reference_t *last_ref, *ref;
+	df_reference_t *last_ref, *ref = NULL;
 	int cookie = -1;
 	gboolean cookie_matches = false;
 	int layer;
@@ -672,7 +672,7 @@ filter_refs_fvalues(GPtrArray *refs_array, drange_t *range)
 	length = last_ref->proto_layer_num;
 
 	for (guint i = 0; i < refs_array->len; i++) {
-		if (range == NULL) {
+		if (range == NULL && ref != NULL) {
 			fvalues = g_slist_prepend(fvalues, fvalue_dup(ref->value));
 			continue;
 		}
