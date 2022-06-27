@@ -1024,7 +1024,11 @@ dissect_eap_identity_wlan(tvbuff_t *tvb, packet_info* pinfo, proto_tree* tree, i
     /* EAP identities do not always equate to IMSIs.  We should
      * still add the MCC and MNC values for non-permanent EAP
      * identities. */
-    if (!sscanf(realm_tokens[2] + 3, "%u", &mnc) || !sscanf(realm_tokens[3] + 3, "%u", &mcc)) {
+    if (nrealm_tokens < 4 ||
+        strlen(realm_tokens[2]) < 3 ||
+        !sscanf(realm_tokens[2] + 3, "%u", &mnc) ||
+        strlen(realm_tokens[3]) < 3 ||
+        !sscanf(realm_tokens[3] + 3, "%u", &mcc)) {
       ret = FALSE;
       goto end;
     }
