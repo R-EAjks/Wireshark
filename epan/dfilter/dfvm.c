@@ -672,13 +672,14 @@ filter_refs_fvalues(GPtrArray *refs_array, drange_t *range)
 	length = last_ref->proto_layer_num;
 
 	for (guint i = 0; i < refs_array->len; i++) {
+		ref = refs_array->pdata[i];
+		layer = ref->proto_layer_num;
+
 		if (range == NULL) {
 			fvalues = g_slist_prepend(fvalues, fvalue_dup(ref->value));
 			continue;
 		}
 
-		ref = refs_array->pdata[i];
-		layer = ref->proto_layer_num;
 		if (cookie == layer) {
 			if (cookie_matches) {
 				fvalues = g_slist_prepend(fvalues, fvalue_dup(ref->value));
