@@ -4386,7 +4386,7 @@ static int dissect_pucch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_inf
 
     // Subtree.
     proto_item *pucch_ti = proto_tree_add_string_format(tree, hf_l2server_pucch_common   , tvb,
-                                                       offset, sizeof(bb_nr5g_PUCCH_CONF_COMMONt), "", "PUSCH_CONF_COMMON");
+                                                       offset, sizeof(bb_nr5g_PUCCH_CONF_COMMONt), "", "PUCCH_CONF_COMMON");
     proto_tree *pucch_tree = proto_item_add_subtree(pucch_ti, ett_l2server_pucch_common);
 
     // PucchResCommon
@@ -4724,10 +4724,12 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
 
     // LteCrsToMatchAround
     if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_COMMON_TOMATCHAROUND_PRESENT)) {
+        // TODO:
         offset += sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt);
     }
     // HighSpeedConfig_r16
     if (!serialize || (fieldmask & bb_nr5g_STRUCT_HIGH_SPEED_CONFIG_R16_PRESENT)) {
+        // TODO:
         offset += sizeof(bb_nr5g_HIGH_SPEED_CONFIG_R16t);
     }
 
@@ -5002,10 +5004,16 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
     //-----------------------------------------------------------------
 
 
-    // mac_CellGroupConfig
+    // mac_CellGroupConfig (nr5g_rlcmac_Cmac_MAC_CellGroupConfig_t)
     proto_tree_add_string_format(params_tree, hf_l2server_mac_cell_group_config, tvb,
                                  offset, sizeof(nr5g_rlcmac_Cmac_MAC_CellGroupConfig_t),
                                  "", "MAC Cell Group Config");
+    // TODO: dissect
+    // bsr_Config
+    // tag_Config
+    // phr_Config
+    // Sr_Config
+    // etc
     offset += sizeof(nr5g_rlcmac_Cmac_MAC_CellGroupConfig_t);
 
     // spCellConfig
@@ -8187,7 +8195,7 @@ proto_register_l2server(void)
        { "PUCCH Common", "l2server.pucch-common", FT_STRING, BASE_NONE,
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_pucch_res_common,
-       { "PUCCH Res Common", "l2server.pucch-res-common", FT_UINT8, BASE_DEC,
+       { "PUCCH Res Common", "l2server.pucch-res-common", FT_INT8, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_pucch_group_hop,
        { "PUCCH Group Hop", "l2server.pucch-group-hop", FT_UINT8, BASE_DEC,
