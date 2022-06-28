@@ -366,6 +366,8 @@ static int hf_l2server_ul_earfcn_1 = -1;
 static int hf_l2server_ssb_arfcn = -1;
 static int hf_l2server_num_dbeam = -1;
 
+static int hf_l2server_ppu = -1;
+
 static int hf_l2server_ul_cell_cfg_ded = -1;
 static int hf_l2server_ul_cell_cfg_ded_len = -1;
 static int hf_l2server_first_active_ul_bwp = -1;
@@ -1386,14 +1388,17 @@ static void dissect_cell_parm_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *
     offset += 4;
 
     /* NumDbeam */
-    proto_tree_add_item(tree, hf_l2server_num_dbeam, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    gint32 num_dbeams;
+    proto_tree_add_item_ret_int(tree, hf_l2server_num_dbeam, tvb, offset, 4, ENC_LITTLE_ENDIAN, &num_dbeams);
     offset += 4;
-    /* Dbeam */
-    for (int n=0; n < nr5g_MaxDbeam; n++) {
-        /* TODO: */
+    /* Dbeam[nr5g_MaxDbeam] */
+    for (int n=0; n < num_dbeams; n++) {
+        /* TODO: subtree? */
         /* Ppu (comgen_qnxPPUIDt from qnx_gen.h)*/
+        proto_tree_add_item(tree, hf_l2server_ppu, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         /* DbeamId */
-        offset += 2;
+        proto_tree_add_item(tree, hf_l2server_dbeamid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
     }
 }
 
@@ -2289,6 +2294,7 @@ static guint dissect_rlcmac_cmac_ra_info_empty(proto_tree *tree, tvbuff_t *tvb, 
 }
 
 // bb_nr5g_PH_CELL_GROUP_CONFIGt (from bb-nr5g_struct.h)
+// N.B. Not changed by serialization.
 static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset)
 {
@@ -2421,8 +2427,9 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
 }
 
 // bb_nr5g_BWP_DOWNLINKDEDICATEDt from bb-nr5g_struct.h
+// TODO: think it needs serialization flag...
 static int dissect_bwp_dl_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
-                                    guint offset, const char *title)
+                                    guint offset, const char *title, gboolean serialized _U_)
 {
     guint start_offset = offset;
 
@@ -3908,7 +3915,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
 
         // InitialDlBwp
         if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_INITIAL_DL_BWP_PRESENT) {
-            offset = dissect_bwp_dl_dedicated(ded_tree, tvb, pinfo, offset, "Initial DL BWP");
+            offset = dissect_bwp_dl_dedicated(ded_tree, tvb, pinfo, offset, "Initial DL BWP", TRUE);
         }
         // PdschServingCellCfg
         if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDSCH_PRESENT) {
@@ -7444,6 +7451,10 @@ proto_register_l2server(void)
       { &hf_l2server_num_dbeam,
         { "Num Dbeam", "l2server.num-dbeam", FT_INT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ppu,
+        { "PPU", "l2server.ppu", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
 
       { &hf_l2server_ul_cell_cfg_ded,
         { "UL Cell Cfg Dedicated", "l2server.ul-cell-cfg-ded", FT_STRING, BASE_NONE,
@@ -8028,7 +8039,7 @@ proto_register_l2server(void)
         { "Interleave Size", "l2server.interleave-size", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_shift_index,
-        { "Shift Index", "l2server.shift-index", FT_UINT16, BASE_DEC,
+        { "Shift Index", "l2server.shift-index", FT_INT16, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_freq_dom_res,
         { "Freq Dom Res", "l2server.freq-dom-res", FT_UINT64, BASE_HEX,
