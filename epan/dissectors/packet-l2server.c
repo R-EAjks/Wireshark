@@ -657,6 +657,23 @@ static int hf_l2server_p0_nom = -1;
 
 static int hf_l2server_ref_sub_car_spacing;
 
+static int hf_l2server_ho_flag = -1;
+
+static int hf_l2server_sr_config = -1;
+static int hf_l2server_n_sr_to_add = -1;
+static int hf_l2server_sr = -1;
+static int hf_l2server_sr_config_index = -1;
+static int hf_l2server_sr_prohibit_timer = -1;
+static int hf_l2server_sr_transmax = -1;
+static int hf_l2server_n_sr_to_del = -1;
+static int hf_l2server_sr_to_del = -1;
+
+static int hf_l2server_bsr_config = -1;
+static int hf_l2server_tag_config = -1;
+static int hf_l2server_phr_config = -1;
+
+
+
 static const value_string lch_vals[] =
 {
     { 0x0,   "SPARE" },
@@ -1209,6 +1226,11 @@ static gint ett_l2server_genbwp = -1;
 static gint ett_l2server_pusch_common = -1;
 static gint ett_l2server_pusch_time_domain_res_alloc = -1;
 static gint ett_l2server_pucch_common = -1;
+static gint ett_l2server_sr_config = -1;
+static gint ett_l2server_sr = -1;
+static gint ett_l2server_bsr_config = -1;
+static gint ett_l2server_tag_config = -1;
+static gint ett_l2server_phr_config = -1;
 
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
@@ -4871,6 +4893,115 @@ static int dissect_rlcmac_drx_config(proto_tree *tree, tvbuff_t *tvb, packet_inf
     return start_offset + sizeof(nr5g_rlcmac_Cmac_DRX_CONFIGt);
 }
 
+// nr5g_rlcmac_Cmac_SR_Configuration_t
+static guint dissect_sr_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                               guint offset _U_)
+{
+    // Subtree.
+    proto_item *sr_config_ti = proto_tree_add_string_format(tree, hf_l2server_sr_config, tvb,
+                                                            offset, sizeof(nr5g_rlcmac_Cmac_SR_Configuration_t),
+                                                            "", "SR Config");
+    proto_tree *sr_config_tree = proto_item_add_subtree(sr_config_ti, ett_l2server_sr_config);
+
+    // NSrToAdd
+    guint32 n_sr_to_add;
+    proto_tree_add_item_ret_uint(sr_config_tree, hf_l2server_n_sr_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &n_sr_to_add);
+    offset += 1;
+    // SrToAdd
+    for (guint n=0; n < nr5g_rlcmac_Cmac_SR_MAX; n++) {
+        // Subtree.
+        proto_item *sr_ti = proto_tree_add_string_format(sr_config_tree, hf_l2server_sr, tvb,
+                                                         offset, sizeof(schedulingRequestToAdd),
+                                                         "", "SR");
+        proto_tree *sr_tree = proto_item_add_subtree(sr_ti, ett_l2server_sr);
+
+        if (n < n_sr_to_add) {
+            // srConfigIndex
+            guint32 sr_config_index;
+            proto_tree_add_item_ret_uint(sr_tree, hf_l2server_sr_config_index, tvb, offset, 1, ENC_LITTLE_ENDIAN, &sr_config_index);
+            offset += 1;
+            // srProhibitTimer
+            guint32 sr_prohibit_timer;
+            proto_tree_add_item_ret_uint(sr_tree, hf_l2server_sr_prohibit_timer, tvb, offset, 1, ENC_LITTLE_ENDIAN, &sr_prohibit_timer);
+            offset += 1;
+            // srTransMax
+            guint32 sr_transmax;
+            proto_tree_add_item_ret_uint(sr_tree, hf_l2server_sr_transmax, tvb, offset, 1, ENC_LITTLE_ENDIAN, &sr_transmax);
+            offset += 1;
+
+            // Summary
+            proto_item_append_text(sr_ti, " (srConfigIndex=%u, srProhibitTimer=%u, srTransMax=%u)",
+                                   sr_config_index, sr_prohibit_timer, sr_transmax);
+        }
+        else {
+            offset += sizeof(schedulingRequestToAdd);
+            proto_item_append_text(sr_ti, " (not set)");
+        }
+    }
+
+    // NSrToDel
+    guint32 n_sr_to_del;
+    proto_tree_add_item_ret_uint(sr_config_tree, hf_l2server_n_sr_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &n_sr_to_del);
+    offset += 1;
+    // SrToDel
+    for (guint n=0; n < nr5g_rlcmac_Cmac_SR_MAX; n++) {
+        proto_item *ti = proto_tree_add_item(sr_config_tree, hf_l2server_n_sr_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+
+        if (n >= n_sr_to_del) {
+            proto_item_append_text(ti, " (not set)");
+        }
+    }
+
+    proto_item_append_text(sr_config_ti, " (%u added, %u deleted)", n_sr_to_add, n_sr_to_del);
+    return offset;
+}
+
+// nr5g_rlcmac_Cmac_BSR_Configuration_t
+static guint dissect_bsr_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset _U_)
+{
+    // Subtree.
+    proto_item *bsr_config_ti = proto_tree_add_string_format(tree, hf_l2server_bsr_config, tvb,
+                                                            offset, 0,
+                                                            "", "BSR Config");
+    //proto_tree *bsr_config_tree = proto_item_add_subtree(bsr_config_ti, ett_l2server_bsr_config);
+
+    offset += sizeof(nr5g_rlcmac_Cmac_BSR_Configuration_t);
+    proto_item_set_len(bsr_config_ti, sizeof(nr5g_rlcmac_Cmac_BSR_Configuration_t));
+    return offset;
+}
+
+// nr5g_rlcmac_Cmac_TAG_Configuration_t
+static guint dissect_tag_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset _U_)
+{
+    // Subtree.
+    proto_item *tag_config_ti = proto_tree_add_string_format(tree, hf_l2server_tag_config, tvb,
+                                                            offset, 0,
+                                                            "", "TAG Config");
+    //proto_tree *tag_config_tree = proto_item_add_subtree(tag_config_ti, ett_l2server_tag_config);
+
+    offset += sizeof(nr5g_rlcmac_Cmac_TAG_Configuration_t);
+    proto_item_set_len(tag_config_ti, sizeof(nr5g_rlcmac_Cmac_TAG_Configuration_t));
+    return offset;
+}
+
+// nr5g_rlcmac_Cmac_PHR_Config_t
+static guint dissect_phr_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset _U_)
+{
+    // Subtree.
+    proto_item *phr_config_ti = proto_tree_add_string_format(tree, hf_l2server_phr_config, tvb,
+                                                            offset, 0,
+                                                            "", "PHR Config");
+    //proto_tree *phr_config_tree = proto_item_add_subtree(phr_config_ti, ett_l2server_phr_config);
+
+    offset += sizeof(nr5g_rlcmac_Cmac_PHR_Config_t);
+    proto_item_set_len(phr_config_ti, sizeof(nr5g_rlcmac_Cmac_PHR_Config_t));
+    return offset;
+}
+
 
 // Type is nr5g_rlcmac_Cmac_CONFIG_CMD_t from nr5g-rlcmac_Cmac.h
 static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -5004,17 +5135,32 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
     //-----------------------------------------------------------------
 
 
-    // mac_CellGroupConfig (nr5g_rlcmac_Cmac_MAC_CellGroupConfig_t)
-    proto_tree_add_string_format(params_tree, hf_l2server_mac_cell_group_config, tvb,
-                                 offset, sizeof(nr5g_rlcmac_Cmac_MAC_CellGroupConfig_t),
-                                 "", "MAC Cell Group Config");
-    // TODO: dissect
-    // bsr_Config
-    // tag_Config
-    // phr_Config
-    // Sr_Config
-    // etc
-    offset += sizeof(nr5g_rlcmac_Cmac_MAC_CellGroupConfig_t);
+    // mac_CellGroupConfig (nr5g_rlcmac_Cmac_MAC_CellGroupConfig_t from nr5g-rlcmac_Cmac.h)
+    {
+        // Subtree.
+        proto_item *mac_cgc_ti = proto_tree_add_string_format(params_tree, hf_l2server_mac_cell_group_config, tvb,
+                                                              offset, sizeof(nr5g_rlcmac_Cmac_MAC_CellGroupConfig_t),
+                                                              "", "MAC Cell Group Config");
+        proto_tree *mac_cgc_tree = proto_item_add_subtree(mac_cgc_ti, ett_l2server_mac_cell_group_config);
+
+        // bsr_Config
+        offset = dissect_bsr_config(mac_cgc_tree, tvb, pinfo, offset);
+        // tag_Config
+        offset = dissect_tag_config(mac_cgc_tree, tvb, pinfo, offset);
+        // phr_Config
+        offset = dissect_phr_config(mac_cgc_tree, tvb, pinfo, offset);
+        // Sr_Config (nr5g_rlcmac_Cmac_SR_Configuration_t)
+        offset = dissect_sr_config(mac_cgc_tree, tvb, pinfo, offset);
+
+        // skipUplinkTxDynamic
+        offset += 1;
+        // sCellDeactivationTimer
+        proto_tree_add_item(mac_cgc_tree, hf_l2server_scell_deact_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+        // HoFlag
+        proto_tree_add_item(mac_cgc_tree, hf_l2server_ho_flag, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+    }
 
     // spCellConfig
     proto_tree_add_string_format(params_tree, hf_l2server_spcell_config, tvb,
@@ -8210,6 +8356,46 @@ proto_register_l2server(void)
       { &hf_l2server_ref_sub_car_spacing,
        { "Ref Sub Carrier Spacing", "l2server.ref-sub-car-spacing", FT_INT8, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ho_flag,
+       { "HO Flag", "l2server.ho-flag", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_sr_config,
+       { "SR Config", "l2server.sr-config", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_n_sr_to_add,
+       { "SRs to add", "l2server.n-sr-to-add", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sr,
+       { "SR", "l2server.sr", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sr_config_index,
+       { "SR Config Index", "l2server.sr-config-index", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sr_prohibit_timer,
+       { "SR Prohibit Timer", "l2server.sr-prohibit-timer", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sr_transmax,
+       { "SR TransMax", "l2server.sr-transmax", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_n_sr_to_del,
+       { "SRs to del", "l2server.n-sr-to-del", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sr_to_del,
+       { "SR to del", "l2server.sr-to-del", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_bsr_config,
+       { "BSR Config", "l2server.bsr-config", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_tag_config,
+       { "TAG Config", "l2server.tag-config", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_phr_config,
+       { "PHR Config", "l2server.phr-config", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+
     };
 
     static gint *ett[] = {
@@ -8285,6 +8471,11 @@ proto_register_l2server(void)
         &ett_l2server_pusch_common,
         &ett_l2server_pusch_time_domain_res_alloc,
         &ett_l2server_pucch_common,
+        &ett_l2server_sr_config,
+        &ett_l2server_sr,
+        &ett_l2server_bsr_config,
+        &ett_l2server_tag_config,
+        &ett_l2server_phr_config,
     };
 
     static ei_register_info ei[] = {
