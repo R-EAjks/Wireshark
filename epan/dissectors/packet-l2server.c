@@ -255,6 +255,15 @@ static int hf_l2server_sp_cell_cfg_lte_crs_pattern_list1 = -1;
 static int hf_l2server_sp_cell_cfg_lte_crs_pattern_list2 = -1;
 
 
+static int hf_l2server_tdd_ul_dl_pattern = -1;
+static int hf_l2server_dl_ul_transm_periodicity_is_valid = -1;
+static int hf_l2server_dl_ul_transm_periodicity = -1;
+static int hf_l2server_nr_dl_slots = -1;
+static int hf_l2server_nr_dl_symbols = -1;
+static int hf_l2server_nr_ul_symbols = -1;
+static int hf_l2server_nr_ul_slots = -1;
+
+
 static int hf_l2server_serv_cell_idx = -1;
 static int hf_l2server_bwp_inactivity_timer = -1;
 static int hf_l2server_tag_id = -1;
@@ -273,6 +282,15 @@ static int hf_l2server_crs_rate_match_per_coreset_poolidx_r16 = -1;
 static int hf_l2server_first_active_ul_bwp_pcell = -1;
 
 static int hf_l2server_sp_cell_cfg_common = -1;
+static int hf_l2server_serv_cell_freqinfo_dl_present = -1;
+static int hf_l2server_serv_cell_bwp_dl_present = -1;
+static int hf_l2server_serv_cell_freqinfo_ul_present = -1;
+static int hf_l2server_serv_cell_bwp_ul_present = -1;
+static int hf_l2server_serv_cell_freqinfo_sul_present = -1;
+static int hf_l2server_serv_cell_bwp_sul_present = -1;
+static int hf_l2server_serv_cell_tdd_present = -1;
+static int hf_l2server_serv_cell_tomatcharound_present = -1;
+static int hf_l2server_serv_cell_hs_r16_present = -1;
 
 static int hf_l2server_config_cmd_type = -1;
 static int hf_l2server_side = -1;
@@ -1231,6 +1249,7 @@ static gint ett_l2server_sr = -1;
 static gint ett_l2server_bsr_config = -1;
 static gint ett_l2server_tag_config = -1;
 static gint ett_l2server_phr_config = -1;
+static gint ett_l2server_tdd_ul_dl_pattern = -1;
 
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
@@ -4543,6 +4562,43 @@ static int dissect_freqinfo_ul(proto_tree *tree, tvbuff_t *tvb, packet_info *pin
     return offset;
 }
 
+// bb_nr5g_TDD_UL_DL_CONFIG_COMMONt
+static gint dissect_tdd_ul_dl_pattern(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, gint offset,
+                                      const char *label, gboolean present)
+{
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string(tree, hf_l2server_tdd_ul_dl_pattern, tvb,
+                                                  offset, sizeof(bb_nr5g_TDD_UL_DL_PATTERNt),
+                                                  label);
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_tdd_ul_dl_pattern);
+
+    if (present) {
+        // DlULTransmPeriodicityIsValid
+        proto_tree_add_item(config_tree, hf_l2server_dl_ul_transm_periodicity_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // DlULTransmPeriodicity
+        proto_tree_add_item(config_tree, hf_l2server_dl_ul_transm_periodicity, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // NrDLSlots
+        proto_tree_add_item(config_tree, hf_l2server_nr_dl_slots, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+        // NrDLSymbols
+        proto_tree_add_item(config_tree, hf_l2server_nr_dl_symbols, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // NrULSymbols
+        proto_tree_add_item(config_tree, hf_l2server_nr_ul_symbols, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // NrULSlots
+        proto_tree_add_item(config_tree, hf_l2server_nr_ul_slots, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+    }
+    else {
+        offset += sizeof(bb_nr5g_TDD_UL_DL_CONFIG_COMMONt);
+        proto_item_append_text(config_ti, " (not set)");
+    }
+
+    return offset;
+}
 
 // bb_nr5g_SERV_CELL_CONFIG_COMMONt (from bb-nr5g_struct.h)
 static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -4558,7 +4614,20 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
 
     // FieldMask
     guint32 fieldmask;
+    gboolean freqinfo_dl_present, bwp_dl_present, freqinfo_ul_present, bwp_ul_present, freqinfo_sul_present, bwp_sul_present,
+             tdd_present, tomatcharound_present, hs_r16_present;
     proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN, &fieldmask);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_freqinfo_dl_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &freqinfo_dl_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_bwp_dl_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &bwp_dl_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_freqinfo_ul_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &freqinfo_ul_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_bwp_ul_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &bwp_ul_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_freqinfo_sul_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &freqinfo_sul_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_bwp_sul_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &bwp_sul_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_tdd_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &tdd_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_tomatcharound_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &tomatcharound_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_hs_r16_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &hs_r16_present);
+
+
     offset += 4;
     // ServCellIdx
     proto_tree_add_item(config_tree, hf_l2server_serv_cell_idx, tvb, offset, 2, ENC_LITTLE_ENDIAN);
@@ -4728,12 +4797,14 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
 
         // Pattern1
         if (!serialize || (tdd_fieldmask & bb_nr5g_STRUCT_TDD_UL_DL_CONFIG_COMMON_PATT1_PRESENT)) {
-            offset += sizeof(bb_nr5g_TDD_UL_DL_PATTERNt);
+            offset = dissect_tdd_ul_dl_pattern(tdd_tree, tvb, pinfo, offset, "Pattern1",
+                                               tdd_fieldmask & bb_nr5g_STRUCT_TDD_UL_DL_CONFIG_COMMON_PATT1_PRESENT);
         }
 
         // Pattern2
         if (!serialize || (tdd_fieldmask & bb_nr5g_STRUCT_TDD_UL_DL_CONFIG_COMMON_PATT2_PRESENT)) {
-            offset += sizeof(bb_nr5g_TDD_UL_DL_PATTERNt);
+            offset = dissect_tdd_ul_dl_pattern(tdd_tree, tvb, pinfo, offset, "Pattern2",
+                                               tdd_fieldmask & bb_nr5g_STRUCT_TDD_UL_DL_CONFIG_COMMON_PATT1_PRESENT);
         }
 
         proto_item_set_len(tdd_ti, offset-tdd_offset);
@@ -7175,7 +7246,6 @@ proto_register_l2server(void)
         { "FieldMask", "l2server.field-mask", FT_UINT32, BASE_HEX,
           NULL, 0x0, NULL, HFILL }},
 
-
       { &hf_l2server_ncelllte,
         { "NCellLte", "l2server.ncelllte", FT_UINT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
@@ -7285,6 +7355,28 @@ proto_register_l2server(void)
         { "CRS Pattern List2 Present", "l2server.sp-cell-cfg-ded.crs-pattern-list2-present", FT_BOOLEAN, 32,
           NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_PATTERN_LIST2_PRESENT, NULL, HFILL }},
 
+      { &hf_l2server_tdd_ul_dl_pattern,
+        { "TDD UL DL Pattern", "l2server.tdd-ul-dl-pattern", FT_STRING, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_dl_ul_transm_periodicity_is_valid,
+        { "DL UL Transm Periodicity is valid", "l2server.dl-ul-tranms-periodicity-is-valid", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_dl_ul_transm_periodicity,
+        { "DL UL Transm Periodicity", "l2server.dl-ul-tranms-periodicity", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nr_dl_slots,
+        { "Nr DL Slots", "l2server.nr-dl-slots", FT_INT16, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nr_dl_symbols,
+        { "Nr DL Symbols", "l2server.nr-dl-symbols", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nr_ul_symbols,
+        { "Nr UL Symbols", "l2server.nr-ul-symbols", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nr_ul_slots,
+        { "Nr UL Slots", "l2server.nr-ul-slots", FT_INT16, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_sp_cell_cfg_tdd,
         { "TDD dedicated", "l2server.sp-cell-cfg-ded.tdd", FT_STRING, FT_NONE,
@@ -7362,9 +7454,38 @@ proto_register_l2server(void)
         { "First Active UL BWP pCell", "l2server.first-active-ul-bwp-pcell", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
 
+
       { &hf_l2server_sp_cell_cfg_common,
         { "SP Cell Cfg Common", "l2server.sp-cell-cfg-common", FT_STRING, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_serv_cell_freqinfo_dl_present,
+        { "FreqInfo DL Present", "l2server.sp-cell-cfg-common.freqinfo-dl-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_DL_COMMON_PRESENT, NULL, HFILL }},
+      { &hf_l2server_serv_cell_bwp_dl_present,
+        { "BWP DL Present", "l2server.sp-cell-cfg-common.bwp-dl-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_DL_COMMON_PRESENT, NULL, HFILL }},
+      { &hf_l2server_serv_cell_freqinfo_ul_present,
+        { "FreqInfo UL Present", "l2server.sp-cell-cfg-common.freqinfo-ul-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_UL_COMMON_PRESENT, NULL, HFILL }},
+      { &hf_l2server_serv_cell_bwp_ul_present,
+        { "BWP UL Present", "l2server.sp-cell-cfg-common.bwp-ul-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_UL_COMMON_PRESENT, NULL, HFILL }},
+      { &hf_l2server_serv_cell_freqinfo_sul_present,
+        { "FreqInfo SUL Present", "l2server.sp-cell-cfg-common.freqinfo-sul-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_SUL_COMMON_PRESENT, NULL, HFILL }},
+      { &hf_l2server_serv_cell_bwp_sul_present,
+        { "BWP SUL Present", "l2server.sp-cell-cfg-common.bwp-sul-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_SUL_COMMON_PRESENT, NULL, HFILL }},
+      { &hf_l2server_serv_cell_tdd_present,
+        { "TDD Common Present", "l2server.sp-cell-cfg-common.tdd-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_TDD_COMMON_PRESENT, NULL, HFILL }},
+      { &hf_l2server_serv_cell_tomatcharound_present,
+        { "LTE CRS Common ToMatchAround Present", "l2server.sp-cell-cfg-common.lte-common-tomatcharound-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_COMMON_TOMATCHAROUND_PRESENT, 0x0, HFILL }},
+      { &hf_l2server_serv_cell_hs_r16_present,
+        { "High Speed Config R16 Present", "l2server.sp-cell-cfg-common.highspeed-config-r16-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_HIGH_SPEED_CONFIG_R16_PRESENT, 0x0, HFILL }},
 
       { &hf_l2server_config_cmd_type,
         { "Type", "l2server.config-cmd-type", FT_UINT16, BASE_DEC,
@@ -8476,6 +8597,7 @@ proto_register_l2server(void)
         &ett_l2server_bsr_config,
         &ett_l2server_tag_config,
         &ett_l2server_phr_config,
+        &ett_l2server_tdd_ul_dl_pattern
     };
 
     static ei_register_info ei[] = {
