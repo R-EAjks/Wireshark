@@ -160,6 +160,7 @@ static int hf_l2server_pcmaxc = -1;
 static int hf_l2server_pcmaxc_sul = -1;
 
 static int hf_l2server_scell_list =-1;
+static int hf_l2server_scell = -1;
 
 static int hf_l2server_pdcp_pdu = -1;
 static int hf_l2server_traffic = -1;
@@ -216,6 +217,8 @@ static int hf_l2server_field_mask_4 = -1;
 
 static int hf_l2server_nb_scell_cfg_add = -1;
 static int hf_l2server_nb_scell_cfg_del = -1;
+static int hf_l2server_scell_cfg_del = -1;
+
 
 static int hf_l2server_ph_cell_config = -1;
 static int hf_l2server_ph_cell_dcp_config_present = -1;
@@ -695,10 +698,17 @@ static int hf_l2server_retxbsr_timer = -1;
 static int hf_l2server_logicalchannelsr_delaytimer = -1;
 
 
-
 static int hf_l2server_tag_config = -1;
-static int hf_l2server_phr_config = -1;
+static int hf_l2server_time_alignment_timer = -1;
 
+static int hf_l2server_phr_config = -1;
+static int hf_l2server_phr_periodic_timer = -1;
+static int hf_l2server_phr_prohibit_timer = -1;
+static int hf_l2server_phr_tx_power_factor_change = -1;
+static int hf_l2server_phr_multiple_phr = -1;
+static int hf_l2server_phr_type2_spcell = -1;
+static int hf_l2server_phr_type2_othercell = -1;
+static int hf_l2server_phr_mode_other_cg = -1;
 
 
 static const value_string lch_vals[] =
@@ -1246,6 +1256,7 @@ static gint ett_l2server_csi_report_freq_config = -1;
 static gint ett_l2server_control_res_set = -1;
 static gint ett_l2server_search_space = -1;
 static gint ett_l2server_scell_list = -1;
+static gint ett_l2server_scell = -1;
 static gint ett_l2server_scs_spec_carrier = -1;
 static gint ett_l2server_ccs_ext = -1;
 static gint ett_l2server_pdsch_alloc = -1;
@@ -5067,12 +5078,20 @@ static guint dissect_tag_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
 {
     // Subtree.
     proto_item *tag_config_ti = proto_tree_add_string_format(tree, hf_l2server_tag_config, tvb,
-                                                            offset, 0,
+                                                            offset, sizeof(nr5g_rlcmac_Cmac_TAG_Configuration_t),
                                                             "", "TAG Config");
-    //proto_tree *tag_config_tree = proto_item_add_subtree(tag_config_ti, ett_l2server_tag_config);
+    proto_tree *tag_config_tree = proto_item_add_subtree(tag_config_ti, ett_l2server_tag_config);
 
-    offset += sizeof(nr5g_rlcmac_Cmac_TAG_Configuration_t);
-    proto_item_set_len(tag_config_ti, sizeof(nr5g_rlcmac_Cmac_TAG_Configuration_t));
+    // tagId
+    guint32 tagid;
+    proto_tree_add_item_ret_uint(tag_config_tree, hf_l2server_tag_id, tvb, offset, 4, ENC_LITTLE_ENDIAN, &tagid);
+    offset += 4;
+    // timeAlignmentTimer
+    proto_tree_add_item(tag_config_tree, hf_l2server_time_alignment_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    proto_item_append_text(tag_config_ti, " (tagId=%u)", tagid);
+
     return offset;
 }
 
@@ -5084,9 +5103,36 @@ static guint dissect_phr_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
     proto_item *phr_config_ti = proto_tree_add_string_format(tree, hf_l2server_phr_config, tvb,
                                                             offset, 0,
                                                             "", "PHR Config");
-    //proto_tree *phr_config_tree = proto_item_add_subtree(phr_config_ti, ett_l2server_phr_config);
+    proto_tree *phr_config_tree = proto_item_add_subtree(phr_config_ti, ett_l2server_phr_config);
 
-    offset += sizeof(nr5g_rlcmac_Cmac_PHR_Config_t);
+    // phr_PeriodicTimer
+    proto_tree_add_item(phr_config_tree, hf_l2server_phr_periodic_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // phr_ProhibitTimer
+    proto_tree_add_item(phr_config_tree, hf_l2server_phr_prohibit_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // phr_Tx_PowerFactorChange
+    proto_tree_add_item(phr_config_tree, hf_l2server_phr_tx_power_factor_change, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // multiplePHR
+    proto_tree_add_item(phr_config_tree, hf_l2server_phr_multiple_phr, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // phr_Type2SpCell
+    proto_tree_add_item(phr_config_tree, hf_l2server_phr_type2_spcell, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // phr_Type2OtherCell
+    proto_tree_add_item(phr_config_tree, hf_l2server_phr_type2_othercell, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // phr_ModeOtherCG
+    proto_tree_add_item(phr_config_tree, hf_l2server_phr_mode_other_cg, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // Spare
+    proto_tree_add_item(phr_config_tree, hf_l2server_spare, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    //offset += sizeof(nr5g_rlcmac_Cmac_PHR_Config_t);
     proto_item_set_len(phr_config_ti, sizeof(nr5g_rlcmac_Cmac_PHR_Config_t));
     return offset;
 }
@@ -5287,21 +5333,31 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
 
         // SCellConfig
         for (guint n=0; n < nr5g_rlcmac_Com_MaxNumSCells; n++) {
-            if (n <= nbSCellCfgAdd) {
+
+            proto_item *scell_ti = proto_tree_add_string_format(scell_list_tree, hf_l2server_scell, tvb,
+                                                                offset, sizeof(nr5g_rlcmac_Cmac_SCellConfig_t),
+                                                                "", "sCell");
+            proto_tree *scell_tree = proto_item_add_subtree(scell_ti, ett_l2server_scell);
+
+            if (n < nbSCellCfgAdd) {
                 // ScellIndex
-                proto_tree_add_item(scell_list_tree, hf_l2server_scellindex, tvb, offset, 1,
-                                    ENC_LITTLE_ENDIAN);
+                guint32 scellIndex;
+                proto_tree_add_item_ret_uint(scell_tree, hf_l2server_scellindex, tvb, offset, 1, ENC_LITTLE_ENDIAN, &scellIndex);
                 offset += 1;
                 // LsuCellId
-                proto_tree_add_item(scell_list_tree, hf_l2server_scellindex, tvb, offset, 1,
-                                    ENC_LITTLE_ENDIAN);
+                proto_tree_add_item(scell_tree, hf_l2server_scellindex, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                 offset += 1;
                 // PCMAXc
+                proto_tree_add_item(scell_tree, hf_l2server_pcmaxc, tvb, offset, 4, ENC_LITTLE_ENDIAN);
                 offset += 4;
                 // PCMAXc_SUL
+                proto_tree_add_item(scell_tree, hf_l2server_pcmaxc_sul, tvb, offset, 4, ENC_LITTLE_ENDIAN);
                 offset += 4;
+
+                proto_item_append_text(scell_ti, " (sCellIndex=%u)", scellIndex);
             }
             else {
+                proto_item_append_text(scell_ti, " (not set)");
                 offset += sizeof(nr5g_rlcmac_Cmac_SCellConfig_t);
             }
         }
@@ -5310,10 +5366,18 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         guint32 nbSCellCfgDel;
         proto_tree_add_item_ret_uint(scell_list_tree, hf_l2server_nb_scell_cfg_del, tvb, offset, 1,
                                      ENC_LITTLE_ENDIAN, &nbSCellCfgDel);
-        // SCellRel
-        offset += nr5g_rlcmac_Com_MaxNumSCells;
+        offset++;
 
-        //offset += sizeof(nr5g_rlcmac_Cmac_SCellList_t);
+        // SCellRel
+        for (guint n=0; n < nr5g_rlcmac_Com_MaxNumSCells; n++) {
+            proto_item *ti = proto_tree_add_item(scell_list_tree, hf_l2server_scell_cfg_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            if (n >= nbSCellCfgDel) {
+                proto_item_append_text(ti, " (not set)");
+            }
+        }
+
+        proto_item_append_text(scell_list_ti, " (%u added, %u deleted)", nbSCellCfgAdd, nbSCellCfgDel);
     }
 
     // At the end of params now.
@@ -7156,6 +7220,9 @@ proto_register_l2server(void)
       { &hf_l2server_scell_list,
         { "sCell List", "l2server.scell-list", FT_STRING, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_scell,
+        { "sCell", "l2server.scell", FT_STRING, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
 
 
 
@@ -7311,6 +7378,9 @@ proto_register_l2server(void)
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_nb_scell_cfg_del,
         { "NbSCellCfgDel", "l2server.number-scell-cfg-del", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_scell_cfg_del,
+        { "SCell Rel", "l2server.scell-rel", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_ph_cell_config,
@@ -8564,10 +8634,34 @@ proto_register_l2server(void)
       { &hf_l2server_tag_config,
        { "TAG Config", "l2server.tag-config", FT_STRING, BASE_NONE,
          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_time_alignment_timer,
+       { "Time Alignment Timer", "l2server.time-alignment-timer", FT_INT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
       { &hf_l2server_phr_config,
        { "PHR Config", "l2server.phr-config", FT_STRING, BASE_NONE,
          NULL, 0x0, NULL, HFILL }},
-
+      { &hf_l2server_phr_periodic_timer,
+       { "PHR PeriodicTimer", "l2server.phr-periodic-timer", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_phr_prohibit_timer,
+       { "PHR ProbihitTimer", "l2server.phr-prohibit-timer", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_phr_tx_power_factor_change,
+       { "PHR Tx Power Factor Change", "l2server.phr-tx-power-factor-change", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_phr_multiple_phr,
+       { "PHR MultiplePHR", "l2server.phr-multiple-phr", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_phr_type2_spcell,
+       { "PHR Type2 SpCell", "l2server.phr-typ2-spcell", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_phr_type2_othercell,
+       { "PHR Type2 Other Cell", "l2server.phr-type2-other-cell", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_phr_mode_other_cg,
+       { "PHR Mode Other Cg", "l2server.phr-mode-other-cg", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
@@ -8636,6 +8730,7 @@ proto_register_l2server(void)
         &ett_l2server_control_res_set,
         &ett_l2server_search_space,
         &ett_l2server_scell_list,
+        &ett_l2server_scell,
         &ett_l2server_scs_spec_carrier,
         &ett_l2server_ccs_ext,
         &ett_l2server_pdsch_alloc,
