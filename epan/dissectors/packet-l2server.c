@@ -156,6 +156,9 @@ static int hf_l2server_rlc_er;
 
 static int hf_l2server_mac_cell_group_config =-1;
 static int hf_l2server_spcell_config =-1;
+static int hf_l2server_pcmaxc = -1;
+static int hf_l2server_pcmaxc_sul = -1;
+
 static int hf_l2server_scell_list =-1;
 
 static int hf_l2server_pdcp_pdu = -1;
@@ -687,6 +690,12 @@ static int hf_l2server_n_sr_to_del = -1;
 static int hf_l2server_sr_to_del = -1;
 
 static int hf_l2server_bsr_config = -1;
+static int hf_l2server_periodicbsr_timer = -1;
+static int hf_l2server_retxbsr_timer = -1;
+static int hf_l2server_logicalchannelsr_delaytimer = -1;
+
+
+
 static int hf_l2server_tag_config = -1;
 static int hf_l2server_phr_config = -1;
 
@@ -1250,6 +1259,7 @@ static gint ett_l2server_bsr_config = -1;
 static gint ett_l2server_tag_config = -1;
 static gint ett_l2server_phr_config = -1;
 static gint ett_l2server_tdd_ul_dl_pattern = -1;
+static gint ett_l2server_spcell_config = -1;
 
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
@@ -5034,12 +5044,20 @@ static guint dissect_bsr_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
 {
     // Subtree.
     proto_item *bsr_config_ti = proto_tree_add_string_format(tree, hf_l2server_bsr_config, tvb,
-                                                            offset, 0,
+                                                            offset, sizeof(nr5g_rlcmac_Cmac_BSR_Configuration_t),
                                                             "", "BSR Config");
-    //proto_tree *bsr_config_tree = proto_item_add_subtree(bsr_config_ti, ett_l2server_bsr_config);
+    proto_tree *bsr_config_tree = proto_item_add_subtree(bsr_config_ti, ett_l2server_bsr_config);
 
-    offset += sizeof(nr5g_rlcmac_Cmac_BSR_Configuration_t);
-    proto_item_set_len(bsr_config_ti, sizeof(nr5g_rlcmac_Cmac_BSR_Configuration_t));
+    // periodicBSR_Timer
+    proto_tree_add_item(bsr_config_tree, hf_l2server_periodicbsr_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // retxBSR_Timer
+    proto_tree_add_item(bsr_config_tree, hf_l2server_retxbsr_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // logicalChannelSR_DelayTimer
+    proto_tree_add_item(bsr_config_tree, hf_l2server_logicalchannelsr_delaytimer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
     return offset;
 }
 
@@ -5234,10 +5252,25 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
     }
 
     // spCellConfig
-    proto_tree_add_string_format(params_tree, hf_l2server_spcell_config, tvb,
-                                 offset, sizeof(nr5g_rlcmac_Cmac_SpCellConfig_t),
-                                 "", "spCell Config");
-    offset += sizeof(nr5g_rlcmac_Cmac_SpCellConfig_t);
+    {
+        proto_item *sp_cell_config_ti = proto_tree_add_string_format(params_tree, hf_l2server_spcell_config, tvb,
+                                                                     offset, sizeof(nr5g_rlcmac_Cmac_SpCellConfig_t),
+                                                                      "", "spCell Config");
+        proto_tree *sp_cell_config_tree = proto_item_add_subtree(sp_cell_config_ti, ett_l2server_spcell_config);
+
+        // SCellIndex
+        guint scellindex;
+        proto_tree_add_item_ret_uint(sp_cell_config_tree, hf_l2server_scellindex, tvb, offset, 1, ENC_LITTLE_ENDIAN, &scellindex);
+        offset += 1;
+        // PCMAXc
+        proto_tree_add_item(sp_cell_config_tree, hf_l2server_pcmaxc, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+        // PCMAXc_SUL
+        proto_tree_add_item(sp_cell_config_tree, hf_l2server_pcmaxc_sul, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+
+        proto_item_append_text(sp_cell_config_ti, " (sCellIndex=%u)", scellindex);
+    }
 
     // sCellList
     {
@@ -7112,6 +7145,14 @@ proto_register_l2server(void)
       { &hf_l2server_spcell_config,
         { "spCell Config", "l2server.spcell-config", FT_STRING, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_pcmaxc,
+        { "PcMaxC", "l2server.pcmaxc", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pcmaxc_sul,
+        { "PcMaxC SUL", "l2server.pcmaxc-sul", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
       { &hf_l2server_scell_list,
         { "sCell List", "l2server.scell-list", FT_STRING, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
@@ -8510,6 +8551,16 @@ proto_register_l2server(void)
       { &hf_l2server_bsr_config,
        { "BSR Config", "l2server.bsr-config", FT_STRING, BASE_NONE,
          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_periodicbsr_timer,
+       { "Periodic BSR Timer", "l2server.periodicbsr-timer", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_retxbsr_timer,
+       { "Retx BSR Timer", "l2server.retxbsr-timer", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_logicalchannelsr_delaytimer,
+       { "LogicalChannel SR Timer", "l2server.logicalchannelsr-delaytimer", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
       { &hf_l2server_tag_config,
        { "TAG Config", "l2server.tag-config", FT_STRING, BASE_NONE,
          NULL, 0x0, NULL, HFILL }},
@@ -8597,7 +8648,8 @@ proto_register_l2server(void)
         &ett_l2server_bsr_config,
         &ett_l2server_tag_config,
         &ett_l2server_phr_config,
-        &ett_l2server_tdd_ul_dl_pattern
+        &ett_l2server_tdd_ul_dl_pattern,
+        &ett_l2server_spcell_config
     };
 
     static ei_register_info ei[] = {
