@@ -180,6 +180,8 @@ static int hf_l2server_params = -1;
 
 static int hf_l2server_rlc_config_tx = -1;
 static int hf_l2server_rlc_config_rx = -1;
+static int hf_l2server_rlc_tx_active_flag = -1;
+static int hf_l2server_rlc_rx_active_flag = -1;
 
 static int hf_l2server_rlc_snlength = -1;
 static int hf_l2server_rlc_t_poll_retransmit = -1;
@@ -5790,20 +5792,76 @@ static void dissect_crlc_tm_config(proto_tree *tree _U_, tvbuff_t *tvb _U_, pack
     /* TODO */
 }
 
+// nr5g_rlcmac_Crlc_UmParm_t
 static void dissect_crlc_um_config(proto_tree *tree _U_, tvbuff_t *tvb _U_, packet_info *pinfo _U_,
                                    guint offset _U_)
 {
-    /* TODO */
+    // TxActiveFlag
+    gboolean tx_active_flag;
+    proto_tree_add_item_ret_boolean(tree, hf_l2server_rlc_tx_active_flag, tvb, offset, 1, ENC_LITTLE_ENDIAN, &tx_active_flag);
+    offset += 1;
+
+    /* Tx (nr5g_rlcmac_Crlc_TxUmParm_t) */
+    proto_item *tx_ti = proto_tree_add_string_format(tree, hf_l2server_rlc_config_tx, tvb,
+                                                          offset, sizeof(nr5g_rlcmac_Crlc_TxUmParm_t),
+                                                          "", "Tx");
+    proto_tree *tx_tree = proto_item_add_subtree(tx_ti, ett_l2server_rlc_config_tx);
+
+    if (tx_active_flag) {
+        // SnLength
+        guint32 sn_length;
+        proto_tree_add_item_ret_uint(tx_tree, hf_l2server_rlc_snlength, tvb, offset, 1, ENC_LITTLE_ENDIAN, &sn_length);
+        offset += 1;
+        /* discardTimer */
+        proto_tree_add_item(tx_tree, hf_l2server_rlc_discard_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+
+        proto_item_append_text(tx_ti, " (SN-Length=%u)", sn_length);
+    }
+    else {
+        offset += sizeof(nr5g_rlcmac_Crlc_TxUmParm_t);
+        proto_item_append_text(tx_ti, " (not set)");
+    }
+
+
+    // RxActiveFlag
+    gboolean rx_active_flag;
+    proto_tree_add_item_ret_boolean(tree, hf_l2server_rlc_rx_active_flag, tvb, offset, 1, ENC_LITTLE_ENDIAN, &rx_active_flag);
+    offset += 1;
+
+    /* Rx (nr5g_rlcmac_Crlc_RxUmParm_t) */
+    proto_item *rx_ti = proto_tree_add_string_format(tree, hf_l2server_rlc_config_rx, tvb,
+                                                          offset, sizeof(nr5g_rlcmac_Crlc_RxUmParm_t),
+                                                          "", "Rx");
+    proto_tree *rx_tree = proto_item_add_subtree(rx_ti, ett_l2server_rlc_config_rx);
+
+    if (rx_active_flag) {
+        // SnLength
+        guint32 sn_length;
+        proto_tree_add_item_ret_uint(tx_tree, hf_l2server_rlc_snlength, tvb, offset, 1, ENC_LITTLE_ENDIAN, &sn_length);
+        offset += 1;
+        /* t_Reassembly */
+        proto_tree_add_item(rx_tree, hf_l2server_rlc_t_reassembly, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+
+        proto_item_append_text(rx_ti, " (SN-Length=%u)", sn_length);
+    }
+    else {
+        offset += sizeof(nr5g_rlcmac_Crlc_RxUmParm_t);
+        proto_item_append_text(rx_ti, " (not set)");
+    }
 }
 
+// nr5g_rlcmac_Crlc_AmParm_t
 static void dissect_crlc_am_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                    guint offset)
 {
-    /* Tx */
+    /* Tx (nr5g_rlcmac_Crlc_TxAmParm_t) */
     proto_item *tx_ti = proto_tree_add_string_format(tree, hf_l2server_rlc_config_tx, tvb,
                                                           offset, sizeof(nr5g_rlcmac_Crlc_TxAmParm_t),
                                                           "", "Tx");
     proto_tree *tx_tree = proto_item_add_subtree(tx_ti, ett_l2server_rlc_config_tx);
+
     /* SnLength */
     guint32 sn_length;
     proto_tree_add_item_ret_uint(tx_tree, hf_l2server_rlc_snlength, tvb, offset, 1, ENC_LITTLE_ENDIAN, &sn_length);
@@ -5826,11 +5884,13 @@ static void dissect_crlc_am_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
 
     proto_item_append_text(tx_ti, " (SN-Length=%u)", sn_length);
 
-    /* Rx */
+
+    /* Rx (nr5g_rlcmac_Crlc_RxAmParm_t) */
     proto_item *rx_ti = proto_tree_add_string_format(tree, hf_l2server_rlc_config_rx, tvb,
                                                           offset, sizeof(nr5g_rlcmac_Crlc_RxAmParm_t),
                                                           "", "Rx");
     proto_tree *rx_tree = proto_item_add_subtree(rx_ti, ett_l2server_rlc_config_rx);
+
     /* SnLength */
     proto_tree_add_item_ret_uint(rx_tree, hf_l2server_rlc_snlength, tvb, offset, 1, ENC_LITTLE_ENDIAN, &sn_length);
     offset += 1;
@@ -7276,6 +7336,14 @@ proto_register_l2server(void)
       { &hf_l2server_rlc_config_rx,
         { "Rx", "l2server.rlc-config.rx", FT_STRING, FT_NONE,
           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_rlc_tx_active_flag,
+        { "Tx Active Flag", "l2server.tx-active-flag", FT_BOOLEAN, 8,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rlc_rx_active_flag,
+        { "Rx Active Flag", "l2server.rx-active-flag", FT_BOOLEAN, 8,
+          NULL, 0x0, NULL, HFILL }},
+
 
       { &hf_l2server_rlc_snlength,
         { "SN Length", "l2server.rlc-config.snlength", FT_UINT8, BASE_DEC,
