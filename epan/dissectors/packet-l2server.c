@@ -443,8 +443,12 @@ static int hf_l2server_prach_root_seq_index_is_valid = -1;
 static int hf_l2server_ssb_per_rach_is_valid = -1;
 static int hf_l2server_prach_root_seq_index = -1;
 static int hf_l2server_ssb_per_rach = -1;
-// TODO: break down and add fields
-//static int hf_l2server_group_b_configured = -1;
+
+static int hf_l2server_group_b_configured = -1;
+static int hf_l2server_ra_msg3_size_group_a = -1;
+static int hf_l2server_message_power_offset_group_b = -1;
+static int hf_l2server_number_of_ra_preambles_group_a = -1;
+
 static int hf_l2server_ra_contention_resolution_timer = -1;
 
 
@@ -1273,6 +1277,8 @@ static gint ett_l2server_tag_config = -1;
 static gint ett_l2server_phr_config = -1;
 static gint ett_l2server_tdd_ul_dl_pattern = -1;
 static gint ett_l2server_spcell_config = -1;
+static gint ett_l2server_group_b_configured = -1;
+
 
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
@@ -4382,9 +4388,26 @@ static int dissect_rach_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_info
     // SsbPerRach
     proto_tree_add_item(rach_tree, hf_l2server_ssb_per_rach, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
+
     // GroupBconfigure
-    // TODO:
-    offset += 3;
+    {
+        proto_item *group_b_ti = proto_tree_add_string_format(rach_tree, hf_l2server_group_b_configured, tvb,
+                                                             offset, 3, "", "Group B Configured");
+        proto_tree *group_b_tree = proto_item_add_subtree(group_b_ti, ett_l2server_group_b_configured);
+
+        // Ra_Msg3SizeGroupA
+        proto_tree_add_item(group_b_tree, hf_l2server_ra_msg3_size_group_a, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // MessagePowerOffsetGroupB
+        proto_tree_add_item(group_b_tree, hf_l2server_message_power_offset_group_b, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // NumberOfRA_PreamblesGroupA
+        proto_tree_add_item(group_b_tree, hf_l2server_number_of_ra_preambles_group_a, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+
+        // TODO: get vals & summary?
+    }
+
     // Ra_ContentionResolutionTimer
     proto_tree_add_item(rach_tree, hf_l2server_ra_contention_resolution_timer, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
@@ -8037,7 +8060,20 @@ proto_register_l2server(void)
       { &hf_l2server_ssb_per_rach,
         { "SSBPerRACH", "l2server.ssb-per-rach", FT_INT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
-      // TODO: hf_l2server_group_b_configured
+
+      { &hf_l2server_group_b_configured,
+        { "Group B Configured", "l2server.group-b-configured", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ra_msg3_size_group_a,
+        { "RA Msg3 Size Group A", "l2server.ra-msg3-size-group-a", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_message_power_offset_group_b,
+        { "Message Power Offset Group B", "l2server.message-power-offset-group-b", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_number_of_ra_preambles_group_a,
+        { "Number of RA Preambles Group A", "l2server.number-of-ra-preambles-group-a", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
       { &hf_l2server_ra_contention_resolution_timer,
         { "RA-ContentionResolutionTimer", "l2server.ca-contention-resolution-timer", FT_INT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
@@ -8812,7 +8848,8 @@ proto_register_l2server(void)
         &ett_l2server_tag_config,
         &ett_l2server_phr_config,
         &ett_l2server_tdd_ul_dl_pattern,
-        &ett_l2server_spcell_config
+        &ett_l2server_spcell_config,
+        &ett_l2server_group_b_configured
     };
 
     static ei_register_info ei[] = {
