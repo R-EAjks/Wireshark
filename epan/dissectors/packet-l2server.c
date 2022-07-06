@@ -1359,10 +1359,10 @@ static guint dissect_rlcmac_cmac_ra_info_empty(proto_tree *tree, tvbuff_t *tvb, 
 static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset);
 
-static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
                                       guint offset, gboolean serialize _U_);
 static int dissect_genbwp(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset);
-static int dissect_pdcch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+static int dissect_pdcch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
                                      guint offset, gboolean serialize);
 
 
@@ -4145,7 +4145,7 @@ static int dissect_genbwp(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U
 
 
 // bb_nr5g_PDCCH_CONF_COMMONt
-static int dissect_pdcch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+static int dissect_pdcch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
                                      guint offset, gboolean serialize)
 {
     gint pdcch_offset = offset;
@@ -4647,7 +4647,7 @@ static gint dissect_tdd_ul_dl_pattern(proto_tree *tree, tvbuff_t *tvb, packet_in
 }
 
 // bb_nr5g_SERV_CELL_CONFIG_COMMONt (from bb-nr5g_struct.h)
-static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
                                       guint offset, gboolean serialize)
 {
     guint start_offset = offset;
@@ -7619,7 +7619,7 @@ proto_register_l2server(void)
         { "TagId", "l2server.tag-id", FT_UINT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_scell_deact_timer,
-        { "SCell Deact Timer", "l2server.scell-deact-timer", FT_INT8, BASE_DEC,
+        { "SCell Deact Timer", "l2server.scell-deact-timer", FT_INT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_pathloss_ref_linking,
         { "Pathloss Ref Linking", "l2server.pathloss-ref-linking", FT_INT8, BASE_DEC,
