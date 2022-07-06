@@ -1,6 +1,6 @@
 /* packet-l2server.c
  *
- * TCP-based protocol between adapter and L2 server.
+ * TCP-based protocol between adaptor and L2 server.
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -1729,7 +1729,7 @@ static void dissect_rlcmac_data_cnf(proto_tree *tree, tvbuff_t *tvb, packet_info
     proto_item_set_hidden(traffic_ti);
 }
 
-static void dissect_rlcmac_data_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+static void dissect_rlcmac_data_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
                                     guint offset, guint len _U_, rlc_mode_e mode)
 {
     /* Create pdcp-nr context info in case we are set to call dissector */
