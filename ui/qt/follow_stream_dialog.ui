@@ -41,7 +41,7 @@
     </widget>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0,0,1,0,0,0,0">
+    <layout class="QHBoxLayout" name="layoutSettings" stretch="0,0,0,0,0">
      <item>
       <widget class="QComboBox" name="cbDirections">
        <property name="sizeAdjustPolicy">
@@ -77,42 +77,63 @@
       </widget>
      </item>
      <item>
-      <spacer name="streamNumberSpacer">
-       <property name="orientation">
-        <enum>Qt::Horizontal</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item>
-      <widget class="QLabel" name="streamNumberLabel">
-       <property name="text">
-        <string>Stream</string>
-       </property>
+      <widget class="QWidget" name="streamSettings" native="true">
+       <layout class="QHBoxLayout" name="layoutStreamSettings">
+        <property name="spacing">
+         <number>0</number>
+        </property>
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <spacer name="streamNumberSpacer">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QLabel" name="streamNumberLabel">
+          <property name="text">
+           <string>Stream</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QSpinBox" name="streamNumberSpinBox"/>
+        </item>
+        <item>
+         <widget class="QLabel" name="subStreamNumberLabel">
+          <property name="text">
+           <string>Substream</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QSpinBox" name="subStreamNumberSpinBox"/>
+        </item>
+       </layout>
       </widget>
-     </item>
-     <item>
-      <widget class="QSpinBox" name="streamNumberSpinBox"/>
-     </item>
-     <item>
-      <widget class="QLabel" name="subStreamNumberLabel">
-       <property name="text">
-        <string>Substream</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QSpinBox" name="subStreamNumberSpinBox"/>
      </item>
     </layout>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="0,1,0">
+    <layout class="QHBoxLayout" name="layoutFind" stretch="0,1,0">
      <item>
       <widget class="QLabel" name="lFind">
        <property name="text">
