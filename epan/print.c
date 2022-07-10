@@ -1814,30 +1814,48 @@ print_escaped_xml(FILE *fh, const char *unescaped_string)
         return;
     }
 
+    static const char hex[] = "0123456789abcdef";
+
     for (p = unescaped_string; *p != '\0' && (offset<(ESCAPED_BUFFER_MAX-1)); p++) {
-        switch (*p) {
-        case '&':
-            (void) g_strlcpy(&temp_buffer[offset], "&amp;", ESCAPED_BUFFER_MAX-offset);
-            offset += 5;
-            break;
-        case '<':
-            (void) g_strlcpy(&temp_buffer[offset], "&lt;", ESCAPED_BUFFER_MAX-offset);
-            offset += 4;
-            break;
-        case '>':
-            (void) g_strlcpy(&temp_buffer[offset], "&gt;", ESCAPED_BUFFER_MAX-offset);
-            offset += 4;
-            break;
-        case '"':
-            (void) g_strlcpy(&temp_buffer[offset], "&quot;", ESCAPED_BUFFER_MAX-offset);
-            offset += 6;
-            break;
-        case '\'':
-            (void) g_strlcpy(&temp_buffer[offset], "&#x27;", ESCAPED_BUFFER_MAX-offset);
-            offset += 6;
-            break;
-        default:
+        /* If the character is in the range 1 to 31 but not in the set {9, 10, 13},
+           then it is illegal to use in XML - https://www.xml.com/axml/target.html#charsets.
+           To fix this, instead of emitting the illegal character, emit a representation
+           of a backslashed encoding e.g. the character with int value 2 would be
+           emitted as the string "\002" (without the quotes). This is a "policy" choice
+           to line up with other byte encodings used by Wireshark, and other choices
+           could be used instead if preferred. */
+        if (*p == 0x09 || *p == 0x0a || *p == 0x0d) {
             temp_buffer[offset++] = *p;
+        } else if (*p >= 0x01 && *p <= 0x1f) {
+            temp_buffer[offset++] = '\\';
+            temp_buffer[offset++] = '0';
+            temp_buffer[offset++] = hex[(*p) >> 4];
+            temp_buffer[offset++] = hex[(*p) & 0x0f];
+        } else {
+            switch (*p) {
+            case '&':
+                (void) g_strlcpy(&temp_buffer[offset], "&amp;", ESCAPED_BUFFER_MAX-offset);
+                offset += 5;
+                break;
+            case '<':
+                (void) g_strlcpy(&temp_buffer[offset], "&lt;", ESCAPED_BUFFER_MAX-offset);
+                offset += 4;
+                break;
+            case '>':
+                (void) g_strlcpy(&temp_buffer[offset], "&gt;", ESCAPED_BUFFER_MAX-offset);
+                offset += 4;
+                break;
+            case '"':
+                (void) g_strlcpy(&temp_buffer[offset], "&quot;", ESCAPED_BUFFER_MAX-offset);
+                offset += 6;
+                break;
+            case '\'':
+                (void) g_strlcpy(&temp_buffer[offset], "&#x27;", ESCAPED_BUFFER_MAX-offset);
+                offset += 6;
+                break;
+            default:
+                temp_buffer[offset++] = *p;
+            }
         }
         if (offset > ESCAPED_BUFFER_MAX-8) {
             /* Getting close to end of buffer so flush to fh */
