@@ -13,8 +13,14 @@
 #include <string.h>
 #include <glib.h>
 
-#include <wsutil/ws_cpuid.h>
 #include <wsutil/cpu_info.h>
+#if (defined(__arm64__) && defined(__APPLE__))
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#include <wsutil/wslog.h>
+#else
+#include <wsutil/ws_cpuid.h>
+#endif
 
 /*
  * Get the CPU info, and append it to the GString
@@ -22,6 +28,21 @@
 void
 get_cpu_info(GString *str)
 {
+#if (defined(__arm64__) && defined(__APPLE__))
+    char CPUBrandString[0x40];
+    size_t size = sizeof(CPUBrandString);
+
+    if (sysctlbyname("machdep.cpu.brand_string", &CPUBrandString, &size, NULL, 0) == -1) {
+        ws_debug("get_cpu_info failed with error: %d", errno);
+        return;
+    }
+
+    if (str->len > 0)
+        g_string_append(str, ", with ");
+
+    g_string_append_printf(str, "%s", g_strstrip(CPUBrandString));
+
+#else
     guint32 CPUInfo[4];
     char CPUBrandString[0x40];
     unsigned nExIds;
@@ -56,6 +77,7 @@ get_cpu_info(GString *str)
 
     if (ws_cpuid_sse42())
         g_string_append(str, " (with SSE4.2)");
+#endif
 }
 
 /*
