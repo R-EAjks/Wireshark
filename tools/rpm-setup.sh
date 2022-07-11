@@ -184,8 +184,10 @@ add_packages BASIC_LIST hicolor-icon-theme xdg-utils ||
 echo "Default icon theme and XDG utils are unavailable" >&2
 
 # This in only required (and available) on OpenSUSE
-add_package BASIC_LIST update-desktop-files ||
-echo "update-desktop-files is unavailable" >&2
+if grep -q "suse" /etc/os-release; then
+	add_package BASIC_LIST update-desktop-files ||
+	echo "update-desktop-files is unavailable" >&2
+fi
 
 add_package BASIC_LIST perl-podlators ||
 echo "perl-podlators unavailable" >&2
@@ -213,7 +215,9 @@ add_package ADDITIONAL_LIST libzstd-devel || echo "zstd is unavailable" >&2
 add_package ADDITIONAL_LIST lz4-devel || add_package ADDITIONAL_LIST liblz4-devel ||
 echo "lz4 devel is unavailable" >&2
 
-add_package ADDITIONAL_LIST libcap-progs || echo "cap progs are unavailable" >&2
+if grep -q "suse" /etc/os-release; then
+	add_package ADDITIONAL_LIST libcap-progs || echo "cap progs are unavailable" >&2
+fi
 
 add_package ADDITIONAL_LIST libmaxminddb-devel ||
 echo "MaxMind DB devel is unavailable" >&2
