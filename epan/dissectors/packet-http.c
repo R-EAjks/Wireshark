@@ -124,11 +124,14 @@ static int hf_http_prev_request_in = -1;
 static int hf_http_prev_response_in = -1;
 static int hf_http_time = -1;
 static int hf_http_chunk_size = -1;
+static int hf_http_chunk_data = -1;
 static int hf_http_chunk_boundary = -1;
 static int hf_http_chunked_trailer_part = -1;
 static int hf_http_file_data = -1;
 static int hf_http_unknown_header = -1;
 static int hf_http_http2_settings_uri = -1;
+static int hf_http_path_segment = -1;
+static int hf_http_path_sub_segment = -1;
 
 static gint ett_http = -1;
 static gint ett_http_ntlmssp = -1;
@@ -141,6 +144,7 @@ static gint ett_http_chunk_data = -1;
 static gint ett_http_encoded_entity = -1;
 static gint ett_http_header_item = -1;
 static gint ett_http_http2_settings_item = -1;
+static gint ett_http_path = -1;
 
 static expert_field ei_http_chat = EI_INIT;
 static expert_field ei_http_te_and_length = EI_INIT;
@@ -162,6 +166,11 @@ static dissector_handle_t http2_handle;
 static dissector_handle_t sstp_handle;
 static dissector_handle_t ntlmssp_handle;
 static dissector_handle_t gssapi_handle;
+
+/* RFC 3986 Ch 2.2 Reserved characters*/
+/* patterns used for tvb_ws_mempbrk_pattern_guint8 */
+static ws_mempbrk_pattern pbrk_gen_delims;
+static ws_mempbrk_pattern pbrk_sub_delims;
 
 /* Stuff for generation/handling of fields for custom HTTP headers */
 typedef struct _header_field_t {
@@ -351,7 +360,7 @@ typedef struct _http_eo_t {
 } http_eo_t;
 
 static tap_packet_status
-http_eo_packet(void *tapdata, packet_info *pinfo, epan_dissect_t *edt _U_, const void *data)
+http_eo_packet(void *tapdata, packet_info *pinfo, epan_dissect_t *edt _U_, const void *data, tap_flags_t flags _U_)
 {
 	export_object_list_t *object_list = (export_object_list_t *)tapdata;
 	const http_eo_t *eo_info = (const http_eo_t *)data;
@@ -465,6 +474,46 @@ static int st_node_reqs_by_srv_addr = -1;
 static int st_node_reqs_by_http_host = -1;
 static int st_node_resps_by_srv_addr = -1;
 
+/* Parse HTTP path sub components RFC3986 Ch 2.2*/
+void
+http_add_path_components_to_tree(tvbuff_t* tvb, packet_info* pinfo _U_, proto_item* item, int offset, int length)
+{
+	int end_offset, gen_delim_offset, next_gen_delim_offset, comp_len, sub_compomet_end_offset, sub_comp_len, next_sub_comp_delim_offset;
+	end_offset = offset + length;
+	/* Check of we have any general delimiters in the path string */
+	gen_delim_offset = tvb_ws_mempbrk_pattern_guint8(tvb, offset, length, &pbrk_gen_delims, NULL);
+	if (gen_delim_offset == -1) {
+		return;
+	}
+	proto_tree *tree = proto_item_add_subtree(item, ett_http_path);
+	comp_len = gen_delim_offset - offset;
+	while (end_offset > offset) {
+		next_gen_delim_offset = tvb_ws_mempbrk_pattern_guint8(tvb, gen_delim_offset + 1, length - comp_len, &pbrk_gen_delims, NULL);
+		if (next_gen_delim_offset == -1) {
+			sub_compomet_end_offset = end_offset;
+		} else {
+			sub_compomet_end_offset = next_gen_delim_offset - 1;
+		}
+		proto_tree_add_item(tree, hf_http_path_segment, tvb, offset, comp_len, ENC_ASCII);
+		offset = offset + comp_len + 1;
+
+		/* Dissect sub segments */
+		while (sub_compomet_end_offset > offset) {
+			next_sub_comp_delim_offset = tvb_ws_mempbrk_pattern_guint8(tvb, offset, sub_compomet_end_offset - offset, &pbrk_sub_delims, NULL);
+			if (next_sub_comp_delim_offset == -1) {
+				sub_comp_len = sub_compomet_end_offset - offset;
+				proto_tree_add_item(tree, hf_http_path_sub_segment, tvb, offset, sub_comp_len, ENC_ASCII);
+				offset = sub_compomet_end_offset;
+			} else {
+				sub_comp_len = next_sub_comp_delim_offset - offset;
+				proto_tree_add_item(tree, hf_http_path_sub_segment, tvb, offset, sub_comp_len, ENC_ASCII);
+				offset = next_sub_comp_delim_offset + 1;
+			}
+		}
+	}
+
+}
+
 /* HTTP/Load Distribution stats init function */
 static void
 http_reqs_stats_tree_init(stats_tree* st)
@@ -477,7 +526,7 @@ http_reqs_stats_tree_init(stats_tree* st)
 
 /* HTTP/Load Distribution stats packet function */
 static tap_packet_status
-http_reqs_stats_tree_packet(stats_tree* st, packet_info* pinfo, epan_dissect_t* edt _U_, const void* p)
+http_reqs_stats_tree_packet(stats_tree* st, packet_info* pinfo, epan_dissect_t* edt _U_, const void* p, tap_flags_t flags _U_)
 {
 	const http_info_value_t* v = (const http_info_value_t*)p;
 	int reqs_by_this_host;
@@ -539,7 +588,7 @@ http_req_stats_tree_init(stats_tree* st)
 
 /* HTTP/Requests stats packet function */
 static tap_packet_status
-http_req_stats_tree_packet(stats_tree* st, packet_info* pinfo _U_, epan_dissect_t* edt _U_, const void* p)
+http_req_stats_tree_packet(stats_tree* st, packet_info* pinfo _U_, epan_dissect_t* edt _U_, const void* p, tap_flags_t flags _U_)
 {
 	const http_info_value_t* v = (const http_info_value_t*)p;
 	int reqs_by_this_host;
@@ -602,7 +651,7 @@ http_stats_tree_init(stats_tree* st)
 
 /* HTTP/Packet Counter stats packet function */
 static tap_packet_status
-http_stats_tree_packet(stats_tree* st, packet_info* pinfo _U_, epan_dissect_t* edt _U_, const void* p)
+http_stats_tree_packet(stats_tree* st, packet_info* pinfo _U_, epan_dissect_t* edt _U_, const void* p, tap_flags_t flags _U_)
 {
 	const http_info_value_t* v = (const http_info_value_t*)p;
 	guint i = v->response_code;
@@ -873,7 +922,7 @@ determine_http_location_target(const gchar *base_url, const gchar * location_url
 
 /* HTTP/Request Sequences stats packet function */
 static tap_packet_status
-http_seq_stats_tree_packet(stats_tree* st, packet_info* pinfo _U_, epan_dissect_t* edt _U_, const void* p)
+http_seq_stats_tree_packet(stats_tree* st, packet_info* pinfo _U_, epan_dissect_t* edt _U_, const void* p, tap_flags_t flags _U_)
 {
 	const http_info_value_t* v = (const http_info_value_t*)p;
 
@@ -2166,7 +2215,6 @@ chunked_encoding_dissector(tvbuff_t **tvb_ptr, packet_info *pinfo,
 	while (datalen > 0) {
 		proto_item *chunk_ti = NULL, *chuck_size_item;
 		proto_tree *chunk_subtree = NULL;
-		tvbuff_t *data_tvb = NULL; /*  */
 		gchar *c = NULL;
 		guint8 *raw_data;
 		gint raw_len = 0;
@@ -2262,15 +2310,12 @@ chunked_encoding_dissector(tvbuff_t **tvb_ptr, packet_info *pinfo,
 			proto_item_set_len(chuck_size_item, chunk_offset - offset);
 
 			/*
-			 * XXX - just add the chunk's data as an item?
-			 *
-			 * Using the data dissector means that, in
+			 * Adding the chunk as FT_BYTES means that, in
 			 * TShark, you get the entire chunk dumped
 			 * out in hex, in addition to whatever
 			 * dissection is done on the reassembled data.
 			 */
-			data_tvb = tvb_new_subset_length(tvb, chunk_offset, chunk_size);
-			call_data_dissector(data_tvb, pinfo, chunk_subtree);
+			proto_tree_add_item(chunk_subtree, hf_http_chunk_data, tvb, chunk_offset, chunk_size, ENC_NA);
 
 			proto_tree_add_item(chunk_subtree, hf_http_chunked_boundary, tvb,
 								chunk_offset + chunk_size, 2, ENC_NA);
@@ -2338,13 +2383,15 @@ chunked_encoding_dissector(tvbuff_t **tvb_ptr, packet_info *pinfo,
 					 "HTTP chunked response");
 
 	/* Dechunk the "chunked response" to a new memory buffer */
+	/* XXX: Composite tvbuffers do work now, so we should probably
+         * use that to avoid the memcpys unless necessary.
+         */
 	orig_datalen      = datalen;
 	raw_data	      = (guint8 *)wmem_alloc(pinfo->pool, datalen);
 	raw_len		      = 0;
 	chunked_data_size = 0;
 
 	while (datalen > 0) {
-		tvbuff_t *data_tvb;
 		guint32	  chunk_size;
 		gint	  chunk_offset;
 		guint8	 *chunk_string;
@@ -2416,16 +2463,12 @@ chunked_encoding_dissector(tvbuff_t **tvb_ptr, packet_info *pinfo,
 			/* last-chunk does not have chunk-data CRLF. */
 			if (chunk_size > 0) {
 				/*
-				 * XXX - just add the chunk's data as an item?
-				 *
-				 * Using the data dissector means that, in
+				 * Adding the chunk as FT_BYTES means that, in
 				 * TShark, you get the entire chunk dumped
 				 * out in hex, in addition to whatever
 				 * dissection is done on the reassembled data.
 				 */
-				data_tvb = tvb_new_subset_length(tvb, chunk_offset, chunk_size);
-				call_data_dissector(data_tvb, pinfo, chunk_subtree);
-
+				proto_tree_add_item(chunk_subtree, hf_http_chunk_data, tvb, chunk_offset, chunk_size, ENC_NA);
 				proto_tree_add_item(chunk_subtree, hf_http_chunk_boundary, tvb,
 									chunk_offset + chunk_size, 2, ENC_NA);
 			}
@@ -4158,6 +4201,10 @@ proto_register_http(void)
 	      { "Chunk size", "http.chunk_size",
 		FT_UINT32, BASE_DEC|BASE_UNIT_STRING, &units_octet_octets, 0,
 		NULL, HFILL }},
+	    { &hf_http_chunk_data,
+	      { "Chunk data", "http.chunk_data",
+		FT_BYTES, BASE_NONE, NULL, 0,
+		NULL, HFILL }},
 	    { &hf_http_file_data,
 	      { "File Data", "http.file_data",
 		FT_STRING, BASE_NONE, NULL, 0,
@@ -4170,6 +4217,15 @@ proto_register_http(void)
 	      { "HTTP2 Settings URI", "http.http2_settings_uri",
 		FT_BYTES, BASE_NONE, NULL, 0,
 		NULL, HFILL }},
+	    { &hf_http_path_segment,
+	      { "Path segment", "http.path_segment",
+		FT_STRING, BASE_NONE, NULL, 0,
+		NULL, HFILL } },
+	    { &hf_http_path_sub_segment,
+	      { "Path sub segment", "http.path_sub_segment",
+		FT_STRING, BASE_NONE, NULL, 0,
+		NULL, HFILL } },
+
 	};
 	static gint *ett[] = {
 		&ett_http,
@@ -4182,7 +4238,8 @@ proto_register_http(void)
 		&ett_http_chunk_data,
 		&ett_http_encoded_entity,
 		&ett_http_header_item,
-		&ett_http_http2_settings_item
+		&ett_http_http2_settings_item,
+		&ett_http_path
 	};
 
 	static ei_register_info ei[] = {
@@ -4329,6 +4386,12 @@ proto_register_http(void)
 	register_follow_stream(proto_http, "http_follow", tcp_follow_conv_filter, tcp_follow_index_filter, tcp_follow_address_filter,
 							tcp_port_to_display, follow_tvb_tap_listener);
 	http_eo_tap = register_export_object(proto_http, http_eo_packet, NULL);
+
+	/* compile patterns, exluding "/" */
+	ws_mempbrk_compile(&pbrk_gen_delims, ":?#[]@");
+	/* exlude "=" */
+	ws_mempbrk_compile(&pbrk_sub_delims, "!$&'()*+,;");
+
 }
 
 /*

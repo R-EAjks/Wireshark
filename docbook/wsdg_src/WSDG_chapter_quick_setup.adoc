@@ -16,7 +16,6 @@ The following must be installed in order to build Wireshark:
 
 * a C compiler and a C++ compiler;
 * the Flex lexical analyzer;
-* either Bison or Berkeley YACC;
 * Perl;
 * Python 3;
 * CMake;
@@ -157,16 +156,24 @@ the file _docbook/README.adoc_ in the Wireshark sources.
 
 ==== Optional: Create an installable or source code package
 
-To create a source code tarball, build the `dist` target.
+You can create packages using the following build targets and commands:
 
-To create an installable package after successfully building Wireshark:
+Source code tarball::
+  Build the `dist` target.
 
-* to build a Debian package, build the `deb-package` target;
-* to build an RPM package, build the `rpm-package` target;
-* to build an https://appimage.org[AppImage] package, build the
-`appimage` target;
-* to build a macOS dmg package containing am application bundle, build
-the `dmg_package` target.
+deb (Debian) package::
+  Create a symlink in the top-level source directory to _packaging/debian_, then run `dpkg-buildpackage`.
+
+RPM package::
+  Build the `wireshark_rpm` target.
+
+https://appimage.org[AppImage] package::
+  Build the `wireshark_appimage` target.
+
+macOS .dmg package containing an application bundle::
+  Build the `wireshark_dmg` or `logray_dmg` targets.
+
+Installable packages typically require building Wireshark first.
 
 ==== Troubleshooting during the build and install on Unix
 
@@ -442,9 +449,10 @@ path and that xsltproc uses the DocBook catalog.
 
 ==== Install winflexbison
 
-Get the winFlexBison installer from https://sourceforge.net/projects/winflexbison/
-and install into the default location. Ensure the directory containing win_flex.exe
-and win_bison.exe is on your path.
+Get the winFlexBison installer from
+https://sourceforge.net/projects/winflexbison/
+and install into the default location.
+Ensure the directory containing win_flex.exe is on your path.
 
 Alternatively you can install Winflexbison using Chocolatey:
 
@@ -649,7 +657,7 @@ on using the <<ChToolsDebugger, Debugger Tools>>.
 To build the Wireshark User's Guide and the Wireshark Developer's Guide,
 build the `all_guides` target, e.g.  `msbuild all_guides.vcxproj`.
 Detailed information to build these guides can be found in the file
-_docbook\README.md_ in the Wireshark sources.
+_docbook\README.adoc_ in the Wireshark sources.
 
 ==== Optional: Create a Wireshark Installer
 
@@ -668,12 +676,12 @@ If you've closed the Visual Studio Command Prompt <<ChSetupPrepareCommandCom,pre
 Run
 
 ----
-> msbuild /m /p:Configuration=RelWithDebInfo nsis_package_prep.vcxproj
-> msbuild /m /p:Configuration=RelWithDebInfo nsis_package.vcxproj
+> msbuild /m /p:Configuration=RelWithDebInfo wireshark_nsis_prep.vcxproj
+> msbuild /m /p:Configuration=RelWithDebInfo wireshark_nsis.vcxproj
 ----
 
-to build a Wireshark installer. If you sign your executables you should do
-so between the “nsis_package_prep” and “nsis_package” steps.
+to build a Wireshark installer.
+If you sign your executables you should do so between the “wireshark_nsis_prep” and “wireshark_nsis” steps.
 
 Run
 

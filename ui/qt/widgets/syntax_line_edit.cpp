@@ -78,6 +78,7 @@ void SyntaxLineEdit::allowCompletion(bool enabled)
 void SyntaxLineEdit::setSyntaxState(SyntaxState state) {
     syntax_state_ = state;
 
+    // XXX Should we drop the background colors here in favor of ::paintEvent below?
     QColor valid_bg = ColorUtils::fromColorT(&prefs.gui_text_valid);
     QColor valid_fg = ColorUtils::contrastingTextColor(valid_bg);
     QColor invalid_bg = ColorUtils::fromColorT(&prefs.gui_text_invalid);
@@ -390,6 +391,45 @@ void SyntaxLineEdit::focusOutEvent(QFocusEvent *event)
 // color blind people.
 void SyntaxLineEdit::paintEvent(QPaintEvent *event)
 {
+    QStyleOptionFrame opt;
+    initStyleOption(&opt);
+    QRect cr = style()->subElementRect(QStyle::SE_LineEditContents, &opt, this);
+    QPainter painter(this);
+
+    // In my (gcc) testing here, if I add "background: yellow;" to the DisplayFilterCombo
+    // stylesheet, when building with Qt 5.15.2 the combobox background is yellow and the
+    // text entry area (between the bookmark and apply button) is drawn in the correct
+    // base color (white for light mode and black for dark mode), and the correct syntax
+    // color otherwise. When building with Qt 6.2.4 and 6.3.1, the combobox background is
+    // yellow and the text entry area is always yellow, i.e. QLineEdit isn't painting its
+    // background for some reason.
+    //
+    // It's not clear if this is a bug or just how things work under Qt6. Either way, it's
+    // easy to work around.
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    // Must match CaptureFilterEdit and DisplayFilterEdit stylesheets.
+    int pad = style()->pixelMetric(QStyle::PM_DefaultFrameWidth) + 1;
+    QRect full_cr = cr.adjusted(-pad, 0, 0, 0);
+    QBrush bg;
+
+    switch (syntax_state_) {
+    case Valid:
+        bg = ColorUtils::fromColorT(&prefs.gui_text_valid);
+        break;
+    case Invalid:
+        bg = ColorUtils::fromColorT(&prefs.gui_text_invalid);
+        break;
+    case Deprecated:
+        bg = ColorUtils::fromColorT(&prefs.gui_text_deprecated);
+        break;
+    default:
+        bg = palette().base();
+        break;
+    }
+
+    painter.fillRect(full_cr, bg);
+#endif
+
     QLineEdit::paintEvent(event);
 
     QString si_name;
@@ -405,9 +445,6 @@ void SyntaxLineEdit::paintEvent(QPaintEvent *event)
         return;
     }
 
-    QStyleOptionFrame opt;
-    initStyleOption(&opt);
-    QRect cr = style()->subElementRect(QStyle::SE_LineEditContents, &opt, this);
     QRect sir = QRect(0, 0, 14, 14); // QIcon::paint scales, which is not what we want.
     int textWidth = fontMetrics().boundingRect(text()).width();
     // Qt always adds a margin of 6px between the border and text, see
@@ -428,9 +465,10 @@ void SyntaxLineEdit::paintEvent(QPaintEvent *event)
     int si_off = (cr.height() - sir.height()) / 2;
     sir.moveTop(si_off);
     sir.moveRight(cr.right() - si_off);
-    QPainter painter(this);
+    painter.save();
     painter.setOpacity(0.25);
     state_icon.paint(&painter, sir);
+    painter.restore();
 }
 
 void SyntaxLineEdit::insertFieldCompletion(const QString &completion_text)

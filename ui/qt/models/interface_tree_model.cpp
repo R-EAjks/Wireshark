@@ -401,12 +401,12 @@ bool InterfaceTreeModel::isRemote(int idx)
  */
 void InterfaceTreeModel::interfaceListChanged()
 {
-    emit beginResetModel();
+    beginResetModel();
 
     points.clear();
     active.clear();
 
-    emit endResetModel();
+    endResetModel();
 }
 
 /*
@@ -509,9 +509,9 @@ void InterfaceTreeModel::updateStatistic(unsigned int idx)
 
     if (active[device->name] != isActive)
     {
-        emit beginResetModel();
+        beginResetModel();
         active[device->name] = isActive;
-        emit endResetModel();
+        endResetModel();
     }
 
     emit dataChanged(index(idx, IFTREE_COL_STATS), index(idx, IFTREE_COL_STATS));

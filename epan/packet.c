@@ -591,6 +591,7 @@ dissect_record(epan_dissect_t *edt, int file_type_subtype,
 	edt->pi.ptype = PT_NONE;
 	edt->pi.use_endpoint = FALSE;
 	edt->pi.conv_endpoint = NULL;
+	edt->pi.conv_elements = NULL;
 	edt->pi.p2p_dir = P2P_DIR_UNKNOWN;
 	edt->pi.link_dir = LINK_DIR_UNKNOWN;
 	edt->pi.src_win_scale = -1; /* unknown Rcv.Wind.Shift */
@@ -664,6 +665,7 @@ dissect_file(epan_dissect_t *edt, wtap_rec *rec,
 	edt->pi.ptype = PT_NONE;
 	edt->pi.use_endpoint = FALSE;
 	edt->pi.conv_endpoint = NULL;
+	edt->pi.conv_elements = NULL;
 	edt->pi.p2p_dir = P2P_DIR_UNKNOWN;
 	edt->pi.link_dir = LINK_DIR_UNKNOWN;
 	edt->pi.layers = wmem_list_new(edt->pi.pool);
@@ -2955,6 +2957,10 @@ dissector_try_heuristic(heur_dissector_list_t sub_dissectors, tvbuff_t *tvb,
 			}
 		}
 		if (len) {
+			if (ws_log_msg_is_active(WS_LOG_DOMAIN, LOG_LEVEL_DEBUG)) {
+				ws_debug("Frame: %d | Layers: %s | Dissector: %s\n", pinfo->num, proto_list_layers(pinfo), hdtbl_entry->short_name);
+			}
+
 			*heur_dtbl_entry = hdtbl_entry;
 
 			/* Bubble the matched entry to the top for faster search next time. */

@@ -450,6 +450,8 @@ static int hf_ieee802154_hie_csl = -1;
 static int hf_ieee802154_hie_csl_phase = -1;
 static int hf_ieee802154_hie_csl_period = -1;
 static int hf_ieee802154_hie_csl_rendezvous_time = -1;
+static int hf_ieee802154_hie_rdv = -1;
+static int hf_ieee802154_hie_rdv_wakeup_interval = -1;
 static int hf_ieee802154_hie_global_time = -1;
 static int hf_ieee802154_hie_global_time_value = -1;
 static int hf_ieee802154_hie_vendor_specific = -1;
@@ -728,6 +730,7 @@ static gint ett_ieee802154_hie_unsupported = -1;
 static gint ett_ieee802154_hie_time_correction = -1;
 static gint ett_ieee802154_hie_ht = -1;
 static gint ett_ieee802154_hie_csl = -1;
+static gint ett_ieee802154_hie_rdv = -1;
 static gint ett_ieee802154_hie_global_time = -1;
 static gint ett_ieee802154_hie_vendor_specific = -1;
 static gint ett_ieee802154_payload_ie = -1;
@@ -941,6 +944,7 @@ static const value_string ieee802154_psie_types[] = {
 static const value_string ieee802154_header_ie_names[] = {
     { IEEE802154_HEADER_IE_VENDOR_SPECIFIC, "Vendor Specific IE" },
     { IEEE802154_HEADER_IE_CSL,             "CSL IE" },
+    { IEEE802154_HEADER_IE_RENDEZVOUS,      "RendezVous Time IE" },
     { IEEE802154_HEADER_IE_RIT,             "RIT IE" },
     { IEEE802154_HEADER_IE_DSME_PAN,        "DSME PAN descriptor IE" },
     { IEEE802154_HEADER_IE_RENDEZVOUS,      "Rendezvous Time IE" },
@@ -3987,6 +3991,34 @@ dissect_hie_csl(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *d
 }
 
 /**
+ * Dissect the Rendez-Vous Time IE (7.4.2.6)
+ * The IE is made of 2 fields:
+ *  - RendezVous Time: in 802.15.4-2015, this is exactly the same field as in the CSL IE
+ *  - Wake-Up Interval: the spec text is unclear about the field being optional or not. This dissector assumes it is
+ */
+static int
+dissect_hie_rendezvous_time(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data _U_)
+{
+    proto_tree *subtree = ieee802154_create_hie_tree(tvb, tree, hf_ieee802154_hie_rdv, ett_ieee802154_hie_rdv);
+
+    // reuse field from CSL IE
+    proto_tree_add_item(subtree, hf_ieee802154_hie_csl_rendezvous_time, tvb, 2, 2, ENC_LITTLE_ENDIAN);
+
+    // In 802.15.4-2015, Rendez-Vous Time IE is only present in CSL Wake-Up Frames
+    // Update the packet information
+    col_set_str(pinfo->cinfo, COL_INFO, "CSL Wake-up Frame");
+    col_append_fstr(pinfo->cinfo, COL_INFO, ", Rendez-Vous Time: %d", tvb_get_guint16(tvb, 2, ENC_LITTLE_ENDIAN));
+
+    // Assume Wake-Up Interval is optional. Spec says "only present [...] when macCslInterval is nonzero"
+    if (tvb_reported_length(tvb) >= 6) {
+        proto_tree_add_item(subtree, hf_ieee802154_hie_rdv_wakeup_interval, tvb, 4, 2, ENC_LITTLE_ENDIAN);
+        return 2 + 4;
+    }
+
+    return 2 + 2;
+}
+
+/**
  * Dissect the Time Correction Header IE (7.4.2.7)
  *
  * This field is constructed by taking a signed 16-bit 2's compliment time
@@ -5560,9 +5592,10 @@ static const char* ieee802154_conv_get_filter_type(conv_item_t* conv, conv_filte
 
 static ct_dissector_info_t ieee802154_ct_dissector_info = {&ieee802154_conv_get_filter_type };
 
-static tap_packet_status ieee802154_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip _U_)
+static tap_packet_status ieee802154_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip _U_, tap_flags_t flags)
 {
     conv_hash_t *hash = (conv_hash_t*)pct;
+    hash->flags = flags;
 
     add_conversation_table_data(hash, &pinfo->dl_src, &pinfo->dl_dst, 0, 0, 1,
             pinfo->fd->pkt_len, &pinfo->rel_ts, &pinfo->abs_ts,
@@ -5585,9 +5618,10 @@ static const char* ieee802154_host_get_filter_type(hostlist_talker_t* host, conv
 
 static hostlist_dissector_info_t ieee802154_host_dissector_info = {&ieee802154_host_get_filter_type };
 
-static tap_packet_status ieee802154_hostlist_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip _U_)
+static tap_packet_status ieee802154_hostlist_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip _U_, tap_flags_t flags)
 {
     conv_hash_t *hash = (conv_hash_t*)pit;
+    hash->flags = flags;
 
     /* Take two "add" passes per packet, adding for each direction, ensures that all
      packets are counted properly (even if address is sending to itself)
@@ -5873,6 +5907,15 @@ void proto_register_ieee802154(void)
         { &hf_ieee802154_hie_csl_rendezvous_time,
         { "Rendezvous Time", "wpan.header_ie.csl.rendezvous_time", FT_INT16, BASE_DEC, NULL, 0x0,
             "CSL Rendezvous Time in units of 10 symbols", HFILL }},
+
+        /* RendezVous Time IE */
+        { &hf_ieee802154_hie_rdv,
+        { "Rendezvous Time IE", "wpan.header_ie.rdv", FT_NONE, BASE_NONE, NULL, 0x0,
+            NULL, HFILL }},
+
+        { &hf_ieee802154_hie_rdv_wakeup_interval,
+        { "Wake-up Interval", "wpan.header_ie.csl.wakeup_interval", FT_INT16, BASE_DEC, NULL, 0x0,
+            "Interval between two successive Wake-Up frames, in units of 10 symbols", HFILL }},
 
         /* Global Time IE */
         { &hf_ieee802154_hie_global_time,
@@ -6707,6 +6750,7 @@ void proto_register_ieee802154(void)
         &ett_ieee802154_hie_time_correction,
         &ett_ieee802154_hie_ht,
         &ett_ieee802154_hie_csl,
+        &ett_ieee802154_hie_rdv,
         &ett_ieee802154_hie_global_time,
         &ett_ieee802154_hie_vendor_specific,
         &ett_ieee802154_payload_ie,
@@ -7020,6 +7064,7 @@ void proto_reg_handoff_ieee802154(void)
     /* Register internal IE handlers */
     dissector_add_uint(IEEE802154_HEADER_IE_DTABLE, IEEE802154_HEADER_IE_TIME_CORR, create_dissector_handle(dissect_hie_time_correction, -1));
     dissector_add_uint(IEEE802154_HEADER_IE_DTABLE, IEEE802154_HEADER_IE_CSL, create_dissector_handle(dissect_hie_csl, -1));
+    dissector_add_uint(IEEE802154_HEADER_IE_DTABLE, IEEE802154_HEADER_IE_RENDEZVOUS, create_dissector_handle(dissect_hie_rendezvous_time, -1));
     dissector_add_uint(IEEE802154_HEADER_IE_DTABLE, IEEE802154_HEADER_IE_GLOBAL_TIME, create_dissector_handle(dissect_hie_global_time, -1));
     dissector_add_uint(IEEE802154_HEADER_IE_DTABLE, IEEE802154_HEADER_IE_VENDOR_SPECIFIC, create_dissector_handle(dissect_hie_vendor_specific, -1));
 
