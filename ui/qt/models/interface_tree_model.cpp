@@ -140,37 +140,7 @@ QVariant InterfaceTreeModel::data(const QModelIndex &index, int role) const
             }
             else if (col == IFTREE_COL_DISPLAY_NAME)
             {
-                // TODO: Clean this up
-                // TODO: "Show hidden interfaces". Windows, it doesn't work. It's already showing the hidden interfaces
-                // TODO: Make interface box bigger
-                // TODO: Dividing lines between the interfaces
-                // TODO: Bold the first one.
-                // Windows:
-                // device->display_name: 0x000001f24623f470 "Local Area Connection* 8"
-                // device->name: 0x000001f245ef6f50 "\\Device\\NPF_{C46583A9-BF68-4C87-81F2-02F28D38BECD}"
-                // device->friendly_name: 0x000001f24623f650 "Local Area Connection* 8"
-                // device->vendor_description: 0x000001f246116d20 "WAN Miniport (IP)"
-
-                // Linux:
-                // device->display_name: 
-                // device->name: same as display_name
-                // device->friendly_name: null
-                // device->vendor_description: null
-
-                // Mac:
-                // device->display_name: 
-                // device->name: 
-                // device->friendly_name: 
-                // device->vendor_description: 
-
-                static char buffer[5000];
-                if (device->vendor_description)
-                    sprintf(buffer, "%s\n[%s]", device->display_name, device->vendor_description);
-                else
-                    sprintf(buffer, "%s\n", device->display_name);
-
-                // return QString(device->display_name);
-                return QString(buffer);
+                return QString(device->display_name);
             }
             else if (col == IFTREE_COL_PIPE_PATH)
             {
@@ -236,7 +206,7 @@ QVariant InterfaceTreeModel::data(const QModelIndex &index, int role) const
                 }
                 else
                 {
-                    return QString("<No IP Address>");
+                    return QString("<None>");
                 }
             }
             else
