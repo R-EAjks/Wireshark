@@ -567,7 +567,7 @@ class case_dissect_tcp(subprocesstest.SubprocessTestCase):
         self.assertRun([cmd_tshark,
                 '-r', capture_file,
                 '-otcp.reassemble_out_of_order:TRUE',
-                '-otcp.fastrt_supersedes_ooo:TRUE',
+                '-otcp.fastrt_supersedes_ooo:FALSE',
                 '-Y', 'http',
             ] + extraArgs)
         self.assertEqual(self.countOutput('HTTP'), 5)
@@ -588,7 +588,7 @@ class case_dissect_tcp(subprocesstest.SubprocessTestCase):
         proc = self.assertRun((cmd_tshark,
                 '-r', capture_file('dns-ooo.pcap'),
                 '-otcp.reassemble_out_of_order:TRUE',
-                '-otcp.fastrt_supersedes_ooo:TRUE',
+                '-otcp.fastrt_supersedes_ooo:FALSE',
                 '-Y', 'dns', '-Tfields', '-edns.qry.name',
             ))
         self.assertEqual(proc.stdout_str.strip(), 'example.com')
@@ -604,7 +604,7 @@ class case_dissect_tcp(subprocesstest.SubprocessTestCase):
         proc = self.assertRun((cmd_tshark,
             '-r', capture_file('http-ooo2.pcap'),
             '-otcp.reassemble_out_of_order:TRUE',
-            '-otcp.fastrt_supersedes_ooo:TRUE',
+            '-otcp.fastrt_supersedes_ooo:FALSE',
             '-Tfields',
             '-eframe.number', '-etcp.reassembled_in', '-e_ws.col.Info',
             '-2',
