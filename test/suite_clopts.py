@@ -220,15 +220,13 @@ class case_tshark_dump_glossaries(subprocesstest.SubprocessTestCase):
 class case_tshark_z_expert(subprocesstest.SubprocessTestCase):
     def test_tshark_z_expert_all(self, cmd_tshark, capture_file):
         self.assertRun((cmd_tshark, '-q', '-z', 'expert',
-            '-otcp.fastrt_supersedes_ooo:FALSE',
-            '-r', capture_file('http-ooo.pcap'))
+            '-r', capture_file('http-ooo.pcap'), '-otcp.fastrt_supersedes_ooo:FALSE'))
         self.assertTrue(self.grepOutput('Errors'))
         self.assertTrue(self.grepOutput('Warns'))
         self.assertTrue(self.grepOutput('Chats'))
 
     def test_tshark_z_expert_error(self, cmd_tshark, capture_file):
         self.assertRun((cmd_tshark, '-q', '-z', 'expert,error',
-            '-otcp.fastrt_supersedes_ooo:FALSE',
             '-r', capture_file('http-ooo.pcap')))
         self.assertTrue(self.grepOutput('Errors'))
         self.assertFalse(self.grepOutput('Warns'))
@@ -236,7 +234,6 @@ class case_tshark_z_expert(subprocesstest.SubprocessTestCase):
 
     def test_tshark_z_expert_warn(self, cmd_tshark, capture_file):
         self.assertRun((cmd_tshark, '-q', '-z', 'expert,warn',
-            '-otcp.fastrt_supersedes_ooo:FALSE',
             '-r', capture_file('http-ooo.pcap')))
         self.assertTrue(self.grepOutput('Errors'))
         self.assertTrue(self.grepOutput('Warns'))
@@ -251,8 +248,7 @@ class case_tshark_z_expert(subprocesstest.SubprocessTestCase):
 
     def test_tshark_z_expert_chat(self, cmd_tshark, capture_file):
         self.assertRun((cmd_tshark, '-q', '-z', 'expert,chat',
-            '-otcp.fastrt_supersedes_ooo:FALSE',
-            '-r', capture_file('http-ooo.pcap')))
+            '-r', capture_file('http-ooo.pcap'), '-otcp.fastrt_supersedes_ooo:FALSE'))
         self.assertTrue(self.grepOutput('Errors'))
         self.assertTrue(self.grepOutput('Warns'))
         self.assertTrue(self.grepOutput('Chats'))
