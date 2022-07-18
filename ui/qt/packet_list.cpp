@@ -881,7 +881,15 @@ void PacketList::mouseMoveEvent (QMouseEvent *event)
 
 void PacketList::keyPressEvent(QKeyEvent *event)
 {
-    QTreeView::keyPressEvent(event);
+    if (event->key() == Qt::Key_Down || event->key() == Qt::Key_Up) {
+        if (currentIndex().isValid() && currentIndex().column() > 0) {
+            int pos = horizontalScrollBar()->value();
+            QTreeView::keyPressEvent(event);
+            horizontalScrollBar()->setValue(pos);
+        }
+    } else
+        QTreeView::keyPressEvent(event);
+
     if (event->matches(QKeySequence::Copy))
     {
         QStringList content;
