@@ -1084,19 +1084,22 @@ uint64_modulo(fvalue_t *dst, const fvalue_t *a, const fvalue_t *b, char **err_pt
 	return FT_OK;
 }
 
-static enum ft_result uint_val_to_uinteger64(const fvalue_t *src, guint64 *dst)
+static enum ft_result
+uint_val_to_uinteger64(const fvalue_t *src, guint64 *dst)
 {
 	*dst = src->value.uinteger;
 	return FT_OK;
 }
 
-static enum ft_result uint_val_to_sinteger64(const fvalue_t *src, gint64 *dst)
+static enum ft_result
+uint_val_to_sinteger64(const fvalue_t *src, gint64 *dst)
 {
 	*dst = (gint64)src->value.uinteger;
 	return FT_OK;
 }
 
-static enum ft_result sint_val_to_uinteger64(const fvalue_t *src, guint64 *dst)
+static enum ft_result
+sint_val_to_uinteger64(const fvalue_t *src, guint64 *dst)
 {
 	if (src->value.sinteger < 0)
 		return FT_OVERFLOW;
@@ -1105,13 +1108,15 @@ static enum ft_result sint_val_to_uinteger64(const fvalue_t *src, guint64 *dst)
 	return FT_OK;
 }
 
-static enum ft_result sint_val_to_sinteger64(const fvalue_t *src, gint64 *dst)
+static enum ft_result
+sint_val_to_sinteger64(const fvalue_t *src, gint64 *dst)
 {
 	*dst = src->value.sinteger;
 	return FT_OK;
 }
 
-static enum ft_result uint64_val_to_uinteger64(const fvalue_t *src, guint64 *dst)
+static enum ft_result
+uint64_val_to_uinteger64(const fvalue_t *src, guint64 *dst)
 {
 	if (src->value.sinteger < 0)
 		return FT_OVERFLOW;
@@ -1120,7 +1125,8 @@ static enum ft_result uint64_val_to_uinteger64(const fvalue_t *src, guint64 *dst
 	return FT_OK;
 }
 
-static enum ft_result uint64_val_to_sinteger64(const fvalue_t *src, gint64 *dst)
+static enum ft_result
+uint64_val_to_sinteger64(const fvalue_t *src, gint64 *dst)
 {
 	if (src->value.uinteger64 > G_MAXINT64)
 		return FT_OVERFLOW;
@@ -1129,7 +1135,8 @@ static enum ft_result uint64_val_to_sinteger64(const fvalue_t *src, gint64 *dst)
 	return FT_OK;
 }
 
-static enum ft_result sint64_val_to_uinteger64(const fvalue_t *src, guint64 *dst)
+static enum ft_result
+sint64_val_to_uinteger64(const fvalue_t *src, guint64 *dst)
 {
 	if (src->value.sinteger64 < 0)
 		return FT_OVERFLOW;
@@ -1138,7 +1145,8 @@ static enum ft_result sint64_val_to_uinteger64(const fvalue_t *src, guint64 *dst
 	return FT_OK;
 }
 
-static enum ft_result sint64_val_to_sinteger64(const fvalue_t *src, gint64 *dst)
+static enum ft_result
+sint64_val_to_sinteger64(const fvalue_t *src, gint64 *dst)
 {
 	*dst = src->value.sinteger64;
 	return FT_OK;
