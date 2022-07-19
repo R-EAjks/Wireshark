@@ -90,6 +90,28 @@ double_val_to_repr(wmem_allocator_t *scope, const fvalue_t *fv, ftrepr_t rtype, 
 }
 
 static enum ft_result
+double_val_to_uinteger64(const fvalue_t *src, guint64 *dst)
+{
+	if (src->value.floating < 0 ||
+			src->value.floating > (gdouble)G_MAXUINT64)
+		return FT_OVERFLOW;
+
+	*dst = (guint64)src->value.floating;
+	return FT_OK;
+}
+
+static enum ft_result
+double_val_to_sinteger64(const fvalue_t *src, gint64 *dst)
+{
+	if (src->value.floating < (gdouble)G_MININT64 ||
+				src->value.floating > (gdouble)G_MAXINT64)
+		return FT_OVERFLOW;
+
+	*dst = (gint64)src->value.floating;
+	return FT_OK;
+}
+
+static enum ft_result
 val_unary_minus(fvalue_t * dst, const fvalue_t *src, char **err_ptr _U_)
 {
 	dst->value.floating = -src->value.floating;
@@ -165,8 +187,8 @@ ftype_register_double(void)
 		NULL,				/* val_from_charconst */
 		float_val_to_repr,		/* val_to_string_repr */
 
-		NULL,				/* val_to_uinteger64 */
-		NULL,				/* val_to_sinteger64 */
+		double_val_to_uinteger64,	/* val_to_uinteger64 */
+		double_val_to_sinteger64,	/* val_to_sinteger64 */
 
 		{ .set_value_floating = double_fvalue_set_floating },		/* union set_value */
 		{ .get_value_floating = value_get_floating },	/* union get_value */
@@ -201,8 +223,8 @@ ftype_register_double(void)
 		NULL,				/* val_from_charconst */
 		double_val_to_repr,		/* val_to_string_repr */
 
-		NULL,				/* val_to_uinteger64 */
-		NULL,				/* val_to_sinteger64 */
+		double_val_to_uinteger64,	/* val_to_uinteger64 */
+		double_val_to_sinteger64,	/* val_to_sinteger64 */
 
 		{ .set_value_floating = double_fvalue_set_floating },		/* union set_value */
 		{ .get_value_floating = value_get_floating },	/* union get_value */
