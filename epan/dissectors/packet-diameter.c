@@ -225,6 +225,7 @@ static value_string_ext diameter_avp_data_addrfamily_vals_ext = VALUE_STRING_EXT
 static int proto_diameter = -1;
 static int hf_diameter_length = -1;
 static int hf_diameter_code = -1;
+static int hf_diameter_code_text = -1;
 static int hf_diameter_hopbyhopid =-1;
 static int hf_diameter_endtoendid =-1;
 static int hf_diameter_version = -1;
@@ -1424,7 +1425,7 @@ dissect_diameter_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 		expert_add_info(c->pinfo, pi, &ei_diameter_reserved_bit_set);
 	}
 
-	cmd_item = proto_tree_add_item_ret_uint(diam_tree, hf_diameter_code, tvb, 5, 3, ENC_BIG_ENDIAN, &cmd);
+	proto_tree_add_item_ret_uint(diam_tree, hf_diameter_code, tvb, 5, 3, ENC_BIG_ENDIAN, &cmd);
 	diam_sub_dis_inf->cmd_code = cmd;
 
 
@@ -1441,8 +1442,8 @@ dissect_diameter_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 
 	cmd_str = val_to_str_const(cmd, cmd_vs, "Unknown");
 
-	/* Append name to command item, warn if unknown */
-	proto_item_append_text(cmd_item," %s", cmd_str);
+	cmd_item = proto_tree_add_string(diam_tree, hf_diameter_code_text, tvb, 5, 3, cmd_str);
+	proto_item_set_generated(cmd_item);
 	if (strcmp(cmd_str, "Unknown") == 0) {
 		expert_add_info(c->pinfo, cmd_item, &ei_diameter_code);
 	}
@@ -2408,6 +2409,8 @@ real_register_diameter_fields(void)
 		  { "Padding","diameter.avp.pad", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
 	{ &hf_diameter_code,
 		  { "Command Code", "diameter.cmd.code", FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL }},
+	{ &hf_diameter_code_text,
+		  { "Command Text", "diameter.cmd.text", FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }},
 	{ &hf_diameter_answer_in,
 		{ "Answer In", "diameter.answer_in", FT_FRAMENUM, BASE_NONE, FRAMENUM_TYPE(FT_FRAMENUM_RESPONSE), 0x0,
 		"The answer to this diameter request is in this frame", HFILL }},
