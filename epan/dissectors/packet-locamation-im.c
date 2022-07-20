@@ -17,7 +17,9 @@
  *
  * Several types of IMs are supported:
  * - Current Interface Module (CIM), version 1
+ * - Current Interface Module (CIM), version 2, revision 0
  * - Voltage Interface Module (VIM), version 1
+ * - Voltage Interface Module (VIM), version 2, revision 0
  */
 
 /* clang-format off */
@@ -60,21 +62,26 @@ void proto_reg_handoff_locamation_im(void);
 #define COMPANY_PID_CALIBRATION 0x0000
 #define COMPANY_PID_IDENT 0xffff
 #define COMPANY_PID_SAMPLES_IM1 0x0002
+#define COMPANY_PID_SAMPLES_IM2R0 0x000e
 
 #define PROTOCOL_NAME_IM_CALIBRATION "CALIBRATION"
 #define PROTOCOL_NAME_IM_IDENT "IDENT"
 #define PROTOCOL_NAME_IM_SAMPLES_IM1 "SAMPLES - IM1"
+#define PROTOCOL_NAME_IM_SAMPLES_IM2R0 "SAMPLES - IM2R0"
 
 #define PROTOCOL_NAME_CALIBRATION (COMPANY_NAME " " COMPANY_IM_TEXT " " PROTOCOL_NAME_IM_CALIBRATION)
 #define PROTOCOL_NAME_IDENT (COMPANY_NAME " " COMPANY_IM_TEXT " " PROTOCOL_NAME_IM_IDENT)
 #define PROTOCOL_NAME_SAMPLES_IM1 (COMPANY_NAME " " COMPANY_IM_TEXT " " PROTOCOL_NAME_IM_SAMPLES_IM1)
+#define PROTOCOL_NAME_SAMPLES_IM2R0 (COMPANY_NAME " " COMPANY_IM_TEXT " " PROTOCOL_NAME_IM_SAMPLES_IM2R0)
 
 #define PROTOCOL_SHORTNAME_CALIBRATION PROTOCOL_NAME_IM_CALIBRATION
 #define PROTOCOL_SHORTNAME_IDENT PROTOCOL_NAME_IM_IDENT
 #define PROTOCOL_SHORTNAME_SAMPLES_IM1 PROTOCOL_NAME_IM_SAMPLES_IM1
+#define PROTOCOL_SHORTNAME_SAMPLES_IM2R0 PROTOCOL_NAME_IM_SAMPLES_IM2R0
 
 #define MASK_SAMPLES_CONTROL_TYPE 0x80
 #define MASK_SAMPLES_CONTROL_SIMULATED 0x40
+#define MASK_SAMPLES_CONTROL_VERSION 0x30
 #define MASK_SAMPLES_CONTROL_SEQUENCE_NUMBER 0x0f
 
 #define MASK_RANGES_SAMPLE_8 0xc000
@@ -98,6 +105,7 @@ static const value_string company_pid_vals[] = {
     {COMPANY_PID_CALIBRATION, PROTOCOL_NAME_IM_CALIBRATION},
     {COMPANY_PID_IDENT, PROTOCOL_NAME_IM_IDENT},
     {COMPANY_PID_SAMPLES_IM1, PROTOCOL_NAME_IM_SAMPLES_IM1},
+    {COMPANY_PID_SAMPLES_IM2R0, PROTOCOL_NAME_IM_SAMPLES_IM2R0},
     {0, NULL}};
 
 /*
@@ -294,7 +302,7 @@ static int dissect_calibration(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tr
  *
  * Ident Packets
  *
- * Ident Packets are sent by IM1 sensors.
+ * Ident Packets are sent by IM1 and IM2R0 sensors.
  *
  * Ident Packet
  * ============
@@ -462,7 +470,8 @@ static void add_rms_values(tvbuff_t *tvb, gint *tvb_offset, int *hfs, guint hfs_
 /*
  * Samples Packets
  *
- * Samples Packets are sent by IM1 sensors.
+ * Samples Packets are sent by IM1 and IM2R0 sensors.
+ * However, details of the packets differ between the sensors.
  *
  * Samples Packet
  * ==============
@@ -471,6 +480,7 @@ static void add_rms_values(tvbuff_t *tvb, gint *tvb_offset, int *hfs, guint hfs_
  * Control data: 1 byte, bitmap
  *   bit  [7]   : type     : 0 = CIM, 1 = VIM
  *   bit  [6]   : simulated: 0 = Real Samples, 1 = Simulated Samples
+ *   bits [5..4]: version  : 00 = IM1, 11 = IM2R0
  *   bits [3..0]: seqnr    : Sequence Number, in the range [0,15], monotonically
  *                           increasing and wrapping
  * Temperature: 2 bytes, signed (resolution = 0.25C)
@@ -518,6 +528,21 @@ static void add_rms_values(tvbuff_t *tvb, gint *tvb_offset, int *hfs, guint hfs_
  *     set 4    channel 1, protection           0
  *     set 5    channel 2, protection           0
  *     set 6    channel 3, protection           0
+ *
+ *   * IM2R0
+ *     8 sample data sets, one set per ADC channel:
+ *
+ *     Sample Data
+ *     ===========
+ *              CIM                             VIM
+ *     set 1    channel 1, measurement          channel 1
+ *     set 2    channel 2, measurement          channel 2
+ *     set 3    channel 3, measurement          channel 3
+ *     set 4    channel 1, protection           neutral channel
+ *     set 5    channel 2, protection           0
+ *     set 6    channel 3, protection           0
+ *     set 7    neutral channel, measurement    0
+ *     set 8    neutral channel, protection     0
  * RMS values
  *   * RMS values are stored as 4 byte signed values.
  *
@@ -533,6 +558,21 @@ static void add_rms_values(tvbuff_t *tvb, gint *tvb_offset, int *hfs, guint hfs_
  *     value 4  channel 1, protection           0
  *     value 5  channel 2, protection           0
  *     value 6  channel 3, protection           0
+ *
+ *   * IM2R0
+ *     8 values, one per ADC-channel:
+ *
+ *     RMS values
+ *     ==========
+ *              CIM                             VIM
+ *     value 1  0                               0
+ *     value 2  0                               0
+ *     value 3  0                               0
+ *     value 4  0                               0
+ *     value 5  0                               0
+ *     value 6  0                               0
+ *     value 7  0                               0
+ *     value 8  0                               0
  */
 
 static gint hst_protocol_samples = -1;
@@ -542,11 +582,14 @@ static gint hst_samples_sets_set = -1;
 static gint hst_samples_rms = -1;
 static gint hst_samples_rms_values = -1;
 
+static expert_field ei_samples_im_version_invalid = EI_INIT;
+
 static int hf_samples_transport_delay = -1;
 static int hf_samples_hop_count = -1;
 static int hf_samples_control = -1;
 static int hf_samples_control_type = -1;
 static int hf_samples_control_simulated = -1;
+static int hf_samples_control_version = -1;
 static int hf_samples_control_sequence_number = -1;
 static int hf_samples_temperature = -1;
 static int hf_samples_padding = -1;
@@ -557,15 +600,18 @@ static int hf_samples_rms_values = -1;
 static int *const controlBits[] = {
     &hf_samples_control_type,
     &hf_samples_control_simulated,
+    &hf_samples_control_version,
     &hf_samples_control_sequence_number,
     NULL};
 
 static int hf_samples_sample_set_measurement_channel_1 = -1;
 static int hf_samples_sample_set_measurement_channel_2 = -1;
 static int hf_samples_sample_set_measurement_channel_3 = -1;
+static int hf_samples_sample_set_measurement_channel_n = -1;
 static int hf_samples_sample_set_protection_channel_1 = -1;
 static int hf_samples_sample_set_protection_channel_2 = -1;
 static int hf_samples_sample_set_protection_channel_3 = -1;
+static int hf_samples_sample_set_protection_channel_n = -1;
 static int hf_samples_sample_set_channel_unused = -1;
 
 static int hf_samples_rms_values_measurement_channel_1 = -1;
@@ -576,9 +622,9 @@ static int hf_samples_rms_values_protection_channel_2 = -1;
 static int hf_samples_rms_values_protection_channel_3 = -1;
 static int hf_samples_rms_values_channel_unused = -1;
 
-static int dissect_samples_im(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_, int h_protocol_samples) {
-	col_set_str(pinfo->cinfo, COL_PROTOCOL, PROTOCOL_SHORTNAME_SAMPLES_IM1);
-	col_set_str(pinfo->cinfo, COL_INFO, PROTOCOL_NAME_SAMPLES_IM1);
+static int dissect_samples_im(bool im1, tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_, int h_protocol_samples) {
+	col_set_str(pinfo->cinfo, COL_PROTOCOL, im1 ? PROTOCOL_SHORTNAME_SAMPLES_IM1 : PROTOCOL_SHORTNAME_SAMPLES_IM2R0);
+	col_set_str(pinfo->cinfo, COL_INFO, im1 ? PROTOCOL_NAME_SAMPLES_IM1 : PROTOCOL_NAME_SAMPLES_IM2R0);
 
 	proto_item *samples_item = proto_tree_add_item(tree, h_protocol_samples, tvb, 0, -1, ENC_NA);
 	proto_tree *samples_item_subtree = proto_item_add_subtree(samples_item, hst_protocol_samples);
@@ -599,13 +645,18 @@ static int dissect_samples_im(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 
 	/* Get Control */
 	guint8 control = tvb_get_guint8(tvb, tvb_offset);
+	bool isIM1 = ((control & MASK_SAMPLES_CONTROL_VERSION) == 0);
+	bool isIM2R0 = ((control & MASK_SAMPLES_CONTROL_VERSION) == MASK_SAMPLES_CONTROL_VERSION);
 	bool isCIM = ((control & MASK_SAMPLES_CONTROL_TYPE) == 0);
 
 	/* Control */
 	item_size = 1;
 	tvb_ensure_bytes_exist(tvb, tvb_offset, item_size);
-	proto_tree_add_bitmask(samples_item_subtree, tvb, tvb_offset, hf_samples_control, hst_samples_control, controlBits, ENC_BIG_ENDIAN);
+	proto_item *control_item = proto_tree_add_bitmask(samples_item_subtree, tvb, tvb_offset, hf_samples_control, hst_samples_control, controlBits, ENC_BIG_ENDIAN);
 	tvb_offset += item_size;
+	if (!isIM1 && !isIM2R0) {
+		expert_add_info(pinfo, control_item, &ei_samples_im_version_invalid);
+	}
 
 	/* Temperature */
 	item_size = 2;
@@ -629,36 +680,72 @@ static int dissect_samples_im(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 	{
 		proto_tree *sample_sets_subtree = proto_item_add_subtree(samples_item, hst_samples_sets);
 
-		item_size = sizeof(sample_set_t) * 6;
+		if (im1) {
+			item_size = sizeof(sample_set_t) * 6;
+		} else {
+			item_size = sizeof(sample_set_t) * 8;
+		}
 		tvb_ensure_bytes_exist(tvb, tvb_offset, item_size);
 		proto_item *sample_sets_subtree_item = proto_tree_add_item(sample_sets_subtree, hf_samples_sample_set, tvb, tvb_offset, item_size, ENC_NA);
 
 		proto_tree *sample_sets_subtree_item_subtree = proto_item_add_subtree(sample_sets_subtree_item, hst_samples_sets_set);
 
-		if (isCIM) {
-			/* IM1 CIM */
+		if (isIM1) {
+			if (isCIM) {
+				/* IM1 CIM */
 
-			int hfs[] = {
-			    hf_samples_sample_set_measurement_channel_1,
-			    hf_samples_sample_set_measurement_channel_2,
-			    hf_samples_sample_set_measurement_channel_3,
-			    hf_samples_sample_set_protection_channel_1,
-			    hf_samples_sample_set_protection_channel_2,
-			    hf_samples_sample_set_protection_channel_3};
+				int hfs[] = {
+				    hf_samples_sample_set_measurement_channel_1,
+				    hf_samples_sample_set_measurement_channel_2,
+				    hf_samples_sample_set_measurement_channel_3,
+				    hf_samples_sample_set_protection_channel_1,
+				    hf_samples_sample_set_protection_channel_2,
+				    hf_samples_sample_set_protection_channel_3};
 
-			add_sample_sets(tvb, pinfo, &tvb_offset, hfs, array_length(hfs), sample_sets_subtree_item_subtree);
-		} else {
-			/* IM1 VIM */
+				add_sample_sets(tvb, pinfo, &tvb_offset, hfs, array_length(hfs), sample_sets_subtree_item_subtree);
+			} else {
+				/* IM1 VIM */
 
-			int hfs[] = {
-			    hf_samples_sample_set_measurement_channel_1,
-			    hf_samples_sample_set_measurement_channel_2,
-			    hf_samples_sample_set_measurement_channel_3,
-			    hf_samples_sample_set_channel_unused,
-			    hf_samples_sample_set_channel_unused,
-			    hf_samples_sample_set_channel_unused};
+				int hfs[] = {
+				    hf_samples_sample_set_measurement_channel_1,
+				    hf_samples_sample_set_measurement_channel_2,
+				    hf_samples_sample_set_measurement_channel_3,
+				    hf_samples_sample_set_channel_unused,
+				    hf_samples_sample_set_channel_unused,
+				    hf_samples_sample_set_channel_unused};
 
-			add_sample_sets(tvb, pinfo, &tvb_offset, hfs, array_length(hfs), sample_sets_subtree_item_subtree);
+				add_sample_sets(tvb, pinfo, &tvb_offset, hfs, array_length(hfs), sample_sets_subtree_item_subtree);
+			}
+		} else if (isIM2R0) {
+			if (isCIM) {
+				/* IM2R0 CIM */
+
+				int hfs[] = {
+				    hf_samples_sample_set_measurement_channel_1,
+				    hf_samples_sample_set_measurement_channel_2,
+				    hf_samples_sample_set_measurement_channel_3,
+				    hf_samples_sample_set_protection_channel_1,
+				    hf_samples_sample_set_protection_channel_2,
+				    hf_samples_sample_set_protection_channel_3,
+				    hf_samples_sample_set_measurement_channel_n,
+				    hf_samples_sample_set_protection_channel_n};
+
+				add_sample_sets(tvb, pinfo, &tvb_offset, hfs, array_length(hfs), sample_sets_subtree_item_subtree);
+			} else {
+				/* IM2R0 VIM */
+
+				int hfs[] = {
+				    hf_samples_sample_set_measurement_channel_1,
+				    hf_samples_sample_set_measurement_channel_2,
+				    hf_samples_sample_set_measurement_channel_3,
+				    hf_samples_sample_set_measurement_channel_n,
+				    hf_samples_sample_set_channel_unused,
+				    hf_samples_sample_set_channel_unused,
+				    hf_samples_sample_set_channel_unused,
+				    hf_samples_sample_set_channel_unused};
+
+				add_sample_sets(tvb, pinfo, &tvb_offset, hfs, array_length(hfs), sample_sets_subtree_item_subtree);
+			}
 		}
 	}
 
@@ -666,31 +753,49 @@ static int dissect_samples_im(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 	{
 		proto_tree *rms_values_subtree = proto_item_add_subtree(samples_item, hst_samples_rms);
 
-		item_size = 4 * 6;
+		if (im1) {
+			item_size = 4 * 6;
+		} else {
+			item_size = 4 * 8;
+		}
 		tvb_ensure_bytes_exist(tvb, tvb_offset, item_size);
 		proto_item *rms_values_item = proto_tree_add_item(rms_values_subtree, hf_samples_rms_values, tvb, tvb_offset, item_size, ENC_NA);
 
 		proto_tree *rms_values_item_subtree = proto_item_add_subtree(rms_values_item, hst_samples_rms_values);
 
-		if (isCIM) {
-			/* IM1 CIM */
+		if (isIM1) {
+			if (isCIM) {
+				/* IM1 CIM */
 
+				int hfs[] = {
+				    hf_samples_rms_values_measurement_channel_1,
+				    hf_samples_rms_values_measurement_channel_2,
+				    hf_samples_rms_values_measurement_channel_3,
+				    hf_samples_rms_values_protection_channel_1,
+				    hf_samples_rms_values_protection_channel_2,
+				    hf_samples_rms_values_protection_channel_3};
+
+				add_rms_values(tvb, &tvb_offset, hfs, array_length(hfs), rms_values_item_subtree);
+			} else {
+				/* IM1 VIM */
+
+				int hfs[] = {
+				    hf_samples_rms_values_measurement_channel_1,
+				    hf_samples_rms_values_measurement_channel_2,
+				    hf_samples_rms_values_measurement_channel_3,
+				    hf_samples_rms_values_channel_unused,
+				    hf_samples_rms_values_channel_unused,
+				    hf_samples_rms_values_channel_unused};
+
+				add_rms_values(tvb, &tvb_offset, hfs, array_length(hfs), rms_values_item_subtree);
+			}
+		} else if (isIM2R0) {
 			int hfs[] = {
-			    hf_samples_rms_values_measurement_channel_1,
-			    hf_samples_rms_values_measurement_channel_2,
-			    hf_samples_rms_values_measurement_channel_3,
-			    hf_samples_rms_values_protection_channel_1,
-			    hf_samples_rms_values_protection_channel_2,
-			    hf_samples_rms_values_protection_channel_3};
-
-			add_rms_values(tvb, &tvb_offset, hfs, array_length(hfs), rms_values_item_subtree);
-		} else {
-			/* IM1 VIM */
-
-			int hfs[] = {
-			    hf_samples_rms_values_measurement_channel_1,
-			    hf_samples_rms_values_measurement_channel_2,
-			    hf_samples_rms_values_measurement_channel_3,
+			    hf_samples_rms_values_channel_unused,
+			    hf_samples_rms_values_channel_unused,
+			    hf_samples_rms_values_channel_unused,
+			    hf_samples_rms_values_channel_unused,
+			    hf_samples_rms_values_channel_unused,
 			    hf_samples_rms_values_channel_unused,
 			    hf_samples_rms_values_channel_unused,
 			    hf_samples_rms_values_channel_unused};
@@ -724,6 +829,13 @@ static const value_string samples_control_simulated_vals[] = {
     {1, "Simulated"},
     {0, NULL}};
 
+static const value_string samples_control_version_vals[] = {
+    {0, "IM1"},
+    {1, "Unused"},
+    {2, "Unused"},
+    {3, "IM2R0"},
+    {0, NULL}};
+
 static void samples_sequence_number(gchar *result, guint8 sequence_number) {
 	snprintf(result, ITEM_LABEL_LENGTH, "%u", sequence_number);
 }
@@ -745,6 +857,7 @@ static hf_register_info protocol_registration_samples[] = {
     {&hf_samples_control, {"Control", "locamation-im.samples.control", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL}},
     {&hf_samples_control_type, {"Type", "locamation-im.samples.control.type", FT_UINT8, BASE_DEC, VALS(samples_control_type_vals), MASK_SAMPLES_CONTROL_TYPE, NULL, HFILL}},
     {&hf_samples_control_simulated, {"Status", "locamation-im.samples.control.simulated", FT_UINT8, BASE_DEC, VALS(samples_control_simulated_vals), MASK_SAMPLES_CONTROL_SIMULATED, NULL, HFILL}},
+    {&hf_samples_control_version, {"Version", "locamation-im.samples.control.version", FT_UINT8, BASE_DEC, VALS(samples_control_version_vals), MASK_SAMPLES_CONTROL_VERSION, NULL, HFILL}},
     {&hf_samples_control_sequence_number, {"Sequence Number", "locamation-im.samples.control.sequence_number", FT_UINT8, BASE_CUSTOM, CF_FUNC(samples_sequence_number), MASK_SAMPLES_CONTROL_SEQUENCE_NUMBER, NULL, HFILL}},
     {&hf_samples_temperature, {"Temperature", "locamation-im.samples.temperature", FT_INT16, BASE_CUSTOM, CF_FUNC(samples_temperature), 0x0, NULL, HFILL}},
     {&hf_samples_padding, {"Padding", "locamation-im.samples.padding", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL}},
@@ -754,9 +867,11 @@ static hf_register_info protocol_registration_samples[] = {
     {&hf_samples_sample_set_measurement_channel_1, {"Measurement Channel 1", "locamation-im.samples.sets.measurement.channel.1", FT_NONE, BASE_NONE, NULL, 0x0, NULL, HFILL}},
     {&hf_samples_sample_set_measurement_channel_2, {"Measurement Channel 2", "locamation-im.samples.sets.measurement.channel.2", FT_NONE, BASE_NONE, NULL, 0x0, NULL, HFILL}},
     {&hf_samples_sample_set_measurement_channel_3, {"Measurement Channel 3", "locamation-im.samples.sets.measurement.channel.3", FT_NONE, BASE_NONE, NULL, 0x0, NULL, HFILL}},
+    {&hf_samples_sample_set_measurement_channel_n, {"Measurement Channel N", "locamation-im.samples.sets.measurement.channel.n", FT_NONE, BASE_NONE, NULL, 0x0, NULL, HFILL}},
     {&hf_samples_sample_set_protection_channel_1, {"Protection Channel 1", "locamation-im.samples.sets.protection.channel.1", FT_NONE, BASE_NONE, NULL, 0x0, NULL, HFILL}},
     {&hf_samples_sample_set_protection_channel_2, {"Protection Channel 2", "locamation-im.samples.sets.protection.channel.2", FT_NONE, BASE_NONE, NULL, 0x0, NULL, HFILL}},
     {&hf_samples_sample_set_protection_channel_3, {"Protection Channel 3", "locamation-im.samples.sets.protection.channel.3", FT_NONE, BASE_NONE, NULL, 0x0, NULL, HFILL}},
+    {&hf_samples_sample_set_protection_channel_n, {"Protection Channel N", "locamation-im.samples.sets.protection.channel.n", FT_NONE, BASE_NONE, NULL, 0x0, NULL, HFILL}},
     {&hf_samples_sample_set_channel_unused, {"Unused Channel", "locamation-im.samples.sets.channel.unused", FT_NONE, BASE_NONE, NULL, 0x0, NULL, HFILL}},
     {&hf_samples_sample_set_ranges, {"Ranges", "locamation-im.samples.sets.measurement.ranges", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL}},
     {&hf_samples_sample_set_ranges_sample_1, {"Sample 1", "locamation-im.samples.sets.measurement.ranges.sample.1", FT_UINT16, BASE_DEC, VALS(ranges_vals), MASK_RANGES_SAMPLE_1, NULL, HFILL}},
@@ -796,7 +911,24 @@ static ei_register_info ei_samples_im1[] = {
 static int h_protocol_samples_im1 = -1;
 
 static int dissect_samples_im1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data) {
-	return dissect_samples_im(tvb, pinfo, tree, data, h_protocol_samples_im1);
+	return dissect_samples_im(true, tvb, pinfo, tree, data, h_protocol_samples_im1);
+}
+
+/*
+ * ########################################################################
+ * #
+ * # Samples - IM2R0
+ * #
+ * ########################################################################
+ */
+
+static ei_register_info ei_samples_im2r0[] = {
+    {&ei_samples_im_version_invalid, {"locamation-im.samples.control.version.invalid", PI_MALFORMED, PI_ERROR, "Invalid Version", EXPFILL}}};
+
+static int h_protocol_samples_im2r0 = -1;
+
+static int dissect_samples_im2r0(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data) {
+	return dissect_samples_im(false, tvb, pinfo, tree, data, h_protocol_samples_im2r0);
 }
 
 /*
@@ -838,6 +970,7 @@ static gint *protocol_subtree[] = {
 static dissector_handle_t h_calibration;
 static dissector_handle_t h_ident;
 static dissector_handle_t h_samples_im1;
+static dissector_handle_t h_samples_im2r0;
 
 void proto_register_locamation_im(void) {
 	/* Setup subtrees */
@@ -861,6 +994,12 @@ void proto_register_locamation_im(void) {
 	expert_module_t *expert_samples_im1 = expert_register_protocol(h_protocol_samples_im1);
 	expert_register_field_array(expert_samples_im1, ei_samples_im1, array_length(ei_samples_im1));
 
+	/* Samples - IM2R0 */
+	h_protocol_samples_im2r0 = proto_register_protocol(PROTOCOL_NAME_SAMPLES_IM2R0, PROTOCOL_SHORTNAME_SAMPLES_IM2R0, "locamation-im.samples.im2r0");
+	proto_register_field_array(h_protocol_samples_im2r0, NULL, 0);
+	expert_module_t *expert_samples_im2r0 = expert_register_protocol(h_protocol_samples_im2r0);
+	expert_register_field_array(expert_samples_im2r0, ei_samples_im2r0, array_length(ei_samples_im2r0));
+
 	/* LLC Handler Registration */
 	llc_add_oui(COMPANY_OUI, "locamation-im.llc.pid", "LLC " COMPANY_NAME " OUI PID", llc_registration, -1);
 }
@@ -877,6 +1016,10 @@ void proto_reg_handoff_locamation_im(void) {
 	/* Samples - IM1 */
 	h_samples_im1 = create_dissector_handle(dissect_samples_im1, h_protocol_samples_im1);
 	dissector_add_uint("locamation-im.llc.pid", COMPANY_PID_SAMPLES_IM1, h_samples_im1);
+
+	/* Samples - IM2R0 */
+	h_samples_im2r0 = create_dissector_handle(dissect_samples_im2r0, h_protocol_samples_im2r0);
+	dissector_add_uint("locamation-im.llc.pid", COMPANY_PID_SAMPLES_IM2R0, h_samples_im2r0);
 }
 
 /*
