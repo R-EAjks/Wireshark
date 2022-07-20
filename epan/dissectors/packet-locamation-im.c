@@ -118,7 +118,7 @@ typedef struct _sample_set_t {
 	gint32 sample_6;
 	gint32 sample_7;
 	gint32 sample_8;
-} __attribute__((packed)) sample_set_t;
+}sample_set_t;
 
 /*
  * ########################################################################
