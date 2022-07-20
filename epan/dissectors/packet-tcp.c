@@ -7388,6 +7388,16 @@ dissect_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
         }
       }
       else {
+          /* Explicitly and immediately move forward the conversation last_frame,
+           * although it would one way or another be changed later
+           * in the conversation helper functions.
+           */
+          if (!(pinfo->fd->visited)) {
+            if (pinfo->num > conv->last_frame) {
+              conv->last_frame = pinfo->num;
+            }
+          }
+
           conversation_completeness  = tcpd->conversation_completeness ;
 
           /* SYN-ACK */
