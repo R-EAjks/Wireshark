@@ -270,11 +270,6 @@ WS_DLL_PUBLIC void prefs_reset(void);
 /** Frees memory used by proto routines. Called at program shutdown */
 void prefs_cleanup(void);
 
-/** Store whether the current UI theme is dark so that we can adjust colors
-* @param is_dark set to TRUE if the UI's theme is dark
-*/
-WS_DLL_PUBLIC void prefs_set_gui_theme_is_dark(gboolean is_dark);
-
 /**
  * Register that a protocol has preferences.
  * @param id the value returned by "proto_register_protocol()" when

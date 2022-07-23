@@ -46,15 +46,22 @@ ColorUtils::ColorUtils(QObject *parent) :
 // just shifting the 16-bit value right 8 bits; I guess you could
 // round them by adding 0x80 to the value before shifting.
 //
-QColor ColorUtils::fromColorT (const color_t *color) {
+QColor ColorUtils::fromColorT (const color_t *color, bool adaptForDark) {
     if (!color) return QColor();
     // Convert [0,65535] values to [0,255] values
-    return QColor(color->red >> 8, color->green >> 8, color->blue >> 8);
+    QColor newColor = QColor(color->red >> 8, color->green >> 8, color->blue >> 8);
+
+    if (adaptForDark)
+    {
+        newColor = QColor(255 - (color->red >> 8), 255 - (color->green >> 8), 255 - (color->blue >> 8));
+    }
+
+    return newColor;
 }
 
-QColor ColorUtils::fromColorT(color_t color)
+QColor ColorUtils::fromColorT(color_t color, bool adaptForDark)
 {
-    return fromColorT(&color);
+    return fromColorT(&color, adaptForDark);
 }
 
 const color_t ColorUtils::toColorT(const QColor color)

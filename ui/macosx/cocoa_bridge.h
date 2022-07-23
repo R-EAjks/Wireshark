@@ -21,6 +21,12 @@ class CocoaBridge
 public:
     static void cleanOSGeneratedMenuItems();
 
+    static bool DarkThemeAvailable();
+    static bool IsInDarkTheme();
+    static void SetToDarkTheme();
+    static void SetToLightTheme();
+    static void SetToAutoTheme();
+
 };
 
 #endif // COCOABRIDGE_H

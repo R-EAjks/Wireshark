@@ -115,6 +115,8 @@ private:
 
 private slots:
     void emitItemHeightChanged(const QModelIndex &ih_index);
+
+    void resetTheme();
 };
 
 #endif // PACKET_LIST_MODEL_H

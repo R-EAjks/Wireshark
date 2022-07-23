@@ -33,3 +33,51 @@ void CocoaBridge::cleanOSGeneratedMenuItems()
     [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"NSDisabledDictationMenuItem"];
     [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"NSDisabledCharacterPaletteMenuItem"];
 }
+
+/* The following code has been inspired by: https://successfulsoftware.net/2021/03/31/how-to-add-a-dark-theme-to-your-qt-application/ */
+
+bool DarkThemeAvailable()
+{
+    if (@available(macOS 10.14, *))
+        return true;
+
+    return false;
+}
+
+bool IsInDarkTheme()
+{
+    if (DarkThemeAvailable())
+    {
+        auto appearance = [NSApp.effectiveAppearance bestMatchFromAppearancesWithNames:
+                @[ NSAppearanceNameAqua, NSAppearanceNameDarkAqua ]];
+        return [appearance isEqualToString:NSAppearanceNameDarkAqua];
+    }
+
+    return false;
+}
+
+void SetToDarkTheme()
+{
+   // https://stackoverflow.com/questions/55925862/how-can-i-set-my-os-x-application-theme-in-code
+   if (DarkThemeAvailable())
+   {
+        [NSApp setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]];
+   }
+}
+
+void SetToLightTheme()
+{
+    // https://stackoverflow.com/questions/55925862/how-can-i-set-my-os-x-application-theme-in-code
+    if (DarkThemeAvailable())
+    {
+        [NSApp setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameAqua]];
+    }
+}
+
+void SetToAutoTheme()
+{
+    if (DarkThemeAvailable())
+    {
+        [NSApp setAppearance:nil];
+    }
+}

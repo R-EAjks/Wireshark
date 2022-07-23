@@ -127,6 +127,12 @@ set(WIRESHARK_MODEL_HEADERS
 	models/voip_calls_info_model.h
 )
 
+set(WIRESHARK_THEME_HEADERS
+	themes/theme_eventfilter.h
+	themes/theme_proxy.h
+	themes/theme_support.h
+)
+
 # All .h files which inherit from QObject aka which use the Q_OBJECT macro
 # need to go here.
 set(WIRESHARK_QT_HEADERS
@@ -374,6 +380,12 @@ set(WIRESHARK_MODEL_SRCS
 	models/uat_model.cpp
 	models/url_link_delegate.cpp
 	models/voip_calls_info_model.cpp
+)
+
+set(WIRESHARK_THEME_SRCS
+	themes/theme_eventfilter.cpp
+	themes/theme_proxy.cpp
+	themes/theme_support.cpp
 )
 
 set(WIRESHARK_QT_SRC
@@ -648,12 +660,17 @@ foreach(_file ${WIRESHARK_QT_TS})
 endforeach()
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/i18n.qrc.in ${CMAKE_CURRENT_BINARY_DIR}/i18n.qrc)
 
+set(WIRESHARK_THEME_RESOURCES
+	../../themes/DarkStyle/darkstyle.qrc
+)
+
 set(WIRESHARK_QT_QRC
 	../../resources/about.qrc
 	../../resources/languages/languages.qrc
 	../../resources/layout.qrc
 	../../resources/stock_icons.qrc
 	../../resources/wsicon.qrc
+	../../resources/themes/DarkStyle/darkstyle.qrc
 	${CMAKE_CURRENT_BINARY_DIR}/i18n.qrc
 )
 
@@ -717,6 +734,7 @@ source_group("ui\\Models Headers" FILES ${WIRESHARK_MODEL_HEADERS})
 source_group("ui\\Models Source" FILES ${WIRESHARK_MODEL_SRCS})
 source_group("ui\\Manager Headers" FILES ${WIRESHARK_MANAGER_HEADERS})
 source_group("ui\\Manager Source" FILES ${WIRESHARK_MANAGER_SRCS})
+source_group("ui\\Themes" FILES ${WIRESHARK_THEME_HEADERS} ${WIRESHARK_THEME_SRCS})
 
 add_library(qtui OBJECT
 	#Included so that Visual Studio can properly put header files in solution
@@ -726,6 +744,7 @@ add_library(qtui OBJECT
 	${WIRESHARK_MANAGER_HEADERS}
 	${WIRESHARK_UTILS_HEADERS}
 	${WIRESHARK_MODEL_HEADERS}
+	${WIRESHARK_THEME_HEADERS}
 
 	${WIRESHARK_QT_SRC}
 	${WIRESHARK_WIDGET_SRCS}
@@ -733,6 +752,7 @@ add_library(qtui OBJECT
 	${WIRESHARK_MANAGER_SRCS}
 	${WIRESHARK_UTILS_SRCS}
 	${WIRESHARK_MODEL_SRCS}
+	${WIRESHARK_THEME_SRCS}
 
 	# For AUTOUIC and AUTORCC.
 	${WIRESHARK_QT_UI}
