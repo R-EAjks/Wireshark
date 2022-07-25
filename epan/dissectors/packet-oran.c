@@ -167,6 +167,7 @@ static expert_field ei_oran_invalid_sample_bit_width = EI_INIT;
 static expert_field ei_oran_reserved_numBundPrb = EI_INIT;
 static expert_field ei_oran_extlen_wrong = EI_INIT;
 static expert_field ei_oran_extlen_zero = EI_INIT;
+static expert_field ei_oran_invalid_eaxc_bit_width = EI_INIT;
 
 
 /* These are the message types handled by this dissector */
@@ -491,38 +492,34 @@ addPcOrRtcid(tvbuff_t *tvb, proto_tree *tree, gint *offset, const char *name)
     /* Subtree */
     proto_item *item;
     proto_tree *oran_pcid_tree = proto_tree_add_subtree(tree, tvb, *offset, 2, ett_oran_ecpri_pcid, &item, name);
-    guint32 duPortId, bandSectorId, ccId, ruPortId = 0;
+    guint64 duPortId, bandSectorId, ccId, ruPortId = 0;
     gint id_offset = *offset;
 
-    if ((pref_du_port_id_bits > 0) && (pref_bandsector_id_bits > 0) && (pref_cc_id_bits > 0) && (pref_ru_port_id_bits > 0) && ((pref_du_port_id_bits + pref_bandsector_id_bits + pref_cc_id_bits + pref_ru_port_id_bits) == 16)) {
-        header_field_info *hf_info;
-
-        hf_info = proto_registrar_get_nth(hf_oran_du_port_id);
-        hf_info->bitmask = ((1 << pref_du_port_id_bits) - 1) << (pref_bandsector_id_bits + pref_cc_id_bits + pref_ru_port_id_bits);
-
-        hf_info = proto_registrar_get_nth(hf_oran_bandsector_id);
-        hf_info->bitmask = ((1 << pref_bandsector_id_bits) - 1) << (pref_cc_id_bits + pref_ru_port_id_bits);
-
-        hf_info = proto_registrar_get_nth(hf_oran_cc_id);
-        hf_info->bitmask = ((1 << pref_cc_id_bits) - 1) << pref_ru_port_id_bits;
-
-        hf_info = proto_registrar_get_nth(hf_oran_ru_port_id);
-        hf_info->bitmask = (1 << pref_ru_port_id_bits) - 1;
+    if (!((pref_du_port_id_bits > 0) && (pref_bandsector_id_bits > 0) && (pref_cc_id_bits > 0) && (pref_ru_port_id_bits > 0) && ((pref_du_port_id_bits + pref_bandsector_id_bits + pref_cc_id_bits + pref_ru_port_id_bits) == 16))) {
+        expert_add_info(NULL, tree, &ei_oran_invalid_eaxc_bit_width);
+        *offset += 2;
+        return;
     }
 
+    guint bit_offset = *offset * 8;
+
     /* DU Port ID */
-    proto_tree_add_item_ret_uint(oran_pcid_tree, hf_oran_du_port_id, tvb, *offset, 2, ENC_NA, &duPortId);
+    proto_tree_add_bits_ret_val(oran_pcid_tree, hf_oran_du_port_id, tvb, bit_offset, pref_du_port_id_bits, &duPortId, ENC_BIG_ENDIAN);
+    bit_offset += pref_du_port_id_bits;
     /* BandSector ID */
-    proto_tree_add_item_ret_uint(oran_pcid_tree, hf_oran_bandsector_id, tvb, *offset, 2, ENC_NA, &bandSectorId);
+    proto_tree_add_bits_ret_val(oran_pcid_tree, hf_oran_bandsector_id, tvb, bit_offset, pref_bandsector_id_bits, &bandSectorId, ENC_BIG_ENDIAN);
+    bit_offset += pref_bandsector_id_bits;
     /* CC ID */
-    proto_tree_add_item_ret_uint(oran_pcid_tree, hf_oran_cc_id, tvb, *offset, 2, ENC_NA, &ccId);
+    proto_tree_add_bits_ret_val(oran_pcid_tree, hf_oran_cc_id, tvb, bit_offset, pref_cc_id_bits, &ccId, ENC_BIG_ENDIAN);
+    bit_offset += pref_cc_id_bits;
     /* RU Port ID */
-    proto_tree_add_item_ret_uint(oran_pcid_tree, hf_oran_ru_port_id, tvb, *offset, 2, ENC_NA, &ruPortId);
+    proto_tree_add_bits_ret_val(oran_pcid_tree, hf_oran_ru_port_id, tvb, bit_offset, pref_ru_port_id_bits, &ruPortId, ENC_BIG_ENDIAN);
+    bit_offset += pref_ru_port_id_bits;
     *offset += 2;
 
-    proto_item_append_text(item, " (DU_Port_ID: %d, BandSector_ID: %d, CC_ID: %d, RU_Port_ID: %d)", duPortId, bandSectorId, ccId, ruPortId);
+    proto_item_append_text(item, " (DU_Port_ID: %d, BandSector_ID: %d, CC_ID: %d, RU_Port_ID: %d)", (int)duPortId, (int)bandSectorId, (int)ccId, (int)ruPortId);
     char id[16];
-    snprintf(id, 16, "%x:%x:%x:%x", duPortId, bandSectorId, ccId, ruPortId);
+    snprintf(id, 16, "%x:%x:%x:%x", (int)duPortId, (int)bandSectorId, (int)ccId, (int)ruPortId);
     proto_item *pi = proto_tree_add_string(oran_pcid_tree, hf_oran_c_eAxC_ID, tvb, id_offset, 2, id);
     proto_item_set_generated(pi);
 }
@@ -1701,7 +1698,7 @@ proto_register_oran(void)
        { &hf_oran_du_port_id,
          { "DU Port ID", "oran_fh_cus.du_port_id",
            FT_UINT16, BASE_DEC,
-           NULL, 0xc000,
+           NULL, 0x0,
            NULL, HFILL }
        },
 
@@ -1709,7 +1706,7 @@ proto_register_oran(void)
        { &hf_oran_bandsector_id,
          { "BandSector ID", "oran_fh_cus.bandsector_id",
            FT_UINT16, BASE_DEC,
-           NULL, 0x3f00,
+           NULL, 0x0,
            NULL, HFILL }
        },
 
@@ -1717,7 +1714,7 @@ proto_register_oran(void)
        { &hf_oran_cc_id,
          { "CC ID", "oran_fh_cus.cc_id",
            FT_UINT16, BASE_DEC,
-           NULL, 0x00f0,
+           NULL, 0x0,
            NULL, HFILL }
        },
 
@@ -1725,7 +1722,7 @@ proto_register_oran(void)
         { &hf_oran_ru_port_id,
           { "RU Port ID", "oran_fh_cus.ru_port_id",
             FT_UINT16, BASE_DEC,
-            NULL, 0x000f,
+            NULL, 0x0,
             NULL, HFILL }
         },
 
@@ -2710,6 +2707,7 @@ proto_register_oran(void)
         { &ei_oran_invalid_sample_bit_width, { "oran_fh_cus.invalid_sample_bit_width", PI_UNDECODED, PI_ERROR, "Unsupported sample bit width", EXPFILL }},
         { &ei_oran_reserved_numBundPrb, { "oran_fh_cus.reserved_numBundPrb", PI_MALFORMED, PI_ERROR, "Reserved value of numBundPrb", EXPFILL }},
         { &ei_oran_extlen_wrong, { "oran_fh_cus.extlen_wrong", PI_MALFORMED, PI_ERROR, "extlen doesn't match number of dissected bytes", EXPFILL }},
+        { &ei_oran_invalid_eaxc_bit_width, { "oran_fh_cus.invalid_exac_bit_width", PI_UNDECODED, PI_ERROR, "Inconsistent eAxC bit width", EXPFILL }},
         { &ei_oran_extlen_zero, { "oran_fh_cus.extlen_zero", PI_MALFORMED, PI_ERROR, "extlen - zero is reserved value", EXPFILL }}
     };
 
