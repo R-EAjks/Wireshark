@@ -1599,7 +1599,7 @@ static dissector_handle_t look_for_dissector(const char *protocol_name)
         return find_dissector("xnap");
     }
     else
-    if (strncmp(protocol_name, "ngap_r15", strlen("ngap_r15")) == 0) {
+    if (strncmp(protocol_name, "ngap_r", 6) == 0) {
         return find_dissector("ngap");
     }
 
