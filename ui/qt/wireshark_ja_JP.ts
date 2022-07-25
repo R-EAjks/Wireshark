@@ -1729,6 +1729,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>出現位置:</translation>
     </message>
     <message>
+        <source>Resolve Names:</source>
+        <translation>名前解決:</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;p&gt;Show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;p&gt;raw(無加工)のフィールド値の代わりに人が読むことのできる文字列を表示します。有効な文字列を含むフィールドを持つカスタム列へ適用する場合にのみ適用できます。&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
         <source>Missing fields.</source>
         <translation>見つからないフィールド</translation>
     </message>
@@ -1762,6 +1770,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Field Occurrence</source>
         <translation>フィールド出現位置</translation>
+    </message>
+    <message>
+        <source>Resolved</source>
+        <translation>解決済</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;Show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings.&lt;/html&gt;</source>
+        <translation>&lt;html&gt;123raw(無加工)のフィールド値の代わりに人が読むことのできる文字列を表示します。有効な文字列を含むフィールドを持つカスタム列へ適用する場合にのみ適用できます。&lt;/html&gt;</translation>
     </message>
     <message>
         <source>New Column</source>
@@ -1810,71 +1826,71 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <name>ConversationDataModel</name>
     <message>
         <source>Address A</source>
-        <translation type="unfinished"></translation>
+        <translation>アドレス A</translation>
     </message>
     <message>
         <source>Port A</source>
-        <translation type="unfinished"></translation>
+        <translation>ポート A</translation>
     </message>
     <message>
         <source>Address B</source>
-        <translation type="unfinished"></translation>
+        <translation>アドレス B</translation>
     </message>
     <message>
         <source>Port B</source>
-        <translation type="unfinished"></translation>
+        <translation>ポート B</translation>
     </message>
     <message>
         <source>Packets</source>
-        <translation type="unfinished"></translation>
+        <translation>パケット</translation>
     </message>
     <message>
         <source>Bytes</source>
-        <translation type="unfinished"></translation>
+        <translation>バイト</translation>
     </message>
     <message>
         <source>Stream ID</source>
-        <translation type="unfinished"></translation>
+        <translation>ストリームID</translation>
     </message>
     <message>
         <source>Packets A </source>
-        <translation type="unfinished"></translation>
+        <translation>パケット A</translation>
     </message>
     <message>
         <source>Bytes A </source>
-        <translation type="unfinished"></translation>
+        <translation>バイト A</translation>
     </message>
     <message>
         <source>Bytes B </source>
-        <translation type="unfinished"></translation>
+        <translation>バイト B</translation>
     </message>
     <message>
         <source>Abs Start</source>
-        <translation type="unfinished"></translation>
+        <translation>絶対的な開始</translation>
     </message>
     <message>
         <source>Rel Start</source>
-        <translation type="unfinished"></translation>
+        <translation>相対的な開始</translation>
     </message>
     <message>
         <source>Duration</source>
-        <translation type="unfinished">時間</translation>
+        <translation>時間</translation>
     </message>
     <message>
         <source>Bits/s A </source>
-        <translation type="unfinished"></translation>
+        <translation>ビット毎秒 A</translation>
     </message>
     <message>
         <source>Bits/s B </source>
-        <translation type="unfinished"></translation>
+        <translation>ビット毎秒 B</translation>
     </message>
     <message>
         <source>Total Packets</source>
-        <translation type="unfinished"></translation>
+        <translation>全パケット</translation>
     </message>
     <message>
         <source>Percent Filtered</source>
-        <translation type="unfinished"></translation>
+        <translation>フィルタされた割合</translation>
     </message>
 </context>
 <context>
@@ -2214,6 +2230,22 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>リレーション</translation>
     </message>
     <message>
+        <source>By default order comparisons and contains/matches/in relations are true if any value matches. The quantifier &quot;all&quot; can be used to apply the test to all values in a frame.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Quantifier</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Any</source>
+        <translation type="unfinished">すべて</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation type="unfinished">すべて</translation>
+    </message>
+    <message>
         <source>Match against this value.</source>
         <translation>この値に合致します</translation>
     </message>
@@ -2390,59 +2422,59 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <name>EndpointDataModel</name>
     <message>
         <source>Address</source>
-        <translation type="unfinished">アドレス</translation>
+        <translation>アドレス</translation>
     </message>
     <message>
         <source>Port</source>
-        <translation type="unfinished">ポート</translation>
+        <translation>ポート</translation>
     </message>
     <message>
         <source>Packets</source>
-        <translation type="unfinished"></translation>
+        <translation>パケット</translation>
     </message>
     <message>
         <source>Bytes</source>
-        <translation type="unfinished"></translation>
+        <translation>バイト</translation>
     </message>
     <message>
         <source>Tx Packets</source>
-        <translation type="unfinished"></translation>
+        <translation>送信パケット</translation>
     </message>
     <message>
         <source>Tx Bytes</source>
-        <translation type="unfinished"></translation>
+        <translation>送信バイト</translation>
     </message>
     <message>
         <source>Rx Packets</source>
-        <translation type="unfinished"></translation>
+        <translation>受信パケット</translation>
     </message>
     <message>
         <source>Rx Bytes</source>
-        <translation type="unfinished"></translation>
+        <translation>受信バイト</translation>
     </message>
     <message>
         <source>Country</source>
-        <translation type="unfinished"></translation>
+        <translation>国</translation>
     </message>
     <message>
         <source>City</source>
-        <translation type="unfinished"></translation>
+        <translation>都市</translation>
     </message>
     <message>
         <source>AS Number</source>
-        <translation type="unfinished"></translation>
+        <translation>AS番号</translation>
     </message>
     <message>
         <source>AS Organization</source>
-        <translation type="unfinished"></translation>
+        <translation>AS 組織</translation>
     </message>
     <message>
         <source>Total Packets</source>
-        <translation type="unfinished"></translation>
+        <translation>全パケット</translation>
     </message>
     <message>
         <source>Percent Filtered</source>
-        <translation type="unfinished"></translation>
+        <translation>フィルタされた割合</translation>
     </message>
 </context>
 <context>
@@ -7092,18 +7124,18 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <name>PathSelectionDelegate</name>
     <message>
         <source>Open a pipe</source>
-        <translation type="unfinished"></translation>
+        <translation>パイプを開く</translation>
     </message>
 </context>
 <context>
     <name>PathSelectionEdit</name>
     <message>
         <source>Browse</source>
-        <translation type="unfinished"></translation>
+        <translation>参照</translation>
     </message>
     <message>
         <source>Select a path</source>
-        <translation type="unfinished"></translation>
+        <translation>パスを選択</translation>
     </message>
 </context>
 <context>
@@ -10919,11 +10951,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>画像形式</translation>
     </message>
     <message>
-        <source>JSON</source>
-        <oldsource>Json</oldsource>
-        <translation type="unfinished">Json</translation>
-    </message>
-    <message>
         <source>Raw</source>
         <translation>Raw(無加工)形式</translation>
     </message>
@@ -10960,6 +10987,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>
             <numerusform>%Ln バイトを表示中</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>JSON</source>
+        <translation>JSON</translation>
     </message>
     <message>
         <source>Regex Find:</source>
@@ -11818,19 +11849,19 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <name>TrafficTab</name>
     <message>
         <source>Map file error</source>
-        <translation type="unfinished">地図ファイルエラー</translation>
+        <translation>マップファイルエラー</translation>
     </message>
     <message>
         <source>Could not open base file %1 for reading: %2</source>
-        <translation type="unfinished"></translation>
+        <translation>%2 を読み込む際にベースファイル %1 を開くことができません。</translation>
     </message>
     <message>
         <source>No endpoints available to map</source>
-        <translation type="unfinished"></translation>
+        <translation>マップに利用できる終端がありません</translation>
     </message>
     <message>
         <source>Unable to create temporary file</source>
-        <translation type="unfinished"></translation>
+        <translation>一時ファイルを作成できません</translation>
     </message>
 </context>
 <context>
@@ -11852,12 +11883,20 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>表示フィルタに制限</translation>
     </message>
     <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Only show types matching the filter value&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;フィルタ値に適当する形式のみ表示します&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>Filter list for specific type</source>
+        <translation>特定の種別でリストをフィルタ</translation>
+    </message>
+    <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Show absolute times in the start time column.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;開始時間列に絶対的な時間を表示します&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>GroupBox</source>
-        <translation type="unfinished">グループボックス</translation>
+        <translation>グループボックス</translation>
     </message>
     <message>
         <source>Absolute start time</source>
@@ -11876,54 +11915,81 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <name>TrafficTree</name>
     <message>
         <source>Resize all columns to content</source>
-        <translation type="unfinished"></translation>
+        <translation>すべての列を内容にあわせてリサイズします</translation>
     </message>
     <message>
         <source>Filter on stream id</source>
-        <translation type="unfinished"></translation>
+        <translation>ストリームIDに基づいてフィルタ</translation>
     </message>
     <message>
         <source>Copy %1 table</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 表をコピー</translation>
     </message>
     <message>
         <source>as CSV</source>
-        <translation type="unfinished">CSVとして</translation>
+        <translation>CSVとして</translation>
     </message>
     <message>
         <source>Copy all values of this page to the clipboard in CSV (Comma Separated Values) format.</source>
-        <translation type="unfinished"></translation>
+        <translation>このページの全ての値をCSV(カンマ区切りテキスト)形式でクリップボードへコピーします</translation>
     </message>
     <message>
         <source>as YAML</source>
-        <translation type="unfinished">YAMLとして</translation>
+        <translation>YAMLとして</translation>
     </message>
     <message>
         <source>Copy all values of this page to the clipboard in the YAML data serialization format.</source>
-        <translation type="unfinished"></translation>
+        <translation>このページの全ての値をシリアル化されたYAMLデータ形式でクリップボードへコピーします</translation>
     </message>
     <message>
         <source>as JSON</source>
-        <translation type="unfinished"></translation>
+        <translation>JSONとして</translation>
     </message>
     <message>
         <source>Copy all values of this page to the clipboard in the JSON data serialization format.</source>
-        <translation type="unfinished"></translation>
+        <translation>このページの全ての値をシリアル化されたJSONデータ形式でクリップボードへコピーします</translation>
     </message>
     <message>
         <source>Save data as raw</source>
-        <translation type="unfinished"></translation>
+        <translation>Raw(無加工)形式でデータを保存</translation>
     </message>
     <message>
         <source>Disable data formatting for export/clipboard and save as raw data</source>
-        <translation type="unfinished"></translation>
+        <translation>エクスポートやクリップボードのためにデータフォーマットを無効にしてRaw(無加工)形式で保存します</translation>
+    </message>
+</context>
+<context>
+    <name>TrafficTreeHeaderView</name>
+    <message>
+        <source>Less than</source>
+        <translation>より小さい</translation>
+    </message>
+    <message>
+        <source>Greater than</source>
+        <translation>より大きい</translation>
+    </message>
+    <message>
+        <source>Equal</source>
+        <translation>イコール</translation>
+    </message>
+    <message>
+        <source>Columns to display</source>
+        <translation>表示する列</translation>
+    </message>
+    <message>
+        <source>Filter %1 by</source>
+        <translation>%1 でフィルタします</translation>
+    </message>
+    <message>
+        <source>Enter filter value</source>
+        <translation>フィルタ値を入力します</translation>
     </message>
 </context>
 <context>
     <name>TrafficTypesModel</name>
     <message>
         <source>Protocol</source>
-        <translation type="unfinished">プロトコル</translation>
+        <translation>プロトコル</translation>
     </message>
 </context>
 <context>
@@ -13497,7 +13563,7 @@ a:hover {
     </message>
     <message>
         <source>Seconds Since First Captured Packet</source>
-        <translation type="unfinished"></translation>
+        <translation>最初にキャプチャしたパケットからの経過時間</translation>
     </message>
     <message>
         <source>Packet &amp;Diagram</source>

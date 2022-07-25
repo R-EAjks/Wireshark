@@ -612,6 +612,7 @@ void PacketList::contextMenuEvent(QContextMenuEvent *event)
             new FrameInformation(new CaptureFile(this, cap_file_), packet_list_model_->getRowFdata(ctxIndex.row()));
 
     QMenu * ctx_menu = new QMenu(this);
+    ctx_menu->setAttribute(Qt::WA_DeleteOnClose);
     // XXX We might want to reimplement setParent() and fill in the context
     // menu there.
     ctx_menu->addAction(window()->findChild<QAction *>("actionEditMarkPacket"));
@@ -712,7 +713,7 @@ void PacketList::contextMenuEvent(QContextMenuEvent *event)
     else
         emit framesSelected(QList<int>());
 
-    ctx_menu->exec(event->globalPos());
+    ctx_menu->popup(event->globalPos());
 }
 
 void PacketList::ctxDecodeAsDialog()
@@ -880,7 +881,19 @@ void PacketList::mouseMoveEvent (QMouseEvent *event)
 
 void PacketList::keyPressEvent(QKeyEvent *event)
 {
-    QTreeView::keyPressEvent(event);
+    bool handled = false;
+    if (event->key() == Qt::Key_Down || event->key() == Qt::Key_Up) {
+        if (currentIndex().isValid() && currentIndex().column() > 0) {
+            int pos = horizontalScrollBar()->value();
+            QTreeView::keyPressEvent(event);
+            horizontalScrollBar()->setValue(pos);
+            handled = true;
+        }
+    }
+
+    if (!handled)
+        QTreeView::keyPressEvent(event);
+
     if (event->matches(QKeySequence::Copy))
     {
         QStringList content;

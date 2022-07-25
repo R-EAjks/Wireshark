@@ -1737,6 +1737,14 @@ Pas exemple, inquiquez 1 heure pour avoir un nouveau fichier créé toutes les h
         <translation>Occurrence :</translation>
     </message>
     <message>
+        <source>Resolve Names:</source>
+        <translation>Résoudre les noms&#xa0;:</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;p&gt;Show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;p&gt;Afficher des chaînes lisibles par l&apos;homme au lieu de valeurs brutes pour les champs. Applicable uniquement aux colonnes personnalisées avec des champs contenant des chaînes de valeur.&lt;/body&gt;</translation>
+    </message>
+    <message>
         <source>Missing fields.</source>
         <translation>Champs manquants.</translation>
     </message>
@@ -1770,6 +1778,14 @@ Pas exemple, inquiquez 1 heure pour avoir un nouveau fichier créé toutes les h
     <message>
         <source>Field Occurrence</source>
         <translation>Occurrence d&apos;un champ</translation>
+    </message>
+    <message>
+        <source>Resolved</source>
+        <translation>Résolu</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;Show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings.&lt;/html&gt;</source>
+        <translation>&lt;html&gt;Afficher des chaînes lisibles par l&apos;homme au lieu de valeurs brutes pour les champs. Applicable uniquement aux colonnes personnalisées avec des champs contenant des chaînes de valeur.</translation>
     </message>
     <message>
         <source>New Column</source>
@@ -1842,7 +1858,7 @@ Pas exemple, inquiquez 1 heure pour avoir un nouveau fichier créé toutes les h
     </message>
     <message>
         <source>Stream ID</source>
-        <translation type="unfinished"></translation>
+        <translation>ID de flux</translation>
     </message>
     <message>
         <source>Packets A </source>
@@ -1854,11 +1870,7 @@ Pas exemple, inquiquez 1 heure pour avoir un nouveau fichier créé toutes les h
     </message>
     <message>
         <source>Bytes B </source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Packets B </source>
-        <translation type="vanished">Paquets B</translation>
+        <translation>Octets B</translation>
     </message>
     <message>
         <source>Abs Start</source>
@@ -2222,6 +2234,22 @@ Pas exemple, inquiquez 1 heure pour avoir un nouveau fichier créé toutes les h
     <message>
         <source>Relation</source>
         <translation>Relation</translation>
+    </message>
+    <message>
+        <source>By default order comparisons and contains/matches/in relations are true if any value matches. The quantifier &quot;all&quot; can be used to apply the test to all values in a frame.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Quantifier</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Any</source>
+        <translation type="unfinished">Tout</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation type="unfinished">Tout</translation>
     </message>
     <message>
         <source>Match against this value.</source>
@@ -10947,11 +10975,6 @@ Pas exemple, inquiquez 1 heure pour avoir un nouveau fichier créé toutes les h
         <translation>Image</translation>
     </message>
     <message>
-        <source>JSON</source>
-        <oldsource>Json</oldsource>
-        <translation type="unfinished">Json</translation>
-    </message>
-    <message>
         <source>Raw</source>
         <translation>Brut</translation>
     </message>
@@ -10989,6 +11012,10 @@ Pas exemple, inquiquez 1 heure pour avoir un nouveau fichier créé toutes les h
             <numerusform>Affichage de %Ln octet.</numerusform>
             <numerusform>Affichage de %Ln octets.</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>JSON</source>
+        <translation>JSON</translation>
     </message>
     <message>
         <source>Regex Find:</source>
@@ -11882,6 +11909,14 @@ Changer la direction de la connexion (voir le flux inverse).&lt;/p&gt;&lt;/body&
         <translation>Limiter au Filtre d&apos;Affichage</translation>
     </message>
     <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Only show types matching the filter value&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Afficher uniquement les types correspondant à la valeur du filtre&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>Filter list for specific type</source>
+        <translation>Filtrer la liste pour un type spécifique</translation>
+    </message>
+    <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Show absolute times in the start time column.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Afficher les heures absolues dans la colonne de l&apos;heure de début.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
@@ -11910,7 +11945,7 @@ Changer la direction de la connexion (voir le flux inverse).&lt;/p&gt;&lt;/body&
     </message>
     <message>
         <source>Filter on stream id</source>
-        <translation type="unfinished"></translation>
+        <translation>Filtrer sur l&apos;ID de flux</translation>
     </message>
     <message>
         <source>Copy %1 table</source>
@@ -11934,19 +11969,11 @@ Changer la direction de la connexion (voir le flux inverse).&lt;/p&gt;&lt;/body&
     </message>
     <message>
         <source>as JSON</source>
-        <translation type="unfinished"></translation>
+        <translation>comme JSON</translation>
     </message>
     <message>
         <source>Copy all values of this page to the clipboard in the JSON data serialization format.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>as Json</source>
-        <translation type="vanished">comme Json</translation>
-    </message>
-    <message>
-        <source>Copy all values of this page to the clipboard in the Json data serialization format.</source>
-        <translation type="vanished">Copier toutes les valeurs de cette page dans le presse-papiers au format de sérialisation des données Json.</translation>
+        <translation>Copier toutes les valeurs de cette page dans le presse-papiers au format de sérialisation des données JSON.</translation>
     </message>
     <message>
         <source>Save data as raw</source>
@@ -11955,6 +11982,33 @@ Changer la direction de la connexion (voir le flux inverse).&lt;/p&gt;&lt;/body&
     <message>
         <source>Disable data formatting for export/clipboard and save as raw data</source>
         <translation>Désactiver le formatage des données pour l&apos;exportation/le presse-papiers et enregistrer en tant que données brutes</translation>
+    </message>
+</context>
+<context>
+    <name>TrafficTreeHeaderView</name>
+    <message>
+        <source>Less than</source>
+        <translation>Moins que</translation>
+    </message>
+    <message>
+        <source>Greater than</source>
+        <translation>Plus grand que</translation>
+    </message>
+    <message>
+        <source>Equal</source>
+        <translation>Égal</translation>
+    </message>
+    <message>
+        <source>Columns to display</source>
+        <translation>Colonnes à afficher</translation>
+    </message>
+    <message>
+        <source>Filter %1 by</source>
+        <translation>Filtrer %1 par</translation>
+    </message>
+    <message>
+        <source>Enter filter value</source>
+        <translation>Entrer la valeur du filtre</translation>
     </message>
 </context>
 <context>
