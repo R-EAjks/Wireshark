@@ -2974,10 +2974,12 @@ add_ipv6_address_embed_ipv4(packet_info *pinfo, proto_tree *tree, tvbuff_t *tvb,
         ti = proto_tree_add_item(tree, hf_ipv6_embed_ipv4_prefix, tvb, offset, ipv4_prefix / 8, ENC_NA);
         PROTO_ITEM_SET_GENERATED(ti);
 
-        // Majority of IPv4 address is after u
+        // Majority of IPv4 address is after u-field
         if (ipv4_prefix >= 56) {
-            ti = proto_tree_add_item(tree, hf_ipv6_embed_ipv4_u, tvb, offset + 8, 1, ENC_NA);
-            PROTO_ITEM_SET_GENERATED(ti);
+            if (ipv4_prefix < 96) {
+                ti = proto_tree_add_item(tree, hf_ipv6_embed_ipv4_u, tvb, offset + 8, 1, ENC_NA);
+                PROTO_ITEM_SET_GENERATED(ti);
+            }
             if (tvb_get_guint8(tvb, offset + 8)) {
                 expert_add_info(pinfo, ti, &ei_ipv6_embed_ipv4_u_value);
             }
@@ -2995,8 +2997,8 @@ add_ipv6_address_embed_ipv4(packet_info *pinfo, proto_tree *tree, tvbuff_t *tvb,
                                  (ipv4_offset > 32 && ipv4_offset < 64) ? 5 : 4, ipv4_addr);
         PROTO_ITEM_SET_GENERATED(ti);
 
-        // Majority of IPv4 address is before u
-        if (ipv4_prefix <= 48) {
+        // Majority of IPv4 address is before u-field
+        if (ipv4_prefix < 56) {
             ti = proto_tree_add_item(tree, hf_ipv6_embed_ipv4_u, tvb, offset + 8, 1, ENC_NA);
             PROTO_ITEM_SET_GENERATED(ti);
             if (tvb_get_guint8(tvb, offset + 8)) {
@@ -4551,7 +4553,7 @@ proto_register_ipv6(void)
         },
         { &ei_ipv6_embed_ipv4_u_value,
             { "ipv6.embed_ipv4.u.nonzero", PI_PROTOCOL, PI_WARN,
-                "IPv4-Embedded IPv6 address u field must be zero", EXPFILL }
+                "IPv4-Embedded IPv6 address bit 64 to 71 must be zero", EXPFILL }
         }
     };
 
