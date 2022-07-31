@@ -5074,7 +5074,7 @@ static guint dissect_sr_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pin
     return offset;
 }
 
-// nr5g_rlcmac_Cmac_BSR_Configuration_t
+// nr5g_rlcmac_Cmac_BSR_Configuration_t (nr5g-rlcmac_Cmac.h)
 static guint dissect_bsr_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                 guint offset _U_)
 {
@@ -5090,8 +5090,12 @@ static guint dissect_bsr_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
     // retxBSR_Timer
     proto_tree_add_item(bsr_config_tree, hf_l2server_retxbsr_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
-    // logicalChannelSR_DelayTimer
-    proto_tree_add_item(bsr_config_tree, hf_l2server_logicalchannelsr_delaytimer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    // logicalChannelSR_DelayTimer (-2 means none)
+    gint32 delay_timer;
+    proto_item *ti = proto_tree_add_item_ret_int(bsr_config_tree, hf_l2server_logicalchannelsr_delaytimer, tvb, offset, 4, ENC_LITTLE_ENDIAN, &delay_timer);
+    if (delay_timer == -2) {
+        proto_item_append_text(ti, " (none)");
+    }
     offset += 4;
 
     return offset;
@@ -8732,7 +8736,7 @@ proto_register_l2server(void)
        { "Retx BSR Timer", "l2server.retxbsr-timer", FT_UINT32, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_logicalchannelsr_delaytimer,
-       { "LogicalChannel SR Timer", "l2server.logicalchannelsr-delaytimer", FT_UINT32, BASE_DEC,
+       { "LogicalChannel SR Timer", "l2server.logicalchannelsr-delaytimer", FT_INT32, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_tag_config,
