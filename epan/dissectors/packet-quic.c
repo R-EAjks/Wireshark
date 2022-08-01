@@ -48,6 +48,8 @@
 
 #include <config.h>
 
+#include <stdbool.h>
+
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include <epan/proto_data.h>
@@ -346,7 +348,7 @@ typedef struct quic_pp_state {
     quic_pp_cipher  pp_ciphers[2];  /**< PP cipher for Key Phase 0/1 */
     quic_hp_cipher  hp_cipher;      /**< HP cipher for both Key Phases; it does not change after KeyUpdate */
     guint64         changed_in_pkn; /**< Packet number where key change occurred. */
-    gboolean        key_phase : 1;  /**< Current key phase. */
+    bool            key_phase : 1;  /**< Current key phase. */
 } quic_pp_state_t;
 
 /** Singly-linked list of Connection IDs. */
@@ -391,6 +393,7 @@ typedef struct _quic_follow_stream {
 typedef struct quic_follow_tap_data {
     tvbuff_t *tvb;
     guint64  stream_id;
+    gboolean from_server;
 } quic_follow_tap_data_t;
 
 /**
@@ -402,12 +405,12 @@ typedef struct quic_info_data {
     guint32         version;
     address         server_address;
     guint16         server_port;
-    gboolean        skip_decryption : 1; /**< Set to 1 if no keys are available. */
-    gboolean        client_dcid_set : 1; /**< Set to 1 if client_dcid_initial is set. */
-    gboolean        client_loss_bits_recv : 1; /**< The client is able to read loss bits info */
-    gboolean        client_loss_bits_send : 1; /**< The client wants to send loss bits info */
-    gboolean        server_loss_bits_recv : 1; /**< The server is able to read loss bits info */
-    gboolean        server_loss_bits_send : 1; /**< The server wants to send loss bits info */
+    bool            skip_decryption : 1; /**< Set to 1 if no keys are available. */
+    bool            client_dcid_set : 1; /**< Set to 1 if client_dcid_initial is set. */
+    bool            client_loss_bits_recv : 1; /**< The client is able to read loss bits info */
+    bool            client_loss_bits_send : 1; /**< The client wants to send loss bits info */
+    bool            server_loss_bits_recv : 1; /**< The server is able to read loss bits info */
+    bool            server_loss_bits_send : 1; /**< The server wants to send loss bits info */
     int             hash_algo;      /**< Libgcrypt hash algorithm for key derivation. */
     int             cipher_algo;    /**< Cipher algorithm for packet number and packet encryption. */
     int             cipher_mode;    /**< Cipher mode for packet encryption. */
@@ -448,8 +451,8 @@ struct quic_packet_info {
     guint8                  pkn_len;        /**< Length of PKN (1/2/3/4) or unknown (0). */
     guint8                  first_byte;     /**< Decrypted flag byte, valid only if pkn_len is non-zero. */
     guint8                  packet_type;
-    gboolean                retry_integrity_failure : 1;
-    gboolean                retry_integrity_success : 1;
+    bool                    retry_integrity_failure : 1;
+    bool                    retry_integrity_success : 1;
 };
 typedef struct quic_packet_info quic_packet_info_t;
 
@@ -457,7 +460,7 @@ typedef struct quic_packet_info quic_packet_info_t;
 typedef struct quic_datagram {
     quic_info_data_t       *conn;
     quic_packet_info_t      first_packet;
-    gboolean                from_server : 1;
+    bool                    from_server : 1;
 } quic_datagram;
 
 /**
@@ -2342,6 +2345,7 @@ dissect_quic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *quic_tree
 
                 follow_data->tvb = tvb_new_subset_remaining(tvb, offset);
                 follow_data->stream_id = stream_id;
+                follow_data->from_server = from_server;
 
                 tap_queue_packet(quic_follow_tap, pinfo, follow_data);
             }
@@ -4445,8 +4449,9 @@ quic_follow_address_filter(address *src_addr _U_, address *dst_addr _U_, int src
 }
 
 static tap_packet_status
-follow_quic_tap_listener(void *tapdata, packet_info *pinfo, epan_dissect_t *edt _U_, const void *data, tap_flags_t flags)
+follow_quic_tap_listener(void *tapdata, packet_info *pinfo, epan_dissect_t *edt _U_, const void *data, tap_flags_t flags _U_)
 {
+    follow_record_t *follow_record;
     follow_info_t *follow_info = (follow_info_t *)tapdata;
     const quic_follow_tap_data_t *follow_data = (const quic_follow_tap_data_t *)data;
 
@@ -4455,12 +4460,44 @@ follow_quic_tap_listener(void *tapdata, packet_info *pinfo, epan_dissect_t *edt 
         return TAP_PACKET_DONT_REDRAW;
     }
 
-    // XXX: follow_tvb_tap_listener sets follow_info->is_server based on
-    // the initial client_port and client_ip, and is not correct after
-    // connection migration. QUIC should implement its own function
-    // here. Ideally, such function should also deal with stream
-    // fragmentation in a similar manner to the TCP dissector.
-    return follow_tvb_tap_listener(tapdata, pinfo, NULL, follow_data->tvb, flags);
+    follow_record = g_new(follow_record_t, 1);
+
+    // XXX: Ideally, we should also deal with stream retransmission
+    // and out of order packets in a similar manner to the TCP dissector,
+    // using the offset, plus ACKs and other information.
+    follow_record->data = g_byte_array_sized_new(tvb_captured_length(follow_data->tvb));
+    follow_record->data = g_byte_array_append(follow_record->data, tvb_get_ptr(follow_data->tvb, 0, -1), tvb_captured_length(follow_data->tvb));
+    follow_record->packet_num = pinfo->fd->num;
+    follow_record->abs_ts = pinfo->fd->abs_ts;
+
+    /* This sets the address and port information the first time this
+     * stream is tapped. It will no longer be true after migration, but
+     * as it seems it's only used for display, using the initial values
+     * is the best we can do.
+     */
+
+    if (follow_data->from_server) {
+        follow_record->is_server = TRUE;
+        if (follow_info->client_port == 0) {
+            follow_info->server_port = pinfo->srcport;
+            copy_address(&follow_info->server_ip, &pinfo->src);
+            follow_info->client_port = pinfo->destport;
+            copy_address(&follow_info->client_ip, &pinfo->dst);
+        }
+    } else {
+        follow_record->is_server = FALSE;
+        if (follow_info->client_port == 0) {
+            follow_info->client_port = pinfo->srcport;
+            copy_address(&follow_info->client_ip, &pinfo->src);
+            follow_info->server_port = pinfo->destport;
+            copy_address(&follow_info->server_ip, &pinfo->dst);
+        }
+    }
+
+    follow_info->bytes_written[follow_record->is_server] += follow_record->data->len;
+
+    follow_info->payload = g_list_prepend(follow_info->payload, follow_record);
+    return TAP_PACKET_DONT_REDRAW;
 }
 
 guint32 get_quic_connections_count(void)
