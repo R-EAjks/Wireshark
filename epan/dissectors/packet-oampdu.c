@@ -746,6 +746,25 @@ static const value_string dpoe_variable_response_code_vals[] = {
     { 0, NULL }
 };
 
+static const value_string dpoe_1904_1_mac_enable_status_vals[] = {
+    { 0x00, "disabled" },
+    { 0x01, "enabled" },
+    { 0, NULL }
+};
+
+static const value_string dpoe_1904_1_media_available_vals[] = {
+    { 0x03, "available" },
+    { 0x04, "not_available" },
+    { 0, NULL }
+};
+
+static const value_string dpoe_1904_1_duplex_status_vals[] = {
+    { 0x01, "half_duplex" },
+    { 0x02, "full_duplex" },
+    { 0x03, "unknown" },
+    { 0, NULL }
+};
+
 static const value_string user_port_object_subtype_vals[] = {
     { 0x00, "Terminator" },
     { 0x01, "Header" },
@@ -1979,17 +1998,11 @@ dissect_oampdu_vendor_specific(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tr
                                 variable_length = 1;
                                 /* fall-through for unmatched: */
                             } else if (leaf_branch == DPOE_LB_1904_1_MAC_ENABLE_STATUS) {
-                                guint8 mes = tvb_get_guint8(tvb, offset);
-                                dpoe_opcode_response = proto_tree_add_item(dpoe_opcode_response_tree, hf_oam_dpoe_1904_1_mac_enable_status, tvb, offset, 1, ENC_BIG_ENDIAN);
-                                proto_item_append_text(dpoe_opcode_response, " (%s)", mes == 0 ? "disabled" : mes == 1 ? "enabled" : "invalid");
+                                proto_tree_add_item(dpoe_opcode_response_tree, hf_oam_dpoe_1904_1_mac_enable_status, tvb, offset, 1, ENC_BIG_ENDIAN);
                             } else if (leaf_branch == DPOE_LB_1904_1_MEDIA_AVAILABLE) {
-                                guint8 ma = tvb_get_guint8(tvb, offset);
-                                dpoe_opcode_response = proto_tree_add_item(dpoe_opcode_response_tree, hf_oam_dpoe_1904_1_media_available, tvb, offset, 1, ENC_BIG_ENDIAN);
-                                proto_item_append_text(dpoe_opcode_response, " (%s)", ma == 3 ? "available" : ma == 4 ? "not_available" : "invalid");
+                                proto_tree_add_item(dpoe_opcode_response_tree, hf_oam_dpoe_1904_1_media_available, tvb, offset, 1, ENC_BIG_ENDIAN);
                             } else if (leaf_branch == DPOE_LB_1904_1_DUPLEX_STATUS) {
-                                guint8 ds = tvb_get_guint8(tvb, offset);
-                                dpoe_opcode_response = proto_tree_add_item(dpoe_opcode_response_tree, hf_oam_dpoe_1904_1_duplex_status, tvb, offset, 1, ENC_BIG_ENDIAN);
-                                proto_item_append_text(dpoe_opcode_response, " (%s)", ds == 1 ? "half_duplex" : ds == 2 ? "full_duplex" : ds == 3 ? "unknown" : "invalid");
+                                proto_tree_add_item(dpoe_opcode_response_tree, hf_oam_dpoe_1904_1_duplex_status, tvb, offset, 1, ENC_BIG_ENDIAN);
                             } else {
                                 proto_tree_add_item(dpoe_opcode_response_tree, hf_oampdu_variable_value, tvb, offset, variable_length, ENC_NA);
                             }
@@ -2577,17 +2590,17 @@ proto_register_oampdu(void)
 
         { &hf_oam_dpoe_1904_1_mac_enable_status,
             { "MAC Enable Status", "oampdu.1904_1.mac_enable_status",
-                FT_UINT8, BASE_DEC, NULL, 0x0,
+                FT_UINT8, BASE_DEC, VALS(dpoe_1904_1_mac_enable_status_vals), 0x0,
                 NULL, HFILL } },
 
         { &hf_oam_dpoe_1904_1_media_available,
             { "Media Available", "oampdu.1904_1.media_available",
-                FT_UINT8, BASE_DEC, NULL, 0x0,
+                FT_UINT8, BASE_DEC, VALS(dpoe_1904_1_media_available_vals), 0x0,
                 NULL, HFILL } },
 
         { &hf_oam_dpoe_1904_1_duplex_status,
             { "Duplex Status", "oampdu.1904_1.duplex_status",
-                FT_UINT8, BASE_DEC, NULL, 0x0,
+                FT_UINT8, BASE_DEC, VALS(dpoe_1904_1_duplex_status_vals), 0x0,
                 NULL, HFILL } },
     };
 
