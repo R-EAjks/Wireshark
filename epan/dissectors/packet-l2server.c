@@ -199,6 +199,8 @@ static int hf_l2server_spare = -1;
 static int hf_l2server_pad = -1;
 
 static int hf_l2server_package_type = -1;
+
+static int hf_l2server_dbeam_ind = -1;
 static int hf_l2server_dbeamid = -1;
 static int hf_l2server_dbeam_status = -1;
 static int hf_l2server_num_beams = -1;
@@ -1371,7 +1373,7 @@ static void dissect_login_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinf
                               guint offset, guint len)
 {
     /* CliName */
-    proto_tree_add_item(tree, hf_l2server_client_name, tvb, offset, len, ENC_NA);
+    proto_tree_add_item(tree, hf_l2server_client_name, tvb, offset, len, ENC_ASCII);
 }
 
 static void dissect_srv_start_cmd(proto_tree *tree _U_, tvbuff_t *tvb _U_, packet_info *pinfo _U_,
@@ -1411,6 +1413,10 @@ static void dissect_open_cell_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *
 static void dissect_cell_parm_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* CellId (but only 1 byte!) */
     proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
 }
@@ -1419,6 +1425,10 @@ static void dissect_cell_parm_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *
 static void dissect_cell_parm_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* CellId (1 byte) */
     proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
@@ -1486,7 +1496,7 @@ static void dissect_rcp_load_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *p
     proto_tree_add_item(tree, hf_l2server_dbeamid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     /* Fname */
-    proto_tree_add_item(tree, hf_l2server_fname, tvb, offset, -1, ENC_NA);
+    proto_tree_add_item(tree, hf_l2server_fname, tvb, offset, -1, ENC_ASCII);
 }
 
 /* Nr5gId (UEId + CellId + BeamIdx) */
@@ -1630,7 +1640,7 @@ static void dissect_rlcmac_data_req(proto_tree *tree, tvbuff_t *tvb, packet_info
             break;
     }
 
-    proto_item *pdcp_ti = proto_tree_add_item(tree, hf_l2server_pdcp_pdu, tvb, offset, len+8-offset, ENC_LITTLE_ENDIAN);
+    proto_item *pdcp_ti = proto_tree_add_item(tree, hf_l2server_pdcp_pdu, tvb, offset, len+8-offset, ENC_NA);
 
     /* Optionally call pdcp-nr dissector for this payload. */
 
@@ -1847,7 +1857,7 @@ static void dissect_rlcmac_data_ind(proto_tree *tree, tvbuff_t *tvb, packet_info
             break;
     }
 
-    proto_item *pdcp_ti = proto_tree_add_item(tree, hf_l2server_pdcp_pdu, tvb, offset, len+8-offset, ENC_LITTLE_ENDIAN);
+    proto_item *pdcp_ti = proto_tree_add_item(tree, hf_l2server_pdcp_pdu, tvb, offset, len+8-offset, ENC_NA);
 
     /* Optionally call pdcp-nr dissector for this payload. */
     if (global_call_pdcp_for_drb && p_pdcp_nr_info->plane == NR_USER_PLANE) {
@@ -2125,7 +2135,7 @@ static void dissect_ra_req(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
     proto_tree_add_item(tree, hf_l2server_scgid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     /* Spare 11 bytes */
-    proto_tree_add_item(tree, hf_l2server_spare, tvb, offset, 11, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_spare, tvb, offset, 11, ENC_NA);
     offset += 11;
     /* Rt_Preamble */
     offset ++;
@@ -2238,7 +2248,7 @@ static void dissect_l1t_log_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
                                 guint offset _U_, guint len _U_)
 {
     /* Log filter */
-    proto_item *log_ti = proto_tree_add_item(tree, hf_l2server_log, tvb, 0, 0, ENC_NA);
+    proto_item *log_ti = proto_tree_add_item(tree, hf_l2server_log, tvb, 0, 0, ENC_ASCII);
     proto_item_set_hidden(log_ti);
 
     /* UEId */
@@ -2251,7 +2261,7 @@ static void dissect_l1t_log_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
     proto_tree_add_item(tree, hf_l2server_dbeamid, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
     // LogStr
-    proto_tree_add_item(tree, hf_l2server_logstr, tvb, offset, 8+len-offset, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_logstr, tvb, offset, 8+len-offset, ENC_ASCII);
 
     col_set_str(pinfo->cinfo, COL_INFO,
                 tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 8+len-offset, ENC_UTF_8|ENC_NA));
@@ -2472,7 +2482,7 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     // Pdsch_HARQ_ACK_CodebookList_r16[2]
     offset += 2;
     // Pad
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
     offset += 1;
 
     // These 2 are included (0xff) in message even present flags not set..
@@ -2526,7 +2536,7 @@ static int dissect_bwp_dl_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info
     offset += 1;
 
     // Pad[2]
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
     offset += 2;
 
     // N.B. These 3 appear regardless of flag!!!!!
@@ -2602,7 +2612,7 @@ static int dissect_pdsch_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info 
     offset += 1;
 
     // Pad
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
     offset += 1;
 
 
@@ -2642,7 +2652,7 @@ static int dissect_pdcch_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info 
     offset += 1;
 
     // Pad
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
     offset += 1;
 
     // Rnti
@@ -2688,7 +2698,7 @@ static int dissect_nzp_csi_rs_res_config(proto_tree *tree, tvbuff_t *tvb, packet
     proto_tree_add_item(config_tree, hf_l2server_scramblingid, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
     // Pad[2]
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
     offset += 2;
 
     // TODO:
@@ -2731,7 +2741,7 @@ static int dissect_nzp_csi_rs_res_set_config(proto_tree *tree, tvbuff_t *tvb, pa
     proto_tree_add_item(config_tree, hf_l2server_aper_trigger_offset_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // Pad[2]
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
     offset += 2;
 
     // NbNzpCsiRsResLis.
@@ -2770,7 +2780,7 @@ static int dissect_csi_im_res_config(proto_tree *tree, tvbuff_t *tvb, packet_inf
     offset += 1;
 
     // Pad[3]
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_NA);
     offset += 3;
 
     // ResElemPattern
@@ -2808,7 +2818,7 @@ static int dissect_csi_im_res_set_config(proto_tree *tree, tvbuff_t *tvb, packet
     offset += 1;
 
     // Pad[2]
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
     offset += 2;
 
     // CsiImResList
@@ -2843,7 +2853,7 @@ static int dissect_csi_ssb_res_set_config(proto_tree *tree, tvbuff_t *tvb, packe
     offset += 1;
 
     // Pad[2]
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
     offset += 2;
 
     // CsiSsbResList
@@ -2922,7 +2932,7 @@ static int dissect_semipersistent_on_pucch(proto_tree *tree, tvbuff_t *tvb, pack
     offset += 1;
 
     // Pad[3]
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_NA);
     offset += 3;
 
     // RepSlotCfg
@@ -2953,7 +2963,7 @@ static int dissect_aperiodic(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo
     offset += 1;
 
     // Pad[3]
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_NA);
     offset += 3;
 
     // RepSlotOffsetList (bb_nr5g_MAX_NB_UL_ALLOCS entries?)
@@ -2988,7 +2998,7 @@ static int dissect_and_ports_more_than_two(proto_tree *tree, tvbuff_t *tvb, pack
     // TypeISinglePanelCodebookSubsetRestrI2
     offset += 2;
     // N1N2[32]
-    proto_tree_add_item(config_tree, hf_l2server_n1n2, tvb, offset, 32, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(config_tree, hf_l2server_n1n2, tvb, offset, 32, ENC_NA);
     offset += 32;
 
     proto_item_set_len(config_ti, offset-start_offset);
@@ -3013,7 +3023,7 @@ static int dissect_codebook_type_1_single_panel(proto_tree *tree, tvbuff_t *tvb,
     // TypeISinglePanelRiRestr
     offset += 1;
     // Pad[2]
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
     offset += 2;
 
     switch (nb_of_ant_ports_is_valid) {
@@ -3049,7 +3059,7 @@ static int dissect_codebook_type_1(proto_tree *tree, tvbuff_t *tvb, packet_info 
     offset += 1;
 
     // Pad[2]
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
     offset += 2;
 
     // CodeBookSubType1 (union)
@@ -3088,7 +3098,7 @@ static int dissect_codebook_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     offset += 1;
 
     // Pad[3]
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_NA);
     offset += 3;
 
     // CodebookType
@@ -3153,7 +3163,7 @@ static int dissect_bwp_downlinkcommon(proto_tree *tree, tvbuff_t *tvb, packet_in
             offset += 1;
 
             // Spare[3]
-            proto_tree_add_item(pdsch_tree, hf_l2server_spare, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+            proto_tree_add_item(pdsch_tree, hf_l2server_spare, tvb, offset, 3, ENC_NA);
             offset += 3;
 
             // PdschAlloc (bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt)
@@ -3262,7 +3272,7 @@ static int dissect_rep_freq_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     offset += 1;
 
     // Pad
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
     offset += 1;
 
     // CsiReportingBand
@@ -3405,7 +3415,7 @@ static int dissect_search_space(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
         proto_tree_add_item(config_tree, hf_l2server_agg_lev16, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
         //   Spare[3]
-        proto_tree_add_item(config_tree, hf_l2server_spare, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(config_tree, hf_l2server_spare, tvb, offset, 3, ENC_NA);
         offset += 3;
 
         // SearchSpaceType
@@ -3427,7 +3437,7 @@ static int dissect_search_space(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
         offset += 2;
 
         // Pad[2]
-        proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
         offset += 2;
 
         proto_item_append_text(config_ti, " (id=%u)", search_space_id);
@@ -3702,7 +3712,7 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     offset += 1;
 
     // Pad[2]
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
     offset += 2;
 
     //========================================================================================
@@ -3969,7 +3979,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         offset += 1;
 
         // Pad
-        proto_tree_add_item(ded_tree, hf_l2server_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(ded_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
         offset += 1;
 
         // DlBwpIdToDel
@@ -4047,7 +4057,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         // NbUlBwpScsSpecCarrier
         offset += 1;
         // Pad
-        proto_tree_add_item(ded_tree, hf_l2server_pad, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(ded_tree, hf_l2server_pad, tvb, offset, 3, ENC_NA);
         offset += 3;
         // UlBwpIdToDel
         offset += (bb_nr5g_MAX_NB_BWPS * 1);
@@ -4299,7 +4309,7 @@ static int dissect_pusch_timedomainresalloc(proto_tree *tree, tvbuff_t *tvb, pac
         proto_tree_add_item(config_tree, hf_l2server_start_sym_and_len, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
         // Pad
-        proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
         offset += 1;
 
         proto_item_append_text(config_ti, " (K2=%u)", k2);
@@ -4412,7 +4422,7 @@ static int dissect_rach_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_info
     proto_tree_add_item(rach_tree, hf_l2server_ra_contention_resolution_timer, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // Pad
-    proto_tree_add_item(rach_tree, hf_l2server_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(rach_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
     offset += 1;
 
     // RaPrioritizationForAccessIdentity_r16 (bb_nr5g_RA_PRIO_FOR_ACCESS_ID_R16t)
@@ -4452,7 +4462,7 @@ static int dissect_pusch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_inf
     offset += 1;
 
     // Spare[3]
-    proto_tree_add_item(pusch_tree, hf_l2server_spare, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(pusch_tree, hf_l2server_spare, tvb, offset, 3, ENC_NA);
     offset += 3;
 
     // PuschTimeDomResAlloc (bb_nr5g_PUSCH_TIMEDOMAINRESALLOCt entries)
@@ -4489,7 +4499,7 @@ static int dissect_pucch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_inf
     proto_tree_add_item(pucch_tree, hf_l2server_p0_nom, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
     // Spare[2]
-    proto_tree_add_item(pucch_tree, hf_l2server_spare, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(pucch_tree, hf_l2server_spare, tvb, offset, 2, ENC_NA);
     offset += 2;
 
     proto_item_set_len(pucch_ti, offset-start_offset);
@@ -4519,7 +4529,7 @@ static int dissect_bwp_uplinkcommon(proto_tree *tree, tvbuff_t *tvb, packet_info
         // UseInterlacePUCCH_PUSCH_r16
         offset += 1;
         // Pad[3]
-        proto_tree_add_item(ul_bwp_tree, hf_l2server_pad, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(ul_bwp_tree, hf_l2server_pad, tvb, offset, 3, ENC_NA);
         offset += 3;
 
         // GenBwp (bb_nr5g_BWPt)
@@ -4581,7 +4591,7 @@ static int dissect_freqinfo_ul(proto_tree *tree, tvbuff_t *tvb, packet_info *pin
         proto_tree_add_item_ret_int(freq_info_ul_common_ti, hf_l2server_nb_scs_spec_carrier, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_scs_spec_carrier);
         offset += 1;
         // Spare[3]
-        proto_tree_add_item(freq_info_ul_common_tree, hf_l2server_spare, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(freq_info_ul_common_tree, hf_l2server_spare, tvb, offset, 3, ENC_NA);
         offset += 3;
 
         // FreqBandList
@@ -4696,7 +4706,7 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
     offset += 1;
 
     // Pad
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
     offset += 1;
 
     // SsbPosInBurst (union)
@@ -4834,7 +4844,7 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
         proto_tree_add_item(tdd_tree, hf_l2server_ref_sub_car_spacing, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
         // Pad
-        proto_tree_add_item(tdd_tree, hf_l2server_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(tdd_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
         offset += 1;
         // FieldMask
         guint32 tdd_fieldmask;
@@ -4995,7 +5005,8 @@ static int dissect_rlcmac_drx_config(proto_tree *tree, tvbuff_t *tvb, packet_inf
     proto_tree_add_item(drx_tree, hf_l2server_drx_longcyclestartoffset_isvalid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // drx_LongCycleStartOffset
-    proto_tree_add_item(drx_tree, hf_l2server_drx_longcyclestartoffset, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    guint long_cycle_start_offset;
+    proto_tree_add_item_ret_uint(drx_tree, hf_l2server_drx_longcyclestartoffset, tvb, offset, 4, ENC_LITTLE_ENDIAN, &long_cycle_start_offset);
     offset += 4;
     // drx_ShortCycle
     proto_tree_add_item(drx_tree, hf_l2server_drx_short_cycle, tvb, offset, 4, ENC_LITTLE_ENDIAN);
@@ -5004,9 +5015,11 @@ static int dissect_rlcmac_drx_config(proto_tree *tree, tvbuff_t *tvb, packet_inf
     proto_tree_add_item(drx_tree, hf_l2server_drx_short_cycle_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     // drx_SlotOffset
-    proto_tree_add_item(drx_tree, hf_l2server_drx_slot_offset, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint32 slot_offset;
+    proto_tree_add_item_ret_uint(drx_tree, hf_l2server_drx_slot_offset, tvb, offset, 1, ENC_LITTLE_ENDIAN, &slot_offset);
     offset += 1;
 
+    proto_item_append_text(drx_ti, " (longCycleStartOffset=%u, slotOffset=%u)", long_cycle_start_offset, slot_offset);
     return start_offset + sizeof(nr5g_rlcmac_Cmac_DRX_CONFIGt);
 }
 
@@ -5145,7 +5158,8 @@ static guint dissect_phr_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
     proto_tree_add_item(phr_config_tree, hf_l2server_phr_tx_power_factor_change, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     // multiplePHR
-    proto_tree_add_item(phr_config_tree, hf_l2server_phr_multiple_phr, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    guint32 multi_phr;
+    proto_tree_add_item_ret_uint(phr_config_tree, hf_l2server_phr_multiple_phr, tvb, offset, 4, ENC_LITTLE_ENDIAN, &multi_phr);
     offset += 4;
     // phr_Type2SpCell
     proto_tree_add_item(phr_config_tree, hf_l2server_phr_type2_spcell, tvb, offset, 4, ENC_LITTLE_ENDIAN);
@@ -5158,10 +5172,10 @@ static guint dissect_phr_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
     offset += 4;
 
     // Spare
-    proto_tree_add_item(phr_config_tree, hf_l2server_spare, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(phr_config_tree, hf_l2server_spare, tvb, offset, 4, ENC_NA);
     offset += 4;
 
-    //offset += sizeof(nr5g_rlcmac_Cmac_PHR_Config_t);
+    proto_item_append_text(phr_config_ti, " (multi-PHR=%s)", multi_phr ? "true" : "false");
     proto_item_set_len(phr_config_ti, sizeof(nr5g_rlcmac_Cmac_PHR_Config_t));
     return offset;
 }
@@ -5437,7 +5451,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
     proto_tree_add_item(tree, hf_l2server_spare2, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
     // Spare[3]
-    proto_tree_add_item(tree, hf_l2server_spare, tvb, offset, 3*4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_spare, tvb, offset, 3*4, ENC_NA);
     offset += (3*4);
 
     // L1CellDedicatedConfig_Len (apparently not set in rrcCOM.c)
@@ -5710,7 +5724,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
 
         offset += 1;
         // Spare[3]
-        proto_tree_add_item(mac_cell_group_tree, hf_l2server_spare, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(mac_cell_group_tree, hf_l2server_spare, tvb, offset, 3, ENC_NA);
         offset += 3;
 
         //------------------------------------
@@ -6015,6 +6029,10 @@ static void dissect_version_info_ack(proto_tree *tree, tvbuff_t *tvb, packet_inf
 static void dissect_dbeam_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                               guint offset, guint len _U_)
 {
+    /* Dbeam Ind filter */
+    proto_item *db_ti = proto_tree_add_item(tree, hf_l2server_dbeam_ind, tvb, 0, 0, ENC_ASCII);
+    proto_item_set_hidden(db_ti);
+
     // Spare
     proto_tree_add_item(tree, hf_l2server_spare4, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -6256,13 +6274,13 @@ static void dissect_rlcmac_error_ind(proto_tree *tree, tvbuff_t *tvb, packet_inf
                                      guint offset, guint len _U_)
 {
     /* Log filter */
-    proto_item *log_ti = proto_tree_add_item(tree, hf_l2server_log, tvb, 0, 0, ENC_NA);
+    proto_item *log_ti = proto_tree_add_item(tree, hf_l2server_log, tvb, 0, 0, ENC_ASCII);
     proto_item_set_hidden(log_ti);
 
     // Not sure what this is...
     offset += 2;
     // LogStr
-    proto_tree_add_item(tree, hf_l2server_logstr, tvb, offset, len-offset+8, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_logstr, tvb, offset, len-offset+8, ENC_ASCII);
 
     col_set_str(pinfo->cinfo, COL_INFO,
                 tvb_get_string_enc(wmem_packet_scope(), tvb, offset, len-offset+8, ENC_UTF_8|ENC_NA));
@@ -6275,7 +6293,7 @@ static void dissect_cmac_status_ind(proto_tree *tree, tvbuff_t *tvb, packet_info
                                     guint offset, guint len _U_)
 {
     /* Log filter */
-    proto_item *log_ti = proto_tree_add_item(tree, hf_l2server_log, tvb, 0, 0, ENC_NA);
+    proto_item *log_ti = proto_tree_add_item(tree, hf_l2server_log, tvb, 0, 0, ENC_ASCII);
     proto_item_set_hidden(log_ti);
 
     /* UEId */
@@ -6922,7 +6940,7 @@ dissect_l2server_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
         /* Lookup dissector function from type (for this SAPI) */
         type2fun = get_type_fun(type, sapi2fun->sapi_funs);
         if (type2fun == NULL) {
-            expert_add_info_format(pinfo, type_ti, &ei_l2server_sapi_unknown,
+            expert_add_info_format(pinfo, type_ti, &ei_l2server_type_unknown,
                                    "L2Server Type (%u) not recognised for SAPI %u", type, sapi);
             return tvb_captured_length(l2_tvb);
         }
@@ -7418,6 +7436,10 @@ proto_register_l2server(void)
         { "PackageType", "l2server.package-type", FT_UINT8, BASE_DEC,
           VALS(version_server_type_vals), 0x0, NULL, HFILL }},
 
+
+      { &hf_l2server_dbeam_ind,
+         { "DBeam Ind", "l2server.dbeam-ind", FT_STRING, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_dbeamid,
          { "DbeamId", "l2server.dbeamid", FT_UINT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
