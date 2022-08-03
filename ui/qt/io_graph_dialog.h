@@ -25,9 +25,12 @@
 #include <ui/qt/models/uat_model.h>
 #include <ui/qt/models/uat_delegate.h>
 
+#include <QVector>
+#include <QString>
 #include <QIcon>
 #include <QMenu>
 #include <QTextStream>
+
 
 class QRubberBand;
 class QTimer;
@@ -100,6 +103,9 @@ private:
     static tap_packet_status tapPacket(void *iog_ptr, packet_info *pinfo, epan_dissect_t *edt, const void *data, tap_flags_t flags);
     static void tapDraw(void *iog_ptr);
 
+    bool findTimeSeriesItemByPacketNumber(guint32 packet_number, time_series_item_t* time_series_item);
+    bool findTimeSeriesItemWithNextGreaterOrEqualTimestamp(double timestamp, time_series_item_t* time_series_item);
+
     void calculateScaledValueUnit();
     template<class DataMap> double maxValueFromGraphData(const DataMap &map);
     template<class DataMap> void scaleGraphData(DataMap &map, int scalar);
@@ -123,6 +129,9 @@ private:
     // much as is feasible.
     io_graph_item_t items_[max_io_items_];
     int cur_idx_;
+
+    // container to store data for a time series graph
+    QVector<time_series_item_t> time_series_;
 };
 
 namespace Ui {
