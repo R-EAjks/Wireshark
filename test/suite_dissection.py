@@ -620,7 +620,7 @@ class case_dissect_tcp(subprocesstest.SubprocessTestCase):
         self.assertIn('5\t6\t[TCP Out-Of-Order]', lines[4])
         self.assertIn('[TCP segment of a reassembled PDU]', lines[4])
         # 3 - finish reassembly
-        self.assertIn('6\t\tPUT /0 HTTP/1.1', lines[5])
+        self.assertIn('6\t6\tPUT /0 HTTP/1.1', lines[5])
         # H - second retransmission.
         self.assertIn('7\t\t', lines[6])
         self.assertNotIn('[TCP segment of a reassembled PDU]', lines[6])

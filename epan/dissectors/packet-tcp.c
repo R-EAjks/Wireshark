@@ -4157,6 +4157,10 @@ again:
              */
             tvbuff_t *next_tvb;
 
+            item = proto_tree_add_uint(tcp_tree, hf_tcp_reassembled_in, tvb, 0,
+                                0, ipfd_head->reassembled_in);
+            proto_item_set_generated(item);
+
             /* create a new TVB structure for desegmented data */
             next_tvb = tvb_new_chain(tvb, ipfd_head->tvb_data);
 
@@ -8216,7 +8220,7 @@ proto_register_tcp(void)
 
         { &hf_tcp_reassembled_in,
         { "Reassembled PDU in frame", "tcp.reassembled_in", FT_FRAMENUM, BASE_NONE, NULL, 0x0,
-            "The PDU that doesn't end in this segment is reassembled in this frame", HFILL }},
+            "Current segment is part of the PDU reassembled in this frame", HFILL }},
 
         { &hf_tcp_reassembled_length,
         { "Reassembled TCP length", "tcp.reassembled.length", FT_UINT32, BASE_DEC, NULL, 0x0,
