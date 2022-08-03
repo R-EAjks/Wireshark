@@ -7,10 +7,11 @@
  */
 
 #include "config.h"
+#include "ftypes-int.h"
 
 #include <stdio.h>
-#include <ftypes-int.h>
 #include <string.h>
+#include <errno.h>
 
 #include <strutil.h>
 #include <wsutil/ws_assert.h>
@@ -74,6 +75,60 @@ val_from_string(fvalue_t *fv, const char *s, size_t len, gchar **err_msg _U_)
 	else
 		fv->value.strbuf = wmem_strbuf_new(NULL, s);
 	return TRUE;
+}
+
+static enum ft_result
+string_to_uinteger64(const fvalue_t *src, guint64 *dst)
+{
+	int base = 0;
+	const char *s;
+	char *endptr;
+	guint64 res;
+
+	s = src->value.strbuf->str;
+
+	if (s[0] == '0' && (s[1] == 'b' || s[1] == 'B')) {
+		base = 2;
+	}
+
+	errno = 0;
+	res = g_ascii_strtoull(s, &endptr, base);
+	if (errno == ERANGE)
+		return FT_OVERFLOW;
+	if (errno != 0)
+		return FT_ERROR;
+	if (endptr == s)
+		return FT_BADARG;
+
+	*dst = res;
+	return FT_OK;
+}
+
+static enum ft_result
+string_to_sinteger64(const fvalue_t *src, gint64 *dst)
+{
+	int base = 0;
+	const char *s;
+	char *endptr;
+	gint64 res;
+
+	s = src->value.strbuf->str;
+
+	if (s[0] == '0' && (s[1] == 'b' || s[1] == 'B')) {
+		base = 2;
+	}
+
+	errno = 0;
+	res = g_ascii_strtoll(s, &endptr, base);
+	if (errno == ERANGE)
+		return FT_OVERFLOW;
+	if (errno != 0)
+		return FT_ERROR;
+	if (endptr == s)
+		return FT_BADARG;
+
+	*dst = res;
+	return FT_OK;
 }
 
 static gboolean
@@ -193,8 +248,8 @@ ftype_register_string(void)
 		val_from_charconst,		/* val_from_charconst */
 		string_to_repr,			/* val_to_string_repr */
 
-		NULL,				/* val_to_uinteger64 */
-		NULL,				/* val_to_sinteger64 */
+		string_to_uinteger64,		/* val_to_uinteger64 */
+		string_to_sinteger64,		/* val_to_sinteger64 */
 
 		{ .set_value_strbuf = string_fvalue_set_strbuf },	/* union set_value */
 		{ .get_value_strbuf = value_get },	/* union get_value */
@@ -228,8 +283,8 @@ ftype_register_string(void)
 		val_from_charconst,		/* val_from_charconst */
 		string_to_repr,			/* val_to_string_repr */
 
-		NULL,				/* val_to_uinteger64 */
-		NULL,				/* val_to_sinteger64 */
+		string_to_uinteger64,		/* val_to_uinteger64 */
+		string_to_sinteger64,		/* val_to_sinteger64 */
 
 		{ .set_value_strbuf = string_fvalue_set_strbuf },	/* union set_value */
 		{ .get_value_strbuf = value_get },	/* union get_value */
@@ -263,8 +318,8 @@ ftype_register_string(void)
 		val_from_charconst,		/* val_from_charconst */
 		string_to_repr,			/* val_to_string_repr */
 
-		NULL,				/* val_to_uinteger64 */
-		NULL,				/* val_to_sinteger64 */
+		string_to_uinteger64,		/* val_to_uinteger64 */
+		string_to_sinteger64,		/* val_to_sinteger64 */
 
 		{ .set_value_strbuf = string_fvalue_set_strbuf },	/* union set_value */
 		{ .get_value_strbuf = value_get },	/* union get_value */
@@ -298,8 +353,8 @@ ftype_register_string(void)
 		val_from_charconst,		/* val_from_charconst */
 		string_to_repr,			/* val_to_string_repr */
 
-		NULL,				/* val_to_uinteger64 */
-		NULL,				/* val_to_sinteger64 */
+		string_to_uinteger64,		/* val_to_uinteger64 */
+		string_to_sinteger64,		/* val_to_sinteger64 */
 
 		{ .set_value_strbuf = string_fvalue_set_strbuf },	/* union set_value */
 		{ .get_value_strbuf = value_get },	/* union get_value */
@@ -333,8 +388,8 @@ ftype_register_string(void)
 		val_from_charconst,		/* val_from_charconst */
 		string_to_repr,			/* val_to_string_repr */
 
-		NULL,				/* val_to_uinteger64 */
-		NULL,				/* val_to_sinteger64 */
+		string_to_uinteger64,		/* val_to_uinteger64 */
+		string_to_sinteger64,		/* val_to_sinteger64 */
 
 		{ .set_value_strbuf = string_fvalue_set_strbuf },	/* union set_value */
 		{ .get_value_strbuf = value_get },	/* union get_value */
