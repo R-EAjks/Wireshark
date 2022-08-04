@@ -2542,38 +2542,44 @@ static int dissect_bwp_dl_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info
     // N.B. These 3 appear regardless of flag!!!!!
     // PdcchConfDed
     //if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDCCH_CFG_PRESENT) {
-        // TODO: bb_nr5g_PDCCH_CONF_DEDICATEDt
+        // TODO: still serialised, so will be smaller than sizeof() !
         offset += sizeof(bb_nr5g_PDCCH_CONF_DEDICATEDt);
     //}
     // PdschConfDed (bb_nr5g_PDSCH_CONF_DEDICATEDt)
     //if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDSCH_CFG_PRESENT) {
-        // TODO:
+        // TODO: still serialised, so will be smaller than sizeof() !
         offset += sizeof(bb_nr5g_PDSCH_CONF_DEDICATEDt);
     //}
     // SpsConfDed
     //if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_SPS_CFG_PRESENT) {
-        // TODO: (bb_nr5g_SPS_CONF_DEDICATEDt)
+        // TODO: serialization is just memcpy, so this is ok..
         offset += sizeof(bb_nr5g_SPS_CONF_DEDICATEDt);
     //}
 
+    // These 3 use the flag when serialised!
 
     // SpsConfToDel_r16
     if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_SPS_CFG_R16_PRESENT) {
         // TODO: (bb_nr5g_SPS_CONFIG_INDEXt)
+        offset += sizeof(bb_nr5g_SPS_CONFIG_INDEXt);
     }
     // PdcchConfDedR16
     if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_R16_PRESENT) {
         // TODO: (bb_nr5g_PDCCH_CONF_DEDICATED_R16t)
+        offset += sizeof(bb_nr5g_PDCCH_CONF_DEDICATED_R16t);
     }
 
-    // TODO
+    // These may be serialised.
+
     // SpsConfToAdd_r16
     for (guint n=0; n < nb_sps_conf_to_add_r16; n++) {
         // TODO:
+        offset += sizeof(bb_nr5g_SPS_CONF_DEDICATEDt);
     }
     // ConfigDeactivationState_r16
     for (guint n=0; n < nb_config_deactivation_state_r16; n++) {
         // TODO:
+        offset += sizeof(bb_nr5g_SPS_CONFIG_INDEXt);
     }
 
     proto_item_set_len(config_ti, offset-start_offset);
@@ -2615,13 +2621,10 @@ static int dissect_pdsch_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info 
     proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
     offset += 1;
 
-
     // CodeBlockGroupTrans (bb_nr5g_PDSCH_CODEBLOCKGROUPTRANSMt)
-    offset += 4;
+    offset += sizeof(bb_nr5g_PDSCH_CODEBLOCKGROUPTRANSMt);
 
     // CodeBlockGroupTransmissionList_r16 (bb_nr5g_PDSCH_CODEBLOCKGROUPTRANSMt)
-    // TODO: this is a hack
-    nb_code_block_group_transmission_r16 = 4;
     for (guint n=0; n < nb_code_block_group_transmission_r16; n++) {
         offset += sizeof(bb_nr5g_PDSCH_CODEBLOCKGROUPTRANSMt);
     }
@@ -4008,9 +4011,6 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         }
         // CsiMeasCfg
         if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_CSI_MEAS_CFG_PRESENT) {
-            // TODO: sad hack to try to get back in line!
-            offset += 42;
-
             offset = dissect_csi_meas_config(ded_tree, tvb, pinfo, offset);
         }
 
