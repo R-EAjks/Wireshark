@@ -174,6 +174,7 @@ typedef struct _e_prefs {
   guint        gui_fileopen_preview;
   gboolean     gui_ask_unsaved;
   gboolean     gui_autocomplete_filter;
+  guint        gui_filter_cache_max_count;
   gboolean     gui_find_wrap;
   gchar       *gui_window_title;
   gchar       *gui_prepend_window_title;
