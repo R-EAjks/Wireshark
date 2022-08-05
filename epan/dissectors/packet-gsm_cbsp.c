@@ -702,7 +702,7 @@ dissect_cbsp_tlvs(tvbuff_t *tvb, int base_offs, int length, packet_info *pinfo, 
 			break;
 		case CBSP_IEI_REP_PERIOD:
 			proto_tree_add_item_ret_uint(att_tree, hf_cbsp_rep_period, tvb, offset, len, ENC_BIG_ENDIAN, &tmp_u);
-			proto_item_append_text(ti, ": %u", tmp_u);
+			proto_item_append_text(ti, ": %u", ((tmp_u & 0xff00) >> 4) + (tmp_u & 0xf));
 			break;
 		case CBSP_IEI_NUM_BCAST_REQ:
 			proto_tree_add_item_ret_uint(att_tree, hf_cbsp_num_bcast_req, tvb, offset, len, ENC_BIG_ENDIAN, &tmp_u);
