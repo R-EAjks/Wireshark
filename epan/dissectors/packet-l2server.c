@@ -519,6 +519,12 @@ static int hf_l2server_nb_config_deactivation_state_r16 = -1;
 static int hf_l2server_pdsch_serving_cell = -1;
 static int hf_l2server_xoverhead = -1;
 static int hf_l2server_nb_harq_processes_for_pdsch = -1;
+static int hf_l2server_pucch_cell = -1;
+static int hf_l2server_max_mimo_layers = -1;
+static int hf_l2server_processing_type2_enabled = -1;
+
+static int hf_l2server_max_code_block_groups_per_tb = -1;
+static int hf_l2server_code_block_group_flush_indicator = -1;
 
 static int hf_l2server_nb_code_block_group_transmission_r16 = -1;
 
@@ -718,6 +724,7 @@ static int hf_l2server_phr_type2_spcell = -1;
 static int hf_l2server_phr_type2_othercell = -1;
 static int hf_l2server_phr_mode_other_cg = -1;
 
+static int hf_l2server_pdcch_conf_dedicated = -1;
 
 static const value_string lch_vals[] =
 {
@@ -1280,6 +1287,7 @@ static gint ett_l2server_phr_config = -1;
 static gint ett_l2server_tdd_ul_dl_pattern = -1;
 static gint ett_l2server_spcell_config = -1;
 static gint ett_l2server_group_b_configured = -1;
+static gint ett_l2server_pdcch_conf_dedicated = -1;
 
 
 
@@ -2506,6 +2514,68 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     return offset;
 }
 
+// bb_nr5g_PDCCH_CONF_DEDICATEDt (from bb-nrg5_struct.h)
+static int dissect_pdcch_conf_dedicated(proto_tree *tree _U_, tvbuff_t *tvb _U_, packet_info *pinfo _U_,
+                                    guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_pdcch_conf_dedicated, tvb,
+                                                         offset, 0,
+                                                          "", "PDCCH Conf Dedicated");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_pdcch_conf_dedicated);
+
+
+    // FieldMask
+    guint32 field_mask;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_1, tvb, offset, 1,
+                                 ENC_LITTLE_ENDIAN, &field_mask);
+    offset += 1;
+
+    // NbDedCtrlResSetsToAdd
+    guint8 nb_ded_ctrl_res_sets_to_add = tvb_get_guint8(tvb, offset);
+    offset += 1;
+    // NbDedCtrlResSetsToDel
+    offset += 1;
+    // NbDedSearchSpacesToAdd
+    guint8 nb_ded_search_spaces_to_add = tvb_get_guint8(tvb, offset);
+    offset += 1;
+    // NbDedSearchSpacesToDel
+    guint8 nb_ded_search_spaces_to_del = tvb_get_guint8(tvb, offset);
+    offset += 1;
+
+    // DedCtrlResSetsIdToDel (fixed size - but not all valid).
+    offset += (bb_nr5g_DED_CTRL_RES_SET_SIZE*1);
+
+    // DownlinkPreemption
+    if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_DOWNLINK_PREEMPTION_PRESENT) {
+        offset += sizeof(bb_nr5g_DOWNLINK_PREEMPTIONt);
+    }
+    // TpcPusch
+    if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_PUSCH_PRESENT) {
+        offset += sizeof(bb_nr5g_PUSCH_TPC_CFGt);
+    }
+    // TpcPucch
+    if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_PUCCH_PRESENT) {
+        offset += sizeof(bb_nr5g_PUCCH_TPC_CFGt);
+    }
+    // TpcSrs
+    if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_SRS_PRESENT) {
+        offset += sizeof(bb_nr5g_SRS_TPC_CFGt);
+    }
+
+    // DedCtrlResSetsToAdd
+    offset += (nb_ded_ctrl_res_sets_to_add * sizeof(bb_nr5g_CTRL_RES_SETt));
+    // DedSearchSpacesToAdd
+    offset += (nb_ded_search_spaces_to_add * sizeof(bb_nr5g_SEARCH_SPACEt));
+    // DedSearchSpacesIdToDel
+    offset += (nb_ded_search_spaces_to_del * 4);
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
 // bb_nr5g_BWP_DOWNLINKDEDICATEDt from bb-nr5g_struct.h
 // TODO: think it needs serialization flag...
 static int dissect_bwp_dl_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -2543,7 +2613,7 @@ static int dissect_bwp_dl_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info
     // PdcchConfDed
     //if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDCCH_CFG_PRESENT) {
         // TODO: still serialised, so will be smaller than sizeof() !
-        offset += sizeof(bb_nr5g_PDCCH_CONF_DEDICATEDt);
+        offset = dissect_pdcch_conf_dedicated(config_tree, tvb, pinfo, offset);
     //}
     // PdschConfDed (bb_nr5g_PDSCH_CONF_DEDICATEDt)
     //if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDSCH_CFG_PRESENT) {
@@ -2556,7 +2626,7 @@ static int dissect_bwp_dl_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info
         offset += sizeof(bb_nr5g_SPS_CONF_DEDICATEDt);
     //}
 
-    // These 3 use the flag when serialised!
+    // These 2 use the present flag when serialised!
 
     // SpsConfToDel_r16
     if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_SPS_CFG_R16_PRESENT) {
@@ -2569,7 +2639,7 @@ static int dissect_bwp_dl_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info
         offset += sizeof(bb_nr5g_PDCCH_CONF_DEDICATED_R16t);
     }
 
-    // These may be serialised.
+    // These arrays may be serialised.
 
     // SpsConfToAdd_r16
     for (guint n=0; n < nb_sps_conf_to_add_r16; n++) {
@@ -2605,10 +2675,13 @@ static int dissect_pdsch_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info 
     proto_tree_add_item(config_tree, hf_l2server_nb_harq_processes_for_pdsch, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // PucchCell
+    proto_tree_add_item(config_tree, hf_l2server_pucch_cell, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
     // MaxMimoLayers
+    proto_tree_add_item(config_tree, hf_l2server_max_mimo_layers, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // ProcessingType2Enabled
+    proto_tree_add_item(config_tree, hf_l2server_processing_type2_enabled, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
 
     // NbCodeBlockGroupTransmission_r16
@@ -2622,7 +2695,16 @@ static int dissect_pdsch_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info 
     offset += 1;
 
     // CodeBlockGroupTrans (bb_nr5g_PDSCH_CODEBLOCKGROUPTRANSMt)
-    offset += sizeof(bb_nr5g_PDSCH_CODEBLOCKGROUPTRANSMt);
+    //    MaxCodeBlockGroupsPerTB
+    proto_tree_add_item(config_tree, hf_l2server_max_code_block_groups_per_tb, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    //    CodeBlockGroupFlushIndicator
+    proto_tree_add_item(config_tree, hf_l2server_code_block_group_flush_indicator, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    //     Pad
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
+    offset += 2;
+
 
     // CodeBlockGroupTransmissionList_r16 (bb_nr5g_PDSCH_CODEBLOCKGROUPTRANSMt)
     for (guint n=0; n < nb_code_block_group_transmission_r16; n++) {
@@ -8278,9 +8360,23 @@ proto_register_l2server(void)
       { &hf_l2server_xoverhead,
         { "XOverhead", "l2server.xoverhead", FT_UINT8, BASE_DEC,
            VALS(xoverhead_vals), 0x0, NULL, HFILL }},
-
       { &hf_l2server_nb_harq_processes_for_pdsch,
         { "Nb HARQ Processes for PDSCH", "l2server.nb-harq-processes-for-pdsch", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pucch_cell,
+        { "PUCCH cell", "l2server.pucch-cell", FT_INT16, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_max_mimo_layers,
+        { "Max MIMO Layers", "l2server.max-mimo-layers", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_processing_type2_enabled,
+        { "Processing Type2 Enabled", "l2server.processing-type2-enabled", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_max_code_block_groups_per_tb,
+        { "Max Code Block Groups Per TB", "l2server.max-code-block-groups-per-tb", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_code_block_group_flush_indicator,
+        { "Code Block Group Flush Indicator", "l2server.code-code-block-group-flush-indicator", FT_INT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_nb_code_block_group_transmission_r16,
@@ -8792,6 +8888,11 @@ proto_register_l2server(void)
       { &hf_l2server_phr_mode_other_cg,
        { "PHR Mode Other Cg", "l2server.phr-mode-other-cg", FT_UINT32, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_pdcch_conf_dedicated,
+       { "PDCCH Config Dedicated", "l2server.pdcp-config-dedicated", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+
     };
 
     static gint *ett[] = {
@@ -8875,7 +8976,8 @@ proto_register_l2server(void)
         &ett_l2server_phr_config,
         &ett_l2server_tdd_ul_dl_pattern,
         &ett_l2server_spcell_config,
-        &ett_l2server_group_b_configured
+        &ett_l2server_group_b_configured,
+        &ett_l2server_pdcch_conf_dedicated
     };
 
     static ei_register_info ei[] = {
