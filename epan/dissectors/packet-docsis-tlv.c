@@ -6296,7 +6296,7 @@ proto_register_docsis_tlv (void)
      {".62 Low Latency Support",
       "docsis_tlv.mcap.low_latancy_sup",
       FT_UINT8, BASE_HEX, NULL, 0x0,
-      "docsis_tlv.mcap.low_latancy_sup", HFILL}
+      "Low Latency Support", HFILL}
     },
     {&hf_docsis_tlv_cm_mic,
      {"6 CM MIC", "docsis_tlv.cmmic",
