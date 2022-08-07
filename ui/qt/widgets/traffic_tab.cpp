@@ -456,7 +456,7 @@ bool TrafficTab::hasGeoIPData(int tabIdx)
     int tab = tabIdx == -1 || tabIdx >= count() ? currentIndex() : tabIdx;
 
     ATapDataModel * dataModel = modelForTabIndex(tab);
-    return dataModel->hasGeoIPData();
+    return (dataModel ? dataModel->hasGeoIPData() : false);
 }
 
 bool
