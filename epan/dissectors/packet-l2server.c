@@ -725,6 +725,12 @@ static int hf_l2server_phr_type2_othercell = -1;
 static int hf_l2server_phr_mode_other_cg = -1;
 
 static int hf_l2server_pdcch_conf_dedicated = -1;
+static int hf_l2server_nb_ded_ctrl_res_sets_to_add = -1;
+static int hf_l2server_nb_ded_ctrl_res_sets_to_del = -1;
+static int hf_l2server_nb_ded_search_spaces_to_add = -1;
+static int hf_l2server_nb_ded_search_spaces_to_del = -1;
+
+static int hf_l2server_pdsch_conf_dedicated = -1;
 
 static const value_string lch_vals[] =
 {
@@ -1288,7 +1294,7 @@ static gint ett_l2server_tdd_ul_dl_pattern = -1;
 static gint ett_l2server_spcell_config = -1;
 static gint ett_l2server_group_b_configured = -1;
 static gint ett_l2server_pdcch_conf_dedicated = -1;
-
+static gint ett_l2server_pdsch_conf_dedicated = -1;
 
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
@@ -2534,15 +2540,20 @@ static int dissect_pdcch_conf_dedicated(proto_tree *tree _U_, tvbuff_t *tvb _U_,
     offset += 1;
 
     // NbDedCtrlResSetsToAdd
-    guint8 nb_ded_ctrl_res_sets_to_add = tvb_get_guint8(tvb, offset);
+    guint32 nb_ded_ctrl_res_sets_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_ded_ctrl_res_sets_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_ded_ctrl_res_sets_to_add);
     offset += 1;
     // NbDedCtrlResSetsToDel
+    //guint32 nb_ded_ctrl_res_sets_to_del;
+    proto_tree_add_item(config_tree, hf_l2server_nb_ded_ctrl_res_sets_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NbDedSearchSpacesToAdd
-    guint8 nb_ded_search_spaces_to_add = tvb_get_guint8(tvb, offset);
+    guint32 nb_ded_search_spaces_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_ded_search_spaces_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_ded_search_spaces_to_add);
     offset += 1;
     // NbDedSearchSpacesToDel
-    guint8 nb_ded_search_spaces_to_del = tvb_get_guint8(tvb, offset);
+    guint32 nb_ded_search_spaces_to_del;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_ded_search_spaces_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_ded_search_spaces_to_del);
     offset += 1;
 
     // DedCtrlResSetsIdToDel (fixed size - but not all valid).
@@ -2571,6 +2582,58 @@ static int dissect_pdcch_conf_dedicated(proto_tree *tree _U_, tvbuff_t *tvb _U_,
     offset += (nb_ded_search_spaces_to_add * sizeof(bb_nr5g_SEARCH_SPACEt));
     // DedSearchSpacesIdToDel
     offset += (nb_ded_search_spaces_to_del * 4);
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_PDSCH_CONF_DEDICATEDt (from bb-nrg5_struct.h)
+static int dissect_pdsch_conf_dedicated(proto_tree *tree _U_, tvbuff_t *tvb _U_, packet_info *pinfo _U_,
+                                    guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_pdsch_conf_dedicated, tvb,
+                                                         offset, 0,
+                                                          "", "PDSCH Conf Dedicated");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_pdsch_conf_dedicated);
+
+    // TODO: !!!
+
+    // DataScrIdentity
+    offset += 2;
+    // VrbToPrbInterl
+    offset += 1;
+    // ResAllocType
+    offset += 1;
+
+    // AggregationFactor
+    offset += 1;
+    // RbgSize
+    offset += 1;
+    // McsTable
+    offset += 1;
+    // MaxCwSchedByDCI
+    offset += 1;
+    // PrbBundlTypeIsValid
+    offset += 1;
+
+    // TODO:
+
+    // PrbBundlType
+    // TODO: ?
+
+    // NbTciStatesToAdd
+    offset += 1;
+    // NbTciStatesToDel
+    offset += 1;
+
+    // Spare
+    proto_tree_add_item(config_tree, hf_l2server_spare, tvb, offset, 2, ENC_NA);
+    offset += 2;
+
+    // TODO:
 
     proto_item_set_len(config_ti, offset-start_offset);
     return offset;
@@ -2612,13 +2675,14 @@ static int dissect_bwp_dl_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info
     // N.B. These 3 appear regardless of flag!!!!!
     // PdcchConfDed
     //if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDCCH_CFG_PRESENT) {
-        // TODO: still serialised, so will be smaller than sizeof() !
+        // bb_nr5g_PDCCH_CONF_DEDICATEDt (serialized)
         offset = dissect_pdcch_conf_dedicated(config_tree, tvb, pinfo, offset);
     //}
     // PdschConfDed (bb_nr5g_PDSCH_CONF_DEDICATEDt)
     //if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDSCH_CFG_PRESENT) {
         // TODO: still serialised, so will be smaller than sizeof() !
-        offset += sizeof(bb_nr5g_PDSCH_CONF_DEDICATEDt);
+        offset = dissect_pdsch_conf_dedicated(config_tree, tvb, pinfo, offset);
+        //offset += sizeof(bb_nr5g_PDSCH_CONF_DEDICATEDt);
     //}
     // SpsConfDed
     //if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_SPS_CFG_PRESENT) {
@@ -5456,7 +5520,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                                      ENC_LITTLE_ENDIAN, &nbSCellCfgAdd);
         offset += 1;
 
-        // SCellConfig
+        // SCellConfig (nr5g_rlcmac_Cmac_SCellConfig_t)
         for (guint n=0; n < nr5g_rlcmac_Com_MaxNumSCells; n++) {
 
             proto_item *scell_ti = proto_tree_add_string_format(scell_list_tree, hf_l2server_scell, tvb,
@@ -8890,9 +8954,24 @@ proto_register_l2server(void)
          NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_pdcch_conf_dedicated,
-       { "PDCCH Config Dedicated", "l2server.pdcp-config-dedicated", FT_STRING, BASE_NONE,
+       { "PDCCH Config Dedicated", "l2server.pdcch-config-dedicated", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_ded_ctrl_res_sets_to_add,
+       { "Nb Dedicated Resource Sets to add", "l2server.nb-ded-ctrl-res-sets-to-add", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_ded_ctrl_res_sets_to_del,
+       { "Nb Dedicated Resource Sets to del", "l2server.nb-ded-ctrl-res-sets-to-adel", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_ded_search_spaces_to_add,
+       { "Nb Dedicated Search Spaces to add", "l2server.nb-ded-search-spaces-to-add", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_ded_search_spaces_to_del,
+       { "Nb Dedicated Search Spaces to del", "l2server.nb-ded-search-spaces-to-del", FT_UINT8, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
 
+      { &hf_l2server_pdsch_conf_dedicated,
+       { "PDSCH Config Dedicated", "l2server.pdsch-config-dedicated", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
@@ -8977,7 +9056,8 @@ proto_register_l2server(void)
         &ett_l2server_tdd_ul_dl_pattern,
         &ett_l2server_spcell_config,
         &ett_l2server_group_b_configured,
-        &ett_l2server_pdcch_conf_dedicated
+        &ett_l2server_pdcch_conf_dedicated,
+        &ett_l2server_pdsch_conf_dedicated
     };
 
     static ei_register_info ei[] = {
