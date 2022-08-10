@@ -643,6 +643,8 @@ private slots:
     void on_actionStatisticsSOMEIPmessages_triggered();
     void on_actionStatisticsSOMEIPSDentries_triggered();
 
+    void on_actionStatisticsExample_triggered();
+
     RtpStreamDialog *openTelephonyRtpStreamsDialog();
     RtpPlayerDialog *openTelephonyRtpPlayerDialog();
     VoipCallsDialog *openTelephonyVoipCallsDialogVoip();

@@ -3277,6 +3277,11 @@ void WiresharkMainWindow::on_actionStatisticsCollectd_triggered()
     openStatisticsTreeDialog("collectd");
 }
 
+void WiresharkMainWindow::on_actionStatisticsExample_triggered()
+{
+    openStatisticsTreeDialog("example");
+}
+
 void WiresharkMainWindow::on_actionStatisticsConversations_triggered()
 {
     ConversationDialog *conv_dialog = new ConversationDialog(*this, capture_file_);

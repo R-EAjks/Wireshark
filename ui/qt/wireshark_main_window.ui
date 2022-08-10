@@ -565,6 +565,7 @@
      <addaction name="actionStatisticsSOMEIPmessages"/>
      <addaction name="actionStatisticsSOMEIPSDentries"/>
     </widget>
+    <addaction name="actionStatisticsExample"/>
    </widget>
    <widget class="QMenu" name="menuTelephony">
     <property name="title">
@@ -3029,6 +3030,11 @@
   <action name="actionToolsCredentials">
    <property name="text">
     <string>Credentials</string>
+   </property>
+  </action>
+  <action name="actionStatisticsExample">
+   <property name="text">
+    <string>Example Statistics</string>
    </property>
   </action>
  </widget>
