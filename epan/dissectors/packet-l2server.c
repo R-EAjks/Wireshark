@@ -5486,7 +5486,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         offset += 1;
     }
 
-    // spCellConfig
+    // spCellConfig (nr5g_rlcmac_Cmac_SpCellConfig_t from nr5g-rlcmac_Cmac.h)
     {
         proto_item *sp_cell_config_ti = proto_tree_add_string_format(params_tree, hf_l2server_spcell_config, tvb,
                                                                      offset, sizeof(nr5g_rlcmac_Cmac_SpCellConfig_t),
@@ -5507,7 +5507,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         proto_item_append_text(sp_cell_config_ti, " (sCellIndex=%u)", scellindex);
     }
 
-    // sCellList
+    // sCellList (nr5g_rlcmac_Cmac_SCellList_t from nr5g-rlcmac_Cmac.h)
     {
         // subtree
         proto_item *scell_list_ti = proto_tree_add_string_format(params_tree, hf_l2server_scell_list, tvb,
@@ -5528,13 +5528,14 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                                                                 "", "sCell");
             proto_tree *scell_tree = proto_item_add_subtree(scell_ti, ett_l2server_scell);
 
+            // SCellConfig (nr5g_rlcmac_Cmac_SCellConfig_t)
             if (n < nbSCellCfgAdd) {
                 // ScellIndex
                 guint32 scellIndex;
                 proto_tree_add_item_ret_uint(scell_tree, hf_l2server_scellindex, tvb, offset, 1, ENC_LITTLE_ENDIAN, &scellIndex);
                 offset += 1;
                 // LsuCellId
-                proto_tree_add_item(scell_tree, hf_l2server_scellindex, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+                proto_tree_add_item(scell_tree, hf_l2server_lsucellid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                 offset += 1;
                 // PCMAXc
                 proto_tree_add_item(scell_tree, hf_l2server_pcmaxc, tvb, offset, 4, ENC_LITTLE_ENDIAN);
