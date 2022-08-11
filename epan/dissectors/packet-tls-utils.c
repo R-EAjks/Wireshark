@@ -3029,9 +3029,9 @@ static const gchar *ciphers[]={
     "CAMELLIA256",
     "SEED",
     "CHACHA20", /* since Libgcrypt 1.7.0 */
-    "*UNKNOWN*",
     "SM1",
-    "SM4"
+    "SM4",
+    "*UNKNOWN*"
 };
 
 static const SslCipherSuite cipher_suites[]={
