@@ -613,6 +613,8 @@ static int hf_l2server_csi_reporting_band = -1;
 
 static int hf_l2server_ul_am_cnf_frame = -1;
 static int hf_l2server_ul_am_req_frame = -1;
+static int hf_l2server_ul_am_req_time_delta = -1;
+
 
 static int hf_l2server_nzp_csi_rs_res_to_del = -1;
 static int hf_l2server_nzp_csi_rs_res_set_to_del = -1;
@@ -1204,8 +1206,15 @@ static gpointer mui_key(guint16 ueid, guint8 cellid _U_, guint8 rbid, guint8 lct
     return GUINT_TO_POINTER(ueid | /*(cellid << 12) |*/ (rbid<<18) | (lct<<26) | (guint64)mui<<32);
 }
 
-// Both tables are from mui_key -> frame_number
+// ype with framenum + ts
+typedef struct {
+    guint32   framenum;
+    nstime_t  ts;
+} DataReqInfo_t;
+
+// mui_key -> DataReqInfo_t*
 static wmem_map_t *ul_req_table = NULL;
+// mui_key -> frame_number
 static wmem_map_t *ul_cnf_table = NULL;
 
 
@@ -1612,9 +1621,13 @@ static void dissect_rlcmac_data_req(proto_tree *tree, tvbuff_t *tvb, packet_info
 
     // Store these on first pass.
     if ((mode == AM) && !PINFO_FD_VISITED(pinfo)) {
+        DataReqInfo_t *req_info = wmem_new0(wmem_file_scope(), DataReqInfo_t);
+        req_info->framenum = pinfo->num;
+        req_info->ts = pinfo->abs_ts;
+
         wmem_map_insert(ul_req_table,
                         mui_key(p_pdcp_nr_info->ueid, cellid, p_pdcp_nr_info->bearerId, lch, mui),
-                        GUINT_TO_POINTER(pinfo->num));
+                        req_info);
     }
     // Look up CNF on further passes.
     else {
@@ -1695,6 +1708,14 @@ static void dissect_rlcmac_data_req_am(proto_tree *tree, tvbuff_t *tvb, packet_i
 }
 
 
+static gint32 get_ms_diff(nstime_t begin, nstime_t end)
+{
+    time_t milli_begin = (begin.secs*1000) + (time_t)(begin.nsecs/1000000.0);
+    time_t milli_end =   (end.secs*1000) +   (time_t)(end.nsecs / 1000000.0);
+
+    return (gint32)(milli_end-milli_begin);
+}
+
 // nr5g_rlcmac_Data_MUI_t (from nr5g-rlcmac_Data.h)
 static void dissect_rlcmac_data_cnf(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                     guint offset, guint len _U_)
@@ -1731,11 +1752,17 @@ static void dissect_rlcmac_data_cnf(proto_tree *tree, tvbuff_t *tvb, packet_info
     }
     // Look up REQ on further passes.
     else {
-        guint32 *req_frame = (guint32*)wmem_map_lookup(ul_req_table,
-                                                       mui_key(ueid, cellid, rbid, lct, mui));
+         DataReqInfo_t *req_frame = (DataReqInfo_t*)wmem_map_lookup(ul_req_table,
+                                                                    mui_key(ueid, cellid, rbid, lct, mui));
         if (req_frame) {
-            proto_tree_add_uint(tree, hf_l2server_ul_am_req_frame,
-                                tvb, 0, 0, GPOINTER_TO_UINT(req_frame));
+            proto_item *ti = proto_tree_add_uint(tree, hf_l2server_ul_am_req_frame, tvb, 0, 0, req_frame->framenum);
+            proto_item_set_generated(ti);
+            gint32 ms_delta = get_ms_diff(req_frame->ts, pinfo->abs_ts);
+            // N.B. this is a bit of a hack, to avoid confusing situation where SN=0 and status PDU both have MUI=0...
+            if (ms_delta > 0) {
+                ti = proto_tree_add_uint(tree, hf_l2server_ul_am_req_time_delta, tvb, 0, 0, (guint32)ms_delta);
+                proto_item_set_generated(ti);
+            }
         }
         else {
             // Add expert info
@@ -5515,12 +5542,13 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                                                               "", "sCell List");
         proto_tree *scell_list_tree = proto_item_add_subtree(scell_list_ti, ett_l2server_scell_list);
 
+        // NumOfSCellAdd
         guint32 nbSCellCfgAdd;
         proto_tree_add_item_ret_uint(scell_list_tree, hf_l2server_nb_scell_cfg_add, tvb, offset, 1,
                                      ENC_LITTLE_ENDIAN, &nbSCellCfgAdd);
         offset += 1;
 
-        // SCellConfig (nr5g_rlcmac_Cmac_SCellConfig_t)
+        // SCellConfig (nr5g_rlcmac_Cmac_SCellConfig_t) entries
         for (guint n=0; n < nr5g_rlcmac_Com_MaxNumSCells; n++) {
 
             proto_item *scell_ti = proto_tree_add_string_format(scell_list_tree, hf_l2server_scell, tvb,
@@ -5535,7 +5563,8 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                 proto_tree_add_item_ret_uint(scell_tree, hf_l2server_scellindex, tvb, offset, 1, ENC_LITTLE_ENDIAN, &scellIndex);
                 offset += 1;
                 // LsuCellId
-                proto_tree_add_item(scell_tree, hf_l2server_lsucellid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+                guint32 lsuCellId;
+                proto_tree_add_item_ret_uint(scell_tree, hf_l2server_lsucellid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &lsuCellId);
                 offset += 1;
                 // PCMAXc
                 proto_tree_add_item(scell_tree, hf_l2server_pcmaxc, tvb, offset, 4, ENC_LITTLE_ENDIAN);
@@ -5544,7 +5573,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                 proto_tree_add_item(scell_tree, hf_l2server_pcmaxc_sul, tvb, offset, 4, ENC_LITTLE_ENDIAN);
                 offset += 4;
 
-                proto_item_append_text(scell_ti, " (sCellIndex=%u)", scellIndex);
+                proto_item_append_text(scell_ti, " (sCellIndex=%u, lsuCellId=%u)", scellIndex, lsuCellId);
             }
             else {
                 proto_item_append_text(scell_ti, " (not set)");
@@ -8670,6 +8699,9 @@ proto_register_l2server(void)
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_ul_am_req_frame,
         { "REQ Frame", "l2server.ul-am-req-frame", FT_FRAMENUM, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_am_req_time_delta,
+        { "Time since REQ (ms)", "l2server.ul-am-req-time-delta", FT_UINT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_nzp_csi_rs_res_to_del,

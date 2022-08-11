@@ -567,7 +567,8 @@ dissect_ulgrant( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data
         g_previous_time_in_ms_ts = pinfo->abs_ts;
 
         // Add to table.
-        g_hash_table_insert(ulgrant_grants_hash, makeGrantKey(slotNumberInFrame, bufferIndex, carrierId, ueid, numberofcodeblocks, data_offset), grantState);
+        g_hash_table_insert(ulgrant_grants_hash, makeGrantKey(slotNumberInFrame, bufferIndex, carrierId, ueid, numberofcodeblocks, data_offset),
+                            grantState);
     }
     else {
         // Subsequent passes, find struct.
