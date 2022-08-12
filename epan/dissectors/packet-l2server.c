@@ -5248,7 +5248,7 @@ static guint dissect_sr_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pin
     offset += 1;
     // SrToDel
     for (guint n=0; n < nr5g_rlcmac_Cmac_SR_MAX; n++) {
-        proto_item *ti = proto_tree_add_item(sr_config_tree, hf_l2server_n_sr_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        proto_item *ti = proto_tree_add_item(sr_config_tree, hf_l2server_sr_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
 
         if (n >= n_sr_to_del) {
