@@ -39,9 +39,9 @@ endif()
 project(${_project_name} C CXX)
 
 # Updated by tools/make-version.py
-set(PROJECT_MAJOR_VERSION 3)
-set(PROJECT_MINOR_VERSION 7)
-set(PROJECT_PATCH_VERSION 3)
+set(PROJECT_MAJOR_VERSION 4)
+set(PROJECT_MINOR_VERSION 1)
+set(PROJECT_PATCH_VERSION 0)
 set(PROJECT_BUILD_VERSION 0)
 set(PROJECT_VERSION_EXTENSION "")
 
@@ -1679,8 +1679,7 @@ if(ENABLE_PLUGINS)
 
 	# Build demo plugin, only if asked explicitly
 	if(ENABLE_PLUGIN_IFDEMO)
-		set(PLUGIN_SRC_DIRS
-			${PLUGIN_SRC_DIRS}
+		list(APPEND PLUGIN_SRC_DIRS
 			plugins/epan/pluginifdemo
 		)
 	endif()
