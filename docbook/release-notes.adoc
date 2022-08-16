@@ -40,6 +40,13 @@ wsbuglink:17779[]
  - Columns for the Conversations and Endpoint dialogs can be hidden by context menu.
  - TCP/UDP conversations now include the stream id and allows filtering on it.
 
+* On systems other than Windows, extcap tools shutdown gracefully. Wireshark sends a SIGTERM
+  signal and applies a 30 second timeout before sending SIGKILL.
+  NOTE: If the process creates a child-process, that will not shut down nor can Wireshark shut down
+  the process. This is especially the case if the extcap tool uses a shellscript for invocation. In
+  such a case, the shellscript should run "exec" to execute the extcap tool or handle the signals
+  explicitly.
+
 * Speed when using MaxMind geolocation has been greatly improved.
 
 * The Wireshark Lua API now uses the https://github.com/rrthomas/lrexlib[lrexlib] bindings to PCRE2.
