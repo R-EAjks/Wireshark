@@ -2667,6 +2667,13 @@ WS_DLL_PUBLIC void proto_get_frame_protocols(const wmem_list_t *layers,
       gboolean *is_ip, gboolean *is_tcp, gboolean *is_udp, gboolean *is_sctp,
       gboolean *is_tls, gboolean *is_rtp, gboolean *is_lte_rlc);
 
+/** Check whether a protocol, specified by id, is in a layer list.
+ * @param layers Protocol layer list
+ * @param proto_id The id of the protocol to search for
+ * @return TRUE if the protocol is found, FALSE if it isn't
+ */
+WS_DLL_PUBLIC gboolean proto_is_frame_protocol_by_id(const wmem_list_t *layers, int proto_id);
+
 /** Check whether a protocol, specified by name, is in a layer list.
  * @param layers Protocol layer list
  * @param proto_name Name of protocol to find

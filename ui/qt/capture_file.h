@@ -114,6 +114,12 @@ public:
      */
     QString displayFilter() const;
 
+    /**
+     * @brief Return all protocols within the detected layers
+     *
+     */
+    QStringList protocols() const;
+
     // XXX This shouldn't be needed.
     static capture_file *globalCapFile();
 

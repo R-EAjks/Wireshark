@@ -7872,20 +7872,18 @@ proto_get_frame_protocols(const wmem_list_t *layers, gboolean *is_ip,
 }
 
 gboolean
-proto_is_frame_protocol(const wmem_list_t *layers, const char* proto_name)
+proto_is_frame_protocol_by_id(const wmem_list_t *layers, int proto_id)
 {
 	wmem_list_frame_t *protos = wmem_list_head(layers);
-	int	    proto_id;
-	const char *name;
+
+	if (proto_id == -1)
+		return FALSE;
 
 	/* Walk the list of a available protocols in the packet and
 	   attempt to find the specified protocol. */
 	while (protos != NULL)
 	{
-		proto_id = GPOINTER_TO_INT(wmem_list_frame_data(protos));
-		name = proto_get_protocol_filter_name(proto_id);
-
-		if (!strcmp(name, proto_name))
+		if (proto_id == GPOINTER_TO_INT(wmem_list_frame_data(protos)))
 		{
 			return TRUE;
 		}
@@ -7894,6 +7892,15 @@ proto_is_frame_protocol(const wmem_list_t *layers, const char* proto_name)
 	}
 
 	return FALSE;
+}
+
+gboolean
+proto_is_frame_protocol(const wmem_list_t *layers, const char* proto_name)
+{
+	int proto_id = proto_get_id_by_filter_name(proto_name);
+	if (proto_id == -1)
+		return FALSE;
+	return proto_is_frame_protocol_by_id(layers, proto_id);
 }
 
 gchar *

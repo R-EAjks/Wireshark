@@ -171,6 +171,7 @@ DIAG_ON(frame-larger-than=)
 #include <QDesktopServices>
 #include <QUrl>
 #include <QMutex>
+#include <QMutexLocker>
 
 // XXX You must uncomment QT_WINEXTRAS_LIB lines in CMakeList.txt and
 // cmakeconfig.h.in.
@@ -1167,8 +1168,10 @@ void WiresharkMainWindow::setEditCommentsMenu()
 
 void WiresharkMainWindow::setMenusForSelectedPacket()
 {
-    gboolean is_ip = FALSE, is_tcp = FALSE, is_udp = FALSE, is_dccp = FALSE, is_sctp = FALSE, is_tls = FALSE, is_rtp = FALSE, is_lte_rlc = FALSE,
-             is_http = FALSE, is_http2 = FALSE, is_quic = FALSE, is_sip = FALSE, is_exported_pdu = FALSE;
+    QMutexLocker locker(&_menuMutex);
+
+    bool is_ip = false, is_tcp = false, is_udp = false, is_dccp = false, is_sctp = false, is_tls = false, is_rtp = false, is_lte_rlc = FALSE,
+             is_http = false, is_http2 = false, is_quic = false, is_sip = false, is_exported_pdu = false;
 
     /* Making the menu context-sensitive allows for easier selection of the
        desired item and has the added benefit, with large captures, of
@@ -1232,20 +1235,28 @@ void WiresharkMainWindow::setMenusForSelectedPacket()
         another_is_time_ref = have_time_ref && rows.count() <= 1 &&
                 !(capture_file_.capFile()->ref_time_count == 1 && frame_selected && current_frame->ref_time);
 
+        QStringList protocols;
         if (capture_file_.capFile()->edt && ! multi_selection)
         {
-            proto_get_frame_protocols(capture_file_.capFile()->edt->pi.layers,
-                                      &is_ip, &is_tcp, &is_udp, &is_sctp,
-                                      &is_tls, &is_rtp, &is_lte_rlc);
-            is_dccp = proto_is_frame_protocol(capture_file_.capFile()->edt->pi.layers, "dccp");
-            is_http = proto_is_frame_protocol(capture_file_.capFile()->edt->pi.layers, "http");
-            is_http2 = proto_is_frame_protocol(capture_file_.capFile()->edt->pi.layers, "http2");
+            protocols = capture_file_.protocols();
+
+            is_ip = protocols.contains("ip") || protocols.contains("ipv6");
+            is_tcp = protocols.contains("tcp");
+            is_udp = protocols.contains("udp");
+            is_sctp = protocols.contains("sctp");
+            is_tls =  protocols.contains("tls");
+            is_rtp =  protocols.contains("rtp");
+            is_lte_rlc = protocols.contains("rlc-lte");
+
+            is_dccp = protocols.contains("dccp");
+            is_http = protocols.contains("http");
+            is_http2 = protocols.contains("http2");
             /* TODO: to follow a QUIC stream we need a *decrypted* QUIC connection, i.e. checking for "quic" in the protocol stack is not enough */
-            is_quic = proto_is_frame_protocol(capture_file_.capFile()->edt->pi.layers, "quic");
-            is_sip = proto_is_frame_protocol(capture_file_.capFile()->edt->pi.layers, "sip");
-            is_exported_pdu = proto_is_frame_protocol(capture_file_.capFile()->edt->pi.layers, "exported_pdu");
+            is_quic = protocols.contains("quic");
+            is_sip = protocols.contains("sip");
+            is_exported_pdu = protocols.contains("exported_pdu");
             /* For Exported PDU there is a tag inserting IP addresses into the SRC and DST columns */
-            if (is_exported_pdu &&
+            if (!is_ip && is_exported_pdu &&
                (capture_file_.capFile()->edt->pi.net_src.type == AT_IPv4 || capture_file_.capFile()->edt->pi.net_src.type == AT_IPv6) &&
                (capture_file_.capFile()->edt->pi.net_dst.type == AT_IPv4 || capture_file_.capFile()->edt->pi.net_dst.type == AT_IPv6)) {
                 is_ip = TRUE;
