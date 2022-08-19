@@ -1044,6 +1044,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-elasticsearch.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-elcom.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-elmi.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-elsucopy.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-enc.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-enip.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-enrp.c

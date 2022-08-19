@@ -1317,7 +1317,7 @@ static dissector_handle_t l2server_handle;
 static dissector_handle_t l2server_message_handle;
 static dissector_handle_t pdcp_nr_handle;
 
-void proto_reg_handoff_l2server (void);
+void proto_reg_handoff_l2server(void);
 
 
 /* Preferences */
@@ -8968,7 +8968,7 @@ proto_register_l2server(void)
        { "PHR PeriodicTimer", "l2server.phr-periodic-timer", FT_UINT32, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_phr_prohibit_timer,
-       { "PHR ProbihitTimer", "l2server.phr-prohibit-timer", FT_UINT32, BASE_DEC,
+       { "PHR ProhibitTimer", "l2server.phr-prohibit-timer", FT_UINT32, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_phr_tx_power_factor_change,
        { "PHR Tx Power Factor Change", "l2server.phr-tx-power-factor-change", FT_UINT32, BASE_DEC,
