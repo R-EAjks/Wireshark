@@ -3639,6 +3639,7 @@ static gboolean
 prf(SslDecryptSession *ssl, StringInfo *secret, const gchar *usage,
     StringInfo *rnd1, StringInfo *rnd2, StringInfo *out, guint out_len)
 {
+    gint md = 0;
     switch (ssl->session.version) {
     case SSLV3_VERSION:
         return ssl3_prf(secret, usage, rnd1, rnd2, out, out_len);
@@ -3652,12 +3653,12 @@ prf(SslDecryptSession *ssl, StringInfo *secret, const gchar *usage,
     default: /* TLSv1.2 */
         switch (ssl->cipher_suite->dig) {
         case DIG_SM3:
-#if GCRYPT_VERSION_NUMBER >= 0x010900
-            return tls12_prf(GCRY_MD_SM3, secret, usage, rnd1, rnd2,
-                             out, out_len);
-#else
-            return FALSE;
-#endif
+            /* could be replaced to GCRY_MD_SM3 when libgcrypt version v1.9.0 or above */
+            md = ssl_get_digest_by_name(ssl_cipher_suite_dig(ssl->cipher_suite)->name);
+            if(md)
+                return tls12_prf(md, secret, usage, rnd1, rnd2, out, out_len);
+            else
+                return FALSE;
         case DIG_SHA384:
             return tls12_prf(GCRY_MD_SHA384, secret, usage, rnd1, rnd2,
                              out, out_len);
