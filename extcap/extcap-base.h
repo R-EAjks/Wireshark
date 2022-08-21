@@ -30,6 +30,7 @@
 extern "C" {
 #endif // __cplusplus
 
+#ifdef _WIN32
 #define EXTCAP_BASE_OPTIONS_ENUM \
     EXTCAP_OPT_LIST_INTERFACES, \
     EXTCAP_OPT_VERSION, \
@@ -60,6 +61,36 @@ extern "C" {
     { "log-level", ws_required_argument, NULL, EXTCAP_OPT_LOG_LEVEL}, \
     { "log-file", ws_required_argument, NULL, EXTCAP_OPT_LOG_FILE}
 
+#else
+#define EXTCAP_BASE_OPTIONS_ENUM \
+    EXTCAP_OPT_LIST_INTERFACES, \
+    EXTCAP_OPT_VERSION, \
+    EXTCAP_OPT_LIST_DLTS, \
+    EXTCAP_OPT_INTERFACE, \
+    EXTCAP_OPT_CONFIG, \
+    EXTCAP_OPT_CAPTURE, \
+    EXTCAP_OPT_CAPTURE_FILTER, \
+    EXTCAP_OPT_FIFO, \
+    EXTCAP_OPT_CONTROL_IN, \
+    EXTCAP_OPT_CONTROL_OUT, \
+    EXTCAP_OPT_LOG_LEVEL, \
+    EXTCAP_OPT_LOG_FILE
+
+#define EXTCAP_BASE_OPTIONS \
+    { "extcap-interfaces", ws_no_argument, NULL, EXTCAP_OPT_LIST_INTERFACES}, \
+    { "extcap-version", ws_optional_argument, NULL, EXTCAP_OPT_VERSION}, \
+    { "extcap-dlts", ws_no_argument, NULL, EXTCAP_OPT_LIST_DLTS}, \
+    { "extcap-interface", ws_required_argument, NULL, EXTCAP_OPT_INTERFACE}, \
+    { "extcap-config", ws_no_argument, NULL, EXTCAP_OPT_CONFIG}, \
+    { "capture", ws_no_argument, NULL, EXTCAP_OPT_CAPTURE}, \
+    { "extcap-capture-filter", ws_required_argument,    NULL, EXTCAP_OPT_CAPTURE_FILTER}, \
+    { "fifo", ws_required_argument, NULL, EXTCAP_OPT_FIFO}, \
+    { "extcap-control-in", ws_required_argument, NULL, EXTCAP_OPT_CONTROL_IN}, \
+    { "extcap-control-out", ws_required_argument, NULL, EXTCAP_OPT_CONTROL_OUT}, \
+    { "log-level", ws_required_argument, NULL, EXTCAP_OPT_LOG_LEVEL}, \
+    { "log-file", ws_required_argument, NULL, EXTCAP_OPT_LOG_FILE}
+#endif /* _WIN32 */
+
 typedef struct _extcap_parameters
 {
     char * exename;
@@ -67,13 +98,11 @@ typedef struct _extcap_parameters
     char * interface;
     char * capture_filter;
 
-    char * shutdown_pipe;
 #ifdef _WIN32
+    char * shutdown_pipe;
     HANDLE shutdown_pipe_h;
-#else
-    int shutdown_pipe_fd;
-#endif
     GThread * shutdown_pipe_thread;
+#endif
     char * control_in;
     int control_in_fd;
     char * control_out;
@@ -99,7 +128,9 @@ typedef struct _extcap_parameters
 
     gboolean debug;
 
-    gboolean shutdown_pipe_supported;
+#ifdef _WIN32
+    gboolean gracefull_shutdown_pipe_requested;
+#endif
 } extcap_parameters;
 
 /* used to inform to extcap application that end of application is requested */

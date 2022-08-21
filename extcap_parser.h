@@ -201,7 +201,11 @@ GList * extcap_parse_args(gchar *output);
 GList * extcap_parse_values(gchar *output);
 
 /* Parse all sentences for interfaces */
+#ifdef _WIN32
 GList * extcap_parse_interfaces(gchar *output, GList **control_items, gboolean *shutdown_pipe);
+#else
+GList * extcap_parse_interfaces(gchar *output, GList **control_items);
+#endif /* _WIN32 */
 
 /* Parse all sentences for DLTs */
 GList * extcap_parse_dlts(gchar *output);

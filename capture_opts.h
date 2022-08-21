@@ -220,9 +220,9 @@ typedef struct interface_options_tag {
 #endif
 #ifdef _WIN32
     HANDLE            extcap_shutdown_h;
-#endif
     int               extcap_shutdown_fd;
     gchar            *extcap_shutdown;
+#endif
     gchar            *extcap_control_in;
     gchar            *extcap_control_out;
 #ifdef CAN_SET_CAPTURE_BUFFER_SIZE

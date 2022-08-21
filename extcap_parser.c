@@ -122,9 +122,15 @@ static extcap_token_sentence *extcap_tokenize_sentence(const gchar *s) {
     rs->sentence = NULL;
 
     /* Regex for catching just the allowed values for sentences */
+#ifdef _WIN32
     if ((regex = g_regex_new("^[\\t| ]*(arg|value|interface|extcap|dlt|control|shutdown)(?=[\\t| ]+\\{)",
                              (GRegexCompileFlags) (G_REGEX_CASELESS),
                              (GRegexMatchFlags) 0, NULL)) != NULL) {
+#else
+    if ((regex = g_regex_new("^[\\t| ]*(arg|value|interface|extcap|dlt|control)(?=[\\t| ]+\\{)",
+                             (GRegexCompileFlags) (G_REGEX_CASELESS),
+                             (GRegexMatchFlags) 0, NULL)) != NULL) {
+#endif /* _WIN32 */
         g_regex_match(regex, s, (GRegexMatchFlags) 0, &match_info);
 
         if (g_match_info_matches(match_info))
@@ -876,7 +882,11 @@ static iface_toolbar_control *extcap_parse_control_sentence(GList *control_items
     return control;
 }
 
+#ifdef _WIN32
 GList *extcap_parse_interfaces(gchar *output, GList **control_items, gboolean *shutdown_pipe) {
+#else
+GList *extcap_parse_interfaces(gchar *output, GList **control_items) {
+#endif /* _WIN32 */
 
     GList *result = NULL;
     GList *tokens = NULL;
@@ -902,11 +912,15 @@ GList *extcap_parse_interfaces(gchar *output, GList **control_items, gboolean *s
                 if ((ti = extcap_parse_control_sentence(*control_items, if_sentence))) {
                     *control_items = g_list_append(*control_items, ti);
                 }
-            } else if (shutdown_pipe &&
+            }
+#ifdef _WIN32
+              else if (shutdown_pipe &&
                        g_ascii_strcasecmp(if_sentence->sentence, "shutdown") == 0)
             {
                 *shutdown_pipe = TRUE;
             }
+#endif /* _WIN32 */
+
         }
 
         walker = g_list_next(walker);

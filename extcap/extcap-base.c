@@ -53,8 +53,10 @@ static FILE *custom_log = NULL;
 gboolean extcap_end_application = FALSE;
 /* graceful shutdown callback, can be null */
 void (*extcap_graceful_shutdown_cb)(void) = NULL;
+#ifdef _WIN32
 /* used to stop pipe thread */
 gboolean extcap_end_pipe_thread = FALSE;
+#endif
 
 static void extcap_init_log_file(const char *filename);
 
@@ -67,8 +69,9 @@ static void extcap_exit_from_loop(int signo _U_)
 #endif /* _WIN32 */
 {
     ws_debug("Exiting from main loop by signal");
-    extcap_end_application = TRUE;
+#ifdef _WIN32
     extcap_end_pipe_thread = TRUE;
+#endif /* _WIN32 */
     if (extcap_graceful_shutdown_cb != NULL) {
        extcap_graceful_shutdown_cb();
     }
@@ -77,6 +80,7 @@ static void extcap_exit_from_loop(int signo _U_)
 #endif /* _WIN32 */
 }
 
+#ifdef _WIN32
 /* Called by shutdown pipe */
 static void shutdown_pipe_command_received(void)
 {
@@ -84,6 +88,7 @@ static void shutdown_pipe_command_received(void)
     extcap_end_application = TRUE;
     extcap_end_pipe_thread = TRUE;
 }
+#endif
 
 void extcap_base_register_interface(extcap_parameters * extcap, const char * interface, const char * ifdescription, uint16_t dlt, const char * dltdescription )
 {
@@ -122,9 +127,10 @@ gboolean extcap_base_register_graceful_shutdown_cb(extcap_parameters * extcap _U
 #endif
 
     extcap_end_application = FALSE;
-    extcap_end_pipe_thread = FALSE;
     extcap_graceful_shutdown_cb = callback;
 #ifdef _WIN32
+    extcap_end_pipe_thread = FALSE;
+    extcap->gracefull_shutdown_pipe_requested = TRUE;
     if (!SetConsoleCtrlHandler(extcap_exit_from_loop, TRUE)) {
             ws_warning("Can't set console handler");
             return FALSE;
@@ -235,13 +241,15 @@ uint8_t extcap_base_parse_options(extcap_parameters * extcap, int result, char *
         case EXTCAP_OPT_FIFO:
             extcap->fifo = g_strdup(optargument);
             break;
+#ifdef _WIN32
         case EXTCAP_OPT_SHUTDOWN:
-            if (!extcap->shutdown_pipe_supported) {
+            if (!extcap->gracefull_shutdown_pipe_requested) {
                 ret = 0;
             } else {
                 extcap->shutdown_pipe = g_strdup(optargument);
             }
             break;
+#endif
         default:
             ret = 0;
     }
@@ -282,9 +290,11 @@ static gint extcap_iface_listall(extcap_parameters * extcap, uint8_t list_ifs)
             extcap_print_version(extcap);
             g_list_foreach(extcap->interfaces, extcap_iface_print, extcap);
         }
-        if (extcap->shutdown_pipe_supported) {
+#ifdef _WIN32
+        if (extcap->gracefull_shutdown_pipe_requested) {
             printf("shutdown {value=shutdown}\n");
         }
+#endif
     } else if (extcap->do_version) {
         extcap_print_version(extcap);
     } else {
@@ -304,6 +314,7 @@ static gint extcap_iface_listall(extcap_parameters * extcap, uint8_t list_ifs)
     return 1;
 }
 
+#ifdef _WIN32
 static void *extcap_base_shutdown_pipe_thread(void * arg)
 {
     extcap_parameters * extcap = (extcap_parameters *)arg;
@@ -311,7 +322,6 @@ static void *extcap_base_shutdown_pipe_thread(void * arg)
 
     ws_debug("SHUTDOWN pipe running");
     do {
-#ifdef _WIN32 /* PeekNamedPipe */
         while (len==0)
         {
             if (!PeekNamedPipe(extcap->shutdown_pipe_h, NULL, 0, NULL, (LPDWORD)&len, NULL))
@@ -320,19 +330,6 @@ static void *extcap_base_shutdown_pipe_thread(void * arg)
             }
             g_usleep(100*1000);
         }
-#else /* select */
-        fd_set set;
-        struct timeval timeout;
-
-        /* Initialize the file descriptor set. */
-        FD_ZERO(&set);
-        FD_SET(extcap->shutdown_pipe_fd, &set);
-
-        /* Initialize the timeout data structure. */
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 1000;
-        len = select(FD_SETSIZE, &set, NULL, NULL, &timeout);
-#endif
     } while (!extcap_end_pipe_thread && !(len > 0));
 
     ws_debug("SHUTDOWN pipe thread is finished (read %d/%ld)", extcap_end_pipe_thread, len);
@@ -342,6 +339,7 @@ static void *extcap_base_shutdown_pipe_thread(void * arg)
 
     return NULL;
 }
+#endif
 
 uint8_t extcap_base_handle_interface(extcap_parameters * extcap)
 {
@@ -352,10 +350,12 @@ uint8_t extcap_base_handle_interface(extcap_parameters * extcap)
         return 0;
     }
 
-    if (extcap->capture && extcap->shutdown_pipe_supported && (extcap->shutdown_pipe == NULL || strlen(extcap->shutdown_pipe) <= 0)) {
-        extcap->shutdown_pipe_supported = 0;
+#ifdef _WIN32
+    if (extcap->capture && extcap->gracefull_shutdown_pipe_requested && (extcap->shutdown_pipe == NULL || strlen(extcap->shutdown_pipe) <= 0)) {
+        extcap->gracefull_shutdown_pipe_requested = 0;
         ws_warning("Extcap Error: No SHUTDOWN pipe provided");
     }
+#endif
 
     if (extcap->do_list_interfaces) {
         return extcap_iface_listall(extcap, 1);
@@ -363,9 +363,9 @@ uint8_t extcap_base_handle_interface(extcap_parameters * extcap)
         return extcap_iface_listall(extcap, 0);
     }
 
-    if (extcap->capture && extcap->shutdown_pipe_supported) {
-        ws_debug("Openning SHUTDOWN pipe %s", extcap->shutdown_pipe);
 #ifdef _WIN32
+    if (extcap->capture && extcap->gracefull_shutdown_pipe_requested) {
+        ws_debug("Openning SHUTDOWN pipe %s", extcap->shutdown_pipe);
         HANDLE h = CreateFile(utf_8to16(extcap->shutdown_pipe),
                                              GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 
@@ -374,18 +374,11 @@ uint8_t extcap_base_handle_interface(extcap_parameters * extcap)
             return 1;
         }
         extcap->shutdown_pipe_h = h;
-#else
-        int fd = ws_open(extcap->shutdown_pipe, O_RDONLY | O_NONBLOCK);
-        if (-1 == fd) {
-            ws_error("Extcap Error: Can't open SHUTDOWN pipe %s, error %s", extcap->shutdown_pipe, g_strerror(errno));
-            return 1;
-        }
-        extcap->shutdown_pipe_fd = fd;
-#endif
         ws_debug("SHUTDOWN pipe thread: starting");
         extcap->shutdown_pipe_thread = g_thread_new("extcap_base_shutdown_pipe", &extcap_base_shutdown_pipe_thread, extcap);
         ws_debug("SHUTDOWN pipe thread: started");
     }
+#endif
 
     return 0;
 }
@@ -410,28 +403,25 @@ static void extcap_help_option_free(gpointer option)
 
 void extcap_base_cleanup(extcap_parameters ** extcap)
 {
-    if ((*extcap)->shutdown_pipe_supported) {
+#ifdef _WIN32
+    if ((*extcap)->gracefull_shutdown_pipe_requested) {
         extcap_end_pipe_thread = TRUE;
         if ((*extcap)->shutdown_pipe_thread) {
             g_thread_join((*extcap)->shutdown_pipe_thread);
         }
-#ifdef _WIN32
         if (INVALID_HANDLE_VALUE != (*extcap)->shutdown_pipe_h) {
             CloseHandle((*extcap)->shutdown_pipe_h);
             (*extcap)->shutdown_pipe_h = INVALID_HANDLE_VALUE;
         }
-#else
-        if (-1 != (*extcap)->shutdown_pipe_fd) {
-            ws_close((*extcap)->shutdown_pipe_fd);
-            (*extcap)->shutdown_pipe_fd = -1;
-        }
-#endif
     }
+#endif
     g_list_free_full((*extcap)->interfaces, extcap_iface_free);
     g_free((*extcap)->exename);
     g_free((*extcap)->fifo);
     g_free((*extcap)->interface);
+#ifdef _WIN32
     g_free((*extcap)->shutdown_pipe);
+#endif
     g_free((*extcap)->version);
     g_free((*extcap)->compiled_with);
     g_free((*extcap)->running_with);
@@ -488,9 +478,11 @@ void extcap_help_add_header(extcap_parameters * extcap, char * help_header)
     extcap_help_add_option(extcap, "--capture", "run the capture");
     extcap_help_add_option(extcap, "--extcap-capture-filter <filter>", "the capture filter");
     extcap_help_add_option(extcap, "--fifo <file>", "dump data to file or fifo");
-    if (extcap->shutdown_pipe_supported) {
+#ifdef _WIN32
+    if (extcap->gracefull_shutdown_pipe_requested) {
         extcap_help_add_option(extcap, "--extcap-shutdown <file>", "Used to shutdown application from calling application");
     }
+#endif
     extcap_help_add_option(extcap, "--extcap-version", "print tool version");
     extcap_help_add_option(extcap, "--log-level", "Set the log level");
     extcap_help_add_option(extcap, "--log-file", "Set a log file to log messages in addition to the console");

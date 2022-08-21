@@ -322,16 +322,21 @@ which is provided using the validation attribute (see example above). The syntax
 such a check is the same as for Qt RegExp classes. This feature is only active in the
 Qt version of Wireshark.
 
-
-==== Extcap signals
+==== Extcap greaceful shutdown
 
 Extcap code can be run by Wireshark or directly by command line/console. In both cases
-the code can require to react to user signals (e.g. Ctrl+C) to cleanup when stopped.
+the code can require to make cleanup before it is terminated - make graceful shutdown.
+Shutdown is initiated by Wireshark and if the extcap do not exit in 30 seconds, it is
+terminated.
 
-For extcaps in C there is `extcap/extcap-base.h` call `extcap_base_set_signal_handlers()`
-which registers handlers for common signals on OS (Linux/MAC/Windows). When application
-is stopped, global variable `extcap_end_application` is set to `TRUE`. Therefore
-application can check it e.g. in main loop whether it should stop.
+For extcaps in C which requires graceful shutdown, there is `extcap/extcap-base.h`
+call `extcap_base_register_graceful_shutdown_cb()`. The call must be called to inform
+the framework that graceful shutdown is requested.
+
+Then, before extcap is terminated, global variable `extcap_end_application` is set
+to `TRUE`. Therefore application can check it e.g. in main loop whether it should exit.
+If callback is registered, it is called too.
+
 
 [source,c]
 ----
@@ -339,8 +344,8 @@ int main(int argc, char *argv[])
 {
     ...
 
-    /* Register handlers for console signals */
-    if (!extcap_base_set_signal_handlers())
+    /* Graceful shutdown is requested */
+    if (!extcap_base_register_graceful_shutdown_cb(extcap_conf, NULL))
         goto end;
 
     /* Setup what should be cleaned up later, e.g. configure a device */
@@ -365,22 +370,14 @@ end:
 }
 ----
 
-[NOTE]
-Please note that signals works just on command line/console. To allow extcap cleanup
-when run by Wireshark see <<ChCaptureExtcapShutdown>>.
+==== Extcap graceful shutdown on Windows
 
+For Windows systems Wireshark implements shutdown pipe to be able to inform a extcap that shutdown
+is requested. Wireshark creates the queue, pass its name to the extcap and writes word `QUIT` to
+the pipe when shutdown is requested.
 
-[[ChCaptureExtcapShutdown]]
-
-==== Extcap shutdown
-
-An extcap utility is terminated by wireshark when capture is stopped. Termination of
-the extcap depends on OS (kill(), TerminateProcess(), ...) and the extcap has no chance
-to catch this.
-
-Wireshark implements shutdown pipe for this case. When capture is stopped, Wireshark
-writes word `QUIT` to the pipe. Extcap should read the pipe and when command is received
-it should cleanup and quit. Wireshark waits 5000 ms till the extcap is terminated as usually.
+Extcap should read the pipe and when command is received it should cleanup and quit. Wireshark waits
+30 s till the extcap is terminated as usually.
 
 To notify Wireshark that extcap is capable of shutdown pipe, it should exhibit `shutdown`
 keyword in configuration query.
@@ -394,13 +391,13 @@ interface {value=example1}{display=Example interface 1 for extcap}
 shutdown {value=shutdown}
 ----
 
-When extcap is shutdown capable, it will receive `--shutdown <pipe>` argument during
+When extcap is graceful shutdown capable, it will receive `--shutdown <pipe>` argument during
 start.
 
-For extcaps in C `extcap/extcap-base.h` contains `extcap_base_register_shutdown_pipe()`
-call to notify framework that it is shutdown pipe capable. When the call is used,
-framework starts thread which monitors the pipe and sets global variable
-`extcap_end_application` to `TRUE` when `QUIT` is sent from Wireshark.
+As mentioned above, for extcaps in C `extcap/extcap-base.h` contains
+`extcap_base_register_graceful_shutdown_cb()` call to notify framework that it is shutdown pipe
+capable. When the call is used, framework starts thread which monitors the pipe and sets global
+variable `extcap_end_application` to `TRUE` when `QUIT` is sent from Wireshark.
 
 [source,c]
 ----
@@ -415,7 +412,7 @@ int main(int argc, char *argv[])
       CISCODUMP_VERSION_RELEASE, help_url);
 
     /* extcap supports shutdown pipe */
-    extcap_base_register_shutdown_pipe(extcap_conf);
+    extcap_base_register_graceful_shutdown_cb(extcap_conf, NULL);
 
     while ((result = ws_getopt_long(argc, argv, ":", longopts, &option_idx)) != -1) {
 
@@ -430,13 +427,6 @@ int main(int argc, char *argv[])
             }
         }
     }
-
-    /* Register handlers for console signals.
-     * It is not required for shutdown pipe case, but allows extcap to run from
-     * command line/console.
-     */
-    if (!extcap_base_set_signal_handlers())
-        goto end;
 
     /* Setup what should be cleaned up later, e.g. configure a device */
     setup();

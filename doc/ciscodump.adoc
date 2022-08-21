@@ -142,6 +142,7 @@ Save captured packet to file or send it through pipe.
 +
 --
 Pipe to shutdown command from calling application.
+Available only on Windows.
 --
 
 --remote-host=<remote host>::

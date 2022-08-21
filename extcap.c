@@ -80,10 +80,12 @@ static GHashTable * _tool_for_ifname = NULL;
  */
 static GHashTable *_toolbars = NULL;
 
+#ifdef _WIN32
 /* internal container, for all the extcap executables that have been found
  * and that provides a shutdown pipe
  */
 static GHashTable *_shutdown_pipes = NULL;
+#endif /* _WIN32 */
 
 /* internal container, to map preference names to pointers that hold preference
  * values. These ensure that preferences can survive extcap if garbage
@@ -366,6 +368,7 @@ extcap_iface_toolbar_add(const gchar *extcap, iface_toolbar *toolbar_entry)
     return ret;
 }
 
+#ifdef _WIN32
 static gboolean
 extcap_iface_shutdown_pipe_add(const gchar *extcap, GList *interfaces)
 {
@@ -388,6 +391,7 @@ extcap_iface_shutdown_pipe_add(const gchar *extcap, GList *interfaces)
     g_free(toolname);
     return ret;
 }
+#endif /* _WIN32 */
 
 static gchar **
 extcap_convert_arguments_to_array(GList * arguments)
@@ -1195,6 +1199,7 @@ extcap_has_toolbar(const char *ifname)
     return FALSE;
 }
 
+#ifdef _WIN32
 gboolean
 extcap_has_shutdown_pipe(const char *ifname)
 {
@@ -1214,6 +1219,7 @@ extcap_has_shutdown_pipe(const char *ifname)
     g_list_free(list);
     return FALSE;
 }
+#endif /* _WIN32 */
 
 #ifdef HAVE_LIBPCAP
 static gboolean extcap_terminate_cb(gpointer user_data)
@@ -1419,11 +1425,6 @@ gboolean extcap_session_stop(capture_session *cap_session)
             ws_unlink(interface_opts->extcap_fifo);
             interface_opts->extcap_fifo = NULL;
         }
-        if (interface_opts->extcap_shutdown && file_exists(interface_opts->extcap_shutdown))
-        {
-            ws_unlink(interface_opts->extcap_shutdown);
-            interface_opts->extcap_shutdown = NULL;
-        }
         if (interface_opts->extcap_control_in && file_exists(interface_opts->extcap_control_in))
         {
             ws_unlink(interface_opts->extcap_control_in);
@@ -1596,11 +1597,13 @@ GPtrArray *extcap_prepare_arguments(interface_options *interface_opts)
         }
         add_arg(EXTCAP_ARGUMENT_RUN_PIPE);
         add_arg(interface_opts->extcap_fifo);
+#ifdef _WIN32
         if (interface_opts->extcap_shutdown)
         {
             add_arg(EXTCAP_ARGUMENT_SHUTDOWN);
             add_arg(interface_opts->extcap_shutdown);
         }
+#endif /* _WIN32 */
         if (interface_opts->extcap_control_in)
         {
             add_arg(EXTCAP_ARGUMENT_CONTROL_OUT);
@@ -1810,6 +1813,7 @@ extcap_init_interfaces(capture_session *cap_session)
                                EXTCAP_CONTROL_OUT_PREFIX);
         }
 
+#ifdef _WIN32
         /* create pipe for shutdown */
         if (extcap_has_shutdown_pipe(interface_opts->name))
         {
@@ -1817,16 +1821,13 @@ extcap_init_interfaces(capture_session *cap_session)
              * will be started
              */
             if (!extcap_create_pipe(interface_opts->name, &interface_opts->extcap_shutdown,
-    #ifdef _WIN32
                                     &interface_opts->extcap_shutdown_h,
-    #else
-                                    capture_opts->temp_dir,
-    #endif
                                     EXTCAP_SHUTDOWN_PREFIX))
             {
                 return FALSE;
             }
         }
+#endif /* _WIN32 */
 
         /* create pipe for fifo */
         if (!extcap_create_pipe(interface_opts->name, &interface_opts->extcap_fifo,
@@ -1915,9 +1916,6 @@ extcap_init_interfaces(capture_session *cap_session)
 #define EXTCAP_REPEAT 10
 #ifdef _WIN32
         if (interface_opts->extcap_shutdown && (INVALID_HANDLE_VALUE != interface_opts->extcap_shutdown_h))
-#else
-        if (interface_opts->extcap_shutdown && file_exists(interface_opts->extcap_shutdown))
-#endif
         {
             int cnt = EXTCAP_REPEAT;
 
@@ -1926,11 +1924,7 @@ extcap_init_interfaces(capture_session *cap_session)
             ws_debug("Waiting for shutdown pipe open by extcap");
             while (cnt--)
             {   /* open the pipe for write */
-#ifdef _WIN32
                 int fd = _open_osfhandle((intptr_t)interface_opts->extcap_shutdown_h, O_BINARY);
-#else
-                int fd = ws_open(interface_opts->extcap_shutdown, O_WRONLY | O_NONBLOCK);
-#endif
                 if (-1 != fd)
                 {
                     interface_opts->extcap_shutdown_fd = fd;
@@ -1948,6 +1942,7 @@ extcap_init_interfaces(capture_session *cap_session)
             }
             ws_debug("  OK");
         }
+#endif /* _WIN32 */
     }
 
     return TRUE;
@@ -2038,17 +2033,23 @@ static void
 process_new_extcap(const char *extcap, char *output)
 {
     GList * interfaces = NULL, * control_items = NULL, * walker = NULL;
-    gboolean shutdown_pipe = FALSE;
     extcap_interface * int_iter = NULL;
     extcap_info * element = NULL;
     iface_toolbar * toolbar_entry = NULL;
     gchar * toolname = g_path_get_basename(extcap);
+#ifdef _WIN32
+    gboolean shutdown_pipe = FALSE;
     GList * shutdown_entry = NULL;
+#endif /* _WIN32 */
 
     GList * interface_keys = g_hash_table_get_keys(_loaded_interfaces);
 
     /* Load interfaces from utility */
+#ifdef _WIN32
     interfaces = extcap_parse_interfaces(output, &control_items, &shutdown_pipe);
+#else
+    interfaces = extcap_parse_interfaces(output, &control_items);
+#endif /* _WIN32 */
 
     ws_debug("Loading interface list for %s ", extcap);
 
@@ -2150,20 +2151,24 @@ process_new_extcap(const char *extcap, char *output)
                 toolbar_entry->ifnames = g_list_append(toolbar_entry->ifnames, g_strdup(int_iter->call));
             }
 
+#ifdef _WIN32
             if (shutdown_pipe)
             {
                 shutdown_entry = g_list_append(shutdown_entry, g_strdup(int_iter->call));
             }
+#endif /* _WIN32 */
         }
 
         walker = g_list_next(walker);
     }
 
+#ifdef _WIN32
     if (shutdown_pipe)
     {
         extcap_iface_shutdown_pipe_add(extcap, shutdown_entry);
         ws_debug("  Interfaces support shutdown pipe");
     }
+#endif /* _WIN32 */
 
     if (toolbar_entry && toolbar_entry->menu_title)
     {
@@ -2212,7 +2217,11 @@ extcap_process_interfaces_cb(thread_pool_t *pool, void *data, char *output)
     info->output = output;
 
     // Are there any interfaces to query information from?
+#ifdef _WIN32
     GList *interfaces = extcap_parse_interfaces(output, NULL, NULL);
+#else
+    GList *interfaces = extcap_parse_interfaces(output, NULL);
+#endif /* _WIN32 */
     for (GList *iface = interfaces; iface; iface = g_list_next(iface)) {
         extcap_interface *intf = (extcap_interface *)iface->data;
         if (intf->if_type == EXTCAP_SENTENCE_INTERFACE) {
@@ -2309,6 +2318,7 @@ extcap_load_interface_list(void)
         _toolbars = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, extcap_free_toolbar);
     }
 
+#ifdef _WIN32
     if (_shutdown_pipes)
     {
         GList *list = g_hash_table_get_values (_shutdown_pipes);
@@ -2320,6 +2330,7 @@ extcap_load_interface_list(void)
     } else {
         _shutdown_pipes = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, extcap_free_toolbar);
     }
+#endif /* _WIN32 */
 
     if (_loaded_interfaces == NULL)
     {
