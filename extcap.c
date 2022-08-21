@@ -56,12 +56,7 @@
 /* Number of seconds to wait for extcap process to exit after cleanup.
  * If extcap does not exit before the timeout, it is forcefully terminated.
  */
-#ifdef _WIN32
-/* Extcap interface does not specify SIGTERM replacement on Windows yet */
-#define EXTCAP_CLEANUP_TIMEOUT 0
-#else
 #define EXTCAP_CLEANUP_TIMEOUT 30
-#endif
 
 /* internal container, for all the extcap executables that have been found.
  * Will be reset if extcap_clear_interfaces() is being explicitly called
