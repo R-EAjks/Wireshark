@@ -39,9 +39,11 @@ extern "C" {
     EXTCAP_OPT_CAPTURE, \
     EXTCAP_OPT_CAPTURE_FILTER, \
     EXTCAP_OPT_FIFO, \
+    EXTCAP_OPT_SHUTDOWN, \
+    EXTCAP_OPT_CONTROL_IN, \
+    EXTCAP_OPT_CONTROL_OUT, \
     EXTCAP_OPT_LOG_LEVEL, \
     EXTCAP_OPT_LOG_FILE
-
 
 #define EXTCAP_BASE_OPTIONS \
     { "extcap-interfaces", ws_no_argument, NULL, EXTCAP_OPT_LIST_INTERFACES}, \
@@ -52,6 +54,9 @@ extern "C" {
     { "capture", ws_no_argument, NULL, EXTCAP_OPT_CAPTURE}, \
     { "extcap-capture-filter", ws_required_argument,    NULL, EXTCAP_OPT_CAPTURE_FILTER}, \
     { "fifo", ws_required_argument, NULL, EXTCAP_OPT_FIFO}, \
+    { "extcap-shutdown", ws_required_argument, NULL, EXTCAP_OPT_SHUTDOWN}, \
+    { "extcap-control-in", ws_required_argument, NULL, EXTCAP_OPT_CONTROL_IN}, \
+    { "extcap-control-out", ws_required_argument, NULL, EXTCAP_OPT_CONTROL_OUT}, \
     { "log-level", ws_required_argument, NULL, EXTCAP_OPT_LOG_LEVEL}, \
     { "log-file", ws_required_argument, NULL, EXTCAP_OPT_LOG_FILE}
 
@@ -61,6 +66,18 @@ typedef struct _extcap_parameters
     char * fifo;
     char * interface;
     char * capture_filter;
+
+    char * shutdown_pipe;
+#ifdef _WIN32
+    HANDLE shutdown_pipe_h;
+#else
+    int shutdown_pipe_fd;
+#endif
+    GThread * shutdown_pipe_thread;
+    char * control_in;
+    int control_in_fd;
+    char * control_out;
+    int control_out_fd;
 
     char * version;
     char * compiled_with;
@@ -81,6 +98,8 @@ typedef struct _extcap_parameters
     GList * help_options;
 
     gboolean debug;
+
+    gboolean shutdown_pipe_supported;
 } extcap_parameters;
 
 /* used to inform to extcap application that end of application is requested */
@@ -93,6 +112,7 @@ void extcap_base_register_interface_ext(extcap_parameters * extcap, const char *
  */
 gboolean extcap_base_register_graceful_shutdown_cb(extcap_parameters * extcap, void (*callback)(void));
 
+void extcap_base_register_shutdown_pipe(extcap_parameters * extcap);
 void extcap_base_set_util_info(extcap_parameters * extcap, const char * exename, const char * major, const char * minor, const char * release, const char * helppage);
 void extcap_base_set_compiled_with(extcap_parameters * extcap, const char *fmt, ...);
 void extcap_base_set_running_with(extcap_parameters * extcap, const char *fmt, ...);

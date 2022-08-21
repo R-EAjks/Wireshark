@@ -51,10 +51,6 @@ sync_pipe_start(capture_options *capture_opts, GPtrArray *capture_comments,
 extern void
 sync_pipe_stop(capture_session *cap_session);
 
-/** User wants to stop the program, just kill the child as soon as possible */
-extern void
-sync_pipe_kill(ws_process_id fork_child);
-
 /**
  * Set wireless channel using dumpcap
  *  On success, *data points to a buffer containing the dumpcap output,

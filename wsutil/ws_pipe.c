@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -40,6 +41,7 @@
 #include "wsutil/filesystem.h"
 #include "wsutil/ws_pipe.h"
 #include "wsutil/wslog.h"
+#include "wsutil/file_util.h"
 
 #ifdef HAS_G_SPAWN_LINUX_THREAD_SAFETY_BUG
 struct linux_dirent64 {
@@ -680,9 +682,10 @@ ws_pipe_wait_for_pipe(HANDLE * pipe_handles, int num_pipe_handles, HANDLE pid)
     HANDLE handles[4];
     gboolean result = TRUE;
 
+    ws_debug("Waiting for %d pipes", num_pipe_handles);
     SecureZeroMemory(pipeinsts, sizeof(pipeinsts));
 
-    if (num_pipe_handles == 0 || num_pipe_handles > 3)
+    if (num_pipe_handles == 0 || num_pipe_handles > 4)
     {
         ws_debug("Invalid number of pipes given as argument.");
         return FALSE;
@@ -800,6 +803,7 @@ ws_pipe_wait_for_pipe(HANDLE * pipe_handles, int num_pipe_handles, HANDLE pid)
         CloseHandle(pipeinsts[i].ol.hEvent);
     }
 
+    ws_debug("Waiting for pipes finished: %d", result);
     return result;
 }
 #endif
@@ -842,6 +846,58 @@ ws_pipe_data_available(int pipe_fd)
 
     return FALSE;
 #endif
+}
+
+/* write to pipe QUIT command */
+void
+ws_pipe_write_quit_to_child(int fd)
+{
+    const char quit_msg[] = "QUIT";
+    ssize_t ret;
+
+    ws_debug("Send QUIT to pipe %d", fd);
+
+    /* it doesn't matter *what* we send here, the first byte will stop the capture */
+    /* simply sending a "QUIT" string */
+    ret = ws_write(fd, quit_msg, sizeof quit_msg);
+    if (ret == -1) {
+        ws_warning("writing to %d: error %s", fd, g_strerror(errno));
+    }
+}
+
+/* Force child to close */
+void
+ws_pipe_kill(ws_process_id fork_child)
+{
+    if (fork_child != WS_INVALID_PID) {
+#ifndef _WIN32
+        int sts = kill(fork_child, SIGTERM);    /* SIGTERM so it can clean up if necessary */
+        if (sts != 0) {
+            ws_warning("Sending SIGTERM to child failed: %s\n", g_strerror(errno));
+        }
+#else
+        /* Remark: This is not the preferred method of closing a process!
+         * the clean way would be getting the process id of the child process,
+         * then getting window handle hWnd of that process (using EnumChildWindows),
+         * and then do a SendMessage(hWnd, WM_CLOSE, 0, 0)
+         *
+         * Unfortunately, I don't know how to get the process id from the
+         * handle.  OpenProcess will get an handle (not a window handle)
+         * from the process ID; it will not get a window handle from the
+         * process ID.  (How could it?  A process can have more than one
+         * window.  For that matter, a process might have *no* windows,
+         * as a process running dumpcap, the normal child process program,
+         * probably does.)
+         *
+         * Hint: GenerateConsoleCtrlEvent() will only work if both processes are
+         * running in the same console; that's not necessarily the case for
+         * us, as we might not be running in a console.
+         * And this also will require to have the process id.
+         */
+        TerminateProcess((HANDLE) (fork_child), 0);
+
+#endif
+    }
 }
 
 /*

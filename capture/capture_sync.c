@@ -1061,7 +1061,7 @@ sync_pipe_close_command(int *data_read_fd, int *message_read_fd,
 
 #ifdef _WIN32
     /* XXX - Should we signal the child somehow? */
-    sync_pipe_kill(*fork_child);
+    ws_pipe_kill(*fork_child);
 #endif
 
     return sync_pipe_wait_for_child(*fork_child, msgp);
@@ -1611,7 +1611,7 @@ sync_interface_stats_close(int *read_fd, ws_process_id *fork_child, gchar **msg)
      * Don't bother waiting for the child. sync_pipe_close_command
      * does this for us on Windows.
      */
-    sync_pipe_kill(*fork_child);
+    ws_pipe_kill(*fork_child);
 #endif
     return sync_pipe_close_command(read_fd, NULL, fork_child, msg);
 }
@@ -2153,24 +2153,6 @@ static void create_dummy_signal_pipe() {
                                   PIPE_ACCESS_OUTBOUND, PIPE_TYPE_BYTE, 1, 65535, 65535, 0, NULL);
     g_free(dummy_signal_pipe_name);
 }
-
-/* tell the child through the signal pipe that we want to quit the capture */
-static void
-signal_pipe_capquit_to_child(capture_session *cap_session)
-{
-    const char quit_msg[] = "QUIT";
-    int ret;
-
-    ws_debug("signal_pipe_capquit_to_child");
-
-    /* it doesn't matter *what* we send here, the first byte will stop the capture */
-    /* simply sending a "QUIT" string */
-    /*pipe_write_block(cap_session->signal_pipe_write_fd, SP_QUIT, quit_msg);*/
-    ret = ws_write(cap_session->signal_pipe_write_fd, quit_msg, sizeof quit_msg);
-    if(ret == -1) {
-        ws_warning("%d header: error %s", cap_session->signal_pipe_write_fd, g_strerror(errno));
-    }
-}
 #endif
 
 
@@ -2192,7 +2174,7 @@ sync_pipe_stop(capture_session *cap_session)
         /* First, use the special signal pipe to try to close the capture child
          * gracefully.
          */
-        signal_pipe_capquit_to_child(cap_session);
+        ws_pipe_write_quit_to_child(cap_session->signal_pipe_write_fd);
 
         /* Next, wait for the process to exit on its own */
         status = WaitForSingleObject((HANDLE) cap_session->fork_child, STOP_SLEEP_TIME);
@@ -2200,44 +2182,8 @@ sync_pipe_stop(capture_session *cap_session)
         /* Force the issue. */
         if (status != WAIT_OBJECT_0) {
             ws_warning("sync_pipe_stop: forcing child to exit");
-            sync_pipe_kill(cap_session->fork_child);
+            ws_pipe_kill(cap_session->fork_child);
         }
-#endif
-    }
-}
-
-
-/* Wireshark has to exit, force the capture child to close */
-void
-sync_pipe_kill(ws_process_id fork_child)
-{
-    if (fork_child != WS_INVALID_PID) {
-#ifndef _WIN32
-        int sts = kill(fork_child, SIGTERM);    /* SIGTERM so it can clean up if necessary */
-        if (sts != 0) {
-            ws_warning("Sending SIGTERM to child failed: %s\n", g_strerror(errno));
-        }
-#else
-        /* Remark: This is not the preferred method of closing a process!
-         * the clean way would be getting the process id of the child process,
-         * then getting window handle hWnd of that process (using EnumChildWindows),
-         * and then do a SendMessage(hWnd, WM_CLOSE, 0, 0)
-         *
-         * Unfortunately, I don't know how to get the process id from the
-         * handle.  OpenProcess will get an handle (not a window handle)
-         * from the process ID; it will not get a window handle from the
-         * process ID.  (How could it?  A process can have more than one
-         * window.  For that matter, a process might have *no* windows,
-         * as a process running dumpcap, the normal child process program,
-         * probably does.)
-         *
-         * Hint: GenerateConsoleCtrlEvent() will only work if both processes are
-         * running in the same console; that's not necessarily the case for
-         * us, as we might not be running in a console.
-         * And this also will require to have the process id.
-         */
-        TerminateProcess((HANDLE) (fork_child), 0);
-
 #endif
     }
 }

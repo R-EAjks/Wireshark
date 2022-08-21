@@ -70,9 +70,11 @@ capture_opts_init(capture_options *capture_opts)
     capture_opts->default_options.extcap_stderr_watch = 0;
 #ifdef _WIN32
     capture_opts->default_options.extcap_pipe_h   = INVALID_HANDLE_VALUE;
+    capture_opts->default_options.extcap_shutdown_h  = INVALID_HANDLE_VALUE;
     capture_opts->default_options.extcap_control_in_h  = INVALID_HANDLE_VALUE;
     capture_opts->default_options.extcap_control_out_h = INVALID_HANDLE_VALUE;
 #endif
+    capture_opts->default_options.extcap_shutdown  = NULL;
     capture_opts->default_options.extcap_control_in  = NULL;
     capture_opts->default_options.extcap_control_out = NULL;
 #ifdef CAN_SET_CAPTURE_BUFFER_SIZE
@@ -794,9 +796,11 @@ capture_opts_add_iface_opt(capture_options *capture_opts, const char *optarg_str
     interface_opts.extcap_stderr_watch = 0;
 #ifdef _WIN32
     interface_opts.extcap_pipe_h = INVALID_HANDLE_VALUE;
+    interface_opts.extcap_shutdown_h = INVALID_HANDLE_VALUE;
     interface_opts.extcap_control_in_h = INVALID_HANDLE_VALUE;
     interface_opts.extcap_control_out_h = INVALID_HANDLE_VALUE;
 #endif
+    interface_opts.extcap_shutdown = g_strdup(capture_opts->default_options.extcap_shutdown);
     interface_opts.extcap_control_in = g_strdup(capture_opts->default_options.extcap_control_in);
     interface_opts.extcap_control_out = g_strdup(capture_opts->default_options.extcap_control_out);
 #ifdef CAN_SET_CAPTURE_BUFFER_SIZE
@@ -1295,6 +1299,7 @@ capture_opts_del_iface(capture_options *capture_opts, guint if_index)
     g_free(interface_opts->extcap_pipedata);
     if (interface_opts->extcap_stderr)
         g_string_free(interface_opts->extcap_stderr, TRUE);
+    g_free(interface_opts->extcap_shutdown);
     g_free(interface_opts->extcap_control_in);
     g_free(interface_opts->extcap_control_out);
 #ifdef HAVE_PCAP_REMOTE
@@ -1352,9 +1357,11 @@ collect_ifaces(capture_options *capture_opts)
             interface_opts.extcap_stderr = NULL;
 #ifdef _WIN32
             interface_opts.extcap_pipe_h = INVALID_HANDLE_VALUE;
+            interface_opts.extcap_shutdown_h = INVALID_HANDLE_VALUE;
             interface_opts.extcap_control_in_h = INVALID_HANDLE_VALUE;
             interface_opts.extcap_control_out_h = INVALID_HANDLE_VALUE;
 #endif
+            interface_opts.extcap_shutdown = NULL;
             interface_opts.extcap_control_in = NULL;
             interface_opts.extcap_control_out = NULL;
 #ifdef CAN_SET_CAPTURE_BUFFER_SIZE

@@ -23,7 +23,8 @@ typedef enum {
     EXTCAP_SENTENCE_EXTCAP,
     EXTCAP_SENTENCE_INTERFACE,
     EXTCAP_SENTENCE_DLT,
-    EXTCAP_SENTENCE_CONTROL
+    EXTCAP_SENTENCE_CONTROL,
+    EXTCAP_SENTENCE_PIPE
 } extcap_sentence_type;
 
 typedef enum {
@@ -200,7 +201,7 @@ GList * extcap_parse_args(gchar *output);
 GList * extcap_parse_values(gchar *output);
 
 /* Parse all sentences for interfaces */
-GList * extcap_parse_interfaces(gchar *output, GList **control_items);
+GList * extcap_parse_interfaces(gchar *output, GList **control_items, gboolean *shutdown_pipe);
 
 /* Parse all sentences for DLTs */
 GList * extcap_parse_dlts(gchar *output);

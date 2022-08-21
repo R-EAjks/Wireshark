@@ -323,6 +323,144 @@ such a check is the same as for Qt RegExp classes. This feature is only active i
 Qt version of Wireshark.
 
 
+==== Extcap signals
+
+Extcap code can be run by Wireshark or directly by command line/console. In both cases
+the code can require to react to user signals (e.g. Ctrl+C) to cleanup when stopped.
+
+For extcaps in C there is `extcap/extcap-base.h` call `extcap_base_set_signal_handlers()`
+which registers handlers for common signals on OS (Linux/MAC/Windows). When application
+is stopped, global variable `extcap_end_application` is set to `TRUE`. Therefore
+application can check it e.g. in main loop whether it should stop.
+
+[source,c]
+----
+int main(int argc, char *argv[])
+{
+    ...
+
+    /* Register handlers for console signals */
+    if (!extcap_base_set_signal_handlers())
+        goto end;
+
+    /* Setup what should be cleaned up later, e.g. configure a device */
+    setup();
+
+    /* Main loop */
+    {
+        /* Read data from source */
+        read_data();
+
+        /* Write it to Wireshark */
+        libpcap_write_packet(...);
+
+        /* Loop till extcap_end_application is set by signal handler */
+    } while (!extcap_end_application);
+
+    /* Cleanup configuration */
+    cleanup();
+
+end:
+    ...
+}
+----
+
+[NOTE]
+Please note that signals works just on command line/console. To allow extcap cleanup
+when run by Wireshark see <<ChCaptureExtcapShutdown>>.
+
+
+[[ChCaptureExtcapShutdown]]
+
+==== Extcap shutdown
+
+An extcap utility is terminated by wireshark when capture is stopped. Termination of
+the extcap depends on OS (kill(), TerminateProcess(), ...) and the extcap has no chance
+to catch this.
+
+Wireshark implements shutdown pipe for this case. When capture is stopped, Wireshark
+writes word `QUIT` to the pipe. Extcap should read the pipe and when command is received
+it should cleanup and quit. Wireshark waits 5000 ms till the extcap is terminated as usually.
+
+To notify Wireshark that extcap is capable of shutdown pipe, it should exhibit `shutdown`
+keyword in configuration query.
+
+.Example of interface definition with shutdown pipeline
+[source,bash]
+----
+$ extcap_example.py --extcap-interfaces
+extcap {version=1.0}{display=Example extcap interface}
+interface {value=example1}{display=Example interface 1 for extcap}
+shutdown {value=shutdown}
+----
+
+When extcap is shutdown capable, it will receive `--shutdown <pipe>` argument during
+start.
+
+For extcaps in C `extcap/extcap-base.h` contains `extcap_base_register_shutdown_pipe()`
+call to notify framework that it is shutdown pipe capable. When the call is used,
+framework starts thread which monitors the pipe and sets global variable
+`extcap_end_application` to `TRUE` when `QUIT` is sent from Wireshark.
+
+[source,c]
+----
+int main(int argc, char *argv[])
+{
+    char* help_url;
+    extcap_parameters * extcap_conf = g_new0(extcap_parameters, 1);
+
+    /* Init extcap_base configuration */
+    help_url = data_file_url("example.html");
+    extcap_base_set_util_info(extcap_conf, argv[0], CISCODUMP_VERSION_MAJOR, CISCODUMP_VERSION_MINOR,
+      CISCODUMP_VERSION_RELEASE, help_url);
+
+    /* extcap supports shutdown pipe */
+    extcap_base_register_shutdown_pipe(extcap_conf);
+
+    while ((result = ws_getopt_long(argc, argv, ":", longopts, &option_idx)) != -1) {
+
+        switch (result) {
+        case OPT_...:
+            ...
+        default:
+            /* Process any extcap_base parameter including shutdown pipe */
+            if (!extcap_base_parse_options(extcap_conf, result - EXTCAP_OPT_LIST_INTERFACES, ws_optarg)) {
+                  ws_warning("Invalid option: %s", argv[ws_optind - 1]);
+                  goto end;
+            }
+        }
+    }
+
+    /* Register handlers for console signals.
+     * It is not required for shutdown pipe case, but allows extcap to run from
+     * command line/console.
+     */
+    if (!extcap_base_set_signal_handlers())
+        goto end;
+
+    /* Setup what should be cleaned up later, e.g. configure a device */
+    setup();
+
+    /* Main loop */
+    {
+        /* Read data from source */
+        read_data();
+
+        /* Write it to Wireshark */
+        libpcap_write_packet(...);
+
+        /* Loop till extcap_end_application is set by signal handler */
+    } while (!extcap_end_application);
+
+    /* Cleanup configuration */
+    cleanup();
+
+end:
+    ...
+}
+----
+
+
 ==== Toolbar Controls
 
 An extcap utility can provide configuration for controls to use in an interface toolbar.
