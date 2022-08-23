@@ -400,6 +400,9 @@ static int hf_l2server_ul_cell_cfg_ded = -1;
 static int hf_l2server_ul_cell_cfg_ded_len = -1;
 static int hf_l2server_first_active_ul_bwp = -1;
 static int hf_l2server_num_ul_bwpid_to_add = -1;
+static int hf_l2server_num_ul_bwpid_to_del = -1;
+static int hf_l2server_ul_bwpid_to_del = -1;
+
 
 static int hf_l2server_initial_ul_bwp = -1;
 static int hf_l2server_initial_ul_bwp_len = -1;
@@ -733,6 +736,20 @@ static int hf_l2server_nb_ded_search_spaces_to_add = -1;
 static int hf_l2server_nb_ded_search_spaces_to_del = -1;
 
 static int hf_l2server_pdsch_conf_dedicated = -1;
+
+static int hf_l2server_uplink_ded_pucch_config = -1;
+static int hf_l2server_uplink_ded_pucch_len = -1;
+static int hf_l2server_nb_sched_req_res_config_to_add = -1;
+
+static int hf_l2server_sr_resource = -1;
+static int hf_l2server_sr_resource_len = -1;
+static int hf_l2server_sr_resource_id = -1;
+static int hf_l2server_sr_id = -1;
+static int hf_l2server_sr_period_and_offset_is_valid = -1;
+static int hf_l2server_sr_period_and_offset = -1;
+
+
+
 
 static const value_string lch_vals[] =
 {
@@ -1184,6 +1201,25 @@ static const value_string nb_of_ant_ports_is_valid_vals[] = {
     { 0,   NULL }
 };
 
+static const value_string sr_period_and_offset_is_valid_vals[] = {
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SYM2,          "SYM2" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SYM6_7,        "SYM6_7" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT1,         "SLOT1" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT2,         "SLOT2" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT4,         "SLOT4" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT5,         "SLOT5" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT8,         "SLOT8" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT10,        "SLOT10" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT16,        "SLOT16" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT20,        "SLOT20" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT40,        "SLOT40" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT80,        "SLOT80" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT160,       "SLOT60" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT320,       "SLOT320" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT640,       "SLOT640" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_DEFAULT,       "DEFAULT" },
+    { 0,   NULL }
+};
 
 
 static const true_false_string nodata_data_vals =
@@ -1206,7 +1242,7 @@ static gpointer mui_key(guint16 ueid, guint8 cellid _U_, guint8 rbid, guint8 lct
     return GUINT_TO_POINTER(ueid | /*(cellid << 12) |*/ (rbid<<18) | (lct<<26) | (guint64)mui<<32);
 }
 
-// ype with framenum + ts
+// Type with framenum + ts
 typedef struct {
     guint32   framenum;
     nstime_t  ts;
@@ -1304,6 +1340,10 @@ static gint ett_l2server_spcell_config = -1;
 static gint ett_l2server_group_b_configured = -1;
 static gint ett_l2server_pdcch_conf_dedicated = -1;
 static gint ett_l2server_pdsch_conf_dedicated = -1;
+static gint ett_l2server_uplink_ded_pucch_config = -1;
+
+static gint ett_l2server_sr_resource = -1;
+
 
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
@@ -5353,6 +5393,58 @@ static guint dissect_phr_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
     return offset;
 }
 
+// nr5g_rlcmac_Cmac_SR_RESOURCE_CFGt
+static guint dissect_scheduling_request_res(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                            guint offset)
+{
+    // Subtree.
+    proto_item *sr_resource_ti = proto_tree_add_string_format(tree, hf_l2server_sr_resource, tvb,
+                                                            offset, 0,
+                                                            "", "SR Resource");
+    proto_tree *sr_resource_tree = proto_item_add_subtree(sr_resource_ti, ett_l2server_sr_resource);
+
+
+    // Len
+    guint32 len;
+    proto_tree_add_item_ret_uint(sr_resource_tree, hf_l2server_sr_resource_len, tvb, offset, 4, ENC_LITTLE_ENDIAN, &len);
+    offset += 4;
+    // Spare
+    proto_tree_add_item(sr_resource_tree, hf_l2server_spare, tvb, offset, 4, ENC_NA);
+    offset += 4;
+    // SRResourceId
+    guint32 sr_resource_id;
+    proto_tree_add_item_ret_uint(sr_resource_tree, hf_l2server_sr_resource_id, tvb, offset, 1, ENC_NA, &sr_resource_id);
+    offset += 1;
+    // SRId
+    guint32 sr_id;
+    proto_tree_add_item_ret_uint(sr_resource_tree, hf_l2server_sr_id, tvb, offset, 1, ENC_NA, &sr_id);
+    offset += 1;
+    // ResourceId
+    guint32 resource_id;
+    proto_tree_add_item_ret_uint(sr_resource_tree, hf_l2server_resource_id, tvb, offset, 1, ENC_NA, &resource_id);
+    offset += 1;
+    // SRPeriodAndOffsetIsValid
+    guint32 sr_period_and_offset_is_valid;
+    proto_tree_add_item_ret_uint(sr_resource_tree, hf_l2server_sr_period_and_offset_is_valid, tvb, offset, 1, ENC_NA,
+                                 &sr_period_and_offset_is_valid);
+    offset += 1;
+
+    // SRPeriodAndOffset
+    guint sr_offset;
+    proto_tree_add_item_ret_uint(sr_resource_tree, hf_l2server_sr_period_and_offset, tvb, offset, 2, ENC_LITTLE_ENDIAN, &sr_offset);
+    offset += 2;
+
+    // Summary
+    proto_item_append_text(sr_resource_ti, " (SRResourceId=%u, srId=%u, resourceId=%u, periodicity=%s, offset=%u)",
+                           sr_resource_id, sr_id, resource_id,
+                           val_to_str_const(sr_period_and_offset_is_valid, sr_period_and_offset_is_valid_vals, "Unknown"),
+                           sr_offset);
+    proto_item_set_len(sr_resource_ti, len);
+
+    return offset;
+}
+
+
 
 // Type is nr5g_rlcmac_Cmac_CONFIG_CMD_t from nr5g-rlcmac_Cmac.h
 static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -5730,6 +5822,8 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
             // TODO:
 
             // NbUlBwpIdToDel
+            guint32 num_bwpid_to_del;
+            proto_tree_add_item_ret_uint(ul_ded_config_tree, hf_l2server_num_ul_bwpid_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &num_bwpid_to_del);
             offset += 1;
 
             // NbUlBwpIdToAdd
@@ -5737,8 +5831,15 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
             proto_tree_add_item_ret_uint(ul_ded_config_tree, hf_l2server_num_ul_bwpid_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &num_bwpid_to_add);
             offset += 1;
 
-            // UlBwpIdToDel[]
-            offset += (1 * bb_nr5g_MAX_NB_BWPS);
+            // UlBwpIdToDel[] (all present when serialized)
+            for (guint32 n=0; n < bb_nr5g_MAX_NB_BWPS; n++) {
+                proto_item *del_ti = proto_tree_add_item(ul_ded_config_tree, hf_l2server_ul_bwpid_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+                offset += 1;
+
+                if (n >= num_bwpid_to_del) {
+                    proto_item_append_text(del_ti, " (not set)");
+                }
+            }
 
             // InitialUlBwp (nr5g_rlcmac_Cmac_BWP_UPLINKDEDICATEDt)
             if (ul_fieldmask & nr5g_rlcmac_Cmac_STRUCT_UPLINK_DEDICATED_CONFIG_INITIAL_UL_BWP_PRESENT) {
@@ -5763,12 +5864,59 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
 
                 // N.B. So far, no entries set here...
                 if (initial_ul_bwp_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_PUCCH_CFG_PRESENT) {
+                    // nr5g_rlcmac_Cmac_PUCCH_CONF_DEDICATEDt
+
+                    //guint32 pucch_start_offset = offset;
+
+                    // Subtree.
+                    proto_item *pucch_ti = proto_tree_add_string_format(initial_ul_bwp_tree, hf_l2server_uplink_ded_pucch_config, tvb,
+                                                                                 offset, 0,
+                                                                                 "", "PUCCH");
+                    proto_tree *pucch_tree = proto_item_add_subtree(pucch_ti, ett_l2server_uplink_ded_pucch_config);
+
+                    // Len
+                    guint32 pucch_len;
+                    proto_tree_add_item_ret_uint(pucch_tree, hf_l2server_uplink_ded_pucch_len, tvb, offset, 4,
+                                                 ENC_LITTLE_ENDIAN, &pucch_len);
+                    offset += 4;
+
+                    // FieldMask
+                    guint pucch_fieldmask;
+                    proto_tree_add_item_ret_uint(pucch_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                                 ENC_LITTLE_ENDIAN, &pucch_fieldmask);
+                    offset += 4;
+
+                    // NbDlDataToUlAck
+                    offset += 1;
+                    // DlDataToUlAck
+                    offset += 8;
+                    // NSchedReqResConfigToAdd
+                    guint32 nb_sched_req_res_config_to_add;
+                    proto_tree_add_item_ret_uint(pucch_tree, hf_l2server_nb_sched_req_res_config_to_add, tvb, offset, 1,
+                                                 ENC_LITTLE_ENDIAN, &nb_sched_req_res_config_to_add);
+                    offset += 1;
+
+                    // PucchConfExtR16
+                    if (pucch_fieldmask & nr5g_rlcmac_Cmac_STRUCT_PUCCH_CONF_DEDICATED_R16_IES_PRESENT) {
+                        offset += sizeof(nr5g_rlcmac_Cmac_PUCCH_CONF_DEDICATED_R16_IESt);
+                    }
+
+                    // SchedReqResCfg
+                    if (pucch_fieldmask & nr5g_rlcmac_Cmac_STRUCT_PUCCH_CONF_DEDICATED_SR_RES_CFG_PRESENT) {
+                        for (uint m=0; m < nb_sched_req_res_config_to_add; m++) {
+                            offset = dissect_scheduling_request_res(pucch_tree, tvb, pinfo, offset);
+                        }
+                    }
+
+                    proto_item_set_len(pucch_ti, pucch_len);
                 }
 
                 if (initial_ul_bwp_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_PUSCH_CFG_PRESENT) {
+                    // nr5g_rlcmac_Cmac_PUSCH_CONF_DEDICATEDt
                 }
 
                 if (initial_ul_bwp_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_SRS_CFG_PRESENT) {
+                    // nr5g_rlcmac_Cmac_SRS_CONF_DEDICATEDt
                 }
 
                 if (initial_ul_bwp_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_CONFIGURED_GRANT_PRESENT) {
@@ -8147,6 +8295,15 @@ proto_register_l2server(void)
       { &hf_l2server_num_ul_bwpid_to_add,
         { "Number of UL BWPIds to add", "l2server.num-ul-bwpids-to-add", FT_UINT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_num_ul_bwpid_to_del,
+        { "Number of UL BWPIds to del", "l2server.num-ul-bwpids-to-del", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwpid_to_del,
+        { "UL BWPId to del", "l2server.ul-bwpid-to-del", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+
+
 
       { &hf_l2server_initial_ul_bwp,
         { "Initial Ul BWP", "l2server.initial-ul-bwp", FT_STRING, BASE_NONE,
@@ -9005,6 +9162,37 @@ proto_register_l2server(void)
       { &hf_l2server_pdsch_conf_dedicated,
        { "PDSCH Config Dedicated", "l2server.pdsch-config-dedicated", FT_STRING, BASE_NONE,
          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_uplink_ded_pucch_config,
+       { "Uplink Ded PUCCH", "l2server.uplink-ded-pucch", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_uplink_ded_pucch_len,
+       { "Len", "l2server.uplink-ded-pucch.len", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_sched_req_res_config_to_add,
+       { "Nb Sched Req Res Config To Add", "l2server.nb-sched-req-res-config-to-add", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_sr_resource,
+       { "SR Resource Cfg", "l2server.sr-resource", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sr_resource_len,
+       { "Len", "l2server.sr-resource.len", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sr_resource_id,
+       { "SR Resource Id", "l2server.sr-resource-id", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sr_id,
+       { "SR Id", "l2server.sr-id", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sr_period_and_offset_is_valid,
+       { "SR Period and offset is valid", "l2server.sr-period-and-offset-is-valid", FT_UINT8, BASE_DEC,
+         VALS(sr_period_and_offset_is_valid_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_sr_period_and_offset,
+       { "SR Period and offset", "l2server.sr-period-and-offset", FT_UINT16, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+
     };
 
     static gint *ett[] = {
@@ -9090,7 +9278,9 @@ proto_register_l2server(void)
         &ett_l2server_spcell_config,
         &ett_l2server_group_b_configured,
         &ett_l2server_pdcch_conf_dedicated,
-        &ett_l2server_pdsch_conf_dedicated
+        &ett_l2server_pdsch_conf_dedicated,
+        &ett_l2server_uplink_ded_pucch_config,
+        &ett_l2server_sr_resource
     };
 
     static ei_register_info ei[] = {
