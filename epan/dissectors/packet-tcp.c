@@ -4041,6 +4041,18 @@ again:
                 /* Whether the new segment has a gap from our latest contiguous
                  * sequence number. */
                 has_gap = LT_SEQ(tcpd->fwd->maxnextseq, seq);
+
+                /* If we know where the previous MSP ends, and this sequence
+                 * number is where the next segment begins, then we don't
+                 * really have a gap, as we know that any missing segments
+                 * before this one will fill in the previous MSP (unless
+                 * the subdissector is buggy). We can go ahead and process
+                 * this segment normally, and in fact need to if it starts
+                 * another MSP.
+                 */
+                if (msp && msp->nxtpdu == seq) {
+                    has_gap = FALSE;
+                }
             }
 
             if (!has_gap) {
