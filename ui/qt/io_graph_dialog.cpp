@@ -111,6 +111,7 @@ static const value_string y_axis_vs[] = {
     { IOG_ITEM_UNIT_CALC_MIN, "MIN(Y Field)" },
     { IOG_ITEM_UNIT_CALC_AVERAGE, "AVG(Y Field)" },
     { IOG_ITEM_UNIT_CALC_LOAD, "LOAD(Y Field)" },
+    { IOG_ITEM_UNIT_DIRECT, "DIRECT(Y Field)" },
     { 0, NULL }
 };
 
@@ -1839,7 +1840,17 @@ void IOGraph::setValueUnits(int val_units)
 
         if (old_val_units != val_units) {
             setFilter(filter_); // Check config & prime vu field
-            if (val_units < IOG_ITEM_UNIT_CALC_SUM) {
+
+            // XOR IOG_ITEM_UNIT_DIRECT
+            // if we come from or go to IOG_ITEM_UNIT_DIRECT a retap might be required
+            if ((val_units_ == IOG_ITEM_UNIT_DIRECT && old_val_units != IOG_ITEM_UNIT_DIRECT)
+                || (val_units_ != IOG_ITEM_UNIT_DIRECT && old_val_units == IOG_ITEM_UNIT_DIRECT)) {
+
+                if (visible_) {
+                    emit requestRetap();
+                }
+            }
+            else if (val_units_ < IOG_ITEM_UNIT_CALC_SUM) {
                 emit requestRecalc();
             }
         }
@@ -1896,25 +1907,51 @@ double IOGraph::startOffset()
     return 0.0;
 }
 
-int IOGraph::packetFromTime(double ts)
+int IOGraph::packetFromTime(double timestamp)
 {
-    int idx = ts * 1000 / interval_;
-    if (idx >= 0 && idx < (int) cur_idx_) {
-        switch (val_units_) {
-        case IOG_ITEM_UNIT_CALC_MAX:
-        case IOG_ITEM_UNIT_CALC_MIN:
-            return items_[idx].extreme_frame_in_invl;
-        default:
-            return items_[idx].last_frame_in_invl;
+    // time series
+    if (val_units_ == IOG_ITEM_UNIT_DIRECT)
+    {
+        int count = time_series_.size();
+        time_series_item_t time_series_item = {};
+
+        if (findTimeSeriesItemWithNextGreaterOrEqualTimestamp(timestamp, &time_series_item)) {
+            return (int)time_series_item.packet_number;
         }
+        // alternatively pick the item at the end of the time series
+        // as it should be the clostest one to the given timestamp
+        else if (count > 0) {
+            time_series_item = time_series_.at(count - 1);
+            return (int)time_series_item.packet_number;
+        }
+
+        return -1;
     }
-    return -1;
+    // interval based
+    else
+    {
+        int idx = timestamp * 1000 / interval_;
+        if (idx >= 0 && idx < (int)cur_idx_) {
+            switch (val_units_) {
+            case IOG_ITEM_UNIT_CALC_MAX:
+            case IOG_ITEM_UNIT_CALC_MIN:
+                return items_[idx].extreme_frame_in_invl;
+            default:
+                return items_[idx].last_frame_in_invl;
+            }
+        }
+        return -1;
+    }
 }
 
 void IOGraph::clearAllData()
 {
     cur_idx_ = -1;
     reset_io_graph_items(items_, max_io_items_);
+
+    time_series_.clear();
+    time_series_.resize(0);
+
     if (graph_) {
         graph_->data()->clear();
     }
@@ -1926,12 +1963,7 @@ void IOGraph::clearAllData()
 
 void IOGraph::recalcGraphData(capture_file *cap_file, bool enable_scaling)
 {
-    /* Moving average variables */
-    unsigned int mavg_in_average_count = 0, mavg_left = 0, mavg_right = 0;
-    unsigned int mavg_to_remove = 0, mavg_to_add = 0;
-    double mavg_cumulated = 0;
     QCPAxis *x_axis = nullptr;
-
     if (graph_) {
         graph_->data()->clear();
         x_axis = graph_->keyAxis();
@@ -1941,73 +1973,102 @@ void IOGraph::recalcGraphData(capture_file *cap_file, bool enable_scaling)
         x_axis = bars_->keyAxis();
     }
 
-    if (moving_avg_period_ > 0 && cur_idx_ >= 0) {
-        /* "Warm-up phase" - calculate average on some data not displayed;
-         * just to make sure average on leftmost and rightmost displayed
-         * values is as reliable as possible
-         */
-        guint64 warmup_interval = 0;
+    // time series
+    if (val_units_ == IOG_ITEM_UNIT_DIRECT) {
+        // Add all items of time series to the graph
+        for (int i = 0; i < time_series_.size(); ++i) {
+            time_series_item_t time_series_item = time_series_.at(i);
 
-//        for (; warmup_interval < first_interval; warmup_interval += interval_) {
-//            mavg_cumulated += get_it_value(io, i, (int)warmup_interval/interval_);
-//            mavg_in_average_count++;
-//            mavg_left++;
-//        }
-        mavg_cumulated += getItemValue((int)warmup_interval/interval_, cap_file);
-        mavg_in_average_count++;
-        for (warmup_interval = interval_;
-            ((warmup_interval < (0 + (moving_avg_period_ / 2) * (guint64)interval_)) &&
-             (warmup_interval <= (cur_idx_ * (guint64)interval_)));
-             warmup_interval += interval_) {
-
-            mavg_cumulated += getItemValue((int)warmup_interval / interval_, cap_file);
-            mavg_in_average_count++;
-            mavg_right++;
-        }
-        mavg_to_add = (unsigned int)warmup_interval;
-    }
-
-    for (int i = 0; i <= cur_idx_; i++) {
-        double ts = (double) i * interval_ / 1000;
-        if (x_axis && qSharedPointerDynamicCast<QCPAxisTickerDateTime>(x_axis->ticker())) {
-            ts += start_time_;
-        }
-        double val = getItemValue(i, cap_file);
-
-        if (moving_avg_period_ > 0) {
-            if (i != 0) {
-                mavg_left++;
-                if (mavg_left > moving_avg_period_ / 2) {
-                    mavg_left--;
-                    mavg_in_average_count--;
-                    mavg_cumulated -= getItemValue((int)mavg_to_remove / interval_, cap_file);
-                    mavg_to_remove += interval_;
-                }
-                if (mavg_to_add <= (unsigned int) cur_idx_ * interval_) {
-                    mavg_in_average_count++;
-                    mavg_cumulated += getItemValue((int)mavg_to_add / interval_, cap_file);
-                    mavg_to_add += interval_;
-                } else {
-                    mavg_right--;
-                }
+            double timestamp = time_series_item.timestamp;
+            if (x_axis != NULL && qSharedPointerDynamicCast<QCPAxisTickerDateTime>(x_axis->ticker())) {
+                timestamp += start_time_;
             }
-            if (mavg_in_average_count > 0) {
-                val = mavg_cumulated / mavg_in_average_count;
-            }
-        }
+            double value = time_series_item.value * y_axis_factor_;
 
-        val *= y_axis_factor_;
-
-        if (hasItemToShow(i, val))
-        {
             if (graph_) {
-                graph_->addData(ts, val);
+                graph_->addData(timestamp, value);
             }
             if (bars_) {
-                bars_->addData(ts, val);
+                bars_->addData(timestamp, value);
             }
         }
-//        qDebug() << "=rgd i" << i << ts << val;
+    }
+    // interval based
+    else
+    {
+        /* Moving average variables */
+        unsigned int mavg_in_average_count = 0, mavg_left = 0, mavg_right = 0;
+        unsigned int mavg_to_remove = 0, mavg_to_add = 0;
+        double mavg_cumulated = 0;
+
+        if (moving_avg_period_ > 0 && cur_idx_ >= 0) {
+            /* "Warm-up phase" - calculate average on some data not displayed;
+             * just to make sure average on leftmost and rightmost displayed
+             * values is as reliable as possible
+             */
+            guint64 warmup_interval = 0;
+
+            //        for (; warmup_interval < first_interval; warmup_interval += interval_) {
+            //            mavg_cumulated += get_it_value(io, i, (int)warmup_interval/interval_);
+            //            mavg_in_average_count++;
+            //            mavg_left++;
+            //        }
+            mavg_cumulated += getItemValue((int)warmup_interval/interval_, cap_file);
+            mavg_in_average_count++;
+            for (warmup_interval = interval_;
+                ((warmup_interval < (0 + (moving_avg_period_ / 2) * (guint64)interval_)) &&
+                    (warmup_interval <= (cur_idx_ * (guint64)interval_)));
+                warmup_interval += interval_) {
+
+                mavg_cumulated += getItemValue((int)warmup_interval / interval_, cap_file);
+                mavg_in_average_count++;
+                mavg_right++;
+            }
+            mavg_to_add = (unsigned int)warmup_interval;
+        }
+
+        for (int i = 0; i <= cur_idx_; i++) {
+            double ts = (double) i * interval_ / 1000;
+            if (x_axis && qSharedPointerDynamicCast<QCPAxisTickerDateTime>(x_axis->ticker())) {
+                ts += start_time_;
+            }
+            double val = getItemValue(i, cap_file);
+
+            if (moving_avg_period_ > 0) {
+                if (i != 0) {
+                    mavg_left++;
+                    if (mavg_left > moving_avg_period_ / 2) {
+                        mavg_left--;
+                        mavg_in_average_count--;
+                        mavg_cumulated -= getItemValue((int)mavg_to_remove / interval_, cap_file);
+                        mavg_to_remove += interval_;
+                    }
+                    if (mavg_to_add <= (unsigned int) cur_idx_ * interval_) {
+                        mavg_in_average_count++;
+                        mavg_cumulated += getItemValue((int)mavg_to_add / interval_, cap_file);
+                        mavg_to_add += interval_;
+                    } else {
+                        mavg_right--;
+                    }
+                }
+                if (mavg_in_average_count > 0) {
+                    val = mavg_cumulated / mavg_in_average_count;
+                }
+            }
+
+            val *= y_axis_factor_;
+
+            if (hasItemToShow(i, val))
+            {
+                if (graph_) {
+                    graph_->addData(ts, val);
+                }
+                if (bars_) {
+                    bars_->addData(ts, val);
+                }
+            }
+            //        qDebug() << "=rgd i" << i << ts << val;
+        }
     }
 
     // attempt to rescale time values to specific units
@@ -2035,6 +2096,7 @@ void IOGraph::calculateScaledValueUnit()
     case IOG_ITEM_UNIT_CALC_MAX:
     case IOG_ITEM_UNIT_CALC_MIN:
     case IOG_ITEM_UNIT_CALC_AVERAGE:
+    case IOG_ITEM_UNIT_DIRECT:
         // Unit is not yet known, continue detecting it.
         break;
     default:
@@ -2185,23 +2247,9 @@ void IOGraph::tapReset(void *iog_ptr)
 tap_packet_status IOGraph::tapPacket(void *iog_ptr, packet_info *pinfo, epan_dissect_t *edt, const void *, tap_flags_t)
 {
     IOGraph *iog = static_cast<IOGraph *>(iog_ptr);
+
     if (!pinfo || !iog) {
         return TAP_PACKET_DONT_REDRAW;
-    }
-
-    int idx = get_io_graph_index(pinfo, iog->interval_);
-    bool recalc = false;
-
-    /* some sanity checks */
-    if ((idx < 0) || (idx >= max_io_items_)) {
-        iog->cur_idx_ = max_io_items_ - 1;
-        return TAP_PACKET_DONT_REDRAW;
-    }
-
-    /* update num_items */
-    if (idx > iog->cur_idx_) {
-        iog->cur_idx_ = (guint32) idx;
-        recalc = true;
     }
 
     /* set start time */
@@ -2212,16 +2260,105 @@ tap_packet_status IOGraph::tapPacket(void *iog_ptr, packet_info *pinfo, epan_dis
         iog->start_time_ = nstime_to_sec(&start_nstime);
     }
 
-    epan_dissect_t *adv_edt = NULL;
-    /* For ADVANCED mode we need to keep track of some more stuff than just frame and byte counts */
-    if (iog->val_units_ >= IOG_ITEM_UNIT_CALC_SUM) {
-        adv_edt = edt;
-    }
+    bool recalc = false;
 
-    if (!update_io_graph_item(iog->items_, idx, pinfo, adv_edt, iog->hf_index_, iog->val_units_, iog->interval_)) {
-        return TAP_PACKET_DONT_REDRAW;
-    }
+    // time series
+    if (iog->val_units_ == IOG_ITEM_UNIT_DIRECT) {
+        if (!edt) {
+            return TAP_PACKET_DONT_REDRAW;
+        }
+        if (iog->hf_index_ <= 0) {
+            return TAP_PACKET_DONT_REDRAW;
+        }
 
+        GPtrArray* field_info_pointers = proto_get_finfo_ptr_array(edt->tree, iog->hf_index_);
+        // if no relevant fields return
+        if (!field_info_pointers) {
+            return TAP_PACKET_REDRAW;
+        }
+
+        double timestamp = (double)pinfo->rel_ts.secs + (double)pinfo->rel_ts.nsecs / 1000000000.0;
+
+        for (guint i = 0; i < field_info_pointers->len; i++) {
+            ftenum field_type = proto_registrar_get_ftype(iog->hf_index_);
+
+            time_series_item_t time_series_item = { };
+            time_series_item.timestamp = timestamp;
+            time_series_item.value = NAN;
+            time_series_item.packet_number = pinfo->num;
+
+            switch (field_type)
+            {
+            case FT_UINT8:
+            case FT_UINT16:
+            case FT_UINT24:
+            case FT_UINT32:
+                time_series_item.value = (double)fvalue_get_uinteger(&((field_info*)field_info_pointers->pdata[i])->value);
+                break;
+            case FT_UINT40:
+            case FT_UINT48:
+            case FT_UINT56:
+            case FT_UINT64:
+                time_series_item.value = (double)fvalue_get_uinteger64(&((field_info*)field_info_pointers->pdata[i])->value);
+                break;
+            case FT_INT8:
+            case FT_INT16:
+            case FT_INT24:
+            case FT_INT32:
+                time_series_item.value = (double)fvalue_get_sinteger(&((field_info*)field_info_pointers->pdata[i])->value);
+                break;
+            case FT_INT40:
+            case FT_INT48:
+            case FT_INT56:
+            case FT_INT64:
+                time_series_item.value = (double)fvalue_get_sinteger64(&((field_info*)field_info_pointers->pdata[i])->value);
+                break;
+            case FT_FLOAT:
+            case FT_DOUBLE:
+                time_series_item.value = (double)fvalue_get_floating(&((field_info*)field_info_pointers->pdata[i])->value);
+                break;
+            default:
+                break;
+            }
+
+            // NAN check for double is special.
+            // this becomes only true if value is NAN
+            if (time_series_item.value != time_series_item.value) {
+                continue;
+            }
+
+            // append time series item to the time series
+            iog->time_series_.append(time_series_item);
+
+            recalc = true;
+        }
+    }
+    // interval based
+    else {
+        int idx = get_io_graph_index(pinfo, iog->interval_);
+
+        /* some sanity checks */
+        if ((idx < 0) || (idx >= max_io_items_)) {
+            iog->cur_idx_ = max_io_items_ - 1;
+            return TAP_PACKET_DONT_REDRAW;
+        }
+
+        /* update num_items */
+        if (idx > iog->cur_idx_) {
+            iog->cur_idx_ = (guint32)idx;
+            recalc = true;
+        }
+
+        epan_dissect_t* adv_edt = NULL;
+        /* For ADVANCED mode we need to keep track of some more stuff than just frame and byte counts */
+        if (iog->val_units_ >= IOG_ITEM_UNIT_CALC_SUM) {
+            adv_edt = edt;
+        }
+
+        if (!update_io_graph_item(iog->items_, idx, pinfo, adv_edt, iog->hf_index_, iog->val_units_, iog->interval_)) {
+            return TAP_PACKET_DONT_REDRAW;
+        }
+    }
 //    qDebug() << "=tapPacket" << iog->name_ << idx << iog->hf_index_ << iog->val_units_ << iog->num_items_;
 
     if (recalc) {
@@ -2243,6 +2380,106 @@ void IOGraph::tapDraw(void *iog_ptr)
     if (iog->bars_) {
 //        qDebug() << "=tapDraw b" << iog->name_ << iog->bars_->data()->keys().size();
     }
+}
+
+bool IOGraph::findTimeSeriesItemByPacketNumber(guint32 packet_number, time_series_item_t* time_series_item)
+{
+    if (!time_series_item) {
+        return false;
+    }
+
+    time_series_item[0] = {};
+
+    int count = time_series_.size();
+
+    if (count <= 0) {
+        return false;
+    }
+
+    // perform a binary search for better performance.
+    int left_index = 0;
+    int mid_index = 0;
+    int right_index = count - 1;
+    time_series_item_t current_time_series_item = {};
+
+    while (right_index >= left_index) {
+        mid_index = (right_index + left_index) / 2;
+        
+        if (mid_index < 0 || mid_index >= count) {
+            return false;
+        }
+
+        current_time_series_item = time_series_.at(mid_index);
+
+        if (packet_number < current_time_series_item.packet_number) {
+            right_index = mid_index - 1;
+
+        }
+        else if (packet_number > current_time_series_item.packet_number) {
+            left_index = mid_index + 1;
+        }
+        else {
+            time_series_item[0] = current_time_series_item;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool IOGraph::findTimeSeriesItemWithNextGreaterOrEqualTimestamp(double timestamp, time_series_item_t* time_series_item)
+{
+    if (!time_series_item) {
+        return false;
+    }
+
+    time_series_item[0] = {};
+
+    int count = time_series_.size();
+
+    if (count <= 0) {
+        return false;
+    }
+
+    // Perform a binary search for better performance.
+    int left_index = 0;
+    int mid_index = 0;
+    int right_index = count - 1;
+    time_series_item_t current_time_series_item = {};
+
+    while (right_index >= left_index)
+    {
+        mid_index = (right_index + left_index) / 2;
+
+        if (mid_index < 0 || mid_index >= count) {
+            return false;
+        }
+
+        current_time_series_item = time_series_.at(mid_index);
+
+        if (left_index == mid_index && mid_index == right_index) {
+            if (timestamp > current_time_series_item.timestamp) {
+                return false;
+            }
+            else {
+                time_series_item[0] = current_time_series_item;
+                return true;
+            }
+        }
+
+        if (timestamp < current_time_series_item.timestamp) {
+            right_index = mid_index;
+        }
+        else if (timestamp > current_time_series_item.timestamp) {
+            left_index = mid_index + 1;
+        }
+        else {
+            time_series_item[0] = current_time_series_item;
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // Stat command + args
