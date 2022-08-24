@@ -41,6 +41,7 @@ private:
     pref_t *pref_recent_files_count_max_;
     pref_t *pref_ask_unsaved_;
     pref_t *pref_autocomplete_filter_;
+    pref_t* pref_filter_cache_max_count_;
     pref_t *pref_toolbar_main_style_;
     pref_t *pref_window_title_;
     pref_t *pref_prepend_window_title_;
@@ -56,6 +57,7 @@ private slots:
     void on_maxRecentLineEdit_textEdited(const QString &new_max);
     void on_confirmUnsavedCheckBox_toggled(bool checked);
     void on_displayAutoCompleteCheckBox_toggled(bool checked);
+    void on_filterCacheMaxCountLineEdit_textEdited(const QString& new_max);
     void on_mainToolbarComboBox_currentIndexChanged(int index);
     void on_languageComboBox_currentIndexChanged(int index);
     void on_windowTitle_textEdited(const QString &new_title);
