@@ -841,14 +841,14 @@ static const value_string config_cmd_type_vals[] =
 {
     { nr5g_l2_Srv_CFG_01tTYPE,     "nr5g_l2_Srv_CFG_01tTYPE" },
     { nr5g_l2_Srv_CFG_02tTYPE,     "nr5g_l2_Srv_CFG_02tTYPE" },
-    // TODO: not sure if others (starting with Type) are alterantives..
+    // TODO: not sure if others (starting with Type) are alternatives..
     { 0,   NULL }
 };
 
 static const value_string setparm_cmd_type_vals[] =
 {
     { nr5g_l2_Srv_SETPARM_03,     "nr5g_l2_Srv_SETPARM_03" },
-    // TODO: not sure if others (starting with Type) are alterntives..
+    // TODO: not sure if others (starting with Type) are alternatives..
     { 0,   NULL }
 };
 
@@ -2101,7 +2101,7 @@ static void dissect_create_ue_nak(proto_tree *tree, tvbuff_t *tvb, packet_info *
 {
     /* UeId */
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    /* 2 more bytes */
+    /* TODO: 2 more bytes */
 }
 
 static void dissect_delete_ue_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -2128,13 +2128,13 @@ static void dissect_delete_ue_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *
     offset += 4;
 }
 
-// : can't find full description
+// Can't find full description
 static void dissect_delete_ue_nak(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset, guint len _U_)
 {
     /* UeId */
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    /* 2 more bytes */
+    /* TODO: 2 more bytes */
 }
 
 // nr5g_l2_Srv_SCG_REL_AND_ADDt (nr5g_l2_Srv_HANDOVERt) from L2ServerMessages.h
@@ -2167,6 +2167,7 @@ static void dissect_handover_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *p
                                                           offset, mac_config_len,
                                                           "", "MAC Config ");
     proto_tree *mac_tree = proto_item_add_subtree(mac_ti, ett_l2server_mac_config);
+
     dissect_rlcmac_cmac_config_cmd(mac_tree, tvb, pinfo, offset, mac_config_len);
 }
 
@@ -2255,7 +2256,7 @@ static void dissect_ra_req(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
     proto_item_set_hidden(rach_ti);
 }
 
-static void dissect_ra_cnf(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+static void dissect_ra_cnf(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
                            guint offset, guint len _U_)
 {
     /* Nr5gId (UEId + CellId + BeamIdx) */
@@ -2283,7 +2284,7 @@ static void dissect_ra_cnf(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _
     proto_item_set_hidden(rach_ti);
 }
 
-static void dissect_ra_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+static void dissect_ra_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
                            guint offset, guint len _U_)
 {
     /* Nr5gId (UEId + CellId + BeamIdx) */
@@ -2307,7 +2308,7 @@ static void dissect_ra_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _
 
 
 /* Also format for RE_EST_END_IND */
-static void dissect_re_est_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+static void dissect_re_est_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
                                guint offset, guint len _U_)
 {
     /* Nr5gId (UEId + CellId + BeamIdx) */
@@ -2326,7 +2327,7 @@ static void dissect_re_est_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pin
 }
 
 static void dissect_l1t_log_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
-                                guint offset _U_, guint len _U_)
+                                guint offset, guint len _U_)
 {
     /* Log filter */
     proto_item *log_ti = proto_tree_add_item(tree, hf_l2server_log, tvb, 0, 0, ENC_ASCII);
@@ -2438,7 +2439,7 @@ static guint dissect_rlcmac_cmac_ra_info(proto_tree *tree, tvbuff_t *tvb, packet
 }
 
 static guint dissect_rlcmac_cmac_ra_info_empty(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
-                                               guint offset _U_, guint len _U_, gboolean from_bwp_mask)
+                                               guint offset, guint len _U_, gboolean from_bwp_mask)
 {
     int ra_start = offset;
 
@@ -2588,7 +2589,7 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
 }
 
 // bb_nr5g_PDCCH_CONF_DEDICATEDt (from bb-nrg5_struct.h)
-static int dissect_pdcch_conf_dedicated(proto_tree *tree _U_, tvbuff_t *tvb _U_, packet_info *pinfo _U_,
+static int dissect_pdcch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                     guint offset)
 {
     guint start_offset = offset;
@@ -2655,8 +2656,8 @@ static int dissect_pdcch_conf_dedicated(proto_tree *tree _U_, tvbuff_t *tvb _U_,
 }
 
 // bb_nr5g_PDSCH_CONF_DEDICATEDt (from bb-nrg5_struct.h)
-static int dissect_pdsch_conf_dedicated(proto_tree *tree _U_, tvbuff_t *tvb _U_, packet_info *pinfo _U_,
-                                    guint offset)
+static int dissect_pdsch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                       guint offset)
 {
     guint start_offset = offset;
 
@@ -2708,7 +2709,7 @@ static int dissect_pdsch_conf_dedicated(proto_tree *tree _U_, tvbuff_t *tvb _U_,
 
 // bb_nr5g_BWP_DOWNLINKDEDICATEDt from bb-nr5g_struct.h
 // TODO: think it needs serialization flag...
-static int dissect_bwp_dl_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+static int dissect_bwp_dl_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
                                     guint offset, const char *title, gboolean serialized _U_)
 {
     guint start_offset = offset;
@@ -6148,18 +6149,27 @@ static void dissect_cmac_rach_cfg_cmd(proto_tree *tree, tvbuff_t *tvb, packet_in
 
     // RA_Info
     guint32 bwpid;
-    offset = dissect_rlcmac_cmac_ra_info(tree, tvb, pinfo, offset, len, &bwpid);
+    dissect_rlcmac_cmac_ra_info(tree, tvb, pinfo, offset, len, &bwpid);
 }
 
+// nr5g_rlcmac_Crlc_TmParm_t (from nr5g-rlcmac_Crlc.h)
 static void dissect_crlc_tm_config(proto_tree *tree _U_, tvbuff_t *tvb _U_, packet_info *pinfo _U_,
                                    guint offset _U_)
 {
     /* TODO */
+
+    // TxActiveFlag
+    offset += 1;
+    // Tx
+    offset += sizeof(nr5g_rlcmac_Crlc_TxTmParm_t);
+    // RxActiveFlag
+    offset += 1;
+    // Rx
+    offset += sizeof(nr5g_rlcmac_Crlc_RxTmParm_t);
 }
 
 // nr5g_rlcmac_Crlc_UmParm_t
-static void dissect_crlc_um_config(proto_tree *tree _U_, tvbuff_t *tvb _U_, packet_info *pinfo _U_,
-                                   guint offset _U_)
+static void dissect_crlc_um_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset)
 {
     // TxActiveFlag
     gboolean tx_active_flag;
@@ -6269,6 +6279,8 @@ static void dissect_crlc_am_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     proto_item_append_text(rx_ti, " (SN-Length=%u)", sn_length);
 }
 
+
+/* nr5g_rlcmac_Crlc_CONFIG_CMD_t from nr5g-rlcmac_Crlc.h */
 static void dissect_crlc_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                       guint offset, guint len _U_)
 {
