@@ -1572,29 +1572,15 @@ add_subdirectory( writecap )
 # application bundle, and on UNIX in general if
 # WIRESHARK_RUN_FROM_BUILD_DIRECTORY is set.
 if(ENABLE_APPLICATION_BUNDLE)
-	if(CMAKE_CFG_INTDIR STREQUAL ".")
-		set(_datafile_dir "${CMAKE_BINARY_DIR}/run/Wireshark.app/Contents/Resources/share/wireshark")
-	else()
-		# Xcode
-		set(_datafile_dir "${CMAKE_BINARY_DIR}/run/${CMAKE_CFG_INTDIR}/Wireshark.app/Contents/Resources/share/wireshark")
-	endif()
+	set(_datafile_dir "${CMAKE_BINARY_DIR}/run/${CMAKE_CFG_INTDIR}/Wireshark.app/Contents/Resources/share/wireshark")
 elseif(NOT CMAKE_CFG_INTDIR STREQUAL ".")
-	# Visual Studio, Xcode, etc.
 	set(_datafile_dir "${CMAKE_BINARY_DIR}/run/${CMAKE_CFG_INTDIR}")
-else()
-	# Makefile, Ninja, etc.
-	set(_datafile_dir "${CMAKE_BINARY_DIR}/run")
 endif()
 
 set(DATAFILE_DIR ${_datafile_dir} CACHE INTERNAL "Build time data file location.")
 
 if(ENABLE_APPLICATION_BUNDLE)
-	if(CMAKE_CFG_INTDIR STREQUAL ".")
-		set(_log_datafile_dir "${CMAKE_BINARY_DIR}/run/Logray.app/Contents/Resources/share/logray")
-	else()
-		# Xcode
-		set(_log_datafile_dir "${CMAKE_BINARY_DIR}/run/${CMAKE_CFG_INTDIR}/Logray.app/Contents/Resources/share/logray")
-	endif()
+	set(_log_datafile_dir "${CMAKE_BINARY_DIR}/run/${CMAKE_CFG_INTDIR}/Logray.app/Contents/Resources/share/logray")
 	set(LOG_DATAFILE_DIR ${_log_datafile_dir} CACHE INTERNAL "Build time log analysis data file location.")
 # XXX We need to update wsutil/filesystem.c and packaging/nsis/*logray* to match.
 # elseif(NOT CMAKE_CFG_INTDIR STREQUAL ".")
