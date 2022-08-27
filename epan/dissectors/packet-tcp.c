@@ -452,6 +452,7 @@ static expert_field ei_tcp_checksum_bad = EI_INIT;
 static expert_field ei_tcp_urgent_pointer_non_zero = EI_INIT;
 static expert_field ei_tcp_suboption_malformed = EI_INIT;
 static expert_field ei_tcp_nop = EI_INIT;
+static expert_field ei_tcp_non_zero_bytes_after_eol = EI_INIT;
 static expert_field ei_tcp_bogus_header_length = EI_INIT;
 
 /* static expert_field ei_mptcp_analysis_unexpected_idsn = EI_INIT; */
@@ -935,7 +936,7 @@ tcpip_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_
     const struct tcpheader *tcphdr=(const struct tcpheader *)vip;
 
     add_conversation_table_data_with_conv_id(hash, &tcphdr->ip_src, &tcphdr->ip_dst, tcphdr->th_sport, tcphdr->th_dport, (conv_id_t) tcphdr->th_stream, 1, pinfo->fd->pkt_len,
-                                              &pinfo->rel_ts, &pinfo->abs_ts, &tcp_ct_dissector_info, ENDPOINT_TCP);
+                                              &pinfo->rel_ts, &pinfo->abs_ts, &tcp_ct_dissector_info, CONVERSATION_TCP);
 
     return TAP_PACKET_REDRAW;
 }
@@ -951,12 +952,12 @@ mptcpip_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _
 
     add_conversation_table_data_with_conv_id(hash, &meta->ip_src, &meta->ip_dst,
         meta->sport, meta->dport, (conv_id_t) tcpd->mptcp_analysis->stream, 1, pinfo->fd->pkt_len,
-                                              &pinfo->rel_ts, &pinfo->abs_ts, &tcp_ct_dissector_info, ENDPOINT_TCP);
+                                              &pinfo->rel_ts, &pinfo->abs_ts, &tcp_ct_dissector_info, CONVERSATION_TCP);
 
     return TAP_PACKET_REDRAW;
 }
 
-static const char* tcp_host_get_filter_type(hostlist_talker_t* host, conv_filter_type_e filter)
+static const char* tcp_endpoint_get_filter_type(endpoint_item_t* endpoint, conv_filter_type_e filter)
 {
     if (filter == CONV_FT_SRC_PORT)
         return "tcp.srcport";
@@ -967,38 +968,38 @@ static const char* tcp_host_get_filter_type(hostlist_talker_t* host, conv_filter
     if (filter == CONV_FT_ANY_PORT)
         return "tcp.port";
 
-    if(!host) {
+    if(!endpoint) {
         return CONV_FILTER_INVALID;
     }
 
     if (filter == CONV_FT_SRC_ADDRESS) {
-        if (host->myaddress.type == AT_IPv4)
+        if (endpoint->myaddress.type == AT_IPv4)
             return "ip.src";
-        if (host->myaddress.type == AT_IPv6)
+        if (endpoint->myaddress.type == AT_IPv6)
             return "ipv6.src";
     }
 
     if (filter == CONV_FT_DST_ADDRESS) {
-        if (host->myaddress.type == AT_IPv4)
+        if (endpoint->myaddress.type == AT_IPv4)
             return "ip.dst";
-        if (host->myaddress.type == AT_IPv6)
+        if (endpoint->myaddress.type == AT_IPv6)
             return "ipv6.dst";
     }
 
     if (filter == CONV_FT_ANY_ADDRESS) {
-        if (host->myaddress.type == AT_IPv4)
+        if (endpoint->myaddress.type == AT_IPv4)
             return "ip.addr";
-        if (host->myaddress.type == AT_IPv6)
+        if (endpoint->myaddress.type == AT_IPv6)
             return "ipv6.addr";
     }
 
     return CONV_FILTER_INVALID;
 }
 
-static hostlist_dissector_info_t tcp_host_dissector_info = {&tcp_host_get_filter_type};
+static et_dissector_info_t tcp_endpoint_dissector_info = {&tcp_endpoint_get_filter_type};
 
 static tap_packet_status
-tcpip_hostlist_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip, tap_flags_t flags)
+tcpip_endpoint_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip, tap_flags_t flags)
 {
     conv_hash_t *hash = (conv_hash_t*) pit;
     hash->flags = flags;
@@ -1007,9 +1008,9 @@ tcpip_hostlist_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, co
 
     /* Take two "add" passes per packet, adding for each direction, ensures that all
     packets are counted properly (even if address is sending to itself)
-    XXX - this could probably be done more efficiently inside hostlist_table */
-    add_hostlist_table_data(hash, &tcphdr->ip_src, tcphdr->th_sport, TRUE, 1, pinfo->fd->pkt_len, &tcp_host_dissector_info, ENDPOINT_TCP);
-    add_hostlist_table_data(hash, &tcphdr->ip_dst, tcphdr->th_dport, FALSE, 1, pinfo->fd->pkt_len, &tcp_host_dissector_info, ENDPOINT_TCP);
+    XXX - this could probably be done more efficiently inside endpoint_table */
+    add_endpoint_table_data(hash, &tcphdr->ip_src, tcphdr->th_sport, TRUE, 1, pinfo->fd->pkt_len, &tcp_endpoint_dissector_info, ENDPOINT_TCP);
+    add_endpoint_table_data(hash, &tcphdr->ip_dst, tcphdr->th_dport, FALSE, 1, pinfo->fd->pkt_len, &tcp_endpoint_dissector_info, ENDPOINT_TCP);
 
     return TAP_PACKET_REDRAW;
 }
@@ -1101,7 +1102,7 @@ gchar *tcp_follow_conv_filter(epan_dissect_t *edt _U_, packet_info *pinfo, guint
     if (((pinfo->net_src.type == AT_IPv4 && pinfo->net_dst.type == AT_IPv4) ||
         (pinfo->net_src.type == AT_IPv6 && pinfo->net_dst.type == AT_IPv6))
         && (pinfo->ptype == PT_TCP) &&
-        (conv=find_conversation(pinfo->num, &pinfo->net_src, &pinfo->net_dst, ENDPOINT_TCP, pinfo->srcport, pinfo->destport, 0)) != NULL)
+        (conv=find_conversation(pinfo->num, &pinfo->net_src, &pinfo->net_dst, CONVERSATION_TCP, pinfo->srcport, pinfo->destport, 0)) != NULL)
     {
         /* TCP over IPv4/6 */
         tcpd=get_tcp_conversation_data(conv, pinfo);
@@ -1460,7 +1461,7 @@ static void
 handle_export_pdu_conversation(packet_info *pinfo, tvbuff_t *tvb, int src_port, int dst_port, struct tcpinfo *tcpinfo)
 {
     if (have_tap_listener(exported_pdu_tap)) {
-        conversation_t *conversation = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, ENDPOINT_TCP, src_port, dst_port, 0);
+        conversation_t *conversation = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, CONVERSATION_TCP, src_port, dst_port, 0);
         if (conversation != NULL)
         {
             dissector_handle_t handle = (dissector_handle_t)wmem_tree_lookup32_le(conversation->dissector_tree, pinfo->num);
@@ -1796,7 +1797,7 @@ add_tcp_process_info(guint32 frame_num, address *local_addr, address *remote_add
     if (!tcp_display_process_info)
         return;
 
-    conv = find_conversation(frame_num, local_addr, remote_addr, ENDPOINT_TCP, local_port, remote_port, 0);
+    conv = find_conversation(frame_num, local_addr, remote_addr, CONVERSATION_TCP, local_port, remote_port, 0);
     if (!conv) {
         return;
     }
@@ -3579,34 +3580,31 @@ static reassembly_table tcp_reassembly_table;
 /* Enable desegmenting of TCP streams */
 static gboolean tcp_desegment = TRUE;
 
-#if 0
-/* Returns true iff any gap exists in the segments associated with msp up to the
- * given sequence number (it ignores any gaps after the sequence number). */
-static gboolean
-missing_segments(packet_info *pinfo, struct tcp_multisegment_pdu *msp, guint32 seq)
+/* Returns the maximum next sequence number associated with msp starting
+ * with the given max sequence number (which is from the current frame
+ * and may not have been added to the msp yet). */
+static guint32
+find_maxnextseq(packet_info *pinfo, struct tcp_multisegment_pdu *msp, guint32 maxnextseq)
 {
     fragment_head *fd_head;
-    guint32 frag_offset = seq - msp->seq;
 
-    if ((gint32)frag_offset <= 0) {
-        return FALSE;
-    }
+    DISSECTOR_ASSERT(msp);
 
     fd_head = fragment_get(&tcp_reassembly_table, pinfo, msp->first_frame, msp);
     /* msp implies existence of fragments, this should never be NULL. */
     DISSECTOR_ASSERT(fd_head);
 
     /* Find length of contiguous fragments. */
-    guint32 max = 0;
+    guint32 max = maxnextseq - msp->seq;
     for (fragment_item *frag = fd_head; frag; frag = frag->next) {
         guint32 frag_end = frag->offset + frag->len;
         if (frag->offset <= max && max < frag_end) {
             max = frag_end;
         }
     }
-    return max < frag_offset;
+
+    return max + msp->seq;
 }
-#endif
 
 static struct tcp_multisegment_pdu*
 split_msp(packet_info *pinfo, struct tcp_multisegment_pdu *msp, struct tcp_analysis *tcpd)
@@ -3676,7 +3674,7 @@ split_msp(packet_info *pinfo, struct tcp_multisegment_pdu *msp, struct tcp_analy
         guint32 frag_offset = fd_i->offset;
         guint32 frag_len = fd_i->len;
         /* Check for some unusual out of order overlapping segment situations. */
-        if (split_offset <= frag_offset + frag_len) {
+        if (split_offset < frag_offset + frag_len) {
             if (fd_i->offset < split_offset) {
                 frag_offset = split_offset;
                 frag_len -= (split_offset - fd_i->offset);
@@ -3742,6 +3740,12 @@ msp_add_out_of_order(packet_info *pinfo, struct tcp_multisegment_pdu *msp, struc
     /* Whether a previous MSP exists with missing segments. */
     gboolean has_unfinished_msp = msp && !(msp->flags & MSP_FLAGS_GOT_ALL_SEGMENTS);
 
+    if (msp) {
+        guint32 maxnextseq = find_maxnextseq(pinfo, msp, tcpd->fwd->maxnextseq);
+        if (LE_SEQ(tcpd->fwd->maxnextseq, maxnextseq)) {
+            tcpd->fwd->maxnextseq = maxnextseq;
+        }
+    }
     wmem_list_frame_t *curr_entry;
     curr_entry = wmem_list_head(tcpd->fwd->ooo_segments);
     ooo_segment_item *fd;
@@ -5141,7 +5145,7 @@ dissect_tcpopt_sack_perm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
     proto_tree_add_item(exp_tree, hf_tcp_option_kind, tvb, offset, 1, ENC_BIG_ENDIAN);
     length_item = proto_tree_add_item(exp_tree, hf_tcp_option_len, tvb, offset + 1, 1, ENC_BIG_ENDIAN);
 
-    tcp_info_append_uint(pinfo, "SACK_PERM", TRUE);
+    col_append_str(pinfo->cinfo, COL_INFO, " SACK_PERM");
 
     if (!tcp_option_len_check(length_item, pinfo, tvb_reported_length(tvb), TCPOLEN_SACK_PERM))
         return tvb_captured_length(tvb);
@@ -6867,7 +6871,7 @@ dissect_tcpopt_rvbd_trpy(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
  /* Started as a copy of dissect_ip_tcp_options(), but was changed to support
     options as a dissector table */
 static void
-tcp_dissect_options(tvbuff_t *tvb, int offset, guint length, int eol,
+tcp_dissect_options(tvbuff_t *tvb, int offset, guint length,
                        packet_info *pinfo, proto_tree *opt_tree,
                        proto_item *opt_item, void * data)
 {
@@ -6879,9 +6883,15 @@ tcp_dissect_options(tvbuff_t *tvb, int offset, guint length, int eol,
     tvbuff_t         *next_tvb;
     struct tcpheader *tcph = (struct tcpheader *)data;
     gboolean          mss_seen = FALSE;
+    gboolean          eol_seen = FALSE;
 
     while (length > 0) {
         opt = tvb_get_guint8(tvb, offset);
+        if (eol_seen && opt != TCPOPT_EOL) {
+            proto_tree_add_expert_format(opt_tree, pinfo, &ei_tcp_non_zero_bytes_after_eol, tvb, offset, length,
+                                         "Non-zero header padding");
+            return;
+        }
         --length;      /* account for type byte */
         if ((opt == TCPOPT_EOL) || (opt == TCPOPT_NOP)) {
             int local_proto;
@@ -6964,8 +6974,8 @@ tcp_dissect_options(tvbuff_t *tvb, int offset, guint length, int eol,
             length -= (optlen-2); //already accounted for type and len bytes
         }
 
-        if (opt == eol)
-            break;
+        if (opt == TCPOPT_EOL)
+            eol_seen = true;
     }
 
     if ((tcph->th_flags & TH_SYN) && (mss_seen != TRUE))
@@ -7029,7 +7039,7 @@ decode_tcp_ports(tvbuff_t *tvb, int offset, packet_info *pinfo,
 /* determine if this packet is part of a conversation and call dissector */
 /* for the conversation if available */
 
-    if (try_conversation_dissector(&pinfo->src, &pinfo->dst, ENDPOINT_TCP,
+    if (try_conversation_dissector(&pinfo->src, &pinfo->dst, CONVERSATION_TCP,
                                    src_port, dst_port, next_tvb, pinfo, tree, tcpinfo, 0)) {
         pinfo->want_pdu_tracking -= !!(pinfo->want_pdu_tracking);
         handle_export_pdu_conversation(pinfo, next_tvb, src_port, dst_port, tcpinfo);
@@ -7422,10 +7432,10 @@ dissect_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
      * reusing ports (see issue 15097), as find_or_create_conversation automatically
      * extends the conversation found. This extension is done later.
      */
-    conv = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, ENDPOINT_TCP, pinfo->srcport, pinfo->destport, 0);
+    conv = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, CONVERSATION_TCP, pinfo->srcport, pinfo->destport, 0);
     if(!conv) {
         conv = conversation_new(pinfo->num, &pinfo->src,
-                     &pinfo->dst, ENDPOINT_TCP,
+                     &pinfo->dst, CONVERSATION_TCP,
                      pinfo->srcport, pinfo->destport, 0);
         /* we need to know when a conversation is new then we initialize the completeness correctly */
         conversation_is_new = TRUE;
@@ -7446,7 +7456,7 @@ dissect_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
             if(tcph->th_seq!=tcpd->fwd->base_seq) {
                 if (!(pinfo->fd->visited)) {
 
-                    conv=conversation_new(pinfo->num, &pinfo->src, &pinfo->dst, ENDPOINT_TCP, pinfo->srcport, pinfo->destport, 0);
+                    conv=conversation_new(pinfo->num, &pinfo->src, &pinfo->dst, CONVERSATION_TCP, pinfo->srcport, pinfo->destport, 0);
                     tcpd=get_tcp_conversation_data(conv,pinfo);
 
                     if(!tcpd->ta)
@@ -8063,8 +8073,8 @@ dissect_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
         rvbd_option_data* option_data;
 
         tcp_dissect_options(tvb, offset + 20, optlen,
-                               TCPOPT_EOL, pinfo, options_tree,
-                               options_item, tcph);
+                            pinfo, options_tree,
+                            options_item, tcph);
 
         /* Do some post evaluation of some Riverbed probe options in the list */
         option_data = (rvbd_option_data*)p_get_proto_data(pinfo->pool, pinfo, proto_tcp_option_rvbd_probe, pinfo->curr_layer_num);
@@ -9223,6 +9233,7 @@ proto_register_tcp(void)
         { &ei_tcp_urgent_pointer_non_zero, { "tcp.urgent_pointer.non_zero", PI_PROTOCOL, PI_NOTE, "The urgent pointer field is nonzero while the URG flag is not set", EXPFILL }},
         { &ei_tcp_suboption_malformed, { "tcp.suboption_malformed", PI_MALFORMED, PI_ERROR, "suboption would go past end of option", EXPFILL }},
         { &ei_tcp_nop, { "tcp.nop", PI_PROTOCOL, PI_WARN, "4 NOP in a row - a router may have removed some options", EXPFILL }},
+        { &ei_tcp_non_zero_bytes_after_eol, { "tcp.non_zero_bytes_after_eol", PI_PROTOCOL, PI_ERROR, "Non zero bytes in option space after EOL option", EXPFILL }},
         { &ei_tcp_bogus_header_length, { "tcp.bogus_header_length", PI_PROTOCOL, PI_ERROR, "Bogus TCP Header length", EXPFILL }},
     };
 
@@ -9448,7 +9459,7 @@ proto_register_tcp(void)
 
     register_decode_as(&tcp_da);
 
-    register_conversation_table(proto_tcp, FALSE, tcpip_conversation_packet, tcpip_hostlist_packet);
+    register_conversation_table(proto_tcp, FALSE, tcpip_conversation_packet, tcpip_endpoint_packet);
     register_conversation_filter("tcp", "TCP", tcp_filter_valid, tcp_build_filter);
 
     register_seq_analysis("tcp", "TCP Flows", proto_tcp, NULL, 0, tcp_seq_analysis_packet);
@@ -9488,7 +9499,7 @@ proto_register_tcp(void)
         "You need to enable DSS mapping analysis for this option to work",
         &mptcp_intersubflows_retransmission);
 
-    register_conversation_table(proto_mptcp, FALSE, mptcpip_conversation_packet, tcpip_hostlist_packet);
+    register_conversation_table(proto_mptcp, FALSE, mptcpip_conversation_packet, tcpip_endpoint_packet);
     register_follow_stream(proto_tcp, "tcp_follow", tcp_follow_conv_filter, tcp_follow_index_filter, tcp_follow_address_filter,
                             tcp_port_to_display, follow_tcp_tap_listener);
 }
