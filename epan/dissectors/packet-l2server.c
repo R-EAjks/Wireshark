@@ -5502,7 +5502,11 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
     guint32 num_of_rb_cfg;
     proto_tree_add_item_ret_uint(params_tree, hf_l2server_num_of_rb_cfg, tvb, offset, 1, ENC_LITTLE_ENDIAN, &num_of_rb_cfg);
     offset++;
+
+    // RbCfg[]
     for (guint n=0; n < num_of_rb_cfg; n++) {
+        // Entries are nr5g_rlcmac_Cmac_RbCfg_t
+
         // Subtree.
         proto_item *rb_config_ti = proto_tree_add_string_format(params_tree, hf_l2server_rb_config, tvb,
                                                               offset, sizeof(nr5g_rlcmac_Cmac_RbCfg_t),
@@ -6686,7 +6690,7 @@ static void dissect_rcp_ue_set_group_ack(proto_tree *tree, tvbuff_t *tvb, packet
     offset += 4;
 }
 
-static void dissect_rcp_set_ue_index_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+static void dissect_rcp_set_ue_set_index_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                          guint offset, guint len _U_)
 {
     /* UEId */
@@ -6849,7 +6853,7 @@ static TYPE_FUN om_type_funs[] =
         { nr5g_l2_Srv_RCP_UE_SET_GROUP_ACK,     "nr5g_l2_Srv_RCP_UE_SET_GROUP_ACK",       dissect_rcp_ue_set_group_ack },
         { nr5g_l2_Srv_RCP_UE_SET_GROUP_NAK,     "nr5g_l2_Srv_RCP_UE_SET_GROUP_NAK",       dissect_sapi_type_dummy },
 
-        { nr5g_l2_Srv_RCP_UE_SET_INDEX_CMD,     "nr5g_l2_Srv_RCP_UE_SET_INDEX_CMD",       dissect_rcp_set_ue_index_cmd },
+        { nr5g_l2_Srv_RCP_UE_SET_INDEX_CMD,     "nr5g_l2_Srv_RCP_UE_SET_INDEX_CMD",       dissect_rcp_set_ue_set_index_cmd },
         { nr5g_l2_Srv_RCP_UE_SET_INDEX_ACK,     "nr5g_l2_Srv_RCP_UE_SET_INDEX_ACK",       dissect_rcp_set_ue_index_ack },
         { nr5g_l2_Srv_RCP_UE_SET_INDEX_NAK,     "nr5g_l2_Srv_RCP_UE_SET_INDEX_NAK",       dissect_sapi_type_dummy },
 
@@ -8212,8 +8216,8 @@ proto_register_l2server(void)
         { "Radio Condition Group", "l2server.radio-condition-group", FT_UINT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_radio_condition_profile_index,
-        { "Radio Condition Profile Index", "l2server.radio-condition-profile-index", FT_UINT32, BASE_DEC,
-          NULL, 0x0, NULL, HFILL }},
+        { "Index", "l2server.radio-condition-profile-index", FT_UINT32, BASE_DEC,
+          NULL, 0x0, "Radio Condition Profile Index", HFILL }},
 
       { &hf_l2server_fname,
         { "fname", "l2server.fname", FT_STRING, BASE_NONE,
