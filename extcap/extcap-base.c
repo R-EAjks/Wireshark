@@ -115,11 +115,6 @@ void extcap_base_register_interface_ext(extcap_parameters * extcap,
     extcap->interfaces = g_list_append(extcap->interfaces, (gpointer) iface);
 }
 
-void extcap_base_register_shutdown_pipe(extcap_parameters * extcap)
-{
-    extcap->shutdown_pipe_supported = TRUE;
-}
-
 gboolean extcap_base_register_graceful_shutdown_cb(extcap_parameters * extcap _U_, void (*callback)(void))
 {
 #ifndef _WIN32
