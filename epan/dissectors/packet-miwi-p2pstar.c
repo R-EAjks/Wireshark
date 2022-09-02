@@ -143,8 +143,8 @@ static int hf_miwi_seq = -1;
 static int hf_miwi_dst_panid = -1;
 static int hf_miwi_short_dst_addr = -1;
 static int hf_miwi_ext_dst_addr = -1;
-static int hf_miwi_no_dst_addr = -1;
-static int hf_miwi_no_src_addr = -1;
+//static int hf_miwi_no_dst_addr = -1;
+//static int hf_miwi_no_src_addr = -1;
 static int hf_miwi_ext_src_addr = -1;
 static int hf_miwi_short_src_addr = -1;
 static int hf_miwi_addr16 = -1;
@@ -164,31 +164,31 @@ static int hf_miwi_cap_info_security_cap = -1;
 static int hf_miwi_cap_info_reserved = -1;
 static int hf_miwi_conn_res_status = -1;
 
-static int hf_miwi_conn_rmv_req = -1;
+//static int hf_miwi_conn_rmv_req = -1;
 static int hf_miwi_conn_rmv_res_status = -1;
-static int hf_miwi_data_req = -1;
-static int hf_miwi_chan_hop = -1;
-static int hf_miwi_conn_res = -1;
-static int hf_miwi_conn_rmv_res = -1;
-static int hf_miwi_active_scan_req = -1;
-static int hf_miwi_active_scan_cur_chan = -1;
+//static int hf_miwi_data_req = -1;
+//static int hf_miwi_chan_hop = -1;
+//static int hf_miwi_conn_res = -1;
+//static int hf_miwi_conn_rmv_res = -1;
+//static int hf_miwi_active_scan_req = -1;
+//static int hf_miwi_active_scan_cur_chan = -1;
 
-static int hf_miwi_active_scan_res = -1;
-static int hf_miwi_active_scan_res_node_id = -1;
+//static int hf_miwi_active_scan_res = -1;
+//static int hf_miwi_active_scan_res_node_id = -1;
 
-static int hf_miwi_fwd_pkt_cmd = -1;
+//static int hf_miwi_fwd_pkt_cmd = -1;
 static int hf_miwi_fwd_pkt_dst_addr = -1;
-static int hf_miwi_conn_tbl_bcast_cmd = -1;
+//static int hf_miwi_conn_tbl_bcast_cmd = -1;
 static int hf_miwi_conn_tbl_size = -1;
-static int hf_miwi_software_ack = -1;
-static int hf_miwi_link_status = -1;
+//static int hf_miwi_software_ack = -1;
+//static int hf_miwi_link_status = -1;
 
 /*Channel hopping frame*/
 static int hf_miwi_current_op_channel = -1;
 static int hf_miwi_dst_channel_to_jump_to = -1;
 
-static int hf_miwi_mic = -1;
-static int hf_miwi_key_number = -1;
+//static int hf_miwi_mic = -1;
+//static int hf_miwi_key_number = -1;
 
 static int miwi_short_address_type = -1;
 
@@ -199,10 +199,10 @@ static expert_field ei_miwi_src = EI_INIT;
 static expert_field ei_miwi_invalid_addressing = EI_INIT;
 static expert_field ei_miwi_invalid_panid_compression = EI_INIT;
 static expert_field ei_miwi_invalid_panid_compression2 = EI_INIT;
-static expert_field  ei_miwi_fcs = EI_INIT;
+//static expert_field  ei_miwi_fcs = EI_INIT;
 /* 802.15.4-2003 security */
-static int hf_miwi_sec_frame_counter = -1;
-static int hf_miwi_sec_key_sequence_counter = -1;
+//static int hf_miwi_sec_frame_counter = -1;
+//static int hf_miwi_sec_key_sequence_counter = -1;
 
 
 /* ethertype for 802.15.4 tag - encapsulating an Ethernet packet */
@@ -336,9 +336,9 @@ static void miwi_da_prompt(packet_info *pinfo _U_, gchar* result)
     ieee802154_hints_t *hints;
     hints = (ieee802154_hints_t *)p_get_proto_data(wmem_file_scope(), pinfo, proto_miwi_p2pstar, 0);
     if(hints)
-        g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "MIWI P2P STAR PAN 0x%04x as", hints->src_pan);
+        snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "MIWI P2P STAR PAN 0x%04x as", hints->src_pan);
     else
-        g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "MIWI P2P STAR PAN Unknown");
+        snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "MIWI P2P STAR PAN Unknown");
 }/* miwi_da_prompt */
 /* Returns the value to index the panid decode table with (source PAN)*/
 static gpointer miwi_da_value(packet_info *pinfo _U_)
