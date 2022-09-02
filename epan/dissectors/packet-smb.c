@@ -926,7 +926,7 @@ smbstat_init(struct register_srt* srt _U_, GArray* srt_array)
 }
 
 static tap_packet_status
-smbstat_packet(void *pss, packet_info *pinfo, epan_dissect_t *edt _U_, const void *prv)
+smbstat_packet(void *pss, packet_info *pinfo, epan_dissect_t *edt _U_, const void *prv, tap_flags_t flags _U_)
 {
 	guint i = 0;
 	srt_stat_table *smb_srt_table;
@@ -1095,6 +1095,7 @@ insert_chunk(active_file   *file, export_object_entry_t *entry, const smb_eo_t *
 		if (chunk_offset<=current_free_chunk->start_offset && chunk_end_offset>=current_free_chunk->end_offset) {
 			file->data_gathered += current_free_chunk->end_offset-current_free_chunk->start_offset+1;
 			file->free_chunk_list = g_slist_remove(file->free_chunk_list, current_free_chunk);
+			g_free(current_free_chunk);
 			nfreechunks -= 1;
 			if (nfreechunks == 0) { /* The free chunk list is empty */
 				g_slist_free(file->free_chunk_list);
@@ -1218,7 +1219,7 @@ find_incoming_file(GSList *GSL_active_files_p, active_file *incoming_file)
 }
 
 static tap_packet_status
-smb_eo_packet(void *tapdata, packet_info *pinfo, epan_dissect_t *edt _U_, const void *data)
+smb_eo_packet(void *tapdata, packet_info *pinfo, epan_dissect_t *edt _U_, const void *data, tap_flags_t flags _U_)
 {
 	export_object_list_t   *object_list = (export_object_list_t *)tapdata;
 	const smb_eo_t         *eo_info     = (const smb_eo_t *)data;

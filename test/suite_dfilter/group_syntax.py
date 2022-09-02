@@ -53,6 +53,11 @@ class case_syntax(unittest.TestCase):
         dfilter = r'http.host matches r"update\.microsoft\.c.."'
         checkDFilterCount(dfilter, 1)
 
+    def test_matches_5(self, checkDFilterSucceed):
+        # case insensitive
+        dfilter = 'http.request.method matches "^head"'
+        checkDFilterSucceed(dfilter)
+
     def test_equal_1(self, checkDFilterCount):
         dfilter = 'ip.addr == 10.0.0.5'
         checkDFilterCount(dfilter, 1)
@@ -107,8 +112,12 @@ class case_syntax(unittest.TestCase):
         checkDFilterCount(dfilter, 1)
 
     def test_bool_2(self, checkDFilterCount):
-        dfilter = "tcp.flags.push == true"
+        dfilter = "tcp.flags.push == True"
         checkDFilterCount(dfilter, 1)
+
+    def test_bool_2(self, checkDFilterCount):
+        dfilter = "tcp.flags.push == FALSE"
+        checkDFilterCount(dfilter, 0)
 
 @fixtures.uses_fixtures
 class case_equality(unittest.TestCase):
@@ -158,20 +167,23 @@ class case_equality(unittest.TestCase):
         dfilter = "frame[0:10] contains :00-01-6c"
         checkDFilterCount(dfilter, 1)
 
-    def test_rhs_literal_bias_1(self, checkDFilterCount):
+    def test_rhs_bias_1(self, checkDFilterCount):
+        # Protocol "Fibre Channel" on the RHS
         dfilter = 'frame[37] == fc'
-        checkDFilterCount(dfilter, 1)
+        checkDFilterCount(dfilter, 0)
 
-    def test_rhs_literal_bias_2(self, checkDFilterCount):
+    def test_rhs_bias_2(self, checkDFilterCount):
+        # Byte 0xFC on the RHS
         dfilter = 'frame[37] == :fc'
         checkDFilterCount(dfilter, 1)
 
     def test_rhs_literal_bias_3(self, checkDFilterCount):
+        # Byte 0xFC on the RHS
         dfilter = 'frame[37] == <fc>'
         checkDFilterCount(dfilter, 1)
 
     def test_rhs_literal_bias_4(self, checkDFilterCount):
-        # This is Fibre Channel on the RHS
+        # Protocol "Fibre Channel" on the RHS
         dfilter = 'frame[37] == .fc'
         checkDFilterCount(dfilter, 0)
 
@@ -273,12 +285,17 @@ class case_arithmetic(unittest.TestCase):
 
 @fixtures.uses_fixtures
 class case_field_reference(unittest.TestCase):
-    trace_file = "dhcp.pcap"
+    trace_file = "ipoipoip.pcap"
 
     def test_ref_1(self, checkDFilterCountWithSelectedFrame):
         dfilter = 'frame.number < ${frame.number}'
-        # select frame 3, expect 2 frames out of 4.
-        checkDFilterCountWithSelectedFrame(dfilter, 2, 3)
+        # select frame 2, expect 1 frames out of 2.
+        checkDFilterCountWithSelectedFrame(dfilter, 1, 2)
+
+    def test_ref_2(self, checkDFilterCountWithSelectedFrame):
+        dfilter = 'ip.src#3 == ${ip.src#4}'
+        # select frame 1, expect 1 frames out of 2.
+        checkDFilterCountWithSelectedFrame(dfilter, 1, 1)
 
 @fixtures.uses_fixtures
 class case_field_reference(unittest.TestCase):

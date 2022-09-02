@@ -167,6 +167,7 @@ set(CLEAN_ASN1_DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-qsig.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ranap.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-rnsap.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-roon_discovery.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ros.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-rrc.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-rrlp.c
@@ -244,6 +245,7 @@ source_group(dissectors-ncp2222 FILES ${NCP2222_DISSECTOR_SRC})
 
 set(DISSECTOR_PUBLIC_HEADERS
 	cond_ace_token_enum.h
+	file-pcapng.h
 	file-rbm.h
 	packet-6lowpan.h
 	packet-a21.h
@@ -589,6 +591,7 @@ set(DISSECTOR_PUBLIC_HEADERS
 	packet-tcap.h
 	packet-tcp.h
 	packet-tcpcl.h
+	packet-tecmp.h
 	packet-tetra.h
 	packet-thrift.h
 	packet-tls-utils.h
@@ -657,6 +660,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-li5g.c
 	${CMAKE_CURRENT_SOURCE_DIR}/file-blf.c
 	${CMAKE_CURRENT_SOURCE_DIR}/file-btsnoop.c
+	${CMAKE_CURRENT_SOURCE_DIR}/file-dlt.c
 	${CMAKE_CURRENT_SOURCE_DIR}/file-elf.c
 	${CMAKE_CURRENT_SOURCE_DIR}/file-file.c
 	${CMAKE_CURRENT_SOURCE_DIR}/file-gif.c
@@ -1148,6 +1152,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-gprs-llc.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-gprscdr.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-gre.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-grebonding.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-grpc.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-gsm_a_bssmap.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-gsm_a_common.c
@@ -1395,6 +1400,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-lmi.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-lmp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-lnet.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-locamation-im.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-logcat.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-logcat-text.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-lon.c
@@ -1570,6 +1576,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-obd-ii.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-obex.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ocfs2.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-ocp1.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-oicq.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-oipf.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-olsr.c

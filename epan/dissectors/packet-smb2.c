@@ -43,6 +43,20 @@
 #include <wsutil/wsgcrypt.h>
 #include <wsutil/ws_roundup.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+/* Defined in winnt.h */
+#define OWNER_SECURITY_INFORMATION 0x00000001
+#define GROUP_SECURITY_INFORMATION 0x00000002
+#define DACL_SECURITY_INFORMATION 0x00000004
+#define SACL_SECURITY_INFORMATION 0x00000008
+#define LABEL_SECURITY_INFORMATION 0x00000010
+#define ATTRIBUTE_SECURITY_INFORMATION 0x00000020
+#define SCOPE_SECURITY_INFORMATION 0x00000040
+#define BACKUP_SECURITY_INFORMATION 0x00010000
+#endif
+
 //#define DEBUG_SMB2
 #ifdef DEBUG_SMB2
 #define DEBUG(...) g_ ## warning(__VA_ARGS__)
@@ -1156,7 +1170,7 @@ smb2stat_init(struct register_srt* srt _U_, GArray* srt_array)
 }
 
 static tap_packet_status
-smb2stat_packet(void *pss, packet_info *pinfo, epan_dissect_t *edt _U_, const void *prv)
+smb2stat_packet(void *pss, packet_info *pinfo, epan_dissect_t *edt _U_, const void *prv, tap_flags_t flags _U_)
 {
 	guint i = 0;
 	srt_stat_table *smb2_srt_table;
@@ -5538,18 +5552,6 @@ static const true_false_string tfs_additional_backup = {
 	"Requesting backup operation security information",
 	"NOT requesting backup operation security information",
 };
-
-#ifndef _MSC_VER
-/*  Those macros are already defined by winnt.h for Windows build */
-#define OWNER_SECURITY_INFORMATION 0x00000001
-#define GROUP_SECURITY_INFORMATION 0x00000002
-#define DACL_SECURITY_INFORMATION 0x00000004
-#define SACL_SECURITY_INFORMATION 0x00000008
-#define LABEL_SECURITY_INFORMATION 0x00000010
-#define ATTRIBUTE_SECURITY_INFORMATION 0x00000020
-#define SCOPE_SECURITY_INFORMATION 0x00000040
-#define BACKUP_SECURITY_INFORMATION 0x00010000
-#endif
 
 static int
 dissect_additional_information_sec_mask(tvbuff_t *tvb, proto_tree *parent_tree, int offset)

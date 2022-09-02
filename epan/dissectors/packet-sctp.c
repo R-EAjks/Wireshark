@@ -60,12 +60,12 @@
 #include <wsutil/adler32.h>
 #include <wsutil/utf8_entities.h>
 #include <wsutil/str_util.h>
+#include <wsutil/ws_roundup.h>
 
 #include "packet-sctp.h"
 
 #define LT(x, y) ((gint32)((x) - (y)) < 0)
 
-#define ADD_PADDING(x) ((((x) + 3) >> 2) << 2)
 #define UDP_TUNNELING_PORT 9899
 
 #define MAX_NUMBER_OF_PPIDS     2
@@ -780,19 +780,21 @@ static const char* sctp_conv_get_filter_type(conv_item_t* conv, conv_filter_type
 static ct_dissector_info_t sctp_ct_dissector_info = {&sctp_conv_get_filter_type};
 
 static tap_packet_status
-sctp_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip)
+sctp_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip, tap_flags_t flags)
 {
   conv_hash_t *hash = (conv_hash_t*) pct;
+  hash->flags = flags;
+
   const struct _sctp_info *sctphdr=(const struct _sctp_info *)vip;
 
   add_conversation_table_data(hash, &sctphdr->ip_src, &sctphdr->ip_dst,
-        sctphdr->sport, sctphdr->dport, 1, pinfo->fd->pkt_len, &pinfo->rel_ts, &pinfo->abs_ts, &sctp_ct_dissector_info, ENDPOINT_SCTP);
+        sctphdr->sport, sctphdr->dport, 1, pinfo->fd->pkt_len, &pinfo->rel_ts, &pinfo->abs_ts, &sctp_ct_dissector_info, CONVERSATION_SCTP);
 
 
   return TAP_PACKET_REDRAW;
 }
 
-static const char* sctp_host_get_filter_type(hostlist_talker_t* host, conv_filter_type_e filter)
+static const char* sctp_endpoint_get_filter_type(endpoint_item_t* endpoint, conv_filter_type_e filter)
 {
     if (filter == CONV_FT_SRC_PORT)
         return "sctp.srcport";
@@ -803,47 +805,49 @@ static const char* sctp_host_get_filter_type(hostlist_talker_t* host, conv_filte
     if (filter == CONV_FT_ANY_PORT)
         return "sctp.port";
 
-    if(!host) {
+    if(!endpoint) {
         return CONV_FILTER_INVALID;
     }
 
     if (filter == CONV_FT_SRC_ADDRESS) {
-        if (host->myaddress.type == AT_IPv4)
+        if (endpoint->myaddress.type == AT_IPv4)
             return "ip.src";
-        if (host->myaddress.type == AT_IPv6)
+        if (endpoint->myaddress.type == AT_IPv6)
             return "ipv6.src";
     }
 
     if (filter == CONV_FT_DST_ADDRESS) {
-        if (host->myaddress.type == AT_IPv4)
+        if (endpoint->myaddress.type == AT_IPv4)
             return "ip.dst";
-        if (host->myaddress.type == AT_IPv6)
+        if (endpoint->myaddress.type == AT_IPv6)
             return "ipv6.dst";
     }
 
     if (filter == CONV_FT_ANY_ADDRESS) {
-        if (host->myaddress.type == AT_IPv4)
+        if (endpoint->myaddress.type == AT_IPv4)
             return "ip.addr";
-        if (host->myaddress.type == AT_IPv6)
+        if (endpoint->myaddress.type == AT_IPv6)
             return "ipv6.addr";
     }
 
     return CONV_FILTER_INVALID;
 }
 
-static hostlist_dissector_info_t sctp_host_dissector_info = {&sctp_host_get_filter_type};
+static et_dissector_info_t sctp_endpoint_dissector_info = {&sctp_endpoint_get_filter_type};
 
 static tap_packet_status
-sctp_hostlist_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip)
+sctp_endpoint_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip, tap_flags_t flags)
 {
   conv_hash_t *hash = (conv_hash_t*) pit;
+  hash->flags = flags;
+
   const struct _sctp_info *sctphdr=(const struct _sctp_info *)vip;
 
   /* Take two "add" passes per packet, adding for each direction, ensures that all
   packets are counted properly (even if address is sending to itself)
-  XXX - this could probably be done more efficiently inside hostlist_table */
-  add_hostlist_table_data(hash, &sctphdr->ip_src, sctphdr->sport, TRUE, 1, pinfo->fd->pkt_len, &sctp_host_dissector_info, ENDPOINT_SCTP);
-  add_hostlist_table_data(hash, &sctphdr->ip_dst, sctphdr->dport, FALSE, 1, pinfo->fd->pkt_len, &sctp_host_dissector_info, ENDPOINT_SCTP);
+  XXX - this could probably be done more efficiently inside endpoint_table */
+  add_endpoint_table_data(hash, &sctphdr->ip_src, sctphdr->sport, TRUE, 1, pinfo->fd->pkt_len, &sctp_endpoint_dissector_info, ENDPOINT_SCTP);
+  add_endpoint_table_data(hash, &sctphdr->ip_dst, sctphdr->dport, FALSE, 1, pinfo->fd->pkt_len, &sctp_endpoint_dissector_info, ENDPOINT_SCTP);
 
   return TAP_PACKET_REDRAW;
 }
@@ -2013,7 +2017,7 @@ dissect_parameters(tvbuff_t *parameters_tvb, packet_info *pinfo, proto_tree *tre
       proto_item_append_text(additional_item, " ");
 
     length       = tvb_get_ntohs(parameters_tvb, offset + PARAMETER_LENGTH_OFFSET);
-    total_length = ADD_PADDING(length);
+    total_length = WS_ROUNDUP_4(length);
 
     /*  If we have less bytes than we need, throw an exception while dissecting
      *  the parameter--not when generating the parameter_tvb below.
@@ -2410,7 +2414,7 @@ dissect_error_causes(tvbuff_t *causes_tvb, packet_info *pinfo, proto_tree *tree)
   offset = 0;
   while((remaining_length = tvb_reported_length_remaining(causes_tvb, offset))) {
     length       = tvb_get_ntohs(causes_tvb, offset + CAUSE_LENGTH_OFFSET);
-    total_length = ADD_PADDING(length);
+    total_length = WS_ROUNDUP_4(length);
 
     /*  If we have less bytes than we need, throw an exception while dissecting
      *  the cause--not when generating the causes_tvb below.
@@ -4583,7 +4587,7 @@ dissect_sctp_chunks(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, proto_i
   while((remaining_length = tvb_reported_length_remaining(tvb, offset))) {
     /* extract the chunk length and compute number of padding bytes */
     length         = tvb_get_ntohs(tvb, offset + CHUNK_LENGTH_OFFSET);
-    total_length   = ADD_PADDING(length);
+    total_length   = WS_ROUNDUP_4(length);
 
     /*  If we have less bytes than we need, throw an exception while dissecting
      *  the chunk--not when generating the chunk_tvb below.
@@ -5187,7 +5191,7 @@ proto_register_sctp(void)
   register_decode_as(&sctp_da_port);
   register_decode_as(&sctp_da_ppi);
 
-  register_conversation_table(proto_sctp, FALSE, sctp_conversation_packet, sctp_hostlist_packet);
+  register_conversation_table(proto_sctp, FALSE, sctp_conversation_packet, sctp_endpoint_packet);
 }
 
 void

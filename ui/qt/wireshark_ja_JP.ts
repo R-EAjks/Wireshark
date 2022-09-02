@@ -28,8 +28,8 @@
         <translation>バージョン情報をクリップボードにコピーします</translation>
     </message>
     <message>
-        <source>Copy To Clipboard</source>
-        <translation>クリップボードにコピー</translation>
+        <source>Copy to Clipboard</source>
+        <translation>クリップボードへコピー</translation>
     </message>
     <message>
         <source>Authors</source>
@@ -1729,6 +1729,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>出現位置:</translation>
     </message>
     <message>
+        <source>Resolve Names:</source>
+        <translation>名前解決:</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;p&gt;Show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;p&gt;raw(無加工)のフィールド値の代わりに人が読むことのできる文字列を表示します。有効な文字列を含むフィールドを持つカスタム列へ適用する場合にのみ適用できます。&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
         <source>Missing fields.</source>
         <translation>見つからないフィールド</translation>
     </message>
@@ -1762,6 +1770,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Field Occurrence</source>
         <translation>フィールド出現位置</translation>
+    </message>
+    <message>
+        <source>Resolved</source>
+        <translation>解決済</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;Show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings.&lt;/html&gt;</source>
+        <translation>&lt;html&gt;123raw(無加工)のフィールド値の代わりに人が読むことのできる文字列を表示します。有効な文字列を含むフィールドを持つカスタム列へ適用する場合にのみ適用できます。&lt;/html&gt;</translation>
     </message>
     <message>
         <source>New Column</source>
@@ -1804,6 +1820,77 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Copy filter text to the clipboard.</source>
         <translation>フィルタテキストをクリップボードにコピーします</translation>
+    </message>
+</context>
+<context>
+    <name>ConversationDataModel</name>
+    <message>
+        <source>Address A</source>
+        <translation>アドレス A</translation>
+    </message>
+    <message>
+        <source>Port A</source>
+        <translation>ポート A</translation>
+    </message>
+    <message>
+        <source>Address B</source>
+        <translation>アドレス B</translation>
+    </message>
+    <message>
+        <source>Port B</source>
+        <translation>ポート B</translation>
+    </message>
+    <message>
+        <source>Packets</source>
+        <translation>パケット</translation>
+    </message>
+    <message>
+        <source>Bytes</source>
+        <translation>バイト</translation>
+    </message>
+    <message>
+        <source>Stream ID</source>
+        <translation>ストリームID</translation>
+    </message>
+    <message>
+        <source>Packets A </source>
+        <translation>パケット A</translation>
+    </message>
+    <message>
+        <source>Bytes A </source>
+        <translation>バイト A</translation>
+    </message>
+    <message>
+        <source>Bytes B </source>
+        <translation>バイト B</translation>
+    </message>
+    <message>
+        <source>Abs Start</source>
+        <translation>絶対的な開始</translation>
+    </message>
+    <message>
+        <source>Rel Start</source>
+        <translation>相対的な開始</translation>
+    </message>
+    <message>
+        <source>Duration</source>
+        <translation>時間</translation>
+    </message>
+    <message>
+        <source>Bits/s A </source>
+        <translation>ビット毎秒 A</translation>
+    </message>
+    <message>
+        <source>Bits/s B </source>
+        <translation>ビット毎秒 B</translation>
+    </message>
+    <message>
+        <source>Total Packets</source>
+        <translation>全パケット</translation>
+    </message>
+    <message>
+        <source>Percent Filtered</source>
+        <translation>フィルタされた割合</translation>
     </message>
 </context>
 <context>
@@ -2089,7 +2176,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Invalid filter: </source>
-        <translation>無効なフィルタ</translation>
+        <translation type="vanished">無効なフィルタ</translation>
     </message>
     <message>
         <source>Save this filter</source>
@@ -2141,6 +2228,22 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Relation</source>
         <translation>リレーション</translation>
+    </message>
+    <message>
+        <source>By default order comparisons and contains/matches/in relations are true if any value matches. The quantifier &quot;all&quot; can be used to apply the test to all values in a frame.</source>
+        <translation>デフォルトでは比較演算子と contains/matches/in 関係演算子はいずれかの値が一致した場合に真になります。数量詞 &quot;all&quot; はフレーム内の全ての値に適用するテストに使えます。</translation>
+    </message>
+    <message>
+        <source>Quantifier</source>
+        <translation>数量</translation>
+    </message>
+    <message>
+        <source>Any</source>
+        <translation>いずれかの</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation>すべて</translation>
     </message>
     <message>
         <source>Match against this value.</source>
@@ -2316,6 +2419,65 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
 </context>
 <context>
+    <name>EndpointDataModel</name>
+    <message>
+        <source>Address</source>
+        <translation>アドレス</translation>
+    </message>
+    <message>
+        <source>Port</source>
+        <translation>ポート</translation>
+    </message>
+    <message>
+        <source>Packets</source>
+        <translation>パケット</translation>
+    </message>
+    <message>
+        <source>Bytes</source>
+        <translation>バイト</translation>
+    </message>
+    <message>
+        <source>Tx Packets</source>
+        <translation>送信パケット</translation>
+    </message>
+    <message>
+        <source>Tx Bytes</source>
+        <translation>送信バイト</translation>
+    </message>
+    <message>
+        <source>Rx Packets</source>
+        <translation>受信パケット</translation>
+    </message>
+    <message>
+        <source>Rx Bytes</source>
+        <translation>受信バイト</translation>
+    </message>
+    <message>
+        <source>Country</source>
+        <translation>国</translation>
+    </message>
+    <message>
+        <source>City</source>
+        <translation>都市</translation>
+    </message>
+    <message>
+        <source>AS Number</source>
+        <translation>AS番号</translation>
+    </message>
+    <message>
+        <source>AS Organization</source>
+        <translation>AS 組織</translation>
+    </message>
+    <message>
+        <source>Total Packets</source>
+        <translation>全パケット</translation>
+    </message>
+    <message>
+        <source>Percent Filtered</source>
+        <translation>フィルタされた割合</translation>
+    </message>
+</context>
+<context>
     <name>EndpointDialog</name>
     <message>
         <source>Map</source>
@@ -2336,14 +2498,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Map file error</source>
         <translation>地図ファイルエラー</translation>
-    </message>
-    <message>
-        <source>No endpoints available to map</source>
-        <translation>地図に利用できる終端がありません</translation>
-    </message>
-    <message>
-        <source>Unable to create temporary file</source>
-        <translation>一時ファイルを作成できません</translation>
     </message>
     <message>
         <source>Save Endpoints Map</source>
@@ -6967,14 +7121,21 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
 </context>
 <context>
-    <name>PathChooserDelegate</name>
+    <name>PathSelectionDelegate</name>
+    <message>
+        <source>Open a pipe</source>
+        <translation>パイプを開く</translation>
+    </message>
+</context>
+<context>
+    <name>PathSelectionEdit</name>
     <message>
         <source>Browse</source>
         <translation>参照</translation>
     </message>
     <message>
-        <source>Open Pipe</source>
-        <translation>パイプを開く</translation>
+        <source>Select a path</source>
+        <translation>パスを選択</translation>
     </message>
 </context>
 <context>
@@ -7743,7 +7904,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Any </source>
-        <translation>すべて </translation>
+        <translation>いずれかの</translation>
     </message>
     <message>
         <source>Don&apos;t show this message again.</source>
@@ -10483,7 +10644,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Any</source>
-        <translation>すべて</translation>
+        <translation>いずれかの</translation>
     </message>
     <message>
         <source>Network</source>
@@ -10790,10 +10951,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>画像形式</translation>
     </message>
     <message>
-        <source>Json</source>
-        <translation>Json</translation>
-    </message>
-    <message>
         <source>Raw</source>
         <translation>Raw(無加工)形式</translation>
     </message>
@@ -10830,6 +10987,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>
             <numerusform>%Ln バイトを表示中</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>JSON</source>
+        <translation>JSON</translation>
     </message>
     <message>
         <source>Regex Find:</source>
@@ -10969,6 +11130,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
 </context>
 <context>
     <name>SyntaxLineEdit</name>
+    <message>
+        <source>Invalid filter: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
     <message>
         <source>&quot;%1&quot; is deprecated in favour of &quot;%2&quot;. See Help section 6.4.8 for details.</source>
         <translation>&quot;%1&quot; は非推奨で &quot;%2&quot; が推奨されます。詳細はヘルプ 6.4.8をご覧ください</translation>
@@ -11685,6 +11850,25 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
 </context>
 <context>
+    <name>TrafficTab</name>
+    <message>
+        <source>Map file error</source>
+        <translation>マップファイルエラー</translation>
+    </message>
+    <message>
+        <source>Could not open base file %1 for reading: %2</source>
+        <translation>%2 を読み込む際にベースファイル %1 を開くことができません。</translation>
+    </message>
+    <message>
+        <source>No endpoints available to map</source>
+        <translation>マップに利用できる終端がありません</translation>
+    </message>
+    <message>
+        <source>Unable to create temporary file</source>
+        <translation>一時ファイルを作成できません</translation>
+    </message>
+</context>
+<context>
     <name>TrafficTableDialog</name>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Show resolved addresses and port names rather than plain values. The corresponding name resolution preference must be enabled.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
@@ -11703,44 +11887,113 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>表示フィルタに制限</translation>
     </message>
     <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Only show types matching the filter value&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;フィルタ値に適当する形式のみ表示します&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>Filter list for specific type</source>
+        <translation>特定の種別でリストをフィルタ</translation>
+    </message>
+    <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Show absolute times in the start time column.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;開始時間列に絶対的な時間を表示します&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>GroupBox</source>
+        <translation>グループボックス</translation>
     </message>
     <message>
         <source>Absolute start time</source>
         <translation>絶対的開始時間</translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add and remove conversation types.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;対話タイプを追加または削除します&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
-    </message>
-    <message>
-        <source>%1 Types</source>
-        <translation>%1 タイプ</translation>
-    </message>
-    <message>
         <source>Copy</source>
         <translation>コピー</translation>
     </message>
     <message>
+        <source>Unknown</source>
+        <translation>不明</translation>
+    </message>
+</context>
+<context>
+    <name>TrafficTree</name>
+    <message>
+        <source>Resize all columns to content</source>
+        <translation>すべての列を内容にあわせてリサイズします</translation>
+    </message>
+    <message>
+        <source>Filter on stream id</source>
+        <translation>ストリームIDに基づいてフィルタ</translation>
+    </message>
+    <message>
+        <source>Copy %1 table</source>
+        <translation>%1 表をコピー</translation>
+    </message>
+    <message>
         <source>as CSV</source>
-        <translation>CSV形式として</translation>
+        <translation>CSVとして</translation>
     </message>
     <message>
         <source>Copy all values of this page to the clipboard in CSV (Comma Separated Values) format.</source>
-        <translation>このページのすべての値をクリップボードにCSV(カンマ区切りテキスト)形式でコピー</translation>
+        <translation>このページの全ての値をCSV(カンマ区切りテキスト)形式でクリップボードへコピーします</translation>
     </message>
     <message>
         <source>as YAML</source>
-        <translation>YAML形式として</translation>
+        <translation>YAMLとして</translation>
     </message>
     <message>
         <source>Copy all values of this page to the clipboard in the YAML data serialization format.</source>
-        <translation>このページのすべての値をクリップボードにYAMLデータシリアル化形式でコピーします</translation>
+        <translation>このページの全ての値をシリアル化されたYAMLデータ形式でクリップボードへコピーします</translation>
     </message>
     <message>
-        <source>Unknown</source>
-        <translation>不明</translation>
+        <source>as JSON</source>
+        <translation>JSONとして</translation>
+    </message>
+    <message>
+        <source>Copy all values of this page to the clipboard in the JSON data serialization format.</source>
+        <translation>このページの全ての値をシリアル化されたJSONデータ形式でクリップボードへコピーします</translation>
+    </message>
+    <message>
+        <source>Save data as raw</source>
+        <translation>Raw(無加工)形式でデータを保存</translation>
+    </message>
+    <message>
+        <source>Disable data formatting for export/clipboard and save as raw data</source>
+        <translation>エクスポートやクリップボードのためにデータフォーマットを無効にしてRaw(無加工)形式で保存します</translation>
+    </message>
+</context>
+<context>
+    <name>TrafficTreeHeaderView</name>
+    <message>
+        <source>Less than</source>
+        <translation>より小さい</translation>
+    </message>
+    <message>
+        <source>Greater than</source>
+        <translation>より大きい</translation>
+    </message>
+    <message>
+        <source>Equal</source>
+        <translation>イコール</translation>
+    </message>
+    <message>
+        <source>Columns to display</source>
+        <translation>表示する列</translation>
+    </message>
+    <message>
+        <source>Filter %1 by</source>
+        <translation>%1 でフィルタします</translation>
+    </message>
+    <message>
+        <source>Enter filter value</source>
+        <translation>フィルタ値を入力します</translation>
+    </message>
+</context>
+<context>
+    <name>TrafficTypesModel</name>
+    <message>
+        <source>Protocol</source>
+        <translation>プロトコル</translation>
     </message>
 </context>
 <context>
@@ -12089,9 +12342,48 @@ a:hover {
 
 &lt;th&gt;&lt;a href=&quot;https://www.wireshark.org/lists/&quot;&gt;Mailing Lists&lt;/a&gt;&lt;/th&gt;
 
+&lt;td style=&quot;padding-left: 8px; padding-right: 8px;&quot;&gt;·&lt;/td&gt;
+
+&lt;th&gt;&lt;a href=&quot;https://sharkfest.wireshark.org/&quot;&gt;SharkFest&lt;/a&gt;&lt;/th&gt;
+
+&lt;td style=&quot;padding-left: 8px; padding-right: 8px;&quot;&gt;·&lt;/td&gt;
+
+&lt;th&gt;&lt;a href=&quot;https://discord.com/invite/ts9GZCjGj5&quot;&gt;Wireshark Discord&lt;/a&gt;&lt;/th&gt;
+
 &lt;/tr&gt;&lt;/table&gt;
 &lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head&gt;
+        <oldsource>&lt;html&gt;&lt;head&gt;
+&lt;style&gt;
+a:link {
+  color: palette(text);
+  text-decoration: none;
+}
+a:hover {
+  color: palette(text);
+  text-decoration: underline;
+}
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+
+&lt;table&gt;&lt;tr&gt;
+&lt;th&gt;&lt;a href=&quot;https://www.wireshark.org/docs/wsug_html_chunked/&quot;&gt;User&apos;s Guide&lt;/a&gt;&lt;/th&gt;
+
+&lt;td style=&quot;padding-left: 8px; padding-right: 8px;&quot;&gt;·&lt;/td&gt;
+
+&lt;th&gt;&lt;a href=&quot;https://gitlab.com/wireshark/wireshark/-/wikis/&quot;&gt;Wiki&lt;/a&gt;&lt;/th&gt;
+
+&lt;td style=&quot;padding-left: 8px; padding-right: 8px;&quot;&gt;·&lt;/td&gt;
+
+&lt;th&gt;&lt;a href=&quot;https://ask.wireshark.org/&quot;&gt;Questions and Answers&lt;/a&gt;&lt;/th&gt;
+
+&lt;td style=&quot;padding-left: 8px; padding-right: 8px;&quot;&gt;·&lt;/td&gt;
+
+&lt;th&gt;&lt;a href=&quot;https://www.wireshark.org/lists/&quot;&gt;Mailing Lists&lt;/a&gt;&lt;/th&gt;
+
+&lt;/tr&gt;&lt;/table&gt;
+&lt;/body&gt;&lt;/html&gt;</oldsource>
+        <translation type="unfinished">&lt;html&gt;&lt;head&gt;
 &lt;style&gt;
 a:link {
   color: palette(text);
@@ -13313,6 +13605,10 @@ a:hover {
         <translation>外観のレイアウトをデフォルトのサイズにリセットします</translation>
     </message>
     <message>
+        <source>Seconds Since First Captured Packet</source>
+        <translation>最初にキャプチャしたパケットからの経過時間</translation>
+    </message>
+    <message>
         <source>Packet &amp;Diagram</source>
         <translation>パケット &amp;ダイアグラム</translation>
     </message>
@@ -13635,10 +13931,6 @@ a:hover {
     <message>
         <source>Show packet times as the seconds since the UNIX / POSIX epoch (1970-01-01).</source>
         <translation>パケットの時間をUNIX/POSIX起源(1970-01-01)以来の秒数で表示します</translation>
-    </message>
-    <message>
-        <source>Seconds Since Beginning of Capture</source>
-        <translation>キャプチャ開始からの秒数</translation>
     </message>
     <message>
         <source>Seconds Since Previous Captured Packet</source>

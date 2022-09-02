@@ -309,6 +309,10 @@ def isGeneratedFile(filename):
     if not filename.endswith('.c'):
         return False
 
+    # This file is generated, but notice is further in than want to check for all files
+    if filename.endswith('pci-ids.c'):
+        return True
+
     # Open file
     f_read = open(os.path.join(filename), 'r')
     for line_no,line in enumerate(f_read):
@@ -336,7 +340,9 @@ def isGeneratedFile(filename):
 
 def isAppropriateFile(filename):
     file, extension = os.path.splitext(filename)
-    return extension in { '.adoc', '.c', '.cpp', '.pod', '.nsi'} or file.endswith('README')
+    if filename.find('CMake') != -1:
+        return False
+    return extension in { '.adoc', '.c', '.cpp', '.pod', '.nsi', '.txt'} or file.endswith('README')
 
 
 def findFilesInFolder(folder, recursive=True):

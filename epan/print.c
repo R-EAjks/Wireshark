@@ -1176,7 +1176,7 @@ write_ek_summary(column_info *cinfo, write_json_data* pdata)
         if (!get_column_visible(i))
             continue;
         json_dumper_set_member_name(pdata->dumper, g_ascii_strdown(cinfo->columns[i].col_title, -1));
-        json_dumper_value_string(pdata->dumper, cinfo->columns[i].col_data);
+        json_dumper_value_string(pdata->dumper, get_column_text(cinfo, i));
     }
 }
 
@@ -1339,7 +1339,7 @@ ek_write_field_value(field_info *fi, write_json_data* pdata)
                 json_dumper_value_anyf(pdata->dumper, "false");
             break;
         case FT_ABSOLUTE_TIME:
-            t = (const nstime_t *)fvalue_get(&fi->value);
+            t = fvalue_get_time(&fi->value);
 #ifdef _WIN32
             /*
              * Do not use gmtime_s(), as it will call and
@@ -1620,7 +1620,7 @@ write_psml_columns(epan_dissect_t *edt, FILE *fh, gboolean use_color)
         if (!get_column_visible(i))
             continue;
         fprintf(fh, "<section>");
-        print_escaped_xml(fh, edt->pi.cinfo->columns[i].col_data);
+        print_escaped_xml(fh, get_column_text(edt->pi.cinfo, i));
         fprintf(fh, "</section>\n");
     }
 
@@ -1686,9 +1686,9 @@ write_csv_columns(epan_dissect_t *edt, FILE *fh)
     for (i = 0; i < edt->pi.cinfo->num_cols - 1; i++) {
         if (!get_column_visible(i))
             continue;
-        csv_write_str(edt->pi.cinfo->columns[i].col_data, ',', fh);
+        csv_write_str(get_column_text(edt->pi.cinfo, i), ',', fh);
     }
-    csv_write_str(edt->pi.cinfo->columns[i].col_data, '\n', fh);
+    csv_write_str(get_column_text(edt->pi.cinfo,i), '\n', fh);
 }
 
 void
@@ -2515,7 +2515,7 @@ static void write_specified_fields(fields_format format, output_fields_t *fields
             g_free(col_name);
 
             if (NULL != field_index) {
-                format_field_values(fields, field_index, g_strdup(cinfo->columns[col].col_data));
+                format_field_values(fields, field_index, g_strdup(get_column_text(cinfo, col)));
             }
         }
     }
@@ -2683,7 +2683,7 @@ gchar* get_node_field_value(field_info* fi, epan_dissect_t* edt)
         case FT_BYTES:
             {
                 gchar *ret;
-                guint8 *bytes = (guint8 *)fvalue_get(&fi->value);
+                const guint8 *bytes = fvalue_get_bytes(&fi->value);
                 if (bytes) {
                     dfilter_string = (gchar *)wmem_alloc(NULL, 3*fvalue_length(&fi->value));
                     switch (fi->hfinfo->display) {

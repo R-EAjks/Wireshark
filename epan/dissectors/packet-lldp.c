@@ -39,6 +39,7 @@
 #include <epan/wmem_scopes.h>
 #include <epan/oui.h>
 
+#include "packet-enip.h"
 
 #define DEFAULT_COLUMN_INFO            1
 #define PROFINET_SPECIAL_COLUMN_INFO   2
@@ -54,6 +55,8 @@ typedef struct _profinet_lldp_column_info {
 }profinet_lldp_column_info;
 
 static gint column_info_selection = DEFAULT_COLUMN_INFO;
+
+static dissector_handle_t lldp_handle;
 
 void proto_register_lldp(void);
 void proto_reg_handoff_lldp(void);
@@ -4515,6 +4518,9 @@ dissect_organizational_specific_tlv(tvbuff_t *tvb, packet_info *pinfo, proto_tre
 	case OUI_ONOS:
 		subTypeStr = val_to_str(subType, onos_subtypes, "Unknown subtype (0x%x)");
 		break;
+	case OUI_ODVA:
+		subTypeStr = val_to_str(subType, lldp_cip_subtypes, "Unknown subtype (0x%x)");
+		break;
 	default:
 		subTypeStr = wmem_strdup_printf(pinfo->pool, "Unknown (%d)",subType);
 		break;
@@ -4577,6 +4583,9 @@ dissect_organizational_specific_tlv(tvbuff_t *tvb, packet_info *pinfo, proto_tre
 		break;
 	case OUI_ONOS:
 		dissect_onos_tlv(vendor_tvb, pinfo, org_tlv_tree);
+		break;
+	case OUI_ODVA:
+		dissect_lldp_cip_tlv(vendor_tvb, pinfo, org_tlv_tree);
 		break;
 	default:
 		dissect_oui_default_tlv(vendor_tvb, pinfo, org_tlv_tree);
@@ -5802,10 +5811,9 @@ proto_register_lldp(void)
 			{ "Altitude Resolution", "lldp.media.loc.alt_resolution", FT_UINT16, BASE_DEC,
 			NULL, 0x0FC0, NULL, HFILL }
 		},
-		/* TODO: should mask be 0x3FFFFFFF, or 0x03FFFFFF ? */
 		{ &hf_media_loc_alt,
 			{ "Altitude", "lldp.media.loc.altitude", FT_UINT32, BASE_DEC,
-			NULL, 0x03FFFFFFF, NULL, HFILL }
+			NULL, 0x3FFFFFFF, NULL, HFILL }
 		},
 		{ &hf_media_loc_datum,
 			{ "Datum", "lldp.media.loc.datum", FT_UINT8, BASE_DEC,
@@ -6479,6 +6487,7 @@ proto_register_lldp(void)
 
 	/* Register the protocol name and description */
 	proto_lldp = proto_register_protocol("Link Layer Discovery Protocol", "LLDP", "lldp");
+	lldp_handle = register_dissector("lldp", dissect_lldp, proto_lldp);
 
 	/* Register preferences */
 	lldp_module = prefs_register_protocol(proto_lldp, NULL);
@@ -6503,9 +6512,6 @@ proto_register_lldp(void)
 void
 proto_reg_handoff_lldp(void)
 {
-	dissector_handle_t lldp_handle;
-
-	lldp_handle = create_dissector_handle(dissect_lldp,proto_lldp);
 	dissector_add_uint("ethertype", ETHERTYPE_LLDP, lldp_handle);
 	dissector_add_uint("ethertype", ETHERTYPE_ONOS, lldp_handle);
 }

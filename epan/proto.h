@@ -81,6 +81,8 @@ typedef void (*custom_fmt_func_t)(gchar *, guint32);
 
 typedef void (*custom_fmt_func_64_t)(gchar *, guint64);
 
+typedef void (*custom_fmt_func_double_t)(gchar *, double);
+
 /** Make a custom format function pointer look like a void pointer. Used to set header_field_info.strings.
  *
  * We cast to gsize first, which 1) is guaranteed to be wide enough to
@@ -362,7 +364,7 @@ void proto_report_dissector_bug(const char *format, ...)
  * bit, required for FT_UINT_STRING and for UCS-2 and UTF-16 strings)
  * and the bottom bit (which we ignore for now so that programs that
  * pass TRUE for the encoding just do ASCII).  (The encodings are given
- * directly as even numbers in hex, so that make-init-lua.pl can just
+ * directly as even numbers in hex, so that make-init-lua.py can just
  * turn them into numbers for use in init.lua.)
  *
  * We don't yet process ASCII and UTF-8 differently.  Ultimately, for
@@ -655,23 +657,21 @@ void proto_report_dissector_bug(const char *format, ...)
 #define FIELD_DISPLAY_E_MASK 0xFF
 
 /*
- * Note that this enum values are parsed in make-init-lua.pl so make sure
+ * Note that this enum values are parsed in make-init-lua.py so make sure
  * any changes here still makes valid entries in init.lua.
  * XXX The script requires the equals sign.
  */
 typedef enum {
     BASE_NONE    = 0,   /**< none */
 
-/* Integral types */
-    BASE_DEC     = 1,   /**< decimal */
-    BASE_HEX     = 2,   /**< hexadecimal */
-    BASE_OCT     = 3,   /**< octal */
-    BASE_DEC_HEX = 4,   /**< decimal (hexadecimal) */
-    BASE_HEX_DEC = 5,   /**< hexadecimal (decimal) */
-    BASE_CUSTOM  = 6,   /**< call custom routine (in ->strings) to format */
-
-/* Float types */
-    BASE_FLOAT   = BASE_NONE, /**< decimal-format float */
+/* Integral and float types */
+    BASE_DEC     = 1,   /**< decimal [integer, float] */
+    BASE_HEX     = 2,   /**< hexadecimal [integer, float] */
+    BASE_OCT     = 3,   /**< octal [integer] */
+    BASE_DEC_HEX = 4,   /**< decimal (hexadecimal) [integer] */
+    BASE_HEX_DEC = 5,   /**< hexadecimal (decimal) [integer] */
+    BASE_CUSTOM  = 6,   /**< call custom routine to format [integer, float] */
+    BASE_EXP     = 7,   /**< exponential [float] */
 
 /* Byte separators */
     SEP_DOT      = 8,   /**< hexadecimal bytes with a period (.) between each byte */
@@ -896,7 +896,7 @@ typedef proto_node proto_item;
  * the bottom up.
  */
 
-/* do not modify the PI_SEVERITY_MASK name - it's used by make-init-lua.pl */
+/* do not modify the PI_SEVERITY_MASK name - it's used by make-init-lua.py */
 /* expert severities */
 #define PI_SEVERITY_MASK        0x00F00000  /**< mask usually for internal use only! */
 /** Packet comment */
@@ -910,7 +910,7 @@ typedef proto_node proto_item;
 /** Serious problems, e.g. a malformed packet */
 #define PI_ERROR                0x00800000
 
-/* do not modify the PI_GROUP_MASK name - it's used by make-init-lua.pl */
+/* do not modify the PI_GROUP_MASK name - it's used by make-init-lua.py */
 /* expert "event groups" */
 #define PI_GROUP_MASK           0xFF000000  /**< mask usually for internal use only! */
 /** The protocol field has a bad checksum, usually uses PI_WARN severity */
@@ -2674,6 +2674,12 @@ WS_DLL_PUBLIC void proto_get_frame_protocols(const wmem_list_t *layers,
  */
 WS_DLL_PUBLIC gboolean proto_is_frame_protocol(const wmem_list_t *layers, const char* proto_name);
 
+/** Create a string of all layers in the packet.
+ * @param pinfo Pointer to packet info
+ * @return string of layer names
+ */
+WS_DLL_PUBLIC gchar * proto_list_layers(const packet_info *pinfo);
+
 /** Mark protocol with the given item number as disabled by default.
  @param proto_id protocol id (0-indexed) */
 WS_DLL_PUBLIC void proto_disable_by_default(const int proto_id);
@@ -2980,6 +2986,25 @@ proto_tree_add_bitmask_value_with_flags(proto_tree *tree, tvbuff_t *tvb, const g
 WS_DLL_PUBLIC void
 proto_tree_add_bitmask_list(proto_tree *tree, tvbuff_t *tvb, const guint offset,
                                 const int len, int * const *fields, const guint encoding);
+
+/** This function will dissect a value that describe a bitmask. Similar to proto_tree_add_bitmask_list(),
+    but with a return value
+ @param tree the tree to append this item to
+ @param tvb the tv buffer of the current data
+ @param offset start of data in tvb
+ @param len number of bytes of data
+ @param fields an array of pointers to int that lists all the fields of the
+        bitmask. These fields can be either of the type FT_BOOLEAN for flags
+        or another integer of the same type/size as hf_hdr with a mask specified.
+        This array is terminated by a NULL entry.
+        FT_BOOLEAN bits that are set to 1 will have the name added to the expansion.
+        FT_integer fields that have a value_string attached will have the
+        matched string displayed on the expansion line.
+ @param encoding big or little endian byte representation (ENC_BIG_ENDIAN/ENC_LITTLE_ENDIAN/ENC_HOST_ENDIAN)
+ @param retval if a pointer is passed here the value is returned. */
+WS_DLL_PUBLIC  void
+proto_tree_add_bitmask_list_ret_uint64(proto_tree *tree, tvbuff_t *tvb, const guint offset,
+					const int len, int * const *fields, const guint encoding, guint64 *retval);
 
 /** This function will dissect a value that describe a bitmask. Similar to proto_tree_add_bitmask_list(),
     but with a passed in value (presumably because it can't be retrieved directly from tvb)

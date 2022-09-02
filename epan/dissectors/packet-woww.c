@@ -4681,7 +4681,7 @@ add_body_fields(guint32 opcode,
             break;
 
         case SMSG_AUTH_RESPONSE:
-            ptvcursor_add(ptv, hf_woww_result, 4, ENC_LITTLE_ENDIAN);
+            ptvcursor_add(ptv, hf_woww_result, 1, ENC_NA);
             // There might more fields depending on the value in login_result.
             // Not implemented currently because they aren't that important.
             break;
@@ -5048,7 +5048,7 @@ proto_register_woww(void)
         },
         { &hf_woww_result,
           { "Result", "woww.result",
-            FT_UINT32, BASE_HEX, VALS(account_result_strings), 0,
+            FT_UINT8, BASE_HEX, VALS(account_result_strings), 0,
             NULL, HFILL }
         },
         { &hf_woww_amount_of_characters,
@@ -5128,22 +5128,22 @@ proto_register_woww(void)
         },
         { &hf_woww_character_position_x,
             { "Position X", "woww.character.position.x",
-              FT_FLOAT, BASE_FLOAT, NULL, 0,
+              FT_FLOAT, BASE_NONE, NULL, 0,
               NULL, HFILL }
         },
         { &hf_woww_character_position_y,
             { "Position Y", "woww.character.position.y",
-              FT_FLOAT, BASE_FLOAT, NULL, 0,
+              FT_FLOAT, BASE_NONE, NULL, 0,
               NULL, HFILL }
         },
         { &hf_woww_character_position_z,
             { "Position Z", "woww.character.position.z",
-              FT_FLOAT, BASE_FLOAT, NULL, 0,
+              FT_FLOAT, BASE_NONE, NULL, 0,
               NULL, HFILL }
         },
         { &hf_woww_character_orientation,
             { "Orientation", "woww.character.orientation",
-              FT_FLOAT, BASE_FLOAT, NULL, 0,
+              FT_FLOAT, BASE_NONE, NULL, 0,
               "Heading in degrees, with 0 being north", HFILL }
         },
         { &hf_woww_character_guild_id,
@@ -5213,37 +5213,37 @@ proto_register_woww(void)
         },
         { &hf_woww_movement_swim_pitch,
             { "Swim Pitch", "woww.movement.swim_pitch",
-              FT_FLOAT, BASE_FLOAT, NULL, 0,
+              FT_FLOAT, BASE_NONE, NULL, 0,
               NULL, HFILL }
         },
         { &hf_woww_movement_fallen_time,
             { "Fallen Time", "woww.movement.fallen_time",
-              FT_FLOAT, BASE_FLOAT, NULL, 0,
+              FT_FLOAT, BASE_NONE, NULL, 0,
               NULL, HFILL }
         },
         { &hf_woww_movement_jump_velocity,
             { "Jump Velocity", "woww.movement.jump.velocity",
-              FT_FLOAT, BASE_FLOAT, NULL, 0,
+              FT_FLOAT, BASE_NONE, NULL, 0,
               NULL, HFILL }
         },
         { &hf_woww_movement_jump_cos_anchor_pitch,
             { "Jump Cos Anchor", "woww.movement.jump.cos_anchor",
-              FT_FLOAT, BASE_FLOAT, NULL, 0,
+              FT_FLOAT, BASE_NONE, NULL, 0,
               NULL, HFILL }
         },
         { &hf_woww_movement_jump_sin_anchor_pitch,
             { "Jump Sin Anchor", "woww.movement.jump.sin_anchor",
-              FT_FLOAT, BASE_FLOAT, NULL, 0,
+              FT_FLOAT, BASE_NONE, NULL, 0,
               NULL, HFILL }
         },
         { &hf_woww_movement_jump_current_speed,
             { "Jump Current Speed", "woww.movement.jump.current_speed",
-              FT_FLOAT, BASE_FLOAT, NULL, 0,
+              FT_FLOAT, BASE_NONE, NULL, 0,
               NULL, HFILL }
         },
         { &hf_woww_movement_fall_start_elevation,
             { "Fall Start Elevation", "woww.movement.fall.start_elevation",
-              FT_FLOAT, BASE_FLOAT, NULL, 0,
+              FT_FLOAT, BASE_NONE, NULL, 0,
               NULL, HFILL }
         },
         { &hf_woww_timestamp,
@@ -5265,8 +5265,7 @@ proto_register_woww(void)
     proto_register_field_array(proto_woww, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
 
-    prefs_register_protocol(proto_woww,
-            NULL);
+    prefs_register_protocol(proto_woww, NULL);
 
 }
 

@@ -212,7 +212,7 @@ guint32 eo_row_count = 0;
  * all associated ftp-data packets to the export objects entry.
  */
 static tap_packet_status
-ftp_eo_packet(void *tapdata, packet_info *pinfo, epan_dissect_t *edt _U_, const void *data)
+ftp_eo_packet(void *tapdata, packet_info *pinfo, epan_dissect_t *edt _U_, const void *data, tap_flags_t flags _U_)
 {
     export_object_list_t *object_list = (export_object_list_t *)tapdata;
     const ftp_eo_t *eo_info = (const ftp_eo_t *)data;
@@ -388,7 +388,7 @@ static void create_and_link_data_conversation(packet_info *pinfo,
     ftp_data_conversation_t *p_ftp_data_conv;
     conversation_t *data_conversation = conversation_new(pinfo->num,
                                                          addr_a, addr_b,
-                                                         ENDPOINT_TCP,
+                                                         CONVERSATION_TCP,
                                                          port_a, port_b,
                                                          NO_PORT2);
     conversation_set_dissector(data_conversation, ftpdata_handle);

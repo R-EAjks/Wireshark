@@ -317,12 +317,13 @@ dissect_lapdm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
         pinfo->fragmented = m;
 
         /* Rely on caller to provide a way to group fragments */
-        fragment_id =  (conversation_get_endpoint_by_id(pinfo, ENDPOINT_GSMTAP, USE_LAST_ENDPOINT) << 4) | (sapi << 1) | pinfo->p2p_dir;
+        fragment_id =  (conversation_get_id_from_elements(pinfo, CONVERSATION_GSMTAP, USE_LAST_ENDPOINT) << 4) | (sapi << 1) | pinfo->p2p_dir;
 
         if (!PINFO_FD_VISITED(pinfo)) {
             /* Check if new N(S) is equal to previous N(S) (to avoid adding retransmissions in reassembly table)
                As GUINT_TO_POINTER macro does not allow to differentiate NULL from 0, use 1-8 range instead of 0-7 */
             guint *p_last_n_s = (guint*)wmem_map_lookup(lapdm_last_n_s_map, GUINT_TO_POINTER(fragment_id));
+            ws_warning("%u: fragid:%u last_n_s:%u n_s:%u", pinfo->num, fragment_id, GPOINTER_TO_UINT(p_last_n_s), n_s);
             if (GPOINTER_TO_UINT(p_last_n_s) == (guint)(n_s+1)) {
                 add_frag = FALSE;
             } else {
@@ -377,7 +378,7 @@ dissect_lapdm(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
     {
         if (!PINFO_FD_VISITED(pinfo) && ((control & XDLC_S_U_MASK) == XDLC_U) && ((control & XDLC_U_MODIFIER_MASK) == XDLC_SABM)) {
             /* SABM frame; reset the last N(S) to an invalid value */
-            guint32 fragment_id = (conversation_get_endpoint_by_id(pinfo, ENDPOINT_GSMTAP, USE_LAST_ENDPOINT) << 4) | (sapi << 1) | pinfo->p2p_dir;
+            guint32 fragment_id = (conversation_get_id_from_elements(pinfo, CONVERSATION_GSMTAP, USE_LAST_ENDPOINT) << 4) | (sapi << 1) | pinfo->p2p_dir;
             wmem_map_insert(lapdm_last_n_s_map, GUINT_TO_POINTER(fragment_id), GUINT_TO_POINTER(0));
         }
 

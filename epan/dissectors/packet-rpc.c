@@ -367,7 +367,7 @@ rpcstat_init(struct register_srt* srt, GArray* srt_array)
 }
 
 static tap_packet_status
-rpcstat_packet(void *pss, packet_info *pinfo, epan_dissect_t *edt _U_, const void *prv)
+rpcstat_packet(void *pss, packet_info *pinfo, epan_dissect_t *edt _U_, const void *prv, tap_flags_t flags _U_)
 {
 	srt_stat_table *rpc_srt_table;
 	srt_data_t *data = (srt_data_t *)pss;
@@ -1687,18 +1687,18 @@ get_conversation_for_call(packet_info *pinfo)
 		 * if you use NO_ADDR_B.
 		 */
 		conversation = find_conversation(pinfo->num,
-		    &pinfo->src, &null_address, conversation_pt_to_endpoint_type(pinfo->ptype),
+		    &pinfo->src, &null_address, conversation_pt_to_conversation_type(pinfo->ptype),
 		    pinfo->destport, 0, NO_ADDR_B|NO_PORT_B);
 	}
 
 	if (conversation == NULL) {
 		if (pinfo->ptype == PT_TCP || pinfo->ptype == PT_IBQP || pinfo->ptype == PT_IWARP_MPA) {
 			conversation = conversation_new(pinfo->num,
-			    &pinfo->src, &pinfo->dst, conversation_pt_to_endpoint_type(pinfo->ptype),
+			    &pinfo->src, &pinfo->dst, conversation_pt_to_conversation_type(pinfo->ptype),
 			    pinfo->srcport, pinfo->destport, 0);
 		} else {
 			conversation = conversation_new(pinfo->num,
-			    &pinfo->src, &null_address, conversation_pt_to_endpoint_type(pinfo->ptype),
+			    &pinfo->src, &null_address, conversation_pt_to_conversation_type(pinfo->ptype),
 			    pinfo->destport, 0, NO_ADDR2|NO_PORT2);
 		}
 	}
@@ -1739,7 +1739,7 @@ find_conversation_for_reply(packet_info *pinfo)
 		 * if you use NO_ADDR_B.
 		 */
 		conversation = find_conversation(pinfo->num,
-		    &pinfo->dst, &null_address, conversation_pt_to_endpoint_type(pinfo->ptype),
+		    &pinfo->dst, &null_address, conversation_pt_to_conversation_type(pinfo->ptype),
 		    pinfo->srcport, 0, NO_ADDR_B|NO_PORT_B);
 	}
 	return conversation;
@@ -1754,22 +1754,22 @@ new_conversation_for_reply(packet_info *pinfo)
 	{
 	case PT_TCP:
 		conversation = conversation_new(pinfo->num,
-		    &pinfo->src, &pinfo->dst, ENDPOINT_TCP,
+		    &pinfo->src, &pinfo->dst, CONVERSATION_TCP,
 		    pinfo->srcport, pinfo->destport, 0);
 		break;
 	case PT_IBQP:
 		conversation = conversation_new(pinfo->num,
-		    &pinfo->src, &pinfo->dst, ENDPOINT_IBQP,
+		    &pinfo->src, &pinfo->dst, CONVERSATION_IBQP,
 		    pinfo->srcport, pinfo->destport, 0);
 		break;
 	case PT_IWARP_MPA:
 		conversation = conversation_new(pinfo->num,
-		    &pinfo->src, &pinfo->dst, ENDPOINT_IWARP_MPA,
+		    &pinfo->src, &pinfo->dst, CONVERSATION_IWARP_MPA,
 		    pinfo->srcport, pinfo->destport, 0);
 		break;
 	default:
 		conversation = conversation_new(pinfo->num,
-		    &pinfo->dst, &null_address, conversation_pt_to_endpoint_type(pinfo->ptype),
+		    &pinfo->dst, &null_address, conversation_pt_to_conversation_type(pinfo->ptype),
 		    pinfo->srcport, 0, NO_ADDR2|NO_PORT2);
 		break;
 	}
@@ -3943,7 +3943,7 @@ static void rpc_prog_stat_init(stat_tap_table_ui* new_stat)
 }
 
 static tap_packet_status
-rpc_prog_stat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *rciv_ptr)
+rpc_prog_stat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *rciv_ptr, tap_flags_t flags _U_)
 {
 	stat_data_t* stat_data = (stat_data_t*)tapdata;
 	const rpc_call_info_value *ri = (const rpc_call_info_value *)rciv_ptr;

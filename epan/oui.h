@@ -47,6 +47,7 @@
 #define OUI_SONY_ERICSSON_3 0x000FDE    /* Sony Ericsson Mobile Communications AB */
 #define OUI_FORTINET        0x00090F    /* Fortinet */
 #define OUI_CIMETRICS       0x001090    /* Cimetrics, Inc. */
+#define OUI_MOJO_ARISTA     0x001174    /* Arista Networks (Formerly Mojo Networks) */
 #define OUI_IEEE_802_3      0x00120F    /* IEEE 802.3 */
 #define OUI_MEDIA_ENDPOINT  0x0012BB    /* Media (TIA TR-41 Committee) */
 #define OUI_SONY_ERICSSON_4 0x0012EE    /* Sony Ericsson Mobile Communications AB */
@@ -64,6 +65,7 @@
 #define OUI_IEEE_802_1QBG   0x001B3F    /* IEEE 802.1 Qbg */
 #define OUI_NINTENDO        0x001F32
 #define OUI_TURBOCELL       0x0020F6    /* KarlNet, who brought you Turbocell */
+#define OUI_ODVA            0x00216C    /* ODVA */
 #define OUI_AVAYA           0x00400D    /* Avaya */
 #define OUI_CISCOWL         0x004096    /* Cisco Wireless (Aironet) */
 #define OUI_MARVELL         0x005043    /* Marvell Semiconductor */

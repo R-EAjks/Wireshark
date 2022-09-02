@@ -52,6 +52,10 @@
 #include <wsutil/wslog.h>
 #include <ui/clopts_common.h>
 
+#ifdef _WIN32
+#include <wsutil/unicode-utils.h>
+#endif
+
 #include "globals.h"
 #include <epan/packet.h>
 #include <epan/ftypes/ftypes.h>
@@ -83,8 +87,6 @@
 #include <ui/version_info.h>
 
 #include "capture/capture-pcap-util.h"
-
-#include "extcap.h"
 
 #ifdef HAVE_LIBPCAP
 #include <setjmp.h>
@@ -812,7 +814,6 @@ clean_exit:
     g_free(pipe_name);
     epan_free(cfile.epan);
     epan_cleanup();
-    extcap_cleanup();
     wtap_cleanup();
     return ret;
 }
@@ -1253,7 +1254,7 @@ static gboolean print_field_value(field_info *finfo, int cmd_line_index)
 }
 
 static tap_packet_status
-protocolinfo_packet(void *prs, packet_info *pinfo _U_, epan_dissect_t *edt, const void *dummy _U_)
+protocolinfo_packet(void *prs, packet_info *pinfo _U_, epan_dissect_t *edt, const void *dummy _U_, tap_flags_t flags _U_)
 {
     pci_t *rs=(pci_t *)prs;
     GPtrArray *gp;

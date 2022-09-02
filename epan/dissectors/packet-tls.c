@@ -414,7 +414,7 @@ ssl_parse_old_keys(void)
 
 
 static tap_packet_status
-ssl_follow_tap_listener(void *tapdata, packet_info *pinfo, epan_dissect_t *edt _U_, const void *ssl)
+ssl_follow_tap_listener(void *tapdata, packet_info *pinfo, epan_dissect_t *edt _U_, const void *ssl, tap_flags_t flags _U_)
 {
     follow_info_t *      follow_info = (follow_info_t*) tapdata;
     follow_record_t * follow_record = NULL;
@@ -1144,6 +1144,7 @@ decrypt_tls13_early_data(tvbuff_t *tvb, packet_info *pinfo, guint32 offset,
         0x1303, /* TLS_CHACHA20_POLY1305_SHA256 */
         0x1304, /* TLS_AES_128_CCM_SHA256 */
         0x1305, /* TLS_AES_128_CCM_8_SHA256 */
+        0x00c6, /* TLS_SM4_GCM_SM3 */
     };
     const guchar   *record = tvb_get_ptr(tvb, offset, record_length);
     for (guint i = 0; i < G_N_ELEMENTS(tls13_ciphers); i++) {
@@ -1248,6 +1249,7 @@ again:
      */
     if ((msp = (struct tcp_multisegment_pdu *)wmem_tree_lookup32(flow->multisegment_pdus, seq))) {
         const char *prefix;
+        gboolean is_retransmission = FALSE;
 
         if (msp->first_frame == pinfo->num) {
             /* This must be after the first pass. */
@@ -1259,8 +1261,19 @@ again:
             }
         } else {
             prefix = "Retransmitted ";
+            is_retransmission = TRUE;
         }
 
+        if (!is_retransmission) {
+            ipfd_head = fragment_get(&ssl_reassembly_table, pinfo, msp->first_frame, msp);
+            if (ipfd_head != NULL && ipfd_head->reassembled_in !=0 &&
+                ipfd_head->reassembled_in != pinfo->num) {
+                /* Show what frame this was reassembled in if not this one. */
+                item=proto_tree_add_uint(tree, *ssl_segment_items.hf_reassembled_in,
+                                         tvb, 0, 0, ipfd_head->reassembled_in);
+                proto_item_set_generated(item);
+            }
+        }
         nbytes = tvb_reported_length_remaining(tvb, offset);
         ssl_proto_tree_add_segment_data(tree, tvb, offset, nbytes, prefix);
         return;
@@ -1388,7 +1401,7 @@ again:
             next_tvb = tvb_new_chain(tvb, ipfd_head->tvb_data);
 
             /* add desegmented data to the data source list */
-            add_new_data_source(pinfo, next_tvb, "Reassembled SSL");
+            add_new_data_source(pinfo, next_tvb, "Reassembled TLS");
 
             /* call subdissector */
             process_ssl_payload(next_tvb, 0, pinfo, tree, session, app_handle_port);
@@ -1567,9 +1580,10 @@ again:
 
     if (!called_dissector || pinfo->desegment_len != 0) {
         if (ipfd_head != NULL && ipfd_head->reassembled_in != 0 &&
+            ipfd_head->reassembled_in != pinfo->num &&
             !(ipfd_head->flags & FD_PARTIAL_REASSEMBLY)) {
             /*
-             * We know what frame this PDU is reassembled in;
+             * We know what other frame this PDU is reassembled in;
              * let the user know.
              */
             item=proto_tree_add_uint(tree, *ssl_segment_items.hf_reassembled_in,
@@ -3488,11 +3502,11 @@ void ssl_set_master_secret(guint32 frame_num, address *addr_srv, address *addr_c
 
     ssl_debug_printf("\nssl_set_master_secret enter frame #%u\n", frame_num);
 
-    conversation = find_conversation(frame_num, addr_srv, addr_cli, conversation_pt_to_endpoint_type(ptype), port_srv, port_cli, 0);
+    conversation = find_conversation(frame_num, addr_srv, addr_cli, conversation_pt_to_conversation_type(ptype), port_srv, port_cli, 0);
 
     if (!conversation) {
         /* create a new conversation */
-        conversation = conversation_new(frame_num, addr_srv, addr_cli, conversation_pt_to_endpoint_type(ptype), port_srv, port_cli, 0);
+        conversation = conversation_new(frame_num, addr_srv, addr_cli, conversation_pt_to_conversation_type(ptype), port_srv, port_cli, 0);
         ssl_debug_printf("  new conversation = %p created\n", (void *)conversation);
     }
     ssl = ssl_get_session(conversation, tls_handle);

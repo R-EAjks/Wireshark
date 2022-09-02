@@ -199,9 +199,9 @@ bool WiresharkMainWindow::openCaptureFile(QString cf_path, QString read_filter, 
     for (;;) {
 
         if (cf_path.isEmpty()) {
-            CaptureFileDialog open_dlg(this, capture_file_.capFile(), read_filter);
+            CaptureFileDialog open_dlg(this, capture_file_.capFile());
 
-            if (open_dlg.open(file_name, type)) {
+            if (open_dlg.open(file_name, type, read_filter)) {
                 cf_path = file_name;
             } else {
                 ret = false;
@@ -547,6 +547,7 @@ void WiresharkMainWindow::captureCaptureUpdateFinished(capture_session *session)
     setMenusForCaptureFile();
 
     setWindowIcon(mainApp->normalIcon());
+    popLiveCaptureInProgress();
 
     if (global_commandline_info.quit_after_cap) {
         // Command line asked us to quit after capturing.
@@ -569,6 +570,7 @@ void WiresharkMainWindow::captureCaptureFixedFinished(capture_session *) {
     setMenusForCaptureFile(true);
 
     setWindowIcon(mainApp->normalIcon());
+    popLiveCaptureInProgress();
 
     if (global_commandline_info.quit_after_cap) {
         // Command line asked us to quit after capturing.
@@ -589,6 +591,7 @@ void WiresharkMainWindow::captureCaptureFailed(capture_session *) {
     mainApp->popStatus(WiresharkApplication::FileStatus);
 
     setWindowIcon(mainApp->normalIcon());
+    popLiveCaptureInProgress();
 
     if (global_commandline_info.quit_after_cap) {
         // Command line asked us to quit after capturing.
@@ -950,7 +953,17 @@ void WiresharkMainWindow::startCapture(QStringList interfaces _U_) {
                     /* Not the first selected interface; is its capture filter
                        the same as the one the other interfaces we've looked
                        at have? */
+                    /* XXX: GCC 12.1 has a bogus warning at -O2 and higher
+                     * even though the isEmpty() check guarantees that
+                     * filter_ba.constData() is never NULL or empty.
+                     */
+#if WS_IS_AT_LEAST_GNUC_VERSION(12,1)
+DIAG_OFF(stringop-overread)
+#endif
                     if (strcmp(interface_opts->cfilter, filter_ba.constData()) != 0) {
+#if WS_IS_AT_LEAST_GNUC_VERSION(12,1)
+DIAG_ON(stringop-overread)
+#endif
                         /* No, so not all selected interfaces have the same capture
                            filter. */
                         filter_ba.clear();
@@ -967,75 +980,9 @@ void WiresharkMainWindow::startCapture(QStringList interfaces _U_) {
 #endif // HAVE_LIBPCAP
 }
 
-// Copied from ui/gtk/gui_utils.c
-void WiresharkMainWindow::pipeTimeout() {
-#ifdef _WIN32
-    HANDLE handle;
-    DWORD avail = 0;
-    gboolean result, result1;
-    DWORD childstatus;
-    gint iterations = 0;
-
-
-    /* try to read data from the pipe only 5 times, to avoid blocking */
-    while (iterations < 5) {
-        /* Oddly enough although Named pipes don't work on win9x,
-           PeekNamedPipe does !!! */
-        handle = (HANDLE)_get_osfhandle(pipe_source_);
-        result = PeekNamedPipe(handle, NULL, 0, NULL, &avail, NULL);
-
-        /* Get the child process exit status */
-        result1 = GetExitCodeProcess((HANDLE)*(pipe_child_process_),
-                                     &childstatus);
-
-        /* If the Peek returned an error, or there are bytes to be read
-           or the childwatcher thread has terminated then call the normal
-           callback */
-        if (!result || avail > 0 || childstatus != STILL_ACTIVE) {
-
-            /* And call the real handler */
-            if (!pipe_input_cb_(pipe_source_, pipe_user_data_)) {
-                ws_log(LOG_DOMAIN_MAIN, LOG_LEVEL_DEBUG, "pipe_timer_cb: input pipe closed, iterations: %u", iterations);
-                /* pipe closed, return false so that the old timer is not run again */
-                delete pipe_timer_;
-                return;
-            }
-        } else {
-            /* No data, stop now */
-            break;
-        }
-
-        iterations++;
-    }
-#endif // _WIN32
-}
-
-void WiresharkMainWindow::pipeActivated(int source) {
-    Q_UNUSED(source)
-
-#ifndef _WIN32
-    ws_assert(source == pipe_source_);
-
-    pipe_notifier_->setEnabled(false);
-    if (pipe_input_cb_(pipe_source_, pipe_user_data_)) {
-        pipe_notifier_->setEnabled(true);
-    }
-    else {
-        delete pipe_notifier_;
-    }
-#endif // _WIN32
-}
-
-void WiresharkMainWindow::pipeNotifierDestroyed()
-{
+void WiresharkMainWindow::popLiveCaptureInProgress() {
     /* Pop the "<live capture in progress>" message off the status bar. */
     main_ui_->statusBar->setFileName(capture_file_);
-
-#ifdef _WIN32
-    pipe_timer_ = NULL;
-#else
-    pipe_notifier_ = NULL;
-#endif // _WIN32
 }
 
 void WiresharkMainWindow::stopCapture() {
@@ -2516,10 +2463,7 @@ void WiresharkMainWindow::setTimestampFormat(QAction *action)
 
         if (packet_list_) {
             packet_list_->resetColumns();
-        }
-        if (capture_file_.capFile()) {
-            /* This call adjusts column width */
-            cf_timestamp_auto_precision(capture_file_.capFile());
+            packet_list_->resizeAllColumns(true);
         }
     }
 }
@@ -2531,16 +2475,12 @@ void WiresharkMainWindow::setTimestampPrecision(QAction *action)
     }
     ts_precision tsp = action->data().value<ts_precision>();
     if (recent.gui_time_precision != tsp) {
-        /* the actual precision will be set in packet_list_queue_draw() below */
         timestamp_set_precision(tsp);
         recent.gui_time_precision = tsp;
 
         if (packet_list_) {
             packet_list_->resetColumns();
-        }
-        if (capture_file_.capFile()) {
-            /* This call adjusts column width */
-            cf_timestamp_auto_precision(capture_file_.capFile());
+            packet_list_->resizeAllColumns(true);
         }
     }
 }
@@ -2556,10 +2496,7 @@ void WiresharkMainWindow::on_actionViewTimeDisplaySecondsWithHoursAndMinutes_tri
 
     if (packet_list_) {
         packet_list_->resetColumns();
-    }
-    if (capture_file_.capFile()) {
-        /* This call adjusts column width */
-        cf_timestamp_auto_precision(capture_file_.capFile());
+        packet_list_->resizeAllColumns(true);
     }
 }
 
@@ -2628,8 +2565,7 @@ void WiresharkMainWindow::on_actionViewNormalSize_triggered()
 
 void WiresharkMainWindow::on_actionViewColorizePacketList_triggered(bool checked) {
     recent.packet_list_colorize = checked;
-    packet_list_recolor_packets();
-    packet_list_->resetColorized();
+    packet_list_->recolorPackets();
 }
 
 void WiresharkMainWindow::on_actionViewColoringRules_triggered()
@@ -3140,10 +3076,8 @@ void WiresharkMainWindow::on_actionWirelessWlanStatistics_triggered()
 // -z expert
 void WiresharkMainWindow::statCommandExpertInfo(const char *, void *)
 {
-    ExpertInfoDialog *expert_dialog = new ExpertInfoDialog(*this, capture_file_);
     const DisplayFilterEdit *df_edit = dynamic_cast<DisplayFilterEdit *>(df_combo_box_->lineEdit());
-
-    expert_dialog->setDisplayFilter(df_edit->text());
+    ExpertInfoDialog *expert_dialog = new ExpertInfoDialog(*this, capture_file_, df_edit->text());
 
     connect(expert_dialog->getExpertInfoView(), SIGNAL(goToPacket(int, int)),
             packet_list_, SLOT(goToPacket(int, int)));
@@ -3343,10 +3277,9 @@ void WiresharkMainWindow::on_actionStatisticsCollectd_triggered()
     openStatisticsTreeDialog("collectd");
 }
 
-// -z conv,...
-void WiresharkMainWindow::statCommandConversations(const char *arg, void *userdata)
+void WiresharkMainWindow::on_actionStatisticsConversations_triggered()
 {
-    ConversationDialog *conv_dialog = new ConversationDialog(*this, capture_file_, GPOINTER_TO_INT(userdata), arg);
+    ConversationDialog *conv_dialog = new ConversationDialog(*this, capture_file_);
     connect(conv_dialog, SIGNAL(filterAction(QString, FilterAction::Action, FilterAction::ActionType)),
         this, SIGNAL(filterAction(QString, FilterAction::Action, FilterAction::ActionType)));
     connect(conv_dialog, SIGNAL(openFollowStreamDialog(follow_type_t, guint, guint)),
@@ -3356,15 +3289,9 @@ void WiresharkMainWindow::statCommandConversations(const char *arg, void *userda
     conv_dialog->show();
 }
 
-void WiresharkMainWindow::on_actionStatisticsConversations_triggered()
+void WiresharkMainWindow::on_actionStatisticsEndpoints_triggered()
 {
-    statCommandConversations(NULL, NULL);
-}
-
-// -z endpoints,...
-void WiresharkMainWindow::statCommandEndpoints(const char *arg, void *userdata)
-{
-    EndpointDialog *endp_dialog = new EndpointDialog(*this, capture_file_, GPOINTER_TO_INT(userdata), arg);
+    EndpointDialog *endp_dialog = new EndpointDialog(*this, capture_file_);
     connect(endp_dialog, SIGNAL(filterAction(QString, FilterAction::Action, FilterAction::ActionType)),
             this, SIGNAL(filterAction(QString, FilterAction::Action, FilterAction::ActionType)));
     connect(endp_dialog, SIGNAL(openFollowStreamDialog(follow_type_t)),
@@ -3372,11 +3299,6 @@ void WiresharkMainWindow::statCommandEndpoints(const char *arg, void *userdata)
     connect(endp_dialog, SIGNAL(openTcpStreamGraph(int)),
             this, SLOT(openTcpStreamDialog(int)));
     endp_dialog->show();
-}
-
-void WiresharkMainWindow::on_actionStatisticsEndpoints_triggered()
-{
-    statCommandEndpoints(NULL, NULL);
 }
 
 void WiresharkMainWindow::on_actionStatisticsHART_IP_triggered()
@@ -3409,8 +3331,7 @@ void WiresharkMainWindow::on_actionStatisticsPacketLengths_triggered()
     openStatisticsTreeDialog("plen");
 }
 
-// -z io,stat
-void WiresharkMainWindow::statCommandIOGraph(const char *, void *)
+void WiresharkMainWindow::on_actionStatisticsIOGraph_triggered()
 {
     const DisplayFilterEdit *df_edit = qobject_cast<DisplayFilterEdit *>(df_combo_box_->lineEdit());
     QString displayFilter;
@@ -3421,11 +3342,6 @@ void WiresharkMainWindow::statCommandIOGraph(const char *, void *)
     connect(iog_dialog, SIGNAL(goToPacket(int)), packet_list_, SLOT(goToPacket(int)));
     connect(this, SIGNAL(reloadFields()), iog_dialog, SLOT(reloadFields()));
     iog_dialog->show();
-}
-
-void WiresharkMainWindow::on_actionStatisticsIOGraph_triggered()
-{
-    statCommandIOGraph(NULL, NULL);
 }
 
 void WiresharkMainWindow::on_actionStatisticsSametime_triggered()

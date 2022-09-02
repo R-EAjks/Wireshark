@@ -28,7 +28,7 @@
         <translation>Copia le informazioni di versione negli appunti</translation>
     </message>
     <message>
-        <source>Copy To Clipboard</source>
+        <source>Copy to Clipboard</source>
         <translation>Copia negli appunti</translation>
     </message>
     <message>
@@ -1737,6 +1737,14 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Occorrenza:</translation>
     </message>
     <message>
+        <source>Resolve Names:</source>
+        <translation>Risolvi nomi:</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;p&gt;Show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;p&gt;Mostra stringhe comprensibili invece che i valori grezzi dei campi. Applicabile solo alle colonne personalizzate con campi che hanno stringhe con valori.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
         <source>Missing fields.</source>
         <translation>Campi mancanti.</translation>
     </message>
@@ -1770,6 +1778,14 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Field Occurrence</source>
         <translation>Occorrenze del campo</translation>
+    </message>
+    <message>
+        <source>Resolved</source>
+        <translation>Risolto</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;Show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings.&lt;/html&gt;</source>
+        <translation>&lt;html&gt;Mostra stringhe comprensibili invece che i valori grezzi dei campi. Applicabile solo alle colonne personalizzate con campi che hanno stringhe con valori.&lt;/html&gt;</translation>
     </message>
     <message>
         <source>New Column</source>
@@ -1812,6 +1828,77 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Copy filter text to the clipboard.</source>
         <translation>Copia il testo del filtro negli appunti.</translation>
+    </message>
+</context>
+<context>
+    <name>ConversationDataModel</name>
+    <message>
+        <source>Address A</source>
+        <translation>Indirizzo A</translation>
+    </message>
+    <message>
+        <source>Port A</source>
+        <translation>Porta A</translation>
+    </message>
+    <message>
+        <source>Address B</source>
+        <translation>Indirizzo B</translation>
+    </message>
+    <message>
+        <source>Port B</source>
+        <translation>Porta B</translation>
+    </message>
+    <message>
+        <source>Packets</source>
+        <translation>Pacchetti</translation>
+    </message>
+    <message>
+        <source>Bytes</source>
+        <translation>Byte</translation>
+    </message>
+    <message>
+        <source>Stream ID</source>
+        <translation>ID flusso</translation>
+    </message>
+    <message>
+        <source>Packets A </source>
+        <translation>Pacchetti A</translation>
+    </message>
+    <message>
+        <source>Bytes A </source>
+        <translation>Byte A</translation>
+    </message>
+    <message>
+        <source>Bytes B </source>
+        <translation>Byte B</translation>
+    </message>
+    <message>
+        <source>Abs Start</source>
+        <translation>Inizio Abs</translation>
+    </message>
+    <message>
+        <source>Rel Start</source>
+        <translation>Inizio Rel</translation>
+    </message>
+    <message>
+        <source>Duration</source>
+        <translation>Durata</translation>
+    </message>
+    <message>
+        <source>Bits/s A </source>
+        <translation>Bit/s A</translation>
+    </message>
+    <message>
+        <source>Bits/s B </source>
+        <translation>Bit/s B</translation>
+    </message>
+    <message>
+        <source>Total Packets</source>
+        <translation>Pacchetti totali</translation>
+    </message>
+    <message>
+        <source>Percent Filtered</source>
+        <translation>Percentuale filtrati</translation>
     </message>
 </context>
 <context>
@@ -2097,7 +2184,7 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
     <message>
         <source>Invalid filter: </source>
-        <translation>Filtro non valido: </translation>
+        <translation type="vanished">Filtro non valido: </translation>
     </message>
     <message>
         <source>Save this filter</source>
@@ -2149,6 +2236,22 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Relation</source>
         <translation>Relazione</translation>
+    </message>
+    <message>
+        <source>By default order comparisons and contains/matches/in relations are true if any value matches. The quantifier &quot;all&quot; can be used to apply the test to all values in a frame.</source>
+        <translation>In modo predefinito, le comparazioni di ordine e le relazioni contiene/corrisponde/in sono vere se qualsiasi valore corrisponde. Il quantificatore &quot;tutto&quot; può essere utilizzato per applicare il test a tutti i valori in un frame.</translation>
+    </message>
+    <message>
+        <source>Quantifier</source>
+        <translation>Quantificatore</translation>
+    </message>
+    <message>
+        <source>Any</source>
+        <translation>Qualsiasi</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation>Tutto</translation>
     </message>
     <message>
         <source>Match against this value.</source>
@@ -2324,6 +2427,65 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
 </context>
 <context>
+    <name>EndpointDataModel</name>
+    <message>
+        <source>Address</source>
+        <translation>Indirizzo</translation>
+    </message>
+    <message>
+        <source>Port</source>
+        <translation>Porta</translation>
+    </message>
+    <message>
+        <source>Packets</source>
+        <translation>Pacchetti</translation>
+    </message>
+    <message>
+        <source>Bytes</source>
+        <translation>Byte</translation>
+    </message>
+    <message>
+        <source>Tx Packets</source>
+        <translation>Pacchetti trasmessi</translation>
+    </message>
+    <message>
+        <source>Tx Bytes</source>
+        <translation>Byte trasmessi</translation>
+    </message>
+    <message>
+        <source>Rx Packets</source>
+        <translation>Pacchetti ricevuti</translation>
+    </message>
+    <message>
+        <source>Rx Bytes</source>
+        <translation>Byte ricevuti</translation>
+    </message>
+    <message>
+        <source>Country</source>
+        <translation>Nazione</translation>
+    </message>
+    <message>
+        <source>City</source>
+        <translation>Città</translation>
+    </message>
+    <message>
+        <source>AS Number</source>
+        <translation>Numero AS</translation>
+    </message>
+    <message>
+        <source>AS Organization</source>
+        <translation>Organizzazione AS</translation>
+    </message>
+    <message>
+        <source>Total Packets</source>
+        <translation>Pacchetti totali</translation>
+    </message>
+    <message>
+        <source>Percent Filtered</source>
+        <translation>Percentuale filtrati</translation>
+    </message>
+</context>
+<context>
     <name>EndpointDialog</name>
     <message>
         <source>Map</source>
@@ -2344,14 +2506,6 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Map file error</source>
         <translation>Errore nel file di mappa</translation>
-    </message>
-    <message>
-        <source>No endpoints available to map</source>
-        <translation>Nessun terminatore disponibile per la mappa</translation>
-    </message>
-    <message>
-        <source>Unable to create temporary file</source>
-        <translation>Impossibile creare il file temporaneo</translation>
     </message>
     <message>
         <source>Save Endpoints Map</source>
@@ -6985,14 +7139,21 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
 </context>
 <context>
-    <name>PathChooserDelegate</name>
+    <name>PathSelectionDelegate</name>
+    <message>
+        <source>Open a pipe</source>
+        <translation>Apri una pipe</translation>
+    </message>
+</context>
+<context>
+    <name>PathSelectionEdit</name>
     <message>
         <source>Browse</source>
         <translation>Sfoglia</translation>
     </message>
     <message>
-        <source>Open Pipe</source>
-        <translation>Apri pipe</translation>
+        <source>Select a path</source>
+        <translation>Seleziona un percorso</translation>
     </message>
 </context>
 <context>
@@ -10817,10 +10978,6 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Immagine</translation>
     </message>
     <message>
-        <source>Json</source>
-        <translation>Json</translation>
-    </message>
-    <message>
         <source>Raw</source>
         <translation>Grezzo</translation>
     </message>
@@ -10858,6 +11015,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
             <numerusform>Visualizzazione di %Ln byte.</numerusform>
             <numerusform>Visualizzazione di %Ln byte.</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>JSON</source>
+        <translation>JSON</translation>
     </message>
     <message>
         <source>Regex Find:</source>
@@ -10997,6 +11158,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
 </context>
 <context>
     <name>SyntaxLineEdit</name>
+    <message>
+        <source>Invalid filter: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
     <message>
         <source>&quot;%1&quot; is deprecated in favour of &quot;%2&quot;. See Help section 6.4.8 for details.</source>
         <translation>&quot;%1&quot; è sconsigliato in favore di &quot;%2&quot;. Vedi la sezione 6.4.8 della guida per i dettagli.</translation>
@@ -11708,6 +11873,25 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
 </context>
 <context>
+    <name>TrafficTab</name>
+    <message>
+        <source>Map file error</source>
+        <translation>Errore nel file di mappa</translation>
+    </message>
+    <message>
+        <source>Could not open base file %1 for reading: %2</source>
+        <translation>Impossibile aprire il file di base %1 in lettura: %2</translation>
+    </message>
+    <message>
+        <source>No endpoints available to map</source>
+        <translation>Nessun terminatore disponibile per la mappa</translation>
+    </message>
+    <message>
+        <source>Unable to create temporary file</source>
+        <translation>Impossibile creare il file temporaneo</translation>
+    </message>
+</context>
+<context>
     <name>TrafficTableDialog</name>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Show resolved addresses and port names rather than plain values. The corresponding name resolution preference must be enabled.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
@@ -11726,24 +11910,47 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Limita al filtro di visualizzazione</translation>
     </message>
     <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Only show types matching the filter value&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Mostra solo i tipi che corrispondono al valore del filtro&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>Filter list for specific type</source>
+        <translation>Elenco di filtri per specifico tipo</translation>
+    </message>
+    <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Show absolute times in the start time column.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Mostra gli orari assoluti nella colonna ora iniziale.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>GroupBox</source>
+        <translation>CasellaGruppo</translation>
     </message>
     <message>
         <source>Absolute start time</source>
         <translation>Ora iniziale assoluta</translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add and remove conversation types.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Aggiungi e rimuovi i tipi di conversazione.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
-    </message>
-    <message>
-        <source>%1 Types</source>
-        <translation>Tipi di %1</translation>
-    </message>
-    <message>
         <source>Copy</source>
         <translation>Copia</translation>
+    </message>
+    <message>
+        <source>Unknown</source>
+        <translation>Sconosciuto</translation>
+    </message>
+</context>
+<context>
+    <name>TrafficTree</name>
+    <message>
+        <source>Resize all columns to content</source>
+        <translation>Ridimensiona tutte le colonne al contenuto</translation>
+    </message>
+    <message>
+        <source>Filter on stream id</source>
+        <translation>Filtro su ID flusso</translation>
+    </message>
+    <message>
+        <source>Copy %1 table</source>
+        <translation>Copia la tabella %1</translation>
     </message>
     <message>
         <source>as CSV</source>
@@ -11762,8 +11969,54 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Copia tutti i valori di questa pagina negli appunti nel formato di serializzazione dati YAML.</translation>
     </message>
     <message>
-        <source>Unknown</source>
-        <translation>Sconosciuto</translation>
+        <source>as JSON</source>
+        <translation>come JSON</translation>
+    </message>
+    <message>
+        <source>Copy all values of this page to the clipboard in the JSON data serialization format.</source>
+        <translation>Copia tutti i valori di questa pagina negli appunti nel formato di serializzazione dati JSON.</translation>
+    </message>
+    <message>
+        <source>Save data as raw</source>
+        <translation>Salva come dati grezzi</translation>
+    </message>
+    <message>
+        <source>Disable data formatting for export/clipboard and save as raw data</source>
+        <translation>Disabilita la formattazione dei dati per l&apos;esportazione/appunti e salva come dati grezzi</translation>
+    </message>
+</context>
+<context>
+    <name>TrafficTreeHeaderView</name>
+    <message>
+        <source>Less than</source>
+        <translation>Minore di</translation>
+    </message>
+    <message>
+        <source>Greater than</source>
+        <translation>Maggiore di</translation>
+    </message>
+    <message>
+        <source>Equal</source>
+        <translation>Uguale</translation>
+    </message>
+    <message>
+        <source>Columns to display</source>
+        <translation>Colonne da visualizzare</translation>
+    </message>
+    <message>
+        <source>Filter %1 by</source>
+        <translation>Filtro %1 per</translation>
+    </message>
+    <message>
+        <source>Enter filter value</source>
+        <translation>Digita il valore del filtro</translation>
+    </message>
+</context>
+<context>
+    <name>TrafficTypesModel</name>
+    <message>
+        <source>Protocol</source>
+        <translation>Protocollo</translation>
     </message>
 </context>
 <context>
@@ -12112,9 +12365,48 @@ a:hover {
 
 &lt;th&gt;&lt;a href=&quot;https://www.wireshark.org/lists/&quot;&gt;Mailing Lists&lt;/a&gt;&lt;/th&gt;
 
+&lt;td style=&quot;padding-left: 8px; padding-right: 8px;&quot;&gt;·&lt;/td&gt;
+
+&lt;th&gt;&lt;a href=&quot;https://sharkfest.wireshark.org/&quot;&gt;SharkFest&lt;/a&gt;&lt;/th&gt;
+
+&lt;td style=&quot;padding-left: 8px; padding-right: 8px;&quot;&gt;·&lt;/td&gt;
+
+&lt;th&gt;&lt;a href=&quot;https://discord.com/invite/ts9GZCjGj5&quot;&gt;Wireshark Discord&lt;/a&gt;&lt;/th&gt;
+
 &lt;/tr&gt;&lt;/table&gt;
 &lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head&gt;
+        <oldsource>&lt;html&gt;&lt;head&gt;
+&lt;style&gt;
+a:link {
+  color: palette(text);
+  text-decoration: none;
+}
+a:hover {
+  color: palette(text);
+  text-decoration: underline;
+}
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+
+&lt;table&gt;&lt;tr&gt;
+&lt;th&gt;&lt;a href=&quot;https://www.wireshark.org/docs/wsug_html_chunked/&quot;&gt;User&apos;s Guide&lt;/a&gt;&lt;/th&gt;
+
+&lt;td style=&quot;padding-left: 8px; padding-right: 8px;&quot;&gt;·&lt;/td&gt;
+
+&lt;th&gt;&lt;a href=&quot;https://gitlab.com/wireshark/wireshark/-/wikis/&quot;&gt;Wiki&lt;/a&gt;&lt;/th&gt;
+
+&lt;td style=&quot;padding-left: 8px; padding-right: 8px;&quot;&gt;·&lt;/td&gt;
+
+&lt;th&gt;&lt;a href=&quot;https://ask.wireshark.org/&quot;&gt;Questions and Answers&lt;/a&gt;&lt;/th&gt;
+
+&lt;td style=&quot;padding-left: 8px; padding-right: 8px;&quot;&gt;·&lt;/td&gt;
+
+&lt;th&gt;&lt;a href=&quot;https://www.wireshark.org/lists/&quot;&gt;Mailing Lists&lt;/a&gt;&lt;/th&gt;
+
+&lt;/tr&gt;&lt;/table&gt;
+&lt;/body&gt;&lt;/html&gt;</oldsource>
+        <translation type="unfinished">&lt;html&gt;&lt;head&gt;
 &lt;style&gt;
 a:link {
   color: palette(text);
@@ -13337,6 +13629,10 @@ a:hover {
         <translation>Ripristina la disposizione dell&apos;aspetto alla dimensione predefinita</translation>
     </message>
     <message>
+        <source>Seconds Since First Captured Packet</source>
+        <translation>Secondi dal primo pacchetto catturato</translation>
+    </message>
+    <message>
         <source>Packet &amp;Diagram</source>
         <translation>&amp;Diagramma del pacchetto</translation>
     </message>
@@ -13659,10 +13955,6 @@ a:hover {
     <message>
         <source>Show packet times as the seconds since the UNIX / POSIX epoch (1970-01-01).</source>
         <translation>Mostra gli orari del pacchetto come secondi dalla epoch UNIX/POSIX (1970-01-01).</translation>
-    </message>
-    <message>
-        <source>Seconds Since Beginning of Capture</source>
-        <translation>Secondi dall&apos;inizio della cattura</translation>
     </message>
     <message>
         <source>Seconds Since Previous Captured Packet</source>

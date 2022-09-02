@@ -805,6 +805,7 @@ const value_string wfa_subtype_vals[] = {
   { WFA_SUBTYPE_WIFI_60G, "60GHz Information Element" },
   { WFA_WNM_SUBTYPE_NON_PREF_CHAN_REPORT, "Non-preferred Channel Report" },
   { WFA_WNM_SUBTYPE_CELL_DATA_CAPABILITIES, "Cellular Data Capabilities" },
+  { WFA_SUBTYPE_TRANSITION_DISABLE_KDE, "Transition Disable KDE" },
   { WFA_SUBTYPE_QOS_MGMT, "QoS Management" },
   { 0, NULL }
 };
@@ -883,7 +884,7 @@ value_string_ext ieee80211_supported_rates_vals_ext = VALUE_STRING_EXT_INIT(ieee
 static const value_string ieee80211_reason_code[] = {
   {  1, "Unspecified reason" },
   {  2, "Previous authentication no longer valid" },
-  {  3, "Deauthenticated because sending STA is leaving (or has left) IBSS or ESS" },
+  {  3, "Deauthenticated because sending STA is leaving (or has left) the BSS" },
   {  4, "Disassociated due to inactivity" },
   {  5, "Disassociated because AP is unable to handle all currently associated STAs" },
   {  6, "Class 2 frame received from nonauthenticated STA" },
@@ -893,16 +894,16 @@ static const value_string ieee80211_reason_code[] = {
   { 10, "Disassociated because the information in the Power Capability element is unacceptable" },
   { 11, "Disassociated because the information in the Supported Channels element is unacceptable" },
   { 12, "Disassociated due to BSS transition management" },
-  { 13, "Invalid information element, i.e., an information element defined in this standard for which the content does not meet the specifications in Clause 7" },
+  { 13, "Invalid information element, i.e., an information element defined in this standard for which the content does not meet the specifications in Clause 9" },
   { 14, "Message integrity code (MIC) failure" },
-  { 15, "4-Way Handshake timeout" },
-  { 16, "Group Key Handshake timeout" },
-  { 17, "Information element in 4-Way Handshake different from (Re)Association Request/Probe Response/Beacon frame" },
+  { 15, "4-way handshake timeout" },
+  { 16, "Group key handshake timeout" },
+  { 17, "Element in 4-way handshake different from (Re)Association Request/Probe Response/Beacon frame" },
   { 18, "Invalid group cipher" },
   { 19, "Invalid pairwise cipher" },
   { 20, "Invalid AKMP" },
-  { 21, "Unsupported RSN information element version" },
-  { 22, "Invalid RSN information element capabilities" },
+  { 21, "Unsupported RSNE version" },
+  { 22, "Invalid RSNE capabilities" },
   { 23, "IEEE 802.1X authentication failed" },
   { 24, "Cipher suite rejected because of the security policy" },
   { 25, "TDLS direct-link teardown due to TDLS peer STA unreachable via the TDLS direct link" },
@@ -917,17 +918,16 @@ static const value_string ieee80211_reason_code[] = {
   { 34, "Disassociated because excessive number of frames need to be acknowledged, but are not acknowledged due to AP transmissions and/or poor channel conditions" },
   { 35, "Disassociated because STA is transmitting outside the limits of its TXOPs" },
   { 36, "Requested from peer STA as the STA is leaving the BSS (or resetting)" },
-  { 37, "Requested from peer STA as it does not want to use the mechanism" },
-  { 38, "Requested from peer STA as the STA received frames using the mechanism for which a setup is required" },
+  { 37, "Requesting STA is no longer using the stream or session" },
+  { 38, "Requesting STA received frames using a mechanism for which a setup has not been completed" },
   { 39, "Requested from peer STA due to timeout" },
-  { 45, "Peer STA does not support the requested cipher suite" },
   { 46, "Disassociated because authorized access limit reached" },
   { 47, "Disassociated due to external service requirements" },
   { 48, "Invalid FT Action frame count" },
-  { 49, "Invalid pairwise master key identifier (PMKI)" },
+  { 49, "Invalid pairwise master key identifier (PMKID)" },
   { 50, "Invalid MDE" },
   { 51, "Invalid FTE" },
-  { 52, "SME cancels the mesh peering instance with the reason other than reaching the maximum number of peer mesh STAs" },
+  { 52, "Mesh peering canceled for unknown reasons" },
   { 53, "The mesh STA has reached the supported maximum number of peer mesh STAs" },
   { 54, "The received information violates the Mesh Configuration policy configured in the mesh STA profile" },
   { 55, "The mesh STA has received a Mesh Peering Close message requesting to close the mesh peering" },
@@ -942,8 +942,10 @@ static const value_string ieee80211_reason_code[] = {
   { 64, "The Deauthentication frame was sent because the MAC address of the STA already exists in the mesh BSS. See 11.3.3 (Additional mechanisms for an AP collocated with a mesh STA)" },
   { 65, "The mesh STA performs channel switch to meet regulatory requirements" },
   { 66, "The mesh STA performs channel switch with unspecified reason" },
-  { 71, "Disassociated due to poor RSSI." },
-  { 0,    NULL}
+  { 67, "Transmission link establishment in alternative channel failed" },
+  { 68, "The alternative channel is occupied" },
+  { 71, "Disassociated due to poor RSSI" },
+  { 0,  NULL}
 };
 value_string_ext ieee80211_reason_code_ext = VALUE_STRING_EXT_INIT(ieee80211_reason_code);
 
@@ -2694,15 +2696,6 @@ static const value_string vht_supported_mcs_flag[] = {
   {0x01, "MCS 0-8"},
   {0x02, "MCS 0-9"},
   {0x03, "Not Supported"},
-  {0x00, NULL}
-};
-
-static const value_string vht_op_channel_width_flag[] = {
-  {0x00, "20 MHz or 40 MHz"},
-  {0x01, "80 MHz"},
-  {0x02, "160 MHz"},
-  {0x03, "80+80 MHz"},
-  {0x04, "Reserved"},
   {0x00, NULL}
 };
 
@@ -4525,6 +4518,7 @@ static int hf_ieee80211_ff_cf_reserved6 = -1;
 /* ************************************************************************* */
 static int hf_ieee80211_amsdu_subframe = -1;
 static int hf_ieee80211_amsdu_length = -1;
+static int hf_ieee80211_amsdu_padding = -1;
 
 /* ************************************************************************* */
 /*                       Tagged value format fields                          */
@@ -6017,6 +6011,13 @@ static int hf_ieee80211_wfa_ie_oce_probe_suppr_ssid = -1;
 static int hf_ieee80211_wfa_anqp_mbo_subtype = -1;
 static int hf_ieee80211_wfa_anqp_mbo_query = -1;
 static int hf_ieee80211_wfa_anqp_mbo_cellular_pref = -1;
+static int hf_ieee80211_wfa_ie_transition_disable_bitmap = -1;
+static int hf_ieee80211_wfa_ie_transition_disable_wpa3_personal = -1;
+static int hf_ieee80211_wfa_ie_transition_disable_sae_pk = -1;
+static int hf_ieee80211_wfa_ie_transition_disable_wpa3_enterprise = -1;
+static int hf_ieee80211_wfa_ie_transition_disable_enhanced_open = -1;
+static int hf_ieee80211_wfa_ie_transition_disable_reserved_b4thru7 = -1;
+static int hf_ieee80211_wfa_ie_transition_disable_reserved= -1;
 
 static int hf_ieee80211_aironet_ie_type = -1;
 static int hf_ieee80211_aironet_ie_dtpc = -1;
@@ -6091,6 +6092,10 @@ static int hf_ieee80211_vs_fortinet_system_apname = -1;
 static int hf_ieee80211_vs_fortinet_system_apmodel = -1;
 static int hf_ieee80211_vs_fortinet_system_apserial = -1;
 static int hf_ieee80211_vs_fortinet_data = -1;
+
+static int hf_ieee80211_vs_arista_subtype = -1;
+static int hf_ieee80211_vs_arista_apname = -1;
+static int hf_ieee80211_vs_arista_data = -1;
 
 static int hf_ieee80211_rsn_ie_ptk_keyid = -1;
 
@@ -7728,6 +7733,7 @@ static gint ett_sta_info = -1;
 static gint ett_ieee80211_esp = -1;
 
 static gint ett_ieee80211_wfa_60g_attr = -1;
+static gint ett_ieee80211_wfa_transition_disable_tree = -1;
 
 /* 802.11ah trees */
 static gint ett_s1g_sync_control_tree = -1;
@@ -7988,38 +7994,40 @@ wlan_conv_get_filter_type(conv_item_t* conv, conv_filter_type_e filter)
 static ct_dissector_info_t wlan_ct_dissector_info = {&wlan_conv_get_filter_type};
 
 static tap_packet_status
-wlan_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip)
+wlan_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip, tap_flags_t flags)
 {
   conv_hash_t *hash = (conv_hash_t*) pct;
+  hash->flags = flags;
   const wlan_hdr_t *whdr=(const wlan_hdr_t *)vip;
 
-  add_conversation_table_data(hash, &whdr->src, &whdr->dst, 0, 0, 1, pinfo->fd->pkt_len, &pinfo->rel_ts, &pinfo->abs_ts, &wlan_ct_dissector_info, ENDPOINT_NONE);
+  add_conversation_table_data(hash, &whdr->src, &whdr->dst, 0, 0, 1, pinfo->fd->pkt_len, &pinfo->rel_ts, &pinfo->abs_ts, &wlan_ct_dissector_info, CONVERSATION_NONE);
 
   return TAP_PACKET_REDRAW;
 }
 
 static const char*
-wlan_host_get_filter_type(hostlist_talker_t* host, conv_filter_type_e filter)
+wlan_endpoint_get_filter_type(endpoint_item_t* endpoint, conv_filter_type_e filter)
 {
-  if ((filter == CONV_FT_ANY_ADDRESS) && (host->myaddress.type == wlan_address_type))
+  if ((filter == CONV_FT_ANY_ADDRESS) && (endpoint->myaddress.type == wlan_address_type))
     return "wlan.addr";
 
   return CONV_FILTER_INVALID;
 }
 
-static hostlist_dissector_info_t wlan_host_dissector_info = {&wlan_host_get_filter_type};
+static et_dissector_info_t wlan_endpoint_dissector_info = {&wlan_endpoint_get_filter_type};
 
 static tap_packet_status
-wlan_hostlist_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip)
+wlan_endpoint_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip, tap_flags_t flags)
 {
   conv_hash_t *hash = (conv_hash_t*) pit;
+  hash->flags = flags;
   const wlan_hdr_t *whdr=(const wlan_hdr_t *)vip;
 
   /* Take two "add" passes per packet, adding for each direction, ensures that all
   packets are counted properly (even if address is sending to itself)
-  XXX - this could probably be done more efficiently inside hostlist_table */
-  add_hostlist_table_data(hash, &whdr->src, 0, TRUE, 1, pinfo->fd->pkt_len, &wlan_host_dissector_info, ENDPOINT_NONE);
-  add_hostlist_table_data(hash, &whdr->dst, 0, FALSE, 1, pinfo->fd->pkt_len, &wlan_host_dissector_info, ENDPOINT_NONE);
+  XXX - this could probably be done more efficiently inside endpoint_table */
+  add_endpoint_table_data(hash, &whdr->src, 0, TRUE, 1, pinfo->fd->pkt_len, &wlan_endpoint_dissector_info, ENDPOINT_NONE);
+  add_endpoint_table_data(hash, &whdr->dst, 0, FALSE, 1, pinfo->fd->pkt_len, &wlan_endpoint_dissector_info, ENDPOINT_NONE);
 
   return TAP_PACKET_REDRAW;
 }
@@ -16995,6 +17003,38 @@ dissect_owe_transition_mode(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 }
 
 static int
+dissect_transition_disable_kde(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
+{
+  int tag_len = tvb_captured_length(tvb);
+  int offset = 0;
+  static int * const ieee80211_wfa_transition_disable_flags[] = {
+    &hf_ieee80211_wfa_ie_transition_disable_wpa3_personal,
+    &hf_ieee80211_wfa_ie_transition_disable_sae_pk,
+    &hf_ieee80211_wfa_ie_transition_disable_wpa3_enterprise,
+    &hf_ieee80211_wfa_ie_transition_disable_enhanced_open,
+    &hf_ieee80211_wfa_ie_transition_disable_reserved_b4thru7,
+    NULL
+  };
+
+  if (tag_len < 1) {
+    expert_add_info(pinfo, tree, &ei_ieee80211_bad_length);
+    return 0;
+  }
+
+  proto_tree_add_bitmask_with_flags(tree, tvb, offset, hf_ieee80211_wfa_ie_transition_disable_bitmap,
+                                    ett_ieee80211_wfa_transition_disable_tree,
+                                    ieee80211_wfa_transition_disable_flags,
+                                    ENC_LITTLE_ENDIAN, BMT_NO_APPEND);
+  offset++;
+
+  if (offset < tag_len)
+    proto_tree_add_item(tree, hf_ieee80211_wfa_ie_transition_disable_reserved, tvb, offset, tag_len-offset, ENC_NA);
+  offset = tag_len;
+
+  return offset;
+}
+
+static int
 dissect_mbo_oce(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 {
   int len = tvb_reported_length(tvb);
@@ -18481,6 +18521,46 @@ dissect_vendor_ie_fortinet(proto_item *item, proto_tree *ietree,
 
   default:
     proto_tree_add_item(ietree, hf_ieee80211_vs_fortinet_data, tvb, offset,
+      tag_len, ENC_NA);
+    if (tag_len > 0)
+      proto_item_append_text(item, " (Data: %s)", tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, tag_len));
+    break;
+  }
+}
+
+#define ARISTA_APNAME  6
+static const value_string ieee80211_vs_arista_subtype_vals[] = {
+  { ARISTA_APNAME, "AP Name"},
+  { 0,                 NULL }
+};
+static void
+dissect_vendor_ie_arista(proto_item *item, proto_tree *ietree,
+                          tvbuff_t *tvb, int offset, guint32 tag_len)
+{
+  guint8 type;
+  const guint8* name;
+
+  offset += 1; /* VS OUI Type */
+  tag_len -= 1;
+
+  type = tvb_get_guint8(tvb, offset);
+  proto_tree_add_item(ietree, hf_ieee80211_vs_arista_subtype, tvb, offset, 1, ENC_NA);
+  proto_item_append_text(item, ": %s", val_to_str_const(type, ieee80211_vs_arista_subtype_vals, "Unknown"));
+  offset += 1;
+  tag_len -= 1;
+
+  switch (type) {
+  case ARISTA_APNAME:
+    offset += 1;
+    tag_len -= 1;
+
+    proto_tree_add_item_ret_string(ietree, hf_ieee80211_vs_arista_apname, tvb,
+                         offset, tag_len, ENC_ASCII|ENC_NA, wmem_packet_scope(), &name);
+    proto_item_append_text(item, " (%s)", name);
+    break;
+
+  default:
+    proto_tree_add_item(ietree, hf_ieee80211_vs_arista_data, tvb, offset,
       tag_len, ENC_NA);
     if (tag_len > 0)
       proto_item_append_text(item, " (Data: %s)", tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, tag_len));
@@ -23641,6 +23721,7 @@ dissect_frame_control(proto_tree *tree, tvbuff_t *tvb, guint32 option_flags,
   guint16 fcf, flags, frame_type_subtype;
   proto_tree *fc_tree, *flag_tree;
   proto_item *fc_item, *flag_item, *hidden_item, *ti;
+  guint32 swap_offset = 0;
 
   fcf = FETCH_FCF(offset);
 
@@ -23650,14 +23731,17 @@ dissect_frame_control(proto_tree *tree, tvbuff_t *tvb, guint32 option_flags,
   /* Swap offset... */
   if(option_flags & IEEE80211_COMMON_OPT_BROKEN_FC)
   {
-    offset += 1;
+    swap_offset += 1;
   }
 
-  proto_tree_add_uint(tree, hf_ieee80211_fc_frame_type_subtype, tvb, offset, 1, frame_type_subtype);
+  proto_tree_add_uint(tree, hf_ieee80211_fc_frame_type_subtype, tvb, offset + swap_offset, 1, frame_type_subtype);
 
   fc_item = proto_tree_add_item(tree, hf_ieee80211_fc_field, tvb, offset, 2, ENC_BIG_ENDIAN);
 
   fc_tree = proto_item_add_subtree(fc_item, ett_fc_tree);
+
+ /* at this point, we can permanently fix the offset, so that it will be used to parse the fcf first 8 bits */
+  offset += swap_offset;
 
   proto_tree_add_item(fc_tree, hf_ieee80211_fc_proto_version, tvb, offset, 1, ENC_NA);
   proto_tree_add_item(fc_tree, hf_ieee80211_fc_frame_type, tvb, offset, 1, ENC_NA);
@@ -23666,13 +23750,14 @@ dissect_frame_control(proto_tree *tree, tvbuff_t *tvb, guint32 option_flags,
   if(IS_FRAME_EXTENSION(fcf) == 1) {
     proto_tree_add_uint(fc_tree, hf_ieee80211_fc_frame_extension, tvb, offset, 1, FCF_FRAME_EXTENSION(fcf));
   }
-  offset += 1;
 
   /* Reswap offset...*/
   if(option_flags & IEEE80211_COMMON_OPT_BROKEN_FC)
   {
     offset -= 1;
     proto_item_append_text(fc_item, "(Swapped)");
+  } else {
+    offset += 1;
   }
 
   /*
@@ -27699,6 +27784,9 @@ ieee80211_tag_vendor_specific_ie(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
       break;
     case OUI_FORTINET:
       dissect_vendor_ie_fortinet(field_data->item_tag, tree, tvb, offset, tag_vs_len);
+      break;
+    case OUI_MOJO_ARISTA:
+      dissect_vendor_ie_arista(field_data->item_tag, tree, tvb, offset, tag_vs_len);
       break;
 
     default:
@@ -32948,6 +33036,7 @@ dissect_ieee80211_pv1(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
     const gchar *ether_name = tvb_get_ether_name(tvb, offset);
 
     set_src_addr_cols(pinfo, tvb, offset, "TA");
+    /* TODO: why adding as visible *and* hidden? */
     proto_tree_add_item(hdr_tree, hf_ieee80211_addr_ta, tvb, offset, 6, ENC_NA);
     hidden = proto_tree_add_item(hdr_tree, hf_ieee80211_addr_ta, tvb, offset, 6, ENC_NA);
     PROTO_ITEM_SET_HIDDEN(hidden);
@@ -34691,6 +34780,8 @@ dissect_ieee80211_pv0(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
           tvbuff_t           *msdu_tvb;
           guint16             msdu_length;
           proto_tree         *subframe_tree;
+          gboolean            last_subframe = FALSE;
+          guint16             subframe_length;
           const gchar *resolve_name;
 
           /*
@@ -34705,8 +34796,17 @@ dissect_ieee80211_pv0(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
            */
           msdu_length = tvb_get_ntohs(next_tvb, msdu_offset+12);
 
+          if (tvb_reported_length_remaining(next_tvb, msdu_offset+14+msdu_length) <= 14)
+            last_subframe = TRUE;
+
+          /* The last A-MSDU subframe has no padding. */
+          if (last_subframe)
+            subframe_length = 14+msdu_length;
+          else
+            subframe_length = WS_ROUNDUP_4(14+msdu_length);
+
           parent_item = proto_tree_add_item(mpdu_tree, hf_ieee80211_amsdu_subframe, next_tvb,
-                            msdu_offset, WS_ROUNDUP_4(msdu_offset+14+msdu_length), ENC_NA);
+                            msdu_offset, subframe_length, ENC_NA);
           proto_item_append_text(parent_item, " #%u", i);
           subframe_tree = proto_item_add_subtree(parent_item, ett_msdu_aggregation_subframe_tree);
           i += 1;
@@ -34726,6 +34826,12 @@ dissect_ieee80211_pv0(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
           msdu_offset += 14;
           msdu_tvb = tvb_new_subset_length(next_tvb, msdu_offset, msdu_length);
           call_dissector(llc_handle, msdu_tvb, pinfo, subframe_tree);
+          if (!last_subframe) {
+            guint8 padding = (4-((msdu_offset+msdu_length)&3))&3;
+            if (padding > 0)
+              proto_tree_add_item(subframe_tree, hf_ieee80211_amsdu_padding, next_tvb, msdu_offset+msdu_length, padding, ENC_NA);
+          }
+
           msdu_offset = WS_ROUNDUP_4(msdu_offset+msdu_length);
         } while (tvb_reported_length_remaining(next_tvb, msdu_offset) > 14);
       } else {
@@ -36104,7 +36210,7 @@ proto_register_ieee80211(void)
     {&hf_ieee80211_fc_frame_type_subtype,
      {"Type/Subtype", "wlan.fc.type_subtype",
       FT_UINT16, BASE_HEX|BASE_EXT_STRING, &frame_type_subtype_vals_ext, 0x0,
-      "Type and subtype combined (first byte: type, second byte: subtype)", HFILL }},
+      "Type and subtype combined (as bytes (for Control Frame Extension subtypes) or nibbles)", HFILL }},
 
     {&hf_ieee80211_fc_frame_extension,
      {"Control Frame Extension", "wlan.fc.extension",
@@ -44344,7 +44450,7 @@ proto_register_ieee80211(void)
 
     {&hf_ieee80211_vht_op_channel_width,
      {"Channel Width", "wlan.vht.op.channelwidth",
-      FT_UINT8, BASE_HEX, VALS(vht_op_channel_width_flag), 0,
+      FT_UINT8, BASE_DEC, VALS(channel_width_vals), 0,
       NULL, HFILL }},
 
     {&hf_ieee80211_vht_op_channel_center0,
@@ -47692,6 +47798,22 @@ proto_register_ieee80211(void)
 
     {&hf_ieee80211_vs_fortinet_data,
      {"Data", "wlan.vs.fortinet.data",
+      FT_BYTES, BASE_NONE, NULL, 0,
+      NULL, HFILL }},
+
+    /* Vendor Specific : Arista Networks */
+    {&hf_ieee80211_vs_arista_subtype,
+     {"Subtype", "wlan.vs.arista.subtype",
+      FT_UINT8, BASE_DEC, VALS(ieee80211_vs_arista_subtype_vals), 0,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_vs_arista_apname,
+     {"AP Name", "wlan.vs.arista.ap_name",
+      FT_STRINGZ, BASE_NONE, NULL, 0,
+      NULL, HFILL }},
+
+    {&hf_ieee80211_vs_arista_data,
+     {"Data", "wlan.vs.arista.data",
       FT_BYTES, BASE_NONE, NULL, 0,
       NULL, HFILL }},
 
@@ -51205,6 +51327,34 @@ proto_register_ieee80211(void)
       {"RSNX", "wlan.rsnx",
        FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL }},
 
+    {&hf_ieee80211_wfa_ie_transition_disable_bitmap,
+      {"Transition Disable Bitmap", "wlan.transition_disable_bitmap",
+       FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL }},
+
+    {&hf_ieee80211_wfa_ie_transition_disable_wpa3_personal,
+      {"WPA3-Personal", "wlan.transition_disable.wpa3_personal",
+       FT_BOOLEAN, 8, NULL, GENMASK(0, 0), NULL, HFILL }},
+
+    {&hf_ieee80211_wfa_ie_transition_disable_sae_pk,
+      {"SAE-PK", "wlan.transition_disable.sae_pk",
+       FT_BOOLEAN, 8, NULL, GENMASK(1, 1), NULL, HFILL }},
+
+    {&hf_ieee80211_wfa_ie_transition_disable_wpa3_enterprise,
+      {"WPA3-Enterprise", "wlan.transition_disable.wpa3_enterprise",
+       FT_BOOLEAN, 8, NULL, GENMASK(2, 2), NULL, HFILL }},
+
+    {&hf_ieee80211_wfa_ie_transition_disable_enhanced_open,
+      {"Wi-Fi Enhanced Open", "wlan.transition_disable.enhanced_open",
+       FT_BOOLEAN, 8, NULL, GENMASK(3, 3), NULL, HFILL }},
+
+    {&hf_ieee80211_wfa_ie_transition_disable_reserved_b4thru7,
+      {"Reserved", "wlan.transition_disable.reserved.b4thru7",
+       FT_UINT8, BASE_HEX, NULL, GENMASK(7, 4), NULL, HFILL }},
+
+    {&hf_ieee80211_wfa_ie_transition_disable_reserved,
+      {"Reserved", "wlan.transition_disable.reserved",
+       FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
+
     {&hf_ieee80211_tag_rsnx_length,
       {"RSNX Length", "wlan.rsnx.length",
        FT_UINT8, BASE_DEC, NULL, 0x0F, NULL, HFILL }},
@@ -51308,14 +51458,19 @@ proto_register_ieee80211(void)
 
   static hf_register_info aggregate_fields[] = {
     {&hf_ieee80211_amsdu_subframe,
-     {"A-MSDU Subframe", "wlan_aggregate.a_mdsu.subframe",
+     {"A-MSDU Subframe", "wlan_aggregate.a_msdu.subframe",
       FT_NONE, BASE_NONE, NULL, 0x0,
       "Aggregate MAC Service Data Unit (MSDU) Subframe", HFILL }},
 
     {&hf_ieee80211_amsdu_length,
-     {"A-MSDU Length", "wlan_aggregate.a_mdsu.length",
+     {"A-MSDU Length", "wlan_aggregate.a_msdu.length",
       FT_UINT16, BASE_DEC, NULL, 0x0,
-      NULL, HFILL }}
+      NULL, HFILL }},
+
+    {&hf_ieee80211_amsdu_padding,
+     {"A-MSDU Padding", "wlan_aggregate.a_msdu.padding",
+      FT_BYTES, BASE_NONE, NULL, 0x0,
+      NULL, HFILL }},
   };
 
   static uat_field_t wep_uat_flds[] = {
@@ -51691,6 +51846,7 @@ proto_register_ieee80211(void)
 
     &ett_ieee80211_esp,
     &ett_ieee80211_wfa_60g_attr,
+    &ett_ieee80211_wfa_transition_disable_tree,
     &ett_gas_resp_fragment,
     &ett_gas_resp_fragments,
 
@@ -52042,7 +52198,7 @@ proto_register_ieee80211(void)
                         &addresses_reassembly_table_functions);
 
   wlan_tap = register_tap("wlan");
-  register_conversation_table(proto_wlan, TRUE, wlan_conversation_packet, wlan_hostlist_packet);
+  register_conversation_table(proto_wlan, TRUE, wlan_conversation_packet, wlan_endpoint_packet);
 
   wlan_address_type = address_type_dissector_register("AT_ETHER_WLAN", "WLAN Address", ether_to_str, ether_str_len, NULL, wlan_col_filter_str,
                                                             ether_len, ether_name_resolution_str, ether_name_resolution_len);
@@ -52529,6 +52685,7 @@ proto_reg_handoff_ieee80211(void)
   dissector_add_uint("wlan.ie.wifi_alliance.subtype", WFA_SUBTYPE_HS20_INDICATION, create_dissector_handle(dissect_hs20_indication, -1));
   dissector_add_uint("wlan.ie.wifi_alliance.subtype", WFA_SUBTYPE_OSEN, create_dissector_handle(dissect_hs20_osen, -1));
   dissector_add_uint("wlan.ie.wifi_alliance.subtype", WFA_SUBTYPE_OWE_TRANSITION_MODE, create_dissector_handle(dissect_owe_transition_mode, -1));
+  dissector_add_uint("wlan.ie.wifi_alliance.subtype", WFA_SUBTYPE_TRANSITION_DISABLE_KDE, create_dissector_handle(dissect_transition_disable_kde, -1));
   dissector_add_uint("wlan.ie.wifi_alliance.subtype", WFA_SUBTYPE_WIFI_60G, create_dissector_handle(dissect_wfa_60g_ie, -1));
   dissector_add_uint("wlan.ie.wifi_alliance.subtype", WFA_SUBTYPE_MBO_OCE, create_dissector_handle(dissect_mbo_oce, -1));
   dissector_add_uint("wlan.ie.wifi_alliance.subtype", WFA_WNM_SUBTYPE_NON_PREF_CHAN_REPORT, create_dissector_handle(dissect_wfa_wnm_non_pref_chan, -1));
