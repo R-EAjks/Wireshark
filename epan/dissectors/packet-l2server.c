@@ -6958,6 +6958,16 @@ static TYPE_FUN nr_rlcmac_l1_test_type_funs[] =
     { nr5g_rlcmac_Cmac_L1L2T_CONF_STOP_TEST_ACK,    "nr5g_rlcmac_Cmac_L1L2T_CONF_STOP_TEST_ACK",       dissect_sapi_type_dummy /* TODO */},
     { nr5g_rlcmac_Cmac_L1L2T_CONF_STOP_TEST_NAK,    "nr5g_rlcmac_Cmac_L1L2T_CONF_STOP_TEST_NAK",       dissect_sapi_type_dummy /* TODO */},
 
+    /* ... */
+
+    { nr5g_rlcmac_Cmac_L1T_BINDUMP_CMD,    "nr5g_rlcmac_Cmac_L1T_BINDUMP_CMD",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1T_BINDUMP_ACK,    "nr5g_rlcmac_Cmac_L1T_BINDUMP_ACK",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1T_BINDUMP_NAK,    "nr5g_rlcmac_Cmac_L1T_BINDUMP_NAK",       dissect_sapi_type_dummy /* TODO */},
+
+    { nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_CMD,    "nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_CMD",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_ACK,    "nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_ACK",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_NAK,    "nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_NAK",       dissect_sapi_type_dummy /* TODO */},
+
     { 0x00,                               NULL,                             NULL }
 };
 #define MAX_NR_RLCMAC_L1_TEST_TYPE_VALS      array_length(nr_rlcmac_l1_test_type_funs)
