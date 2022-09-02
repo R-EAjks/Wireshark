@@ -43,7 +43,7 @@ int _debug_conversation_indent = 0;
  * We could use an element list here, but this is effectively a parameter list
  * for find_conversation and is more compact.
  */
-struct conversation_key {
+struct conversation_addr_port_endpoints {
     address addr1;
     address addr2;
     guint32 port1;
@@ -723,14 +723,14 @@ conversation_new(const guint32 setup_frame, const address *addr1, const address 
                 /*
                  * Port 1 but not port 2.
                  */
-                DPRINT(("creating conversation for frame #%u: ID %u (etype=%d)",
-                            setup_frame, port1, etype));
+                DPRINT(("creating conversation for frame #%u: ID %u (ctype=%d)",
+                            setup_frame, port1, ctype));
             } else {
                 /*
                  * Ports 1 and 2.
                  */
-                DPRINT(("creating conversation for frame #%u: %u -> %u (etype=%d)",
-                            setup_frame, port1, port2, etype));
+                DPRINT(("creating conversation for frame #%u: %u -> %u (ctype=%d)",
+                            setup_frame, port1, port2, ctype));
             }
         } else {
             /*
@@ -741,14 +741,14 @@ conversation_new(const guint32 setup_frame, const address *addr1, const address 
                 /*
                  * Port 1 but not port 2.
                  */
-                DPRINT(("creating conversation for frame #%u: ID %u, address %s (etype=%d)",
-                            setup_frame, port1, addr2_str, etype));
+                DPRINT(("creating conversation for frame #%u: ID %u, address %s (ctype=%d)",
+                            setup_frame, port1, addr2_str, ctype));
             } else {
                 /*
                  * Ports 1 and 2.
                  */
-                DPRINT(("creating conversation for frame #%u: %u -> %s:%u (etype=%d)",
-                            setup_frame, port1, addr2_str, port2, etype));
+                DPRINT(("creating conversation for frame #%u: %u -> %s:%u (ctype=%d)",
+                            setup_frame, port1, addr2_str, port2, ctype));
             }
             wmem_free(NULL, addr2_str);
         }
@@ -765,14 +765,14 @@ conversation_new(const guint32 setup_frame, const address *addr1, const address 
                 /*
                  * Port 1 but not port 2.
                  */
-                DPRINT(("creating conversation for frame #%u: %s:%u (etype=%d)",
-                            setup_frame, addr1_str, port1, etype));
+                DPRINT(("creating conversation for frame #%u: %s:%u (ctype=%d)",
+                            setup_frame, addr1_str, port1, ctype));
             } else {
                 /*
                  * Ports 1 and 2.
                  */
-                DPRINT(("creating conversation for frame #%u: %s:%u -> %u (etype=%d)",
-                            setup_frame, addr1_str, port1, port2, etype));
+                DPRINT(("creating conversation for frame #%u: %s:%u -> %u (ctype=%d)",
+                            setup_frame, addr1_str, port1, port2, ctype));
             }
         } else {
             /*
@@ -783,14 +783,14 @@ conversation_new(const guint32 setup_frame, const address *addr1, const address 
                 /*
                  * Port 1 but not port 2.
                  */
-                DPRINT(("creating conversation for frame #%u: %s:%u -> %s (etype=%d)",
-                            setup_frame, addr1_str, port1, addr2_str, etype));
+                DPRINT(("creating conversation for frame #%u: %s:%u -> %s (ctype=%d)",
+                            setup_frame, addr1_str, port1, addr2_str, ctype));
             } else {
                 /*
                  * Ports 1 and 2.
                  */
-                DPRINT(("creating conversation for frame #%u: %s:%u -> %s:%u (etype=%d)",
-                            setup_frame, addr1_str, port1, addr2_str, port2, etype));
+                DPRINT(("creating conversation for frame #%u: %s:%u -> %s:%u (ctype=%d)",
+                            setup_frame, addr1_str, port1, addr2_str, port2, ctype));
             }
             wmem_free(NULL, addr2_str);
         }
@@ -1692,11 +1692,11 @@ find_conversation_pinfo(packet_info *pinfo, const guint options)
     DINSTR(wmem_free(NULL, dst_str));
 
     /* Have we seen this conversation before? */
-    if (pinfo->use_endpoint) {
-        DISSECTOR_ASSERT(pinfo->conv_key);
-        if ((conv = find_conversation(pinfo->num, &pinfo->conv_key->addr1, &pinfo->conv_key->addr2,
-                        pinfo->conv_key->ctype, pinfo->conv_key->port1,
-                        pinfo->conv_key->port2, 0)) != NULL) {
+    if (pinfo->use_conv_addr_port_endpoints) {
+        DISSECTOR_ASSERT(pinfo->conv_addr_port_endpoints);
+        if ((conv = find_conversation(pinfo->num, &pinfo->conv_addr_port_endpoints->addr1, &pinfo->conv_addr_port_endpoints->addr2,
+                        pinfo->conv_addr_port_endpoints->ctype, pinfo->conv_addr_port_endpoints->port1,
+                        pinfo->conv_addr_port_endpoints->port2, 0)) != NULL) {
             DPRINT(("found previous conversation for frame #%u (last_frame=%d)",
                     pinfo->num, conv->last_frame));
             if (pinfo->num > conv->last_frame) {
@@ -1745,10 +1745,10 @@ find_or_create_conversation(packet_info *pinfo)
         DPRINT(("did not find previous conversation for frame #%u",
                     pinfo->num));
         DINDENT();
-        if (pinfo->use_endpoint) {
-            conv = conversation_new(pinfo->num, &pinfo->conv_key->addr1, &pinfo->conv_key->addr2,
-                        pinfo->conv_key->ctype, pinfo->conv_key->port1,
-                        pinfo->conv_key->port2, 0);
+        if (pinfo->use_conv_addr_port_endpoints) {
+            conv = conversation_new(pinfo->num, &pinfo->conv_addr_port_endpoints->addr1, &pinfo->conv_addr_port_endpoints->addr2,
+                        pinfo->conv_addr_port_endpoints->ctype, pinfo->conv_addr_port_endpoints->port1,
+                        pinfo->conv_addr_port_endpoints->port2, 0);
         } else if (pinfo->conv_elements) {
             conv = conversation_new_full(pinfo->num, pinfo->conv_elements);
         } else {
@@ -1781,23 +1781,23 @@ find_or_create_conversation_by_id(packet_info *pinfo, const conversation_type ct
 }
 
 void
-conversation_set_elements_by_address_port_pairs(struct _packet_info *pinfo, address* addr1, address* addr2,
+conversation_set_conv_addr_port_endpoints(struct _packet_info *pinfo, address* addr1, address* addr2,
         conversation_type ctype, guint32 port1, guint32 port2)
 {
-    pinfo->conv_key = wmem_new0(pinfo->pool, struct conversation_key);
+    pinfo->conv_addr_port_endpoints = wmem_new0(pinfo->pool, struct conversation_addr_port_endpoints);
 
     if (addr1 != NULL) {
-        copy_address_wmem(pinfo->pool, &pinfo->conv_key->addr1, addr1);
+        copy_address_wmem(pinfo->pool, &pinfo->conv_addr_port_endpoints->addr1, addr1);
     }
     if (addr2 != NULL) {
-        copy_address_wmem(pinfo->pool, &pinfo->conv_key->addr2, addr2);
+        copy_address_wmem(pinfo->pool, &pinfo->conv_addr_port_endpoints->addr2, addr2);
     }
 
-    pinfo->conv_key->ctype = ctype;
-    pinfo->conv_key->port1 = port1;
-    pinfo->conv_key->port2 = port2;
+    pinfo->conv_addr_port_endpoints->ctype = ctype;
+    pinfo->conv_addr_port_endpoints->port1 = port1;
+    pinfo->conv_addr_port_endpoints->port2 = port2;
 
-    pinfo->use_endpoint = TRUE;
+    pinfo->use_conv_addr_port_endpoints = TRUE;
 }
 
 void
@@ -1904,6 +1904,7 @@ conversation_type conversation_pt_to_conversation_type(port_type pt)
         case PT_USB:
             return CONVERSATION_USB;
         case PT_I2C:
+            /* XXX - this doesn't currently have conversations */
             return CONVERSATION_I2C;
         case PT_IBQP:
             return CONVERSATION_IBQP;
@@ -1915,6 +1916,44 @@ conversation_type conversation_pt_to_conversation_type(port_type pt)
 
     DISSECTOR_ASSERT(FALSE);
     return CONVERSATION_NONE;
+}
+
+WS_DLL_PUBLIC
+endpoint_type conversation_pt_to_endpoint_type(port_type pt)
+{
+    switch (pt)
+    {
+        case PT_NONE:
+            return ENDPOINT_NONE;
+        case PT_SCTP:
+            return ENDPOINT_SCTP;
+        case PT_TCP:
+            return ENDPOINT_TCP;
+        case PT_UDP:
+            return ENDPOINT_UDP;
+        case PT_DCCP:
+            return ENDPOINT_DCCP;
+        case PT_IPX:
+            return ENDPOINT_IPX;
+        case PT_DDP:
+            return ENDPOINT_DDP;
+        case PT_IDP:
+            return ENDPOINT_IDP;
+        case PT_USB:
+            return ENDPOINT_USB;
+        case PT_I2C:
+            /* XXX - this doesn't have ports */
+            return ENDPOINT_I2C;
+        case PT_IBQP:
+            return ENDPOINT_IBQP;
+        case PT_BLUETOOTH:
+            return ENDPOINT_BLUETOOTH;
+        case PT_IWARP_MPA:
+            return ENDPOINT_IWARP_MPA;
+    }
+
+    DISSECTOR_ASSERT(FALSE);
+    return ENDPOINT_NONE;
 }
 
 /*
