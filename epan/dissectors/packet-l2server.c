@@ -9249,7 +9249,6 @@ proto_register_l2server(void)
       { &hf_l2server_bindump_event_ul,
        { "Bindump Event UL", "l2server.bindump-event-ul", FT_UINT64, BASE_HEX,
          NULL, 0x0, NULL, HFILL }},
-
     };
 
     static gint *ett[] = {
