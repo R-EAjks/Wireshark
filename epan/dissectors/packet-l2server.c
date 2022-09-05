@@ -748,6 +748,9 @@ static int hf_l2server_sr_id = -1;
 static int hf_l2server_sr_period_and_offset_is_valid = -1;
 static int hf_l2server_sr_period_and_offset = -1;
 
+static int hf_l2server_bindump_version = -1;
+static int hf_l2server_bindump_event_dl = -1;
+static int hf_l2server_bindump_event_ul = -1;
 
 
 
@@ -2348,6 +2351,25 @@ static void dissect_l1t_log_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
     col_set_str(pinfo->cinfo, COL_INFO,
                 tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 8+len-offset, ENC_UTF_8|ENC_NA));
 }
+
+static void dissect_bindump_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset, guint len _U_)
+{
+    /* Version */
+    proto_tree_add_item(tree, hf_l2server_bindump_version, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* EventDumpDL */
+    proto_tree_add_item(tree, hf_l2server_bindump_event_dl, tvb, offset, 8, ENC_LITTLE_ENDIAN);
+    offset += 8;
+
+    /* EventDumpUL */
+    proto_tree_add_item(tree, hf_l2server_bindump_event_ul, tvb, offset, 8, ENC_LITTLE_ENDIAN);
+    offset += 8;
+
+}
+
+
 
 
 // nr5g_rlcmac_Cmac_RA_Info_t (from nr5g-rlcmac_Cmac.h)
@@ -6960,11 +6982,11 @@ static TYPE_FUN nr_rlcmac_l1_test_type_funs[] =
 
     /* ... */
 
-    { nr5g_rlcmac_Cmac_L1T_BINDUMP_CMD,    "nr5g_rlcmac_Cmac_L1T_BINDUMP_CMD",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1T_BINDUMP_CMD,    "nr5g_rlcmac_Cmac_L1T_BINDUMP_CMD",       dissect_bindump_cmd /* TODO */},
     { nr5g_rlcmac_Cmac_L1T_BINDUMP_ACK,    "nr5g_rlcmac_Cmac_L1T_BINDUMP_ACK",       dissect_sapi_type_dummy /* TODO */},
     { nr5g_rlcmac_Cmac_L1T_BINDUMP_NAK,    "nr5g_rlcmac_Cmac_L1T_BINDUMP_NAK",       dissect_sapi_type_dummy /* TODO */},
 
-    { nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_CMD,    "nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_CMD",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_CMD,    "nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_CMD",       dissect_bindump_cmd /* TODO */},
     { nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_ACK,    "nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_ACK",       dissect_sapi_type_dummy /* TODO */},
     { nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_NAK,    "nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_NAK",       dissect_sapi_type_dummy /* TODO */},
 
@@ -9218,6 +9240,15 @@ proto_register_l2server(void)
        { "SR Period and offset", "l2server.sr-period-and-offset", FT_UINT16, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
 
+      { &hf_l2server_bindump_version,
+       { "Version", "l2server.bindump-version", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_bindump_event_dl,
+       { "Bindump Event DL", "l2server.bindump-event-dl", FT_UINT64, BASE_HEX,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_bindump_event_ul,
+       { "Bindump Event UL", "l2server.bindump-event-ul", FT_UINT64, BASE_HEX,
+         NULL, 0x0, NULL, HFILL }},
 
     };
 
