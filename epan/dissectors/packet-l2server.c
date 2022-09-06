@@ -736,6 +736,13 @@ static int hf_l2server_nb_ded_search_spaces_to_add = -1;
 static int hf_l2server_nb_ded_search_spaces_to_del = -1;
 
 static int hf_l2server_pdsch_conf_dedicated = -1;
+static int hf_l2server_data_scr_identity = -1;
+static int hf_l2server_vrb_to_prb_interl = -1;
+static int hf_l2server_res_alloc_scope = -1;
+static int hf_l2server_aggregation_factor = -1;
+static int hf_l2server_rbg_size = -1;
+static int hf_l2server_mcs_table = -1;
+static int hf_l2server_max_cw_sched_by_dci = -1;
 
 static int hf_l2server_uplink_ded_pucch_config = -1;
 static int hf_l2server_uplink_ded_pucch_len = -1;
@@ -1542,6 +1549,7 @@ static void dissect_cell_parm_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *
         /* TODO: subtree? */
         /* Ppu (comgen_qnxPPUIDt from qnx_gen.h)*/
         proto_tree_add_item(tree, hf_l2server_ppu, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
         /* DbeamId */
         proto_tree_add_item(tree, hf_l2server_dbeamid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
@@ -2542,7 +2550,7 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     proto_tree_add_item(config_tree, hf_l2server_pdcch_blind_detection, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
 
-    // TODO
+    // TODO (but not really interested in r16...)
     // Harq_ACK_SpatialBundlingPUCCH_secondaryPUCCHgroup_r16
     offset += 1;
     // Harq_ACK_SpatialBundlingPUSCH_secondaryPUCCHgroup_r16
@@ -2689,22 +2697,27 @@ static int dissect_pdsch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_
                                                           "", "PDSCH Conf Dedicated");
     proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_pdsch_conf_dedicated);
 
-    // TODO: !!!
-
     // DataScrIdentity
+    proto_tree_add_item(config_tree, hf_l2server_data_scr_identity, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
     // VrbToPrbInterl
+    proto_tree_add_item(config_tree, hf_l2server_vrb_to_prb_interl, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // ResAllocType
+    proto_tree_add_item(config_tree, hf_l2server_res_alloc_scope, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
 
     // AggregationFactor
+    proto_tree_add_item(config_tree, hf_l2server_aggregation_factor, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // RbgSize
+    proto_tree_add_item(config_tree, hf_l2server_rbg_size, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // McsTable
+    proto_tree_add_item(config_tree, hf_l2server_mcs_table, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // MaxCwSchedByDCI
+    proto_tree_add_item(config_tree, hf_l2server_max_cw_sched_by_dci, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // PrbBundlTypeIsValid
     offset += 1;
@@ -2714,16 +2727,33 @@ static int dissect_pdsch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_
     // PrbBundlType
     // TODO: ?
 
-    // NbTciStatesToAdd
-    offset += 1;
-    // NbTciStatesToDel
-    offset += 1;
-
     // Spare
     proto_tree_add_item(config_tree, hf_l2server_spare, tvb, offset, 2, ENC_NA);
     offset += 2;
 
-    // TODO:
+    // FieldMask
+    offset += 4;
+
+    // RateMatchPatternGroup1
+    // RateMatchPatternGroup2
+    // DmrsMappingTypeA
+    // DmrsMappingTypeB
+    // PZpCsiRsResSet
+    // PdschConfExtR16
+
+    // NbTciStatesToAdd
+    offset += 1;
+    // NbTciStatesToDel
+    offset += 1;
+    // PdschAllocDed
+    // RateMatchPatternDedToAdd
+    // RateMatchPatternDedToDel
+    // ZpCsiRsResourceToAdd
+    // ZpCsiRsResourceToDel
+    // AperiodicZpCsiRsResSetsToAdd
+    // AperiodicZpCsiRsResSetsToDel
+    // SpZpCsiRsResSetsToAdd
+    // SpZpCsiRsResSetsToDel
 
     proto_item_set_len(config_ti, offset-start_offset);
     return offset;
@@ -9209,6 +9239,29 @@ proto_register_l2server(void)
 
       { &hf_l2server_pdsch_conf_dedicated,
        { "PDSCH Config Dedicated", "l2server.pdsch-config-dedicated", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_data_scr_identity,
+       { "Data Scr Identity", "l2server.data-scr-identity", FT_UINT16, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      // TODO: VALS()
+      { &hf_l2server_vrb_to_prb_interl,
+       { "Vrb to Prb Interl", "l2server.vrb-to-prb-interl", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_res_alloc_scope,
+       { "Res Alloc Scope", "l2server.res-alloc-scope", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_aggregation_factor,
+       { "Aggregation Factor", "l2server.aggregation-factor", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      // TODO: VALS()
+      { &hf_l2server_rbg_size,
+       { "RBG Size", "l2server.rbg-size", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_mcs_table,
+       { "MCS Table", "l2server.mcs-table", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_max_cw_sched_by_dci,
+       { "Max Cw Sched By DCI", "l2server.max-cw-sched-by-dci", FT_UINT8, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_uplink_ded_pucch_config,
