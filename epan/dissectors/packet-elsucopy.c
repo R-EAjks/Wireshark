@@ -44,6 +44,7 @@ static range_t *global_elsucopy_port_range = NULL;
 static const value_string code_vals[] = {
     { 1,          "String" },
     { 3,          "Adaptor Log Copy" },
+    { 4,          "getreport archive name" },
     { 5,          "lsugetreport Copy" },
     { 9,          "Exit" },
     { 0,   NULL }
