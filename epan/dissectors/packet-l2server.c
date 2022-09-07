@@ -6048,16 +6048,29 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                         guint32 pusch_len = tvb_get_guint32(tvb, offset, ENC_LITTLE_ENDIAN);
                         offset += 4;
                         // Spare
+                        offset += 4;
                         // NbPuschTimeDomResAlloc
+                        guint32 nb_pusch_time_dom_res_alloc = tvb_get_guint8(tvb, offset);
+                        offset += 1;
                         // PuschTimeDomResAlloc
+                        offset += (nb_pusch_time_dom_res_alloc * sizeof(bb_nr5g_PUSCH_TIMEDOMAINRESALLOCt));
 
+                        // Using length anyway.
                         offset = pusch_start_offset + pusch_len;
                     }
                 }
 
-                // BwpULDed
+                // BwpULDed (nr5g_rlcmac_Cmac_BWP_UPLINKDEDICATEDt)
                 if (ul_bwp_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DEDICATED_CFG_PRESENT) {
-                    // TODO:
+                    guint32 ul_bwp_ded_start = offset;
+                    // TODO: subtree
+                    // Len
+                    guint32 bwp_ul_ded_len = tvb_get_guint32(tvb, offset, ENC_LITTLE_ENDIAN);
+                    offset += 4;
+                    // FieldMask
+                    offset += 4;
+
+                    offset = ul_bwp_ded_start + bwp_ul_ded_len;
                 }
 
                 proto_item_set_len(ul_bwp_ti, bwp_uplink_len);
