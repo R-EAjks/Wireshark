@@ -411,6 +411,8 @@ static int hf_l2server_ul_bwp = -1;
 static int hf_l2server_ul_bwp_len = -1;
 
 static int hf_l2server_ul_bwp_common = -1;
+static int hf_l2server_ul_bwp_common_len = -1;
+
 
 static int hf_l2server_ul_bwp_common_pdcch = -1;
 static int hf_l2server_ul_bwp_common_search_space_sib1 = -1;
@@ -759,6 +761,8 @@ static int hf_l2server_bindump_version = -1;
 static int hf_l2server_bindump_event_dl = -1;
 static int hf_l2server_bindump_event_ul = -1;
 
+static int hf_l2server_csi_meas_cfg = -1;
+static int hf_l2server_csi_meas_cfg_len = -1;
 
 
 static const value_string lch_vals[] =
@@ -1351,8 +1355,8 @@ static gint ett_l2server_group_b_configured = -1;
 static gint ett_l2server_pdcch_conf_dedicated = -1;
 static gint ett_l2server_pdsch_conf_dedicated = -1;
 static gint ett_l2server_uplink_ded_pucch_config = -1;
-
 static gint ett_l2server_sr_resource = -1;
+static gint ett_l2server_csi_meas_cfg = -1;
 
 
 
@@ -2620,7 +2624,7 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
 
 // bb_nr5g_PDCCH_CONF_DEDICATEDt (from bb-nrg5_struct.h)
 static int dissect_pdcch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
-                                    guint offset)
+                                        guint offset)
 {
     guint start_offset = offset;
 
@@ -5854,6 +5858,8 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         // UlCellCfgDed (nr5g_rlcmac_Cmac_UPLINK_DEDICATED_CONFIGt from nr5g-rlcmac_Cmac-bb.h)
         if (fieldmask & nr5g_rlcmac_Cmac_STRUCT_SERV_CELL_CONFIG_UPLINK_PRESENT) {
 
+            guint spcell_config_ded_start = offset;
+
             // Subtree.
             proto_item *ul_ded_config_ti = proto_tree_add_string_format(spcell_config_ded_tree, hf_l2server_ul_cell_cfg_ded, tvb,
                                                                         offset, 0,
@@ -5993,6 +5999,8 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
 
             // UlBwpIdToAdd (entries are nr5g_rlcmac_Cmac_BWP_UPLINKt from nr5g-rlcmac_Cmac-bb.h)
             for (guint32 n=0; n < num_bwpid_to_add; n++) {
+                guint bwp_uplink_start = offset;
+
                 // Subtree.
                 proto_item *ul_bwp_ti = proto_tree_add_string_format(ul_ded_config_tree, hf_l2server_ul_bwp, tvb,
                                                                              offset, 0,
@@ -6017,12 +6025,17 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                 // BwpULCommon (nr5g_rlcmac_Cmac_BWP_UPLINKCOMMONt from nr5g-rlcmac_Cmac-bb.h)
                 if (ul_bwp_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_COMMON_CFG_PRESENT) {
 
+                    guint32 bwp_ul_common_start = offset;
+
                     // Subtree.
                     proto_item *common_ti = proto_tree_add_string_format(ul_bwp_tree, hf_l2server_ul_bwp_common, tvb,
-                                                                         offset, 1, "", "Common ");
+                                                                         offset, 0, "", "Common ");
                     proto_tree *common_tree = proto_item_add_subtree(common_ti, ett_l2server_ul_bwp_common);
 
                     // Len
+                    guint32 bwp_ul_common_len;
+                    proto_tree_add_item_ret_uint(common_tree, hf_l2server_ul_bwp_common_len, tvb, offset, 4,
+                                                 ENC_LITTLE_ENDIAN, &bwp_ul_common_len);
                     offset += 4;
 
                     // FieldMask
@@ -6058,6 +6071,9 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                         // Using length anyway.
                         offset = pusch_start_offset + pusch_len;
                     }
+
+                    proto_item_set_len(common_ti, bwp_ul_common_len);
+                    offset = bwp_ul_common_start + bwp_ul_common_len;
                 }
 
                 // BwpULDed (nr5g_rlcmac_Cmac_BWP_UPLINKDEDICATEDt)
@@ -6070,12 +6086,22 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                     // FieldMask
                     offset += 4;
 
+                    // TODO:
+                    // PucchConfDed
+                    // PuschConfDed
+                    // SrsConfDed
+                    // GrantConfDed
+                    // BeamFailRecConfDed
+
+                    // Using length anyway
                     offset = ul_bwp_ded_start + bwp_ul_ded_len;
                 }
 
                 proto_item_set_len(ul_bwp_ti, bwp_uplink_len);
-                offset += bwp_uplink_len;
+                offset = bwp_uplink_start + bwp_uplink_len;
             }
+
+            offset = spcell_config_ded_start + ul_len;
             proto_item_set_len(ul_ded_config_ti, ul_len);
         }
 
@@ -6084,9 +6110,41 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
             // TODONT
         }
 
-        // CsiMeasCfg
+        // CsiMeasCfg (nr5g_rlcmac_Cmac_CSI_MEAS_CFGt)
         if (fieldmask & nr5g_rlcmac_Cmac_STRUCT_CSI_MEAS_CFG_PRESENT) {
+            guint32 csi_meas_start = offset;
+
+            // Subtree.
+            proto_item *csi_meas_ti = proto_tree_add_string_format(spcell_config_ded_tree, hf_l2server_csi_meas_cfg, tvb,
+                                                                 offset, 0, "", "CSI Meas Config ");
+            proto_tree *csi_meas_tree = proto_item_add_subtree(csi_meas_ti, ett_l2server_csi_meas_cfg);
+
+            // Len
+            guint32 csi_meas_len;
+            proto_tree_add_item_ret_uint(csi_meas_tree, hf_l2server_csi_meas_cfg_len, tvb, offset, 4,
+                                         ENC_LITTLE_ENDIAN, &csi_meas_len);
+            offset += 4;
+
+            // Spare
+            proto_tree_add_item(csi_meas_tree, hf_l2server_spare, tvb, offset, 4, ENC_NA);
+            offset += 4;
+
+            // NbCsiRepCfgToDel
+            guint32 nb_csi_rep_cfg_to_del;
+            proto_tree_add_item_ret_uint(csi_meas_tree, hf_l2server_nb_csi_rep_cfg_to_del, tvb, offset, 1, ENC_NA, &nb_csi_rep_cfg_to_del);
+            offset += 1;
+            // NbCsiRepCfgToAdd
+            guint32 nb_csi_rep_cfg_to_add;
+            proto_tree_add_item_ret_uint(csi_meas_tree, hf_l2server_nb_csi_rep_cfg_to_add, tvb, offset, 1, ENC_NA, &nb_csi_rep_cfg_to_add);
+            offset += 1;
+
             // TODO:
+            // CsiRepCfgToDel (uint32_t)
+            // CsiRepCfgToAdd (nr5g_rlcmac_Cmac_CSI_REPORT_CFGt)
+
+            // Using length anyway
+            offset = csi_meas_start + csi_meas_len;
+            proto_item_set_len(csi_meas_ti, csi_meas_len);
         }
 
         proto_item_set_len(spcell_config_ded_ti, ded_len);
@@ -8413,6 +8471,9 @@ proto_register_l2server(void)
       { &hf_l2server_ul_bwp_common,
         { "UL BWP Common", "l2server.ul-bwp-common", FT_STRING, BASE_NONE,
            NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_len,
+        { "Len", "l2server.ul-bwp-common.len", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_ul_bwp_common_pdcch,
         { "UL BWP Common PDCCH", "l2server.ul-bwp-common-pdcch", FT_STRING, BASE_NONE,
@@ -9254,27 +9315,27 @@ proto_register_l2server(void)
        { "PDSCH Config Dedicated", "l2server.pdsch-config-dedicated", FT_STRING, BASE_NONE,
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_data_scr_identity,
-       { "Data Scr Identity", "l2server.data-scr-identity", FT_UINT16, BASE_DEC,
+       { "Data Scr Identity", "l2server.data-scr-identity", FT_INT16, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
       // TODO: VALS()
       { &hf_l2server_vrb_to_prb_interl,
-       { "Vrb to Prb Interl", "l2server.vrb-to-prb-interl", FT_UINT8, BASE_DEC,
+       { "Vrb to Prb Interl", "l2server.vrb-to-prb-interl", FT_INT8, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_res_alloc_scope,
-       { "Res Alloc Scope", "l2server.res-alloc-scope", FT_UINT8, BASE_DEC,
+       { "Res Alloc Scope", "l2server.res-alloc-scope", FT_INT8, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_aggregation_factor,
-       { "Aggregation Factor", "l2server.aggregation-factor", FT_UINT8, BASE_DEC,
+       { "Aggregation Factor", "l2server.aggregation-factor", FT_INT8, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
       // TODO: VALS()
       { &hf_l2server_rbg_size,
-       { "RBG Size", "l2server.rbg-size", FT_UINT8, BASE_DEC,
+       { "RBG Size", "l2server.rbg-size", FT_INT8, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_mcs_table,
-       { "MCS Table", "l2server.mcs-table", FT_UINT8, BASE_DEC,
+       { "MCS Table", "l2server.mcs-table", FT_INT8, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_max_cw_sched_by_dci,
-       { "Max Cw Sched By DCI", "l2server.max-cw-sched-by-dci", FT_UINT8, BASE_DEC,
+       { "Max Cw Sched By DCI", "l2server.max-cw-sched-by-dci", FT_INT8, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_uplink_ded_pucch_config,
@@ -9314,6 +9375,13 @@ proto_register_l2server(void)
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_bindump_event_ul,
        { "Bindump Event UL", "l2server.bindump-event-ul", FT_UINT64, BASE_HEX,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_csi_meas_cfg,
+       { "CSI Meas Cfg", "l2server.csi-meas-config", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_meas_cfg_len,
+       { "Len", "l2server.csi-meas-config.len", FT_UINT32, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
     };
 
@@ -9402,7 +9470,8 @@ proto_register_l2server(void)
         &ett_l2server_pdcch_conf_dedicated,
         &ett_l2server_pdsch_conf_dedicated,
         &ett_l2server_uplink_ded_pucch_config,
-        &ett_l2server_sr_resource
+        &ett_l2server_sr_resource,
+        &ett_l2server_csi_meas_cfg
     };
 
     static ei_register_info ei[] = {
