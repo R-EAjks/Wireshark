@@ -764,6 +764,7 @@ static int hf_l2server_bindump_event_ul = -1;
 static int hf_l2server_csi_meas_cfg = -1;
 static int hf_l2server_csi_meas_cfg_len = -1;
 
+static int hf_l2server_sps_conf_dedicated = -1;
 
 static const value_string lch_vals[] =
 {
@@ -1357,6 +1358,7 @@ static gint ett_l2server_pdsch_conf_dedicated = -1;
 static gint ett_l2server_uplink_ded_pucch_config = -1;
 static gint ett_l2server_sr_resource = -1;
 static gint ett_l2server_csi_meas_cfg = -1;
+static gint ett_l2server_sps_conf_dedicated = -1;
 
 
 
@@ -2726,29 +2728,63 @@ static int dissect_pdsch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_
     // PrbBundlTypeIsValid
     offset += 1;
 
-    // TODO:
-
     // PrbBundlType
+    offset += 2;  // widest part of union
     // TODO: ?
-
-    // Spare
-    proto_tree_add_item(config_tree, hf_l2server_spare, tvb, offset, 2, ENC_NA);
-    offset += 2;
-
-    // FieldMask
-    offset += 4;
-
-    // RateMatchPatternGroup1
-    // RateMatchPatternGroup2
-    // DmrsMappingTypeA
-    // DmrsMappingTypeB
-    // PZpCsiRsResSet
-    // PdschConfExtR16
 
     // NbTciStatesToAdd
     offset += 1;
     // NbTciStatesToDel
     offset += 1;
+    // NbPdschAllocDed
+    offset += 1;
+    // NbRateMatchPatternDedToAdd
+    offset += 1;
+
+    // NbRateMatchPatternDedToDel
+    offset += 1;
+    // NbRateMatchPatternGroup1
+    offset += 1;
+    // NbRateMatchPatternGroup2
+    offset += 1;
+    // NbZpCsiRsResourceToAdd
+    offset += 1;
+
+    // NbZpCsiRsResourceToDel
+    offset += 1;
+    // NbAperiodicZpCsiRsResSetsToAdd
+    offset += 1;
+    // NbAperiodicZpCsiRsResSetsToDel
+    offset += 1;
+    // NbSpZpCsiRsResSetsToAdd
+    offset += 1;
+
+    // NbSpZpCsiRsResSetsToDel
+    offset += 1;
+    // Spare
+    proto_tree_add_item(config_tree, hf_l2server_spare, tvb, offset, 2, ENC_NA);
+    offset += 2;
+
+    // FieldMask
+    guint32 fieldmask;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                 ENC_LITTLE_ENDIAN, &fieldmask);
+
+    offset += 4;
+
+    // TODO:
+    // RateMatchPatternGroup1
+    offset += bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS;
+    // RateMatchPatternGroup2
+    offset += bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS;
+
+    // DmrsMappingTypeA
+    // DmrsMappingTypeB
+    // PZpCsiRsResSet
+
+    // PdschConfExtR16
+
+    // TciStatesToAdd
     // PdschAllocDed
     // RateMatchPatternDedToAdd
     // RateMatchPatternDedToDel
@@ -2808,11 +2844,41 @@ static int dissect_bwp_dl_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info
         offset = dissect_pdsch_conf_dedicated(config_tree, tvb, pinfo, offset);
         //offset += sizeof(bb_nr5g_PDSCH_CONF_DEDICATEDt);
     //}
-    // SpsConfDed
+    // SpsConfDed (bb_nr5g_SPS_CONF_DEDICATEDt)
     //if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_SPS_CFG_PRESENT) {
-        // TODO: serialization is just memcpy, so this is ok..
-        offset += sizeof(bb_nr5g_SPS_CONF_DEDICATEDt);
-    //}
+    {
+        // Subtree.
+        proto_item *sps_ti = proto_tree_add_string_format(tree, hf_l2server_sps_conf_dedicated, tvb,
+                                                          offset, 0,
+                                                          "", "SPS Config Dedicated");
+        proto_tree *sps_tree = proto_item_add_subtree(sps_ti, ett_l2server_sps_conf_dedicated);
+
+        // TODO:
+        // Periodicity
+        offset += 1;
+        // NbHarqProcesses
+        offset += 1;
+        // McsTable
+        offset += 1;
+        // N1PucchAn
+        offset += 1;
+        // Sps_ConfigIndex_r16
+        offset += 1;
+        // Harq_ProcID_Offset_r16
+        offset += 1;
+        // PeriodicityExt_r16
+        offset += 2;
+        // Harq_CodebookID_r16
+        offset += 1;
+        // Pdsch_AggregationFactor_r16
+        offset += 1;
+        // Pad[2]
+        proto_tree_add_item(sps_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
+        offset += 2;
+
+        proto_item_set_len(sps_ti, sizeof(bb_nr5g_SPS_CONF_DEDICATEDt));
+        //offset += sizeof(bb_nr5g_SPS_CONF_DEDICATEDt);
+    }
 
     // These 2 use the present flag when serialised!
 
@@ -3304,7 +3370,7 @@ static int dissect_codebook_type_1_single_panel(proto_tree *tree, tvbuff_t *tvb,
             // TODO:
             break;
         case bb_nr5g_CODEBOOK_SUBTYPE1_NB_ANT_PORTS_MORETHANTWO:
-            dissect_and_ports_more_than_two(config_tree, tvb, pinfo, offset);
+            offset = dissect_and_ports_more_than_two(config_tree, tvb, pinfo, offset);
             break;
     }
 
@@ -3891,6 +3957,36 @@ static int dissect_csi_rep_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
 }
 
 
+// bb_nr5g_CSI_APERIODIC_TRIGGER_STATE_CFGt (from bb-nr5g_struct.h)
+static int dissect_aper_trigger_state(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_csi_rep_config,  tvb,
+                                                         offset, 0,
+                                                          "", "Aperiodic Trigger State Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_rep_config);
+
+    // NbAssRepCfInfoList
+    guint32 nb_ass_rep_cf_info_list = tvb_get_guint8(tvb, offset);
+    offset += 1;
+
+    // Pad[3]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_NA);
+    offset += 3;
+
+    // AssRepCfInfoList
+    for (guint n=0; n < nb_ass_rep_cf_info_list; n++) {
+        offset += sizeof(bb_nr5g_CSI_ASSOCIATED_REPORT_CFG_INFOt);
+    }
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+
 
 // bb_nr5g_CSI_MEAS_CFGt from bb-nr5g_struct.h
 static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -4027,8 +4123,7 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
 
     // AperTriggerStateList
     for (guint n=0; n < nb_aper_trigger_state_list; n++) {
-        // TODO: not fixed sized...
-        offset += (nb_aper_trigger_state_list * sizeof(bb_nr5g_CSI_APERIODIC_TRIGGER_STATE_CFGt));
+        offset = dissect_aper_trigger_state(config_tree, tvb, pinfo, offset);
     }
 
     // TODO:
@@ -4410,14 +4505,19 @@ static int dissect_genbwp(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U
     proto_tree *genbwp_tree = proto_item_add_subtree(genbwp_ti, ett_l2server_genbwp);
 
     // LocAndBw
-    proto_tree_add_item(genbwp_tree, hf_l2server_loc_and_bw, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    guint32 loc_and_bw;
+    proto_tree_add_item_ret_uint(genbwp_tree, hf_l2server_loc_and_bw, tvb, offset, 2, ENC_LITTLE_ENDIAN, &loc_and_bw);
     offset += 2;
+
     // SubCarSpacing
-    proto_tree_add_item(genbwp_tree, hf_l2server_sub_car_spacing, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    gint32 sub_carr_spacing;
+    proto_tree_add_item_ret_int(genbwp_tree, hf_l2server_sub_car_spacing, tvb, offset, 1, ENC_LITTLE_ENDIAN, &sub_carr_spacing);
     offset += 1;
     // CyclicPrefix
     proto_tree_add_item(genbwp_tree, hf_l2server_cyclic_prefix, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
+
+    proto_item_append_text(genbwp_ti, " (LowAndBw=%u, SCS=%d)", loc_and_bw, sub_carr_spacing);
 
     return offset;
 }
@@ -9383,6 +9483,11 @@ proto_register_l2server(void)
       { &hf_l2server_csi_meas_cfg_len,
        { "Len", "l2server.csi-meas-config.len", FT_UINT32, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_sps_conf_dedicated,
+       { "SPS Config Dedicated", "l2server.sps-config-dedicated", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+
     };
 
     static gint *ett[] = {
@@ -9471,7 +9576,8 @@ proto_register_l2server(void)
         &ett_l2server_pdsch_conf_dedicated,
         &ett_l2server_uplink_ded_pucch_config,
         &ett_l2server_sr_resource,
-        &ett_l2server_csi_meas_cfg
+        &ett_l2server_csi_meas_cfg,
+        &ett_l2server_sps_conf_dedicated
     };
 
     static ei_register_info ei[] = {
