@@ -745,6 +745,8 @@ static int hf_l2server_aggregation_factor = -1;
 static int hf_l2server_rbg_size = -1;
 static int hf_l2server_mcs_table = -1;
 static int hf_l2server_max_cw_sched_by_dci = -1;
+static int hf_l2server_nb_tci_states_to_add = -1;
+
 
 static int hf_l2server_uplink_ded_pucch_config = -1;
 static int hf_l2server_uplink_ded_pucch_len = -1;
@@ -765,6 +767,8 @@ static int hf_l2server_csi_meas_cfg = -1;
 static int hf_l2server_csi_meas_cfg_len = -1;
 
 static int hf_l2server_sps_conf_dedicated = -1;
+
+static int hf_l2server_dbeam = -1;
 
 static const value_string lch_vals[] =
 {
@@ -1359,7 +1363,7 @@ static gint ett_l2server_uplink_ded_pucch_config = -1;
 static gint ett_l2server_sr_resource = -1;
 static gint ett_l2server_csi_meas_cfg = -1;
 static gint ett_l2server_sps_conf_dedicated = -1;
-
+static gint ett_l2server_dbeam = -1;
 
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
@@ -1546,19 +1550,35 @@ static void dissect_cell_parm_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *
     proto_tree_add_item(tree, hf_l2server_ssb_arfcn, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 
+
     /* NumDbeam */
     gint32 num_dbeams;
     proto_tree_add_item_ret_int(tree, hf_l2server_num_dbeam, tvb, offset, 4, ENC_LITTLE_ENDIAN, &num_dbeams);
     offset += 4;
     /* Dbeam[nr5g_MaxDbeam] */
-    for (int n=0; n < num_dbeams; n++) {
-        /* TODO: subtree? */
-        /* Ppu (comgen_qnxPPUIDt from qnx_gen.h)*/
-        proto_tree_add_item(tree, hf_l2server_ppu, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-        offset += 1;
-        /* DbeamId */
-        proto_tree_add_item(tree, hf_l2server_dbeamid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-        offset += 1;
+    for (int n=0; n < nr5g_MaxDbeam; n++) {
+        // Subtree.
+        proto_item *dbeam_ti = proto_tree_add_string_format(tree, hf_l2server_dbeam, tvb,
+                                                              offset, sizeof(nr5g_l2_Srv_Dbeam_t),
+                                                              "", "Dbeam ");
+        proto_tree *dbeam_tree = proto_item_add_subtree(dbeam_ti, ett_l2server_dbeam);
+
+        if (n < num_dbeams) {
+            /* Ppu (comgen_qnxPPUIDt from qnx_gen.h) */
+            guint32 ppu;
+            proto_tree_add_item_ret_uint(dbeam_tree, hf_l2server_ppu, tvb, offset, 4, ENC_LITTLE_ENDIAN, &ppu);
+            offset += 4;
+            /* DbeamId */
+            guint32 dbeamid;
+            proto_tree_add_item_ret_uint(dbeam_tree, hf_l2server_dbeamid, tvb, offset, 2, ENC_LITTLE_ENDIAN, &dbeamid);
+            offset += 2;
+
+            proto_item_append_text(dbeam_ti, " (ppu=%u, dbeamid=%u)", ppu, dbeamid);
+        }
+        else {
+            proto_item_append_text(dbeam_ti, " (not set)");
+            offset += sizeof(nr5g_l2_Srv_Dbeam_t);
+        }
     }
 }
 
@@ -2691,9 +2711,45 @@ static int dissect_pdcch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_
     return offset;
 }
 
+// bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt
+gint dissect_pdcsh_time_domain_res_alloc(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                         guint offset, gboolean valid)
+{
+    // Subtree.
+    proto_item *pdsch_alloc_ti = proto_tree_add_string_format(tree, hf_l2server_pdsch_alloc, tvb,
+                                                              offset, sizeof(bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt),
+                                                              "", "PdschAlloc ");
+    proto_tree *pdsch_alloc_tree = proto_item_add_subtree(pdsch_alloc_ti, ett_l2server_pdsch_alloc);
+
+    if (valid) {
+        // K0
+        proto_tree_add_item(pdsch_alloc_tree, hf_l2server_k0, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // MappingType
+        proto_tree_add_item(pdsch_alloc_tree, hf_l2server_mapping_type, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // StartSymAndLen
+        guint32 start_symbol_and_length;
+        proto_tree_add_item_ret_uint(pdsch_alloc_tree, hf_l2server_start_sym_and_len, tvb, offset, 1, ENC_LITTLE_ENDIAN, &start_symbol_and_length);
+        offset += 1;
+        // Spare
+        proto_tree_add_item(pdsch_alloc_tree, hf_l2server_spare1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+
+        proto_item_append_text(pdsch_alloc_ti, " (StartSymAndLen=%u)", start_symbol_and_length);
+    }
+    else {
+        offset += sizeof(bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt);
+        proto_item_append_text(pdsch_alloc_ti, " (not set)");
+    }
+
+    return offset;
+}
+
+
 // bb_nr5g_PDSCH_CONF_DEDICATEDt (from bb-nrg5_struct.h)
 static int dissect_pdsch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
-                                       guint offset)
+                                        guint offset)
 {
     guint start_offset = offset;
 
@@ -2733,10 +2789,14 @@ static int dissect_pdsch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_
     // TODO: ?
 
     // NbTciStatesToAdd
+    guint32 nb_tci_states_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_tci_states_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_tci_states_to_add);
     offset += 1;
     // NbTciStatesToDel
     offset += 1;
     // NbPdschAllocDed
+    guint32 nb_pdsch_alloc_ded;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_pdsch_alloc, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_pdsch_alloc_ded);
     offset += 1;
     // NbRateMatchPatternDedToAdd
     offset += 1;
@@ -2785,7 +2845,14 @@ static int dissect_pdsch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_
     // PdschConfExtR16
 
     // TciStatesToAdd
+    for (guint n=0; n < nb_tci_states_to_add; n++) {
+        // TODO:
+        offset += sizeof(bb_nr5g_TCI_STATEt);
+    }
     // PdschAllocDed
+    for (guint n=0; n < nb_pdsch_alloc_ded; n++) {
+        offset = dissect_pdcsh_time_domain_res_alloc(config_tree, tvb, pinfo, offset, TRUE);
+    }
     // RateMatchPatternDedToAdd
     // RateMatchPatternDedToDel
     // ZpCsiRsResourceToAdd
@@ -3507,33 +3574,7 @@ static int dissect_bwp_downlinkcommon(proto_tree *tree, tvbuff_t *tvb, packet_in
 
             // PdschAlloc (bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt)
             for (guint n=0; n < bb_nr5g_MAX_NB_DL_ALLOCS; n++) {
-                // Subtree.
-                proto_item *pdsch_alloc_ti = proto_tree_add_string_format(pdsch_tree, hf_l2server_pdsch_alloc, tvb,
-                                                                          offset, sizeof(bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt),
-                                                                          "", "PdschAlloc ");
-                proto_tree *pdsch_alloc_tree = proto_item_add_subtree(pdsch_alloc_ti, ett_l2server_pdsch_alloc);
-
-                if (n < nb_pdsch_alloc) {
-                    // K0
-                    proto_tree_add_item(pdsch_alloc_tree, hf_l2server_k0, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-                    offset += 1;
-                    // MappingType
-                    proto_tree_add_item(pdsch_alloc_tree, hf_l2server_mapping_type, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-                    offset += 1;
-                    // StartSymAndLen
-                    guint32 start_symbol_and_length;
-                    proto_tree_add_item_ret_uint(pdsch_alloc_tree, hf_l2server_start_sym_and_len, tvb, offset, 1, ENC_LITTLE_ENDIAN, &start_symbol_and_length);
-                    offset += 1;
-                    // Spare
-                    proto_tree_add_item(pdsch_alloc_tree, hf_l2server_spare1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-                    offset += 1;
-
-                    proto_item_append_text(pdsch_alloc_ti, " (StartSymAndLen=%u)", start_symbol_and_length);
-                }
-                else {
-                    offset += sizeof(bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt);
-                    proto_item_append_text(pdsch_alloc_ti, " (not set)");
-                }
+                offset = dissect_pdcsh_time_domain_res_alloc(pdsch_tree, tvb, pinfo, offset, n < nb_pdsch_alloc);
             }
             proto_item_set_len(pdsch_ti, offset-pdsch_offset);
         }
@@ -8528,7 +8569,7 @@ proto_register_l2server(void)
         { "Num Dbeam", "l2server.num-dbeam", FT_INT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_ppu,
-        { "PPU", "l2server.ppu", FT_UINT8, BASE_DEC,
+        { "PPU", "l2server.ppu", FT_UINT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
 
 
@@ -9437,6 +9478,9 @@ proto_register_l2server(void)
       { &hf_l2server_max_cw_sched_by_dci,
        { "Max Cw Sched By DCI", "l2server.max-cw-sched-by-dci", FT_INT8, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_tci_states_to_add,
+       { "Nb TCI States to add", "l2server.nb-tci-states-to-add", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_uplink_ded_pucch_config,
        { "Uplink Ded PUCCH", "l2server.uplink-ded-pucch", FT_STRING, BASE_NONE,
@@ -9486,6 +9530,10 @@ proto_register_l2server(void)
 
       { &hf_l2server_sps_conf_dedicated,
        { "SPS Config Dedicated", "l2server.sps-config-dedicated", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_dbeam,
+       { "Dbeam", "l2server.dbeam", FT_STRING, BASE_NONE,
          NULL, 0x0, NULL, HFILL }},
 
     };
@@ -9577,7 +9625,8 @@ proto_register_l2server(void)
         &ett_l2server_uplink_ded_pucch_config,
         &ett_l2server_sr_resource,
         &ett_l2server_csi_meas_cfg,
-        &ett_l2server_sps_conf_dedicated
+        &ett_l2server_sps_conf_dedicated,
+        &ett_l2server_dbeam
     };
 
     static ei_register_info ei[] = {
