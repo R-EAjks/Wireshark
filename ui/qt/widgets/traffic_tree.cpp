@@ -110,7 +110,7 @@ void TrafficTreeHeaderView::headerContextMenu(const QPoint &pos)
         return;
 
     QMenu * ctxMenu = new QMenu(this);
-    ctxMenu->setAttribute(Qt::WA_DeleteOnClose);
+    connect(ctxMenu, &QMenu::triggered, ctxMenu, &QMenu::deleteLater);
 
     QAction * headerAction = ctxMenu->addAction(tr("Columns to display"));
     headerAction->setEnabled(false);

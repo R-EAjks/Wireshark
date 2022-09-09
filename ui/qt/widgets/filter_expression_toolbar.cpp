@@ -85,7 +85,7 @@ void FilterExpressionToolBar::onCustomMenuHandler(const QPoint& pos)
 void FilterExpressionToolBar::customMenu(FilterExpressionToolBar * target, QAction * filterAction, const QPoint& pos)
 {
     QMenu * filterMenu = new QMenu(target);
-    filterMenu->setAttribute(Qt::WA_DeleteOnClose);
+    connect(filterMenu, &QMenu::triggered, filterMenu, &QMenu::deleteLater);
 
     /* Only display context menu for actual filter actions */
     QString filterText = filterAction->property(dfe_property_expression_).toString().trimmed();

@@ -372,7 +372,7 @@ void WelcomePage::showRecentContextMenu(QPoint pos)
     if (!li) return;
 
     QMenu *recent_ctx_menu = new QMenu(this);
-    recent_ctx_menu->setAttribute(Qt::WA_DeleteOnClose);
+    connect(recent_ctx_menu, &QMenu::triggered, recent_ctx_menu, &QMenu::deleteLater);
 
     QString cf_path = li->data(Qt::UserRole).toString();
 

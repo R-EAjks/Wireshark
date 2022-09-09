@@ -21,7 +21,7 @@ void FindLineEdit::contextMenuEvent(QContextMenuEvent *event)
     QMenu *menu = createStandardContextMenu();
     QAction *action;
 
-    menu->setAttribute(Qt::WA_DeleteOnClose);
+    connect(menu, &QMenu::triggered, menu, &QMenu::deleteLater);
     menu->addSeparator();
 
     action = menu->addAction(tr("Textual Find"));

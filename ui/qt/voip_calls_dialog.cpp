@@ -263,7 +263,7 @@ void VoipCallsDialog::contextMenuEvent(QContextMenuEvent *event)
     QMenu *popupMenu = new QMenu(this);
     QAction *action;
 
-    popupMenu->setAttribute(Qt::WA_DeleteOnClose);
+    connect(popupMenu, &QMenu::triggered, popupMenu, &QMenu::deleteLater);
     popupMenu->addMenu(ui->menuSelect);
     action = popupMenu->addAction(tr("Display time as time of day"), this, SLOT(switchTimeOfDay()));
     action->setCheckable(true);

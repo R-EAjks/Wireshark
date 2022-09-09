@@ -243,7 +243,7 @@ void ProtoTree::contextMenuEvent(QContextMenuEvent *event)
         buildForDialog = true;
 
     QMenu * ctx_menu = new QMenu(this);
-    ctx_menu->setAttribute(Qt::WA_DeleteOnClose);
+    connect(ctx_menu, &QMenu::triggered, ctx_menu, &QMenu::deleteLater);
     ctx_menu->setProperty("toolTipsVisible", QVariant::fromValue(true));
 
     QMenu *main_menu_item, *submenu;

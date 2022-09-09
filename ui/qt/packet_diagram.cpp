@@ -468,7 +468,7 @@ void PacketDiagram::contextMenuEvent(QContextMenuEvent *event)
 
     QAction *action;
     QMenu *ctx_menu = new QMenu(this);
-    ctx_menu->setAttribute(Qt::WA_DeleteOnClose);
+    connect(ctx_menu, &QMenu::triggered, ctx_menu, &QMenu::deleteLater);
 
     action = ctx_menu->addAction(tr("Show Field Values"));
     action->setCheckable(true);
