@@ -527,6 +527,7 @@ void AboutDialog::handleCopyMenu(QPoint pos)
         return;
 
     QMenu * menu = new QMenu(this);
+    connect(menu, &QMenu::triggered, menu, &QMenu::deleteLater);
 
     if (ui->tabWidget->currentWidget() == ui->tab_plugins)
     {

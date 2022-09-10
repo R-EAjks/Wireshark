@@ -140,7 +140,7 @@ void DisplayFilterEdit::connectToMainWindow()
 
 void DisplayFilterEdit::contextMenuEvent(QContextMenuEvent *event) {
     QMenu *menu = this->createStandardContextMenu();
-    menu->setAttribute(Qt::WA_DeleteOnClose);
+    connect(menu, &QMenu::triggered, menu, &QMenu::deleteLater);
 
     if (menu->actions().count() <= 0) {
         menu->deleteLater();

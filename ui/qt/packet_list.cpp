@@ -612,7 +612,7 @@ void PacketList::contextMenuEvent(QContextMenuEvent *event)
             new FrameInformation(new CaptureFile(this, cap_file_), packet_list_model_->getRowFdata(ctxIndex.row()));
 
     QMenu * ctx_menu = new QMenu(this);
-    ctx_menu->setAttribute(Qt::WA_DeleteOnClose);
+    connect(ctx_menu, &QMenu::triggered, ctx_menu, &QMenu::deleteLater);
     // XXX We might want to reimplement setParent() and fill in the context
     // menu there.
     ctx_menu->addAction(window()->findChild<QAction *>("actionEditMarkPacket"));
