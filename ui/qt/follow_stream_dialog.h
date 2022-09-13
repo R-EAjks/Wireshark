@@ -40,7 +40,7 @@ class FollowStreamDialog : public WiresharkDialog
     Q_OBJECT
 
 public:
-    explicit FollowStreamDialog(QWidget &parent, CaptureFile &cf, follow_type_t type = FOLLOW_TCP);
+    explicit FollowStreamDialog(QWidget &parent, CaptureFile &cf, int proto_id = -1);
     ~FollowStreamDialog();
 
     void addCodecs(const QMap<QString, QTextCodec *> &codecMap);
@@ -82,13 +82,12 @@ private:
     void resetStream(void);
     void updateWidgets(bool follow_in_progress);
     void updateWidgets() { updateWidgets(false); } // Needed for WiresharkDialog?
-    frs_return_t
-    showBuffer(char *buffer, size_t nchars, gboolean is_from_server,
+    void showBuffer(char *buffer, size_t nchars, gboolean is_from_server,
                 guint32 packet_num, nstime_t abs_ts, guint32 *global_pos);
 
-    frs_return_t readStream();
-    frs_return_t readFollowStream();
-    frs_return_t readSslStream();
+    void readStream();
+    void readFollowStream();
+    void readSslStream();
 
     void followStream();
     void addText(QString text, gboolean is_from_server, guint32 packet_num, gboolean colorize = true);
@@ -101,7 +100,6 @@ private:
     QPushButton             *b_save_;
     QPushButton             *b_back_;
 
-    follow_type_t           follow_type_;
     follow_info_t           follow_info_;
     register_follow_t*      follower_;
     show_type_t             show_type_;

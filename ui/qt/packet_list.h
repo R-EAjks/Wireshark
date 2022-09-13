@@ -153,6 +153,8 @@ private:
     void colorsChanged();
     QString joinSummaryRow(QStringList col_parts, int row, SummaryCopyType type);
 
+    static gboolean followCallbackHandler(const void * key, void * data, void * user_data);
+
 signals:
     void packetDissectionChanged();
     void showColumnPreferences(QString pane_name);
@@ -199,6 +201,7 @@ private slots:
     void drawNearOverlay();
     void updatePackets(bool redraw);
     void ctxDecodeAsDialog();
+    void followActionTriggered();
 };
 
 #endif // PACKET_LIST_H

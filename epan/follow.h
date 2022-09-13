@@ -24,19 +24,6 @@
 extern "C" {
 #endif /* __cplusplus */
 
-typedef enum {
-  TCP_STREAM = 0,
-  UDP_STREAM,
-  MAX_STREAM
-} stream_type;
-
-typedef enum {
-    FRS_OK,
-    FRS_OPEN_ERROR,
-    FRS_READ_ERROR,
-    FRS_PRINT_ERROR
-} frs_return_t;
-
 /* Type of follow we are doing */
 typedef enum {
     FOLLOW_TCP,
@@ -76,7 +63,6 @@ typedef union _stream_addr {
 struct _follow_info;
 
 typedef gboolean (*follow_print_line_func)(char *, size_t, gboolean, void *);
-typedef frs_return_t (*follow_read_stream_func)(struct _follow_info *follow_info, follow_print_line_func follow_print, void *arg);
 
 #define SUBSTREAM_UNUSED	G_GUINT64_CONSTANT(0xFFFFFFFFFFFFFFFF)
 
@@ -206,6 +192,8 @@ WS_DLL_PUBLIC void follow_reset_stream(follow_info_t* info);
  * @param follow_info [in] follower info
  */
 WS_DLL_PUBLIC void follow_info_free(follow_info_t* follow_info);
+
+WS_DLL_PUBLIC register_follow_t* follow_search_by_proto_id(int proto_id);
 
 #ifdef __cplusplus
 }

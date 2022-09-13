@@ -24,6 +24,7 @@
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/proto.h>
+#include <epan/follow.h>
 
 #include "ui/main_statusbar.h"
 #include "ui/packet_list_utils.h"
@@ -660,19 +661,18 @@ void PacketList::contextMenuEvent(QContextMenuEvent *event)
         submenu->addAction(window()->findChild<QAction *>("actionSCTPFilterThisAssociation"));
     }
 
-    main_menu_item = window()->findChild<QMenu *>("menuFollow");
-    submenu = new QMenu(main_menu_item->title(), ctx_menu);
-    ctx_menu->addMenu(submenu);
-    submenu->addAction(window()->findChild<QAction *>("actionAnalyzeFollowTCPStream"));
-    submenu->addAction(window()->findChild<QAction *>("actionAnalyzeFollowUDPStream"));
-    submenu->addAction(window()->findChild<QAction *>("actionAnalyzeFollowDCCPStream"));
-    submenu->addAction(window()->findChild<QAction *>("actionAnalyzeFollowTLSStream"));
-    submenu->addAction(window()->findChild<QAction *>("actionAnalyzeFollowHTTPStream"));
-    submenu->addAction(window()->findChild<QAction *>("actionAnalyzeFollowHTTP2Stream"));
-    submenu->addAction(window()->findChild<QAction *>("actionAnalyzeFollowQUICStream"));
-    submenu->addAction(window()->findChild<QAction *>("actionAnalyzeFollowSIPCall"));
-
-    ctx_menu->addSeparator();
+    QMap<QString, QString> registrations;
+    follow_iterate_followers(PacketList::followCallbackHandler, &registrations);
+    if (registrations.count()) {
+        submenu = new QMenu(tr("Follow"), ctx_menu);
+        foreach(QString key, registrations.keys()) {
+            QAction * entry = submenu->addAction(tr("%1 stream").arg(key));
+            entry->setProperty("follow_registration_key", registrations.value(key));
+            connect(entry, &QAction::triggered, this, &PacketList::followActionTriggered);
+        }
+        ctx_menu->addMenu(submenu);
+        ctx_menu->addSeparator();
+    }
 
     main_menu_item = window()->findChild<QMenu *>("menuEditCopy");
     submenu = new QMenu(main_menu_item->title(), ctx_menu);
@@ -714,6 +714,43 @@ void PacketList::contextMenuEvent(QContextMenuEvent *event)
         emit framesSelected(QList<int>());
 
     ctx_menu->popup(event->globalPos());
+}
+#include <QDebug>
+gboolean PacketList::followCallbackHandler(const void * key, void * data, void * user_data)
+{
+    if (!data || ! user_data)
+        return TRUE;
+
+    QMap<QString, QString> * registrations = (QMap<QString, QString> *)user_data;
+    qDebug() << "Callback " << QString((const char *)key);
+    register_follow_t * reg = (register_follow_t *)data;
+    registrations->insert(QString((const char *)key), QString(get_follow_tap_string(reg)));
+
+    return FALSE;
+}
+
+void PacketList::followActionTriggered()
+{
+    QAction * sendAction = qobject_cast<QAction *>(sender());
+    if (!sendAction || !sendAction->property("follow_registration_key").isValid())
+        return;
+
+    QString key = sendAction->property("follow_registration_key").toString();
+    qDebug() << "Open dialog for " << key; //openFollowStreamDialog(type, 0, 0, false);
+#if 0
+    FollowStreamDialog *fsd = new FollowStreamDialog(*this, cap_file_, type);
+    connect(fsd, SIGNAL(updateFilter(QString, bool)), this, SLOT(filterPackets(QString, bool)));
+    connect(fsd, SIGNAL(goToPacket(int)), packet_list_, SLOT(goToPacket(int)));
+    fsd->addCodecs(text_codec_map_);
+    fsd->show();
+    if (use_stream_index) {
+        // If a specific conversation was requested, then ignore any previous
+        // display filters and display all related packets.
+        fsd->follow("", true, stream_num, sub_stream_num);
+    } else {
+        fsd->follow(getFilter());
+    }
+#endif
 }
 
 void PacketList::ctxDecodeAsDialog()
