@@ -169,6 +169,7 @@ static gint global_call_pdcp_for_drb = (gint)PDCP_drb_SN_12;
 
 
 static gboolean global_skip_mystery_byte = FALSE;
+static gboolean global_call_rohc = FALSE;
 
 #if 0
 /* Return the number of bytes used to encode the length field
@@ -263,13 +264,26 @@ static gint dissect_ue_id_lcid(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tr
         /* LCID field */
         tag = tvb_get_guint8(tvb, offset++);
         if (tag == 2) {
+            guint32 lcid;
             /* Skip len */
             offset++;
-            guint32 lcid;
             proto_tree_add_item_ret_uint(ue_id_lcid_tree, hf_pdcp_uu_lcid,
                                          tvb, offset++, 1, ENC_BIG_ENDIAN, &lcid);
             proto_item_append_text(ue_id_lcid_ti, " LCID:%u", lcid);
         }
+    }
+
+    /* RoHC */
+    if ((p_pdcp_lte_info->plane == USER_PLANE) && global_call_rohc) {
+        p_pdcp_nr_info->rohc.rohc_compression = TRUE;
+        p_pdcp_nr_info->rohc.rohc_ip_version = 4;
+        p_pdcp_nr_info->rohc.cid_inclusion_info = TRUE;
+        p_pdcp_nr_info->rohc.large_cid_present = FALSE;
+        p_pdcp_nr_info->rohc.mode = RELIABLE_BIDIRECTIONAL;
+        p_pdcp_nr_info->rohc.rnd = FALSE;
+        p_pdcp_nr_info->rohc.udp_checksum_present = TRUE;
+        p_pdcp_nr_info->rohc.profile = 1;
+        p_pdcp_nr_info->rohc.last_created_item = NULL;
     }
 
     proto_item_append_text(ue_id_lcid_ti, ")");
@@ -817,6 +831,11 @@ proto_register_pdcp_uu(void)
     prefs_register_bool_preference(pdcp_uu_module, "skip_mystery_byte", "Skip mystery byte (CSCS_UE_RLCPRIM_TAG?)",
         "This appears to be CSCS_UE_RLCPRIM_TAG (value 0x05), which will be seen if the message comes through the proxy",
         &global_skip_mystery_byte);
+
+    prefs_register_bool_preference(pdcp_uu_module, "call_rohc", "ROHC (RTP profile)",
+        "Call ROHC dissector for DRB payloads",
+        &global_call_rohc);
+
 }
 
 static void
