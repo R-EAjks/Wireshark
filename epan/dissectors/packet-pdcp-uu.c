@@ -279,7 +279,7 @@ static gint dissect_ue_id_lcid(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tr
         p_pdcp_nr_info->rohc.rohc_ip_version = 4;
         p_pdcp_nr_info->rohc.cid_inclusion_info = TRUE;
         p_pdcp_nr_info->rohc.large_cid_present = FALSE;
-        p_pdcp_nr_info->rohc.mode = RELIABLE_BIDIRECTIONAL;
+        p_pdcp_nr_info->rohc.mode = OPTIMISTIC_BIDIRECTIONAL;
         p_pdcp_nr_info->rohc.rnd = FALSE;
         p_pdcp_nr_info->rohc.udp_checksum_present = TRUE;
         p_pdcp_nr_info->rohc.profile = 1;
