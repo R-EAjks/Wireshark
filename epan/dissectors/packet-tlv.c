@@ -134,8 +134,9 @@ static gboolean global_pdcprrc_show_tag_and_len = TRUE;
 
 
 // TODO: add channel type param, and check direction.
-static dissector_handle_t look_up_rrc_dissector(guint8 message_type _U_, guint32 rrc_pdu_type)
+static dissector_handle_t look_up_rrc_dissector(guint8 message_type, guint32 rrc_pdu_type _U_)
 {
+#if 0
     switch (rrc_pdu_type) {
         case 1:
             return nr_rrc_dl_ccch;
@@ -151,8 +152,9 @@ static dissector_handle_t look_up_rrc_dissector(guint8 message_type _U_, guint32
         default:
             return data_dh;
     }
+#endif
 
-#if 0
+#if 1
     // TODO: use rrc_pdu_type!
     switch (message_type) {
         case 1:  // PdcpDataReq
@@ -234,6 +236,7 @@ dissect_pdcprrc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data 
         expert_add_info(pinfo, ti, &ei_pdcprrc_wrong_length);
     }
 
+    /* TODO: need to set this? */
     guint32 pdu_type = 0;
 
     /* TLVs follow. */
@@ -272,7 +275,7 @@ dissect_pdcprrc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data 
                 pdcp_info.bearerId = val32;
                 break;
             case 4:
-                /* Cell Grouop */
+                /* Cell Group */
                 proto_tree_add_item_ret_uint(pdcprrc_tree, hf_pdcprrc_cell_group, tvb, offset, len, ENC_BIG_ENDIAN, &val32);
                 col_append_fstr(pinfo->cinfo, COL_INFO, "CellGroup=%u ", val32);
                 break;
