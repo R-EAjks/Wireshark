@@ -294,7 +294,7 @@ extern "C" {
 #define WTAP_ENCAP_USB_2_0_FULL_SPEED           216
 #define WTAP_ENCAP_USB_2_0_HIGH_SPEED           217
 #define WTAP_ENCAP_AUTOSAR_DLT                  218
-#define WTAP_ENCAP_AUERSWALD_LOG                296
+#define WTAP_ENCAP_AUERSWALD_LOG                219
 
 /* After adding new item here, please also add new item to encap_table_base array */
 
@@ -613,7 +613,7 @@ struct ieee_802_11g {
 };
 
 /*
- * Mode values.
+ * Mode values.cd buil  
  */
 #define PHDR_802_11G_MODE_NORMAL    0
 #define PHDR_802_11G_MODE_SUPER_G   1  /* Atheros Super G */
