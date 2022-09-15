@@ -613,7 +613,7 @@ struct ieee_802_11g {
 };
 
 /*
- * Mode values.cd buil  
+ * Mode values.
  */
 #define PHDR_802_11G_MODE_NORMAL    0
 #define PHDR_802_11G_MODE_SUPER_G   1  /* Atheros Super G */
