@@ -2800,10 +2800,8 @@ static gint dissect_user_defined(proto_tree *tree, tvbuff_t * tvb, gint offset, 
         }
     }
     if (info && (flags & MEMBER_OPTIONAL) == MEMBER_OPTIONAL) {
-        gint offset_before = offset;
         rtps_util_dissect_parameter_header(tvb, &offset, encoding, &member_id, &member_length);
-        offset = offset_before;
-        if (element_member_id != 0 && member_id != element_member_id)
+        if ((element_member_id != 0 && member_id != element_member_id) || (member_length == 0))
             return offset;
     }
     if (extensibility == EXTENSIBILITY_MUTABLE) {
