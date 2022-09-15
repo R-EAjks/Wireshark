@@ -3364,9 +3364,24 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                                 is_lte = TRUE;
                             }
                         }
+                        else if (strcmp(label, "tid")==0) {
+                            // Ignoring..
+                        }
+                        else if (strcmp(label, "rohcv1")==0) {
+                            guint profile, mode;
+                            if (sscanf(value, "%u:%u", &profile, &mode) == 2) {
+                                /* Switch it on */
+                                p_pdcp_nr_info->rohc.rohc_compression = TRUE;
+                                /* Probably doesn't matter */
+                                p_pdcp_nr_info->rohc.rohc_ip_version = 4;
+                                p_pdcp_nr_info->rohc.profile = profile;
+                                /* Only gives preferred mode - cid context might have different? */
+                                p_pdcp_nr_info->rohc.mode = mode;
+                            }
+                        }
 
                         else {
-                            printf("%u: NOT HANDLING: %s (%s) !!!!!!\n", pinfo->num, label, value);
+                            printf("%u: NOT HANDLING PDCP label: %s (%s) !!!!!!\n", pinfo->num, label, value);
                         }
                     }
 
@@ -3376,7 +3391,7 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
 
                     // These are not set by any label:value so assume default.
                     //p_pdcp_nr_info->sdap_header = 0;
-                    p_pdcp_nr_info->rohc.rohc_compression = FALSE;
+                    //p_pdcp_nr_info->rohc.rohc_compression = FALSE;
                     p_pdcp_nr_info->is_retx = FALSE;
 
                     /* Payload is from $ to end of string.   */
