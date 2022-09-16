@@ -3249,12 +3249,10 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
 
                             else if (strcmp(value, "processUlSrbFrame after clip") == 0) {
                                 // Supposed to be UL RRC..
-                                //is_pdcp = FALSE;
                             }
 
                             else if (strcmp(value, "tx_rlc_frame") == 0) {
                                 // RLC payload?
-                                //is_pdcp = FALSE;
                             }
 
                             else if (strcmp(value, "After DL Decrypt") == 0) {
