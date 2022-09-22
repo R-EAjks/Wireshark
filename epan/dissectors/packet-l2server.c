@@ -398,6 +398,8 @@ static int hf_l2server_ppu = -1;
 
 static int hf_l2server_ul_cell_cfg_ded = -1;
 static int hf_l2server_ul_cell_cfg_ded_len = -1;
+static int hf_l2server_initial_ul_bwp_present = -1;
+static int hf_l2server_pusch_present = -1;
 static int hf_l2server_first_active_ul_bwp = -1;
 static int hf_l2server_num_ul_bwpid_to_add = -1;
 static int hf_l2server_num_ul_bwpid_to_del = -1;
@@ -6015,6 +6017,10 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
             guint ul_fieldmask;
             proto_tree_add_item_ret_uint(ul_ded_config_tree, hf_l2server_field_mask_4, tvb, offset, 4,
                                          ENC_LITTLE_ENDIAN, &ul_fieldmask);
+            // Show individual flags
+            gboolean initial_ul_bwp_present, pusch_present;
+            proto_tree_add_item_ret_boolean(ul_ded_config_tree, hf_l2server_initial_ul_bwp_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &initial_ul_bwp_present);
+            proto_tree_add_item_ret_boolean(ul_ded_config_tree, hf_l2server_pusch_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &pusch_present);
             offset += 4;
 
             // FirstActiveUlBwp
@@ -6046,7 +6052,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
             }
 
             // InitialUlBwp (nr5g_rlcmac_Cmac_BWP_UPLINKDEDICATEDt)
-            if (ul_fieldmask & nr5g_rlcmac_Cmac_STRUCT_UPLINK_DEDICATED_CONFIG_INITIAL_UL_BWP_PRESENT) {
+            if (initial_ul_bwp_present) {
 
                 // Subtree.
                 proto_item *initial_ul_bwp_ti = proto_tree_add_string_format(ul_ded_config_tree, hf_l2server_initial_ul_bwp, tvb,
@@ -6133,7 +6139,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
             }
 
             // PuschServingCellCfg
-            if (ul_fieldmask & nr5g_rlcmac_Cmac_STRUCT_UPLINK_DEDICATED_CONFIG_PUSCH_PRESENT) {
+            if (pusch_present) {
                 // TODO
             }
 
@@ -7808,7 +7814,7 @@ proto_register_l2server(void)
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_ra_info,
         { "RA Info", "l2server.ra-info", FT_STRING, BASE_NONE,
-          NULL, 0x0, NULL, HFILL }},
+          NULL, 0x0, "nr5g_rlcmac_Cmac_RA_Info_t", HFILL }},
       { &hf_l2server_bwpid,
         { "BwpId", "l2server.bwpid", FT_INT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
@@ -7875,14 +7881,14 @@ proto_register_l2server(void)
           VALS(l2_test_mode_vals), 0x0, NULL, HFILL }},
       { &hf_l2server_l2_cell_dedicated_config,
         { "L2 Cell Dedicated Config", "l2server.l2-cell-dedicated-config", FT_STRING, BASE_NONE,
-          NULL, 0x0, NULL, HFILL }},
+          NULL, 0x0, "nr5g_rlcmac_Cmac_CELL_DEDICATED_CONFIGt", HFILL }},
       { &hf_l2server_l2_cell_dedicated_config_len,
         { "Len", "l2server.l2-cell-dedicated-config.len", FT_UINT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_l1_cell_dedicated_config,
         { "L1 Cell Dedicated Config", "l2server.l1-cell-dedicated-config", FT_STRING, BASE_NONE,
-          NULL, 0x0, NULL, HFILL }},
+          NULL, 0x0, "bb_nr5g_CELL_DEDICATED_CONFIGt", HFILL }},
 
 
       { &hf_l2server_num_of_rb_cfg,
@@ -7890,7 +7896,7 @@ proto_register_l2server(void)
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_rb_config,
         { "RB Config", "l2server.rb-config", FT_STRING, BASE_NONE,
-          NULL, 0x0, NULL, HFILL }},
+          NULL, 0x0, "nr5g_rlcmac_Cmac_RbCfg_t", HFILL }},
       { &hf_l2server_num_of_rb_rel,
         { "Number of RBs to release", "l2server.num-rb-rel", FT_UINT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
@@ -7924,10 +7930,10 @@ proto_register_l2server(void)
 
       { &hf_l2server_mac_cell_group_config,
         { "MAC Cell Group Config", "l2server.mac-cell-group-config", FT_STRING, BASE_NONE,
-          NULL, 0x0, NULL, HFILL }},
+          NULL, 0x0, "nr5g_rlcmac_Cmac_MAC_CellGroupConfig_t", HFILL }},
       { &hf_l2server_spcell_config,
         { "spCell Config", "l2server.spcell-config", FT_STRING, BASE_NONE,
-          NULL, 0x0, NULL, HFILL }},
+          NULL, 0x0, "nr5g_rlcmac_Cmac_SpCellConfig_t", HFILL }},
 
       { &hf_l2server_pcmaxc,
         { "PcMaxC", "l2server.pcmaxc", FT_INT32, BASE_DEC,
@@ -7938,7 +7944,7 @@ proto_register_l2server(void)
 
       { &hf_l2server_scell_list,
         { "sCell List", "l2server.scell-list", FT_STRING, BASE_NONE,
-          NULL, 0x0, NULL, HFILL }},
+          NULL, 0x0, "nr5g_rlcmac_Cmac_SCellList_t", HFILL }},
       { &hf_l2server_scell,
         { "sCell", "l2server.scell", FT_STRING, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
@@ -7987,7 +7993,7 @@ proto_register_l2server(void)
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_params,
         { "Params", "l2server.params", FT_STRING, FT_NONE,
-          NULL, 0x0, NULL, HFILL }},
+          NULL, 0x0, "nr5g_rlcmac_Cmac_CfgParams_t", HFILL }},
 
       { &hf_l2server_rlc_config_tx,
         { "Tx", "l2server.rlc-config.tx", FT_STRING, FT_NONE,
@@ -8430,7 +8436,7 @@ proto_register_l2server(void)
       /* DRX config */
       { &hf_l2server_drx_config,
         { "DRX Config", "l2server.drx-config", FT_STRING, BASE_NONE,
-          NULL, 0x0, NULL, HFILL }},
+          NULL, 0x0, "nr5g_rlcmac_Cmac_DRX_CONFIGt", HFILL }},
       { &hf_l2server_drx_len,
         { "Length", "l2server.drx-lenth", FT_UINT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
@@ -8481,7 +8487,7 @@ proto_register_l2server(void)
 
       { &hf_l2server_spcell_config_ded,
         { "spCell Config Dedicated", "l2server.spcell-config-ded", FT_STRING, BASE_NONE,
-          NULL, 0x0, NULL, HFILL }},
+          NULL, 0x0, "nr5g_rlcmac_Cmac_SERV_CELL_CONFIGt", HFILL }},
       { &hf_l2server_spcell_config_ded_len,
         { "Length", "l2server.spcell-config-ded-len", FT_UINT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
@@ -8572,13 +8578,20 @@ proto_register_l2server(void)
         { "PPU", "l2server.ppu", FT_UINT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
 
-
       { &hf_l2server_ul_cell_cfg_ded,
         { "UL Cell Cfg Dedicated", "l2server.ul-cell-cfg-ded", FT_STRING, BASE_NONE,
-           NULL, 0x0, NULL, HFILL }},
+           NULL, 0x0, "nr5g_rlcmac_Cmac_UPLINK_DEDICATED_CONFIGt", HFILL }},
       { &hf_l2server_ul_cell_cfg_ded_len,
         { "Len", "l2server.ul-cell-cfg-ded.len", FT_UINT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_initial_ul_bwp_present,
+        { "Initial UL Bwp Present", "l2server.initial-ul-bwp-present", FT_BOOLEAN, 32,
+           NULL, nr5g_rlcmac_Cmac_STRUCT_UPLINK_DEDICATED_CONFIG_INITIAL_UL_BWP_PRESENT, NULL, HFILL }},
+      { &hf_l2server_pusch_present,
+        { "PUSCH Present", "l2server.pusch-present", FT_BOOLEAN, 32,
+           NULL, nr5g_rlcmac_Cmac_STRUCT_UPLINK_DEDICATED_CONFIG_PUSCH_PRESENT, NULL, HFILL }},
+
       { &hf_l2server_first_active_ul_bwp,
         { "First active UL BWP", "l2server.first-active-ul-bwp", FT_UINT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
@@ -8597,7 +8610,7 @@ proto_register_l2server(void)
 
       { &hf_l2server_initial_ul_bwp,
         { "Initial Ul BWP", "l2server.initial-ul-bwp", FT_STRING, BASE_NONE,
-           NULL, 0x0, NULL, HFILL }},
+           NULL, 0x0, "bb_nr5g_BWP_UPLINKCOMMONt", HFILL }},
       { &hf_l2server_initial_ul_bwp_len,
         { "Len", "l2server.initial-ul-bwp.len", FT_UINT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
@@ -8934,7 +8947,7 @@ proto_register_l2server(void)
 
       { &hf_l2server_csi_meas_config,
         { "CSI Meas Config", "l2server.csi-meas-config", FT_STRING, BASE_NONE,
-           NULL, 0x0, NULL, HFILL }},
+           NULL, 0x0, "bb_nr5g_CSI_MEAS_CFGt", HFILL }},
 
       { &hf_l2server_nb_nzp_csi_rs_res_to_add,
         { "Nb NZP CSI RS Res To Add", "l2server.nb-nzp-csi-rs-res-to-add", FT_UINT8, BASE_DEC,
