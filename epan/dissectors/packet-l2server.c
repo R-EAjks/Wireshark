@@ -2714,8 +2714,8 @@ static int dissect_pdcch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_
 }
 
 // bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt
-gint dissect_pdcsh_time_domain_res_alloc(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
-                                         guint offset, gboolean valid)
+static gint dissect_pdcsh_time_domain_res_alloc(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                                guint offset, gboolean valid)
 {
     // Subtree.
     proto_item *pdsch_alloc_ti = proto_tree_add_string_format(tree, hf_l2server_pdsch_alloc, tvb,

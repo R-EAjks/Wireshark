@@ -36,7 +36,7 @@ signal.signal(signal.SIGINT, signal_handler)
 dissectors = [ 'packet-ulgrant.c', 'packet-l2server.c',  'packet-dlblock.c',
                'packet-pdcp-uu.c', 'packet-pdcp-gtpu.c', 'packet-ip-udp.c',
                'packet-pacs.c',    'packet-axe-rpc.c',   'packet-textlogger.c',
-               'packet-tlv.c',     'packet-elsucopy.c']
+               'packet-tlv.c',     'packet-elsucopy.c',  'packet-rohc.c' ]
 
 tools = ['check_tfs.py', 'check_typed_item_calls.py  --consecutive --label --mask', 'check_static.py', 'check_dissector_urls.py', 'check_spelling.py', 'cppcheck/cppcheck.sh']
 
