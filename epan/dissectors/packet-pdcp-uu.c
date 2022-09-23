@@ -508,7 +508,7 @@ dissect_pdcp_uu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data 
 
                 if (tag == 0x62) {
                     /* This is FI */
-                    offset++;
+                    offset++; // skip length
                     proto_tree_add_item(pdcp_uu_tree, hf_pdcp_uu_rlc_fi,
                                         tvb, offset, 1, ENC_BIG_ENDIAN);
                     offset++;
