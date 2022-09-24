@@ -485,7 +485,7 @@ dissect_esmc_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *treex)
                     {
                         proto_item *item_c;
                         guint16 length;
-                        guint8 reserved;
+                        guint64 reserved;
 
                         /* type */
                         item_c = proto_tree_add_item(tree_b, hf_esmc_tlv_type, tvb, offset, 1, ENC_BIG_ENDIAN);
