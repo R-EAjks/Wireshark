@@ -1562,7 +1562,12 @@ void LograyMainWindow::addStatsPluginsToMenu() {
             stats_tree_action = new QAction(stat_name, this);
             stats_tree_action->setData(cfg->abbr);
             parent_menu->addAction(stats_tree_action);
-            connect(stats_tree_action, SIGNAL(triggered()), this, SLOT(actionStatisticsPlugin_triggered()));
+            connect(stats_tree_action, &QAction::triggered, this, [this]() {
+                QAction* action = qobject_cast<QAction*>(sender());
+                if (action) {
+                    openStatisticsTreeDialog(action->data().toString().toUtf8());
+                }
+            });
         }
     }
     g_list_free(cfg_list);
@@ -1663,98 +1668,83 @@ void LograyMainWindow::softwareUpdateRequested() {
 
 // File Menu
 
-void LograyMainWindow::on_actionFileOpen_triggered()
+void LograyMainWindow::connectFileMenuActions()
 {
-    openCaptureFile();
+    connect(main_ui_->actionFileOpen, &QAction::triggered, this,
+            [this]() { openCaptureFile(); });
+
+    connect(main_ui_->actionFileMerge, &QAction::triggered, this,
+            [this]() { mergeCaptureFile(); });
+
+    connect(main_ui_->actionFileImportFromHexDump, &QAction::triggered, this,
+            [this]() { importCaptureFile(); });
+
+    connect(main_ui_->actionFileClose, &QAction::triggered, this, [this]() {
+        QString before_what(tr(" before closing the file"));
+        if (testCaptureFileClose(before_what)) {
+            showWelcome();
+        }
+    });
+
+    connect(main_ui_->actionFileSave, &QAction::triggered, this,
+        [this]() { saveCaptureFile(capture_file_.capFile(), false); });
+
+    connect(main_ui_->actionFileSaveAs, &QAction::triggered, this,
+        [this]() { saveAsCaptureFile(capture_file_.capFile()); });
+
+    connect(main_ui_->actionFileSetListFiles, &QAction::triggered, this,
+        [this]() { file_set_dialog_->show(); });
+
+    connect(main_ui_->actionFileSetNextFile, &QAction::triggered, this, [this]() {
+        fileset_entry *entry = fileset_get_next();
+
+        if (entry) {
+            QString new_cf_path = entry->fullname;
+            openCaptureFile(new_cf_path);
+        }
+    });
+
+    connect(main_ui_->actionFileSetPreviousFile, &QAction::triggered, this, [this]() {
+        fileset_entry *entry = fileset_get_previous();
+
+        if (entry) {
+            QString new_cf_path = entry->fullname;
+            openCaptureFile(new_cf_path);
+        }
+    });
+
+    connect(main_ui_->actionFileExportPackets, &QAction::triggered, this,
+        [this]() { exportSelectedPackets(); });
+
+    connect(main_ui_->actionFileExportAsPlainText, &QAction::triggered, this,
+        [this]() { exportDissections(export_type_text); });
+
+    connect(main_ui_->actionFileExportAsCSV, &QAction::triggered, this,
+        [this]() { exportDissections(export_type_csv); });
+
+    connect(main_ui_->actionFileExportAsCArrays, &QAction::triggered, this,
+        [this]() { exportDissections(export_type_carrays); });
+
+    connect(main_ui_->actionFileExportAsPSML, &QAction::triggered, this,
+        [this]() { exportDissections(export_type_psml); });
+
+    connect(main_ui_->actionFileExportAsPDML, &QAction::triggered, this,
+        [this]() { exportDissections(export_type_pdml); });
+
+    connect(main_ui_->actionFileExportAsJSON, &QAction::triggered, this,
+        [this]() { exportDissections(export_type_json); });
+
+    connect(main_ui_->actionFileExportPacketBytes, &QAction::triggered, this,
+        [this]() { exportPacketBytes(); });
+
+    connect(main_ui_->actionFileExportPDU, &QAction::triggered, this,
+        [this]() { exportPDU(); });
+
+    connect(main_ui_->actionFilePrint, &QAction::triggered, this,
+        [this]() { printFile(); });
 }
 
-void LograyMainWindow::on_actionFileMerge_triggered()
-{
-    mergeCaptureFile();
-}
-
-void LograyMainWindow::on_actionFileImportFromHexDump_triggered()
-{
-    importCaptureFile();
-}
-
-void LograyMainWindow::on_actionFileClose_triggered() {
-    QString before_what(tr(" before closing the file"));
-    if (testCaptureFileClose(before_what))
-        showWelcome();
-}
-
-void LograyMainWindow::on_actionFileSave_triggered()
-{
-    saveCaptureFile(capture_file_.capFile(), false);
-}
-
-void LograyMainWindow::on_actionFileSaveAs_triggered()
-{
-    saveAsCaptureFile(capture_file_.capFile());
-}
-
-void LograyMainWindow::on_actionFileSetListFiles_triggered()
-{
-    file_set_dialog_->show();
-}
-
-void LograyMainWindow::on_actionFileSetNextFile_triggered()
-{
-    fileset_entry *entry = fileset_get_next();
-
-    if (entry) {
-        QString new_cf_path = entry->fullname;
-        openCaptureFile(new_cf_path);
-    }
-}
-
-void LograyMainWindow::on_actionFileSetPreviousFile_triggered()
-{
-    fileset_entry *entry = fileset_get_previous();
-
-    if (entry) {
-        QString new_cf_path = entry->fullname;
-        openCaptureFile(new_cf_path);
-    }
-}
-
-void LograyMainWindow::on_actionFileExportPackets_triggered()
-{
-    exportSelectedPackets();
-}
-
-void LograyMainWindow::on_actionFileExportAsPlainText_triggered()
-{
-    exportDissections(export_type_text);
-}
-
-void LograyMainWindow::on_actionFileExportAsCSV_triggered()
-{
-    exportDissections(export_type_csv);
-}
-
-void LograyMainWindow::on_actionFileExportAsCArrays_triggered()
-{
-    exportDissections(export_type_carrays);
-}
-
-void LograyMainWindow::on_actionFileExportAsPSML_triggered()
-{
-    exportDissections(export_type_psml);
-}
-
-void LograyMainWindow::on_actionFileExportAsPDML_triggered()
-{
-    exportDissections(export_type_pdml);
-}
-
-void LograyMainWindow::on_actionFileExportAsJSON_triggered()
-{
-    exportDissections(export_type_json);
-}
-
-void LograyMainWindow::on_actionFileExportPacketBytes_triggered()
+void LograyMainWindow::exportPacketBytes()
 {
     QString file_name;
 
@@ -1778,14 +1768,7 @@ void LograyMainWindow::on_actionFileExportPacketBytes_triggered()
     }
 }
 
-void LograyMainWindow::on_actionAnalyzeShowPacketBytes_triggered()
-{
-    ShowPacketBytesDialog *spbd = new ShowPacketBytesDialog(*this, capture_file_);
-    spbd->addCodecs(text_codec_map_);
-    spbd->show();
-}
-
-void LograyMainWindow::on_actionFileExportPDU_triggered()
+void LograyMainWindow::exportPDU()
 {
     ExportPDUDialog *exportpdu_dialog = new ExportPDUDialog(this);
 
@@ -1802,7 +1785,7 @@ void LograyMainWindow::on_actionFileExportPDU_triggered()
     exportpdu_dialog->activateWindow();
 }
 
-void LograyMainWindow::on_actionFilePrint_triggered()
+void LograyMainWindow::printFile()
 {
     capture_file *cf = capture_file_.capFile();
     g_return_if_fail(cf);
@@ -1938,6 +1921,9 @@ void LograyMainWindow::connectEditMenuActions()
 
     connect(main_ui_->actionEditTimeShift, &QAction::triggered, this,
             [this]() { editTimeShift(); }, Qt::QueuedConnection);
+
+    connect(main_ui_->actionDeleteAllPacketComments, &QAction::triggered, this,
+            [this]() { deleteAllPacketComments(); }, Qt::QueuedConnection);
 
     connect(main_ui_->actionEditConfigurationProfiles, &QAction::triggered, this,
             [this]() { editConfigurationProfiles(); }, Qt::QueuedConnection);
@@ -2080,7 +2066,7 @@ void LograyMainWindow::editTimeShiftFinished(int)
     }
 }
 
-void LograyMainWindow::actionAddPacketComment()
+void LograyMainWindow::addPacketComment()
 {
     QList<int> rows = selectedRows();
     if (rows.count() == 0)
@@ -2106,7 +2092,7 @@ void LograyMainWindow::addPacketCommentFinished(PacketCommentDialog* pc_dialog _
     }
 }
 
-void LograyMainWindow::actionEditPacketComment()
+void LograyMainWindow::editPacketComment()
 {
     QList<int> rows = selectedRows();
     if (rows.count() != 1)
@@ -2130,7 +2116,7 @@ void LograyMainWindow::editPacketCommentFinished(PacketCommentDialog* pc_dialog 
     }
 }
 
-void LograyMainWindow::actionDeletePacketComment()
+void LograyMainWindow::deletePacketComment()
 {
     QAction *ra = qobject_cast<QAction*>(sender());
     guint nComment = ra->data().toUInt();
@@ -2138,13 +2124,13 @@ void LograyMainWindow::actionDeletePacketComment()
     updateForUnsavedChanges();
 }
 
-void LograyMainWindow::actionDeleteCommentsFromPackets()
+void LograyMainWindow::deleteCommentsFromPackets()
 {
     packet_list_->deleteCommentsFromPackets();
     updateForUnsavedChanges();
 }
 
-void LograyMainWindow::on_actionDeleteAllPacketComments_triggered()
+void LograyMainWindow::deleteAllPacketComments()
 {
     QMessageBox *msg_dialog = new QMessageBox();
     connect(msg_dialog, SIGNAL(finished(int)), this, SLOT(deleteAllPacketCommentsFinished(int)));
@@ -2783,6 +2769,13 @@ void LograyMainWindow::statCommandExpertInfo(const char *, void *)
     expert_dialog->show();
 }
 
+void LograyMainWindow::on_actionAnalyzeShowPacketBytes_triggered()
+{
+    ShowPacketBytesDialog *spbd = new ShowPacketBytesDialog(*this, capture_file_);
+    spbd->addCodecs(text_codec_map_);
+    spbd->show();
+}
+
 void LograyMainWindow::on_actionAnalyzeExpertInfo_triggered()
 {
     statCommandExpertInfo(NULL, NULL);
@@ -2844,14 +2837,6 @@ void LograyMainWindow::on_actionStatisticsIOGraph_triggered()
     connect(iog_dialog, SIGNAL(goToPacket(int)), packet_list_, SLOT(goToPacket(int)));
     connect(this, SIGNAL(reloadFields()), iog_dialog, SLOT(reloadFields()));
     iog_dialog->show();
-}
-
-void LograyMainWindow::actionStatisticsPlugin_triggered()
-{
-    QAction* action = qobject_cast<QAction*>(sender());
-    if (action) {
-        openStatisticsTreeDialog(action->data().toString().toUtf8());
-    }
 }
 
 // Tools Menu
