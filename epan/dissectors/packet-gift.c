@@ -14,6 +14,7 @@
 #include "config.h"
 
 #include <epan/packet.h>
+#include <epan/charsets.h>
 #include <epan/strutil.h>
 
 void proto_register_gift(void);
@@ -81,10 +82,10 @@ dissect_gift(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
 		if (tokenlen != 0) {
 			if (is_request) {
 				proto_tree_add_string(cmd_tree, hf_gift_request_cmd, tvb, offset,
-						    tokenlen, format_text(pinfo->pool, line, tokenlen));
+						    tokenlen, get_utf_8_string(pinfo->pool, line, tokenlen));
 			} else {
 				proto_tree_add_string(cmd_tree, hf_gift_response_cmd, tvb, offset,
-						    tokenlen, format_text(pinfo->pool, line, tokenlen));
+						    tokenlen, get_utf_8_string(pinfo->pool, line, tokenlen));
 			}
 			offset += (gint) (next_token - line);
 			linelen -= (int) (next_token - line);
@@ -94,10 +95,10 @@ dissect_gift(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
 		if (linelen != 0) {
 			if (is_request) {
 				proto_tree_add_string(cmd_tree, hf_gift_request_arg, tvb, offset,
-						    linelen, format_text(pinfo->pool, line, linelen));
+						    linelen, get_utf_8_string(pinfo->pool, line, linelen));
 			} else {
 				proto_tree_add_string(cmd_tree, hf_gift_response_arg, tvb, offset,
-						    linelen, format_text(pinfo->pool, line, linelen));
+						    linelen, get_utf_8_string(pinfo->pool, line, linelen));
 			}
 		}
 	}

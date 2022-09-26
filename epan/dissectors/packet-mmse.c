@@ -456,9 +456,9 @@ get_text_string(tvbuff_t *tvb, guint offset, wmem_allocator_t *pool, const char 
     len = tvb_strsize(tvb, offset);
     DebugLog((" [1] tvb_strsize(tvb, offset) == %u\n", len));
     if (tvb_get_guint8(tvb, offset) == MM_QUOTE)
-        *strval = (const char *)tvb_memdup(pool, tvb, offset+1, len-1);
+        *strval = (const char *)tvb_get_string_enc(pool, tvb, offset+1, len-1, ENC_ASCII);
     else
-        *strval = (const char *)tvb_memdup(pool, tvb, offset, len);
+        *strval = (const char *)tvb_get_string_enc(pool, tvb, offset, len, ENC_ASCII);
     DebugLog((" [3] Return(len) == %u\n", len));
     return len;
 }
@@ -1106,10 +1106,8 @@ dissect_mmse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint8 pdut,
                     /* Now render the fields */
                     tii = proto_tree_add_string_format(mmse_tree,
                             hf_mmse_prev_sent_by,
-                            tvb, offset - 1, 1 + count + length,
-                            strval, "%s (Forwarded-count=%u)",
-                            format_text(pinfo->pool, strval, strlen(strval)),
-                            fwd_count);
+                            tvb, offset - 1, 1 + count + length, strval,
+                            "%s (Forwarded-count=%u)", strval, fwd_count);
                     subtree = proto_item_add_subtree(tii,
                             ett_mmse_hdr_details);
                     proto_tree_add_uint(subtree,
@@ -1143,10 +1141,8 @@ dissect_mmse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint8 pdut,
                     /* Now render the fields */
                     tii = proto_tree_add_string_format(mmse_tree,
                             hf_mmse_prev_sent_date,
-                            tvb, offset - 1, 1 + count + length,
-                            strval, "%s (Forwarded-count=%u)",
-                            format_text(pinfo->pool, strval, strlen(strval)),
-                            fwd_count);
+                            tvb, offset - 1, 1 + count + length, strval,
+                            "%s (Forwarded-count=%u)", strval, fwd_count);
                     subtree = proto_item_add_subtree(tii,
                             ett_mmse_hdr_details);
                     proto_tree_add_uint(subtree,
@@ -1166,7 +1162,6 @@ dissect_mmse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint8 pdut,
                     guint8 peek = tvb_get_guint8(tvb, offset);
                     const char *hdr_name = val_to_str(field, vals_mm_header_names,
                             "Unknown field (0x%02x)");
-                    const char *str;
                     DebugLog(("\t\tUndecoded well-known header: %s\n",
                                 hdr_name));
 
@@ -1179,9 +1174,8 @@ dissect_mmse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint8 pdut,
                                 hdr_name, peek);
                     } else if ((peek == 0) || (peek >= 0x20)) { /* Text */
                         length = get_text_string(tvb, offset, pinfo->pool, &strval);
-                        str = format_text(pinfo->pool, strval, strlen(strval));
                         proto_tree_add_string_format(mmse_tree, hf_mmse_header_string, tvb, offset - 1,
-                                length + 1, str, "%s: %s (Not decoded)", hdr_name, str);
+                                length + 1, strval, "%s: %s (Not decoded)", hdr_name, strval);
                     } else { /* General form with length */
                         if (peek == 0x1F) { /* Value length in guintvar */
                             guint length_len = 0;
@@ -1212,9 +1206,7 @@ dissect_mmse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint8 pdut,
                             length + length2,
                             tvb_get_string_enc(pinfo->pool, tvb, offset,
                                 length + length2, ENC_ASCII),
-                            "%s: %s",
-                            format_text(pinfo->pool, strval, strlen(strval)),
-                            format_text(pinfo->pool, strval2, strlen(strval2)));
+                            "%s: %s", strval, strval2);
 
                     offset += length + length2;
                 }

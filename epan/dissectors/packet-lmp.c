@@ -1460,10 +1460,9 @@ dissect_lmp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
                 if (l && l <= obj_length - 8) {
                     proto_item_append_text(lmp_object_tree, " = %s",
                                            tvb_format_text(pinfo->pool, tvb, offset2+4, l));
-                    proto_tree_add_string(lmp_object_tree,
+                    proto_tree_add_item(lmp_object_tree,
                                           hf_lmp_filter[LMPF_VAL_TRACE_LOCAL_MSG],
-                                          tvb, offset2+4, l, tvb_format_text(pinfo->pool, tvb,
-                                                                             offset2+4,l));
+                                          tvb, offset2+4, l, ENC_ASCII);
                 }
                 else
                     expert_add_info(pinfo, trace_item, &ei_lmp_trace_len);
@@ -1483,9 +1482,9 @@ dissect_lmp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
                                     tvb, offset2+2, 2, l);
                 proto_item_append_text(lmp_object_tree, " = %s",
                                        tvb_format_text(pinfo->pool, tvb, offset2+4, l));
-                proto_tree_add_string(lmp_object_tree,
+                proto_tree_add_item(lmp_object_tree,
                                       hf_lmp_filter[LMPF_VAL_TRACE_REMOTE_MSG],
-                                      tvb, offset2+4, l, tvb_format_text(pinfo->pool, tvb, offset2+4,l));
+                                      tvb, offset2+4, l, ENC_ASCII);
                 break;
 
             default:
