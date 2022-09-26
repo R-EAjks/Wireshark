@@ -39,11 +39,8 @@ void proto_reg_handoff_ossp(void);
 #define ESMC_EXTENDED_QL_TLV_TYPE   0x02
 #define ESMC_EXTENDED_QL_TLV_LENGTH 0x14
 
-static const value_string esmc_event_flag_vals[] = {
-    { 0, "Information ESMC PDU" },
-    { 1, "Time-critical Event ESMC PDU" },
-    { 0, NULL }
-};
+static const true_false_string esmc_event_flag_tfs =
+    { "Time-critical Event ESMC PDU", "Information ESMC PDU" };
 
 static const value_string esmc_tlv_type_vals[] = {
     { 1, "Quality Level" },
@@ -621,7 +618,7 @@ proto_register_ossp(void)
 
         { &hf_esmc_event_flag,
           { "Event Flag",    "ossp.esmc.event_flag",
-            FT_BOOLEAN,    8,    VALS(esmc_event_flag_vals),    0x08,
+            FT_BOOLEAN,    8,    TFS(&esmc_event_flag_tfs),    0x08,
             "This bit distinguishes the critical, time sensitive behaviour of the "
             "ESMC Event PDU from the ESMC Information PDU", HFILL }},
 
