@@ -1122,7 +1122,6 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 	proto_item* hidden_item;
 	char *transid = NULL;
 	char *code = NULL;
-	char *endpointId = NULL;
 	mgcp_type_t mgcp_type = MGCP_OTHERS;
 	conversation_t* conversation;
 	mgcp_call_info_key mgcp_call_key;
@@ -1130,8 +1129,7 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 	mgcp_call_t *mgcp_call = NULL;
 	nstime_t delta;
 	const gchar *verb_description = "";
-	char code_with_verb[64] = "";  /* To fit "<4-letter-code> (<longest-verb>)" */
-	proto_item* pi;
+	proto_item* pi, *it;
 
 	static address null_address = ADDRESS_INIT_NONE;
 	tvb_previous_offset = 0;
@@ -1165,21 +1163,19 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 					return;
 				}
 
-				code = tvb_format_text(pinfo->pool, tvb, tvb_previous_offset, tokenlen);
+				code = tvb_get_string_enc(pinfo->pool, tvb, tvb_previous_offset, tokenlen, ENC_ASCII);
 				(void) g_strlcpy(mi->code, code, 5);
 				if (is_mgcp_verb(tvb, tvb_previous_offset, tvb_current_len, &verb_description))
 				{
 					mgcp_type = MGCP_REQUEST;
+					it = proto_tree_add_item(tree, hf_mgcp_req_verb, tvb,
+					                             tvb_previous_offset, tokenlen,
+					                             ENC_ASCII);
 					if (verb_description != NULL)
 					{
 						/* Can show verb along with code if known */
-						snprintf(code_with_verb, 64, "%s (%s)", code, verb_description);
+						proto_item_append_text(it, " (%s)", verb_description);
 					}
-
-					proto_tree_add_string_format(tree, hf_mgcp_req_verb, tvb,
-					                             tvb_previous_offset, tokenlen,
-					                             code, "%s",
-					                             strlen(code_with_verb) ? code_with_verb : code);
 				}
 				else
 				if (is_mgcp_rspcode(tvb, tvb_previous_offset, tvb_current_len))
@@ -1199,20 +1195,17 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 			}
 			if (tokennum == 1)
 			{
-				transid = tvb_format_text(pinfo->pool, tvb, tvb_previous_offset, tokenlen);
+				proto_tree_add_item_ret_string(tree, hf_mgcp_transid, tvb,
+				                      tvb_previous_offset, tokenlen, ENC_ASCII, pinfo->pool, (const guint8 **)&transid);
 				/* XXX - what if this isn't a valid text string? */
 				mi->transid = (guint32)strtoul(transid, NULL, 10);
-				proto_tree_add_string(tree, hf_mgcp_transid, tvb,
-				                      tvb_previous_offset, tokenlen, transid);
 			}
 			if (tokennum == 2)
 			{
 				if (mgcp_type == MGCP_REQUEST)
 				{
-					endpointId = tvb_format_text(pinfo->pool, tvb, tvb_previous_offset, tokenlen);
-					mi->endpointId = wmem_strdup(wmem_packet_scope(), endpointId);
-					proto_tree_add_string(tree, hf_mgcp_req_endpoint, tvb,
-					                      tvb_previous_offset, tokenlen, endpointId);
+					proto_tree_add_item_ret_string(tree, hf_mgcp_req_endpoint, tvb,
+					                      tvb_previous_offset, tokenlen, ENC_ASCII, pinfo->pool, (const guint8 **)&mi->endpointId);
 				}
 				else
 				if (mgcp_type == MGCP_RESPONSE)
@@ -1226,10 +1219,8 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 					{
 						tokenlen = tvb_current_len;
 					}
-					proto_tree_add_string(tree, hf_mgcp_rsp_rspstring, tvb,
-					                      tvb_previous_offset, tokenlen,
-					                      tvb_format_text(pinfo->pool, tvb, tvb_previous_offset,
-					                      tokenlen));
+					proto_tree_add_item(tree, hf_mgcp_rsp_rspstring, tvb,
+					                      tvb_previous_offset, tokenlen, ENC_ASCII);
 					break;
 				}
 			}
@@ -1245,10 +1236,8 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 				{
 					tokenlen = tvb_current_len;
 				}
-				proto_tree_add_string(tree, hf_mgcp_version, tvb,
-				                      tvb_previous_offset, tokenlen,
-				                      tvb_format_text(pinfo->pool, tvb, tvb_previous_offset,
-				                      tokenlen));
+				proto_tree_add_item(tree, hf_mgcp_version, tvb,
+				                      tvb_previous_offset, tokenlen, ENC_ASCII);
 				break;
 			}
 			if (tvb_current_offset < tvb_len)
@@ -1557,9 +1546,8 @@ static void dissect_mgcp_params(tvbuff_t *tvb, proto_tree *tree, mgcp_info_t* mi
 				else
 				{
 					tokenlen = tvb_find_line_end(tvb, tvb_tokenbegin, -1, &tvb_lineend, FALSE);
-					proto_tree_add_string(mgcp_param_tree, *my_param, tvb,
-							tvb_linebegin, linelen,
-							tvb_format_text(wmem_packet_scope(), tvb, tvb_tokenbegin, tokenlen));
+					proto_tree_add_item(mgcp_param_tree, *my_param, tvb,
+							tvb_linebegin, linelen, ENC_ASCII);
 				}
 		}
 

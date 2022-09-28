@@ -519,7 +519,7 @@ static void dissect_srv_records(tvbuff_t* tvb, packet_info *pinfo, proto_tree* t
                             tvb,
                             curr + 8,
                             used_bytes,
-                            format_text(pinfo->pool, dname, dlen));
+                            dname);
 
         curr+=(int)((sizeof(short)*4) + used_bytes);
 
@@ -570,7 +570,7 @@ static void dissect_mx_records(tvbuff_t* tvb, packet_info *pinfo, proto_tree* tr
                             tvb,
                             curr + 4,
                             used_bytes,
-                            format_text(pinfo->pool, dname, dlen));
+                            dname);
 
         curr+=(int)((sizeof(short)*2) + used_bytes);
 
@@ -610,7 +610,7 @@ static void dissect_ns_records(tvbuff_t* tvb, packet_info *pinfo, proto_tree* tr
                             tvb,
                             curr + 2,
                             used_bytes,
-                            format_text(pinfo->pool, dname, dlen));
+                            dname);
         curr+=(int)(sizeof(short) + used_bytes);
 
     }

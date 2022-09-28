@@ -118,11 +118,11 @@ dissect_acap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
         tokenlen = get_token_len(line, line + linelen, &next_token);
         if (tokenlen != 0) {
             if (is_request) {
-                proto_tree_add_string(reqresp_tree, hf_acap_request_tag, tvb, offset,
-                    tokenlen, format_text(pinfo->pool, line, tokenlen));
+                proto_tree_add_item(reqresp_tree, hf_acap_request_tag, tvb, offset,
+                    tokenlen, ENC_ASCII);
             } else {
-                proto_tree_add_string(reqresp_tree, hf_acap_response_tag, tvb, offset,
-                    tokenlen, format_text(pinfo->pool, line, tokenlen));
+                proto_tree_add_item(reqresp_tree, hf_acap_response_tag, tvb, offset,
+                    tokenlen, ENC_ASCII);
             }
             offset += (int)(next_token - line);
             linelen -= (int)(next_token - line);
@@ -134,11 +134,11 @@ dissect_acap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
          */
         if (linelen != 0) {
             if (is_request) {
-                proto_tree_add_string(reqresp_tree, hf_acap_request_data, tvb, offset,
-                    linelen, format_text(pinfo->pool, line, linelen));
+                proto_tree_add_item(reqresp_tree, hf_acap_request_data, tvb, offset,
+                    linelen, ENC_ASCII);
             } else {
-                proto_tree_add_string(reqresp_tree, hf_acap_response_data, tvb, offset,
-                    linelen, format_text(pinfo->pool, line, linelen));
+                proto_tree_add_item(reqresp_tree, hf_acap_response_data, tvb, offset,
+                    linelen, ENC_ASCII);
             }
         }
 

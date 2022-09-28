@@ -1132,10 +1132,8 @@ dissect_rtspmessage(tvbuff_t *tvb, int offset, packet_info *pinfo,
             if (HDR_MATCHES(rtsp_transport))
             {
                 proto_item *ti;
-                ti = proto_tree_add_string(rtsp_tree, hf_rtsp_transport, tvb,
-                                           offset, linelen,
-                                           tvb_format_text(pinfo->pool, tvb, value_offset,
-                                                           value_len));
+                ti = proto_tree_add_item(rtsp_tree, hf_rtsp_transport, tvb,
+                                           offset, linelen, ENC_ASCII);
 
                 /*
                  * Based on the port numbers specified
@@ -1146,10 +1144,8 @@ dissect_rtspmessage(tvbuff_t *tvb, int offset, packet_info *pinfo,
                 rtsp_create_conversation(pinfo, ti, line, linelen, rdt_feature_level, rtsp_type_packet);
             } else if (HDR_MATCHES(rtsp_content_type))
             {
-                proto_tree_add_string(rtsp_tree, hf_rtsp_content_type,
-                                      tvb, offset, linelen,
-                                      tvb_format_text(pinfo->pool, tvb, value_offset,
-                                                      value_len));
+                proto_tree_add_item(rtsp_tree, hf_rtsp_content_type,
+                                      tvb, offset, linelen, ENC_ASCII);
 
                 offset = offset + (int)STRLEN_CONST(rtsp_content_type);
                 /* Skip wsp */
@@ -1185,11 +1181,9 @@ dissect_rtspmessage(tvbuff_t *tvb, int offset, packet_info *pinfo,
 
             } else if (HDR_MATCHES(rtsp_Session))
             {
-                session_id = tvb_format_text(pinfo->pool, tvb, value_offset, value_len);
                 /* Put the value into the protocol tree */
-                proto_tree_add_string(rtsp_tree, hf_rtsp_session, tvb,
-                                      offset, linelen,
-                                      session_id);
+                proto_tree_add_item(rtsp_tree, hf_rtsp_session, tvb,
+                                      offset, linelen, ENC_ASCII);
 
             } else if (HDR_MATCHES(rtsp_X_Vig_Msisdn)) {
                 /*
@@ -1199,9 +1193,8 @@ dissect_rtspmessage(tvbuff_t *tvb, int offset, packet_info *pinfo,
                 {
                     proto_item *ti;
                     /* Put the value into the protocol tree */
-                    ti = proto_tree_add_string(rtsp_tree, hf_rtsp_X_Vig_Msisdn,tvb,
-                                               offset, linelen ,
-                                               tvb_format_text(pinfo->pool, tvb, value_offset, value_len));
+                    ti = proto_tree_add_item(rtsp_tree, hf_rtsp_X_Vig_Msisdn,tvb,
+                                               offset, linelen, ENC_ASCII);
                     sub_tree = proto_item_add_subtree(ti, ett_rtsp_method);
 
                     e164_info.e164_number_type = CALLING_PARTY_NUMBER;
@@ -1406,9 +1399,8 @@ process_rtsp_request(tvbuff_t *tvb, int offset, const guchar *data,
     }
 
     /* Add a tree for this request */
-    ti = proto_tree_add_string(tree, hf_rtsp_request, tvb, offset,
-                              (gint) (next_line_offset - offset),
-                              tvb_format_text(wmem_packet_scope(), tvb, offset, (gint) (next_line_offset - offset)));
+    ti = proto_tree_add_item(tree, hf_rtsp_request, tvb, offset,
+                              (gint) (next_line_offset - offset), ENC_ASCII);
     sub_tree = proto_item_add_subtree(ti, ett_rtsp_method);
 
 
@@ -1450,9 +1442,8 @@ process_rtsp_reply(tvbuff_t *tvb, int offset, const guchar *data,
     guint         status_i;
 
     /* Add a tree for this request */
-    ti = proto_tree_add_string(tree, hf_rtsp_response, tvb, offset,
-                               (gint) (next_line_offset - offset),
-                               tvb_format_text(wmem_packet_scope(), tvb, offset, (gint) (next_line_offset - offset)));
+    ti = proto_tree_add_item(tree, hf_rtsp_response, tvb, offset,
+                               (gint) (next_line_offset - offset), ENC_ASCII);
     sub_tree = proto_item_add_subtree(ti, ett_rtsp_method);
 
 

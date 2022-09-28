@@ -5070,9 +5070,9 @@ dissect_v9_v10_pdu_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pdutree, 
     address               local_addr, remote_addr;
     guint16               local_port = 0, remote_port = 0/*, ipv4_id = 0, icmp_id = 0*/;
     guint32               uid = 0, pid = 0;
-    int                   uname_len;
+    guint32               uname_len;
     gchar                *uname_str = NULL;
-    int                   cmd_len;
+    guint32               cmd_len;
     gchar                *cmd_str = NULL;
     guint16               got_flags = 0;
 
@@ -5084,7 +5084,6 @@ dissect_v9_v10_pdu_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pdutree, 
     proto_tree           *juniper_resilincy_tree;
     guint32               cpid, cpdesc;
 
-    gchar                *gen_str = NULL;
     int                   gen_str_offset = 0;
 
     proto_item           *ti;
@@ -8125,23 +8124,19 @@ dissect_v9_v10_pdu_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pdutree, 
             break;
 
         case VENDOR_CACE << 16 | 10: /* caceLocalProcessUserName */
-            uname_len = tvb_get_guint8(tvb, offset);
-            uname_str = tvb_format_text(pinfo->pool, tvb, offset+1, uname_len);
-            proto_tree_add_item(pdutree, hf_pie_cace_local_username_len,
-                                tvb, offset, 1, ENC_BIG_ENDIAN);
-            ti = proto_tree_add_string(pdutree, hf_pie_cace_local_username,
-                                       tvb, offset+1, uname_len, uname_str);
+            proto_tree_add_item_ret_uint(pdutree, hf_pie_cace_local_username_len,
+                                tvb, offset, 1, ENC_BIG_ENDIAN, &uname_len);
+            ti = proto_tree_add_item(pdutree, hf_pie_cace_local_username,
+                                       tvb, offset+1, uname_len, ENC_ASCII);
             length = uname_len + 1;
             got_flags |= GOT_USERNAME;
             break;
 
         case VENDOR_CACE << 16 | 11: /* caceLocalProcessCommand */
-            cmd_len = tvb_get_guint8(tvb, offset);
-            cmd_str = tvb_format_text(pinfo->pool, tvb, offset+1, cmd_len);
-            proto_tree_add_item(pdutree, hf_pie_cace_local_cmd_len,
-                                tvb, offset, 1, ENC_BIG_ENDIAN);
-            ti = proto_tree_add_string(pdutree, hf_pie_cace_local_cmd,
-                                       tvb, offset+1, cmd_len, cmd_str);
+            proto_tree_add_item_ret_uint(pdutree, hf_pie_cace_local_cmd_len,
+                                tvb, offset, 1, ENC_BIG_ENDIAN, &cmd_len);
+            ti = proto_tree_add_item(pdutree, hf_pie_cace_local_cmd,
+                                       tvb, offset+1, cmd_len, ENC_ASCII);
             length = cmd_len + 1;
             got_flags |= GOT_COMMAND;
             break;
@@ -10143,37 +10138,32 @@ dissect_v9_v10_pdu_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pdutree, 
                                      tvb, offset, length, ENC_BIG_ENDIAN);
             break;
         case ((VENDOR_PLIXER << 16) | 101):    /* client_hostname */
-            gen_str = tvb_format_text(pinfo->pool, tvb, offset, length);
-            ti = proto_tree_add_string(pdutree, hf_pie_plixer_client_hostname,
-                                       tvb, offset, length, gen_str);
+            ti = proto_tree_add_item(pdutree, hf_pie_plixer_client_hostname,
+                                       tvb, offset, length, ENC_ASCII);
             break;
         case ((VENDOR_PLIXER << 16) | 102):    /* partner_name */
-            gen_str = tvb_format_text(pinfo->pool, tvb, offset, length);
-            ti = proto_tree_add_string(pdutree, hf_pie_plixer_partner_name,
-                                       tvb, offset, length, gen_str);
+            ti = proto_tree_add_item(pdutree, hf_pie_plixer_partner_name,
+                                       tvb, offset, length, ENC_ASCII);
             break;
         case ((VENDOR_PLIXER << 16) | 103):    /* server_hostname */
-            gen_str = tvb_format_text(pinfo->pool, tvb, offset, length);
-            ti = proto_tree_add_string(pdutree, hf_pie_plixer_server_hostname,
-                                       tvb, offset, length, gen_str);
+            ti = proto_tree_add_item(pdutree, hf_pie_plixer_server_hostname,
+                                       tvb, offset, length, ENC_ASCII);
             break;
         case ((VENDOR_PLIXER << 16) | 104):    /* server_ip_v4 */
             ti = proto_tree_add_item(pdutree, hf_pie_plixer_server_ip_v4,
                                      tvb, offset, length, ENC_BIG_ENDIAN);
             break;
         case ((VENDOR_PLIXER << 16) | 105):    /* recipient_address */
-            gen_str = tvb_format_text(pinfo->pool, tvb, offset, length);
-            ti = proto_tree_add_string(pdutree, hf_pie_plixer_recipient_address,
-                                       tvb, offset, length, gen_str);
+            ti = proto_tree_add_item(pdutree, hf_pie_plixer_recipient_address,
+                                       tvb, offset, length, ENC_ASCII);
             break;
         case ((VENDOR_PLIXER << 16) | 106):    /* event_id */
             ti = proto_tree_add_item(pdutree, hf_pie_plixer_event_id,
                                      tvb, offset, length, ENC_BIG_ENDIAN);
             break;
         case ((VENDOR_PLIXER << 16) | 107):    /* msgid */
-            gen_str = tvb_format_text(pinfo->pool, tvb, offset, length);
-            ti = proto_tree_add_string(pdutree, hf_pie_plixer_msgid,
-                                       tvb, offset, length, gen_str);
+            ti = proto_tree_add_item(pdutree, hf_pie_plixer_msgid,
+                                       tvb, offset, length, ENC_ASCII);
             break;
         case ((VENDOR_PLIXER << 16) | 108):    /* priority */
             ti = proto_tree_add_item(pdutree, hf_pie_plixer_priority,
@@ -10197,24 +10187,20 @@ dissect_v9_v10_pdu_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pdutree, 
                                      tvb, offset, length, ENC_BIG_ENDIAN);
             break;
         case ((VENDOR_PLIXER << 16) | 113):    /* service_version */
-            gen_str = tvb_format_text(pinfo->pool, tvb, offset, length);
-            ti = proto_tree_add_string(pdutree, hf_pie_plixer_service_version,
-                                       tvb, offset, length, gen_str);
+            ti = proto_tree_add_item(pdutree, hf_pie_plixer_service_version,
+                                       tvb, offset, length, ENC_ASCII);
             break;
         case ((VENDOR_PLIXER << 16) | 114):    /* linked_msgid */
-            gen_str = tvb_format_text(pinfo->pool, tvb, offset, length);
-            ti = proto_tree_add_string(pdutree, hf_pie_plixer_linked_msgid,
-                                       tvb, offset, length, gen_str);
+            ti = proto_tree_add_item(pdutree, hf_pie_plixer_linked_msgid,
+                                       tvb, offset, length, ENC_ASCII);
             break;
         case ((VENDOR_PLIXER << 16) | 115):    /* message_subject */
-            gen_str = tvb_format_text(pinfo->pool, tvb, offset, length);
-            ti = proto_tree_add_string(pdutree, hf_pie_plixer_message_subject,
-                                       tvb, offset, length, gen_str);
+            ti = proto_tree_add_item(pdutree, hf_pie_plixer_message_subject,
+                                       tvb, offset, length, ENC_ASCII);
             break;
         case ((VENDOR_PLIXER << 16) | 116):    /* sender_address */
-            gen_str = tvb_format_text(pinfo->pool, tvb, offset, length);
-            ti = proto_tree_add_string(pdutree, hf_pie_plixer_sender_address,
-                                       tvb, offset, length, gen_str);
+            ti = proto_tree_add_item(pdutree, hf_pie_plixer_sender_address,
+                                       tvb, offset, length, ENC_ASCII);
             break;
         case ((VENDOR_PLIXER << 16) | 117):    /* date_time */
             /* XXX - what format is this? */

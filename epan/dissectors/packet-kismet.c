@@ -17,6 +17,7 @@
 #include <epan/packet.h>
 #include <epan/to_str.h>
 #include <epan/strutil.h>
+#include <epan/charsets.h>
 #include <epan/expert.h>
 #include <wsutil/strtoi.h>
 
@@ -171,42 +172,42 @@ dissect_kismet(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void * da
 						line = next_token;
 						tokenlen = get_token_len(line, line + linelen, &next_token);
 						proto_tree_add_string(reqresp_tree, hf_kismet_version, tvb, offset,
-							tokenlen, format_text(pinfo->pool, line, tokenlen));
+							tokenlen, get_utf_8_string(pinfo->pool, line, tokenlen));
 
 						offset += (gint) (next_token - line);
 						linelen -= (int) (next_token - line);
 						line = next_token;
 						tokenlen = get_token_len(line, line + linelen, &next_token);
 						proto_tree_add_string(reqresp_tree, hf_kismet_start_time, tvb, offset,
-							tokenlen, format_text(pinfo->pool, line, tokenlen));
+							tokenlen, get_utf_8_string(pinfo->pool, line, tokenlen));
 
 						offset += (gint) (next_token - line);
 						linelen -= (int) (next_token - line);
 						line = next_token;
 						tokenlen = get_token_len(line, line + linelen, &next_token);
 						proto_tree_add_string(reqresp_tree, hf_kismet_server_name, tvb, offset,
-							tokenlen, format_text(pinfo->pool, line + 1, tokenlen - 2));
+							tokenlen, get_utf_8_string(pinfo->pool, line + 1, tokenlen - 2));
 
 						offset += (gint) (next_token - line);
 						linelen -= (int) (next_token - line);
 						line = next_token;
 						tokenlen = get_token_len(line, line + linelen, &next_token);
 						proto_tree_add_string(reqresp_tree, hf_kismet_build_revision, tvb, offset,
-							tokenlen, format_text(pinfo->pool, line, tokenlen));
+							tokenlen, get_utf_8_string(pinfo->pool, line, tokenlen));
 
 						offset += (gint) (next_token - line);
 						linelen -= (int) (next_token - line);
 						line = next_token;
 						tokenlen = get_token_len(line, line + linelen, &next_token);
 						proto_tree_add_string(reqresp_tree, hf_kismet_unknown_field, tvb, offset,
-							tokenlen, format_text(pinfo->pool, line, tokenlen));
+							tokenlen, get_utf_8_string(pinfo->pool, line, tokenlen));
 
 						offset += (gint) (next_token - line);
 						linelen -= (int) (next_token - line);
 						line = next_token;
 						tokenlen = get_token_len(line, line + linelen, &next_token);
 						proto_tree_add_string(reqresp_tree, hf_kismet_extended_version_string, tvb, offset,
-							tokenlen, format_text(pinfo->pool, line, tokenlen));
+							tokenlen, get_utf_8_string(pinfo->pool, line, tokenlen));
 					}
 					/*
 					 * *TIME: {Time}
