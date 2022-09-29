@@ -4,7 +4,7 @@
 //#include "lsu.h"
 #include "nr5g.h"
 
-#define nr5g_rlcmac_Data_VERSION   "0.0.3"
+#define nr5g_rlcmac_Data_VERSION   "0.1.0"
 
 #pragma pack(1)
 
@@ -34,11 +34,29 @@
 /* Indicate end of RLC Re-Establishment */
 #define nr5g_rlcmac_Data_RE_EST_END_IND	0x404
 
-/* Request for  RLC buffer status */
-#define nr5g_rlcmac_Data_RLC_BUFFER_REQ	0x05
+/* Set RLC uplink split threshold */
+#define nr5g_rlcmac_Data_RLC_SPLIT_THR_REQ	0x05
 
-/* Indicate RLC buffer status */
-#define nr5g_rlcmac_Data_RLC_BUFFER_IND	0x405
+/* Set RLC uplink split threshold */
+#define nr5g_rlcmac_Data_RLC_SPLIT_THR_IND	0x405
+
+/* Request for RLC Entity status */
+#define nr5g_rlcmac_Data_RLC_ENTITY_REQ	0x06
+
+/* Indicate RLC Entity status */
+#define nr5g_rlcmac_Data_RLC_ENTITY_IND	0x406
+
+/* Indicate RLC Entity Creation */
+#define nr5g_rlcmac_Data_RLC_ENTITY_CREATE_IND	0x407
+
+/* Request for a SI on demand (USER side only) */
+#define nr5g_rlcmac_Data_SI_REQ		0x08
+
+/* Confirm success or failure of a Random Access (USER side only) */
+#define nr5g_rlcmac_Data_SI_CNF		0x208
+
+/* Indicate a successful Random Access */
+#define nr5g_rlcmac_Data_SI_IND		0x408
 
 /*
  * TM SAP
@@ -111,6 +129,10 @@ typedef struct {
 	ushort			Esbf;		/* Extended L1 SFN/SBF number (1) */
 	nr5g_Ref_Dl_1_t	DlLogRef;	/* Reference for DL Logging */
 	nr5g_rlcmac_info_t	RLcMacInfo; /* Additional info */
+	uint			RlcBuffer;
+	uint			RlcStatus;
+	uint			NrCurrentRate;
+	uint			Spare[2];
 	uchar			Data[1];
 
 } nr5g_rlcmac_Data_DATA_IND_t;
@@ -146,6 +168,10 @@ typedef struct {
 	uchar                   ScGid;          /* 0 for MCG 1 for SGC */
 	uint			Ref;		/* Reference for Cnf */
 	uchar			MUI;		/* User Information */
+	uint			RlcBuffer;
+	uint			RlcStatus;
+	uint			NrCurrentRate;
+	uint			Spare[2];
 
 } nr5g_rlcmac_Data_MUI_t;
 
@@ -174,7 +200,6 @@ typedef struct {
 	
 	uint			Flags;
 #define nr5g_rlcmac_Data_FLAG_RA_TEST_01	(0x01) /* Enable RA test mode type 1 */
-#define nr5g_rlcmac_Data_FLAG_NO_UL_HARQ	(0x02) /* Disable UL HARQ */
 	uchar                   ScGid;          /* 0 for MCG 1 for SGC */
 	uchar			Spare[11];	/* Must be set to zero */
 	uchar			Rt_Preamble;	/* RA test mode preamble. Valid in RA_TEST_* mode only.
@@ -212,6 +237,37 @@ typedef struct {
 	uint			Crnti;		/* Assigned C-RNTI */
 	uchar			CrId[1];	/* Contention Resolution Id */
 } nr5g_rlcmac_Data_RA_IND_t;
+
+/*
+ * nr5g_rlcmac_Data_SI_REQ
+ */
+typedef struct {
+	nr5g_Id_t					Nr5gId;			/* NR5G Id */
+	uchar						RequestResIdx;	/* Request Resources index */
+	nr5g_rlcmac_Data_RA_REQ_t	SiRaInfo;		/* RA Info */
+} nr5g_rlcmac_Data_SI_REQ_t;
+
+/*
+ * nr5g_rlcmac_Data_SI_CNF
+ */
+typedef struct {
+	nr5g_Id_t		Nr5gId;					/* NR5G Id */
+	short			Res;					/* Result code (see TODO) */
+	nr5g_SI_RES_v	SiRes;					/* RA Result code */
+	uchar			RequestResIdx;			/* Request Resources index */
+	uint			numberOfPreamblesSent;	/* number of RACH preambles that were transmitted. Corresponds to parameter PREAMBLE_TRANSMISSION_COUNTER in TS 36.321 */
+	uchar			contentionDetected;		/* If set contention was detected for at least one of the transmitted preambles */
+} nr5g_rlcmac_Data_SI_CNF_t;
+
+/*
+ * nr5g_rlcmac_Data_SI_IND
+ */
+typedef struct {
+	nr5g_Id_t		Nr5gId;			/* NR5G Id; CellId is valid */
+	short			Res;			/* Result code (see TODO) */
+	uchar			RequestResIdx;	/* Request Resources index */
+} nr5g_rlcmac_Data_SI_IND_t;
+
 /*
  * (1) Returned value is choose by MAC and returned to client.
  *     It can correspond to a new or reconfigured UE.
@@ -246,25 +302,85 @@ typedef struct {
     uchar            Data[1];    /* CE Body - See 6.1.3 of 38.321 */
 } nr5g_rlcmac_Data_CE_DATA_IND_t;
 
-/*
- * nr5g_rlcmac_Data_RLC_BUFFER_REQ
- */
-typedef struct {
-	nr5g_Id_t		Nr5gId;		/* NR5G Id; CellId is valid */
-	nr5g_RbType_v	RbType;
-	uchar			RbId;		/* Rb id */
-} nr5g_rlcmac_Data_RLC_BUFFER_REQ_t;
+#define NR_RLC_COMMAND_SEND		0
+#define NR_RLC_COMMAND_EMPTY	1
+#define NR_RLC_COMMAND_STOP		2
 
+#define NR_RLC_STATUS_NORMAL	0
+#define NR_RLC_STATUS_EMPTYING	1
+#define NR_RLC_STATUS_EMPTIED	2
+#define NR_RLC_STATUS_STOP		3
 /*
- * nr5g_rlcmac_Data_RLC_BUFFER_IND
+ * nr5g_rlcmac_Data_RLC_SPLIT_THR_REQ
+ * nr5g_rlcmac_Data_RLC_SPLIT_THR_IND
  */
 typedef struct {
 	nr5g_Id_t		Nr5gId;		/* NR5G Id; CellId is valid */
 	nr5g_RbType_v	RbType;
 	uchar			RbId;		/* Rb id */
 	uchar                   NrStkInst;
-	int				RlcBuffer;	/* RLC Buffer */
-} nr5g_rlcmac_Data_RLC_BUFFER_IND_t;
+	uchar			RlcCommand;	/* see above NR_RLC_COMMAND_XXX */
+	uchar			RlcStatus;	/* see above NR_RLC_STATUS_XXX */
+    uchar           Flag[3];
+    uint            SplitThr;   /* UL Split threshold */
+} nr5g_rlcmac_Data_RLC_SPLIT_THR_t;
+
+/*
+ * nr5g_rlcmac_Data_RLC_ENTITY_REQ
+ */
+#define NUM_LCID_FOR_RBID	(4)
+
+// values for tx_DuplicationState, dup_state
+#define ggDUP_NO     (0)
+#define ggDUP_CONFIG (1)
+#define ggDUP_ACTIVE (2)
+
+// values for flag
+#define ggLCID_FLAG_NONE           (0)
+#define ggLCID_FLAG_PRIMARY        (1)
+#define ggLCID_FLAG_CGID_PRIMARY   (2)
+
+typedef struct {
+	uchar lcid;        /* LcId value */
+	uchar cgid;        /* Cell Group Identifier */
+	uchar dup_state;   /* State: used in DRB/SRB, changed by MAC or by PDCP: ggDUP_* */
+	uchar flag;        /* ggLCID_FLAG_* */
+} nr5g_rlcmac_Data_LCID_t;
+
+typedef struct {
+	nr5g_Id_t		Nr5gId;		/* NR5G Id; CellId is valid */
+	nr5g_RbType_v	RbType;
+	uchar			RbId;		/* Rb id */
+	uchar			cgid;                            /* Cell Group Identifier */
+	uchar			flag;                            /* ggLCID_FLAG_* */
+	uchar			dup_state;                       /* State: used in DRB/SRB, changed by MAC or by PDCP: ggDUP_* */
+	uchar			NumLcId;                         /* Global LcId Num for this RbId */
+	nr5g_rlcmac_Data_LCID_t LcId[NUM_LCID_FOR_RBID]; /* Global LcId List for this RbId */
+} nr5g_rlcmac_Data_RLC_ENTITY_REQ_t;
+
+/*
+ * nr5g_rlcmac_Data_RLC_ENTITY_IND
+ */
+typedef struct {
+	nr5g_Id_t		Nr5gId;		/* NR5G Id; CellId is valid */
+	nr5g_RbType_v	RbType;
+	uchar			RbId;		/* Rb id */
+	uchar			cgid;                            /* Cell Group Identifier */
+	uchar			flag;                            /* ggLCID_FLAG_* */
+	uchar			dup_state;                       /* State: used in DRB/SRB, changed by MAC or by PDCP: ggDUP_* */
+	uchar			NumLcId;                         /* Global LcId Num for this RbId */
+	nr5g_rlcmac_Data_LCID_t LcId[NUM_LCID_FOR_RBID]; /* Global LcId List for this RbId */
+	uchar			Answer;                          /* Answer: 0 Spontaneous from RLCMAC, 1 answer to nr5g_rlcmac_Data_RLC_ENTITY_REQ */
+} nr5g_rlcmac_Data_RLC_ENTITY_IND_t;
+
+/*
+ * nr5g_rlcmac_Data_RLC_ENTITY_IND
+ */
+typedef struct {
+	nr5g_Id_t		Nr5gId;		/* NR5G Id; CellId is valid */
+	nr5g_RbType_v	RbType;
+	uchar			RbId;		/* Rb id */
+} nr5g_rlcmac_Data_RLC_ENTITY_CREATE_IND_t;
 
 /*------------------------------------------------------------------*
  |  SUMMARY OF PRIMITIVES                                           |
@@ -283,8 +399,14 @@ typedef union {
 	nr5g_rlcmac_Data_RA_IND_t      RaInd;
 	nr5g_rlcmac_Data_RE_EST_t      ReestInd;
 	nr5g_rlcmac_Data_RE_EST_t      ReestEndInd;
-	nr5g_rlcmac_Data_RLC_BUFFER_REQ_t RlcBufferReq;
-	nr5g_rlcmac_Data_RLC_BUFFER_IND_t RlcBufferInd;
+	nr5g_rlcmac_Data_RLC_SPLIT_THR_t RlcSplitThrReq;
+	nr5g_rlcmac_Data_RLC_SPLIT_THR_t RlcSplitThrInd;
+	nr5g_rlcmac_Data_RLC_ENTITY_REQ_t RlcEntityReq;
+	nr5g_rlcmac_Data_RLC_ENTITY_IND_t RlcEntityInd;
+	nr5g_rlcmac_Data_RLC_ENTITY_CREATE_IND_t RlcCreateInd;
+	nr5g_rlcmac_Data_SI_REQ_t      SiReq;
+	nr5g_rlcmac_Data_SI_CNF_t      SiCnf;
+	nr5g_rlcmac_Data_SI_IND_t      SiInd;
 
 	/* TM SAP */
 	nr5g_rlcmac_Data_DATA_REQ_t  TmDataReq;

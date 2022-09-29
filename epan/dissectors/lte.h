@@ -84,7 +84,7 @@
 #define lte_MaxNrOfPDP_CTX      32      // Prop. (per UE)
 #define lte_MaxNrOfRB           32      // Prop. (per UE)
 #define lte_MaxNrOfRB_C_MRB     8       // RB for MCCHs (up to 8 for a single cell, 1 for an MBSFN Area): range 33 - 40
-#define lte_MaxNrOfRB_T_MRB     23      // RB for MTCHs (up to 23 for a PMCH of an MBSFN Area, max number of sessions for PMCH for Area 29): range 41 - 63
+#define lte_MaxNrOfRB_T_MRB     64      // RB for MTCHs per cell (up to 23 for a PMCH of an MBSFN Area, max number of sessions for PMCH for Area 29): range 41 - 105
 #define lte_MaxLchIdxSch        10
 #define lte_MaxLchIdMch         28
 #define lte_MaxLchPrio          16
@@ -159,7 +159,7 @@ typedef enum {
     lte_BCCHoDLSCHNB = 11,
     lte_CCCH_NB = 12,
     lte_DCCH_NB = 13,
-	lte_PCCH_NB = 14,
+    lte_PCCH_NB = 14,
     /* ADD Other */
 } lte_LchType_e;
 typedef uchar lte_LchType_v;
@@ -229,36 +229,36 @@ typedef struct {
 #define lte_MAX_LI (64)
 /* This structure takes into account the reference for UL logging trough layers */
 typedef struct {
-	uint UeId;
-	uchar RbId;
-	ushort PdcpSn;
-	uchar NumLi;
-	ushort PdcpRlcSn[lte_MAX_LI];
-	ushort Li[lte_MAX_LI];
+    uint UeId;
+    uchar RbId;
+    ushort PdcpSn;
+    uchar NumLi;
+    ushort PdcpRlcSn[lte_MAX_LI];
+    ushort Li[lte_MAX_LI];
 } lte_Ref_Ul_t;
 
 typedef struct {
-	ushort rlcPdcpSn[lte_MAX_LI];
-	ushort sduLen[lte_MAX_LI];
+    ushort rlcPdcpSn[lte_MAX_LI];
+    ushort sduLen[lte_MAX_LI];
 } lte_Ref_Dl_SduInfo_t;
 
 //lte_MAX_MAC_SDU -> it must be 1024 to be aligned with sw architecture, but it has been decremented to 256 due to memory allocation issue
 #define lte_MAX_MAC_SDU (256)
 /* This structure takes into account the reference for DL logging trough layers (MAC to RLC) */
 typedef struct {
-	uchar logRefFlag;
-	ushort numPdu;
-	ushort RlcSn[lte_MAX_MAC_SDU];
-	uint UeId[lte_MAX_MAC_SDU];
-	uchar RbId[lte_MAX_MAC_SDU];
+    uchar logRefFlag;
+    ushort numPdu;
+    ushort RlcSn[lte_MAX_MAC_SDU];
+    uint UeId[lte_MAX_MAC_SDU];
+    uchar RbId[lte_MAX_MAC_SDU];
 } lte_Ref_Dl_t;
 
 /* This structure takes into account the reference for DL logging trough layers (RLC to PDCP) */
 typedef struct {
-	uint UeId;
-	uchar RbId;
-	uchar numPduForSdu;
-	lte_Ref_Dl_SduInfo_t SduInfo;
+    uint UeId;
+    uchar RbId;
+    uchar numPduForSdu;
+    lte_Ref_Dl_SduInfo_t SduInfo;
 } lte_Ref_Dl_1_t;
 
 #define lte_RefDl_PDCP_Size (9)

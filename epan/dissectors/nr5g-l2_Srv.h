@@ -19,11 +19,6 @@ $Log$
 #include "qnx_gen.h" 
 #include "nr5g.h"
 
-// include added to compile in TM
-#include "lte-l2_Srv.h"
-#include "nr5g-rlcmac_Cmac.h"
-#include "nr5g-pdcp_Com.h"
-
 #pragma  pack(1)
 
 
@@ -43,7 +38,7 @@ $Log$
 /*
  * The current Server Interface version
  */
-#define     nr5g_l2_Srv_VERSION       "1.14.1"
+#define     nr5g_l2_Srv_VERSION       "1.20.0"
 
 /*
  * The default TCP Port
@@ -156,6 +151,12 @@ $Log$
 #define  nr5g_l2_Srv_SCG_REL_AND_ADD_NAK      (512 + nr5g_l2_Srv_SCG_REL_AND_ADD_CMD)
 
 /*
+ * Configure Ue Test Mode level */
+#define  nr5g_l2_Srv_SET_UE_TEST_MODE_CMD      nr5g_l2_Srv_BASE_TYPE + 32
+#define  nr5g_l2_Srv_SET_UE_TEST_MODE_ACK      (256 + nr5g_l2_Srv_SET_UE_TEST_MODE_CMD)
+#define  nr5g_l2_Srv_SET_UE_TEST_MODE_NAK      (512 + nr5g_l2_Srv_SET_UE_TEST_MODE_CMD)
+
+/*
  * Trigger handover to target NR cell. */
 #define  nr5g_l2_Srv_HANDOVER_CMD      nr5g_l2_Srv_BASE_TYPE + 18
 #define  nr5g_l2_Srv_HANDOVER_ACK      (256 + nr5g_l2_Srv_HANDOVER_CMD)
@@ -233,6 +234,11 @@ $Log$
 /*********************************************
  * STRUCT
  *********************************************/
+#if defined DU_SIM
+typedef ushort nr5g_l2_Srv_CellId_TYPE; // JIRA[NR5GX0A-3769] cell id should be 16-bits only in TSTM-DUSIM interface
+#else
+typedef uchar nr5g_l2_Srv_CellId_TYPE; // "normal" cell id 8 bits  
+#endif
 
 typedef struct {
     ushort  phy_cell_id;    /* physical cell identifier [0] */
@@ -241,6 +247,8 @@ typedef struct {
     uint    ulFreq[2];      /* 0 not found, 1st freq rf,2nd freq udc [kHz] */
     uint    ulEarfcn[2];    /* 0 not found, 1st arfcn rf,2nd arfcn udc [kHz] */
     uint    SsbArfcn;       /* ARFCN of cell (-1 not available) */
+    uchar   sCellWithoutSsbFlg; /* 0: normal cell, 1: sCell without SSB */
+    uint    absoluteFrequencyPointAL1; /* Valid only if sCellWithoutSsbFlg is 1 */
 } nr5g_l2_Srv_Cell_Parm_t;
 
 typedef struct {
@@ -262,7 +270,7 @@ typedef struct {
 
 #define nr5g_l2_Srv_L1Sim_MaxDb (4)
 typedef struct {
-    uchar                       CellId;
+    nr5g_l2_Srv_CellId_TYPE     CellId;
     uint                        NumDbeam;
     nr5g_l2_Srv_L1Sim_Dbeam_t   Dbeam[nr5g_l2_Srv_L1Sim_MaxDb]; /* Simulated Dbeam */
 } nr5g_l2_Srv_CellL1Sim_t;
@@ -407,7 +415,7 @@ typedef struct {
 #define nr5g_l2_Srv_SETPARM_L1SIM_02    4
 #define nr5g_l2_Srv_SETPARM_L1SIM_03    5
 #define nr5g_l2_Srv_SETPARM_L1SIM_04    6
-#define nr5g_l2_Srv_SETPARM_03          7
+#define nr5g_l2_Srv_SETPARM_03      7
 
 typedef struct {
     ushort  Type;                       /* Parameter Type (1) */
@@ -464,9 +472,9 @@ typedef struct {
     char    DeltaNumLdpcIteration;     /* Provides a difference to be applied to the optimal LDPC iteration value selected by the software 
                                                 (-5 .. 5) (0xff means no difference is applied) */
     uchar   NumStkPpu;                  /* Number of elements of StkPpu[] list */
-    uchar   NumLteCell;
+    nr5g_l2_Srv_CellId_TYPE   NumLteCell;
     comgen_qnxPPUIDt  StkPpu[];         /* PPU list where put the stack processes (higher level) (12) */
-/*  uchar   LteCellIdList[]; */             /* Start of the list of LTE cell's CellId  */
+/*  nr5g_l2_Srv_CellId_TYPE   LteCellIdList[]; */             /* Start of the list of LTE cell's CellId  */
 /*  nr5g_l2_Srv_CellL1Sim_t CellL1Sim[]; */ /* Cell parameters for L1Sim connection */
 } nr5g_l2_Srv_SETPARM_L1SIM_02t;
 
@@ -511,9 +519,9 @@ typedef struct {
     char    DeltaNumLdpcIteration;     /* Provides a difference to be applied to the optimal LDPC iteration value selected by the software 
                                                 (-5 .. 5) (0xff means no difference is applied) */
     uchar   NumStkPpu;                  /* Number of elements of StkPpu[] list */
-    uchar   NumLteCell;
+    nr5g_l2_Srv_CellId_TYPE   NumLteCell;
     comgen_qnxPPUIDt  StkPpu[];         /* PPU list where put the stack processes (higher level) (12) */
-/*  uchar   LteCellIdList[]; */             /* Start of the list of LTE cell's CellId  */
+/*  nr5g_l2_Srv_CellId_TYPE   LteCellIdList[]; */             /* Start of the list of LTE cell's CellId  */
 /*  nr5g_l2_Srv_CellL1Sim_t CellL1Sim[]; */ /* Cell parameters for L1Sim connection */
 } nr5g_l2_Srv_SETPARM_L1SIM_03t;
 
@@ -529,6 +537,8 @@ typedef struct {
     uint    L2_nr5g_RlcMac_Verbosity;            /* Nr5g RlcMac Global Trace Verbosity bit mask */
     uint    L2_nr5g_pdcp_Verbosity;              /* Nr5g Pdcp Global Trace Verbosity bit mask */
     
+    uint    RemScgAddr;                 /* Only for Host testing: SCG PPU IP address (host order),
+                                         * -1 if no NR-DC */
     uchar   HostInterfaceId;       /* See nr5g_l2_Srv_HOST_ID_*/
     uchar   Spare1[2];            /* Reserved set to 0 */
 #define nr5g_l2_Srv_DL_HARQ_OFF         (0)  /* DL HARQ is off (no feedback is sent to peer) */
@@ -547,12 +557,11 @@ typedef struct {
                                                 (-5 .. 5) (0xff means no difference is applied) */
     uchar   NumStkPpu;                  /* Number of elements of StkPpu[] list */
     uchar   NumLtePpu;              /* Num of lte_l2_Srv_InstParmUdp_t */
-    uchar   NumNrCell;
+    nr5g_l2_Srv_CellId_TYPE   NumNrCell;
     comgen_qnxPPUIDt  StkPpu[];         /* PPU list where put the stack processes (higher level) (12) */
 /*  lte_l2_Srv_InstParmUdp_t LtePPuL1Sim[]; */             /* Ppu parameters for LTE L1Sim connection including LTE Cell parameters  */
 /*  nr5g_l2_Srv_CellL1Sim_t CellL1Sim[]; */ /* Cell parameters for NR L1Sim connection */
 } nr5g_l2_Srv_SETPARM_L1SIM_04t;
-
 
 #define   nr5g_l2_Srv_HOST_ID_INTERNAL   0
 #define   nr5g_l2_Srv_HOST_ID_MODE_A     1
@@ -578,7 +587,7 @@ typedef struct {
     uchar   NumProPpu;            /* Number of elements of ProPpu[] list */
     comgen_qnxPPUIDt StkPpu[];    /* PPU list where put the nr5g.stk processes (12) */
 /*  comgen_qnxPPUIDt ProPpu[]; */ /* PPU list where put the nr5g-l2.pro processes (13) */
-/*  uchar   CellId[]; */          /* Start of the list of cell's CellId which
+/*  nr5g_l2_Srv_CellId_TYPE   CellId[]; */          /* Start of the list of cell's CellId which
                                    * will be used in the test */
 } nr5g_l2_Srv_SETPARM_01t;
 
@@ -619,12 +628,12 @@ typedef struct {
 
     uchar   NumStkPpu;            /* Number of elements of StkPpu[] list */
     uchar   NumNrProPpu;          /* Number of elements of NrProPpu[] list */
-    uchar   NumLteCell;
-    uchar   NumNrCell;
+    nr5g_l2_Srv_CellId_TYPE   NumLteCell;
+    nr5g_l2_Srv_CellId_TYPE   NumNrCell;
     comgen_qnxPPUIDt StkPpu[];    /* PPU list where put the nr5g.stk processes (12) */
 /*  comgen_qnxPPUIDt NrProPpu[]; */ /* PPU list where put the nr5g-l2.pro processes (13) */
-/*  uchar   LteCellIdList[]; */   /* Start of the list of LTE cell's CellId  */
-/*  uchar   NrCellIdList[];  */   /* Start of the list of NR5G cell's CellId */
+/*  nr5g_l2_Srv_CellId_TYPE   LteCellIdList[]; */   /* Start of the list of LTE cell's CellId  */
+/*  nr5g_l2_Srv_CellId_TYPE   NrCellIdList[];  */   /* Start of the list of NR5G cell's CellId */
 } nr5g_l2_Srv_SETPARM_02t;
 
 /* This type must be used in case LTE and/or NR  is configured. */
@@ -666,21 +675,22 @@ typedef struct {
                                       default = 15*/
     uchar   CatmEnable;           /* Enable CatM support; values = 0/1; default=1 */
     uchar   LteDlSoftCombining;   /* LTE DL HARQ soft combining algorithm enabled (1) or disabled (0). Def=0 */
-    uchar   SpareC[3];            /* set to zero */
+    uchar   EnableDynPhRotationCompensation; /* 1 -> enabled; 0 -> disabled */
+    uchar   SpareC[2];            /* set to zero */
     uint    Spare[18];            /* set to zero */
 
     uchar   NumUpStkPpu;          /* Number of elements of UpStkPpu[] list */
     uchar   NumDwnStkPpu;         /* Number of elements of DWnStkPpu[] list */
     uchar   NumLteProPpu;         /* Number of elements of LteProPpu[] list (in case of LTE/DSP set to 0)*/
     uchar   NumNrProPpu;          /* Number of elements of NrProPpu[] list */
-    uchar   NumLteCell;
-    uchar   NumNrCell;
+    nr5g_l2_Srv_CellId_TYPE   NumLteCell;
+    nr5g_l2_Srv_CellId_TYPE   NumNrCell;
     comgen_qnxPPUIDt UpStkPpu[];    /* PPU list where put the lte.stk.up processes (12) */
 /*  comgen_qnxPPUIDt DwnStkPpu[]; */ /* PPU list where put the lte.stk.dwn processes (12) */
 /*  comgen_qnxPPUIDt LteProPpu[]; */ /* PPU list where put the lte-l2.pro processes (13) */
 /*  comgen_qnxPPUIDt NrProPpu[]; */ /* PPU list where put the nr5g-l2.pro processes (13) */
-/*  uchar   LteCellIdList[]; */   /* Start of the list of LTE cell's CellId  */
-/*  uchar   NrCellIdList[];  */   /* Start of the list of NR5G cell's CellId */
+/*  nr5g_l2_Srv_CellId_TYPE   LteCellIdList[]; */   /* Start of the list of LTE cell's CellId  */
+/*  nr5g_l2_Srv_CellId_TYPE   NrCellIdList[];  */   /* Start of the list of NR5G cell's CellId */
 } nr5g_l2_Srv_SETPARM_03t;
 
 
@@ -805,12 +815,12 @@ typedef struct
  *********************************************/
 typedef struct
 {
-    uchar     NCellLte;
-    uchar     NCellNr;
+    nr5g_l2_Srv_CellId_TYPE     NCellLte;
+    nr5g_l2_Srv_CellId_TYPE     NCellNr;
     uchar     NumLteProPpu;         /* Number of elements of LteProPpu[] list */
     uchar     NumNrProPpu;          /* Number of elements of NrProPpu[] list */
-    uchar     CellIdLteList[];      /* Start of the list of cell's CellId which */
-/*  uchar     CellIdNrList[]; */    /* Start of the list of cell's CellId which */
+    nr5g_l2_Srv_CellId_TYPE     CellIdLteList[];      /* Start of the list of cell's CellId which */
+/*  nr5g_l2_Srv_CellId_TYPE     CellIdNrList[]; */    /* Start of the list of cell's CellId which */
 /*  comgen_qnxPPUIDt LteProPpu[]; */   /* PPU list available for lte-l2.pro processes  */
 /*  comgen_qnxPPUIDt NrProPpu[]; */   /* PPU list available for nr5g-l2.pro processes  */
 } nr5g_l2_Srv_CELL_PPU_LIST_ACKt;
@@ -822,12 +832,12 @@ typedef struct
 
 typedef struct
 {
-    uchar       CellId;       /* Cell Identifier */
+    nr5g_l2_Srv_CellId_TYPE       CellId;       /* Cell Identifier */
 } nr5g_l2_Srv_CELL_PARM_CMDt;
 
 typedef struct
 {
-    uchar                      CellId;             /* Cell Identifier */
+    nr5g_l2_Srv_CellId_TYPE    CellId;             /* Cell Identifier */
     nr5g_l2_Srv_Cell_Parm_t    Parm;               /* Cell parameters */
     uint                       NumDbeam;           /* # of Dbeam for this cell */
     nr5g_l2_Srv_Dbeam_t        Dbeam[nr5g_MaxDbeam]; /* Dbeam List */
@@ -839,13 +849,13 @@ typedef struct
 
 typedef struct
 {
-    uchar       CellId;       /* Cell Identifier */
+    nr5g_l2_Srv_CellId_TYPE       CellId;       /* Cell Identifier */
     
 } nr5g_l2_Srv_CELL_INFO_CMDt;
 
 typedef struct
 {
-    uchar                    CellId; /* Cell Identifier */
+    nr5g_l2_Srv_CellId_TYPE  CellId; /* Cell Identifier */
     nr5g_l2_Srv_Cell_State_t State;  /* Cell State */
     
 } nr5g_l2_Srv_CELL_INFO_ACKt;
@@ -853,6 +863,14 @@ typedef struct
 /*********************************************
  * nr5g_l2_Srv_CELL_CONFIG_CMD
  *********************************************/
+#define nr5g_l2_Srv_CELL_CONFIG_TYPE_PRIMARY    1
+#define nr5g_l2_Srv_CELL_CONFIG_TYPE_SECONDARY  2
+typedef struct
+{
+    uchar                          CellCfgType; /* Flags nr5g_l2_Srv_CELL_CONFIG_TYPE_* */
+    nr5g_rlcmac_Cmac_CellCfg_t     CellCfg;
+} nr5g_rlcmac_Cmac_CellCfg_Section_t;
+
 
 typedef struct {
 
@@ -862,14 +880,13 @@ typedef struct {
     uchar       Ta;            /* Time Advance Command [TODO, -1 for none] (see MAC par. TODO) */
     uchar       RaInfoValid;   /* To Validate RA Info */
     uchar       RachProbeReq;  /* If 1 RAch probe is requested */
-    
+    uchar       SiSchedulingInfoValid;
     /* cell RA configuration */
     nr5g_rlcmac_Cmac_RA_Info_t    RA_Info;
     
     /* cell configuration */
-    
-    nr5g_rlcmac_Cmac_CellCfg_t     CellCfg;
-    
+    nr5g_rlcmac_Cmac_CellCfg_Section_t     CellCfgSection;
+    nr5g_rlcmac_Cmac_SI_SCHED_INFOt SiSchedulingInfo;
 } nr5g_l2_Srv_CELL_CONFIGt;
 
 
@@ -900,7 +917,22 @@ typedef struct
  * (3) This controls the stack process where the UE is located.
  *  if split is abled UdgStkInst is instance of UDG, StkInst is instance of PDCP
  *  if split isn't abled UdgStkInst isn't used , StkInst is instance of PDCP/UDG
+ *
  */
+
+/*********************************************
+ * nr5g_l2_Srv_SET_UE_TEST_MODE_CMD
+ *********************************************/
+typedef struct
+{
+    uint            UeId;           /* Ue Identifier (1) */
+    uint            TestMode;       /* See nr5g_l2_Srv_MODE_*/
+} nr5g_l2_Srv_SET_UE_TEST_MODEt;
+
+#define nr5g_l2_Srv_MODE_HARQ    1
+#define nr5g_l2_Srv_MODE_MAC     2
+#define nr5g_l2_Srv_MODE_RLC     3
+#define nr5g_l2_Srv_MODE_PDCP    4
 
 /*********************************************
  * nr5g_l2_Srv_UE_SETATTR_CMD
@@ -1217,6 +1249,7 @@ union nr5g_l2_Srv_MSGu
     nr5g_l2_Srv_CELL_CONFIGt      CellConfigCmd;
 
     nr5g_l2_Srv_CREATE_UEt        CreateNrUe;
+    nr5g_l2_Srv_SET_UE_TEST_MODEt UseSetTestMode;
     nr5g_l2_Srv_UE_SETATTRt       UeSetAttr;
     nr5g_l2_Srv_UE_SET_CELLt      UeSetCell;
     nr5g_l2_Srv_SCG_ADDt          ScgAdd;

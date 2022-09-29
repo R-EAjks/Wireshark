@@ -127,6 +127,7 @@
 #define lte_rlcmac_Com_ERACHPROBE       -35 /* Rach Probe procedure is already ongoing */
 #define lte_rlcmac_Com_ELTEMNBINCONST   -36 /* LTE-M, NB-IOT configuration inconsistency */
 #define lte_rlcmac_Com_ERANOTPERF       -37 /* RA cannot be performed */
+#define lte_rlcmac_Com_L1L2_ITF_MISMATCH -38 /* L1-L2 interface mismatch */
 
 #define lte_rlcmac_Com_ERRNONE            (0) /* Ack/Nack no error */
 /* MBMS ACK ERRORS */
@@ -157,8 +158,8 @@ typedef struct
     int     PowerHeadr;     /* Power Headroom [dB] */
     int     Pcmax;          /* Maximum configured power [dB] */
 
-    int Pue_PUSCH;          /* PUSCH power level of uplink tx for the UE (0.25 dBm) */
-    int Pue_PUCCH;          /* PUCCH power level of uplink tx for the UE (0.25 dBm) */
+    int Pue_PUSCH;          /* PUSCH power level of uplink tx fot the UE (0.25 dBm) */
+    int Pue_PUCCH;          /* PUCCH power level of uplink tx fot the UE (0.25 dBm) */
     uint SR_attemptsMax;       /* Maximum number of scheduling request sent
                                   before receiving a grant last second. */
     uint SR_attemptsMean;       /* Number of scheduling request sent

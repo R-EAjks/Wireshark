@@ -82,7 +82,6 @@
  *------------------------------------------------------------------*/
 
 #define lte_pdcp_Com_MAX_DATA_SIZE  9000 /* Max value of PDCP SDU data size
-                                            current implementation differ from LTE spec. value 8188, 
                                             see TS 36.323, par. 4.3.1 */
 
 /*------------------------------------------------------------------*

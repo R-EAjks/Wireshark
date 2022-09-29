@@ -1,12 +1,12 @@
 #ifndef nr5g_pdcp_Ctrl_DEFINED
 #define nr5g_pdcp_Ctrl_DEFINED
 
-// #include "lsu.h"
+#ifndef tmLTEUU 
+#include "lsu.h"
+#endif
 #include "nr5g.h"
-#include "nr5g-pdcp_Com.h"
-#include "rohcPrim.h"
 
-#define nr5g_pdcp_Ctrl_VERSION   "1.3.1"
+#define nr5g_pdcp_Ctrl_VERSION   "1.8.0"
 
 /*
  * This interface conforms to the rules specified in `lsu.h'.
@@ -74,6 +74,27 @@
 #define nr5g_pdcp_Ctrl_QFI_CONFIG_NAK            (0x200 + nr5g_pdcp_Ctrl_QFI_CONFIG_CMD)
 
 /*
+ * Configuration for nodeB security testing for U-plane data */
+#define nr5g_pdcp_Ctrl_NB_SEC_UPLANE_CFG         0x0A
+#define nr5g_pdcp_Ctrl_NB_SEC_UPLANE_CFG_ACK     (0x100 + nr5g_pdcp_Ctrl_NB_SEC_UPLANE_CFG)
+#define nr5g_pdcp_Ctrl_NB_SEC_UPLANE_CFG_NAK     (0x200 + nr5g_pdcp_Ctrl_NB_SEC_UPLANE_CFG)
+
+/*
+ * UE test loop mode A: start data loopback
+ */
+#define nr5g_pdcp_Ctrl_UE_LOOP_A_START_CMD      0x0B
+#define nr5g_pdcp_Ctrl_UE_LOOP_A_START_ACK      (0x100 + nr5g_pdcp_Ctrl_UE_LOOP_A_START_CMD)
+#define nr5g_pdcp_Ctrl_UE_LOOP_A_START_NAK      (0x200 + nr5g_pdcp_Ctrl_UE_LOOP_A_START_CMD)
+
+/*
+ * UE test loop: stop data loopback
+ */
+#define nr5g_pdcp_Ctrl_UE_LOOP_STOP_CMD         0x0C
+#define nr5g_pdcp_Ctrl_UE_LOOP_STOP_ACK         (0x100 + nr5g_pdcp_Ctrl_UE_LOOP_STOP_CMD)
+#define nr5g_pdcp_Ctrl_UE_LOOP_STOP_NAK         (0x200 + nr5g_pdcp_Ctrl_UE_LOOP_STOP_CMD)
+
+
+/*
  * STAT SAP
  */
 #define  nr5g_pdcp_Ctrl_STAT_UE_REQ         0x01
@@ -116,6 +137,19 @@ typedef enum {
 } nr5g_pdcp_Ctrl_DataFlowType_e;
 typedef uchar nr5g_pdcp_Ctrl_DataFlowType_v;
 
+typedef enum {
+    nr5g_pdcp_Ctrl_RohcUsed = 0,        /* Rohc is used */
+    nr5g_pdcp_Ctrl_RohcNotUsed = 1,     /* Rohc is not used */
+    nr5g_pdcp_Ctrl_RohcNoChange = 2    /* Rohc continue to use prev cfg */
+} nr5g_pdcp_Ctrl_RohcCfgType_e;
+typedef uchar nr5g_pdcp_Ctrl_RohcCfgType_v;
+
+typedef enum {
+    nr5g_pdcp_Ctrl_UpType_Ip,        /* The upper layer data flow is bearer oriented (e.g. EPS bearer case) */
+    nr5g_pdcp_Ctrl_UpType_Eth, /* The upper layer data flow is QoS oriented (e.g. PDU_Session/QFI case) */
+} nr5g_pdcp_Ctrl_UpType_e;
+typedef uchar nr5g_pdcp_Ctrl_UpType_v;
+
 /*------------------------------------------------------------------*
  |  STRUCTURES USED IN PRIMITIVES                                   |
  *------------------------------------------------------------------*/
@@ -125,9 +159,9 @@ typedef struct {
     nr5g_pdcp_Ctrl_SnSize_v snSizeTx;               /* snSizeUl, UM and AM Mode */
     nr5g_pdcp_Ctrl_SnSize_v snSizeRx;               /* snSizeDl, UM and AM Mode */
 
-    struct {
-        uchar			NotUsed; /* If set, headerCompression is not used configured nor active [BOOL] */
-        rohcCFG_PARt	CfgPar; /* Configuration of ROHC Compressor/Decompressor */
+    struct headerCompression_s{
+        nr5g_pdcp_Ctrl_RohcCfgType_v    NotUsed; /* See nr5g_pdcp_Ctrl_RohcCfgType_e */
+        rohcCFG_PARt    CfgPar; /* Configuration of ROHC Compressor/Decompressor */
     } headerCompression;
 
     uchar                   integrityProtection;    /* [BOOL] */
@@ -147,6 +181,12 @@ typedef struct {
 
     uint security_config_idx; /* Indicate the security config. to be used (Prop., see nr5g_pdcp_Ctrl_SET_SEC_UE_CMD). */
 
+    struct {
+        uchar   splitSecondaryPath;     /* LCID of the split secondary RLC entity as specified in TS 38.323, -1U means not configured */
+        uchar   duplicationState;       /* 3 [BOOL] uplink PDCP duplication state for the associated RLC entities,
+                                           ascending order of logical channel ID of all RLC entities other than the primary RLC entity (order of MCG and SCG). -1U means not configured */
+    } moreThanTwoRLC_DRB;               /* r16: SRBs (absent), DRBs (present if PDCP entity for a radio bearer with more than two associated logical channels) */
+
 } nr5g_pdcp_Ctrl_PdcpInfo_t;
 
 /*
@@ -164,10 +204,17 @@ typedef enum {
 typedef uchar nr5g_pdcp_Ctrl_ER_t;
 
 typedef struct {
-    uchar     QFI;     /* values: 0...63 */
+    uchar     QFI;          /* values: 0...63 */
     ushort    PrevNsapi;    /* Nsapi of the PDP Context previosly linked to the upper layer data flow.
                                -1 means "not apply". */
 } nr5g_pdcp_Ctrl_QfiCfg_t;
+
+typedef struct {
+    uint        StartAfter;         /* Start corruptin/replaying after ... */
+    uint        NumOfConsecutive;   /* Number of consecutive PDU to be corrupted/replayed */
+    uint        RetransmitAfter;    /* Retransmit PDU after ... */
+    uint        Spare[4];           /* */
+} nr5g_NbSec_Uplane_Config_t;
 
 /*------------------------------------------------------------------*
  |  LAYOUT OF PRIMITIVES                                            |
@@ -222,6 +269,7 @@ typedef struct {
     ushort                          PDU_SessionID; /* PDU_SessionID */
     uchar                           RbId;       /* Rb id */
     nr5g_RbType_v                   RbType;     /* Radio Bearer Type of the mapped RB */
+    nr5g_pdcp_Ctrl_UpType_v         UpType;     /* PDCP Upper level traffic type (only in case of DataFlowType = nr5g_pdcp_Ctrl_DtaFlowType_PDU_SessionID) */
     /* 38.331: "SDAP-Config" information element */
     nr5g_SdapHeader_v               SdapHeaderDl;
     nr5g_SdapHeader_v               SdapHeaderUl;
@@ -324,6 +372,38 @@ typedef struct {
 } nr5g_pdcp_Ctrl_SET_SEC_UE_NAKt;
 
 
+/* nr5g_pdcp_Ctrl_UE_LOOP_A_START_CMD */
+typedef struct {
+    uint            UeId;           /* Ue Identifier */
+    uint            NumLBsetup;     /* Number of elements in LB setup list */
+    struct {
+        ushort          UlPdcpSduSz;    /* UL PDCP SDU size in bytes */
+        ushort          Nsapi;
+    }               LBsetup[1];     /* LB setup list */
+} nr5g_pdcp_Ctrl_UE_LOOP_A_START_CMDt;
+
+
+/* nr5g_pdcp_Ctrl_UE_LOOP_STOP_CMD */
+typedef struct {
+    uint            UeId;           /* Ue Identifier */
+} nr5g_pdcp_Ctrl_UE_LOOP_STOP_CMDt;
+
+/* nr5g_pdcp_Ctrl_UE_LOOP_A_START_ACK
+ * nr5g_pdcp_Ctrl_UE_LOOP_STOP_ACK
+ */
+typedef struct {
+    uint            UeId;           /* Ue Identifier */
+} nr5g_pdcp_Ctrl_UE_LOOP_ACKt;
+
+/* nr5g_pdcp_Ctrl_UE_LOOP_A_START_NAK
+ * nr5g_pdcp_Ctrl_UE_LOOP_STOP_NAK
+ */
+typedef struct {
+    uint            UeId;           /* Ue Identifier */
+    short           Err;            /* Error code */
+} nr5g_pdcp_Ctrl_UE_LOOP_NAKt;
+
+
 /*
  * nr5g_pdcp_Ctrl_ERROR_IND
  */
@@ -391,7 +471,7 @@ typedef struct
 typedef struct {
     uint            CellId;         /* Cell Identification */
     uint            SibFilterFlag;  /* 0 -> Legacy */
-
+    uchar           Inst;           /* TSTM Inst */
 } nr5g_pdcp_Ctrl_SIB_FILTER_CMDt;
 
 /*
@@ -399,9 +479,9 @@ typedef struct {
  * nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_ACK
  */
 typedef struct {
-    uint            CellId;   /* Cell Identification */
+    uint            CellId;         /* Cell Identification */
     uint            SibFilterFlag;  /* 0 -> Legacy */
-
+    uchar           Inst;           /* TSTM Inst */
 } nr5g_pdcp_Ctrl_SIB_FILTER_ACKt;
 
 /*
@@ -409,10 +489,24 @@ typedef struct {
  * nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_NAK
  */
 typedef struct {
-    uint            CellId;   /* Cell Identification */
-    short           Err;      /* Error code */
-
+    uint            CellId;     /* Cell Identification */
+    short           Err;        /* Error code */
+    uchar           Inst;       /* TSTM Inst */
 } nr5g_pdcp_Ctrl_SIB_FILTER_NAKt;
+
+/*
+ * nr5g_pdcp_Ctrl_NB_SEC_UPLANE_CFG
+ */
+typedef struct {
+    uint        UeId;       /* UE Id (1) */
+    uchar       RbId;       /* Rb id */
+    nr5g_RbType_v RbType;    /* Radio Bearer Type */
+    uchar       CorruptionEnabled;
+    nr5g_NbSec_Uplane_Config_t   CorruptionCfg;
+    uchar       ReplayEnabled;
+    nr5g_NbSec_Uplane_Config_t   ReplayCfg;
+
+} nr5g_pdcp_Ctrl_NB_SEC_UPLANE_t;
 
 /*------------------------------------------------------------------*
  |  SUMMARY OF PRIMITIVES                                           |
@@ -445,6 +539,13 @@ typedef union {
     nr5g_pdcp_Ctrl_SIB_FILTER_CMDt SibFilterCmd;
     nr5g_pdcp_Ctrl_SIB_FILTER_ACKt SibFilterAck;
     nr5g_pdcp_Ctrl_SIB_FILTER_NAKt SibFilterNak;
+
+    nr5g_pdcp_Ctrl_NB_SEC_UPLANE_t NbSecUplane;
+
+    nr5g_pdcp_Ctrl_UE_LOOP_A_START_CMDt UeLoopAStartCmd;
+    nr5g_pdcp_Ctrl_UE_LOOP_STOP_CMDt    UeLoopStopCmd;
+    nr5g_pdcp_Ctrl_UE_LOOP_ACKt         UeLoopAck;
+    nr5g_pdcp_Ctrl_UE_LOOP_NAKt         UeLoopNak;
 
 } nr5g_pdcp_Ctrl_PRIMt;
 

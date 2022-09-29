@@ -4,8 +4,9 @@
 #include "bb-nr5g_instr_macros.h"
 #include "bb-nr5g_struct.h"
 
-#pragma pack(1)
+#define nr5g_rlcmac_Cmac_bb_VERSION   "0.1.0"
 
+#pragma pack(1)
 
 #define nr5g_rlcmac_Cmac_DRX_ON_DURATION_TIMER_SUBMILLISEC (0)
 #define nr5g_rlcmac_Cmac_DRX_ON_DURATION_TIMER_MILLISEC    (1)
@@ -72,7 +73,7 @@ typedef struct {
 } PREFIX(nr5g_rlcmac_Cmac_SR_RESOURCE_CFGt);
 
 typedef struct {
-    uint32_t Len;    /* Effective length of this Element */
+    uint32_t Len;   /* Effective length of this Element */
     uint32_t Spare; /* Must be set to 0 */
 
     uint8_t NbDl_DataToUL_ACK_r16;
@@ -91,11 +92,21 @@ typedef struct {
     uint32_t FieldMask;
     uint8_t NbDlDataToUlAck;  /* Gives the number of valid elements in DlDataToUlAck vector: 1...8; Default value is 0*/
     uint8_t DlDataToUlAck[8]; /* Static list of timing for given PDSCH to the DL ACK. Range element 0...15*/
-    uint8_t  NSchedReqResConfigToAdd;  /* Gives the number of valid elements in  vector SchedReqResCfg: 1...bb_nr5g_MAX_SR_RESOURCES; Default value is 0*/
+    uint8_t  NSchedReqResConfigToAdd;  /* Gives the number of valid elements in  vector SchedReqResCfgAdd: 1...bb_nr5g_MAX_SR_RESOURCES; Default value is 0*/
+    uint8_t  NSchedReqResConfigToDel;  /* Gives the number of valid elements in  vector SchedReqResCfgDel: 1...bb_nr5g_MAX_SR_RESOURCES; Default value is 0*/
+    uint8_t NbResourceDedToAdd;  /* Gives the number of valid elements in ResourceDedToAdd vector: 1...bb_nr5g_MAX_PUCCH_RESOURCES; Default value is 0*/
+    uint8_t NbResourceDedToDel;  /* Gives the number of valid elements in ResourceDedToDel vector: 1...bb_nr5g_MAX_PUCCH_RESOURCES; Default value is 0*/
+    uint8_t Spare[3]; /* Must be set to 0 */
 #define nr5g_rlcmac_Cmac_STRUCT_PUCCH_CONF_DEDICATED_R16_IES_PRESENT 0x0020
     VFIELD(PREFIX(nr5g_rlcmac_Cmac_PUCCH_CONF_DEDICATED_R16_IESt), PucchConfExtR16);
+    AFIELD(uint32_t, SchedReqResCfgDel, bb_nr5g_MAX_SR_RESOURCES); /* Dynamic list for releasing scheduling Request Resources*/
 #define nr5g_rlcmac_Cmac_STRUCT_PUCCH_CONF_DEDICATED_SR_RES_CFG_PRESENT    0x0001
-    AFIELD(PREFIX(nr5g_rlcmac_Cmac_SR_RESOURCE_CFGt), SchedReqResCfg, bb_nr5g_MAX_SR_RESOURCES); /* Dynamic list of added scheduling Request Resources*/
+    AFIELD(PREFIX(nr5g_rlcmac_Cmac_SR_RESOURCE_CFGt), SchedReqResCfgAdd, bb_nr5g_MAX_SR_RESOURCES); /* Dynamic list of added scheduling Request Resources*/
+
+    AFIELD(uint32_t, ResourceDedToDel, bb_nr5g_MAX_PUCCH_RESOURCES); /* Dynamic list for releasing PUCCH resources applicable for the UL BWP
+                                                 and serving cell in which the PUCCH-Conf is defined.*/
+    AFIELD(PREFIX(bb_nr5g_PUCCH_RESOURCEt), ResourceDedToAdd, bb_nr5g_MAX_PUCCH_RESOURCES); /* Dynamic list for adding PUCCH resources applicable for the UL BWP
+                                                 and serving cell in which the PUCCH-Conf is defined.*/
 } PREFIX(nr5g_rlcmac_Cmac_PUCCH_CONF_DEDICATEDt);
 
 /* 38.331 BWP-UplinkCommon IE : It is prepared to become dynamic. 
@@ -141,7 +152,7 @@ typedef struct {
     struct {
         uint16_t TimeDomOffset;         /* Offset [slots] related to SFN=0; Range 0..5119; Default value 0xFF; Need R */
     } RrcConfUlGrant;
-
+    
     uint8_t Timer;                  /* Indicates the initial value of the configured grant timer in multiples of periodicity.
                                        Range 1..64; Default value 0xFF; Need R */
     uint8_t cg_RetransmissionTimer_r16; /*  Range 1..64; Default value 0xFF */
@@ -156,7 +167,7 @@ typedef struct {
     uint8_t ConfigGrantConfigIndex_r16; /* Range (0.. maxNrofConfiguredGrantConfig-r16-1=11) */
     uint8_t ConfigGrantConfigIndexMAC_r16; /* Range (0.. maxNrofConfiguredGrantConfigMAC-r16-1=31) */
 
-    uint16_t PeriodicityExt_r16;          /* Range (1.. 5120) */
+    uint16_t PeriodicityExt_r16;          /* Range (1.. 5120); Default value 0xFFFF; Need R */
     uint8_t StartingFromRV0_r16;      /* Enum [on, off];  Default value 0xFF */
     uint8_t Phy_PriorityIndex_r16;    /* Enum [p0, p1];   Default value 0xFF */
 
@@ -201,6 +212,10 @@ typedef struct {
 typedef struct {
     uint32_t Len;   /* Effective length of this Element */
     uint32_t FieldMask;
+    uint8_t NbPucchConfDedToAdd;                /* Range (0..2) Default value is 0, -1 meas Release (SetupRelease Need M) */
+    uint8_t NbConfigGrantConfigToRel_r16;       /* Default value is 0 */
+    uint8_t NbConfigGrantConfigToAdd_r16;       /* Default value is 0 */
+    uint8_t NbConfigGrantConfigType2DeactState_r16;       /* Default value is 0 */
 #define nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_PUCCH_CFG_PRESENT   0x0001
     PREFIX(nr5g_rlcmac_Cmac_PUCCH_CONF_DEDICATEDt) PucchConfDed; 
 #define nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_PUSCH_CFG_PRESENT   0x0002
@@ -214,6 +229,11 @@ typedef struct {
        only in one of the uplink carriers, either UL or SUL. */
 #define nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_BEAM_RECOVERY_CFG_PRESENT   0x0010
     VFIELD(PREFIX(bb_nr5g_BEAM_FAIL_RECOVERY_CFGt),   BeamFailRecConfDed);
+
+    AFIELD(PREFIX(nr5g_rlcmac_Cmac_PUCCH_CONF_DEDICATEDt), PucchConfigurationList_r16, 2);
+    AFIELD(uint8_t, ConfigGrantConfigToRel_r16, bb_nr5g_MAX_NB_CONFIGURED_GRANT_CONFIG);
+    AFIELD(PREFIX(nr5g_rlcmac_Cmac_CONFIGURED_GRANT_CONFt), ConfiguredGrantConfigToAddMod_r16, bb_nr5g_MAX_NB_CONFIGURED_GRANT_CONFIG );
+    AFIELD(PREFIX(bb_nrg5_CONFIGURED_GRANT_TYPE2_DEACT_STATEt), ConfigGrantConfigType2DeactState_r16, bb_nr5g_MAX_NB_CG_TYPE2_DEACT_STATE);
 } PREFIX(nr5g_rlcmac_Cmac_BWP_UPLINKDEDICATEDt);
 
 /* 38.331 BWP-Uplink IE */
@@ -296,7 +316,13 @@ typedef struct {
 
     uint8_t DefaultDlBwpId; /* 1 to bb_nr5g_MAX_NB_BWPS; Default/Absent 0xFF */
     uint8_t SupplUlRel; /* Enum[true]; Default/NoAction 0xFF */
-    uint8_t Spare[2]; /* Must be set to 0xFF */
+    uint8_t FirstActiveDlBwp; /* If configured for an SpCell, this field contains the ID of the DL BWP to be activated upon performing the reconfiguration
+                                 in which it is received. If the field is absent, the RRC reconfiguration does not impose a BWP switch.
+                                 If configured for an SCell, this field contains the ID of the downlink bandwidth part to be used upon MAC-activation of an SCell.
+                                 If not provided, the UE uses the default BWP.
+                                 The initial bandwidth part is referred to by BwpId = 0.
+                                 Range 0....(bb_nr5g_MAX_NB_BWPS-1); Default value is 0xFF*/
+    uint8_t Spare[1]; /* Must be set to 0xFF */
 #define nr5g_rlcmac_Cmac_STRUCT_SERV_CELL_CONFIG_UPLINK_PRESENT   0x0004
     VFIELD(PREFIX(nr5g_rlcmac_Cmac_UPLINK_DEDICATED_CONFIGt), UlCellCfgDed);
 #define nr5g_rlcmac_Cmac_STRUCT_SERV_CELL_CONFIG_SUP_UPLINK_PRESENT   0x0008
@@ -310,7 +336,7 @@ typedef struct {
     uint32_t Len;   /* Effective length of this Element */
     /* Field mask according to bb_nr5g_STRUCT_SCELL_CONFIG_***_PRESENT */
     uint32_t FieldMask;
-
+    
     /* Secondary cell dedicated parameter configuration */
     /* To semplify the handling we decide to have ServCellIdx also at this level*/
     uint16_t ServCellIdx;

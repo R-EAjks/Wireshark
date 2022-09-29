@@ -1,6 +1,11 @@
 #ifndef __BB_NR5G_INSTR_MACROS_H__INCLUDED__
 #define __BB_NR5G_INSTR_MACROS_H__INCLUDED__
 
+/*
+ * The current bb-nr5g_instr_macros Interface version
+ */
+#define  bb_nr5g_instr_macros_VERSION       "1.0.0"
+
 #ifdef PREFIX
 #undef PREFIX
 #endif

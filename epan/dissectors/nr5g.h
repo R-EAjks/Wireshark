@@ -6,7 +6,7 @@
 #define nr5g_DEFINED
 
 
-#define nr5g_VERSION   "0.1.0"
+#define nr5g_VERSION   "0.2.0"
 
 
 /*------------------------------------------------------------------*
@@ -130,6 +130,14 @@ typedef enum {
 } nr5g_RA_RES_e;
 typedef uchar nr5g_RA_RES_v;
 
+typedef enum {
+    nr5g_SI_TYPE1_SUCCESS = 1,
+    nr5g_SI_TYPE2_SUCCESS = 2,
+    nr5g_SI_TYPE1_FAILURE = 3, /* Random access Unsuccessful */
+    nr5g_SI_TYPE2_FAILURE = 4, /* Contention Resolution Unsuccessful */
+} nr5g_SI_RES_e;
+typedef uchar nr5g_SI_RES_v;
+
 /* 33.501 */
 typedef enum {
     nr5g_NEA0 = 0x00, // equal to EEA0
@@ -244,6 +252,7 @@ typedef struct {
 #define nr5g_TRF_TM_RLC       6
 #define nr5g_TRF_TM_PDCP      7
 #define nr5g_TRF_TM_NAS       8
+
 #define nr5g_TRF_RLC          9
 
 #pragma pack()

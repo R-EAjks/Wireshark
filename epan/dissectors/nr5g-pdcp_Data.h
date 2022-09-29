@@ -1,11 +1,13 @@
 #ifndef nr5g_pdcp_Data_DEFINED
 #define nr5g_pdcp_Data_DEFINED
 
-//#include "lsu.h"
+#ifndef tmLTEUU 
+#include "lsu.h"
+#endif
 #include "nr5g.h"
 #include "nr5g-pdcp_Com.h"
 
-#define nr5g_pdcp_Data_VERSION   "0.2.0"
+#define nr5g_pdcp_Data_VERSION   "0.4.0"
 
 /*
  * This interface conforms to the rules specified in `lsu.h'.
@@ -43,6 +45,15 @@
  */
 #define nr5g_pdcp_Data_RX_BUF_REQ    0x04
 
+/* Request for a Random Access (USER side only) */
+#define nr5g_pdcp_Data_SI_REQ       0x06
+
+/* Confirm success or failure of a Random Access (USER side only) */
+#define nr5g_pdcp_Data_SI_CNF       0x206
+
+/* Indicate a successful Random Access */
+#define nr5g_pdcp_Data_SI_IND       0x406
+
 /*
  * DATA SAP
  */
@@ -74,6 +85,15 @@ typedef enum {
 } nr5g_pdcp_Data_RxBufAct_e;
 typedef uchar nr5g_pdcp_Data_RxBufAct_v;
 
+#define nr5g_pdcp_CORRUPT_MAC_I     0x1
+#define nr5g_pdcp_REPLAY_PDU        0x2
+
+typedef struct {
+    uchar       Action;             /* CORRUPT/REPLAY; different values have to be intended as: do-nothing */
+    uint        NumOfConsecutive;   /* Number of consecutive PDU to be corrupted/replayed */
+    uint        Delay;              /* Delay between corrupted/replayed */
+    uint        RetransmitAfter;    /* Retransmit PDU after ... */
+} nr5g_NbSec_t;
 
 /*------------------------------------------------------------------*
  |  LAYOUT OF PRIMITIVES                                            |
@@ -93,7 +113,6 @@ typedef struct {
     
     uint            Flags;
 #define nr5g_pdcp_Data_FLAG_RA_TEST_01  (0x01) /* Enable RA test mode type 1 (see NOTE (1))  */
-#define nr5g_pdcp_Data_FLAG_NO_UL_HARQ  (0x02) /* Disable UL HARQ (see NOTE (2)) */
     uchar                   NrCellGrId;    /* Nr Ceel Group Id (0 or 1) Default 0*/
     uchar                   SpareC[3];
     uint            Spare[2];   /* Must be set to zero */
@@ -149,6 +168,36 @@ typedef struct {
 } nr5g_pdcp_Data_RA_IND_t;
 
 /*
+ * nr5g_pdcp_Data_SI_REQ
+ */
+typedef struct {
+    nr5g_Id_t                   Nr5gId;         /* NR5G Id */
+    uchar                       RequestResIdx;  /* Request Resources index */
+    nr5g_pdcp_Data_RA_REQ_t     SiRaInfo;       /* RA Info */
+} nr5g_pdcp_Data_SI_REQ_t;
+
+/*
+ * nr5g_pdcp_Data_SI_CNF
+ */
+typedef struct {
+    nr5g_Id_t       Nr5gId;                 /* NR5G Id */
+    short           Res;                    /* Result code (see TODO) */
+    nr5g_SI_RES_v   RaRes;                  /* SI Result code */
+    uchar           RequestResIdx;          /* Request Resources index */
+    uint            numberOfPreamblesSent;  /* number of RACH preambles that were transmitted. Corresponds to parameter PREAMBLE_TRANSMISSION_COUNTER in TS 36.321 */
+    uchar           contentionDetected;     /* If set contention was detected for at least one of the transmitted preambles */
+} nr5g_pdcp_Data_SI_CNF_t;
+
+/*
+ * nr5g_pdcp_Data_SI_IND
+ */
+typedef struct {
+    nr5g_Id_t       Nr5gId;         /* NR5G Id; CellId is valid */
+    short           Res;            /* Result code (see TODO) */
+    uchar           RequestResIdx;  /* Request Resources index */
+} nr5g_pdcp_Data_SI_IND_t;
+
+/*
  * nr5g_pdcp_Data_INT_CKH_REQ
  */
 typedef struct {
@@ -193,6 +242,7 @@ typedef struct {
     nr5g_RbType_v    RbType;     /* Radio Bearer Type */
     uchar           RbId;       /* Rb id */
     nr5g_LchType_v  Lch;        /* Logical Channel Type */
+    nr5g_NbSec_t    NbSec;      /* Info for testing nodeB security */
     uchar           MUI;        /* User Information */
     uchar           Data[1];    /* Data (see Note 1) */
 } nr5g_pdcp_Data_DATA_REQ_t;
@@ -209,6 +259,7 @@ typedef struct {
     nr5g_RbType_v    RbType;     /* Radio Bearer Type */
     uchar           RbId;       /* Rb id */
     nr5g_LchType_v   Lch;        /* Logical Channel Type */
+    nr5g_NbSec_t    NbSec;      /* Info for testing nodeB security */
     uchar           MUI;        /* User Information */
     uchar           Integr;     /* If !=0, 'Data' must be integrity protected */
     uchar           Cipher;     /* If !=0, 'Data' must be ciphered */
@@ -318,6 +369,9 @@ typedef union {
     nr5g_pdcp_Data_INT_CKH_REQ_t IntChkReq;
     nr5g_pdcp_Data_INT_CKH_CNF_t IntChkCnf;
     nr5g_pdcp_Data_RX_BUF_REQt   RxBufReq;
+    nr5g_pdcp_Data_SI_REQ_t     SiReq;
+    nr5g_pdcp_Data_SI_CNF_t     SiCnf;
+    nr5g_pdcp_Data_SI_IND_t     SiInd;
 
     nr5g_pdcp_Data_DATA_REQ_t   DataReq;
     nr5g_pdcp_Data_DATA_1_REQ_t  Data1Req;

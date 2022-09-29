@@ -28,7 +28,7 @@ $Log$
 /*
  * The current bb-nr5g Interface version
  */
-#define     bb_nr5g_struct_VERSION       "1.12.1"
+#define     bb_nr5g_struct_VERSION       "1.17.0"
 
 /* RNTI */
 typedef struct {
@@ -185,7 +185,9 @@ typedef struct {
     uint8_t DciFmts; /* Default/Invalid value is 0xFF: Release 15: Enum [formats0-0-And-1-0, formats0-1-And-1-1] */
                      /* Release 16: Enum [formats0-2-And-1-2, formats0-1-And-1-1And-0-2-And-1-2] - [0-1]*/
     uint8_t DciFormatsR16Present;   /* Default/Invalid value is 0xFF. If it is 1, the dci-Formats values are ignored and dci-FormatsExt is used instead. */
-    uint16_t Spare;
+    uint8_t DciFmtsMT_r16;    /* Default/Invalid value is 0xFF: Enum: [formats2-5] */
+    uint8_t DciFmtsSL_r16;    /* Default/Invalid value is 0xFF: Enum: [formats0-0-And-1-0, formats0-1-And-1-1, formats3-0, formats3-1,
+                                 formats3-0-And-3-1] */
 } PREFIX(bb_nr5g_SEARCH_SPACETYPE_DEDICATEDt);
 
 typedef struct {
@@ -359,21 +361,18 @@ typedef struct {
                            Enum [type2]; Default/Invalid value is 0xFF*/
     uint8_t DmrsAddPos; /* Position for additional DM-RS in DL
                            Enum [pos0, pos1, pos3]; Default/Invalid value is 0xFF*/
-    uint16_t DmrsGroup1; /* DM-RS groups that are QCL
-                            BIT STRING (SIZE (12)); Default/Invalid value is 0xFFFF*/
-    uint16_t DmrsGroup2; /* DM-RS groups that are QCL
-                            BIT STRING (SIZE (12)); Default/Invalid value is 0xFFFF*/
     uint8_t MaxLength;   /* The maximum number of OFDM symbols for DL front loaded DMRS
                             Enum [len2]; Default/Invalid value is 0xFF*/
-    uint8_t IsPhaseTrackingRSValid; /* This parameter handles if the PhaseTrackingRS has to be considered as optional or not.
-                                       If this parameter is set to 0 -> PhaseTrackingRS field is not read because not valid
-                                       If this parameter is set to 1 -> PhaseTrackingRS field is present*/
-    uint32_t ScramblingID0; /* DL DMRS scrambling initalization
-                               Range 0....65535 */
-    uint32_t ScramblingID1; /* DL DMRS scrambling initalization
-                               Range 0....65535 */
-    uint8_t DmrsDownlink_r16;     /* Enum [enabled]; Default/Invalid value is 0xFF */
-    uint8_t Pad[3];
+
+    uint8_t DmrsDownlink_r16;   /* Enum [enabled]; Default/Invalid value is 0xFF */
+
+    uint32_t ScramblingID0;     /* DL DMRS scrambling initalization, range 0....65535 */
+    uint32_t ScramblingID1;     /* DL DMRS scrambling initalization, range 0....65535 */
+
+    uint32_t FieldMask;
+
+#define bb_nr5g_DMRS_DOWNLINK_CFG_PHASE_TRACKING_RS_SETUP     0x0001
+#define bb_nr5g_DMRS_DOWNLINK_CFG_PHASE_TRACKING_RS_RELEASE   0x0002
     PREFIX(bb_nr5g_PTRS_DOWNLINK_CFGt) PhaseTrackingRS;
 } PREFIX(bb_nr5g_DMRS_DOWNLINK_CFGt);
 
@@ -425,12 +424,16 @@ typedef struct {
     uint16_t PuschIdentity;/* Parameter: N_ID^(PUSCH) for DFT-s-OFDM DMRS
                                Range 0....1007 */
     uint8_t DisableSeqGroupHop; /* Sequence-group hopping for PUSCH can be disabled for a certain UE despite being enabled on a cell basis
-                            Enum [disabled]; Default/Invalid value is 0xFF*/
-    uint8_t SeqHopEnabled; /* Determines if sequence hopping is enabled or not
-                            Enum [enabled]; Default/Invalid value is 0xFF*/
+                                   Enum [disabled]; Default/Invalid value is 0xFF*/
+    uint8_t SeqHopEnabled; /* Determines if sequence hopping is enabled or not. Enum [enabled]; Default/Invalid value is 0xFF*/
 
+    uint32_t FieldMask;
+
+#define bb_nr5g_STRUCT_TRANSF_PRECOD_PI2BPSK_SCRAMBLING_ID_SETUP       0x0001
+#define bb_nr5g_STRUCT_TRANSF_PRECOD_PI2BPSK_SCRAMBLING_ID_RELEASE     0x0002
     uint32_t Pi2BPSKScramblingID0;                 /* Range(0..65535)       */
     uint32_t Pi2BPSKScramblingID1;                 /* Range(0..65535)       */
+
 } PREFIX(bb_nr5g_TRANSF_PRECOD_ENABLEt);
 
 typedef struct {
@@ -443,8 +446,14 @@ typedef struct {
     uint8_t TransfPrecodIsValid;/* This field assumes a value defined as bb_nr5g_DMRS_UPLINK_TRANSF_PRECOD_***
                                        in order to read in good way the associated parameters in TransfPrecod***.
                                        If this field is set to default value TransfPrecodDisable or TransfPrecodEnable is neither read or used */
+
+    uint32_t FieldMask;
+
     PREFIX(bb_nr5g_TRANSF_PRECOD_DISABLEt) TransfPrecodDisable;
     PREFIX(bb_nr5g_TRANSF_PRECOD_ENABLEt) TransfPrecodEnable;
+
+#define bb_nr5g_STRUCT_DMRS_UPLINK_CFG_PHASE_TRACKING_RS_SETUP     0x0001
+#define bb_nr5g_STRUCT_DMRS_UPLINK_CFG_PHASE_TRACKING_RS_RELEASE   0x0002
     PREFIX(bb_nr5g_PTRS_UPLINK_CFGt) PhaseTrackingRS;
 } PREFIX(bb_nr5g_DMRS_UPLINK_CFGt);
 
@@ -930,6 +939,38 @@ typedef struct {
 } PREFIX(bb_nr5g_SRS_RESOURCETYPEt);
 
 typedef struct {
+    uint8_t SrsResourceType;            /* This field assumes a value defined as bb_nr5g_SRS_RESOURCETYPE_***
+                                           If set to default value, neither SlotOffset_r16 nor PeriodicityAndOffset_r16 are read */
+    uint8_t SrsPeriodAndOffSetIsValid;  /* This field assumes a value defined as bb_nr5g_SRS_PERIODICITYANDOFFSET_***
+                                           If this field is set to default value PeriodicityAndOffset_r16 is not read */
+    uint8_t SlotOffset_r16;             /* Range 1..32; Default 0xFF */
+    uint8_t Pad;
+    union{
+        uint32_t Slot1;     /* Range 0; Default is 0xFFFFFFFF */
+        uint32_t Slot2;     /* Range 0..1; Default is 0xFFFFFFFF */
+        uint32_t Slot4;     /* Range 0..3; Default is 0xFFFFFFFF */
+        uint32_t Slot5;     /* Range 0..4; Default is 0xFFFFFFFF */
+        uint32_t Slot8;     /* Range 0..7; Default is 0xFFFFFFFF */
+        uint32_t Slot10;    /* Range 0..9; Default is 0xFFFFFFFF */
+        uint32_t Slot16;    /* Range 0..15; Default is 0xFFFFFFFF */
+        uint32_t Slot20;    /* Range 0..19; Default is 0xFFFFFFFF */
+        uint32_t Slot32;    /* Range 0..31; Default is 0xFFFFFFFF */
+        uint32_t Slot40;    /* Range 0..39; Default is 0xFFFFFFFF */
+        uint32_t Slot64;    /* Range 0..63; Default is 0xFFFFFFFF */
+        uint32_t Slot80;    /* Range 0..79; Default is 0xFFFFFFFF */
+        uint32_t Slot160;   /* Range 0..159; Default is 0xFFFFFFFF */
+        uint32_t Slot320;   /* Range 0..319; Default is 0xFFFFFFFF */
+        uint32_t Slot640;   /* Range 0..639; Default is 0xFFFFFFFF */
+        uint32_t Slot1280;  /* Range 0..1279; Default is 0xFFFFFFFF */
+        uint32_t Slot2560;  /* Range 0..2559; Default is 0xFFFFFFFF */
+        uint32_t Slot5120;  /* Range 0..5119; Default is 0xFFFFFFFF */
+        uint32_t Slot10240; /* Range 0..10239; Default is 0xFFFFFFFF */
+        uint32_t Slot40960; /* Range 0..40959; Default is 0xFFFFFFFF */
+        uint32_t Slot81920; /* Range 0..81919; Default is 0xFFFFFFFF */
+    } PeriodicityAndOffset_r16;
+} PREFIX(bb_nr5g_SRS_RESOURCETYPE_R16t);
+
+typedef struct {
     uint8_t SrsResourceTypeSetIsValid; /* This field assumes a value defined as bb_nr5g_SRS_RESOURCETYPESET_***
                                     in good way the associated parameter SrsResourceTypeSet.
                                     If this field is set to default value SrsResourceTypeSet is neither read or used */
@@ -937,7 +978,7 @@ typedef struct {
         struct
         {
             uint8_t CsiRs;            /* Range 0....(bb_nr5g_MAX_NB_NZP_CSI_RS_RESOURCES-1); Default is 0xFF */
-            uint8_t ResTrigger;       /* Range 0....(bb_nr5g_MAX_NB_SRS_TRIGGER_STATES-1); Default is 0xFF */
+            uint8_t ResTrigger;       /* Range 1....(bb_nr5g_MAX_NB_SRS_TRIGGER_STATES); Default is 0xFF */
             uint8_t SlotOffset;       /* Range 1...32; Default is 0xFF */
         } Aperiodic;
         struct
@@ -976,6 +1017,19 @@ typedef struct {
 } PREFIX(bb_nr5g_SRS_RESOURCEt);
 
 typedef struct {
+    uint8_t SrsPathlossReferenceRSId_r16;   /* Range 0..bb_nr5g_MAX_SRS_PATHLOSS_REFERENCE_RS-1; Default is 0xFF */
+    uint8_t PathlossRefRSCfgIsValid;        /* This field assumes a value defined as bb_nr5g_SRS_PATHLOSS_REFERENCE_RS_***
+                                               in order to read the associated parameters in PathlossRefRSCfg.
+                                               If this field is set to default value PathlossRefRSCfg is neither read or used */
+    union{
+        uint8_t SsbIndex;              /* Range 0....63; Default is 0xFF */
+        uint8_t CsiRsIndex;            /* Range 0....(bb_nr5g_MAX_NB_NZP_CSI_RS_RESOURCES-1); Default is 0xFF */
+    } PathlossRefRSCfg;
+    uint8_t Pad;
+} PREFIX(bb_nr5g_SRS_PATHLOSS_REF_RS_R16t);
+
+typedef struct {
+    uint32_t FieldMask;
     uint8_t ResourceId; /* SRS Resource Set id 0...(bb_nr5g_MAX_SRS_RESOURCE_SETS-1); Default/Invalid value is 0xFF*/
     uint8_t Usage; /* Indicates if the SRS resource set is used for beam management vs. used for either codebook based or non-codebook based transmission
                      Enum [beamManagement, codebook, nonCodebook, antennaSwitching]; Default/Invalid value is 0xFF */
@@ -993,9 +1047,13 @@ typedef struct {
     } PathlossRefRS;
     int16_t P0; /*P0 value for SRS power control. Range -202...24*/
     uint8_t NbResourceIdList; /*Gives the number of valid elements in ResourceIdList vector: 1.. bb_nr5g_MAX_SRS_RESOURCE_PERSET; Default value is 0*/
-    uint8_t Pad[3];
+    uint8_t Pad[2];
     uint8_t ResourceIdList[bb_nr5g_MAX_SRS_RESOURCE_PERSET]; /*The IDs of the SRS-Reosurces used in this SRS-ResourceSet*/
+    uint8_t NbPathlossReferenceRSList;    /* NUmber of valid elements in PathlossReferenceRSList: 1..bb_nr5g_MAX_SRS_PATHLOSS_REFERENCE_RS; Default value is 0 */
     PREFIX(bb_nr5g_SRS_RESOURCETYPESETt) ResourceType;
+#define bb_nr5g_STRUCT_SRS_RESOURCE_SET_PATHLOSS_REF_RS_LIST_R16_SETUP    0x0001
+#define bb_nr5g_STRUCT_SRS_RESOURCE_SET_PATHLOSS_REF_RS_LIST_R16_RELEASE  0x0002
+    AFIELD(PREFIX(bb_nr5g_SRS_PATHLOSS_REF_RS_R16t), PathlossReferenceRSList, bb_nr5g_MAX_SRS_PATHLOSS_REFERENCE_RS);
 } PREFIX(bb_nr5g_SRS_RESOURCE_SETt);
 
 /* nrofCandidates-IAB-r16 or nrofCandidates-CI-r16 */
@@ -1113,7 +1171,7 @@ typedef struct {
           resource sets (CORESET), search spaces and additional parameters for acquiring the
           PDCCH. */
 typedef struct {
-     /* Field mask according to bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_***_PRESENT */
+   /* Field mask according to bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_***_PRESENT */
     uint8_t FieldMask;
    /* The network configures at most 3 CORESETs per BWP per cell (including the initial CORESET)*/
     uint8_t NbDedCtrlResSetsToAdd;  /*Gives the number of valid elements in DedCtrlResSetsToAdd vector: 1..3; Default value is 0*/
@@ -1121,14 +1179,23 @@ typedef struct {
     uint8_t NbDedSearchSpacesToAdd; /*Gives the number of valid elements in DedSearchSpacesToAdd vector: 1 .. 10; Default value is 0*/
     uint8_t NbDedSearchSpacesToDel; /*Gives the number of valid elements in DedSearchSpacesToDel vector: 1 .. 10; Default value is 0*/
     uint8_t DedCtrlResSetsIdToDel[bb_nr5g_DED_CTRL_RES_SET_SIZE]; /* A static list of dedicated control resource sets identifier to delete.*/
-#define bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_DOWNLINK_PREEMPTION_PRESENT   0x0001
+
+#define bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_DOWNLINK_PREEMPTION_SETUP       0x0001
+#define bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_DOWNLINK_PREEMPTION_RELEASE     0x0002
     VFIELD(PREFIX(bb_nr5g_DOWNLINK_PREEMPTIONt), DownlinkPreemption); /*Configuration of downlink preemtption indications to be monitored in this cell*/
-#define bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_PUSCH_PRESENT   0x0002
+
+#define bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_PUSCH_SETUP                 0x0004
+#define bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_PUSCH_RELEASE               0x0008
     VFIELD(PREFIX(bb_nr5g_PUSCH_TPC_CFGt), TpcPusch); /* Enable and configure reception of group TPC commands for PUSCH*/
-#define bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_PUCCH_PRESENT   0x0004
+
+#define bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_PUCCH_SETUP                 0x0010
+#define bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_PUCCH_RELEASE               0x0020
     VFIELD(PREFIX(bb_nr5g_PUCCH_TPC_CFGt), TpcPucch); /* Enable and configure reception of group TPC commands for PUCCH*/
-#define bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_SRS_PRESENT   0x0008
+
+#define bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_SRS_SETUP                   0x0040
+#define bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_SRS_RELEASE                 0x0080
     VFIELD(PREFIX(bb_nr5g_SRS_TPC_CFGt), TpcSrs); /* Enable and configure reception of group TPC commands for SRS*/
+
     AFIELD(PREFIX(bb_nr5g_CTRL_RES_SETt), DedCtrlResSetsToAdd, bb_nr5g_DED_CTRL_RES_SET_SIZE); /* A dynamic list of dedicated control resource sets to add.*/
     AFIELD(PREFIX(bb_nr5g_SEARCH_SPACEt), DedSearchSpacesToAdd, bb_nr5g_DED_SEARCH_SPACE_SIZE);/* A dynamic list of dedicated search space to add.*/
     AFIELD(uint32_t, DedSearchSpacesIdToDel, bb_nr5g_DED_SEARCH_SPACE_SIZE); /* A dynamic list of dedicated search space identifier to delete.*/
@@ -1164,10 +1231,12 @@ typedef struct {
 typedef struct {
     uint32_t FieldMask;
 
-#define bb_nr5g_STRUCT_FDM_TDM_PRESENT   0x0001
+#define bb_nr5g_STRUCT_FDM_TDM_SETUP        0x0001
+#define bb_nr5g_STRUCT_FDM_TDM_RELEASE      0x0002
     VFIELD(PREFIX(bb_nr5g_FDM_TDMt), FdmTDM);
 
-#define bb_nr5g_STRUCT_SLOT_BASED_PRESENT   0x0002
+#define bb_nr5g_STRUCT_SLOT_BASED_SETUP     0x0004
+#define bb_nr5g_STRUCT_SLOT_BASED_RELEASE   0x0008
     VFIELD(PREFIX(bb_nr5g_SLOT_BASEDt), SlotBased);
 } PREFIX(bb_nr5g_REPETITION_SCHEME_CONFIG_R16t);
 
@@ -1197,7 +1266,10 @@ typedef struct {
 typedef struct {
     uint32_t FieldMask;
 
+#define bb_nr5g_STRUCT_PDSCH_CONF_MAX_MIMO_LAYERS_SETUP     0x0001
+#define bb_nr5g_STRUCT_PDSCH_CONF_MAX_MIMO_LAYERS_RELEASE   0x0002
     uint8_t MaxMIMOLayers_r16;                      /* Range (1..8)                       */
+
     uint8_t AntennaPortsFieldPresenceDCI12_r16;     /* Enum {enabled}                       */
     uint8_t DmrsSequenceInitializationDCI12_r16;    /* Enum {enabled}                       */
     uint8_t HarqProcessNumberSizeDCI12_r16;         /* Range (0..4)                       */
@@ -1221,33 +1293,46 @@ typedef struct {
         PREFIX(bb_nr5g_PDSCH_PRBBUNDLTYPEDYNAMICt) BundTypeDynamic;
     } PrbBundlTypeDCI12_r16; /* Indicates the PRB bundle type and bundle size(s).*/
 
-    uint8_t NbRateMatchPatternGroup1DCI12;  /* Gives the number of valid elements in RateMatchPatternGroup1 vector: 1...bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS; Default value is 0*/
-    uint8_t NbRateMatchPatternGroup2DCI12;  /* Gives the number of valid elements in RateMatchPatternGroup2 vector: 1...bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS; Default value is 0*/
+    uint8_t NbRateMatchPatternGroup1DCI12;  /* Gives the number of valid elements in RateMatchPatternGroup1 vector: 1...bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP; Default value is 0*/
+    uint8_t NbRateMatchPatternGroup2DCI12;  /* Gives the number of valid elements in RateMatchPatternGroup2 vector: 1...bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP; Default value is 0*/
 
     uint8_t NbMinimumSchedulingOffsetK0_r16;
     uint8_t NbAperiodicZpCsiRSResSetsToAddDCI12_r16;
     uint8_t NbAperiodicZpCsiRSResSetsToDelDCI12_r16;
     uint8_t NbPdschTimeDomainAllocationDCI12_r16;
     uint8_t NbPdschTimeDomainAllocation_r16;
-    uint8_t RateMatchPatternGroup1DCI12_r16[bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS];    /* Bit 0..6: IDs of a first group of RateMatchPatterns defined in the RateMatchPatternDed.
-                                                                                             Range 1... bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS; Default value is 0
+    uint8_t RateMatchPatternGroup1DCI12_r16[bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP];    /* Bit 0..6: IDs of a first group of RateMatchPatterns defined in the RateMatchPatternDed.
+                                                                                             Range 1... bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP; Default value is 0
                                                                                              Bit 7: 0 means cellLevel, 1 means BWP level*/
-    uint8_t RateMatchPatternGroup2DCI12_r16[bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS]; /* Bit 0..6: IDs of a first group of RateMatchPatterns defined in the RateMatchPatternDed.
-                                                                                          Range 1... bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS; Default value is 0
+    uint8_t RateMatchPatternGroup2DCI12_r16[bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP]; /* Bit 0..6: IDs of a first group of RateMatchPatterns defined in the RateMatchPatternDed.
+                                                                                          Range 1... bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP; Default value is 0
                                                                                           Bit 7: 0 means cellLevel, 1 means BWP level*/
+
+#define bb_nr5g_STRUCT_PDSCH_CONF_MIN_SCHEDULING_OFFSET_K0_r16_SETUP     0x0004
+#define bb_nr5g_STRUCT_PDSCH_CONF_MIN_SCHEDULING_OFFSET_K0_r16_RELEASE   0x0008
     uint8_t MinimumSchedulingOffsetK0_r16[2];
 
-#define bb_nr5g_STRUCT_DMRS_DOWNLINK_PDSCH_MAPPING_TYPEA_DCI_1_2_PRESENT   0x0001
+#define bb_nr5g_STRUCT_PDSCH_CONF_DMRS_DOWNLINK_PDSCH_MAPPING_TYPEA_DCI_1_2_SETUP      0x0010
+#define bb_nr5g_STRUCT_PDSCH_CONF_DMRS_DOWNLINK_PDSCH_MAPPING_TYPEA_DCI_1_2_RELEASE    0x0020
     VFIELD(PREFIX(bb_nr5g_DMRS_DOWNLINK_CFGt), DmrsDownlinkForPDSCHMappingTypeADCI12_r16);
-#define bb_nr5g_STRUCT_DMRS_DOWNLINK_PDSCH_MAPPING_TYPEB_DCI_1_2_PRESENT   0x0002
+
+#define bb_nr5g_STRUCT_PDSCH_CONF_DMRS_DOWNLINK_PDSCH_MAPPING_TYPEB_DCI_1_2_SETUP      0x0040
+#define bb_nr5g_STRUCT_PDSCH_CONF_DMRS_DOWNLINK_PDSCH_MAPPING_TYPEB_DCI_1_2_RELEASE    0x0080
     VFIELD(PREFIX(bb_nr5g_DMRS_DOWNLINK_CFGt), DmrsDownlinkForPDSCHMappingTypeBDCI12_r16);
 
-#define bb_nr5g_STRUCT_REPETITION_SCHEME_CONFIG_PRESENT   0x0004
+#define bb_nr5g_STRUCT_PDSCH_CONF_REPETITION_SCHEME_CONFIG_SETUP                   0x0100
+#define bb_nr5g_STRUCT_PDSCH_CONF_REPETITION_SCHEME_CONFIG_RELEASE                 0x0200
     VFIELD(PREFIX(bb_nr5g_REPETITION_SCHEME_CONFIG_R16t), RepetitionSchemeConfig_r16);
 
     AFIELD(PREFIX(bb_nr5g_ZP_CSI_RS_RES_SETt), AperiodicZpCsiRSResSetsToAddDCI12_r16, bb_nr5g_MAX_NB_ZP_CSI_RS_RES_SETS );
     AFIELD(uint8_t, AperiodicZpCsiRSResSetsToDelDCI12_r16, bb_nr5g_MAX_NB_ZP_CSI_RS_RES_SETS); /* Range (0..15) */
+
+#define bb_nr5g_STRUCT_PDSCH_CONF_TIME_DOMAIN_RES_ALLOCATION_DCI12_R16_SETUP       0x0400
+#define bb_nr5g_STRUCT_PDSCH_CONF_TIME_DOMAIN_RES_ALLOCATION_DCI12_R16_RELEASE     0x0800
     AFIELD(PREFIX(bb_nr5g_PDSCH_TIME_DOMAIN_RES_ALLOCATION_R16t), PdschTimeDomainAllocationDCI12_r16, bb_nr5g_MAX_NB_DL_ALLOCATIONS);
+
+#define bb_nr5g_STRUCT_PDSCH_CONF_TIME_DOMAIN_RES_ALLOCATION_R16_SETUP             0x1000
+#define bb_nr5g_STRUCT_PDSCH_CONF_TIME_DOMAIN_RES_ALLOCATION_R16_RELEASE           0x2000
     AFIELD(PREFIX(bb_nr5g_PDSCH_TIME_DOMAIN_RES_ALLOCATION_R16t), PdschTimeDomainAllocation_r16, bb_nr5g_MAX_NB_DL_ALLOCATIONS);
 
 } PREFIX(bb_nr5g_PDSCH_CONF_DEDICATED_R16_IESt);
@@ -1284,8 +1369,8 @@ typedef struct {
     uint8_t NbRateMatchPatternDedToAdd;  /* Gives the number of valid elements in RateMatchPatternDedToAdd vector: 1...bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS; Default value is 0*/
 
     uint8_t NbRateMatchPatternDedToDel;  /* Gives the number of valid elements in RateMatchPatternDedToDel vector: 1...bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS; Default value is 0*/
-    uint8_t NbRateMatchPatternGroup1;  /* Gives the number of valid elements in RateMatchPatternGroup1 vector: 1...bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS; Default value is 0*/
-    uint8_t NbRateMatchPatternGroup2;  /* Gives the number of valid elements in RateMatchPatternGroup2 vector: 1...bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS; Default value is 0*/
+    uint8_t NbRateMatchPatternGroup1;  /* Gives the number of valid elements in RateMatchPatternGroup1 vector: 1...bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP; Default value is 0*/
+    uint8_t NbRateMatchPatternGroup2;  /* Gives the number of valid elements in RateMatchPatternGroup2 vector: 1...bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP; Default value is 0*/
     uint8_t NbZpCsiRsResourceToAdd;/* Gives the number of valid elements in ZpCsiRsResourceToAdd vector: 1...bb_nr5g_MAX_NB_ZP_CSI_RS_RESOURCES; Default value is 0*/
 
     uint8_t NbZpCsiRsResourceToDel;/* Gives the number of valid elements in ZpCsiRsResourceToAdd vector: 1...bb_nr5g_MAX_NB_ZP_CSI_RS_RESOURCES; Default value is 0*/
@@ -1299,26 +1384,34 @@ typedef struct {
     /* Field mask according to bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_***_PRESENT to handle DmrsMappingTypeA and DmrsMappingTypeB*/
     uint32_t FieldMask;
 
-    uint8_t RateMatchPatternGroup1[bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS]; /* Bit 0..6: IDs of a first group of RateMatchPatterns defined in the RateMatchPatternDed.
-                                                                                     Range 1... bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS; Default value is 0
+    uint8_t RateMatchPatternGroup1[bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP]; /* Bit 0..6: IDs of a first group of RateMatchPatterns defined in the RateMatchPatternDed.
+                                                                                     Range 1... bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP; Default value is 0
                                                                            Bit 7: 0 means cellLevel, 1 means BWP level*/
-    uint8_t RateMatchPatternGroup2[bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS];/*  Bit 0..6: IDs of a second group of RateMatchPatterns defined in the RateMatchPatternDed.
-                                                                                    Range 1... bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS; Default value is 0
+    uint8_t RateMatchPatternGroup2[bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP];/*  Bit 0..6: IDs of a second group of RateMatchPatterns defined in the RateMatchPatternDed.
+                                                                                    Range 1... bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP; Default value is 0
                                                                            Bit 7: 0 means cellLevel, 1 means BWP level*/
-#define bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_DMRS_TYPEA_PRESENT   0x0001
+#define bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_DMRS_TYPEA_SETUP        0x0001
+#define bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_DMRS_TYPEA_RELEASE      0x0002
     VFIELD(PREFIX(bb_nr5g_DMRS_DOWNLINK_CFGt), DmrsMappingTypeA); /* DMRS configuration for PDSCH transmissions using PDSCH mapping type A */
-#define bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_DMRS_TYPEB_PRESENT   0x0002
+
+#define bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_DMRS_TYPEB_SETUP        0x0004
+#define bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_DMRS_TYPEB_RELEASE      0x0008
     VFIELD(PREFIX(bb_nr5g_DMRS_DOWNLINK_CFGt), DmrsMappingTypeB); /* DMRS configuration for PDSCH transmissions using PDSCH mapping type B */
-#define bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_P_ZP_CSI_RS_RESOURCE_SET_PRESENT   0x0004
+
+#define bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_P_ZP_CSI_RS_RESOURCE_SET_SETUP      0x0010
+#define bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_P_ZP_CSI_RS_RESOURCE_SET_RELEASE    0x0020
     VFIELD(PREFIX(bb_nr5g_ZP_CSI_RS_RES_SETt), PZpCsiRsResSet); /* A set of periodically occurring ZP-CSI-RS-Resources (the actual resources are defined in the ZpCsiRsResourceToAdd). 
                                                                    The network uses the ZP-CSI-RS-ResourceSetId=0 for this set. */
-#define bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_R16_IES_PRESENT 0x0008
+#define bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_R16_IES_PRESENT                     0x0040
     VFIELD(PREFIX(bb_nr5g_PDSCH_CONF_DEDICATED_R16_IESt), PdschConfExtR16);
 
-    AFIELD(PREFIX(bb_nr5g_TCI_STATEt), TciStatesToAdd, bb_nr5g_MAX_NB_TCI_STATES);    /* Dynamic list of Transmission Configuration Indicator (TCI) states for dynamically indicating (over DCI)
-                                                                                 a transmission configuration to be added/modified.*/
+    AFIELD(PREFIX(bb_nr5g_TCI_STATEt), TciStatesToAdd, bb_nr5g_MAX_NB_TCI_STATES);    /* Dynamic list of Transmission Configuration Indicator (TCI) states for dynamically indicating (over DCI) a transmission configuration to be added/modified.*/
     AFIELD(uint32_t, TciStatesToDel, bb_nr5g_MAX_NB_TCI_STATES); /* Dynamic list of Transmission Configuration Indicator (TCI) states to be deleted.*/
+  
+#define bb_nr5g_STRUCT_PDSCH_CONF_TIMEDOMAINRESALLOC_SETUP                      0x0080
+#define bb_nr5g_STRUCT_PDSCH_CONF_TIMEDOMAINRESALLOC_RELEASE                    0x0100
     AFIELD(PREFIX(bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt), PdschAllocDed, bb_nr5g_MAX_NB_DL_ALLOCS); /* Dynamic list of time-domain configurations for timing of DL assignment to DL data.*/
+    
     AFIELD(PREFIX(bb_nr5g_RATE_MATCH_PATTERNt), RateMatchPatternDedToAdd, bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS);  /* Dynamic list of Resources patterns which the UE should rate match PDSCH around to be added/modified.*/
     AFIELD(uint32_t, RateMatchPatternDedToDel, bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS); /* Dynamic list of Resources patterns to be deleted.*/
     AFIELD(PREFIX(bb_nr5g_ZP_CSI_RS_RESt), ZpCsiRsResourceToAdd, bb_nr5g_MAX_NB_ZP_CSI_RS_RESOURCES); /* Dynamic list of Zero-Power (ZP) CSI-RS resources used for PDSCH rate-matching to be added/modified.*/
@@ -1593,59 +1686,97 @@ typedef struct {
     uint8_t InvalidSymbolPatternIndicatorDCI02_r16;         /*  Enum {enabled}                       */
     uint8_t MaxRankDCIDCI02_r16;                            /*      Range (1..4)   */
 
-    uint8_t McsTableDCI02_r16;                              /*       Enum {qam256, qam64LowSE}  */
-    uint8_t McsTableTransformPrecoderDCI02_r16;             /*        Enum {qam256, qam64LowSE} */
-    uint8_t PriorityIndicatorDCI02_r16;                     /*         Enum {enabled}   */
-    uint8_t PuschRepTypeIndicatorDCI02_r16;                 /*       Enum { pusch-RepTypeA, pusch-RepTypeB}  */
-    uint8_t PuschRepTypeIndicatorDCI01_r16;                  /*  Enum { pusch-RepTypeA, pusch-RepTypeB}      */
-    uint8_t ResourceAllocationDCI02_r16;                    /*         Enum { resourceAllocationType0, resPUSCH-ConfigourceAllocationType1, dynamicSwitch} */
+    uint8_t McsTableDCI02_r16;                              /*  Enum {qam256, qam64LowSE}  */
+    uint8_t McsTableTransformPrecoderDCI02_r16;             /*  Enum {qam256, qam64LowSE} */
+    uint8_t PriorityIndicatorDCI02_r16;                     /*  Enum {enabled}   */
+    uint8_t PuschRepTypeIndicatorDCI02_r16;                 /*  Enum { pusch-RepTypeA, pusch-RepTypeB}  */
+    uint8_t PuschRepTypeIndicatorDCI01_r16;                 /*  Enum { pusch-RepTypeA, pusch-RepTypeB}      */
+    uint8_t ResourceAllocationDCI02_r16;                    /*  Enum { resourceAllocationType0, resPUSCH-ConfigourceAllocationType1, dynamicSwitch} */
 
-    uint8_t ResourceAllocationType1GranularityDCI02_r16;    /*       Enum { n2,n4,n8,n16 }  */
-    uint8_t InvalidSymbolPatternIndicatorDCI01_r16;          /*  Enum {enabled}   */
-    uint8_t PriorityIndicatorDCI01_r16;                      /*  Enum {enabled}   */
+    uint8_t ResourceAllocationType1GranularityDCI02_r16;    /*  Enum { n2,n4,n8,n16 }  */
+    uint8_t InvalidSymbolPatternIndicatorDCI01_r16;         /*  Enum {enabled}   */
+    uint8_t PriorityIndicatorDCI01_r16;                     /*  Enum {enabled}   */
 
-    uint8_t FrequencyHoppingDCI01_r16;                       /*  Enum {interRepetition, interSlot}         */
+    uint8_t FrequencyHoppingDCI01_r16;                      /*  Enum {interRepetition, interSlot}         */
 
-    uint8_t NbUciOnPUSCHListDCI01_r16;                       /* Default value 0 */
+    uint8_t NbUciOnPUSCHListDCI01_r16;                      /* Default value 0 */
     uint8_t NbUciOnPUSCHListDCI02_r16;                      /* Default value 0 */
-    uint8_t NbMinSchedOffsetK2_r16;                         /* Gives the number of valid elements in PuschAllocDed vector: 1...bb_nr5g_MAX_NB_UL_ALLOCS; Default value is 0 */
+    uint8_t NbMinSchedOffsetK2_r16;                         /* Gives the number of valid elements in MinSchedOffsetK2_r16 vector: 1...bb_nr5g_MAX_NB_MIN_SCHED_OFFSET_VALUES_R16; Default value is 0 */
     uint8_t NbFrequencyHoppingDCI02Lists_r16;         
-    uint8_t NbPuschTimeDomainAlloListDCI01_r16;              /* Default value 0 */
-    uint8_t NbPuschTimeDomainAlloListDCI02_r16;              /* Default value 0 */
+    uint8_t NbPuschTimeDomainAlloListDCI01_r16;             /* Default value 0 */
+    uint8_t NbPuschTimeDomainAlloListDCI02_r16;             /* Default value 0 */
 
-    uint8_t UlFullPowerTransmission_r16;                        /* Enum {fullpower, fullpowerMode1, fullpoweMode2}    */
-    uint8_t NumberOfInvalidSymbolsForDLULSwitching_r16;        /* Range (1..4) */
+    uint8_t UlFullPowerTransmission_r16;                    /* Enum {fullpower, fullpowerMode1, fullpoweMode2}    */
+    uint8_t NumberOfInvalidSymbolsForDLULSwitching_r16;     /* Range (1..4) */
     uint8_t NbPuschTimeDomainAllocListForMultiPUSCH_r16;
 
     uint8_t NbFreqHopOffset;  /* Gives the number of valid elements in FreqHopOffset vector: 1...4; Default value is 0 */
     uint8_t NbPuschAllocDed;  /* Gives the number of valid elements in PuschAllocDed vector: 1...bb_nr5g_MAX_NB_UL_ALLOCS; Default value is 0*/
-    /* Field mask according to bb_nr5g_STRUCT_PUSCH_CONF_DEDICATED_***_PRESENT to handle DmrsMappingTypeA,DmrsMappingTypeB, PuschPwCtrl and UciOnPusch*/
     uint32_t FieldMask;
     uint16_t FreqHopOffset[4];   /* Set of frequency hopping offsets used when frequency hopping is enabled for granted transmission (not msg3) and type 2
                                     Element range is 1....(bb_nr5g_MAX_NB_PHYS_RES_BLOCKS-1). Static list */
     uint8_t Pad;
 
-#define bb_nr5g_STRUCT_PUSCH_CONF_DEDICATED_DMRS_TYPEA_PRESENT   0x0001
+#define bb_nr5g_STRUCT_PUSCH_CONF_DEDICATED_DMRS_TYPEA_SETUP        0x00000001
+#define bb_nr5g_STRUCT_PUSCH_CONF_DEDICATED_DMRS_TYPEA_RELEASE      0x00000002
     VFIELD(PREFIX(bb_nr5g_DMRS_UPLINK_CFGt), DmrsMappingTypeA); /* DMRS configuration for PDSCH transmissions using PDSCH mapping type A */
-#define bb_nr5g_STRUCT_PUSCH_CONF_DEDICATED_DMRS_TYPEB_PRESENT   0x0002
+
+#define bb_nr5g_STRUCT_PUSCH_CONF_DEDICATED_DMRS_TYPEB_SETUP        0x00000004
+#define bb_nr5g_STRUCT_PUSCH_CONF_DEDICATED_DMRS_TYPEB_RELEASE      0x00000008
     VFIELD(PREFIX(bb_nr5g_DMRS_UPLINK_CFGt), DmrsMappingTypeB); /* DMRS configuration for PDSCH transmissions using PDSCH mapping type B */
-#define bb_nr5g_STRUCT_PUSCH_CONF_DEDICATED_PW_CTRL_PRESENT   0x0004
+
+#define bb_nr5g_STRUCT_PUSCH_CONF_DEDICATED_DMRS_TYPEA_DCI_0_2_SETUP        0x00000010
+#define bb_nr5g_STRUCT_PUSCH_CONF_DEDICATED_DMRS_TYPEA_DCI_0_2_RELEASE      0x00000020
+    VFIELD(PREFIX(bb_nr5g_DMRS_UPLINK_CFGt), DmrsMappingTypeADci02);
+
+#define bb_nr5g_STRUCT_PUSCH_CONF_DEDICATED_DMRS_TYPEB_DCI_0_2_SETUP        0x00000040
+#define bb_nr5g_STRUCT_PUSCH_CONF_DEDICATED_DMRS_TYPEB_DCI_0_2_RELEASE      0x00000080
+    VFIELD(PREFIX(bb_nr5g_DMRS_UPLINK_CFGt), DmrsMappingTypeBDci02);
+
+#define bb_nr5g_STRUCT_PUSCH_CONF_DEDICATED_PW_CTRL_PRESENT         0x00000100
     VFIELD(PREFIX(bb_nr5g_PUSCH_POWERCONTROLt), PuschPwCtrl);
-#define bb_nr5g_STRUCT_PUSCH_CONF_DEDICATED_UCI_PRESENT   0x0008
+
+#define bb_nr5g_STRUCT_PUSCH_CONF_DEDICATED_UCI_SETUP               0x00000200
+#define bb_nr5g_STRUCT_PUSCH_CONF_DEDICATED_UCI_RELEASE             0x00000400
     VFIELD(PREFIX(bb_nr5g_UCI_ON_PUSCHt), UciOnPusch);
 
-#define bb_nr5g_STRUCT_PUSCH_CONF_DEDICATED_PW_CTRL_R16_PRESENT   0x0010
+#define bb_nr5g_STRUCT_PUSCH_CONF_DEDICATED_PW_CTRL_R16_SETUP       0x00000800
+#define bb_nr5g_STRUCT_PUSCH_CONF_DEDICATED_PW_CTRL_R16_RELEASE     0x00001000
     VFIELD(PREFIX(bb_nr5g_PUSCH_POWER_CONTROL_r16), PuschPwCtrl_r16);
-#define bb_nr5g_STRUCT_INVALID_SYMB_PATTERN_r16_PRESENT   0x0020
+
+#define bb_nr5g_STRUCT_PUSCH_CONF_INVALID_SYMB_PATTERN_r16_PRESENT  0x00002000
     VFIELD(PREFIX(bb_nr5g_INVALID_SYMB_PATTERN_R16t), InvalidSymbolPattern_r16);
 
+#define bb_nr5g_STRUCT_PUSCH_CONF_TIMEDOMAINRESALLOC_SETUP          0x00004000
+#define bb_nr5g_STRUCT_PUSCH_CONF_TIMEDOMAINRESALLOC_RELEASE        0x00008000
     AFIELD(PREFIX(bb_nr5g_PUSCH_TIMEDOMAINRESALLOCt), PuschAllocDed, bb_nr5g_MAX_NB_UL_ALLOCS); /* Dynamic list of time domain allocations for timing of UL assignment to UL data*/
+
+#define bb_nr5g_STRUCT_PUSCH_CONF_MINSCHED_OFFK2_SETUP              0x00010000
+#define bb_nr5g_STRUCT_PUSCH_CONF_MINSCHED_OFFK2_RELEASE            0x00020000
     AFIELD(uint8_t, MinSchedOffsetK2_r16, bb_nr5g_MAX_NB_MIN_SCHED_OFFSET_VALUES_R16);
+
+#define bb_nr5g_STRUCT_PUSCH_CONF_FREQHOP_DCI02_SETUP               0x00040000
+#define bb_nr5g_STRUCT_PUSCH_CONF_FREQHOP_DCI02_RELEASE             0x00080000
     AFIELD(uint16_t, FrequencyHoppingDCI02Lists_r16, 4);   /* 1..274 */
+
+#define bb_nr5g_STRUCT_PUSCH_CONF_UCI_DCI02_SETUP                   0x00100000
+#define bb_nr5g_STRUCT_PUSCH_CONF_UCI_DCI02_RELEASE                 0x00200000
     AFIELD(PREFIX(bb_nr5g_UCI_ON_PUSCH_DCI02_R16t), UciOnPUSCHListDCI02_r16, bb_nr5g_UCI_ONPUSCH_DCI_0_2_R16);
-    AFIELD(PREFIX(bb_nr5g_PUSCH_TIMEDOMAINRESALLOC_R16t), PuschTimeDomainAlloListDCI02_r16, bb_nr5g_MAX_NR_OF_UL_ALLOCATION);    
+
+#define bb_nr5g_STRUCT_PUSCH_CONF_TIMEDOMAINRESALLOC_DCI02_R16_SETUP                   0x00400000
+#define bb_nr5g_STRUCT_PUSCH_CONF_TIMEDOMAINRESALLOC_DCI02_R16_RELEASE                 0x00800000
+    AFIELD(PREFIX(bb_nr5g_PUSCH_TIMEDOMAINRESALLOC_R16t), PuschTimeDomainAlloListDCI02_r16, bb_nr5g_MAX_NR_OF_UL_ALLOCATION);
+
+#define bb_nr5g_STRUCT_PUSCH_CONF_TIMEDOMAINRESALLOC_DCI01_R16_SETUP                    0x01000000
+#define bb_nr5g_STRUCT_PUSCH_CONF_TIMEDOMAINRESALLOC_DCI01_R16_RELEASE                  0x02000000
     AFIELD(PREFIX(bb_nr5g_PUSCH_TIMEDOMAINRESALLOC_R16t), PuschTimeDomainAlloListDCI01_r16, bb_nr5g_MAX_NR_OF_UL_ALLOCATION);
+
+#define bb_nr5g_STRUCT_PUSCH_CONF_UCI_DCI01_SETUP                                       0x04000000
+#define bb_nr5g_STRUCT_PUSCH_CONF_UCI_DCI01_RELEASE                                     0x08000000
     AFIELD(PREFIX(bb_nr5g_UCI_ON_PUSCHt), UciOnPUSCHListDCI01_r16, 2);
+
+#define bb_nr5g_STRUCT_PUSCH_CONF_TIMEDOMAINRESALLOC_MULTI_PUSCH_R16_SETUP              0x10000000
+#define bb_nr5g_STRUCT_PUSCH_CONF_TIMEDOMAINRESALLOC_MULTI_PUSCH_R16_RELEASE            0x20000000
     AFIELD(PREFIX(bb_nr5g_PUSCH_TIMEDOMAINRESALLOC_R16t), PuschTimeDomainAllocListForMultiPUSCH_r16, bb_nr5g_MAX_NR_OF_UL_ALLOCATION);
 } PREFIX(bb_nr5g_PUSCH_CONF_DEDICATEDt);
 
@@ -1721,9 +1852,11 @@ typedef struct {
     uint8_t AutonomousTx_r16;         /* Enum [enabled];  Default value 0xFF */
 
     PREFIX(bb_nr5g_DMRS_UPLINK_CFGt) DmrsConfiguration;
-#define bb_nr5g_STRUCT_CONFIGURED_GRANT_CONF_UCI_PRESENT   0x0001
+#define bb_nr5g_STRUCT_CONFIGURED_GRANT_CONF_UCI_SETUP      0x0001
+#define bb_nr5g_STRUCT_CONFIGURED_GRANT_CONF_UCI_RELEASE    0x0002
     VFIELD(PREFIX(bb_nr5g_UCI_ON_PUSCHt), UciOnPusch);
-#define bb_nr5g_STRUCT_CONFIGURED_GRANT_CONF_UL_GRANT_PRESENT   0x0002
+
+#define bb_nr5g_STRUCT_CONFIGURED_GRANT_CONF_UL_GRANT_PRESENT   0x0004
     VFIELD(PREFIX(bb_nr5g_RRC_CONFIGURED_UL_GRANTt), RrcConfUlGrant);
 } PREFIX(bb_nr5g_CONFIGURED_GRANT_CONFt);
 
@@ -1812,18 +1945,34 @@ typedef struct {
     uint8_t SubslotLengthForPUCCH_extendedCP; /* Enum[n2, n6] */ 
     uint8_t NumberOfBitsForPUCCH_ResourceIndicatorDCI_1_2_r16;
     uint8_t Dmrs_UplinkTransformPrecodingPUCCH_r16; /* 0xFF for disabled or absent */
-    uint8_t Pad[3];
+    uint16_t FieldMask;
+    uint8_t Pad;
+
     AFIELD(PREFIX(bb_nr5g_PUCCH_RESOURCE_EXT_R16t), ResourceToAdd, bb_nr5g_MAX_PUCCH_RESOURCES);
+
+#define bb_nr5g_STRUCT_PUCCH_CONF_DL_DATATOUL_ACK_R16_SETUP                   0x0001
+#define bb_nr5g_STRUCT_PUCCH_CONF_DL_DATATOUL_ACK_R16_RELEASE                 0x0002
     AFIELD(int8_t, Dl_DataToUL_ACK_r16, 8);
+
+#define bb_nr5g_STRUCT_PUCCH_CONF_UL_ACCESS_CONFIG_LIST_DCI_1_1_R16_SETUP     0x0004
+#define bb_nr5g_STRUCT_PUCCH_CONF_UL_ACCESS_CONFIG_LIST_DCI_1_1_R16_RELEASE   0x0008
     AFIELD(uint8_t, Ul_AccessConfigListDCI_1_1_r16, 16);
+
+#define bb_nr5g_STRUCT_PUCCH_CONF_UL_DATATOUL_ACK_DCI_1_2_R16_SETUP           0x0010
+#define bb_nr5g_STRUCT_PUCCH_CONF_UL_DATATOUL_ACK_DCI_1_2_R16_RELEASE         0x0020
     AFIELD(uint8_t, Dl_DataToUL_ACK_DCI_1_2_r16, 8);
+
     AFIELD(PREFIX(bb_nr5g_SPATIAL_RELATION_INFOt), SpatialRelationInfoToAdd, bb_nr5g_MAX_NB_SPATIAL_RELATION_INFOS_DIFF);
     AFIELD(uint8_t, SpatialRelationInfoToDel, bb_nr5g_MAX_NB_SPATIAL_RELATION_INFOS_DIFF);
     AFIELD(PREFIX(bb_nr5g_PUCCH_SPATIALRELATIONINFO_EXTt), SpatialRelationInfoToAddExt, bb_nr5g_MAX_NB_SPATIAL_RELATION_INFOS_R16);
     AFIELD(uint8_t, SpatialRelationInfoToDelExt, bb_nr5g_MAX_NB_SPATIAL_RELATION_INFOS_R16);
     AFIELD(PREFIX(bb_nr5g_PUCCH_RESOURCE_GROUP_R16t), ResourceGroupToAdd, bb_nrg5_MAX_PUCCH_RESOURCE_GROUPS);
     AFIELD(uint8_t, ResourceGroupToDel, bb_nrg5_MAX_PUCCH_RESOURCE_GROUPS);
+
+#define bb_nr5g_STRUCT_PUCCH_CONF_SPS_PUCCH_AN_R16_SETUP                      0x0040
+#define bb_nr5g_STRUCT_PUCCH_CONF_SPS_PUCCH_AN_R16_RELEASE                    0x0080
     AFIELD(PREFIX(bb_nr5g_SPS_PUCCH_ANt), Sps_PUCCH_AN_r16, 4);
+
     AFIELD(uint8_t, SchedulingRequestResourceToAdd, bb_nr5g_MAX_SR_RESOURCES); /* Enum[p0, p1] */
 } PREFIX(bb_nr5g_PUCCH_CONF_DEDICATED_R16_IESt);
 
@@ -1853,17 +2002,26 @@ typedef struct {
     uint8_t MultiCsiPucchRes[2]; /* Static list for releasing PUCCH resource sets.*/
 
     uint8_t DlDataToUlAck[8]; /* Static list of timing for given PDSCH to the DL ACK. Range element 0...15*/
-#define bb_nr5g_STRUCT_PUCCH_CONF_DEDICATED_FMT1_PRESENT   0x0001
+#define bb_nr5g_STRUCT_PUCCH_CONF_DEDICATED_FMT1_SETUP      0x0001
+#define bb_nr5g_STRUCT_PUCCH_CONF_DEDICATED_FMT1_RELEASE    0x0002
     VFIELD(PREFIX(bb_nr5g_PUCCH_FMT_CFGt), Fmt1); /*Parameters that are common for all PUCCH resources of format 1*/
-#define bb_nr5g_STRUCT_PUCCH_CONF_DEDICATED_FMT2_PRESENT   0x0002
+
+#define bb_nr5g_STRUCT_PUCCH_CONF_DEDICATED_FMT2_SETUP      0x0004
+#define bb_nr5g_STRUCT_PUCCH_CONF_DEDICATED_FMT2_RELEASE    0x0008
     VFIELD(PREFIX(bb_nr5g_PUCCH_FMT_CFGt), Fmt2); /*Parameters that are common for all PUCCH resources of format 2*/
-#define bb_nr5g_STRUCT_PUCCH_CONF_DEDICATED_FMT3_PRESENT   0x0004
+
+#define bb_nr5g_STRUCT_PUCCH_CONF_DEDICATED_FMT3_SETUP      0x0010
+#define bb_nr5g_STRUCT_PUCCH_CONF_DEDICATED_FMT3_RELEASE    0x0020
     VFIELD(PREFIX(bb_nr5g_PUCCH_FMT_CFGt), Fmt3); /*Parameters that are common for all PUCCH resources of format 3*/
-#define bb_nr5g_STRUCT_PUCCH_CONF_DEDICATED_FMT4_PRESENT   0x0008
+
+#define bb_nr5g_STRUCT_PUCCH_CONF_DEDICATED_FMT4_SETUP      0x0040
+#define bb_nr5g_STRUCT_PUCCH_CONF_DEDICATED_FMT4_RELEASE    0x0080
     VFIELD(PREFIX(bb_nr5g_PUCCH_FMT_CFGt), Fmt4); /*Parameters that are common for all PUCCH resources of format 4*/
-#define bb_nr5g_STRUCT_PUCCH_CONF_DEDICATED_PW_CTRL_PRESENT   0x0010
+
+#define bb_nr5g_STRUCT_PUCCH_CONF_DEDICATED_PW_CTRL_PRESENT 0x0100
     VFIELD(PREFIX(bb_nr5g_PUCCH_POWERCONTROLt), PucchPwCtrl);
-#define bb_nr5g_STRUCT_PUCCH_CONF_DEDICATED_R16_IES_PRESENT 0x0020
+
+#define bb_nr5g_STRUCT_PUCCH_CONF_DEDICATED_R16_IES_PRESENT 0x0200
     VFIELD(PREFIX(bb_nr5g_PUCCH_CONF_DEDICATED_R16_IESt), PucchConfExtR16);
 
     AFIELD(PREFIX(bb_nr5g_PUCCH_RESOURCEt), ResourceDedToAdd, bb_nr5g_MAX_PUCCH_RESOURCES); /* Dynamic list for adding PUCCH resources applicable for the UL BWP
@@ -1876,14 +2034,56 @@ typedef struct {
     AFIELD(PREFIX(bb_nr5g_SR_RESOURCE_CFGt), SRResDedToAdd, bb_nr5g_MAX_SR_RESOURCES); /* Dynamic list for adding Scheduling Request resources.*/
 } PREFIX(bb_nr5g_PUCCH_CONF_DEDICATEDt);
 
+typedef struct {
+    uint16_t SfnOffset_r16; /* Range (0..1023) */
+    uint8_t IntegerSubframeOffset_r16; /* Range (0..9); Default 0xFF */
+    uint8_t Pad;
+} PREFIX(bb_nr5g_SRS_SSB_NCELL_SSB_CONFIG_SFN0_OFFSETt);
+
+typedef struct {
+    uint8_t FieldMask;
+    uint32_t SsbFreq_r16;
+    uint8_t HalfFrameIndex_r16; /* Enum[NR_zero, NR_one] */
+    uint8_t SsbSubcarrierSpacing_r16; /* Enum[NR_kHz15, NR_kHz30, NR_kHz60, NR_kHz120, NR_kHz240, spare5, spare6, spare7] */
+    uint8_t SsbPeriodicity_r16; /* Enum[NR_ms5, NR_ms10, NR_ms20, NR_ms40, NR_ms80, NR_ms160, spare6, spare7]; Default 0xFF */
+    uint8_t SfnSSBOffset_r16; /* Range (0..15) */
+    int8_t SsPBCHBlockPower_r16; /* Range (-60..50); Default 0xFF */
+    uint8_t Pad[2];
+#define bb_nr5g_SRS_SSB_NCELL_SSB_CONFIG_SFN0_OFFSET_PRESENT 0x0001
+    VFIELD(PREFIX(bb_nr5g_SRS_SSB_NCELL_SSB_CONFIG_SFN0_OFFSETt), Sfn0Offset_r16);
+} PREFIX(bb_nr5g_SRS_SSB_NCELL_SSB_CONFIGt);
+
+typedef struct {
+    uint32_t FieldMask;
+    uint16_t PhysicalCellId_r16; /* PhysCellId Range (0..1007) */
+    uint8_t SsbIndexNcell_r16; /* Range (0..maxNrofSSBs-1) maxNrofSSBs-1 INTEGER ::= 63; Default 0xFF */
+    uint8_t Spare;
+#define bb_nr5g_SRS_SSB_NCELL_SSB_CONFIG_PRESENT 0x0001
+    VFIELD(PREFIX(bb_nr5g_SRS_SSB_NCELL_SSB_CONFIGt), SsbConfiguration_r16);
+} PREFIX(bb_nr5g_SRS_SSB_NCELLt);
+
+typedef struct {
+    uint8_t DlPRSID_r16; /* Range (0..255) */
+    uint8_t DlPRSResourceSetId_r16; /* Range (0..7) */
+    uint8_t DlPRSResourceId_r16; /* Range (0..63); Default 0xFF */
+    uint8_t Pad;
+} PREFIX(bb_nr5g_SRS_DL_PRSt);
+
 /* NR_SRS_PosResourceSet_r16 */
 typedef struct {
+    uint32_t FieldMask;
     uint8_t SrsPosResourceSetId;
-    uint8_t NbPosResourceAperiodic;
-    uint8_t NbPosResourceIdList;
+    uint8_t NbPosResourceAperiodic;     /* 1..maxNrofSRS-TriggerStates-1; Default 0 */
+    uint8_t NbPosResourceIdList;        /* 1..maxNrofSRS-ResourcesPerSet; Default 0 */
     uint8_t Alpha;
     int16_t P0;
     uint16_t Len;
+    uint8_t SsbIndexServing;        /* Range (0..maxNrofSSBs-1); maxNrofSSBs-1 INTEGER ::= 63; Default 0xFF */
+    uint8_t Pad[3];
+#define bb_nr5g_STRUCT_SRS_POS_RESOURCE_SET_SSB_NCELL_PRESENT    0x0001
+    VFIELD(PREFIX(bb_nr5g_SRS_SSB_NCELLt), SsbInfoNCell);
+#define bb_nr5g_STRUCT_SRS_POS_RESOURCE_SET_DL_PRS_PRESENT       0x0002
+    VFIELD(PREFIX(bb_nr5g_SRS_DL_PRSt), DlPrs);
     AFIELD(uint8_t, PosResourceSetAperiodic, bb_nr5g_MAX_NB_SRS_TRIGGER_STATES);
     AFIELD(uint8_t, PosResourceIdList, bb_nr5g_MAX_SRS_RESOURCE_PER_SET);
 } PREFIX(bb_nr5g_SRS_POS_RESOURCE_SETt);
@@ -1901,49 +2101,14 @@ typedef struct {
 } PREFIX(bb_nr5g_SRS_SPATIALRELATIONINFOPOS_SERVINGRSt);
 
 typedef struct {
-    uint16_t SfnOffset_r16; /* Range (0..1023) */
-    uint8_t IntegerSubframeOffset_r16; /* Range (0..9); Default 0xFF */
-    uint8_t Pad;
-} PREFIX(bb_nr5g_SRS_SPATIALRELATIONINFOPOS_SSB_NCELL_SSB_CONFIG_SFN0_OFFSETt);
-
-typedef struct {
-    uint8_t FieldMask;
-    uint32_t SsbFreq_r16;
-    uint8_t HalfFrameIndex_r16; /* Enum[NR_zero, NR_one] */
-    uint8_t SsbSubcarrierSpacing_r16; /* Enum[NR_kHz15, NR_kHz30, NR_kHz60, NR_kHz120, NR_kHz240, spare5, spare6, spare7] */
-    uint8_t SsbPeriodicity_r16; /* Enum[NR_ms5, NR_ms10, NR_ms20, NR_ms40, NR_ms80, NR_ms160, spare6, spare7]; Default 0xFF */
-    uint8_t SfnSSBOffset_r16; /* Range (0..15) */
-    int8_t SsPBCHBlockPower_r16; /* Range (-60..50); Default 0xFF */
-    uint8_t Pad[2];
-#define bb_nr5g_SRS_SPATIALRELATIONINFOPOS_SSB_NCELL_SSB_CONFIG_SFN0_OFFSET_PRESENT 0x0001
-    VFIELD(PREFIX(bb_nr5g_SRS_SPATIALRELATIONINFOPOS_SSB_NCELL_SSB_CONFIG_SFN0_OFFSETt), Sfn0Offset_r16);
-} PREFIX(bb_nr5g_SRS_SPATIALRELATIONINFOPOS_SSB_NCELL_SSB_CONFIGt);
-
-typedef struct {
-    uint32_t FieldMask;
-    uint16_t PhysicalCellId_r16; /* PhysCellId Range (0..1007) */
-    uint8_t SsbIndexNcell_r16; /* Range (0..maxNrofSSBs-1) maxNrofSSBs-1 INTEGER ::= 63; Default 0xFF */
-    uint8_t Spare;
-#define bb_nr5g_SRS_SPATIALRELATIONINFOPOS_SSB_NCELL_SSB_CONFIG_PRESENT 0x0001
-    VFIELD(PREFIX(bb_nr5g_SRS_SPATIALRELATIONINFOPOS_SSB_NCELL_SSB_CONFIGt), SsbConfiguration_r16);
-} PREFIX(bb_nr5g_SRS_SPATIALRELATIONINFOPOS_SSB_NCELLt);
-
-typedef struct {
-    uint8_t DlPRSID_r16; /* Range (0..255) */
-    uint8_t DlPRSResourceSetId_r16; /* Range (0..7) */
-    uint8_t DlPRSResourceId_r16; /* Range (0..63); Default 0xFF */
-    uint8_t Pad;
-} PREFIX(bb_nr5g_SRS_SPATIALRELATIONINFOPOS_DL_PRSt);
-
-typedef struct {
     uint32_t FieldMask;
    
 #define bb_nr5g_SRS_SPATIALRELATIONINFOPOS_SERVINGRS_PRESENT 0x0001
     VFIELD(PREFIX(bb_nr5g_SRS_SPATIALRELATIONINFOPOS_SERVINGRSt), ServingRS_r16);
 #define bb_nr5g_SRS_SPATIALRELATIONINFOPOS_SSB_NCELL_PRESENT 0x0002
-    VFIELD(PREFIX(bb_nr5g_SRS_SPATIALRELATIONINFOPOS_SSB_NCELLt), SsbNcell_r16);
+    VFIELD(PREFIX(bb_nr5g_SRS_SSB_NCELLt), SsbNcell_r16);
 #define bb_nr5g_SRS_SPATIALRELATIONINFOPOS_DL_PRS_PRESENT 0x0004
-    VFIELD(PREFIX(bb_nr5g_SRS_SPATIALRELATIONINFOPOS_DL_PRSt), DlPRS_r16);
+    VFIELD(PREFIX(bb_nr5g_SRS_DL_PRSt), DlPRS_r16);
 } PREFIX(bb_nr5g_SRS_SPATIAL_RELATION_INFO_POS_R16t);
 
 typedef struct {
@@ -1963,6 +2128,7 @@ typedef struct {
 
     uint8_t Pad;
     PREFIX(bb_nr5g_SRS_TRANSMISSION_COMBt) TransmissionComb; /* Comb value (2, 4, 8) and comb offset (0..combValue-1).*/
+    PREFIX(bb_nr5g_SRS_RESOURCETYPE_R16t) ResourceType_r16;
     
 #define bb_nr5g_SPATIALRELATIONINFOPOS_R16_PRESENT 0x0001
     VFIELD(PREFIX(bb_nr5g_SRS_SPATIAL_RELATION_INFO_POS_R16t), SpatialRelationInfoPos_r16);
@@ -2113,9 +2279,12 @@ typedef struct {
 typedef struct {
     uint32_t FieldMask; 
     PREFIX(bb_nr5g_BWPt)   GenBwp;
-#define bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDCCH_CFG_PRESENT   0x0001
+#define bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDCCH_CFG_SETUP      0x0001
+#define bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDCCH_CFG_RELEASE    0x0002
     PREFIX(bb_nr5g_PDCCH_CONF_COMMONt) PdcchConfCommon;
-#define bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDSCH_CFG_PRESENT   0x0002
+
+#define bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDSCH_CFG_SETUP      0x0004
+#define bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDSCH_CFG_RELEASE    0x0008
     PREFIX(bb_nr5g_PDSCH_CONF_COMMONt) PdschConfCommon;
 } PREFIX(bb_nr5g_BWP_DOWNLINKCOMMONt);
 
@@ -2134,7 +2303,8 @@ typedef struct {
     uint8_t NbDedCtrlResSetsToDel_r16;
     uint8_t NbSearchSpacesToAddExt_r16;
     uint8_t DedCtrlResSetsToDel_r16[5];  /* Range (0..15) */
-#define bb_nr5g_STRUCT_UPLINK_CANCELLATION_PRESENT   0x0001
+#define bb_nr5g_STRUCT_PDCCH_CONF_UPLINK_CANCELLATION_SETUP        0x0001
+#define bb_nr5g_STRUCT_PDCCH_CONF_UPLINK_CANCELLATION_RELEASE      0x0002
     PREFIX(bb_nr5g_UPLINK_CANCELt) UplinkCancellation_r16;
 
     PREFIX(bb_nr5g_CTRL_RES_SETt) DedCtrlResSetsToAdd_r16[2];
@@ -2149,19 +2319,23 @@ typedef struct {
     uint8_t NbConfigDeactivationState_r16;
     uint8_t Pad[2];
 
-#define bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDCCH_CFG_PRESENT   0x0001
+#define bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDCCH_CFG_SETUP     0x0001
+#define bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDCCH_CFG_RELEASE   0x0002
     PREFIX(bb_nr5g_PDCCH_CONF_DEDICATEDt) PdcchConfDed;
-#define bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDSCH_CFG_PRESENT   0x0002
-    PREFIX(bb_nr5g_PDSCH_CONF_DEDICATEDt) PdschConfDed;
-#define bb_nr5g_STRUCT_BWP_DOWNLINK_DED_SPS_CFG_PRESENT     0x0004
-    PREFIX(bb_nr5g_SPS_CONF_DEDICATEDt)   SpsConfDed;
-#define bb_nr5g_STRUCT_BWP_DOWNLINK_DED_SPS_CFG_R16_PRESENT             0x0008
-    VFIELD(PREFIX(bb_nr5g_SPS_CONFIG_INDEXt), SpsConfToDel_r16);
-#define bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_R16_PRESENT   0x00010
-    VFIELD(PREFIX(bb_nr5g_PDCCH_CONF_DEDICATED_R16t), PdcchConfDedR16);
 
-#define bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDCCH_CFG_RELEASE   0x0020
-#define bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDSCH_CFG_RELEASE   0x0040
+#define bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDSCH_CFG_SETUP     0x0004
+#define bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDSCH_CFG_RELEASE   0x0008
+    PREFIX(bb_nr5g_PDSCH_CONF_DEDICATEDt) PdschConfDed;
+
+#define bb_nr5g_STRUCT_BWP_DOWNLINK_DED_SPS_CFG_SETUP       0x0010
+#define bb_nr5g_STRUCT_BWP_DOWNLINK_DED_SPS_CFG_RELEASE     0x0020
+    PREFIX(bb_nr5g_SPS_CONF_DEDICATEDt)   SpsConfDed;
+
+#define bb_nr5g_STRUCT_BWP_DOWNLINK_DED_SPS_CFG_R16_PRESENT   0x0040
+    VFIELD(PREFIX(bb_nr5g_SPS_CONFIG_INDEXt), SpsConfToDel_r16);
+
+#define bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDCCH_CONF_DEDICATED_R16_PRESENT     0x0080
+    VFIELD(PREFIX(bb_nr5g_PDCCH_CONF_DEDICATED_R16t), PdcchConfDedR16);
 
     AFIELD(PREFIX(bb_nr5g_SPS_CONF_DEDICATEDt), SpsConfToAdd_r16, bb_nr5g_MAX_NR_OF_SPS_CONFIG_R16);
     AFIELD(PREFIX(bb_nr5g_SPS_CONFIG_INDEXt), ConfigDeactivationState_r16, bb_nr5g_MAX_NR_OF_SPS_DEACTIVATIONSTATE);
@@ -2176,8 +2350,9 @@ typedef struct {
                         The other BWPs are referred to by 1 to bb_nr5g_MAX_NB_BWPS.*/
     uint8_t  Spare;
     uint16_t FieldMask;
-#define bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_CFG_PRESENT   0x0001
+#define bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_CFG_PRESENT      0x0001
     VFIELD(PREFIX(bb_nr5g_BWP_DOWNLINKCOMMONt), BwpDLCommon);
+
 #define bb_nr5g_STRUCT_BWP_DOWNLINK_DEDICATED_CFG_PRESENT   0x0002
     VFIELD(PREFIX(bb_nr5g_BWP_DOWNLINKDEDICATEDt), BwpDLDed);
 } PREFIX(bb_nr5g_BWP_DOWNLINKt);
@@ -2191,12 +2366,18 @@ typedef struct {
     uint8_t Pad[3];
 
     PREFIX(bb_nr5g_BWPt)   GenBwp;
-#define bb_nr5g_STRUCT_BWP_UPLINK_COMMON_RACH_CFG_PRESENT    0x0001
+#define bb_nr5g_STRUCT_BWP_UPLINK_COMMON_RACH_CFG_SETUP         0x0001
+#define bb_nr5g_STRUCT_BWP_UPLINK_COMMON_RACH_CFG_RELEASE       0x0002
     PREFIX(bb_nr5g_RACH_CONF_COMMONt) RachCfgCommon;
-#define bb_nr5g_STRUCT_BWP_UPLINK_COMMON_PUSCH_CFG_PRESENT   0x0002
+
+#define bb_nr5g_STRUCT_BWP_UPLINK_COMMON_PUSCH_CFG_SETUP        0x0004
+#define bb_nr5g_STRUCT_BWP_UPLINK_COMMON_PUSCH_CFG_RELEASE      0x0008
     PREFIX(bb_nr5g_PUSCH_CONF_COMMONt) PuschCfgCommon;
-#define bb_nr5g_STRUCT_BWP_UPLINK_COMMON_PUCCH_CFG_PRESENT   0x0004
+
+#define bb_nr5g_STRUCT_BWP_UPLINK_COMMON_PUCCH_CFG_SETUP        0x0010
+#define bb_nr5g_STRUCT_BWP_UPLINK_COMMON_PUCCH_CFG_RELEASE      0x0020
     PREFIX(bb_nr5g_PUCCH_CONF_COMMONt) PucchCfgCommon;
+
 } PREFIX(bb_nr5g_BWP_UPLINKCOMMONt);
 
 typedef struct {
@@ -2225,23 +2406,33 @@ typedef struct {
     uint8_t NbPucchConfDedToAdd;                /* Range (1..2) */
     uint8_t Pad;
 
-#define bb_nr5g_STRUCT_BWP_UPLINK_DED_PUCCH_CFG_PRESENT   0x0001
+#define bb_nr5g_STRUCT_BWP_UPLINK_DED_PUCCH_CFG_SETUP           0x0001
+#define bb_nr5g_STRUCT_BWP_UPLINK_DED_PUCCH_CFG_RELEASE         0x0002
     PREFIX(bb_nr5g_PUCCH_CONF_DEDICATEDt) PucchConfDed;
-#define bb_nr5g_STRUCT_BWP_UPLINK_DED_PUSCH_CFG_PRESENT   0x0002
+
+#define bb_nr5g_STRUCT_BWP_UPLINK_DED_PUSCH_CFG_SETUP           0x0004
+#define bb_nr5g_STRUCT_BWP_UPLINK_DED_PUSCH_CFG_RELEASE         0x0008
     PREFIX(bb_nr5g_PUSCH_CONF_DEDICATEDt) PuschConfDed;
-#define bb_nr5g_STRUCT_BWP_UPLINK_DED_SRS_CFG_PRESENT   0x0004
+
+#define bb_nr5g_STRUCT_BWP_UPLINK_DED_SRS_CFG_SETUP             0x0010
+#define bb_nr5g_STRUCT_BWP_UPLINK_DED_SRS_CFG_RELEASE           0x0020
     PREFIX(bb_nr5g_SRS_CONF_DEDICATEDt)   SrsConfDed;
-#define bb_nr5g_STRUCT_BWP_UPLINK_DED_CONFIGURED_GRANT_PRESENT 0x0008
+
+#define bb_nr5g_STRUCT_BWP_UPLINK_DED_CONFIGURED_GRANT_SETUP    0x0040
+#define bb_nr5g_STRUCT_BWP_UPLINK_DED_CONFIGURED_GRANT_RELEASE  0x0080
     PREFIX(bb_nr5g_CONFIGURED_GRANT_CONFt) GrantConfDed;
+
     /* Configuration of beam failure recovery. It can be present only for SpCell.
        If supplementaryUplink is present, the field is present 
        only in one of the uplink carriers, either UL or SUL. */
-#define bb_nr5g_STRUCT_BWP_UPLINK_DED_BEAM_RECOVERY_CFG_PRESENT   0x0010
+#define bb_nr5g_STRUCT_BWP_UPLINK_DED_BEAM_RECOVERY_CFG_SETUP   0x0100
+#define bb_nr5g_STRUCT_BWP_UPLINK_DED_BEAM_RECOVERY_CFG_RELEASE 0x0200
     VFIELD(PREFIX(bb_nr5g_BEAM_FAIL_RECOVERY_CFGt),   BeamFailRecConfDed);
 
-#define bb_nr5g_STRUCT_BWP_UPLINK_DED_PUSCH_CFG_RELEASE   0x0020
-
+#define bb_nr5g_STRUCT_BWP_UPLINK_DED_PUCCH_CONF_LIST_R16_SETUP     0x0400
+#define bb_nr5g_STRUCT_BWP_UPLINK_DED_PUCCH_CONF_LIST_R16_RELEASE   0x0800
     AFIELD(PREFIX(bb_nr5g_PUCCH_CONF_DEDICATEDt), PucchConfigurationList_r16, 2);
+
     AFIELD(PREFIX(bb_nr5g_CONFIGURED_GRANT_CONFt), ConfiguredGrantConfigToAddMod_r16, bb_nr5g_MAX_NB_CONFIGURED_GRANT_CONFIG );
     AFIELD(uint8_t, ConfigGrantConfigToRel_r16, bb_nr5g_MAX_NB_CONFIGURED_GRANT_CONFIG);
     AFIELD(PREFIX(bb_nrg5_CONFIGURED_GRANT_TYPE2_DEACT_STATEt), ConfigGrantConfigType2DeactState_r16, bb_nr5g_MAX_NB_CG_TYPE2_DEACT_STATE);
@@ -2254,21 +2445,16 @@ typedef struct {
                         The other BWPs are referred to by 1 to bb_nr5g_MAX_NB_BWPS.*/
     uint8_t  Spare;
     uint16_t FieldMask;
-#define bb_nr5g_STRUCT_BWP_UPLINK_COMMON_CFG_PRESENT   0x0001
+#define bb_nr5g_STRUCT_BWP_UPLINK_COMMON_CFG_PRESENT        0x0001
     VFIELD(PREFIX(bb_nr5g_BWP_UPLINKCOMMONt), BwpULCommon);
-#define bb_nr5g_STRUCT_BWP_UPLINK_DEDICATED_CFG_PRESENT   0x0002
+#define bb_nr5g_STRUCT_BWP_UPLINK_DEDICATED_CFG_PRESENT     0x0002
     VFIELD(PREFIX(bb_nr5g_BWP_UPLINKDEDICATEDt), BwpULDed);
 } PREFIX(bb_nr5g_BWP_UPLINKt);
 
-/* PDSCH-CodeBlockGroupTransmission-r16 */
-typedef struct {
-    uint8_t MaxCodeBlockGroupsPerTransportBlock; /* Enum {n2, n4, n6, n8} */
-    uint8_t CodeBlockGroupFlushIndicator;
-    uint8_t Pad[2];
-} PREFIX(bb_nr5g_PDSCH_CODEBLOCKGROUP_TRANS_R16t);
-
 /****************************************************************************************/
 /* 38.331 PDSCH-ServingCellConfig IE: it is used to configure UE specific PDSCH parameters that are common across the UE's BWPs of one serving cell */
+
+/* PDSCH-CodeBlockGroupTransmission-r16 */
 typedef struct {
     uint8_t MaxCodeBlockGroupsPerTB; /* Maximum number of code-block-groups (CBGs) per TB.
                                         Enum [n2, n4, n6, n8]; Default/Invalid value is 0xFF*/
@@ -2289,20 +2475,30 @@ typedef struct {
     uint8_t ProcessingType2Enabled;/*Enables configuration of advanced processing time capability 2 for PDSCH 
                                      Range 0..1; Default/Invalid value is 0xFF*/
     uint8_t NbCodeBlockGroupTransmission_r16;
-    uint8_t Pad;
 
+    uint8_t FieldMask;
+
+#define bb_nr5g_STRUCT_PDSCH_SERV_CELL_CONFIG_CODE_BLOCKGROUP_TRANSMISSION_SETUP        0x01
+#define bb_nr5g_STRUCT_PDSCH_SERV_CELL_CONFIG_CODE_BLOCKGROUP_TRANSMISSION_RELEASE      0x02
     PREFIX(bb_nr5g_PDSCH_CODEBLOCKGROUPTRANSMt) CodeBlockGroupTrans; /*Enables and configures code-block-group (CBG) based transmission*/
+
+#define bb_nr5g_STRUCT_PDSCH_SERV_CELL_CONFIG_CODE_BLOCKGROUP_TRANSMISSION_R16_SETUP    0x04
+#define bb_nr5g_STRUCT_PDSCH_SERV_CELL_CONFIG_CODE_BLOCKGROUP_TRANSMISSION_R16_RELEASE  0x08
     AFIELD(PREFIX(bb_nr5g_PDSCH_CODEBLOCKGROUPTRANSMt), CodeBlockGroupTransmissionList_r16, 2);
 } PREFIX(bb_nr5g_PDSCH_SERVING_CELL_CFGt);
 
 /****************************************************************************************/
 /* 38.331 PDCCH-ServingCellConfig IE: is used to configure UE specific PDCCH parameters applicable across all bandwidth parts of a serving cell */
 typedef struct {
+    uint32_t FieldMask;
+
+#define bb_nr5g_STRUCT_PDCCH_SERVING_CELL_CFG_SLOT_FMT_INDICATOR_SETUP   0x0001
+#define bb_nr5g_STRUCT_PDCCH_SERVING_CELL_CFG_SLOT_FMT_INDICATOR_RELEASE 0x0002
     PREFIX(bb_nr5g_SLOT_FMT_INDICATORt) SlotFormatIndicator;
 } PREFIX(bb_nr5g_PDCCH_SERVING_CELL_CFGt);
 
 /****************************************************************************************/
-/* 38.331 PDSCH-ServingCellConfig IE: it is used to configure UE specific PDSCH parameters that are common across the UE's BWPs of one serving cell */
+/* 38.331 PUSCH-ServingCellConfig IE: it is used to configure UE specific PUSCH parameters that are common across the UE's BWPs of one serving cell */
 typedef struct {
     uint8_t MaxCodeBlockGroupsPerTB; /* Maximum number of code-block-groups (CBGs) per TB.
                                         Enum [n2, n4, n6, n8]; Default/Invalid value is 0xFF*/
@@ -2318,9 +2514,16 @@ typedef struct {
                              Range 1...8; Default/Invalid value is 0xFF*/
     uint8_t ProcessingType2Enabled;/*Enables configuration of advanced processing time capability 2 for PUSCH
                                      Range 0..1; Default/Invalid value is 0xFF*/
-    uint8_t MaxMIMOLayersDCI02_r16;       /*  Range (1..4); Default/Invalid value is 0xFF*/
-    uint8_t Pad[3];
 
+#define bb_nr5g_STRUCT_PUSCH_SERV_CELL_CONFIG_MAX_MIMODCI02_R16_SETUP   0x0001
+#define bb_nr5g_STRUCT_PUSCH_SERV_CELL_CONFIG_MAX_MIMODCI02_R16_RELEASE 0x0002
+    uint8_t MaxMIMOLayersDCI02_r16;       /*  Range (1..4); Default/Invalid value is 0xFF*/
+    uint8_t Pad;
+
+    uint16_t FieldMask;
+
+#define bb_nr5g_STRUCT_PUSCH_SERV_CELL_CONFIG_CODE_BLOCKGROUP_TRANSMISSION_SETUP   0x0004
+#define bb_nr5g_STRUCT_PUSCH_SERV_CELL_CONFIG_CODE_BLOCKGROUP_TRANSMISSION_RELEASE 0x0008
     PREFIX(bb_nr5g_PUSCH_CODEBLOCKGROUPTRANSMt) CodeBlockGroupTrans; /*Enables and configures code-block-group (CBG) based transmission*/
 } PREFIX(bb_nr5g_PUSCH_SERVING_CELL_CFGt);
 
@@ -2777,8 +2980,8 @@ to be transmitted on L1 (PUCCH, PUSCH) on the serving cell in which CSI-MeasConf
 typedef struct {
     uint8_t NbNzpCsiRsResToAdd; /* Gives the number of valid elements in NzpCsiRsResToAdd vector: 1...bb_nr5g_MAX_NB_NZP_CSI_RS_RESOURCES; Default value is 0*/
     uint8_t NbNzpCsiRsResToDel; /* Gives the number of valid elements in NzpCsiRsResToDel vector: 1...bb_nr5g_MAX_NB_NZP_CSI_RS_RESOURCES; Default value is 0*/
-    uint8_t NbNzpCsiRsResSetToAdd; /* Gives the number of valid elements in NzpCsiRsResSetToAdd vector: 1...bb_nr5g_MAX_NB_ZP_CSI_RS_RESOURCE_SETS; Default value is 0*/
-    uint8_t NbNzpCsiRsResSetToDel; /* Gives the number of valid elements in NzpCsiRsResSetToDel vector: 1...bb_nr5g_MAX_NB_ZP_CSI_RS_RESOURCE_SETS; Default value is 0*/
+    uint8_t NbNzpCsiRsResSetToAdd; /* Gives the number of valid elements in NzpCsiRsResSetToAdd vector: 1...bb_nr5g_MAX_NB_NZP_CSI_RS_RESOURCE_SETS; Default value is 0*/
+    uint8_t NbNzpCsiRsResSetToDel; /* Gives the number of valid elements in NzpCsiRsResSetToDel vector: 1...bb_nr5g_MAX_NB_NZP_CSI_RS_RESOURCE_SETS; Default value is 0*/
     uint8_t NbCsiImResToAdd; /* Gives the number of valid elements in CsiImResToAdd vector: 1...bb_nr5g_MAX_NB_CSI_IM_RESOURCES; Default value is 0*/
     uint8_t NbCsiImResToDel; /* Gives the number of valid elements in CsiImResToDel vector: 1...bb_nr5g_MAX_NB_CSI_IM_RESOURCES; Default value is 0*/
     uint8_t NbCsiImResSetToAdd; /* Gives the number of valid elements in CsiImResSetToAdd vector: 1...bb_nr5g_MAX_NB_CSI_IM_RESOURCE_SETS; Default value is 0*/
@@ -2793,19 +2996,26 @@ typedef struct {
     uint8_t NbSPOnPuschTriggerStateList; /* Gives the number of valid elements in SPOnPuschTriggerStateList vector: 1...bb_nr5g_MAX_NB_SEMIPERS_ONPUSCH_TRIGGERS; Default value is 0*/
     uint8_t ReportTriggerSize; /*Size of CSI request field in DCI (bits). Range 0...6. Default/Invalid value is 0xff*/
     uint8_t ReportTriggerSizeDCI02_r16;  /*        Range (0..6)   */
-    uint8_t Pad[2];
+    uint16_t FieldMask;
 
     AFIELD(PREFIX(bb_nr5g_NZP_CSI_RS_RES_CFGt), NzpCsiRsResToAdd, bb_nr5g_MAX_NB_NZP_CSI_RS_RESOURCES); /*Dynamic list of NZP-CSI-RS-Resource which can be referred to from CSI-ResourceConfig */
-    AFIELD(PREFIX(bb_nr5g_NZP_CSI_RS_RES_SET_CFGt), NzpCsiRsResSetToAdd, bb_nr5g_MAX_NB_ZP_CSI_RS_RESOURCE_SETS); /*Dynamic list of NZP-CSI-RS-ResourceSet to be added/modify */
+    AFIELD(PREFIX(bb_nr5g_NZP_CSI_RS_RES_SET_CFGt), NzpCsiRsResSetToAdd, bb_nr5g_MAX_NB_NZP_CSI_RS_RESOURCE_SETS); /*Dynamic list of NZP-CSI-RS-ResourceSet to be added/modify */
     AFIELD(PREFIX(bb_nr5g_CSI_IM_RES_CFGt), CsiImResToAdd, bb_nr5g_MAX_NB_CSI_IM_RESOURCES); /*Dynamic list of CSI-IM-Resource to be added/modify */
     AFIELD(PREFIX(bb_nr5g_CSI_IM_RES_SET_CFGt), CsiImResSetToAdd, bb_nr5g_MAX_NB_CSI_IM_RESOURCE_SETS); /*Dynamic list of CSI-IM-ResourcSet to be added/modify */
     AFIELD(PREFIX(bb_nr5g_CSI_SSB_RES_SET_CFGt), CsiSsbResSetToAdd, bb_nr5g_MAX_NB_CSI_SSB_RESOURCE_SETS); /*Dynamic list of CSI-SSB-ResourceSet to be added/modify */
     AFIELD(PREFIX(bb_nr5g_CSI_RESOURCE_CFGt), CsiResCfgToAdd, bb_nr5g_MAX_NB_CSI_RESOURCE_CFGS); /*Dynamic list of Configured CSI resource settings to be added/modify */
     AFIELD(PREFIX(bb_nr5g_CSI_REPORT_CFGt), CsiRepCfgToAdd, bb_nr5g_MAX_NB_CSI_REPORT_CFGS); /*Dynamic list of Configured CSI report settings to be added/modify */    
+
+#define bb_nr5g_STRUCT_CSI_MEAS_APERIODIC_TRIGGER_STATE_CFG_SETUP                0x0001
+#define bb_nr5g_STRUCT_CSI_MEAS_APERIODIC_TRIGGER_STATE_CFG_RELEASE              0x0002
     AFIELD(PREFIX(bb_nr5g_CSI_APERIODIC_TRIGGER_STATE_CFGt), AperTriggerStateList, bb_nr5g_MAX_NB_CSI_APERIODIC_TRIGGERS); /*Dynamic list of aperiodic trigger states */    
+
+#define bb_nr5g_STRUCT_CSI_MEAS_SEMIPERSISTENT_ONPUSCH_TRIGGER_STATE_CFG_SETUP   0x0004
+#define bb_nr5g_STRUCT_CSI_MEAS_SEMIPERSISTENT_ONPUSCH_TRIGGER_STATE_CFG_RELEASE 0x0008
     AFIELD(PREFIX(bb_nr5g_CSI_SEMIPERSISTENT_ONPUSCH_TRIGGER_STATE_CFGt), SPOnPuschTriggerStateList, bb_nr5g_MAX_NB_SEMIPERS_ONPUSCH_TRIGGERS); /*Dynamic list of aperiodic trigger states */
+
     AFIELD(uint32_t, NzpCsiRsResToDel, bb_nr5g_MAX_NB_NZP_CSI_RS_RESOURCES); /*Dynamic list of NZP-CSI-RS-ResourceSet to be deleted */
-    AFIELD(uint32_t, NzpCsiRsResSetToDel, bb_nr5g_MAX_NB_ZP_CSI_RS_RESOURCE_SETS); /*Dynamic list of NZP-CSI-RS-ResourceSet to be deleted  */
+    AFIELD(uint32_t, NzpCsiRsResSetToDel, bb_nr5g_MAX_NB_NZP_CSI_RS_RESOURCE_SETS); /*Dynamic list of NZP-CSI-RS-ResourceSet to be deleted  */
     AFIELD(uint32_t, CsiImResToDel, bb_nr5g_MAX_NB_CSI_IM_RESOURCES); /*Dynamic list of CSI-IM-Resources to be deleted  */
     AFIELD(uint32_t, CsiImResSetToDel, bb_nr5g_MAX_NB_CSI_IM_RESOURCE_SETS); /*Dynamic list of CSI-IM-ResourceSet to be deleted  */
     AFIELD(uint32_t, CsiSsbResSetToDel, bb_nr5g_MAX_NB_CSI_SSB_RESOURCE_SETS); /*Dynamic list of CSI-SSB-ResourceSet to be deleted  */
@@ -2952,9 +3162,15 @@ typedef struct {
     uint32_t TpcPucchRNTI;              /* RNTI-Value := Range (0..65535) */
     uint32_t TpcPuschRNTI;              /* RNTI-Value := Range (0..65535) */
     uint32_t SpCsiRNTI;                 /* RNTI-Value := Range (0..65535) */
+
+#define bb_nr5g_STRUCT_PH_CELL_GROUP_CS_RNTI_SETUP   0x0001
+#define bb_nr5g_STRUCT_PH_CELL_GROUP_CS_RNTI_RELEASE 0x0002
     uint32_t CsRNTI;                    /* RNTI-Value := Range (0..65535); Default value is 0xFF */
 
+#define bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION_SETUP   0x0004
+#define bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION_RELEASE 0x0008
     uint8_t Pdcch_BlindDetection; /* Range (1..15); Default value is 0xFF */
+
     uint8_t Harq_ACK_SpatialBundlingPUCCH_secondaryPUCCHgroup_r16; /* Enum[enabled, disabled] */
     uint8_t Harq_ACK_SpatialBundlingPUSCH_secondaryPUCCHgroup_r16; /* Enum[enabled, disabled] */
     uint8_t Pdsch_HARQ_ACK_Codebook_secondaryPUCCHgroup_r16; /* Enum[semiStatic, dynamic] */
@@ -2972,15 +3188,29 @@ typedef struct {
     uint8_t DownlinkAssignmentIndexDCI_1_2_r16; /* Enum[n1, n2, n4]; Default 0xFF */
     uint8_t NbPdsch_HARQ_ACK_CodebookList_r16;
     uint8_t AckNackFeedbackMode_r16; /* Enum[joint, separate]; Default 0xFF */
+
+#define bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION2_SETUP   0x0010
+#define bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION2_RELEASE 0x0020
     uint8_t Pdcch_BlindDetection2_r16; /* Range (1..15) */
+
+#define bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION3_SETUP   0x0040
+#define bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION3_RELEASE 0x0080
     uint8_t Pdcch_BlindDetection3_r16; /* Range (1..15) */
+
     uint8_t BdFactorR_r16; /* Enum[n1]; Default 0xFF */
+
+#define bb_nr5g_STRUCT_PH_CELL_GROUP_PDSCH_HARQ_CODEBOOK_SETUP   0x0100
+#define bb_nr5g_STRUCT_PH_CELL_GROUP_PDSCH_HARQ_CODEBOOK_RELEASE 0x0200
     uint8_t Pdsch_HARQ_ACK_CodebookList_r16[2]; /* Enum[semiStatic, dynamic]; Default 0xFF */
+
     uint8_t Pad;
 
-#define bb_nr5g_STRUCT_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16_PRESENT 0x0001
+#define bb_nr5g_STRUCT_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16_SETUP   0x0400
+#define bb_nr5g_STRUCT_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16_RELEASE 0x0800
     PREFIX(bb_nr5g_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16t) Dcp_Config_r16;
-#define bb_nr5g_STRUCT_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_PRESENT 0x0002
+
+#define bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_SETUP   0x1000
+#define bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_RELEASE 0x2000
     PREFIX(bb_nr5g_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16t) Pdcch_BlindDetectionCA_CombIndicator_r16;
 } PREFIX(bb_nr5g_PH_CELL_GROUP_CONFIGt);
 
@@ -3000,6 +3230,7 @@ typedef struct {
        In future implementation this bitmap would be able to support messages with a complete dynamic size */
     uint32_t FieldMask;
     uint16_t ServCellIdx;
+    uint16_t PhysCellId;            /* PhysCellId Range (0..1007) */
     uint8_t SsbPeriodicityServCell; /* SSB periodicity in msec for the rate matching purpose
                                        Default value is 0xFF; Enum [ms5, ms10, ms20, ms40, ms80, ms160]*/
     uint8_t DmrsTypeAPos;           /* Position of (first) DL DM-RS
@@ -3011,7 +3242,7 @@ typedef struct {
     uint8_t NTimingAdvanceOffset;   /* The N_TA-Offset to be applied for random access on this serving cell. If the field is absent, 
                                        the UE applies the value defined for the duplex mode and frequency range of this serving cell.
                                        Enum [n0, n25600, n39936]; Default/Invalid value is 0xFF*/
-    uint8_t Pad;
+    uint8_t  Pad[3];
     union {
         uint8_t  ShortBitmap;    /* bitmap for sub 3 GHz */
         uint8_t  MediumBitmap;   /* bitmap for sub 3-6 GHz */
@@ -3047,10 +3278,11 @@ typedef struct {
     uint8_t RateMatchPatternToDel[bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS];/* List of RateMatchPatternId*/
     PREFIX(bb_nr5g_RATE_MATCH_PATTERNt) RateMatchPatternToAddMod[bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS]; 
 
-#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_COMMON_TOMATCHAROUND_PRESENT   0x0080
+#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_COMMON_TOMATCHAROUND_SETUP     0x0080
+#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_COMMON_TOMATCHAROUND_RELEASE   0x0100
     PREFIX(bb_nr5g_RATE_MATCH_PATTERN_LTEt) LteCrsToMatchAround;
 
-#define bb_nr5g_STRUCT_HIGH_SPEED_CONFIG_R16_PRESENT 0x0100
+#define bb_nr5g_STRUCT_HIGH_SPEED_CONFIG_R16_PRESENT 0x0200
     PREFIX(bb_nr5g_HIGH_SPEED_CONFIG_R16t) HighSpeedConfig_r16;
 } PREFIX(bb_nr5g_SERV_CELL_CONFIG_COMMONt);
 
@@ -3078,12 +3310,17 @@ typedef struct {
     /* The dedicated (UE-specific) configuration for the initial downlink bandwidth-part*/
 #define bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_INITIAL_DL_BWP_PRESENT   0x0001
     VFIELD(PREFIX(bb_nr5g_BWP_DOWNLINKDEDICATEDt), InitialDlBwp);
-#define bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDSCH_PRESENT   0x0002
+#define bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDSCH_SETUP   0x0002
+#define bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDSCH_RELEASE 0x0004
     VFIELD(PREFIX(bb_nr5g_PDSCH_SERVING_CELL_CFGt), PdschServingCellCfg);
-#define bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDCCH_PRESENT   0x0004
+#define bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDCCH_SETUP   0x0008
+#define bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDCCH_RELEASE 0x0010
     VFIELD(PREFIX(bb_nr5g_PDCCH_SERVING_CELL_CFGt), PdcchServingCellCfg);
-#define bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_CSI_MEAS_CFG_PRESENT   0x0008
+
+#define bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_CSI_MEAS_CFG_SETUP   0x0020
+#define bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_CSI_MEAS_CFG_RELEASE 0x0040
     VFIELD(PREFIX(bb_nr5g_CSI_MEAS_CFGt), CsiMeasCfg);
+
     AFIELD(PREFIX(bb_nr5g_BWP_DOWNLINKt), DlBwpIdToAdd, bb_nr5g_MAX_NB_BWPS); /*Dynamic list of additional downlink bandwidth parts to be added/modified*/
     AFIELD(PREFIX(bb_nr5g_SCS_SPEC_CARRIERt), DlChannelBwPerScs, bb_nr5g_MAX_SCS); /*Dynamic list of A set of UE specific carrier configurations for different subcarrier spacings (numerologies). */
     AFIELD(PREFIX(bb_nr5g_RATE_MATCH_PATTERNt), RateMatchPatternDedToAdd, bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS);  /* Dynamic Resources patterns which the UE should rate match PDSCH around to bee added/modified.*/
@@ -3111,27 +3348,34 @@ typedef struct {
     /* The dedicated (UE-specific) configuration for the initial uplink bandwidth-part*/
 #define bb_nr5g_STRUCT_UPLINK_DEDICATED_CONFIG_INITIAL_UL_BWP_PRESENT   0x0001
     VFIELD(PREFIX(bb_nr5g_BWP_UPLINKDEDICATEDt), InitialUlBwp);
-#define bb_nr5g_STRUCT_UPLINK_DEDICATED_CONFIG_PUSCH_PRESENT   0x0002
-    VFIELD(PREFIX(bb_nr5g_PUSCH_SERVING_CELL_CFGt), PuschServingCellCfg);
-    AFIELD(PREFIX(bb_nr5g_BWP_UPLINKt), UlBwpIdToAdd, bb_nr5g_MAX_NB_BWPS); /*Dynamic list of additional uplink bandwidth parts to be added/modified*/
-#define bb_nr5g_STRUCT_UPLINK_DEDICATED_CONFIG_SRS_CARRIER_SWITCHING_PRESENT   0x0004
-    VFIELD(PREFIX(bb_nr5g_SRS_CARRIER_SWITCHING_CFGt), CarrierSwitching);
 
-#define bb_nr5g_STRUCT_UPLINK_DEDICATED_CONFIG_PUSCH_RELEASE   0x0008
+#define bb_nr5g_STRUCT_UPLINK_DEDICATED_CONFIG_PUSCH_SETUP     0x0002
+#define bb_nr5g_STRUCT_UPLINK_DEDICATED_CONFIG_PUSCH_RELEASE   0x0004
+    VFIELD(PREFIX(bb_nr5g_PUSCH_SERVING_CELL_CFGt), PuschServingCellCfg);
+
+    AFIELD(PREFIX(bb_nr5g_BWP_UPLINKt), UlBwpIdToAdd, bb_nr5g_MAX_NB_BWPS); /*Dynamic list of additional uplink bandwidth parts to be added/modified*/
+#define bb_nr5g_STRUCT_UPLINK_DEDICATED_CONFIG_SRS_CARRIER_SWITCHING_SETUP     0x0008
+#define bb_nr5g_STRUCT_UPLINK_DEDICATED_CONFIG_SRS_CARRIER_SWITCHING_RELEASE   0x0010
+    VFIELD(PREFIX(bb_nr5g_SRS_CARRIER_SWITCHING_CFGt), CarrierSwitching);
 
     AFIELD(PREFIX(bb_nr5g_SCS_SPEC_CARRIERt), UlChannelBwPerScs, bb_nr5g_MAX_SCS); /*Dynamic list of A set of UE specific carrier configurations for different subcarrier spacings (numerologies). */
 } PREFIX(bb_nr5g_UPLINK_DEDICATED_CONFIGt);
 
 typedef struct {
-    uint8_t  SchedCellIsValid;       /* This field assumes a value defined as bb_nr5g_CROSS_CARRIER_SCHED_CFG_***
+    uint8_t SchedCellIsValid;       /* This field assumes a value defined as bb_nr5g_CROSS_CARRIER_SCHED_CFG_***
                                        in order to read in good way the associated parameters .
                                        If this field is set to default value anything more is neither read or used */
-    uint8_t  CifPresence;           /* This field can assume meaning only if SchedCellIsValid is set to bb_nr5g_CROSS_CARRIER_SCHED_CFG_OWN.
+    uint8_t CifPresence;            /* This field can assume meaning only if SchedCellIsValid is set to bb_nr5g_CROSS_CARRIER_SCHED_CFG_OWN.
                                        Range 0..1. Invalid value is 0xFF*/
-    uint8_t  CifInSchedulingCell;   /* This field can assume meaning only if SchedCellIsValid is set to bb_nr5g_CROSS_CARRIER_SCHED_CFG_OTHER.
+    uint8_t CifInSchedulingCell;    /* This field can assume meaning only if SchedCellIsValid is set to bb_nr5g_CROSS_CARRIER_SCHED_CFG_OTHER.
                                        Range 1..7. Invalid value is 0xFF*/                 
-   uint8_t   ServCellIdx;           /* This field can assume meaning only if SchedCellIsValid is set to bb_nr5g_CROSS_CARRIER_SCHED_CFG_OTHER.
+    uint8_t ServCellIdx;            /* This field can assume meaning only if SchedCellIsValid is set to bb_nr5g_CROSS_CARRIER_SCHED_CFG_OTHER.
                                        Invalid value is 0xFF*/                 
+    uint8_t CarrierIndicatorSizeDCI_1_2_R16;    /* Number of bits for the field of carrier indicator in PDCCH DCI format 1_2.
+                                                   Range 0..3. Invalid value is 0xFF */
+    uint8_t CarrierIndicatorSizeDCI_0_2_R16;    /* Number of bits for the field of carrier indicator in PDCCH DCI format 0_2.
+                                                   Range 0..3. Invalid value is 0xFF */
+    uint8_t Pad[2];
 } PREFIX(bb_nr5g_CROSS_CARRIER_SCHEDULING_CONFIGt);
 
 /* 38.331 NR_WithinActiveTimeConfig_r16 */                                                                                                                                                                         
@@ -3155,9 +3399,11 @@ typedef struct {
     uint8_t FieldMask;
     uint8_t DormantBWP_Id_r16;
     uint8_t Pad[2];
-#define bb_nrg5_STRUCT_DORMANTBWP_WITHIN_PRESENT 0x0001
+#define bb_nrg5_STRUCT_DORMANTBWP_WITHIN_SETUP   0x0001
+#define bb_nrg5_STRUCT_DORMANTBWP_WITHIN_RELEASE 0x0002
     VFIELD(PREFIX(bb_nr5g_DORMANTBWP_WITHINt), WithinActiveTimeConfig_r16);
-#define bb_nrg5_STRUCT_DORMANTBWP_OUTSIDE_PRESENT 0x0002
+#define bb_nrg5_STRUCT_DORMANTBWP_OUTSIDE_SETUP   0x0004
+#define bb_nrg5_STRUCT_DORMANTBWP_OUTSIDE_RELEASE 0x0008
     VFIELD(PREFIX(bb_nr5g_DORMANTBWP_OUTSIDEt), OutsideActiveTimeConfig_r16);
 } PREFIX(bb_nr5g_DORMANTBWP_CONFIGt);
 
@@ -3202,25 +3448,37 @@ typedef struct {
     uint8_t CbgTxDiffTBsProcessingType2_r16; /* Enum[enabled]; Default 0xFF */
     uint8_t FirstActiveUlBwp_pCell; /* The FirstActiveUlBwp of the SpCell. See bb_nr5g_UPLINK_DEDICATED_CONFIGt */
 
-#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_TDD_DED_PRESENT   0x0001
+#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_TDD_DED_PRESENT                 0x0001
     VFIELD(PREFIX(bb_nr5g_TDD_UL_DL_CONFIG_DEDICATEDt), TddDlUlConfDed);  /* A cell-specific TDD UL/DL configuration */
-#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_DOWNLINK_PRESENT   0x0002
+
+#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_DOWNLINK_PRESENT                0x0002
     VFIELD(PREFIX(bb_nr5g_DOWNLINK_DEDICATED_CONFIGt), DlCellCfgDed);
-#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_UPLINK_PRESENT   0x0004
+
+#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_UPLINK_PRESENT                  0x0004
     VFIELD(PREFIX(bb_nr5g_UPLINK_DEDICATED_CONFIGt), UlCellCfgDed);
-#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_SUP_UPLINK_PRESENT   0x0008
+
+#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_SUP_UPLINK_PRESENT              0x0008
     VFIELD(PREFIX(bb_nr5g_UPLINK_DEDICATED_CONFIGt), SulCellCfgDed);
-#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_CROSS_CARRIER_SCHED_PRESENT   0x0010
+
+#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_CROSS_CARRIER_SCHED_PRESENT     0x0010
     VFIELD(PREFIX(bb_nr5g_CROSS_CARRIER_SCHEDULING_CONFIGt), CrossCarrierSchedulingConfig);
-#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_TOMATCHAROUND_PRESENT   0x0020
+
+#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_TOMATCHAROUND_SETUP     0x0020
+#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_TOMATCHAROUND_RELEASE   0x0040
     VFIELD(PREFIX(bb_nr5g_RATE_MATCH_PATTERN_LTEt), LteCrsToMatchAround);
 
-#define bb_nr5g_STRUCT_DORMANTBWP_CONFIG_PRESENT 0x0080
+#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_DORMANTBWP_CONFIG_SETUP         0x0080
+#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_DORMANTBWP_CONFIG_RELEASE       0x0100
     VFIELD(PREFIX(bb_nr5g_DORMANTBWP_CONFIGt), DormantBWP_Config_r16);
-#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_PATTERN_LIST1_PRESENT   0x0100
+
+#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_PATTERN_LIST1_SETUP     0x0200
+#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_PATTERN_LIST1_RELEASE   0x0400
     AFIELD(PREFIX(bb_nr5g_RATE_MATCH_PATTERN_LTEt), LteCrsPatternList1_r16, bb_nr5g_MAX_LTE_CRS_PATTERNS_R16);
-#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_PATTERN_LIST2_PRESENT   0x0200
+
+#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_PATTERN_LIST2_SETUP     0x0800
+#define bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_PATTERN_LIST2_RELEASE   0x1000
     AFIELD(PREFIX(bb_nr5g_RATE_MATCH_PATTERN_LTEt), LteCrsPatternList2_r16, bb_nr5g_MAX_LTE_CRS_PATTERNS_R16);
+
 } PREFIX(bb_nr5g_SERV_CELL_CONFIGt);
 
 /****************************************************************************************/
@@ -3254,6 +3512,19 @@ typedef struct {
 } PREFIX(bb_nr5g_SCELL_CONFIGt);
 
 /****************************************************************************************/
+/* UE capabilities forwarding */
+typedef struct {
+    uint8_t SuppSRS_TxPSwitch;        /* Enum: [t1r2, t1r4, t2r4, t1r4-t2r4, t1r1, t2r2, t4r4, notSupported]. */
+    uint8_t SuppSRS_TxPSwitch_v1610;  /* Enum: [t1r1-t1r2, t1r1-t1r2-t1r4, t1r1-t1r2-t2r2-t2r4, t1r1-t1r2-t2r2-t1r4-t2r4,
+                                                t1r1-t2r2, t1r1-t2r2-t4r4]. */
+    uint8_t MaxNbMIMO_LayersCB;       /* Enum: [oneLayer, twoLayers, fourLayers]. */
+    uint8_t MaxNbMIMO_LayersNonCB;    /* Enum: [oneLayer, twoLayers, fourLayers]. */
+    uint8_t MaxNbMIMO_LayersPDSCH;    /* Enum: [twoLayer, fourLayers, eightLayers]. */
+    uint8_t Ue_PowerClass;            /* Enum: [pc1, pc2, pc3, pc4]. */
+    uint8_t Pad[2];
+} PREFIX(bb_nr5g_RNTI_CAPABILITIESt);
+
+/****************************************************************************************/
 /* 38.331 CellGroupConfig IE: Serving cell specific MAC and PHY parameters for a SpCell and for SCell*/
 typedef struct {
     /*  Message static part has to be put at the beginning */
@@ -3267,6 +3538,8 @@ typedef struct {
                                   Invalid value is 0xFF. */
     /* Cell-Group specific L1 parameters */
     PREFIX(bb_nr5g_PH_CELL_GROUP_CONFIGt) PhyCellConf;
+    /* RNTI Capabilities */
+    PREFIX(bb_nr5g_RNTI_CAPABILITIESt) RntiCap;
     /* Primary cell dedicated parameter configuration */
 #define bb_nr5g_STRUCT_SPCELL_CONFIG_DED_PRESENT   0x0001
     PREFIX(bb_nr5g_SERV_CELL_CONFIGt) SpCellCfgDed;
@@ -3325,7 +3598,7 @@ typedef struct {
 #define bb_nr5g_STRUCT_MEASSET_CSI_CFG_RI_CHANGED   0x0002
     uint8_t   Ri;             /* Rank indicator */
 #define bb_nr5g_STRUCT_MEASSET_CSI_CFG_WBCQI_CHANGED   0x0004
-    uint8_t   WbCqi;          /* Wideband Channel Quality Indicator */
+    uint8_t   WbCqi[2];       /* Wideband Channel Quality Indicator for normal and low spectral efficiency (lowSE) tables */
 #define bb_nr5g_STRUCT_MEASSET_CSI_CFG_WBPMIX1I1_CHANGED   0x0008
     uint8_t   WbPmiX1i1;      /* index i1 for X1 Wideband Precoding Matrix Indicator 3GPP 38.212 (maximum allowed value is 32) */
 #define bb_nr5g_STRUCT_MEASSET_CSI_CFG_WBPMIX1I2_CHANGED   0x0010
@@ -3341,9 +3614,21 @@ typedef struct {
                                 selectivity */
 #define bb_nr5g_STRUCT_MEASSET_CSI_CFG_LOS_CHANGED   0x0100
     uint8_t    Los;             /* Line of sight flag */    
+#define bb_nr5g_STRUCT_MEASSET_CSI_CFG_CRI_CHANGED   0x0100
+    uint8_t    Cri;             /* CRI (CSI resource indicator) */
     /* The following set of parameters gives the size if the associated vector */
     uint8_t   NumSsb;         /* Number of SSBs in Ssb vector. Default value is 0. Range 1 ...bb_nr5g_MAX_NUM_BEAM. If NumSsb=0 no Ssb element is present*/
     uint8_t   NumCsiRs;       /* Number of CSI-RSs in CsiRs vector. Default value is 0. Range 1 ...bb_nr5g_MAX_NB_CSI_CFGS. If NumCsiRs=0 no CsiRs element is present */
+
+    uint32_t  csiPart1BitLen;        /* CSI part1 sequence length in bits*/
+    uint32_t  csiPart2WidebandBitLen;/* CSI part2 sequence length in bits for wideband report */
+    uint32_t  csiPart2SubbandBitLen; /* CSI part2 sequence length in bits for subband report*/
+#define bb_nr5g_STRUCT_MEASSET_CSI_CFG_PART1_CHANGED   0x0200
+    uint8_t   CSIPart1[bb_nr5g_CSIPART1_MAX_SIZE];
+#define bb_nr5g_STRUCT_MEASSET_CSI_CFG_PART2_WIDEBAND_CHANGED   0x0400
+    uint8_t   CSIPart2Wideband[bb_nr5g_CSIPART2_WIDEBAND_MAX_SIZE];
+#define bb_nr5g_STRUCT_MEASSET_CSI_CFG_PART2_SUBBAND_CHANGED   0x0800
+    uint8_t   CSIPart2Subband[bb_nr5g_CSIPART2_SUBBAND_MAX_SIZE];
 
     /* The following set of vectors is present only the associated size is different to 0 
        Every vector trasports only the elements that are changed */

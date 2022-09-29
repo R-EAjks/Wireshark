@@ -6,7 +6,7 @@
 #include "sdrdrv-lte-def.h"
 #include "lte-rlcmac_Com.h"
 
-#define lte_rlcmac_Cmac_VERSION   "2.32.1"
+#define lte_rlcmac_Cmac_VERSION   "2.32.3"
 
 /*
  * References used in this interface:
@@ -115,6 +115,8 @@
 #define  lte_rlcmac_Cmac_TEST_JITTER_REQ     0x01
 #define  lte_rlcmac_Cmac_TEST_JITTER_IND     (0x400 + lte_rlcmac_Cmac_TEST_JITTER_REQ)
 
+#define  lte_rlcmac_Cmac_TEST_SNIFFER_TRIGGER_IND 0x402
+
 #define lte_rlcmac_Cmac_TEST_DEBUG_CFG_CMD       0x02
 #define lte_rlcmac_Cmac_TEST_DEBUG_CFG_ACK       (0x100 + lte_rlcmac_Cmac_TEST_DEBUG_CFG_CMD)
 #define lte_rlcmac_Cmac_TEST_DEBUG_CFG_NAK       (0x200 + lte_rlcmac_Cmac_TEST_DEBUG_CFG_CMD)
@@ -210,7 +212,7 @@ typedef struct
                                         // This field has been added to mantain the consistency between a legacy cell and a NB-IoT one 
     uint                UlEarfcn;       // Uplink Radio Frequency Channel Number
 
-    uchar                AddEmission;    // Additional spectrum emission defined in [36.101]
+    uchar                AddEmission;   // Additional spectrum emission defined in [36.101]
                                         // (0, 31)
     sdrLte_SibDataNB     SibDataNB;     // Physical channel configuration according to SIB-NB content
 
@@ -372,7 +374,7 @@ typedef struct {
 } lte_rlcmac_Cmac_NPrach_ParametersList_t;
 
 typedef struct {
-    
+
     struct {
         uchar n;
         uchar elem[sdrLteMAXNPRACH_RES-1];
@@ -476,7 +478,7 @@ typedef struct {
     uchar extendedPHRFlags; /* Bitmask for extended PHR configuration */
     #define lte_rlcmac_Cmac_EPHR_extendedPHR         0x01   /* extendedPHR enabled */
     #define lte_rlcmac_Cmac_EPHR_extendedPHR2        0x02   /* extendedPHR2 enabled */
-    #define lte_rlcmac_Cmac_EPHR_dualConnectivityPHR 0x04   /* dualConnectivityPHR enabled */    
+    #define lte_rlcmac_Cmac_EPHR_dualConnectivityPHR 0x04   /* dualConnectivityPHR enabled */
 
     uchar extendedBSRFlag;      /* 1: use extended-BSR */
 
@@ -662,11 +664,11 @@ typedef struct {
 
     uint            UeId;
     uint            TestType;       /* see lte_tm_rlcmac_Cmac_RACH_TYPE_..*/
-    uchar           RbId;       /* Rb id  (1)*/
+    uchar       RbId;       /* Rb id  (1)*/
     lte_LchType_v   Lch;        /* Logical Channel Type: lte_CCCH, lte_DCCH (1)*/
-        int     MaxUpPwr;       /* Maximum uplink power (in dBm) (1)*/
+    int     MaxUpPwr;   /* Maximum uplink power (in dBm) (1)*/
     int     RSRP;       /* Simulated RSRP [dBm, 0x7FFFFFFF for none] (1)*/
-    int     UeCategory;     /* UE category (1)*/
+    int     UeCategory; /* UE category (1)*/
     uchar       Data[1];    /* Data to be transmitted in RA procedure (MAC SDU Msg3) (1)*/
 
 } lte_rlcmac_Cmac_DEB_RACH_ACC_CMD_t;
@@ -674,7 +676,7 @@ typedef struct {
 
 #define lte_rlcmac_Cmac_RACH_TYPE_PREAMBLE      1  /* Only premable*/
 #define lte_rlcmac_Cmac_RACH_TYPE_MSG3_NO_CONT      2  /* Msg3 without waiting for Msg 4*/
-#define lte_rlcmac_Cmac_RACH_TYPE_MSG3_CONT             3  /* Do contention resolution */
+#define lte_rlcmac_Cmac_RACH_TYPE_MSG3_CONT     3  /* Do contention resolution */
 
 /*
  *  Notes:
@@ -788,7 +790,7 @@ typedef struct {
     /* Status info */
     lte_rlcmac_Cmac_STATUS_v    Status;
 
-    uchar                       Master;         /* Master Cell 0: Slave -- 1: Master*/
+    uchar                       OLcPrimary;     /* OLc Primary Cell [0] 0: Secondary -- 1: OLc Primary*/
     uchar                       CellCfgMsk;     /* Cell configuration mask [see note 0]*/
 
 } lte_rlcmac_Cmac_CELL_STATUS_IND_t;
@@ -1009,6 +1011,14 @@ typedef struct
 } lte_rlcmac_Cmac_TEST_DEBUG_CFG_CMD_t;
 
 /*
+ * lte_rlcmac_Cmac_TEST_SNIFFER_TRIGGER_IND
+ */
+typedef struct
+{
+    uint        Spare;      /* for future ext */
+} lte_rlcmac_Cmac_TEST_SNIFFER_TRIGGER_IND_t;
+
+/*
  * lte_rlcmac_Cmac_SCHED_CFG_CMD
  */
 typedef struct
@@ -1127,15 +1137,15 @@ typedef struct
  */
 typedef struct NotificationConfig_t {
     uchar NotificationRepetitionCoeff; /* Actual change notification repetition period common for all MCCHs that are
-                                        *  configured = shortest modification period / notificationRepetitionCoeff. The
-                                        *  "shortest modification period" corresponds with the lowest value of
-                                        *  mcch-ModificationPeriod of all MCCHs that are configured. [0 -> n2, 1 -> n4]
-                                        */
+                        *  configured = shortest modification period / notificationRepetitionCoeff. The
+                        *  "shortest modification period" corresponds with the lowest value of
+                        *  mcch-ModificationPeriod of all MCCHs that are configured. [0 -> n2, 1 -> n4]
+                        */
     uchar NotificationOffset;          /* Indicates, together with the notificationRepetitionCoeff, the radio frames in
-                                        * which the MCCH information change notification is scheduled i.e. the MCCH
-                                        * information change notification is scheduled in radio frames for which:
-                                        * SFN mod(notification repetition period) = notificationOffset. [0-10]
-                                        */
+                        * which the MCCH information change notification is scheduled i.e. the MCCH
+                        * information change notification is scheduled in radio frames for which:
+                        * SFN mod(notification repetition period) = notificationOffset. [0-10]
+                        */
     uchar NotificationSFIndex;         /* Indicates the subframe used to transmit MCCH change notifications on PDCCH.
                                         * Different from FDD to TDD
                                         */
@@ -1423,6 +1433,7 @@ typedef union {
 
     lte_rlcmac_Cmac_TEST_JITTERt                 Jitter;
     lte_rlcmac_Cmac_TEST_DEBUG_CFG_CMD_t         DebugCfgCmd;
+    lte_rlcmac_Cmac_TEST_SNIFFER_TRIGGER_IND_t   SnifferTriggerInd;
 
     lte_rlcmac_Cmac_SCHED_CFG_CMDt               SchedCfgCmd;
     lte_rlcmac_Cmac_SCHED_CFG_ACKt               SchedCfgAck;

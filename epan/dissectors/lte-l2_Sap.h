@@ -22,7 +22,7 @@ $Log$
  * THE LTE SAPIs
  ********************************************************************/
 
-#define  lte_l2_Sap_VERSION      "1.5.0"
+#define  lte_l2_Sap_VERSION      "1.6.0"
 
 
 /*
@@ -46,24 +46,25 @@ $Log$
 #define  lte_l2_Sap_RLCMAC_CMAC_TM	16
 #define  lte_l2_Sap_RLCMAC_CRLC_TM	17
 #define  lte_l2_Sap_RLCMAC_SCHED	20
-#define  lte_l2_Sap_RLCMAC_MBMS 	21
-#define  lte_l2_Sap_RLCMAC_DRLC_TM 	27
-#define  lte_l2_Sap_RLCMAC_STAT_TM 	28
+#define  lte_l2_Sap_RLCMAC_MBMS		21
+#define  lte_l2_Sap_RLCMAC_DRLC_TM	27
+#define  lte_l2_Sap_RLCMAC_STAT_TM	28
+#define  lte_l2_Sap_RLCMAC_HOST_CTRL 29
 
 /*
  * PDCP
  */
-#define	 lte_l2_Sap_PDCP_ERROR	    31
-#define  lte_l2_Sap_PDCP_CTRL		32
-#define  lte_l2_Sap_PDCP_AUX		33
-#define  lte_l2_Sap_PDCP_DATA		34
-#define  lte_l2_Sap_PDCP_STAT		35
-#define  lte_l2_Sap_PDCP_CTRL_TM	36
-#define  lte_l2_Sap_NR_PDCP_CTRL	37
-#define  lte_l2_Sap_NR_PDCP_AUX		38
-#define  lte_l2_Sap_NR_PDCP_DATA	39
-#define  lte_l2_Sap_NR_PDCP_STAT	40
-#define  lte_l2_Sap_NR_PDCP_CTRL_TM	43
+#define  lte_l2_Sap_PDCP_ERROR      31
+#define  lte_l2_Sap_PDCP_CTRL       32
+#define  lte_l2_Sap_PDCP_AUX        33
+#define  lte_l2_Sap_PDCP_DATA       34
+#define  lte_l2_Sap_PDCP_STAT       35
+#define  lte_l2_Sap_PDCP_CTRL_TM    36
+#define  lte_l2_Sap_NR_PDCP_CTRL    37
+#define  lte_l2_Sap_NR_PDCP_AUX     38
+#define  lte_l2_Sap_NR_PDCP_DATA    39
+#define  lte_l2_Sap_NR_PDCP_STAT    40
+#define  lte_l2_Sap_NR_PDCP_CTRL_TM 43
 
 
 /*
@@ -118,24 +119,25 @@ $Log$
 /*
  * NR RLCMAC
  */
-#define  lte_l2_Sap_NR_RLCMAC_ERROR	141
-#define  lte_l2_Sap_NR_RLCMAC_L1_TEST	142
-#define  lte_l2_Sap_NR_RLCMAC_CMAC	143
-#define  lte_l2_Sap_NR_RLCMAC_CRLC	144
-#define  lte_l2_Sap_NR_RLCMAC_CMAC_TM	146
-#define  lte_l2_Sap_NR_RLCMAC_CRLC_TM	147
-#define  lte_l2_Sap_NR_RLCMAC_DRLC_TM	148
+#define  lte_l2_Sap_NR_RLCMAC_ERROR 141
+#define  lte_l2_Sap_NR_RLCMAC_L1_TEST   142
+#define  lte_l2_Sap_NR_RLCMAC_CMAC  143
+#define  lte_l2_Sap_NR_RLCMAC_CRLC  144
+#define  lte_l2_Sap_NR_RLCMAC_CMAC_TM   146
+#define  lte_l2_Sap_NR_RLCMAC_CRLC_TM   147
+#define  lte_l2_Sap_NR_RLCMAC_DRLC_TM   148
 #define  lte_l2_Sap_NR_RLCMAC_AUX       149  /* to PDCP */
 #define  lte_l2_Sap_NR_RLCMAC_TM        150  /* to PDCP */
 #define  lte_l2_Sap_NR_RLCMAC_UM        151  /* to PDCP */
 #define  lte_l2_Sap_NR_RLCMAC_AM        152  /* to PDCP */
 #define  lte_l2_Sap_NR_RLCMAC_STAT      154
 #define  lte_l2_Sap_NR_RLCMAC_STAT_TM   155
-#define  lte_l2_Sap_NR_SCG_RLCMAC_CMAC		156
-#define  lte_l2_Sap_NR_SCG_RLCMAC_CRLC		157
-#define  lte_l2_Sap_NR_SCG_RLCMAC_CMAC_TM	158
-#define  lte_l2_Sap_NR_SCG_RLCMAC_CRLC_TM	159
-#define  lte_l2_Sap_NR_SCG_RLCMAC_DRLC_TM	160
+#define  lte_l2_Sap_NR_SCG_RLCMAC_CMAC      156
+#define  lte_l2_Sap_NR_SCG_RLCMAC_CRLC      157
+#define  lte_l2_Sap_NR_SCG_RLCMAC_CMAC_TM   158
+#define  lte_l2_Sap_NR_SCG_RLCMAC_CRLC_TM   159
+#define  lte_l2_Sap_NR_SCG_RLCMAC_DRLC_TM   160
 #define  lte_l2_Sap_NR_SCG_RLCMAC_STAT      161
+#define  lte_l2_Sap_NR_RLCMAC_HOST_CTRL 162
 
 #endif

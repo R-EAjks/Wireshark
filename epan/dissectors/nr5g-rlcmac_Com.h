@@ -6,11 +6,7 @@
 #ifndef nr5g_rlcmac_Com_DEFINED
 #define nr5g_rlcmac_Com_DEFINED
 
-#ifdef VERSION_15
-#define nr5g_rlcmac_Com_VERSION   "0.5.0"
-#else
-#define nr5g_rlcmac_Com_VERSION   "0.6.0"
-#endif
+#define nr5g_rlcmac_Com_VERSION   "0.10.0"
 
 /*------------------------------------------------------------------*
  |  NOTES                                                           |
@@ -85,8 +81,10 @@
 #define nr5g_rlcmac_Com_ELL_EUNEXP       (nr5g_rlcmac_Com_ELL_BASE + 1) /* Unexpected primitive */
 #define nr5g_rlcmac_Com_ELL_ESRCH        (nr5g_rlcmac_Com_ELL_BASE + 3) /* Invalid object identifier */
 #define nr5g_rlcmac_Com_ELL_EMAX         (nr5g_rlcmac_Com_ELL_BASE + 5) /* Maximum number of objects reached */
+#define nr5g_rlcmac_Com_ELL_ITF_MISMATCH (nr5g_rlcmac_Com_ELL_BASE + 6) /* L1-L2 interface mismatch */
 
-
+#define nr5g_rlcmac_Com_MAX_TX_DL_LAYER  4
+#define nr5g_rlcmac_Com_MAX_TX_UL_LAYER  4
 // NR TODO da ridefinire
 /* VERBOSITY */
 
@@ -96,12 +94,12 @@
 /* RLC statistics */
 typedef struct
 {
-    uint32_t TxPduNum;            // Number of UL RLC data PDUs transmitted
-    uint32_t TxPduVol;            // Volume of UL RLC data PDUs transmitted [bytes]
-    uint32_t RxPduNum;            // Number of DL RLC data PDUs received
-    uint32_t RxPduVol;            // Volume of DL RLC data PDUs received [bytes]
+    uint32_t TxPduNum;          // Number of UL RLC data PDUs transmitted
+    uint32_t TxPduVol;          // Volume of UL RLC data PDUs transmitted [bytes]
+    uint32_t RxPduNum;          // Number of DL RLC data PDUs received
+    uint32_t RxPduVol;          // Volume of DL RLC data PDUs received [bytes]
         uint32_t TxPduNumRetx;                  // Number of UL RLC PDU retransmitted
-    uint32_t RxPduNumDisc;        // Number of DL RLC data PDUs discarded
+    uint32_t RxPduNumDisc;      // Number of DL RLC data PDUs discarded
 
     uint32_t RlcNakPduRecv;         /* Number of NACK RLC PDU received in STATUS REPORT */
     uint32_t RlcAckPduRecv;         /* Number of ACK RLC PDU received in STATUS REPORT */
@@ -113,9 +111,30 @@ typedef struct
 
     uint32_t Vta, Vts;         //Rlc Tx Status
     uint32_t Vrr, Vrh;         //Rlc Rx Status
-
+    
         uint32_t RlcReTxPduMax;    // Number of RLC PDU retransmitted till to Max RTX times
 } nr5g_rlcmac_Com_RlcStatElem_t;
+
+typedef struct
+{
+    uint32_t TxPduNum;          // Number of UL RLC data PDUs transmitted
+    uint32_t TxPduVol;          // Volume of UL RLC data PDUs transmitted [bytes]
+    uint32_t RxPduNum;          // Number of DL RLC data PDUs received
+    uint32_t RxPduVol;          // Volume of DL RLC data PDUs received [bytes]
+    uint32_t TxPduNumRetx;                  // Number of UL RLC PDU retransmitted
+    uint32_t RxPduNumDisc;      // Number of DL RLC data PDUs discarded
+
+    uint32_t RlcNakPduRecv;         /* Number of NACK RLC PDU received in STATUS REPORT */
+    uint32_t RlcAckPduRecv;         /* Number of ACK RLC PDU received in STATUS REPORT */
+
+    uint32_t RlcNakPduSent;   /* Number of RLC PDU pointed out in transmitted Status Report */
+    uint32_t RlcAckPduSent;   /* Number of RLC PDU pointed out in transmitted Status Report */
+
+    uint32_t PduOfWinSt;        /* PDU out of win in received STATUS */
+
+
+    uint32_t RlcReTxPduMax;    // Number of RLC PDU retransmitted till to Max RTX times
+} nr5g_rlcmac_Com_RlcStatDbElem_t;
 
 /* NOTE
  * UL(DL) means consider UL for simulated UE side and DL for simulated net side. 
@@ -125,66 +144,66 @@ typedef struct
 /* MAC statistics */
 typedef struct
 {
-    uint32_t    NormPH;            // The normalized Power Headroom reported by UE [dB]
+    uint32_t    NormPH;         // The normalized Power Headroom reported by UE [dB]
 
     uint32_t    TimingAdvRAR;   /* Timing Advance Command in received RAR (index value) */
 
-    uint32_t    NumAccPrach;     // Number of access on PRACH
-    uint32_t    NumRcvdRar;     // Number of received RAR
-    uint32_t    NumAccPrachFail; // Number of failed access on PRACH
+    uint32_t    NumAccPrach;     // Number of access on PRACH 
+    uint32_t    NumRcvdRar;  // Number of received RAR
+    uint32_t    NumAccPrachFail; // Number of failed access on PRACH 
 
-    uint32_t    NumPucch;           // Number of PUCCH Data Req
-    uint32_t    NumPusch;           //Number of PUSCH Data Req
-    uint32_t    NumHarqPucch;       // Number of PUCCH Harq
-    uint32_t    NumHarqPusch;       //Number of PUSCH Harq
-    uint32_t    NumSr;              // Number of SR
-    uint32_t    NumSrsA;            // Number of aperiodic SRS
-    uint32_t    NumSrsP;            // Number of periodic SRS
-    uint32_t    NumCsiA;            // Number of aperiodic CSI
-    uint32_t    NumCsiP;            // Number of periodic CSI
+    uint32_t        NumPucch;        //Number of PUCCH Data Req
+    uint32_t        NumPusch;        //Number of PUSCH Data Req
+    uint32_t        NumHarqPucch;    //Number of PUCCH Harq
+    uint32_t        NumHarqPusch;    //Number of PUSCH Harq
+    uint32_t        NumSr;           //Number of SR
+    uint32_t        NumSrsA;         //Number of aperiodic SRS
+    uint32_t        NumSrsP;         //Number of periodic SRS
+    uint32_t        NumCsiA;         //Number of aperiodic CSI
+    uint32_t        NumCsiP;         //Number of periodic CSI
 
     uint32_t    NumDrxRx;       /* Number of PDCCH for DL data received during not active time */
     uint32_t    NumDrxTx;       /* Number of PDCCH for UL data received during not active time */
+
+    uint64_t        TbTxNoPadVol;  /* Tx No Pad Volume */
+    uint64_t        TbRxNoPadVol;  /* Rx No Pad Volume */
 
 } nr5g_rlcmac_Com_MacStatBasic_t;
 
 typedef struct
 {
-    uint32_t    BufferSize[8];    // The Buffer Size per logical channel group [bytes]
+    uint32_t    BufferSize[8];  // The Buffer Size per logical channel group [bytes]
 
 } nr5g_rlcmac_Com_MacStatBuff_t;
-
-#define nr5g_rlcmac_Com_MAX_TX_DL_LAYER  4
-#define nr5g_rlcmac_Com_MAX_TX_UL_LAYER  2
 
 typedef struct
 {
     /*PDSCH part */
-    uint32_t        xPdschIniTxNum;    // Number of initial trasmissions on xPDSCH
-    uint32_t        xPdschIniTxVol;    // Volume of transport blocks of initial transmission on xPDSCH [bytes]
+    uint32_t        xPdschIniTxNum; // Number of initial trasmissions on xPDSCH
+    uint32_t        xPdschIniTxVol; // Volume of transport blocks of initial transmission on xPDSCH [bytes]
     uint32_t        xPdschTxNum;    // Sum of initial and retrasmissions on xPDSCH
     uint32_t        xPdschTxVol;    // Volume of initial and retrasmissions on xPDSCH
-    uint32_t        xPdschRtxUne;    // Sum of unexpected Rtx on xPDSCH (no previous CRC KO)
-    uint32_t        xPdschRtxRv0;    // Sum of retransmissions with RV =0
-    uint32_t        xPdschRtxRvN;    // Sum of retransmissions with RV != 0
+    uint32_t        xPdschRtxUne;   // Sum of unexpected Rtx on xPDSCH (no previous CRC KO)
+    uint32_t        xPdschRtxRv0;   // Sum of retransmissions with RV =0
+    uint32_t        xPdschRtxRvN;   // Sum of retransmissions with RV != 0
 
     uint32_t    NumTbCrcSucc;   // Number of TB CRC success
-    uint32_t    NumTbCrcFail;   // Number of TB CRC fail
-    uint32_t        NumTbCrcFailAmm;// Number of TB CRC fail for mobility (Simulated)
+    uint32_t    NumTbCrcFail;   // Number of TB CRC fail 
+    uint32_t    NumTbCrcFailAmm;// Number of TB CRC fail for mobility
 
     uint32_t    NumCbCrcSucc;   // Number of CB CRC success
-    uint32_t    NumCbCrcFail;   // Number of CB CRC fail
+    uint32_t    NumCbCrcFail;   // Number of CB CRC fail 
 
     uint32_t        xPdschTxNum4L[nr5g_rlcmac_Com_MAX_TX_DL_LAYER]; //Sum of Tx for layer
 
     /*PUSCH part */
-    uint32_t        xPuschIniTxNum;    // Number of initial trasmissions on xPUSCH
-    uint32_t        xPuschIniTxVol;    // Volume of transport blocks of initial transmission on xPUSCH [bytes]
+    uint32_t        xPuschIniTxNum; // Number of initial trasmissions on xPUSCH
+    uint32_t        xPuschIniTxVol; // Volume of transport blocks of initial transmission on xPUSCH [bytes]
     uint32_t        xPuschTxNum;    // Sum of initial and retrasmissions on xPUSCH
     uint32_t        xPuschTxVol;    // Volume of initial and retrasmissions on xPUSCH
-    uint32_t        xPuschRtxRv0;    // Sum of retransmissions with RV =0
-    uint32_t        xPuschRtxRvN;    // Sum of retransmissions with RV != 0
-    uint32_t        HarqFeed;       // Number of HARQ feedback received
+    uint32_t        xPuschRtxRv0;   // Sum of retransmissions with RV =0
+    uint32_t        xPuschRtxRvN;   // Sum of retransmissions with RV != 0
+    uint32_t        HarqFeed;       // Number of HARQ feedback recived
     uint32_t        HarqFeedAck;    // Number of ACK HARQ feedback
 
     uint32_t        xPuschTxNum4L[nr5g_rlcmac_Com_MAX_TX_UL_LAYER]; //Sum of Tx for layer
@@ -195,8 +214,8 @@ typedef struct
  *  PDSCH Rtx = xPdschTxNum - xPdschIniTxNum
  *  PDSCH Bler = (NumTbCrcFail/(NumTbCrcFail + NumTbCrcSucc))
  *  PDSCH AMM Bler = (NumTbCrcFailAmm/(NumTbCrcFailAmm + NumTbCrcSucc))
- *  CRC CB KO ratio (CB BLER)= (NumCbCrcFail / (NumCbCrcSucc + NumCbCrcFail))
- *  RTX Ratio = (xPdschTxNum - xPdschIniTxNum)/xPdschTxNum
+ *  CRC CB KO ratio = (NumCbCrcFail / (NumCbCrcSucc + NumCbCrcFail))
+ *  RTX Ratio = xPdschTxNum - xPdschIniTxNum/xPdschTxNum
  *
  *
  *   PUSCH Troughput = xPuschTxVol/DeltaTs
@@ -221,7 +240,7 @@ typedef struct
 
     uint32_t        uDciDisc;       //Discarded DCI for uplink
     uint32_t        dDciDisc;       //Discarded DCI for downlink
-
+    
 } nr5g_rlcmac_Com_MacStatPdcch_t;
 
 #define nr5g_rlcmac_Com_MAX_ANTENNAS  4
@@ -242,10 +261,6 @@ typedef struct
     int     maxRsrq[nr5g_rlcmac_Com_MAX_ANTENNAS];     /* maximum RSRQ (Reference Signal Received Quality or antenna 0 - 3 dB) [1]*/
     int     Rsrq[nr5g_rlcmac_Com_MAX_ANTENNAS];        /* Average RSRQ (Reference Signal Received Quality or antenna 0 - 3 dB) [1]*/
 
-#ifdef VERSION_15
-    int     UlGain[nr5g_rlcmac_Com_MAX_ANTENNAS];      /* Digital ul gain per antenna port */
-    int     DlGain[nr5g_rlcmac_Com_MAX_ANTENNAS];      /* Digital dl gain per antenna port */
-#endif
 } nr5g_rlcmac_Com_BeamStat_t; /* Base band specific statistic  */
 
 
@@ -255,18 +270,32 @@ typedef struct {
     uint8_t   WbPmiX1i3;      /* index i3 for X1 Wideband Precoding Matrix Indicator 3GPP 38.212 (maximum allowed value is 32)*/
     uint32_t  WbPmiX2;        /* X2 Wideband Precoding Matrix Indicator 3GPP 38.212 */
     uint8_t   Ri;             /* Estimated Rank indicator */
+} nr5g_rlcmac_Com_PMI_Elemt;
+
+typedef struct {
+    nr5g_rlcmac_Com_PMI_Elemt PmiEl[bb_nr5g_MAX_NUM_CRI];
+    uint8_t   bestCri;
     uint8_t   NumCsiRsPort;
     uint8_t   ReportId;
-    uint8_t   Pad;       
+    uint8_t   Pad;
 } nr5g_rlcmac_Com_PMIt;
 
+typedef struct {
+    int32_t     DmrsRotSymb;    /* symbol-step rotation correction, computed between first and last DMRS. In 0.01 degrees */
+    int32_t     PtrsRotSymb;    /* Max rotation correction computed using PTRS. In 0.01 degrees */
+    int32_t     BlindRotSymb;   /* Max rotation correction computed with "blind" algorithm. In 0.01 degrees */
+} nr5g_rlcmac_Com_RotSymbol_t;
+
+typedef struct {
+    uint32_t    EvmSymbMax; /* Max EVM computed on PDSCH data constellation. In 0.01 degrees. */
+    uint32_t    EvmSymbAvg; /* Average EVM computed on PDSCH data constellation. In 0.01 degrees. */
+} nr5g_rlcmac_Com_EVM_t;
 
 typedef struct
 {
-#ifndef VERSION_15
     int     UlGain[nr5g_rlcmac_Com_MAX_ANTENNAS];      /* Digital ul gain per antenna port */
     int     DlGain[nr5g_rlcmac_Com_MAX_ANTENNAS];      /* Digital dl gain per antenna port */
-#endif
+    int     FrequencyOffset;  /* Frequency offset in Hz */
     uchar                       NBeam;
     nr5g_rlcmac_Com_BeamStat_t  Beam[1];
 } nr5g_rlcmac_Com_BbStat_t; /* Base band specific statistic  */

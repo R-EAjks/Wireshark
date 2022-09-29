@@ -72,24 +72,24 @@
 /* PDCP statistics */
 typedef struct
 {
-	uint TxSduNum;			// Number of UL(DL) PDCP SDUs transmitted
-	uint TxSduVol;			// Volume of UL(DL) PDCP SDUs transmitted [bytes]
+    uint TxSduNum;          // Number of UL(DL) PDCP SDUs transmitted
+    uint TxSduVol;          // Volume of UL(DL) PDCP SDUs transmitted [bytes]
 
-	uint RxSduNum;			// Number of DL(UL) PDCP SDUs received
-	uint RxSduVol;			// Volume of DL(UL) PDCP SDUs received [bytes]
+    uint RxSduNum;          // Number of DL(UL) PDCP SDUs received
+    uint RxSduVol;          // Volume of DL(UL) PDCP SDUs received [bytes]
 
-	uint TxSduNumRelDisc;	// Number of UL(DL) PDCP SDUs discarded due to bearer release
-	uint TxSduNumOthDisc;	// Number of UL(DL) PDCP SDUs discarded due to other causes
-	uint TxSduVolRelDisc;	// Volume of UL(DL) PDCP SDUs discarded due to bearer release [bytes]
-	uint TxSduVolOthDisc;	// Volume of UL(DL) PDCP SDUs discarded due to other causes [bytes]
+    uint TxSduNumRelDisc;   // Number of UL(DL) PDCP SDUs discarded due to bearer release
+    uint TxSduNumOthDisc;   // Number of UL(DL) PDCP SDUs discarded due to other causes
+    uint TxSduVolRelDisc;   // Volume of UL(DL) PDCP SDUs discarded due to bearer release [bytes]
+    uint TxSduVolOthDisc;   // Volume of UL(DL) PDCP SDUs discarded due to other causes [bytes]
 
-	uint RxPduNumCorrDisc;	// Number of DL(UL) PDCP PDUs discarded due to corrupted header
-	uint RxPduNumIntDisc;	// Number of DL(UL) PDCP PDUs discarded due to integrity check fail
-	uint RxPduNumReordGap;	// Number of DL(UL) PDCP PDUs gaps after re-ordering
-	uint RxPduNumOthDisc;	// Number of DL(UL) PDCP PDUs discarded due to other causes
-	uint RxPduVolCorrDisc;	// Volume of DL(UL) PDCP PDUs discarded due to corrupted header
-	uint RxPduVolIntDisc;	// Volume of DL(UL) PDCP PDUs discarded due to integrity check fail
-	uint RxPduVolOthDisc;	// Volume of DL(UL) PDCP PDUs discarded due to other causes [bytes]
+    uint RxPduNumCorrDisc;  // Number of DL(UL) PDCP PDUs discarded due to corrupted header
+    uint RxPduNumIntDisc;   // Number of DL(UL) PDCP PDUs discarded due to integrity check fail
+    uint RxPduNumReordGap;  // Number of DL(UL) PDCP PDUs gaps after re-ordering
+    uint RxPduNumOthDisc;   // Number of DL(UL) PDCP PDUs discarded due to other causes
+    uint RxPduVolCorrDisc;  // Volume of DL(UL) PDCP PDUs discarded due to corrupted header
+    uint RxPduVolIntDisc;   // Volume of DL(UL) PDCP PDUs discarded due to integrity check fail
+    uint RxPduVolOthDisc;   // Volume of DL(UL) PDCP PDUs discarded due to other causes [bytes]
 
 } nr5g_pdcp_Com_StatElem_t;
 

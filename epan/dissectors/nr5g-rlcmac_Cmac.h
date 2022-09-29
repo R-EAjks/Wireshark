@@ -1,11 +1,14 @@
 #ifndef nr5g_rlcmac_Cmac_DEFINED
 #define nr5g_rlcmac_Cmac_DEFINED
 
+//#ifndef tmLTEUU
+//#include "lsu.h"
+//#endif
 #include "nr5g.h"
-#include "nr5g-rlcmac_Com.h"
 #include "nr5g-rlcmac_Cmac-bb.h"
+#include "nr5g-rlcmac_Com.h"
 
-#define nr5g_rlcmac_Cmac_VERSION   "0.21.0"
+#define nr5g_rlcmac_Cmac_VERSION   "0.27.0"
 
 /*
  * This interface conforms to the rules specified in `lsu.h'.
@@ -51,7 +54,16 @@
 #define nr5g_rlcmac_Cmac_DBEAM_IND            0x408
 #define nr5g_rlcmac_Cmac_DCI_IND              0x409
 
+#define nr5g_rlcmac_Cmac_URLLC_CHECK_CMD  0x16
+#define nr5g_rlcmac_Cmac_URLLC_CHECK_ACK (0x100 + nr5g_rlcmac_Cmac_URLLC_CHECK_CMD)
+#define nr5g_rlcmac_Cmac_URLLC_CHECK_NAK (0x200 + nr5g_rlcmac_Cmac_URLLC_CHECK_CMD)
+
 #define nr5g_rlcmac_Cmac_MEAS_SET_REQ    0x06
+#define nr5g_rlcmac_Cmac_UE_CONTEXT_CMD    0x14
+#define nr5g_rlcmac_Cmac_UE_CONTEXT_ACK   (0x100 + nr5g_rlcmac_Cmac_UE_CONTEXT_CMD)
+#define nr5g_rlcmac_Cmac_UE_CONTEXT_NAK   (0x200 + nr5g_rlcmac_Cmac_UE_CONTEXT_CMD)
+#define nr5g_rlcmac_Cmac_UE_CONTEXT_IND   (0x400 + nr5g_rlcmac_Cmac_UE_CONTEXT_CMD)
+#define nr5g_rlcmac_Cmac_SEG_UE_CONTEXT_REQ    0x15
 
 /* To Debug Rach Access */
 #define nr5g_rlcmac_Cmac_RACH_CFG_CMD       0x10
@@ -121,6 +133,18 @@
 #define nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_ACK (0x100 + nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_CMD)
 #define nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_NAK (0x200 + nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_CMD)
 
+#define nr5g_rlcmac_Cmac_L1T_SCAN_ONGOING  0x16
+#define nr5g_rlcmac_Cmac_L1T_SCAN_ONGOING_ACK (0x100 + nr5g_rlcmac_Cmac_L1T_SCAN_ONGOING)
+#define nr5g_rlcmac_Cmac_L1T_SCAN_ONGOING_NAK (0x200 + nr5g_rlcmac_Cmac_L1T_SCAN_ONGOING)
+
+#define nr5g_rlcmac_Cmac_L1T_START_BFW  0x17
+#define nr5g_rlcmac_Cmac_L1T_START_BFW_ACK (0x100 + nr5g_rlcmac_Cmac_L1T_START_BFW)
+#define nr5g_rlcmac_Cmac_L1T_START_BFW_NAK (0x200 + nr5g_rlcmac_Cmac_L1T_START_BFW)
+
+#define nr5g_rlcmac_Cmac_L1T_BFW_END            (0x118)
+
+#define nr5g_rlcmac_Cmac_L1T_ABORT_BFW_REQ      (0x119)
+
 /*
  * STAT SAP
  */
@@ -146,6 +170,7 @@ typedef struct {
  * PHYSICAL CHANNELS CONFIGURATION
  */
 typedef bb_nr5g_CELL_GROUP_CONFIGt nr5g_rlcmac_Cmac_CellCfg_t;
+typedef bb_nr5g_RACH_CONF_GENERICt nr5g_rlcmac_Cmac_RACH_CONF_GENERICt;
 
 /*
 *  RB INFORMATION ELEMENT
@@ -155,18 +180,20 @@ typedef struct {
     uchar   logicalChannelIdentity;
     uchar   logicalChannelGroup;        /* -1 for none */
     uchar   priority;
-    uint    prioritisedBitRate;            /* [kBytes/sec, -1 for "infinity"] */
-    uint    bucketSizeDuration;            /* [ms] */
-    uint    allowedServingCells;
+    uint    prioritisedBitRate;         /* [kBytes/sec, -1 for "infinity"] */
+    uint    bucketSizeDuration;         /* [ms] */
+    uint    allowedServingCells;        /* Bitmask representing RRC parameter allowedServingCells.
+                                        If ServCellIndex=i is present, bit i of the bitmask is set to 1, otherwise bit i is set to 0. 
+                                        If set to 0 it means "not present/reset" */
     uint    allowedSCS_List;
-    uchar    maxPUSCH_Duration;
-    uchar    configuredGrantType1Allowed;/* [BOOLEAN] If TRUE LCID can be Txd on configuredGrantType1 */
-    uchar   logicalChannelSR_Mask;        /* TRUE means enabled */
+    uchar   maxPUSCH_Duration;
+    uchar   configuredGrantType1Allowed;/* [BOOLEAN] If TRUE LCID can be Txd on configuredGrantType1 */
+    uchar   logicalChannelSR_Mask;      /* TRUE means enabled */
     uchar   logicalChannelSR_DelayTimerConfigured;  /* TRUE means enabled */
-    uchar    requestDuplicatesFromPDCP;    /* E/// only. If set to TRUE, this logical channel is configured for data duplication. */
+    uchar   requestDuplicatesFromPDCP;  /* E/// only. If set to TRUE, this logical channel is configured for data duplication. */
     uint    schedulingRequestID;        /* mapped SchedulingRequestId */
-    uint    bitRateQueryProhibitTimer;    /* [ms, -1 means "not configured"] */
-    uchar    allowedPHY_PriorityIndex;    /* [0: p0, 1: p1, -1: "not present"] */
+    uint    bitRateQueryProhibitTimer;  /* [ms, -1 means "not configured"] */
+    uchar   allowedPHY_PriorityIndex;   /* [0: p0, 1: p1, -1: "not present"] */
 } nr5g_rlcmac_Cmac_TxLchInfo_t;
 
 typedef struct {
@@ -196,9 +223,9 @@ typedef struct {
 
 typedef struct {
 
-    nr5g_RbType_v           RbType;
+    nr5g_RbType_v          RbType;
     uchar                  RbId;
-
+    uchar                  LcId; /* Value used in logicalChannelIdentity */
 } nr5g_rlcmac_Cmac_RbRel_t;
 
 
@@ -246,15 +273,15 @@ typedef struct {
     uint    ra_ssb_OccasionMaskIndex; /*  TODO */
     uint    preambleTxMax;       /* RRC: preambleTransMax. Max number of preamble trasmission */
 
-    uchar    totalNumberOfRA_Preambles; /* {not present in MAC, present in RRC} [1 - 63] TODO */
-    nr5g_rlcmac_Cmac_ssb_perRACH_Occasion_v    ssb_perRACH_Occasion;    /* SSB per RACH occasion. First part of ssb-perRACH-OccasionAndCB-PreamblesPerSSB */
-    uchar    CB_PreamblesPerSSB; /* Number of CB preambles per SSB. Second part of ssb-perRACH-OccasionAndCB-PreamblesPerSSB */
-
+    uchar   totalNumberOfRA_Preambles; /* {not present in MAC, present in RRC} [1 - 63] TODO */
+    nr5g_rlcmac_Cmac_ssb_perRACH_Occasion_v ssb_perRACH_Occasion;   /* SSB per RACH occasion. First part of ssb-perRACH-OccasionAndCB-PreamblesPerSSB */
+    uchar   CB_PreamblesPerSSB; /* Number of CB preambles per SSB. Second part of ssb-perRACH-OccasionAndCB-PreamblesPerSSB */
+    
     struct {
-        uint    ra_Msg3SizeGroupA;            /* [bytes, -1 means Group B not present] */
-        uchar    numberofRA_PreamblesGroupA;    /* [1 - 64] */
-        uchar    deltaPreambleMsg3;            /* as in TS 38.213 */
-        int        messagePowerOffsetGroupB; /* [dB, 0x8000.. means minusinfinity] */
+        uint    ra_Msg3SizeGroupA;          /* [bytes, -1 means Group B not present] */
+        uchar   numberofRA_PreamblesGroupA; /* [1 - 64] */
+        uchar   deltaPreambleMsg3;          /* as in TS 38.213 */
+        int     messagePowerOffsetGroupB; /* [dB, 0x8000.. means minusinfinity] */
     } groupBconfigured;
 
     /* {set of Random Access Preambles for SI request: missing in specs} TODO */
@@ -268,6 +295,42 @@ typedef struct {
 //    nr5g_rlcmac_Cmac_RntiCfg RntiCfg;  /* Default configuration for T-RNTI's (variable length) */
 } nr5g_rlcmac_Cmac_RA_Info_t;
 
+#define nr5g_rlcmac_Cmac_MAX_NUM_SI_MESSAGES  (32)
+
+typedef enum {
+    nr5g_rlcmac_Cmac_BitMask_NUL = 1,
+    nr5g_rlcmac_Cmac_BitMask_SUL = 2,
+}nr5g_rlcmac_Cmac_BitMask_NUL_SUL_e;
+typedef uchar nr5g_rlcmac_Cmac_BitMask_NUL_SUL_v;
+
+/* 38.331 SI-RequestConfig contains configuration for Msg1 based SI request */
+typedef struct {
+    nr5g_rlcmac_Cmac_RACH_CONF_GENERICt RachConfGeneric;
+    uint8_t SsbPerRachIsValid;      /* This field assumes a value defined as bb_nr5g_RACH_CONF_COMMON_OCCASION_***
+                                    in order to read in good way the associated parameters in SsbPerRach.
+                                    If this field is set to default value SsbPerRach is neither read or used */
+} nr5g_rlcmac_Cmac_RACH_OCCASIONt;
+
+/* 38.331 SI-RequestResources IE: It contains configuration for Msg1 based SI request*/
+typedef struct {
+    uint8_t raPreambleStartIndex;
+    uint8_t RaAssociationPeriodIndex;
+    uint8_t RaSsbOccasionMaskIndex;
+} nr5g_rlcmac_Cmac_SI_REQUEST_RESOURCESt;
+
+/* 38.331 SI-RequestConfig contains configuration for Msg1 based SI request */
+typedef struct {
+    nr5g_rlcmac_Cmac_RACH_OCCASIONt RachOccasion;
+    uint8_t RequestPeriod;
+    uint8_t NumRequestResources;
+    nr5g_rlcmac_Cmac_SI_REQUEST_RESOURCESt RequestResources[nr5g_rlcmac_Cmac_MAX_NUM_SI_MESSAGES];
+} nr5g_rlcmac_Cmac_SI_REQUEST_CONFIGt;
+
+/* 38.331 SI-SchedulingInfo IE: it contains information needed for acquisition of SI message*/
+typedef struct {
+    nr5g_rlcmac_Cmac_BitMask_NUL_SUL_v RequestConfigMask;
+    nr5g_rlcmac_Cmac_SI_REQUEST_CONFIGt RequestConfigNUL;
+} nr5g_rlcmac_Cmac_SI_SCHED_INFOt;
 
 typedef struct {
     uint    periodicBSR_Timer;          /* [sf, -1 means infinity] */
@@ -299,26 +362,26 @@ typedef struct {
     uint    phr_PeriodicTimer; /* [sf, 0 means PHR disabled, -1 means infinity] */
     uint    phr_ProhibitTimer; /* [sf] */
 
-    int        phr_Tx_PowerFactorChange;    /* [dB, 0x7FF.. means infinity] */
-    uint    multiplePHR                ;    /* [BOOLEAN] */
-    uint    phr_Type2SpCell            ;    /* [BOOLEAN] */
-    uint    phr_Type2OtherCell        ;    /* [BOOLEAN] */
-    uint    phr_ModeOtherCG            ;    /* [0 -> real, 1 -> virtual] */
-
-    uint    Spare                    ;
+    int     phr_Tx_PowerFactorChange;   /* [dB, 0x7FF.. means infinity] */
+    uint    multiplePHR             ;   /* [BOOLEAN] */
+    uint    phr_Type2SpCell         ;   /* [BOOLEAN] */
+    uint    phr_Type2OtherCell      ;   /* [BOOLEAN] */
+    uint    phr_ModeOtherCG         ;   /* [0 -> real, 1 -> virtual] */
+    
+    uint    Spare                   ;
 } nr5g_rlcmac_Cmac_PHR_Config_t;
 
 typedef struct {
     nr5g_rlcmac_Cmac_BSR_Configuration_t    bsr_Config;
     nr5g_rlcmac_Cmac_TAG_Configuration_t    tag_Config; /* E/// not present */
-    nr5g_rlcmac_Cmac_PHR_Config_t            phr_Config;
-    nr5g_rlcmac_Cmac_SR_Configuration_t    Sr_Config;
+    nr5g_rlcmac_Cmac_PHR_Config_t           phr_Config;
+    nr5g_rlcmac_Cmac_SR_Configuration_t Sr_Config;
 
-    uchar    skipUplinkTxDynamic;
-    uint    sCellDeactivationTimer;    /* E/// not present [ms], -1 means none */
-
-    uchar  HoFlag;                      /* Handover flag ( 0 = normal config,
+    uchar   skipUplinkTxDynamic;
+    uchar  HoFlag;                      /* Handover flag ( 0 = normal config, 
                                                            1 = prim. is used to configure an HO */
+    uint    DataInactivityTimer;    /* seconds;  0 = deactivate timer,
+                                                -1 = value not present */
    
 } nr5g_rlcmac_Cmac_MAC_CellGroupConfig_t;
 
@@ -328,17 +391,15 @@ typedef struct {
 
     int PCMAXc;
     int PCMAXc_SUL; /* -1 means no SUL carrier */
+    uint sCellDeactivationTimer; /* 3GPP 38.331 optional: -1 (not present), 20,40,80,...(in millisec) */
 #if 0
     TODO
     /* MAC parameters */
     SPS_Config_t sps_Config;
-     STAG_Id_t stag_Id;
+    STAG_Id_t stag_Id;
     HARQ_RTT_Timers_t harq_RTT_Timers;
     SPSULtransmissionWithoutGrant_Config_t ulTransmissionWithoutGrantsps_Config;
-    uint    sCellDeactivationTimer;    /* E/// only [ms], -1 means none in 3GPP is one for the CG and not per ServCell */
-
 #endif
-
 } nr5g_rlcmac_Cmac_ServCellConfig_t;
 
 
@@ -346,6 +407,8 @@ typedef enum {
     
     nr5g_rlcmac_Cmac_Rrc_State_IDLE = 1,
     nr5g_rlcmac_Cmac_Rrc_State_MAC_RESET = 2,
+    nr5g_rlcmac_Cmac_Rrc_State_MAC_RESUME = 3,
+    nr5g_rlcmac_Cmac_Rrc_State_MAC_RESUME_NO_SCELL = 4, /* perform resume of MAC according 38.331 5.3.13.4 in case of missing restoreMCG-SCells (i.e. SCells to be removed) */
     
 } nr5g_rlcmac_Cmac_Rrc_State_e;
 typedef uchar nr5g_rlcmac_Cmac_Rrc_State_v;
@@ -367,6 +430,8 @@ typedef enum {
     nr5g_rlcmac_Cmac_STATUS_LOWER_LAYER_NAK = 4,         /* (4) */
     nr5g_rlcmac_Cmac_STATUS_RLF_HARQ_CSI_OFF = 5,        /* (5) */
     nr5g_rlcmac_Cmac_STATUS_RL_SYNC_ON = 6,              /* (6) */
+    nr5g_rlcmac_Cmac_STATUS_URLLC_ACCESS = 7,            /* (7) */
+    nr5g_rlcmac_Cmac_STATUS_DATA_INACT_TMR_EXP = 8
 
 } nr5g_rlcmac_Cmac_STATUS_e;
 typedef uchar nr5g_rlcmac_Cmac_STATUS_v;
@@ -478,17 +543,17 @@ typedef struct {
 
     /* RA information elements */
     uint    BwpMask;                                            /* Validity mask of RA_Info[] array. */
-    nr5g_rlcmac_Cmac_RA_Info_t    RA_Info[bb_nr5g_MAX_NB_BWPS+1]; /* First element for Initial BWP. other elements for additional BWP. Array Index correspond to BWP-Id */
+    nr5g_rlcmac_Cmac_RA_Info_t  RA_Info[bb_nr5g_MAX_NB_BWPS+1]; /* First element for Initial BWP. other elements for additional BWP. Array Index correspond to BWP-Id */
     
     /* RB information elements */
     nr5g_rlcmac_Cmac_RbInfoElem_t    RbIE;
 
     /* Parameters applicable for the entire cell group: */
     nr5g_rlcmac_Cmac_MAC_CellGroupConfig_t mac_CellGroupConfig; /* not (yet) present in E/// */
-
-    nr5g_rlcmac_Cmac_SpCellConfig_t    spCellConfig; /* E///: pCellConfig */
+    
+    nr5g_rlcmac_Cmac_SpCellConfig_t spCellConfig; /* E///: pCellConfig */
     nr5g_rlcmac_Cmac_SCellList_t    sCellList;
-
+    
 } nr5g_rlcmac_Cmac_CfgParams_t;
 
 #define nr5g_rlcmac_Cmac_MAC_SEG_SIZE    (20000) /* unit: bytes */
@@ -506,7 +571,9 @@ typedef struct {
 #define nr5g_rlcmac_Cmac_L2_TEST_MODE_NO 0 /* no test mode */
 #define nr5g_rlcmac_Cmac_L2_TEST_MODE_01 1 /* L2 test mode: UL and DL are active, RA not expected */
 #define nr5g_rlcmac_Cmac_L2_TEST_MODE_02 2 /* L2 test mode: RA without contention */
-    uchar L2TestMode;
+#define nr5g_rlcmac_Cmac_L2_TEST_NO_UL_HARQ 4 /* Disable UL HARQ  */
+#define nr5g_rlcmac_Cmac_L2_TEST_NO_DL_HARQ 8 /* Disable DL HARQ To disable UL and DL nr5g_rlcmac_Cmac_L2_TEST_NO_UL_HARQ | nr5g_rlcmac_Cmac_L2_TEST_NO_DL_HARQ */
+    uchar L2TestMode;   /* BitMask */
     uint  RL_Failure_Timer; /* Started when Radio Link Failure detected (RLF_HARQ_OFF,RLF_CSI_OFF set 1) */
                             /* Stopped if no more Radio Link Failure. At expiration: nr5g_rlcmac_Cmac_STATUS_IND(nr5g_rlcmac_Cmac_STATUS_RLF_HARQ_CSI_OFF) to TSTM */
                             /* Values: 0 (no timer, default) or <milliseconds value> */
@@ -520,7 +587,7 @@ typedef struct {
     uchar RA_InfoIsForSUL;   /* Flag to control RA_Info (dedicated). 0: RA_Info (dedicated) is for NUL, 1: RA_Info (dedicated) is for SUL */
     uchar Spare1[2];   /* For future extension, set to 0 */
     uint  Spare[3];    /* For future extension, set to 0 */
-
+    
     uint L1CellDedicatedConfig_Len; /* byte length of L1CellDedicatedConfig[] */
     /* L1 for L2 parameters (variable length) */
     nr5g_rlcmac_Cmac_CELL_DEDICATED_CONFIGt L2CellDedicatedConfig;
@@ -537,7 +604,7 @@ of transport channels.
 typedef struct {
 
     uint   UeId;
-
+    
     uchar  SegCnt;     /* Segment counter (1) */
     uchar  Spare[31];  /* For future extension, set to 0 */
     uchar  Data[];     /* contains a segment of CONFIG_CMD. */
@@ -624,9 +691,9 @@ typedef struct {
 
     /* Status info */
     nr5g_rlcmac_Cmac_STATUS_v    Status;
-    uint                        numberOfPreamblesSent;    /* number of RACH preambles that were transmitted. Corresponds to parameter PREAMBLE_TRANSMISSION_COUNTER in TS 36.321 */
-    uchar                       contentionDetected;        /* If set contention was detected for at least one of the transmitted preambles */
-    uchar                       maxTxPowerReached;        /* If set the maximum power level was used for the last transmitted preamble */
+    uint                        numberOfPreamblesSent;  /* number of RACH preambles that were transmitted. Corresponds to parameter PREAMBLE_TRANSMISSION_COUNTER in TS 36.321 */
+    uchar                       contentionDetected;     /* If set contention was detected for at least one of the transmitted preambles */
+    uchar                       maxTxPowerReached;      /* If set the maximum power level was used for the last transmitted preamble */
 
 } nr5g_rlcmac_Cmac_STATUS_CNF_t;
 
@@ -690,8 +757,8 @@ typedef struct {
  * nr5g_rlcmac_Cmac_RACH_CFG_CMD
  */
 typedef struct {
-    nr5g_Id_t    Nr5gId;        /* NR5G Id */
-    nr5g_rlcmac_Cmac_RA_Info_t    RA_Info;
+    nr5g_Id_t   Nr5gId;     /* NR5G Id */
+    nr5g_rlcmac_Cmac_RA_Info_t  RA_Info;
 } nr5g_rlcmac_Cmac_RACH_CFG_CMDt;
 
 
@@ -700,22 +767,22 @@ typedef struct {
  * To test a RACH access in case of HARQ or MAC MODE TestMode
  */
 typedef struct {
-    nr5g_Id_t        Nr5gId;        /* NR5G Id */
+    nr5g_Id_t       Nr5gId;     /* NR5G Id */
     uint            TestType;       /* see nr5g_tm_rlcmac_Cmac_RACH_TYPE_..*/
     nr5g_RbType_v   RbType;         /* Radio Bearer Type */
-    uchar            RbId;         /* Rb id  (1)*/
-    nr5g_LchType_v    Lch;         /* Logical Channel Type: nr5g_CCCH, nr5g_DCCH (1)*/
-    int                MaxUpPwr;       /* Maximum uplink power (in dBm) (1)*/
-    int                RSRP;        /* Simulated RSRP [dBm, 0x7FFFFFFF for none] (1)*/
-    int                UeCategory;     /* UE category (1)*/
-    uint             Spare[2];       /* For future extension, set to 0 */
+    uchar           RbId;       /* Rb id  (1)*/
+    nr5g_LchType_v  Lch;        /* Logical Channel Type: nr5g_CCCH, nr5g_DCCH (1)*/
+    int             MaxUpPwr;       /* Maximum uplink power (in dBm) (1)*/
+    int             RSRP;       /* Simulated RSRP [dBm, 0x7FFFFFFF for none] (1)*/
+    int             UeCategory;     /* UE category (1)*/
+    uint            Spare[2];       /* For future extension, set to 0 */
 
-    uchar            Data[1];    /* Data to be transmitted in RA procedure (MAC SDU Msg3) (1)*/
+    uchar           Data[1];    /* Data to be transmitted in RA procedure (MAC SDU Msg3) (1)*/
 } nr5g_rlcmac_Cmac_RACH_ACC_CMDt;
 
 #define nr5g_rlcmac_Cmac_RACH_TYPE_PREAMBLE         1  /* Only premable*/
 #define nr5g_rlcmac_Cmac_RACH_TYPE_MSG3_NO_CONT     2  /* Msg3 without waiting for Msg 4*/
-#define nr5g_rlcmac_Cmac_RACH_TYPE_MSG3_CONT             3  /* Do contention resolution */
+#define nr5g_rlcmac_Cmac_RACH_TYPE_MSG3_CONT            3  /* Do contention resolution */
 
 /*
  *  Notes:
@@ -729,10 +796,10 @@ typedef struct {
  */
 
 typedef struct {
-    nr5g_Id_t        Nr5gId;        /* NR5G Id; CellId is valid */
-    short            Res;        /* Result code (see TODO) */
-    uint            Crnti;        /* Assigned C-RNTI */
-    uchar            CrId[1];    /* Contention Resolution Id */
+    nr5g_Id_t       Nr5gId;     /* NR5G Id; CellId is valid */
+    short           Res;        /* Result code (see TODO) */
+    uint            Crnti;      /* Assigned C-RNTI */
+    uchar           CrId[1];    /* Contention Resolution Id */
 } nr5g_rlcmac_Cmac_RACH_ACC_INDt;
 
 
@@ -750,6 +817,8 @@ typedef struct {
     /* Current Status info */
     nr5g_rlcmac_Cmac_DBEAM_STATUS_v    Status;
 
+    ushort                      phy_cell_id;  /* Physical Cell Identifier */
+    uint                        SsbArfcn;     /* ARFCN of cell */
     uint                        NumBeam;
 //    bb_nr5g_BEAM_STATUS         Beam[];
 
@@ -831,6 +900,7 @@ typedef struct {
  * nr5g_rlcmac_Cmac_L1T_BINDUMP_CMD
  */
 typedef struct {
+
     nr5g_rlcmac_Cmac_BB_INSTt    BbInst;
     uint8_t                      Param[]; /* Debug Cfg parameters */
 
@@ -841,9 +911,17 @@ typedef struct {
  */
 typedef struct {
     nr5g_rlcmac_Cmac_BB_INSTt   BbInst;
-    uint						Len;
+    uint                        Len;
     char                        Param[]; /* Debug Cfg parameters */
 } nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_CMD_t;
+
+/*
+ * nr5g_rlcmac_Cmac_URLLC_CHECK_CMD
+ */
+typedef struct {
+    nr5g_rlcmac_Cmac_BB_INSTt   BbInst;
+    uchar                       EnableUrllcLicCheck;
+} nr5g_rlcmac_Cmac_URLLC_CHECK_CMD_t;
 
 /*
  * nr5g_rlcmac_Cmac_L1L2T_CONF_START_TEST_CMD
@@ -856,7 +934,7 @@ typedef struct {
     uint            Rnti;
 
     uchar           PucchTest;     /* If 1 PUCCH configuration is valid */
-
+    
     /* PDCCH configuration */
     uchar           NumCce;        /* Aggregation level in number of CCEs (1, 2, 4, 8, 16) */
     uchar           Symb;          /* Symbol inside the slot the PDCCH is expected on (0..13) */
@@ -872,14 +950,14 @@ typedef struct {
                                             0 means the PUSCH is transmitted in every slot with RV=0 */
     uchar           K2;            /* K2 parameter for downlink/uplink timing */
     uchar           TrfPre;        /* Transform precoding (0 = disabled, 1 = enabled) */
-
+    
     /* Grant parameters */
-    uchar             DmrsSym;       /* DMRS symbol (0..13) */
+    uchar           DmrsSym;       /* DMRS symbol (0..13) */   
     uchar           PuschMap;      /* PUSCH mapping type (0 = A, 1 = B) */
     uchar           StartSymb;     /* Starting symbol */
     uchar           NumSymb;       /* Number of symbols */
     ushort          StartRB;       /* Starting RB (0..272) */
-    ushort          NumRB;         /* Number of PRBs (1..273) */
+    ushort          NumRB;         /* Number of PRBs (1..273) */ 
     uchar           McsTab;        /* MCS table (0, 1) */
     uchar           Mcs;           /* MCS value */
     uchar           NDmrsAddPos;   /* Number of additional DMRS symbols 0..2 */
@@ -891,7 +969,7 @@ typedef struct {
     uint            ScramblerId;   /* ScramblerId (0xffffffff means PCI is used) */
     uint            DmrsSeqId;     /* DMRS sequence id (0xffffffff means PCI is used) */
     uchar           Pmi;           /* Precoding matrix index (0,1) */
-
+    
     /* UCI configurations */
     uchar           UciOn;         /* UCI multiplexing flag */
     uchar           CsiPart1Len;   /* CSI part 1 information bit payload */
@@ -909,12 +987,12 @@ typedef struct {
     ushort          GroupHop;      /* Group hopping (0=neither, 1=enabled, 2=disabled) */
     ushort          HopId;         /* Hopping id */
     ushort          Cs;            /* Initial cyclic shift */
-    ushort          OccIdx;        /* Time domain OCC index */
-    ushort          OccLen;        /* Time domain OCC length */
+    ushort          OccIdx;        /* Time domain OCC index */ 
+    ushort          OccLen;        /* Time domain OCC length */ 
     ushort          addDmrsF3F4;  /* Additional DMRS for PUCCH format 3/4 (0=no additional DMRS, 1=otherwise) */
 
     /* Radio condition */
-     uint            Ta;             /* Timing advance (TS) */
+    uint            Ta;             /* Timing advance (TS) */
         int             Power;          /* TX Power per resource element in dB */
     int             Awgn;           /* AWGN power in dBm (0x7FFFFF means disabled) */
     uint            FadingProfile;
@@ -959,10 +1037,10 @@ typedef struct {
     uint32_t          NumTxInLoop;               /* Number of transmission in one loop */
     uint32_t          NumLoop;                   /* Number of loops (0xffffffff means infinite loop) */
     uint32_t          DeltaTimeOff;              /* Addition timing offset for each transmission in the loop */
-
+    
 
     /* Radio condition */
-     uint            Ta;             /* Timing advance (TS) */
+    uint            Ta;             /* Timing advance (TS) */
     int             Power;          /* TX Power per resource element in dB */
     int             Awgn;           /* AWGN power in dBm (0x7FFFFF means disabled) */
     uint            FadingProfile;
@@ -1003,6 +1081,60 @@ typedef struct {
 
 } nr5g_rlcmac_Cmac_L1L2T_PUCCH_START_CMD_t;
 
+/*
+ * nr5g_rlcmac_Cmac_L1T_SCAN_ONGOING
+ */
+typedef struct {
+
+    nr5g_rlcmac_Cmac_BB_INSTt    BbInst;
+    uint8_t                      ScanOngoing; /* 1 -> true; 0 -> false */
+
+} nr5g_rlcmac_Cmac_L1T_SCAN_ONGOING_t;
+
+
+#define nr5g_rlcmac_Cmac_BFW_DUMP_SSB        0
+#define nr5g_rlcmac_Cmac_BFW_DUMP_CRI        1
+#define nr5g_rlcmac_Cmac_BFW_DUMP_PDCCH      2
+#define nr5g_rlcmac_Cmac_BFW_DUMP_PDSCH      3
+#define nr5g_rlcmac_Cmac_MAX_BFW_NAME_LEN    128
+/*
+ * nr5g_rlcmac_Cmac_L1T_START_BFW
+ */
+typedef struct {
+
+    nr5g_rlcmac_Cmac_BB_INSTt    BbInst;
+    uint8_t           TestHdl;                      /* BFW procedure handler */
+    uint8_t           ChType;                       /* Possible values: nr5g_rlcmac_Cmac_BFW_DUMP_* */
+    char              BfwFname[nr5g_rlcmac_Cmac_MAX_BFW_NAME_LEN];   /* BFW Filename */ 
+
+} nr5g_rlcmac_Cmac_L1T_START_BFW_t;
+
+#define nr5g_rlcmac_Cmac_BFW_END_OK        0
+#define nr5g_rlcmac_Cmac_BFW_END_FAIL      1
+
+/*
+ * nr5g_rlcmac_Cmac_L1T_BFW_END
+ */
+typedef struct {
+
+    nr5g_rlcmac_Cmac_BB_INSTt    BbInst;
+    uint8_t           TestHdl;                      /* BFW procedure handler */
+    char              BfwFname[nr5g_rlcmac_Cmac_MAX_BFW_NAME_LEN];   /* BFW Filename */ 
+    uint8_t           Result;                       /* Result */
+
+} nr5g_rlcmac_Cmac_L1T_BFW_END_t;
+
+/*
+ * nr5g_rlcmac_Cmac_L1T_ABORT_BFW_REQ
+ */
+typedef struct {
+
+    nr5g_rlcmac_Cmac_BB_INSTt    BbInst;
+    uint8_t           TestHdl;                      /* BFW procedure handler */
+    uint8_t           Spare[3];                     /* For future use */
+
+} nr5g_rlcmac_Cmac_L1T_ABORT_BFW_REQ_t;
+
 
 /*
  * STAT SAP
@@ -1037,10 +1169,11 @@ typedef struct
     uint    DeltaTs;        /* Interval between current and previous stat report */
 
     uchar   Type;           /* Set it to 0: for future extension */
-    nr5g_rlcmac_Com_MacStatBasic_t    Basic;
-    nr5g_rlcmac_Com_MacStatPxsch_t        Mcs[nr5g_rlcmac_Cmac_NUM_MCS];
+    nr5g_rlcmac_Com_RlcStatDbElem_t    Rlc;  /* RLC specific statistics */
+    nr5g_rlcmac_Com_MacStatBasic_t  Basic;
+    nr5g_rlcmac_Com_MacStatPxsch_t      Mcs[nr5g_rlcmac_Cmac_NUM_MCS];
     
-    nr5g_rlcmac_Com_MacStatPdcch_t        Pdcch;
+    nr5g_rlcmac_Com_MacStatPdcch_t      Pdcch;
 
     nr5g_rlcmac_Com_BbStat_t BbStat; /* Base band specific statistic  */
 } nr5g_rlcmac_Cmac_STAT_DBEAM_INDt;
@@ -1075,10 +1208,10 @@ typedef struct
     uchar   Type;           /* Set it to 0: for future extension */
 
     uint    NumRlc;
-    nr5g_rlcmac_Cmac_RlcStat_t    Rlc[nr5g_rlcmac_Cmac_STAT_NUM_RLC];  /* RLC stat */
-
-    nr5g_rlcmac_Com_MacStatBasic_t    Basic;
-    nr5g_rlcmac_Com_MacStatBuff_t    Buff;
+    nr5g_rlcmac_Cmac_RlcStat_t  Rlc[nr5g_rlcmac_Cmac_STAT_NUM_RLC];  /* RLC stat */
+    
+    nr5g_rlcmac_Com_MacStatBasic_t  Basic;
+    nr5g_rlcmac_Com_MacStatBuff_t   Buff;
  
 } nr5g_rlcmac_Cmac_STAT_UE_HI_INDt;
 
@@ -1095,10 +1228,12 @@ typedef struct
     uint    DeltaTs;        /* Interval between current and previous stat report */
     
     uchar   Type;           /* Set it to 0: for future extension */
-    nr5g_rlcmac_Com_MacStatPxsch_t        Mcs[nr5g_rlcmac_Cmac_NUM_MCS];
-    nr5g_rlcmac_Com_MacStatPdcch_t        Pdcch;
-
+    nr5g_rlcmac_Com_MacStatPxsch_t      Mcs[nr5g_rlcmac_Cmac_NUM_MCS];
+    nr5g_rlcmac_Com_MacStatPdcch_t      Pdcch;
+    
     nr5g_rlcmac_Com_PMIt            Pmi;
+    nr5g_rlcmac_Com_RotSymbol_t     RotSymbol; /* Symbol Rotation Corrections measurements */
+    nr5g_rlcmac_Com_EVM_t           Evm; /* EVM measurements */
     int                             Snr[nr5g_rlcmac_MAX_NUM_LAYER];   /* Per-layer SNR in dB; -1 means "not valid" */
 
 } nr5g_rlcmac_Cmac_STAT_UE_LO_INDt;
@@ -1115,9 +1250,55 @@ typedef struct
     uchar   Type;           /* Set it to 1: for future extension */
     uchar   UlMcs;
     uchar   DlMcs;
-    nr5g_rlcmac_Com_MacStatPxsch_t        Rv[nr5g_rlcmac_Cmac_NUM_RV];
-    nr5g_rlcmac_Com_MacStatPdcch_t        Pdcch;
+    nr5g_rlcmac_Com_MacStatPxsch_t      Rv[nr5g_rlcmac_Cmac_NUM_RV];
+    nr5g_rlcmac_Com_MacStatPdcch_t      Pdcch;
 } nr5g_rlcmac_Cmac_STAT_UE_LO_RV_INDt;
+
+/*
+ * nr5g_rlcmac_Cmac_UE_CONTEXT_CMD
+This primitive is used to provide the configuration of the UE on the target BB/DBEAM during UE context relocation on BB/DBEAM.
+ */
+typedef struct {
+
+    uint   UeId;
+    uchar SegCnt;      /* Segment counter (1) */
+    uint enablePmiReporting; /* 0: disabled, 1:enabled */
+    uint  Spare[4];    /* For future extension, set to 0 */
+    uint L1CellDedicatedConfig_Len; /* byte length of L1CellDedicatedConfig[] */
+    /* L1 parameters */
+    uchar L1CellDedicatedConfig[]; /* contains bb_nr5g_CELL_DEDICATED_CONFIGt (variable length) according to bb-nr5g_struct.h interface. */
+} nr5g_rlcmac_Cmac_UE_CONTEXT_CMD_t;
+
+/*
+nr5g_rlcmac_Cmac_SEG_UE_CONTEXT_REQ:
+This primitive is used to request a segment of UE_CONTEXT_CMD.
+*/
+typedef struct {
+
+    uint   UeId;
+    uchar  SegCnt;     /* Segment counter (1) */
+    uchar  Spare[31];  /* For future extension, set to 0 */
+    uchar  Data[];     /* contains a segment of UE_CONTEXT_CMD. */
+} nr5g_rlcmac_Cmac_SEG_UE_CONTEXT_REQ_t;
+
+/* 
+ *  Notes:
+ *
+ * 1) Segment counter: count remaining segments of the UE_CONTEXT_CMD.
+ *
+ *    UE_CONTEXT_CMD can be segmented in one initial UE_CONTEXT_CMD and one or more SEG_UE_CONTEXT_REQ.
+ *    The same segmentation mechanism of CONFIG_CMD and SEG_CONFIG_CMD is used, see Note 1 of SEG_CONFIG_CMD.
+ * */
+
+/*
+ * nr5g_rlcmac_Cmac_UE_CONTEXT_IND
+This primitive is used to ask for a UE_CONTEXT_CMD.
+Used to start the procedure of UE relocation on BB/DBEAM.
+ */
+typedef struct {
+    uint            UeId;
+    uchar           CellGroupId; // 0: MCG 1:SCG
+} nr5g_rlcmac_Cmac_UE_CONTEXT_IND_t;
 
 /*------------------------------------------------------------------*
  |  SUMMARY OF PRIMITIVES                                           |
@@ -1140,9 +1321,13 @@ typedef union {
     nr5g_rlcmac_Cmac_CELL_STATUS_IND_t             CellStatusInd;
     nr5g_rlcmac_Cmac_CELL_STATUS_REQ_t             CellStatusReq;
     nr5g_rlcmac_Cmac_CELL_STATUS_t                 CellStatusCnf;
+    nr5g_rlcmac_Cmac_UE_CONTEXT_CMD_t              UeContextCmd;
+    nr5g_rlcmac_Cmac_SEG_UE_CONTEXT_REQ_t          SegUeContextCmd;
+    nr5g_rlcmac_Cmac_UE_CONTEXT_IND_t              UeContextInd;
+    nr5g_rlcmac_Cmac_URLLC_CHECK_CMD_t             UrllcCheckCmd;
 
-    nr5g_rlcmac_Cmac_RACH_ACC_CMDt                 RachAccCmd;
-    nr5g_rlcmac_Cmac_RACH_ACC_INDt                 RachAccInd;
+    nr5g_rlcmac_Cmac_RACH_ACC_CMDt             RachAccCmd;
+    nr5g_rlcmac_Cmac_RACH_ACC_INDt             RachAccInd;
     
     nr5g_rlcmac_Cmac_L1T_START_TEST_CMD_t         StartTestCmd;
     nr5g_rlcmac_Cmac_L1T_STOP_TEST_CMD_t          StopTestCmd;
@@ -1152,18 +1337,22 @@ typedef union {
     nr5g_rlcmac_Cmac_L1L2T_CONF_START_TEST_CMD_t  ConfStartCmd;
     nr5g_rlcmac_Cmac_L1L2T_CONF_STOP_TEST_CMD_t   ConfStopCmd;
     nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_CMD_t     L2BinDumpCfg;
+    nr5g_rlcmac_Cmac_L1T_SCAN_ONGOING_t           ScanOngoing;
+    nr5g_rlcmac_Cmac_L1T_START_BFW_t              StartBfw;
+    nr5g_rlcmac_Cmac_L1T_BFW_END_t                EndBfw;
+    nr5g_rlcmac_Cmac_L1T_ABORT_BFW_REQ_t          AbortBfwReq;
 
     nr5g_rlcmac_Cmac_L1L2T_CONF_START_PRACH_TEST_CMD_t ConfStartPrachCmd;
     nr5g_rlcmac_Cmac_L1L2T_CONF_STOP_PRACH_TEST_CMD_t   ConfStopPrachCmd;
     nr5g_rlcmac_Cmac_L1L2T_RACH_START_LOOP_CMD_t        ConfRachStartLoop;
     nr5g_rlcmac_Cmac_L1L2T_PUCCH_START_CMD_t        ConfPucchStart;
-
+    
     nr5g_rlcmac_Cmac_STAT_CELL_REQt                StatCellReq;
     nr5g_rlcmac_Cmac_STAT_DBEAM_INDt               StatDbeamInd;
     nr5g_rlcmac_Cmac_STAT_UE_REQt                  StatUeReq;
     nr5g_rlcmac_Cmac_STAT_UE_HI_INDt               StatUeHiInd;
     nr5g_rlcmac_Cmac_STAT_UE_LO_INDt               StatUeLoInd;
-
+    
 } nr5g_rlcmac_Cmac_PRIMu;
 
 #pragma    pack()

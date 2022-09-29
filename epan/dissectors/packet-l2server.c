@@ -225,8 +225,8 @@ static int hf_l2server_scell_cfg_del = -1;
 
 
 static int hf_l2server_ph_cell_config = -1;
-static int hf_l2server_ph_cell_dcp_config_present = -1;
-static int hf_l2server_ph_pdcch_blind_detection_present = -1;
+static int hf_l2server_ph_cell_dcp_config_setup = -1;
+static int hf_l2server_ph_pdcch_blind_detection_setup = -1;
 static int hf_l2server_harq_ack_spatial_bundling_pucch = -1;
 static int hf_l2server_harq_ack_spatial_bundling_pusch = -1;
 static int hf_l2server_pmax_nr = -1;
@@ -249,10 +249,10 @@ static int hf_l2server_sp_cell_cfg_dl_ded_present = -1;
 static int hf_l2server_sp_cell_cfg_ul_ded_present = -1;
 static int hf_l2server_sp_cell_cfg_sup_ul_present = -1;
 static int hf_l2server_sp_cell_cfg_cross_carrier_sched_present = -1;
-static int hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_present = -1;
-static int hf_l2server_sp_cell_cfg_dormantbwp_present = -1;
-static int hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_present = -1;
-static int hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_present = -1;
+static int hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_setup= -1;
+static int hf_l2server_sp_cell_cfg_dormantbwp_setup = -1;
+static int hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_setup = -1;
+static int hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_setup = -1;
 
 static int hf_l2server_sp_cell_cfg_tdd = -1;
 static int hf_l2server_sp_cell_cfg_dl = -1;
@@ -299,7 +299,7 @@ static int hf_l2server_serv_cell_bwp_ul_present = -1;
 static int hf_l2server_serv_cell_freqinfo_sul_present = -1;
 static int hf_l2server_serv_cell_bwp_sul_present = -1;
 static int hf_l2server_serv_cell_tdd_present = -1;
-static int hf_l2server_serv_cell_tomatcharound_present = -1;
+static int hf_l2server_serv_cell_tomatcharound_setup= -1;
 static int hf_l2server_serv_cell_hs_r16_present = -1;
 
 static int hf_l2server_config_cmd_type = -1;
@@ -511,9 +511,9 @@ static int hf_l2server_mac_config = -1;
 static int hf_l2server_lch_basedprioritization_r16 = -1;
 
 static int hf_l2server_initial_dl_bwp_present = -1;
-static int hf_l2server_pdsch_present = -1;
-static int hf_l2server_pdcch_present = -1;
-static int hf_l2server_csi_meas_config_present = -1;
+static int hf_l2server_pdsch_setup = -1;
+static int hf_l2server_pdcch_setup= -1;
+static int hf_l2server_csi_meas_config_setup = -1;
 
 static int hf_l2server_first_active_dl_bwp = -1;
 static int hf_l2server_nb_dl_bwp_scs_spec_carrier = -1;
@@ -2531,8 +2531,9 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_4, tvb, offset, 4,
                                  ENC_LITTLE_ENDIAN, &fieldmask);
     gboolean dcp_config_present, pdcch_blind_detection_present;
-    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_ph_cell_dcp_config_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dcp_config_present);
-    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_ph_pdcch_blind_detection_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &pdcch_blind_detection_present);
+    // TODO: add release flags here too...
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_ph_cell_dcp_config_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dcp_config_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_ph_pdcch_blind_detection_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &pdcch_blind_detection_present);
     offset += 4;
 
     // HarqACKSpatialBundlingPUCCH
@@ -2686,19 +2687,19 @@ static int dissect_pdcch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_
     offset += (bb_nr5g_DED_CTRL_RES_SET_SIZE*1);
 
     // DownlinkPreemption
-    if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_DOWNLINK_PREEMPTION_PRESENT) {
+    if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_DOWNLINK_PREEMPTION_SETUP) {
         offset += sizeof(bb_nr5g_DOWNLINK_PREEMPTIONt);
     }
     // TpcPusch
-    if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_PUSCH_PRESENT) {
+    if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_PUSCH_SETUP) {
         offset += sizeof(bb_nr5g_PUSCH_TPC_CFGt);
     }
     // TpcPucch
-    if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_PUCCH_PRESENT) {
+    if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_PUCCH_SETUP) {
         offset += sizeof(bb_nr5g_PUCCH_TPC_CFGt);
     }
     // TpcSrs
-    if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_SRS_PRESENT) {
+    if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_SRS_SETUP) {
         offset += sizeof(bb_nr5g_SRS_TPC_CFGt);
     }
 
@@ -2957,7 +2958,7 @@ static int dissect_bwp_dl_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info
         offset += sizeof(bb_nr5g_SPS_CONFIG_INDEXt);
     }
     // PdcchConfDedR16
-    if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_R16_PRESENT) {
+    if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDCCH_CONF_DEDICATED_R16_PRESENT) {
         // TODO: (bb_nr5g_PDCCH_CONF_DEDICATED_R16t)
         offset += sizeof(bb_nr5g_PDCCH_CONF_DEDICATED_R16t);
     }
@@ -3527,7 +3528,7 @@ static int dissect_codebook_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     return offset;
 }
 
-// bb_nr5g_BWP_DOWNLINKCOMMONt
+// bb_nr5g_BWP_DOWNLINKCOMMONt (from bb-nr5g_struct.h)
 static int dissect_bwp_downlinkcommon(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                       guint offset, const char* label, gboolean present, gboolean serialized _U_)
 {
@@ -3551,12 +3552,12 @@ static int dissect_bwp_downlinkcommon(proto_tree *tree, tvbuff_t *tvb, packet_in
         offset = dissect_genbwp(bwp_dl_common_tree, tvb, pinfo, offset);
 
         // PdcchConfCommon (bb_nr5g_PDCCH_CONF_COMMONt)
-        if (field_mask_4 & bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDCCH_CFG_PRESENT) {
+        if (field_mask_4 & bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDCCH_CFG_SETUP) {
             offset = dissect_pdcch_conf_common(bwp_dl_common_tree, tvb, pinfo, offset, FALSE);
         }
 
         // PdschConfCommon (bb_nr5g_PDSCH_CONF_COMMONt) (apparently present regardless!)
-        if (field_mask_4 & bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDSCH_CFG_PRESENT) {
+        if (field_mask_4 & bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDSCH_CFG_SETUP) {
             gint pdsch_offset = offset;
 
             // Subtree.
@@ -4241,18 +4242,18 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
     proto_tree_add_item(config_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 
     gboolean tdd_ded_present, dl_ded_present, ul_ded_present, sup_ul_present;
-    gboolean cross_carrier_sched_present, lte_crs_tomatcharound_present;
-    gboolean dormantbwp_present, lte_crs_pattern_list1_present, lte_crs_pattern_list2_present;
+    gboolean cross_carrier_sched_present, lte_crs_tomatcharound_setup;
+    gboolean dormantbwp_setup, lte_crs_pattern_list1_setup, lte_crs_pattern_list2_setup;
 
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_tdd_ded_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &tdd_ded_present);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_dl_ded_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dl_ded_present);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_ul_ded_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &ul_ded_present);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_sup_ul_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &sup_ul_present);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_cross_carrier_sched_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &cross_carrier_sched_present);
-    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &lte_crs_tomatcharound_present);
-    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_dormantbwp_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dormantbwp_present);
-    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &lte_crs_pattern_list1_present);
-    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &lte_crs_pattern_list2_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &lte_crs_tomatcharound_setup);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_dormantbwp_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dormantbwp_setup);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &lte_crs_pattern_list1_setup);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &lte_crs_pattern_list2_setup);
     offset += 4;
 
     // ServCellIdx
@@ -4355,9 +4356,9 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         guint32 field_mask;
         proto_tree_add_item_ret_uint(ded_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN, &field_mask);
         proto_tree_add_item(ded_tree, hf_l2server_initial_dl_bwp_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-        proto_tree_add_item(ded_tree, hf_l2server_pdsch_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-        proto_tree_add_item(ded_tree, hf_l2server_pdcch_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-        proto_tree_add_item(ded_tree, hf_l2server_csi_meas_config_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(ded_tree, hf_l2server_pdsch_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(ded_tree, hf_l2server_pdcch_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(ded_tree, hf_l2server_csi_meas_config_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN);
         offset += 4;
 
         // FirstActiveDlBwp
@@ -4409,16 +4410,16 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
             offset = dissect_bwp_dl_dedicated(ded_tree, tvb, pinfo, offset, "Initial DL BWP", TRUE);
         }
         // PdschServingCellCfg
-        if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDSCH_PRESENT) {
+        if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDSCH_SETUP) {
             offset = dissect_pdsch_dedicated(ded_tree, tvb, pinfo, offset);
         }
         // PdcchServingCellCfg
-        if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDCCH_PRESENT) {
+        if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDCCH_SETUP) {
             offset = dissect_pdcch_dedicated(ded_tree, tvb, pinfo, offset);
 
         }
         // CsiMeasCfg
-        if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_CSI_MEAS_CFG_PRESENT) {
+        if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_CSI_MEAS_CFG_SETUP) {
             offset = dissect_csi_meas_config(ded_tree, tvb, pinfo, offset);
         }
 
@@ -4499,7 +4500,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
     }
 
     // LteCrsToMatchAround (bb_nr5g_RATE_MATCH_PATTERN_LTEt)
-    if (lte_crs_tomatcharound_present) {
+    if (lte_crs_tomatcharound_setup) {
         /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_lte_crs_tomatcharound, tvb,
                                                               offset, sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt),
                                                               "", "tomatcharound");
@@ -4508,7 +4509,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
     }
 
     // DormantBWP_Config_r16 (bb_nr5g_DORMANTBWP_CONFIGt)
-    if (dormantbwp_present) {
+    if (dormantbwp_setup) {
         /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_dormantbwp, tvb,
                                                               offset, sizeof(bb_nr5g_DORMANTBWP_CONFIGt),
                                                               "", "Dormant-BWP Config");
@@ -4517,7 +4518,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
     }
 
     // LteCrsPatternList1_r16 (bb_nr5g_RATE_MATCH_PATTERN_LTEt)
-    if (lte_crs_pattern_list1_present) {
+    if (lte_crs_pattern_list1_setup) {
         /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list1, tvb,
                                                               offset, sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt),
                                                               "", "LTE CRS Pattern List1");
@@ -4526,7 +4527,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
     }
 
     // LteCrsPatternList2_r16 (bb_nr5g_RATE_MATCH_PATTERN_LTEt)
-    if (lte_crs_pattern_list2_present) {
+    if (lte_crs_pattern_list2_setup) {
         /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list2, tvb,
                                                               offset, sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt),
                                                               "", "LTE CRS Pattern List2");
@@ -5084,7 +5085,7 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
     // FieldMask
     guint32 fieldmask;
     gboolean freqinfo_dl_present, bwp_dl_present, freqinfo_ul_present, bwp_ul_present, freqinfo_sul_present, bwp_sul_present,
-             tdd_present, tomatcharound_present, hs_r16_present;
+             tdd_present, tomatcharound_setup, hs_r16_present;
     proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN, &fieldmask);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_freqinfo_dl_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &freqinfo_dl_present);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_bwp_dl_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &bwp_dl_present);
@@ -5093,7 +5094,7 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_freqinfo_sul_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &freqinfo_sul_present);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_bwp_sul_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &bwp_sul_present);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_tdd_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &tdd_present);
-    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_tomatcharound_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &tomatcharound_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_tomatcharound_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &tomatcharound_setup);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_hs_r16_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &hs_r16_present);
 
 
@@ -5285,7 +5286,7 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
     offset += (bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS * sizeof(bb_nr5g_RATE_MATCH_PATTERNt));
 
     // LteCrsToMatchAround
-    if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_COMMON_TOMATCHAROUND_PRESENT)) {
+    if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_COMMON_TOMATCHAROUND_SETUP)) {
         // TODO:
         offset += sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt);
     }
@@ -7150,8 +7151,8 @@ static TYPE_FUN aux_type_funs[] =
     { nr5g_rlcmac_Data_RA_IND,               "nr5g_rlcmac_Data_RA_IND",               dissect_ra_ind},
     { nr5g_rlcmac_Data_RE_EST_IND,           "nr5g_rlcmac_Data_RE_EST_IND",           dissect_re_est_ind /* TODO */},
     { nr5g_rlcmac_Data_RE_EST_END_IND,       "nr5g_rlcmac_Data_RE_EST_END_IND",       dissect_re_est_ind /* TODO */},
-    { nr5g_rlcmac_Data_RLC_BUFFER_REQ,       "nr5g_rlcmac_Data_RLC_BUFFER_REQ",       dissect_sapi_type_dummy /* TODO */},
-    { nr5g_rlcmac_Data_RLC_BUFFER_IND,       "nr5g_rlcmac_Data_RLC_BUFFER_IND",       dissect_sapi_type_dummy /* TODO */},
+    //{ nr5g_rlcmac_Data_RLC_BUFFER_REQ,       "nr5g_rlcmac_Data_RLC_BUFFER_REQ",       dissect_sapi_type_dummy /* TODO */},
+    //{ nr5g_rlcmac_Data_RLC_BUFFER_IND,       "nr5g_rlcmac_Data_RLC_BUFFER_IND",       dissect_sapi_type_dummy /* TODO */},
     { 0x00,                               NULL,                             NULL }
 };
 #define MAX_AUX_TYPE_VALS      array_length(aux_type_funs)
@@ -8123,12 +8124,12 @@ proto_register_l2server(void)
       { &hf_l2server_ph_cell_config,
         { "PH Cell Config", "l2server.ph-cell-config", FT_STRING, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
-      { &hf_l2server_ph_cell_dcp_config_present,
-        { "DCP Config Present", "l2server.field-mask.dcp-config-present", FT_BOOLEAN, 8,
-          NULL, bb_nr5g_STRUCT_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16_PRESENT, NULL, HFILL }},
-      { &hf_l2server_ph_pdcch_blind_detection_present,
-        { "PDCCH Blind Detection Present", "l2server.field-mask.pdcch-blind-detection-present", FT_BOOLEAN, 8,
-          NULL, bb_nr5g_STRUCT_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_PRESENT, NULL, HFILL }},
+      { &hf_l2server_ph_cell_dcp_config_setup,
+        { "DCP Config Present", "l2server.field-mask.dcp-config-setup", FT_BOOLEAN, 8,
+          NULL, bb_nr5g_STRUCT_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16_SETUP, NULL, HFILL }},
+      { &hf_l2server_ph_pdcch_blind_detection_setup,
+        { "PDCCH Blind Detection Setup", "l2server.field-mask.pdcch-blind-detection-setup", FT_BOOLEAN, 8,
+          NULL, bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_SETUP, NULL, HFILL }},
       { &hf_l2server_harq_ack_spatial_bundling_pucch,
         { "HARQ ACK Spacial Bundling PUCCH", "l2server.harq-ack-spatial-bundling-pucch", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
@@ -8190,18 +8191,18 @@ proto_register_l2server(void)
       { &hf_l2server_sp_cell_cfg_cross_carrier_sched_present,
         { "Cross Carriers Sched Present", "l2server.sp-cell-cfg-ded.cross-carrier-sched-present", FT_BOOLEAN, 32,
           NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_CROSS_CARRIER_SCHED_PRESENT, NULL, HFILL }},
-      { &hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_present,
-        { "LTE CRS tomatcharound Present", "l2server.sp-cell-cfg-ded.lte-crs-tomatcharound-present", FT_BOOLEAN, 32,
-          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_TOMATCHAROUND_PRESENT, NULL, HFILL }},
-      { &hf_l2server_sp_cell_cfg_dormantbwp_present,
-        { "DormantBWP Present", "l2server.sp-cell-cfg-ded.dormantbwp-present", FT_BOOLEAN, 32,
-          NULL, bb_nr5g_STRUCT_DORMANTBWP_CONFIG_PRESENT, NULL, HFILL }},
-      { &hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_present,
-        { "CRS Pattern List1 Present", "l2server.sp-cell-cfg-ded.crs-pattern-list1-present", FT_BOOLEAN, 32,
-          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_PATTERN_LIST1_PRESENT, NULL, HFILL }},
-      { &hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_present,
-        { "CRS Pattern List2 Present", "l2server.sp-cell-cfg-ded.crs-pattern-list2-present", FT_BOOLEAN, 32,
-          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_PATTERN_LIST2_PRESENT, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_setup,
+        { "LTE CRS tomatcharound Setup", "l2server.sp-cell-cfg-ded.lte-crs-tomatcharound-setup", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_TOMATCHAROUND_SETUP, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_dormantbwp_setup,
+        { "DormantBWP Setup", "l2server.sp-cell-cfg-ded.dormantbwp-setup", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_DORMANTBWP_CONFIG_SETUP, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_setup,
+        { "CRS Pattern List1 Setup", "l2server.sp-cell-cfg-ded.crs-pattern-list1-setup", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_PATTERN_LIST1_SETUP, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_setup,
+        { "CRS Pattern List2 Setup", "l2server.sp-cell-cfg-ded.crs-pattern-list2-setup", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_PATTERN_LIST2_SETUP, NULL, HFILL }},
 
       { &hf_l2server_tdd_ul_dl_pattern,
         { "TDD UL DL Pattern", "l2server.tdd-ul-dl-pattern", FT_STRING, BASE_NONE,
@@ -8328,9 +8329,9 @@ proto_register_l2server(void)
       { &hf_l2server_serv_cell_tdd_present,
         { "TDD Common Present", "l2server.sp-cell-cfg-common.tdd-present", FT_BOOLEAN, 32,
           NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_TDD_COMMON_PRESENT, NULL, HFILL }},
-      { &hf_l2server_serv_cell_tomatcharound_present,
-        { "LTE CRS Common ToMatchAround Present", "l2server.sp-cell-cfg-common.lte-common-tomatcharound-present", FT_BOOLEAN, 32,
-          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_COMMON_TOMATCHAROUND_PRESENT, 0x0, HFILL }},
+      { &hf_l2server_serv_cell_tomatcharound_setup,
+        { "LTE CRS Common ToMatchAround Setup", "l2server.sp-cell-cfg-common.lte-common-tomatcharound-setup", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_TOMATCHAROUND_SETUP, 0x0, HFILL }},
       { &hf_l2server_serv_cell_hs_r16_present,
         { "High Speed Config R16 Present", "l2server.sp-cell-cfg-common.highspeed-config-r16-present", FT_BOOLEAN, 32,
           NULL, bb_nr5g_STRUCT_HIGH_SPEED_CONFIG_R16_PRESENT, 0x0, HFILL }},
@@ -8890,15 +8891,15 @@ proto_register_l2server(void)
       { &hf_l2server_initial_dl_bwp_present,
         { "Initial DL BWP Present", "l2server.initial-dl-bwp-present", FT_BOOLEAN, 32,
            NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_INITIAL_DL_BWP_PRESENT, NULL, HFILL }},
-      { &hf_l2server_pdsch_present,
-        { "PDSCH Present", "l2server.pdsch-present", FT_BOOLEAN, 32,
-           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDSCH_PRESENT, NULL, HFILL }},
-      { &hf_l2server_pdcch_present,
-        { "PDCCH Present", "l2server.pdcch-present", FT_BOOLEAN, 32,
-           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDCCH_PRESENT, NULL, HFILL }},
-      { &hf_l2server_csi_meas_config_present,
-        { "CSI Meas Config Present", "l2server.csi-meas-config-present", FT_BOOLEAN, 32,
-           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_CSI_MEAS_CFG_PRESENT, NULL, HFILL }},
+      { &hf_l2server_pdsch_setup,
+        { "PDSCH Setup", "l2server.pdsch-setup", FT_BOOLEAN, 32,
+           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDSCH_SETUP, NULL, HFILL }},
+      { &hf_l2server_pdcch_setup,
+        { "PDCCH Setup", "l2server.pdcch-setup", FT_BOOLEAN, 32,
+           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDCCH_SETUP, NULL, HFILL }},
+      { &hf_l2server_csi_meas_config_setup,
+        { "CSI Meas Config Setup", "l2server.csi-meas-config-setup", FT_BOOLEAN, 32,
+           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_CSI_MEAS_CFG_SETUP, NULL, HFILL }},
 
       { &hf_l2server_bwp_dl_dedicated,
         { "BWP DL Dedicated", "l2server.bwp-dl-dedicated", FT_STRING, BASE_NONE,

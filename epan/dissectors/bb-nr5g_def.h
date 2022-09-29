@@ -16,6 +16,11 @@ $Log$
 #ifndef  bb_nr5g_def_DEFINED
 #define  bb_nr5g_def_DEFINED
 
+/*
+ * The current bb-nr5g_def Interface version
+ */
+#define  bb_nr5g_def_VERSION       "1.0.1"
+
 /* General verbosity bitmask */
 #define bb_nr5g_GENVERB_MUTE_ALL          0x0000000000000001LL
 #define bb_nr5g_GENVERB_DEVONLY           0x0000000000000002LL
@@ -54,6 +59,8 @@ $Log$
 #define bb_nr5g_DLVERB_CELL_CFG           0x0000000000004000LL
 // LDPC accelerator
 #define bb_nr5g_DLVERB_LDPC_ACC           0x0000000000008000LL
+// create FFT dumps only for crc errors
+#define bb_nr5g_PDSCH_DUMPCRC             0x0000000000010000LL
 
 // L2-BB messages
 #define bb_nr5g_ULVERB_MSG_RX             0x0000000000000001LL
@@ -80,47 +87,6 @@ $Log$
 // UL CELL configuration
 #define bb_nr5g_ULVERB_CELL_CFG           0x0000000000000800LL
 
-/* Event triggered verbosity bitmask */
-
-// DL bindump on first RACH
-#define bb_nr5g_DLDUMP_RACH                 0x0000000000000001LL
-// DL bindump on first RRCsetup
-#define bb_nr5g_DLDUMP_RRCSETUP             0x0000000000000002LL
-// DL bindump on 100th attached UE
-#define bb_nr5g_DLDUMP_100UE                0x0000000000000004LL
-// DL bindump on 500th attached UE
-#define bb_nr5g_DLDUMP_500UE                0x0000000000000008LL
-// DL bindump on 2000th attached UE
-#define bb_nr5g_DLDUMP_2000UE               0x0000000000000010LL
-// DL bindump on 20th CRC error on PDSCH in one second
-#define bb_nr5g_DLDUMP_CRCERR_20            0x0000000000000020LL
-// DL bindump on 100th CRC error on PDSCH in one second
-#define bb_nr5g_DLDUMP_CRCERR_100           0x0000000000000040LL
-// DL bindump MASK
-#define bb_nr5g_DLDUMP_MASK                 0x000000000000007FLL
-// UL bindump on first RACH
-#define bb_nr5g_ULDUMP_RACH                 0x0000000000000080LL
-// UL bindump on first RRCsetup
-#define bb_nr5g_ULDUMP_RRCSETUP             0x0000000000000100LL
-// UL bindump on 100th attached UE
-#define bb_nr5g_ULDUMP_100UE                0x0000000000000200LL
-// UL bindump on 500th attached UE
-#define bb_nr5g_ULDUMP_500UE                0x0000000000000400LL
-// UL bindump on 2000th attached UE
-#define bb_nr5g_ULDUMP_2000UE               0x0000000000000800LL
-// UL bindump MASK
-#define bb_nr5g_ULDUMP_MASK                 0x0000000000000F80LL
-// unused
-#define bb_nr5g_RES1                        0x0000000000001000LL
-// unused
-#define bb_nr5g_RES2                        0x0000000000002000LL
-// unused
-#define bb_nr5g_RES3                        0x0000000000004000LL
-// unused
-#define bb_nr5g_RES4                        0x0000000000008000LL
-// create FFT dumps only for crc errors
-#define bb_nr5g_PDSCH_DUMPCRC               0x0000000000010000LL
-
 
 #define bb_nr5g_RNTI_C_RNTI         0
 #define bb_nr5g_RNTI_SI_RNTI        1   /* SIB1 and oSIB */
@@ -133,6 +99,11 @@ $Log$
 #define bb_nr5g_RNTI_TPCPUCCH       8   /* TCP for PUCCH DCI format 2_2 */
 #define bb_nr5g_RNTI_TPCPUSCH       9   /* TCP for PUSCH DCI format 2_2 */
 #define bb_nr5g_RNTI_TPCSRS        10   /* TPC SRS DCI format 2_3 */
+#define bb_nr5g_RNTI_SP_CSI_RNTI   11   /* Semi-Persistent CSI reporting on PUSCH */
+#define bb_nr5g_RNTI_CS_RNTI       12   /* Downlink SPS / Uplink configured grant */
+#define bb_nr5g_RNTI_MCS_C_RNTI    13   /* Use of qam64LowSE for grant-based transmissions */
+#define bb_nr5g_RNTI_CI_RNTI       14   /* UL cancellation */
+#define bb_nr5g_RNTI_PS_RNTI       15   /* Power Saving Information */
 
 /* bb_nr5g_RNTI_MEASSET defines */
 #define  bb_nr5g_RNTI_NUM_MCS             (29)  /*MCS range 0...28; [29,30,31] are reserved*/
@@ -150,6 +121,26 @@ $Log$
 #define  bb_nr5g_MAX_NB_CSI_CFGS          (16)  /* Maximum number of CSI elements configured in bb_nr5g_RNTI_MEASSETt*/
 #define  bb_nr5g_MAX_NUM_BEAM             (32)  /* Maximum number of beams handled by a DBEAM */
 #define  bb_nr5g_MAX_NB_CSI_SUBBAND       (18)  /* Maximum number of CSI subbands */
+
+/* UCI part1: 60 bits -> 8 Bytes (use 16 Bytes, doubled for future extensions) */
+#define bb_nr5g_CSIPART1_MAX_SIZE           (16)
+/* UCI part2 wideband: 199 bits needed by Type2 (type2-R16 needs only 34 bits for group0) -> 25 Bytes (use 64 Bytes, more than doubled for future extensions) */
+#define bb_nr5g_CSIPART2_WIDEBAND_MAX_SIZE  (64)
+/* UCI part2 subband: 1836 bits needed by Type2 (type2-R16 needs only 1645 bits) -> 230 Bytes (use 480 Bytes, more than doubled for future extensions)*/
+#define bb_nr5g_CSIPART2_SUBBAND_MAX_SIZE   (480)
+
+/* bb_nr5g_RNTI_MEASREPt defines */
+#define bb_nr5g_MXANT                       (4)
+#define bb_nr5g_MAX_RX_PORTS_X2             (2*bb_nr5g_MXANT)
+#define bb_nr5g_MAX_TX_PORTS_CSI_RS         (32)
+#define bb_nr5g_MAX_TX_PORTS_CSI_RS_X2      (2*bb_nr5g_MAX_TX_PORTS_CSI_RS)
+#define bb_nr5g_MAX_NUM_CSI_SUBBANDS        (18)
+#define bb_nr5g_MAX_L_TYPE2_CODEBOOK        (6)
+#define bb_nr5g_MAX_2L_TYPE2_CODEBOOK       (2*bb_nr5g_MAX_L_TYPE2_CODEBOOK)
+#define bb_nr5g_MAX_M_TYPE2_CODEBOOK        (10)
+#define bb_nr5g_MAX_LAYERS_TYPE2_CODEBOOK   (4)
+#define bb_nr5g_MAX_N3_TYPE2_CODEBOOK       (2*bb_nr5g_MAX_NUM_CSI_SUBBANDS)
+#define bb_nr5g_MAX_NUM_CRI                 (4)
 
 /* bb_nr5g_RNTI_ACT_DEACT_SCELL defines */
 #define  bb_nr5g_DEACT_COMMAND_SCELL        (0)  /* SCell is deactivated if it receives this flag in bb_nr5g_RNTI_ACT_DEACT_SCELLt*/
@@ -189,6 +180,8 @@ $Log$
 #define bb_nr5g_MAX_NB_SERVING_CELLS (32)
 /* 38.331 maxNrofRateMatchPatterns: Max number of rate matching patterns that may be configured */
 #define bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS (4)
+/* 38.331 maxNrofRateMatchPatternsPerGroup: Max number of rate matching patterns that may be configured in one group */
+#define bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP (8)
 /* 38.331 maxNrofMultiBands */
 #define bb_nr5g_MAX_NB_MULTIBANDS (8)
 /* 38.331 maxSCSs */
@@ -200,7 +193,7 @@ $Log$
 /* 38.331 maxNrofAggregatedCellsPerCellGroup*/
 #define bb_nr5g_MAX_AGG_CELLS_PER_GROUP (16)
 /* 38.331 maxNrofSlotFormatCombinationsPerSet*/
-#define bb_nr5g_MAX_SLOT_FMT_COMBS_PER_SET (4096)
+#define bb_nr5g_MAX_SLOT_FMT_COMBS_PER_SET (512)
 /* 38.331 maxNrofSlotFormatsPerCombination*/
 #define bb_nr5g_MAX_NB_SLOT_FMTS_PER_COMB (256)
 /* 38.331 maxNrofNZP-CSI-RS-Resources*/
@@ -243,7 +236,7 @@ $Log$
 #define bb_nr5g_MAX_PUCCH_P0_PERSET (8)
 /* 38.331 maxNrofPUCCH-PathlossReferenceRSs*/
 #define bb_nr5g_MAX_NB_PUCCH_PATHLOSS_REFERENCE_RS (4)
-/* 38.331 maxNrofSRS-TriggerStates*/
+/* 38.331 maxNrofSRS-TriggerStates-1*/
 #define bb_nr5g_MAX_NB_SRS_TRIGGER_STATES (3)
 /* 38.331 maxNrofCSI-IM-Resources*/
 #define bb_nr5g_MAX_NB_CSI_IM_RESOURCES (32)
@@ -327,6 +320,8 @@ $Log$
 #define bb_nr5g_MAX_SRS_RESOURCE_PER_SET (16)
 /* 38.331 maxNrofSRS-PosResources-r16 */
 #define bb_nr5g_MAX_SRS_POS_RESOURCES (64)
+/* 38.331 maxNrofSRS-PathlossReferenceRS-r16 */
+#define bb_nr5g_MAX_SRS_PATHLOSS_REFERENCE_RS (64)
 
 /* R16 end */
 
@@ -522,24 +517,28 @@ $Log$
 #define bb_nr5g_SRS_TRANSMISSION_COMB_N8        (2)
 #define bb_nr5g_SRS_TRANSMISSION_COMB_DEFAULT   (0xff)
 
-#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT1    (0)
-#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT2    (1)
-#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT4    (2)
-#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT5    (3)
-#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT8    (4)
-#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT10    (5)
-#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT16    (6)
-#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT20    (7)
-#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT32    (8)
-#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT40    (9)
-#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT64    (10)
-#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT80    (11)
-#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT160    (12)
-#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT320    (13)
-#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT640    (14)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT1       (0)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT2       (1)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT4       (2)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT5       (3)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT8       (4)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT10      (5)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT16      (6)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT20      (7)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT32      (8)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT40      (9)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT64      (10)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT80      (11)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT160     (12)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT320     (13)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT640     (14)
 #define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT1280    (15)
 #define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT2560    (16)
-#define bb_nr5g_SRS_PERIODICITYANDOFFSET_DEFAULT  (0xff)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT5120    (17)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT10240   (18)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT40960   (19)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_SLOT81920   (20)
+#define bb_nr5g_SRS_PERIODICITYANDOFFSET_DEFAULT     (0xff)
 
 #define bb_nr5g_SRS_RESOURCETYPE_APERIODIC        (0)
 #define bb_nr5g_SRS_RESOURCETYPE_SEMIPERSISTENT    (1)
@@ -584,57 +583,57 @@ $Log$
 #define bb_nr5g_CSI_RS_REPORT_PERIODICITYANDOFFSET_DEFAULT  (0xff)
 
 /* 38.331 ReportQuantity and ReportQuantity-r16 */
-#define bb_nr5g_CSI_REPORT_CFG_QUANTITY_NONE    		(0)
+#define bb_nr5g_CSI_REPORT_CFG_QUANTITY_NONE            (0)
 #define bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_PMI_CQI  (1)
-#define bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_I1    	(2)
+#define bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_I1       (2)
 #define bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_I1_CQI   (3)
-#define bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_CQI    	(4)
-#define bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RSRP    	(5)
+#define bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_CQI      (4)
+#define bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RSRP        (5)
 #define bb_nr5g_CSI_REPORT_CFG_QUANTITY_SSBINDEX_RSRP   (6)
 #define bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_LII_PMI_CQI (7)
 #define bb_nr5g_CSI_REPORT_CFG_QUANTITY_R16_CRI_SINR        (8)
 #define bb_nr5g_CSI_REPORT_CFG_QUANTITY_R16_SSB_INDEX_SINR  (9)
 #define bb_nr5g_CSI_REPORT_CFG_QUANTITY_DEFAULT   (0xff)
 
-#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_3    		(0)
-#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_4    		(1)
-#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_5    		(2)
-#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_6    		(3)
-#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_7    		(4)
-#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_8    		(5)
-#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_9    		(6)
-#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_10    		(7)
-#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_11    		(8)
-#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_12    		(9)
-#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_13    		(10)
-#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_14    		(11)
-#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_15    		(12)
-#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_16    		(13)
-#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_17    		(14)
-#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_18    		(15)
-#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_19    		(16)
-#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_DEFAULT   (0xff)    		
+#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_3            (0)
+#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_4            (1)
+#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_5            (2)
+#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_6            (3)
+#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_7            (4)
+#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_8            (5)
+#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_9            (6)
+#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_10           (7)
+#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_11           (8)
+#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_12           (9)
+#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_13           (10)
+#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_14           (11)
+#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_15           (12)
+#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_16           (13)
+#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_17           (14)
+#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_18           (15)
+#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_19           (16)
+#define bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_DEFAULT   (0xff)         
 
-#define bb_nr5g_CSI_REPORT_CFG_GROUP_BEAM_REP_ENABLE    		(0)
-#define bb_nr5g_CSI_REPORT_CFG_GROUP_BEAM_REP_DISABLE    		(1)
-#define bb_nr5g_CSI_REPORT_CFG_GROUP_BEAM_REP_DEFAULT    		(0xff)
+#define bb_nr5g_CSI_REPORT_CFG_GROUP_BEAM_REP_ENABLE            (0)
+#define bb_nr5g_CSI_REPORT_CFG_GROUP_BEAM_REP_DISABLE           (1)
+#define bb_nr5g_CSI_REPORT_CFG_GROUP_BEAM_REP_DEFAULT           (0xff)
 
-#define bb_nr5g_CSI_REPORT_CFG_PORT_INDEX_RANKS_2    		    (0)
-#define bb_nr5g_CSI_REPORT_CFG_PORT_INDEX_RANKS_4    		    (1)
-#define bb_nr5g_CSI_REPORT_CFG_PORT_INDEX_RANKS_8    		    (2)
-#define bb_nr5g_CSI_REPORT_CFG_PORT_INDEX_RANKS_DEFAULT    		(0xff)
+#define bb_nr5g_CSI_REPORT_CFG_PORT_INDEX_RANKS_2               (0)
+#define bb_nr5g_CSI_REPORT_CFG_PORT_INDEX_RANKS_4               (1)
+#define bb_nr5g_CSI_REPORT_CFG_PORT_INDEX_RANKS_8               (2)
+#define bb_nr5g_CSI_REPORT_CFG_PORT_INDEX_RANKS_DEFAULT         (0xff)
 
 #define bb_nr5g_CSI_RESOURCE_CFG_RES_SET_LIST_NZP_CSI_RS_SSB   (0)
-#define bb_nr5g_CSI_RESOURCE_CFG_RES_SET_LIST_CSI_IM    		(1)
-#define bb_nr5g_CSI_RESOURCE_CFG_RES_SET_LIST_DEFAULT    		(0xff)
+#define bb_nr5g_CSI_RESOURCE_CFG_RES_SET_LIST_CSI_IM            (1)
+#define bb_nr5g_CSI_RESOURCE_CFG_RES_SET_LIST_DEFAULT           (0xff)
 
 #define bb_nr5g_CSI_ASSOCIATED_REPORT_CFG_INFO_RES_FOR_CHANNEL_NZP_CSI_RS   (0)
 #define bb_nr5g_CSI_ASSOCIATED_REPORT_CFG_INFO_RES_FOR_CHANNEL_CSI_SSB  (1)
-#define bb_nr5g_CSI_ASSOCIATED_REPORT_CFG_INFO_RES_FOR_CHANNEL_DEFAULT    		(0xff)
+#define bb_nr5g_CSI_ASSOCIATED_REPORT_CFG_INFO_RES_FOR_CHANNEL_DEFAULT          (0xff)
 
 #define bb_nr5g_CODEBOOK_SUBTYPE1_MORETHANTWO_ANT_PORTS_TYPEI_ABSENT    (0)
 #define bb_nr5g_CODEBOOK_SUBTYPE1_MORETHANTWO_ANT_PORTS_TYPEI_PRESENT   (1)
-#define bb_nr5g_CODEBOOK_SUBTYPE1_MORETHANTWO_ANT_PORTS_TYPEI_DEFAULT	(0xff)
+#define bb_nr5g_CODEBOOK_SUBTYPE1_MORETHANTWO_ANT_PORTS_TYPEI_DEFAULT   (0xff)
 
 #define bb_nr5g_CODEBOOK_SUBTYPE1_MORETHANTWO_ANT_PORTS_N1N2_TWO_ONE_T1   (0)
 #define bb_nr5g_CODEBOOK_SUBTYPE1_MORETHANTWO_ANT_PORTS_N1N2_TWO_TWO_T1   (1)

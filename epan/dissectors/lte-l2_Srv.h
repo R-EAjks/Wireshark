@@ -1,12 +1,12 @@
 /********************************************************************
 $Source$
-$Author: rohgomes $
-$Date: 2021/09/05 $
+$Author$
+$Date$
 ---------------------------------------------------------------------
 Project :       LTE SERVER
 Description :   The CLIENT INTERFACE - lte_l2_Srv.h
 ---------------------------------------------------------------------
-$Revision: #1 $
+$Revision$
 $State$
 $Name$
 ---------------------------------------------------------------------
@@ -16,13 +16,15 @@ $Log$
 #ifndef  lte_l2_Srv_DEFINED
 #define  lte_l2_Srv_DEFINED
 
-//#include "qnx_gen.h"
+#include "qnx_gen.h" 
 #include "lte.h"
 #include "lte-rlcmac_Cmac.h"
 #include "lte-pdcp_Com.h"
 #include "nr5g-rlcmac_Cmac.h"
+#include "nr5g-rlcmac_Crlc.h"
 
 #pragma  pack(1)
+
 
 /********************************************************************
  * THE CLIENT INTERFACE
@@ -40,7 +42,7 @@ $Log$
 /*
  * The current Server Interface version
  */
-#define     lte_l2_Srv_VERSION       "1.33.0"
+#define     lte_l2_Srv_VERSION       "1.35.0"
 
 /*
  * The default TCP Port
@@ -50,11 +52,15 @@ $Log$
 /*
  * Max client message length
  */
-#define     lte_l2_Srv_MSGSIZE       (22*1024)
+#define     lte_l2_Srv_MSGSIZE       (40*1024)
 
 
-#define TYPE_ACK	0x0100
-#define TYPE_NAK	0x0200
+#define TYPE_ACK    0x0100
+#define TYPE_NAK    0x0200
+
+
+#define TYPE_ACK    0x0100
+#define TYPE_NAK    0x0200
 
 
 
@@ -404,11 +410,11 @@ $Log$
 
 #define lte_l2_Srv_RCP_UE_SET_GROUP_CMD (57)
 #define lte_l2_Srv_RCP_UE_SET_GROUP_ACK (lte_l2_Srv_RCP_UE_SET_GROUP_CMD | TYPE_ACK)
-#define lte_l2_Srv_RCP_UE_SET_GROUP_NAK	(lte_l2_Srv_RCP_UE_SET_GROUP_CMD | TYPE_NAK)
+#define lte_l2_Srv_RCP_UE_SET_GROUP_NAK (lte_l2_Srv_RCP_UE_SET_GROUP_CMD | TYPE_NAK)
 
-#define lte_l2_Srv_RCP_UE_SET_INDEX_CMD	(58)
-#define lte_l2_Srv_RCP_UE_SET_INDEX_ACK	(lte_l2_Srv_RCP_UE_SET_INDEX_CMD | TYPE_ACK)
-#define lte_l2_Srv_RCP_UE_SET_INDEX_NAK	(lte_l2_Srv_RCP_UE_SET_INDEX_CMD | TYPE_NAK)
+#define lte_l2_Srv_RCP_UE_SET_INDEX_CMD (58)
+#define lte_l2_Srv_RCP_UE_SET_INDEX_ACK (lte_l2_Srv_RCP_UE_SET_INDEX_CMD | TYPE_ACK)
+#define lte_l2_Srv_RCP_UE_SET_INDEX_NAK (lte_l2_Srv_RCP_UE_SET_INDEX_CMD | TYPE_NAK)
 
 
 /********************************************************************
@@ -438,6 +444,8 @@ $Log$
 
 #define  lte_l2_Srv_EAMM     -11     /* AMM/BRC features inconsistency */
 #define  lte_l2_Srv_ENBIOT   -12     /* NB-IOT/BR features inconsistency */
+#define  lte_l2_Srv_L1L2_LTE_ITF_MISMATCH -13 /* LTE L1-L2 interface not compatible */
+#define  lte_l2_Srv_L1L2_NR_ITF_MISMATCH -14 /* NR L1-L2 interface not compatible */
 
 
 
@@ -460,6 +468,13 @@ $Log$
 #define  lte_l2_Srv_ESEND    9       /* Reported error sending message */
 #define  lte_l2_Srv_EFILE    10      /* Error managing file */
 
+#if defined DU_SIM
+typedef ushort lte_l2_Srv_CellId_TYPE; // JIRA[NR5GX0A-3769] cell id should be 16-bits only in TSTM-DUSIM interface
+#else
+typedef uchar lte_l2_Srv_CellId_TYPE; // "normal" cell id 8 bits  
+#endif
+
+
 typedef struct {
     uint    LocAddr;    /* Local UDP/IP Address 
                            (host order) */
@@ -473,19 +488,19 @@ typedef struct {
 } lte_l2_Srv_UDP_Parm_t;
 
 typedef struct {
-    ushort  PhyCellId;        /* cell identifier Physical Cell Id [0]*/
+    ushort  PhyCellId;        /* cell identifier Physical Cell Id [0] */
     uchar   SdrNeedCalibration; /* Indicate that it is needed to calibrate SDR where the cell is created
                                    -1 -> not available, 0 -> no calibration, 1 -> calibration */
     uchar   LaaFlag; /* LAA configuration
-					 0 = cell no LAA
-					 1 = cell LAA (this cell needs to have an associated cell that gives the synchronization)
-					 2 = cell that provides synchronization for a LAA cell that will be configured on the same SDR */
+                     0 = cell no LAA
+                     1 = cell LAA (this cell needs to have an associated cell that gives the synchronization)
+                     2 = cell that provides synchronization for a LAA cell that will be configured on the same SDR */
     uint    mode;           /* User or Network Mode */
     uchar   dl_Bandwidth;    /* Downlink trasmission bandwith configured 
                                (Number of Resource Block NRB)
                                (6, 15, 25, 50, 75, 100) */
 
-    uchar   Master;         /* Master Cell [0] 0: Slave -- 1: Master*/
+    uchar   OLcPrimary;     /* OLc Primary Cell [0] 0: Secondary -- 1: OLc Primary*/
     uchar   CellCfgMsk;     /* Cell configuration mask [2]*/
     uchar   spare1[1];
     
@@ -497,8 +512,8 @@ typedef struct {
     uint    sibWin;         /* New SIB acquiring window (Prop.) */
     uint    nSdr;           /* number of SDR for this cell */
     uchar   interferenceId; /* interference id group */
-    uchar   sdrIdx;			/* sdr idx */
-    uchar   localCellId;    /* Local cell index */
+    uchar   sdrIdx;         /* sdr idx */
+    lte_l2_Srv_CellId_TYPE   localCellId;    /* Local cell index */
     uchar   spare3;
     uchar   aggrId;         /* aggregation/sibling id (0
                                 => not "aggregable") */
@@ -526,7 +541,7 @@ typedef struct {
     /* MIB info, see TS 36.331, MasterInformationBlock ie */
     uchar   dl_Bandwidth;    /* Trasmission bandwidth (Number of Resource Block NRB)
                              (6, 15, 25, 50, 75, 100) */
-	uchar  spare;
+    uchar  spare;
 
 } lte_l2_Srv_Cell_State_t;
 
@@ -582,14 +597,14 @@ typedef struct {
     comgen_qnxPPUIDt        Ppu;         /* PPU number */
     lte_l2_Srv_UDP_Parm_t   Udp;         /* UDP transport parameters */
     uchar                   NumCell;     /* Number of Cells for this PPU */
-    uchar                   CellId[];    /* Start of the list of cells which
+    lte_l2_Srv_CellId_TYPE  CellId[];    /* Start of the list of cells which
                                           * will be used in the test (for
                                           * this instance) */
 } lte_l2_Srv_InstParmUdp_t;
 
 typedef struct {
     comgen_qnxPPUIDt        Ppu;         /* PPU number */
-    uchar                   CellId;
+    lte_l2_Srv_CellId_TYPE  CellId;
 } lte_l2_Srv_InstParmNet_t;
 
 typedef struct {
@@ -654,11 +669,11 @@ typedef struct {
 
 typedef struct
 {
-	union {
-		uint    UeId;           /* Ue Identifier (1) */
-		uint    CellId;         /* Cell Identifier */
-		uint    RcGroup;        /* Radio Condition Group */
-	}u;
+    union {
+        uint    UeId;           /* Ue Identifier (1) */
+        uint    CellId;         /* Cell Identifier */
+        uint    RcGroup;        /* Radio Condition Group */
+    }u;
 } lte_l2_Srv_ACKt;
 
 /*
@@ -675,11 +690,11 @@ typedef struct
  ****************/
 
 typedef struct {
-	union {
-		uint    UeId;           /* Ue Identifier (1) */
-		uint    CellId;         /* Cell Identifier */
-		uint    RcGroup;        /* Radio Condition Group */
-	}u;
+    union {
+        uint    UeId;           /* Ue Identifier (1) */
+        uint    CellId;         /* Cell Identifier */
+        uint    RcGroup;        /* Radio Condition Group */
+    }u;
     short   Err;            /* Error code */
 } lte_l2_Srv_NAKt;
 
@@ -786,15 +801,15 @@ typedef struct {
     
 /* UDG timeout configuration */
     uint    Alive;      /* Keep alive period timeout [s]               (3,4) *
-						 * NET side will be closed if NRetry timeout expire  *
-						 * before a keep alive indication arrive             */
-	uint    TxErr;      /* DATA transmission error timeout [s]         (3,13,5) */
-	uint    StartTO;    /* START_REQ retransmission timeout [s]        (3,14) */
-	uint    TermTO;     /* TERMIANTE_REQ retransmission timeout [s]    (3,15) */
-	uint    TermAckTO;  /* RESULT_IND retransmission error timeout [s] (3,16) */
-	uint    NLost;      /* Number of pkt lost after TO (Def=1)         (3,13) */
-	uint    NStartRetry;/* Number of START command retry (Def=3)       (3,14) */
-	uint    NTermRetry; /* Number of TERM command retry (Def=3)        (3,15) */
+                         * NET side will be closed if NRetry timeout expire  *
+                         * before a keep alive indication arrive             */
+    uint    TxErr;      /* DATA transmission error timeout [s]         (3,13,5) */
+    uint    StartTO;    /* START_REQ retransmission timeout [s]        (3,14) */
+    uint    TermTO;     /* TERMIANTE_REQ retransmission timeout [s]    (3,15) */
+    uint    TermAckTO;  /* RESULT_IND retransmission error timeout [s] (3,16) */
+    uint    NLost;      /* Number of pkt lost after TO (Def=1)         (3,13) */
+    uint    NStartRetry;/* Number of START command retry (Def=3)       (3,14) */
+    uint    NTermRetry; /* Number of TERM command retry (Def=3)        (3,15) */
 
 /* UDG Ramp configuration, useful to start high bandwith tests smootest    */
 /* UDG Global configuration of TUDG socket buf size (Default, see sysctl -a) */
@@ -819,7 +834,7 @@ typedef struct {
     #define lte_l2_Srv_CFLAG_RESv2ON  0x02   /* Enable RESULTv2 UDG stats */
     #define lte_l2_Srv_CFLAG_UDG_UM   0x04   /* Enable unsafe unacked UDG  (17) */
     #define lte_l2_Srv_CFLAG_IRAT     0x08   /* Enable IRAT mode           */
-    #define lte_l2_Srv_CFLAG_USLAVE   0x10   /* Enable IRAT SLAVE/[MASTER] */
+    #define lte_l2_Srv_CFLAG_USECONDARY   0x10   /* Enable IRAT SECONDARY/[PRIMARY] */
     #define lte_l2_Srv_CFLAG_FRGIPON  0x20   /* Enable NAT IP fragmentation */
     #define lte_l2_Srv_CFLAG_UDGV1    0x40   /* Enable xUDG to use IUDG V1 */
     #define lte_l2_Srv_CFLAG_STATRST  0x80   /* Enable CNTR reset on STAT_REQ */
@@ -828,6 +843,7 @@ typedef struct {
     #define lte_l2_Srv_CFLAG_MSW_MULBE 0x0400 /* Enable MSWITCH multibearer  */
     #define lte_l2_Srv_CFLAG_UDG_EITF  0x0800 /* Enable UDG Extended Interface (19) */
     #define lte_l2_Srv_CFLAG_UDG_MTCP  0x1000 /* Enable UDG internal MTCP lib (20) */
+    #define lte_l2_Srv_CFLAG_ETH_NET_ON 0x2000 /* Enable NUDG Eth traffic (D-389)*/
 
 } lte_l2_Srv_CFG_V4t;
 
@@ -961,12 +977,12 @@ typedef struct
 {
     ushort      Type;      /* Type for future ext set to lte_l2_Srv_VERSION_HASH */
     ushort      Spare;     /* Zero */
-    uint	HashCode;  /* Hash value of interfaces */
+    uint    HashCode;  /* Hash value of interfaces */
 } lte_l2_Srv_VERSION_TYPE1_INFO_CMDt;
 
 typedef struct
 {
-    uint	Spare;
+    uint    Spare;
 } lte_l2_Srv_VERSION_TYPE1_INFO_ACKt;
 
 typedef struct
@@ -1030,7 +1046,7 @@ typedef struct {
     uint    MaxPdcp;              /* Max number of PDCP (2,6) */
     uchar   NumStkPpu;            /* Number of elements of StkPpu[] list */
     comgen_qnxPPUIDt   StkPpu[];  /* PPU list where put the stack processes (higher level) (12) */
-/*  uchar   CellId[]; */          /* Start of the list of cell's CellId which
+/*  lte_l2_Srv_CellId_TYPE   CellId[]; */          /* Start of the list of cell's CellId which
                                    * will be used in the test */
 } lte_l2_Srv_SETPARM_05t;
 
@@ -1064,7 +1080,7 @@ typedef struct {
     uint    Spare[3];             /* Reserved set to 0 */
     uchar   NumStkPpu;            /* Number of elements of StkPpu[] list */
     comgen_qnxPPUIDt   StkPpu[];  /* PPU list where put the stack processes (higher level) (12) */
-/*  uchar   CellId[]; */          /* Start of the list of cell's CellId which
+/*  lte_l2_Srv_CellId_TYPE   CellId[]; */          /* Start of the list of cell's CellId which
                                    * will be used in the test */
 } lte_l2_Srv_SETPARM_06t;
 
@@ -1254,6 +1270,7 @@ typedef struct
     uint      CellId;         /* Cell Identifier */
     uint      L1Verbosity;    /* L1 Verbosity bit mask (see sdrLteVERB* defines from sdrLteStruct.h) */
     uint      L1UlReport;     /* Uplink report activation and format configuration (see sdrLteULREP* defines from sdrLteStruct.h) */ 
+    uint      Spare;         
 } lte_l2_Srv_CREATE_CELLt;
 
 /*********************************************
@@ -1292,7 +1309,7 @@ typedef struct
 
 typedef struct
 {
-    uchar       CellId[1];    /* Start of CellId list */
+    lte_l2_Srv_CellId_TYPE       CellId[1];    /* Start of CellId list */
 
 } lte_l2_Srv_CELL_LIST_ACKt;
 
@@ -1302,12 +1319,12 @@ typedef struct
 
 typedef struct
 {
-    uchar       CellId;       /* Cell Identifier */
+    lte_l2_Srv_CellId_TYPE       CellId;       /* Cell Identifier */
 } lte_l2_Srv_CELL_PARM_CMDt;
 
 typedef struct
 {
-    uchar                       CellId;         /* Cell Identifier */
+    lte_l2_Srv_CellId_TYPE      CellId;         /* Cell Identifier */
     lte_l2_Srv_Cell_Parm_t      Parm;           /* Cell parameters */
     char                        FadingSim[128]; /* ASCIIZ fading simulation file name */
 } lte_l2_Srv_CELL_PARM_ACKt;
@@ -1318,13 +1335,13 @@ typedef struct
 
 typedef struct
 {
-    uchar       CellId;       /* Cell Identifier */
+    lte_l2_Srv_CellId_TYPE       CellId;       /* Cell Identifier */
     
 } lte_l2_Srv_CELL_INFO_CMDt;
 
 typedef struct
 {
-    uchar                   CellId; /* Cell Identifier */
+    lte_l2_Srv_CellId_TYPE  CellId; /* Cell Identifier */
     lte_l2_Srv_Cell_State_t State;  /* Cell State */
     
 } lte_l2_Srv_CELL_INFO_ACKt;
@@ -1335,7 +1352,7 @@ typedef struct
 
 typedef struct
 {
-    uchar                   CellId; /* Cell Identifier */
+    lte_l2_Srv_CellId_TYPE  CellId; /* Cell Identifier */
     ushort                  UlCoeff[29]; /* Scale coefficients for Uplink [1] */
     ushort                  DlCoeff[29]; /* Scale coefficients for Downlink [2] */
 } lte_l2_Srv_CELL_ERRPROFt;
@@ -1363,7 +1380,7 @@ typedef struct
     uint            CellId;         /* Cell Identifier */
     #define lte_l2_Srv_LOG_UE   1   /* Log Ue Flag (2) */
     #define lte_l2_Srv_MBMS_UE  2   /* This UE is for MBMS */
-	uint            UeFlags;
+    uint            UeFlags;
     uint            StkInst;        /* stack process Instance (3) */
     uint            UdgStkInst;     /* UDG stack process Instance (3) */
 } lte_l2_Srv_CREATE_UEt;
@@ -1380,8 +1397,8 @@ typedef struct
  *     logged.
  *     
  * (3) This controls the stack process where the UE is located.
- * 	if split is abled UdgStkInst is instance of UDG, StkInst is instance of PDCP
- * 	if split isn't abled UdgStkInst isn't used , StkInst is instance of PDCP/UDG
+ *  if split is abled UdgStkInst is instance of UDG, StkInst is instance of PDCP
+ *  if split isn't abled UdgStkInst isn't used , StkInst is instance of PDCP/UDG
  */
 
 /*********************************************
@@ -1716,11 +1733,10 @@ typedef struct {
     uint    RemId;      // Remote process ID (>0xFF, set it to 0x100)
 } lte_l2_Srv_X2_GETLINKt;
 
-#define LNK_SIZE 256
 typedef struct {
     uint    ProcInst;   // "instance" (1)
 
-    char    Lnk[LNK_SIZE];   // Link info
+    char    Lnk[256];   // Link info
 } lte_l2_Srv_X2_GETLINK_ACKt;
 
 /*********************************************
@@ -1733,7 +1749,7 @@ typedef struct {
     uint    LocId;      // Local process ID  (>0xFF, set it to 0x100)
     uint    RemId;      // Remote process ID (>0xFF, set it to 0x100)
 
-    char    Lnk[LNK_SIZE];   // Link info
+    char    Lnk[256];   // Link info
 } lte_l2_Srv_X2_SETLINKt;
 
 
@@ -1780,7 +1796,7 @@ typedef struct {
 typedef struct {
     uint    ProcInst;   // "instance" (1)
 
-    char    Lnk[LNK_SIZE];   // Link info
+    char    Lnk[256];   // Link info
 } lte_l2_Srv_IRAT_GETLINK_ACKt;
 
 /*********************************************
@@ -1793,7 +1809,7 @@ typedef struct {
     uint    IratMsk;    // Remote process to link (see GETLINK)
     uint    RemInst;    // Remote instance to link (Ignored, set to 0)
 
-    char    Lnk[LNK_SIZE];   // Link info
+    char    Lnk[256];   // Link info
 } lte_l2_Srv_IRAT_SETLINKt;
 
 typedef struct {
@@ -1876,9 +1892,9 @@ typedef struct
  */
 typedef struct
 {
-	uint UeId; /* Ue Identifier */
-	uint Info; /* Info -> RcpIdx if lte_l2_Srv_RCP_CMD, RcGroup if lte_l2_Srv_RCP_UECFG_CMD */
-	int Err; /* Error code */
+    uint UeId; /* Ue Identifier */
+    uint Info; /* Info -> RcpIdx if lte_l2_Srv_RCP_CMD, RcGroup if lte_l2_Srv_RCP_UECFG_CMD */
+    int Err; /* Error code */
 
 } lte_l2_Srv_RCP_NACK_INFOt;
 
@@ -1887,8 +1903,8 @@ typedef struct
  *********************************************/
 typedef struct
 {
-	uint NumRcpNackInfo;
-	lte_l2_Srv_RCP_NACK_INFOt RcpNackInfo[0];
+    uint NumRcpNackInfo;
+    lte_l2_Srv_RCP_NACK_INFOt RcpNackInfo[0];
 
 } lte_l2_Srv_RCP_ACKt;
 
@@ -1897,9 +1913,9 @@ typedef struct
  *********************************************/
 typedef struct
 {
-	uint RcGroup; /* Radio Condition Group */
-	uint NumUePerRcGroup;
-	uint UeIdRcGroup[0]; /* UeId array */
+    uint RcGroup; /* Radio Condition Group */
+    uint NumUePerRcGroup;
+    uint UeIdRcGroup[0]; /* UeId array */
 
 } lte_l2_Srv_RCP_UECFGt;
 
@@ -1908,8 +1924,8 @@ typedef struct
  */
 typedef struct
 {
-	uint UeId; /* Ue Identifier */
-	uint RcpIdx; /* Radio Condition Profile Index */
+    uint UeId; /* Ue Identifier */
+    uint RcpIdx; /* Radio Condition Profile Index */
 
 } lte_l2_Srv_RCP_INFOt;
 
@@ -1918,8 +1934,8 @@ typedef struct
  *********************************************/
 typedef struct
 {
-	uint NumRcpInfo;
-	lte_l2_Srv_RCP_INFOt RcpInfo[0];
+    uint NumRcpInfo;
+    lte_l2_Srv_RCP_INFOt RcpInfo[0];
 
 } lte_l2_Srv_RCPt;
 
@@ -1940,18 +1956,18 @@ typedef struct
 
 typedef struct
 {
-    uint UeId;		/* Ue Identifier */
-    uint Group;		/* Radio Condition Group */
+    uint UeId;      /* Ue Identifier */
+    uint Group;     /* Radio Condition Group */
 } lte_l2_Srv_RCP_UE_SET_GROUPt;
- 
+
 /*********************************************
- * lte_l2_Srv_RCP_UE_SET_INDEX_CMD
+ * lte_l2_Srv_RCP_UE_SET_IDX_CMD
  *********************************************/
 
 typedef struct
 {
-     uint UeId;		/* Ue Identifier */
-     uint Index;	/* Radio Condition Profile Index */
+     uint UeId;     /* Ue Identifier */
+     uint Index;    /* Radio Condition Profile Index */
 } lte_l2_Srv_RCP_UE_SET_INDEXt;
 
 
@@ -2055,15 +2071,15 @@ union lte_l2_Srv_MSGu
     lte_l2_Srv_CELL_PDCP_RELEASEt CellPdcpReleaseCmd;
 
     /* Map Driven Mobility */
-    lte_l2_Srv_RCP_LOADt            RcpLoadCmd;
-    lte_l2_Srv_RCP_LOAD_ENDt        RcpLoadEndCmd;
-    lte_l2_Srv_RCP_CLOSEt           RcpCloseCmd;
-    lte_l2_Srv_RCPt                 RcpCmd;
-    lte_l2_Srv_RCP_UECFGt           RcpUeCfgCmd;
-    lte_l2_Srv_RCP_ACKt             RcpAck;
-    lte_l2_Srv_RCP_FADINGt          RcpFadingCmd;
-    lte_l2_Srv_RCP_UE_SET_GROUPt    RcpUeSetGroupCmd;
-    lte_l2_Srv_RCP_UE_SET_INDEXt    RcpUeSetIndexCmd;
+    lte_l2_Srv_RCP_LOADt        RcpLoadCmd;
+    lte_l2_Srv_RCP_LOAD_ENDt    RcpLoadEndCmd;
+    lte_l2_Srv_RCP_CLOSEt       RcpCloseCmd;
+    lte_l2_Srv_RCPt             RcpCmd;
+    lte_l2_Srv_RCP_UECFGt       RcpUeCfgCmd;
+    lte_l2_Srv_RCP_ACKt         RcpAck;
+    lte_l2_Srv_RCP_FADINGt      RcpFadingCmd;
+    lte_l2_Srv_RCP_UE_SET_GROUPt RcpUeSetGroupCmd;
+    lte_l2_Srv_RCP_UE_SET_INDEXt RcpUeSetIndexCmd;
 
 };
 
