@@ -1,6 +1,7 @@
 /* packet-l2server.c
  *
  * TCP-based protocol between adaptor and L2 server.
+ * This is based upon the TM 23.0 header files.
  *
  * TODO:
  * - add release wherever setup appears
@@ -230,7 +231,9 @@ static int hf_l2server_scell_cfg_del = -1;
 
 static int hf_l2server_ph_cell_config = -1;
 static int hf_l2server_ph_cell_dcp_config_setup = -1;
+static int hf_l2server_ph_cell_dcp_config_release = -1;
 static int hf_l2server_ph_pdcch_blind_detection_setup = -1;
+static int hf_l2server_ph_pdcch_blind_detection_release = -1;
 static int hf_l2server_harq_ack_spatial_bundling_pucch = -1;
 static int hf_l2server_harq_ack_spatial_bundling_pusch = -1;
 static int hf_l2server_pmax_nr = -1;
@@ -253,10 +256,14 @@ static int hf_l2server_sp_cell_cfg_dl_ded_present = -1;
 static int hf_l2server_sp_cell_cfg_ul_ded_present = -1;
 static int hf_l2server_sp_cell_cfg_sup_ul_present = -1;
 static int hf_l2server_sp_cell_cfg_cross_carrier_sched_present = -1;
-static int hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_setup= -1;
+static int hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_setup = -1;
+static int hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_release = -1;
 static int hf_l2server_sp_cell_cfg_dormantbwp_setup = -1;
+static int hf_l2server_sp_cell_cfg_dormantbwp_release = -1;
 static int hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_setup = -1;
+static int hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_release = -1;
 static int hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_setup = -1;
+static int hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_release = -1;
 
 static int hf_l2server_sp_cell_cfg_tdd = -1;
 static int hf_l2server_sp_cell_cfg_dl = -1;
@@ -304,6 +311,7 @@ static int hf_l2server_serv_cell_freqinfo_sul_present = -1;
 static int hf_l2server_serv_cell_bwp_sul_present = -1;
 static int hf_l2server_serv_cell_tdd_present = -1;
 static int hf_l2server_serv_cell_tomatcharound_setup= -1;
+static int hf_l2server_serv_cell_tomatcharound_release= -1;
 static int hf_l2server_serv_cell_hs_r16_present = -1;
 
 static int hf_l2server_config_cmd_type = -1;
@@ -516,8 +524,11 @@ static int hf_l2server_lch_basedprioritization_r16 = -1;
 
 static int hf_l2server_initial_dl_bwp_present = -1;
 static int hf_l2server_pdsch_setup = -1;
-static int hf_l2server_pdcch_setup= -1;
+static int hf_l2server_pdsch_release = -1;
+static int hf_l2server_pdcch_setup = -1;
+static int hf_l2server_pdcch_release = -1;
 static int hf_l2server_csi_meas_config_setup = -1;
+static int hf_l2server_csi_meas_config_release = -1;
 
 static int hf_l2server_first_active_dl_bwp = -1;
 static int hf_l2server_nb_dl_bwp_scs_spec_carrier = -1;
@@ -2534,10 +2545,11 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     guint32 fieldmask;
     proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_4, tvb, offset, 4,
                                  ENC_LITTLE_ENDIAN, &fieldmask);
-    gboolean dcp_config_present, pdcch_blind_detection_present;
-    // TODO: add release flags here too...
-    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_ph_cell_dcp_config_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dcp_config_present);
-    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_ph_pdcch_blind_detection_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &pdcch_blind_detection_present);
+    gboolean dcp_config_setup, pdcch_blind_detection_setup;
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_ph_cell_dcp_config_setup,         tvb, offset, 4, ENC_LITTLE_ENDIAN, &dcp_config_setup);
+    proto_tree_add_item(config_tree, hf_l2server_ph_cell_dcp_config_release,       tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_ph_pdcch_blind_detection_setup,   tvb, offset, 4, ENC_LITTLE_ENDIAN, &pdcch_blind_detection_setup);
+    proto_tree_add_item(config_tree, hf_l2server_ph_pdcch_blind_detection_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 
     // HarqACKSpatialBundlingPUCCH
@@ -2633,7 +2645,7 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     // These 2 are included (0xff) in message even present flags not set..
 
     // Dcp_Config_r16 (bb_nr5g_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16t)
-    if (dcp_config_present) {
+    if (dcp_config_setup) {
         // N.B. Size of this is fixed.
         // TODO:
     }
@@ -2641,7 +2653,7 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
 
 
     // Pdcch_BlindDetectionCA_CombIndicator_r16 (bb_nr5g_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16t)
-    if (pdcch_blind_detection_present) {
+    if (pdcch_blind_detection_setup) {
         // N.B. Size of this is fixed.
         // TODO:
     }
@@ -4255,9 +4267,13 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_sup_ul_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &sup_ul_present);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_cross_carrier_sched_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &cross_carrier_sched_present);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &lte_crs_tomatcharound_setup);
+    proto_tree_add_item(config_tree, hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_dormantbwp_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dormantbwp_setup);
+    proto_tree_add_item(config_tree, hf_l2server_sp_cell_cfg_dormantbwp_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &lte_crs_pattern_list1_setup);
+    proto_tree_add_item(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &lte_crs_pattern_list2_setup);
+    proto_tree_add_item(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 
     // ServCellIdx
@@ -4361,8 +4377,11 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
         proto_tree_add_item_ret_uint(ded_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN, &field_mask);
         proto_tree_add_item(ded_tree, hf_l2server_initial_dl_bwp_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
         proto_tree_add_item(ded_tree, hf_l2server_pdsch_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(ded_tree, hf_l2server_pdsch_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
         proto_tree_add_item(ded_tree, hf_l2server_pdcch_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(ded_tree, hf_l2server_pdcch_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
         proto_tree_add_item(ded_tree, hf_l2server_csi_meas_config_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(ded_tree, hf_l2server_csi_meas_config_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
         offset += 4;
 
         // FirstActiveDlBwp
@@ -5099,6 +5118,7 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_bwp_sul_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &bwp_sul_present);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_tdd_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &tdd_present);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_tomatcharound_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &tomatcharound_setup);
+    proto_tree_add_item(config_tree, hf_l2server_serv_cell_tomatcharound_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_hs_r16_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &hs_r16_present);
 
 
@@ -8131,8 +8151,14 @@ proto_register_l2server(void)
       { &hf_l2server_ph_cell_dcp_config_setup,
         { "DCP Config Present", "l2server.field-mask.dcp-config-setup", FT_BOOLEAN, 8,
           NULL, bb_nr5g_STRUCT_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16_SETUP, NULL, HFILL }},
+      { &hf_l2server_ph_cell_dcp_config_release,
+        { "DCP Config Release", "l2server.field-mask.dcp-config-release", FT_BOOLEAN, 8,
+          NULL, bb_nr5g_STRUCT_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16_RELEASE, NULL, HFILL }},
       { &hf_l2server_ph_pdcch_blind_detection_setup,
         { "PDCCH Blind Detection Setup", "l2server.field-mask.pdcch-blind-detection-setup", FT_BOOLEAN, 8,
+          NULL, bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_SETUP, NULL, HFILL }},
+      { &hf_l2server_ph_pdcch_blind_detection_release,
+        { "PDCCH Blind Detection Release", "l2server.field-mask.pdcch-blind-detection-release", FT_BOOLEAN, 8,
           NULL, bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_SETUP, NULL, HFILL }},
       { &hf_l2server_harq_ack_spatial_bundling_pucch,
         { "HARQ ACK Spacial Bundling PUCCH", "l2server.harq-ack-spatial-bundling-pucch", FT_INT8, BASE_DEC,
@@ -8198,15 +8224,28 @@ proto_register_l2server(void)
       { &hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_setup,
         { "LTE CRS tomatcharound Setup", "l2server.sp-cell-cfg-ded.lte-crs-tomatcharound-setup", FT_BOOLEAN, 32,
           NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_TOMATCHAROUND_SETUP, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_release,
+        { "LTE CRS tomatcharound Release", "l2server.sp-cell-cfg-ded.lte-crs-tomatcharound-release", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_TOMATCHAROUND_RELEASE, NULL, HFILL }},
       { &hf_l2server_sp_cell_cfg_dormantbwp_setup,
         { "DormantBWP Setup", "l2server.sp-cell-cfg-ded.dormantbwp-setup", FT_BOOLEAN, 32,
           NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_DORMANTBWP_CONFIG_SETUP, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_dormantbwp_release,
+        { "DormantBWP Release", "l2server.sp-cell-cfg-ded.dormantbwp-release", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_DORMANTBWP_CONFIG_RELEASE, NULL, HFILL }},
+
       { &hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_setup,
         { "CRS Pattern List1 Setup", "l2server.sp-cell-cfg-ded.crs-pattern-list1-setup", FT_BOOLEAN, 32,
           NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_PATTERN_LIST1_SETUP, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_release,
+        { "CRS Pattern List1 Release", "l2server.sp-cell-cfg-ded.crs-pattern-list1-release", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_PATTERN_LIST1_RELEASE, NULL, HFILL }},
       { &hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_setup,
         { "CRS Pattern List2 Setup", "l2server.sp-cell-cfg-ded.crs-pattern-list2-setup", FT_BOOLEAN, 32,
           NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_PATTERN_LIST2_SETUP, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_release,
+        { "CRS Pattern List2 Release", "l2server.sp-cell-cfg-ded.crs-pattern-list2-release", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_PATTERN_LIST2_RELEASE, NULL, HFILL }},
 
       { &hf_l2server_tdd_ul_dl_pattern,
         { "TDD UL DL Pattern", "l2server.tdd-ul-dl-pattern", FT_STRING, BASE_NONE,
@@ -8336,6 +8375,9 @@ proto_register_l2server(void)
       { &hf_l2server_serv_cell_tomatcharound_setup,
         { "LTE CRS Common ToMatchAround Setup", "l2server.sp-cell-cfg-common.lte-common-tomatcharound-setup", FT_BOOLEAN, 32,
           NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_TOMATCHAROUND_SETUP, 0x0, HFILL }},
+      { &hf_l2server_serv_cell_tomatcharound_release,
+        { "LTE CRS Common ToMatchAround Release", "l2server.sp-cell-cfg-common.lte-common-tomatcharound-release", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_TOMATCHAROUND_RELEASE, 0x0, HFILL }},
       { &hf_l2server_serv_cell_hs_r16_present,
         { "High Speed Config R16 Present", "l2server.sp-cell-cfg-common.highspeed-config-r16-present", FT_BOOLEAN, 32,
           NULL, bb_nr5g_STRUCT_HIGH_SPEED_CONFIG_R16_PRESENT, 0x0, HFILL }},
@@ -8898,12 +8940,21 @@ proto_register_l2server(void)
       { &hf_l2server_pdsch_setup,
         { "PDSCH Setup", "l2server.pdsch-setup", FT_BOOLEAN, 32,
            NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDSCH_SETUP, NULL, HFILL }},
+      { &hf_l2server_pdsch_release,
+        { "PDSCH Release", "l2server.pdsch-release", FT_BOOLEAN, 32,
+           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDSCH_RELEASE, NULL, HFILL }},
       { &hf_l2server_pdcch_setup,
         { "PDCCH Setup", "l2server.pdcch-setup", FT_BOOLEAN, 32,
            NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDCCH_SETUP, NULL, HFILL }},
+      { &hf_l2server_pdcch_release,
+        { "PDCCH Release", "l2server.pdcch-release", FT_BOOLEAN, 32,
+           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDCCH_RELEASE, NULL, HFILL }},
       { &hf_l2server_csi_meas_config_setup,
         { "CSI Meas Config Setup", "l2server.csi-meas-config-setup", FT_BOOLEAN, 32,
            NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_CSI_MEAS_CFG_SETUP, NULL, HFILL }},
+      { &hf_l2server_csi_meas_config_release,
+        { "CSI Meas Config Release", "l2server.csi-meas-config-release", FT_BOOLEAN, 32,
+           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_CSI_MEAS_CFG_RELEASE, NULL, HFILL }},
 
       { &hf_l2server_bwp_dl_dedicated,
         { "BWP DL Dedicated", "l2server.bwp-dl-dedicated", FT_STRING, BASE_NONE,
