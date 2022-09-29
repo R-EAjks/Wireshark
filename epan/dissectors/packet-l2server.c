@@ -2,6 +2,10 @@
  *
  * TCP-based protocol between adaptor and L2 server.
  *
+ * TODO:
+ * - add release wherever setup appears
+ * - use consistent flags scheme (using bools) for FieldMask bits
+ *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
  * Copyright 1998 Gerald Combs
