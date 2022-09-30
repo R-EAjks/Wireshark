@@ -18,6 +18,7 @@
 #include <epan/dissectors/packet-tcp.h>
 #include <epan/proto_data.h>
 
+/* TODO: if python throws exception, error comes straight out over this socket, so if all of payload is ASCII, just show as text? */
 
 void proto_register_elsucopy(void);
 
@@ -27,6 +28,7 @@ static int proto_elsucopy = -1;
 static int hf_elsucopy_code = -1;
 static int hf_elsucopy_len = -1;
 static int hf_elsucopy_payload = -1;
+static int hf_elsucopy_exception_text = -1;
 
 /* Subtrees */
 static gint ett_elsucopy = -1;
@@ -55,14 +57,26 @@ static const value_string code_vals[] = {
 
 /* Bytes 4-7 have the PDU length in little-endian order */
 static guint
-get_elsucopy_message_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_) {
-    return 5 + (guint)tvb_get_guint32(tvb, offset + 1, ENC_LITTLE_ENDIAN);
+get_elsucopy_message_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_)
+{
+    //printf("%s()\n", __func__);
+
+    // First, look to see if first 5 bytes of data are all printable - if yes, can assume exception has been thrown and
+    // that this isn't really a protocol PDU.
+    if (tvb_ascii_isprint(tvb, offset, 5)) {
+        return tvb_reported_length(tvb);
+    }
+    else {
+        // Assume that is is an actual protocol message.
+        return 5 + (guint)tvb_get_guint32(tvb, offset + 1, ENC_LITTLE_ENDIAN);
+    }
 }
 
 /* Dissect one PDU.  Guaranteed that the tvb is the right size */
 static int
 dissect_elsucopy_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 {
+    //printf("%s()\n", __func__);
     proto_tree *elsucopy_tree;
     proto_item *root_ti;
     gint offset = 0;
@@ -89,6 +103,18 @@ dissect_elsucopy_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
     /* Protocol root */
     root_ti = proto_tree_add_item(tree, proto_elsucopy, elsu_tvb, offset, -1, ENC_NA);
     elsucopy_tree = proto_item_add_subtree(root_ti, ett_elsucopy);
+
+    /* If first 5 bytes are printable, it is just exceptions being thrown, so show all as text. */
+    if (tvb_ascii_isprint(tvb, offset, 5)) {
+        proto_tree_add_item(elsucopy_tree, hf_elsucopy_exception_text, tvb, offset, -1, ENC_ASCII);
+        // Write text to Info column
+        col_add_lstr(pinfo->cinfo, COL_INFO,
+                     "stdout: ",
+                     tvb_format_text(pinfo->pool, tvb, offset, -1),
+                     COL_ADD_LSTR_TERMINATOR);
+        return tvb_reported_length(tvb);
+    }
+
 
     /* Code */
     guint32 code;
@@ -122,6 +148,8 @@ dissect_elsucopy_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
 static int
 dissect_elsucopy(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 {
+    //printf("%s()\n", __func__);
+
     /* Frame starts off with no PDUs seen */
     static gboolean false_value = FALSE;
     p_add_proto_data(wmem_file_scope(), pinfo, proto_elsucopy, 0, &false_value);
@@ -146,6 +174,9 @@ proto_register_elsucopy(void)
           NULL, 0x0, NULL, HFILL }},
       { &hf_elsucopy_payload,
         { "Payload", "elsucopy.payload", FT_BYTES, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_elsucopy_exception_text,
+        { "Stdout output", "elsucopy.stdout-output", FT_STRING, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
     };
 
