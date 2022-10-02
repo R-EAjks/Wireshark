@@ -110,7 +110,7 @@ dissect_elsucopy_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
         // Write text to Info column
         col_add_lstr(pinfo->cinfo, COL_INFO,
                      "stdout: ",
-                     tvb_format_text(pinfo->pool, tvb, offset, -1),
+                     tvb_format_text(wmem_packet_scope(), tvb, offset, tvb_captured_length(tvb)),
                      COL_ADD_LSTR_TERMINATOR);
         return tvb_reported_length(tvb);
     }
