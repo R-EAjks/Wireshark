@@ -31,6 +31,7 @@
 
 /* Prefix for the pipe interfaces */
 #define EXTCAP_PIPE_PREFIX "wireshark_extcap"
+#define EXTCAP_SHUTDOWN_PREFIX  "wireshark_shutdown"
 #define EXTCAP_CONTROL_IN_PREFIX  "wireshark_control_ext_to_ws"
 #define EXTCAP_CONTROL_OUT_PREFIX "wireshark_control_ws_to_ext"
 
@@ -44,6 +45,7 @@
 #define EXTCAP_ARGUMENT_RUN_CAPTURE             "--capture"
 #define EXTCAP_ARGUMENT_CAPTURE_FILTER          "--extcap-capture-filter"
 #define EXTCAP_ARGUMENT_RUN_PIPE                "--fifo"
+#define EXTCAP_ARGUMENT_SHUTDOWN                "--extcap-shutdown"
 #define EXTCAP_ARGUMENT_CONTROL_IN              "--extcap-control-in"
 #define EXTCAP_ARGUMENT_CONTROL_OUT             "--extcap-control-out"
 

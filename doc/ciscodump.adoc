@@ -22,6 +22,7 @@ ciscodump - Provide interfaces to capture from a remote Cisco device through SSH
 [ *--extcap-capture-filter*=<capture filter> ]
 [ *--capture* ]
 [ *--fifo*=<path to file or pipe> ]
+[ *--extcap-shutdown*=<path to pipe> ]
 [ *--remote-host*=<IP address> ]
 [ *--remote-port*=<TCP port> ]
 [ *--remote-username*=<username> ]
@@ -49,6 +50,7 @@ ciscodump - Provide interfaces to capture from a remote Cisco device through SSH
 *ciscodump*
 *--extcap-interface*=ciscodump
 *--fifo*=<path to file or pipe>
+*--extcap-shutdown*=<path to pipe>
 *--capture*
 *--remote-host*=remotedevice
 *--remote-port*=22
@@ -134,6 +136,13 @@ Start capturing from specified interface and save it in place specified by --fif
 +
 --
 Save captured packet to file or send it through pipe.
+--
+
+--extcap-shutdown=<path to pipe>::
++
+--
+Pipe to shutdown command from calling application.
+Available only on Windows.
 --
 
 --remote-host=<remote host>::

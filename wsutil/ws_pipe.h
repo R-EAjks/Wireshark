@@ -87,6 +87,18 @@ WS_DLL_PUBLIC gboolean ws_pipe_wait_for_pipe(HANDLE * pipe_handles, int num_pipe
  */
 WS_DLL_PUBLIC gboolean ws_pipe_data_available(int pipe_fd);
 
+/**
+ * @brief Write to pipe word QUIT to stop child process
+ * @param fd File descriptor
+ */
+WS_DLL_PUBLIC void ws_pipe_write_quit_to_child(int fd);
+
+/**
+ * @brief Force child to close
+ * @param ws_process_id Process ID
+ */
+WS_DLL_PUBLIC void ws_pipe_kill(ws_process_id fork_child);
+
 #endif /* __WS_PIPE_H__ */
 
 /*

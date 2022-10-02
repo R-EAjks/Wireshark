@@ -19,6 +19,9 @@
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
+#include <wsutil/file_util.h>
+#include <wsutil/unicode-utils.h>
+#include <wsutil/ws_pipe.h>
 #include <wsutil/wslog.h>
 
 #include <wsutil/ws_assert.h>
@@ -50,6 +53,10 @@ static FILE *custom_log = NULL;
 gboolean extcap_end_application = FALSE;
 /* graceful shutdown callback, can be null */
 void (*extcap_graceful_shutdown_cb)(void) = NULL;
+#ifdef _WIN32
+/* used to stop pipe thread */
+gboolean extcap_end_pipe_thread = FALSE;
+#endif
 
 static void extcap_init_log_file(const char *filename);
 
@@ -62,7 +69,9 @@ static void extcap_exit_from_loop(int signo _U_)
 #endif /* _WIN32 */
 {
     ws_debug("Exiting from main loop by signal");
-    extcap_end_application = TRUE;
+#ifdef _WIN32
+    extcap_end_pipe_thread = TRUE;
+#endif /* _WIN32 */
     if (extcap_graceful_shutdown_cb != NULL) {
        extcap_graceful_shutdown_cb();
     }
@@ -70,6 +79,16 @@ static void extcap_exit_from_loop(int signo _U_)
     return TRUE;
 #endif /* _WIN32 */
 }
+
+#ifdef _WIN32
+/* Called by shutdown pipe */
+static void shutdown_pipe_command_received(void)
+{
+    ws_debug("Exiting from main loop by shutdown pipe");
+    extcap_end_application = TRUE;
+    extcap_end_pipe_thread = TRUE;
+}
+#endif
 
 void extcap_base_register_interface(extcap_parameters * extcap, const char * interface, const char * ifdescription, uint16_t dlt, const char * dltdescription )
 {
@@ -105,6 +124,8 @@ gboolean extcap_base_register_graceful_shutdown_cb(extcap_parameters * extcap _U
     extcap_end_application = FALSE;
     extcap_graceful_shutdown_cb = callback;
 #ifdef _WIN32
+    extcap_end_pipe_thread = FALSE;
+    extcap->gracefull_shutdown_pipe_requested = TRUE;
     if (!SetConsoleCtrlHandler(extcap_exit_from_loop, TRUE)) {
             ws_warning("Can't set console handler");
             return FALSE;
@@ -215,6 +236,15 @@ uint8_t extcap_base_parse_options(extcap_parameters * extcap, int result, char *
         case EXTCAP_OPT_FIFO:
             extcap->fifo = g_strdup(optargument);
             break;
+#ifdef _WIN32
+        case EXTCAP_OPT_SHUTDOWN:
+            if (!extcap->gracefull_shutdown_pipe_requested) {
+                ret = 0;
+            } else {
+                extcap->shutdown_pipe = g_strdup(optargument);
+            }
+            break;
+#endif
         default:
             ret = 0;
     }
@@ -255,6 +285,11 @@ static gint extcap_iface_listall(extcap_parameters * extcap, uint8_t list_ifs)
             extcap_print_version(extcap);
             g_list_foreach(extcap->interfaces, extcap_iface_print, extcap);
         }
+#ifdef _WIN32
+        if (extcap->gracefull_shutdown_pipe_requested) {
+            printf("shutdown {value=shutdown}\n");
+        }
+#endif
     } else if (extcap->do_version) {
         extcap_print_version(extcap);
     } else {
@@ -274,6 +309,33 @@ static gint extcap_iface_listall(extcap_parameters * extcap, uint8_t list_ifs)
     return 1;
 }
 
+#ifdef _WIN32
+static void *extcap_base_shutdown_pipe_thread(void * arg)
+{
+    extcap_parameters * extcap = (extcap_parameters *)arg;
+    ssize_t len = 0;
+
+    ws_debug("SHUTDOWN pipe running");
+    do {
+        while (len==0)
+        {
+            if (!PeekNamedPipe(extcap->shutdown_pipe_h, NULL, 0, NULL, (LPDWORD)&len, NULL))
+            {
+                ws_debug("PeekNamedPipe error %d.\n", GetLastError());
+            }
+            g_usleep(100*1000);
+        }
+    } while (!extcap_end_pipe_thread && !(len > 0));
+
+    ws_debug("SHUTDOWN pipe thread is finished (read %d/%ld)", extcap_end_pipe_thread, len);
+    if (len > 0) {
+        shutdown_pipe_command_received();
+    }
+
+    return NULL;
+}
+#endif
+
 uint8_t extcap_base_handle_interface(extcap_parameters * extcap)
 {
     /* A fifo must be provided for capture */
@@ -283,11 +345,35 @@ uint8_t extcap_base_handle_interface(extcap_parameters * extcap)
         return 0;
     }
 
+#ifdef _WIN32
+    if (extcap->capture && extcap->gracefull_shutdown_pipe_requested && (extcap->shutdown_pipe == NULL || strlen(extcap->shutdown_pipe) <= 0)) {
+        extcap->gracefull_shutdown_pipe_requested = 0;
+        ws_warning("Extcap Error: No SHUTDOWN pipe provided");
+    }
+#endif
+
     if (extcap->do_list_interfaces) {
         return extcap_iface_listall(extcap, 1);
     } else if (extcap->do_version || extcap->do_list_dlts) {
         return extcap_iface_listall(extcap, 0);
     }
+
+#ifdef _WIN32
+    if (extcap->capture && extcap->gracefull_shutdown_pipe_requested) {
+        ws_debug("Openning SHUTDOWN pipe %s", extcap->shutdown_pipe);
+        HANDLE h = CreateFile(utf_8to16(extcap->shutdown_pipe),
+                                             GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+
+        if (h == INVALID_HANDLE_VALUE) {
+            ws_error("Extcap Error: Can't open SHUTDOWN pipe %s", extcap->shutdown_pipe);
+            return 1;
+        }
+        extcap->shutdown_pipe_h = h;
+        ws_debug("SHUTDOWN pipe thread: starting");
+        extcap->shutdown_pipe_thread = g_thread_new("extcap_base_shutdown_pipe", &extcap_base_shutdown_pipe_thread, extcap);
+        ws_debug("SHUTDOWN pipe thread: started");
+    }
+#endif
 
     return 0;
 }
@@ -312,10 +398,25 @@ static void extcap_help_option_free(gpointer option)
 
 void extcap_base_cleanup(extcap_parameters ** extcap)
 {
+#ifdef _WIN32
+    if ((*extcap)->gracefull_shutdown_pipe_requested) {
+        extcap_end_pipe_thread = TRUE;
+        if ((*extcap)->shutdown_pipe_thread) {
+            g_thread_join((*extcap)->shutdown_pipe_thread);
+        }
+        if (INVALID_HANDLE_VALUE != (*extcap)->shutdown_pipe_h) {
+            CloseHandle((*extcap)->shutdown_pipe_h);
+            (*extcap)->shutdown_pipe_h = INVALID_HANDLE_VALUE;
+        }
+    }
+#endif
     g_list_free_full((*extcap)->interfaces, extcap_iface_free);
     g_free((*extcap)->exename);
     g_free((*extcap)->fifo);
     g_free((*extcap)->interface);
+#ifdef _WIN32
+    g_free((*extcap)->shutdown_pipe);
+#endif
     g_free((*extcap)->version);
     g_free((*extcap)->compiled_with);
     g_free((*extcap)->running_with);
@@ -372,6 +473,11 @@ void extcap_help_add_header(extcap_parameters * extcap, char * help_header)
     extcap_help_add_option(extcap, "--capture", "run the capture");
     extcap_help_add_option(extcap, "--extcap-capture-filter <filter>", "the capture filter");
     extcap_help_add_option(extcap, "--fifo <file>", "dump data to file or fifo");
+#ifdef _WIN32
+    if (extcap->gracefull_shutdown_pipe_requested) {
+        extcap_help_add_option(extcap, "--extcap-shutdown <file>", "Used to shutdown application from calling application");
+    }
+#endif
     extcap_help_add_option(extcap, "--extcap-version", "print tool version");
     extcap_help_add_option(extcap, "--log-level", "Set the log level");
     extcap_help_add_option(extcap, "--log-file", "Set a log file to log messages in addition to the console");

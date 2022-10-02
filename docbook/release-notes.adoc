@@ -40,7 +40,7 @@ The following features are new (or have been significantly updated) since versio
 // * The Windows installers now ship with Npcap 1.71.
 //   They previously shipped with Npcap 1.60.
 
-
+* Extcaps can be stopped gracefully and the application can cleanup.
 
 // === Removed Features and Support
 

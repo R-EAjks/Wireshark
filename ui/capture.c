@@ -44,6 +44,7 @@
 #include <wsutil/filesystem.h>
 #include <wsutil/wslog.h>
 #include <wsutil/ws_assert.h>
+#include <wsutil/ws_pipe.h>
 
 typedef struct if_stat_cache_item_s {
     char *name;
@@ -199,7 +200,7 @@ capture_kill_child(capture_session *cap_session)
     ws_info("Capture Kill");
 
     /* kill the capture child */
-    sync_pipe_kill(cap_session->fork_child);
+    ws_pipe_kill(cap_session->fork_child);
 }
 
 /* We've succeeded in doing a (non real-time) capture; try to read it into a new capture file */

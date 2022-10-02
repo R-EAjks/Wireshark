@@ -123,6 +123,7 @@ ssh_session create_ssh_connection(const ssh_params_t* ssh_params, char** err_inf
 		ws_info("failed (%s)", ssh_get_error(sshs));
 	}
 
+	/* If password provided, we use password authentication before keys. Some cisco devices drop connection when used in opposite (more common) order */
 	/* Workaround: it may happen that libssh closes socket in meantime and any next ssh_ call fails so we should detect it in advance */
 	if (ssh_get_fd(sshs) != -1) {
 		/* If a password has been provided and all previous attempts failed, try to use it */
@@ -169,6 +170,7 @@ int ssh_channel_printf(ssh_channel channel, const char* fmt, ...)
 
 	va_start(arg, fmt);
 	buf = ws_strdup_vprintf(fmt, arg);
+	ws_debug("sending command '%s'", buf);
 	if (ssh_channel_write(channel, buf, (guint32)strlen(buf)) == SSH_ERROR)
 		ret = EXIT_FAILURE;
 	va_end(arg);
