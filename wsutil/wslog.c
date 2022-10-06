@@ -1124,6 +1124,78 @@ void ws_log_write_always_full(const char *domain, enum ws_log_level level,
 }
 
 
+static char *
+make_utf8_display(const char *src, size_t src_length, size_t good_length)
+{
+    wmem_strbuf_t *buf;
+    char ch;
+    size_t offset = 0;
+
+    buf = wmem_strbuf_new(NULL, NULL);
+
+    for (size_t pos = 0; pos < src_length; pos++) {
+        ch = src[pos];
+        if (pos < good_length) {
+            if (g_ascii_isalnum(ch) || ch == ' ') {
+                wmem_strbuf_append_c(buf, ch);
+                offset += 1;
+            }
+            else {
+                wmem_strbuf_append_hex(buf, ch);
+                offset += 4;
+            }
+        }
+        else {
+            wmem_strbuf_append_hex(buf, ch);
+        }
+    }
+    wmem_strbuf_append_c(buf, '\n');
+    for (size_t pos = 0; pos < offset; pos++) {
+        wmem_strbuf_append_c(buf, ' ');
+    }
+    wmem_strbuf_append(buf, "^^^^");
+    for (size_t pos = good_length + 1; pos < src_length; pos++) {
+        wmem_strbuf_append(buf, "~~~~");
+    }
+    return wmem_strbuf_finalize(buf);
+}
+
+
+void ws_log_utf8_full(const char *domain, enum ws_log_level level,
+                    const char *file, long line, const char *func,
+                    const char *string, ssize_t _length, const char *endptr)
+{
+    if (!ws_log_msg_is_active(domain, level))
+        return;
+
+    char *display;
+    size_t length;
+    size_t good_length;
+
+    if (_length < 0)
+        length = strlen(string);
+    else
+        length = _length;
+
+    if (endptr == NULL || endptr < string) {
+        /* Find the pointer to the first invalid byte. */
+        if (g_utf8_validate(string, length, &endptr)) {
+            /* Valid string - should not happen. */
+            return;
+        }
+    }
+    good_length = endptr - string;
+
+    display = make_utf8_display(string, length, good_length);
+
+    ws_log_write_always_full(domain, level, file, line, func,
+            "Invalid UTF-8 at address %p offset %zu (length = %zu):\n%s",
+            string, good_length, length, display);
+
+    g_free(display);
+}
+
+
 void ws_log_buffer_full(const char *domain, enum ws_log_level level,
                     const char *file, long line, const char *func,
                     const uint8_t *ptr, size_t size,  size_t max_bytes_len,
@@ -1192,6 +1264,7 @@ static void ws_log_cleanup(void)
     free_log_filter(&domain_filter);
     free_log_filter(&debug_filter);
     free_log_filter(&noisy_filter);
+    free_log_filter(&fatal_filter);
 }
 
 
@@ -1211,13 +1284,16 @@ void ws_log_add_custom_file(FILE *fp)
     "sets level to abort the program (\"critical\" or \"warning\")"
 
 #define USAGE_DOMAINS \
-    "comma separated list of the active log domains"
+    "comma-separated list of the active log domains"
+
+#define USAGE_FATAL_DOMAINS \
+    "list of domains that cause the program to abort"
 
 #define USAGE_DEBUG \
-    "comma separated list of domains with \"debug\" level"
+    "list of domains with \"debug\" level"
 
 #define USAGE_NOISY \
-    "comma separated list of domains with \"noisy\" level"
+    "list of domains with \"noisy\" level"
 
 #define USAGE_FILE \
     "file to output messages to (in addition to stderr)"
@@ -1228,6 +1304,8 @@ void ws_log_print_usage(FILE *fp)
     fprintf(fp, "  --log-level <level>      " USAGE_LEVEL "\n");
     fprintf(fp, "  --log-fatal <level>      " USAGE_FATAL "\n");
     fprintf(fp, "  --log-domains <[!]list>  " USAGE_DOMAINS "\n");
+    fprintf(fp, "  --log-fatal-domains <list>\n");
+    fprintf(fp, "                           " USAGE_FATAL_DOMAINS "\n");
     fprintf(fp, "  --log-debug <[!]list>    " USAGE_DEBUG "\n");
     fprintf(fp, "  --log-noisy <[!]list>    " USAGE_NOISY "\n");
     fprintf(fp, "  --log-file <path>        " USAGE_FILE "\n");
