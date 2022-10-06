@@ -502,7 +502,9 @@ static int hf_l2server_tdd_common = -1;
 
 static int hf_l2server_beamid = -1;
 
+static int hf_l2server_verbosity = -1;
 static int hf_l2server_rlcmac_verbosity = -1;
+static int hf_l2server_pdcp_verbosity = -1;
 static int hf_l2server_dl_harq_mode = -1;
 static int hf_l2server_ul_fs_advance = -1;
 static int hf_l2server_max_rach = -1;
@@ -5314,6 +5316,9 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
                                                tdd_fieldmask & bb_nr5g_STRUCT_TDD_UL_DL_CONFIG_COMMON_PATT1_PRESENT);
         }
 
+        if (!tdd_present) {
+            proto_item_append_text(tdd_ti, " (not set)");
+        }
         proto_item_set_len(tdd_ti, offset-tdd_offset);
     }
 
@@ -6877,11 +6882,13 @@ static void dissect_setparm_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
     offset += 4;
 
     // Verbosity
+    proto_tree_add_item(tree, hf_l2server_verbosity, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     // L2_nr5g_RlcMac_Verbosity
     proto_tree_add_item(tree, hf_l2server_rlcmac_verbosity, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     // L2_nr5g_pdcp_Verbosity
+    proto_tree_add_item(tree, hf_l2server_pdcp_verbosity, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 
     // BeamChangeTimer
@@ -8931,11 +8938,16 @@ proto_register_l2server(void)
         { "BeamId", "l2server.beamid", FT_INT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
 
-
-
-      { &hf_l2server_rlcmac_verbosity,
-        { "RLCMAC Verbosity", "l2server.rlcmac-verbosity", FT_UINT32, BASE_DEC,
+      { &hf_l2server_verbosity,
+        { "Verbosity", "l2server.verbosity", FT_UINT32, BASE_HEX_DEC,
            NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rlcmac_verbosity,
+        { "RLCMAC Verbosity", "l2server.rlcmac-verbosity", FT_UINT32, BASE_HEX_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pdcp_verbosity,
+        { "PDCP Verbosity", "l2server.pdcp-verbosity", FT_UINT32, BASE_HEX_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
 
       { &hf_l2server_dl_harq_mode,
         { "DL HARQ Mode", "l2server.dl-harq-mode", FT_UINT8, BASE_DEC,
