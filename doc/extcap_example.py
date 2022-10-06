@@ -365,20 +365,17 @@ def control_write_defaults(fn_out):
 
     control_write(fn_out, CTRL_ARG_DELAY, CTRL_CMD_REMOVE, str(60))
 
+fragmentId = 0
+
 def extcap_capture(interface, fifo, control_in, control_out, in_delay, in_verify, in_message, remote, fake_ip):
-    global message, delay, verify, button_disabled
+    global message, delay, verify, button_disabled, fragmentId
     delay = in_delay if in_delay != 0 else 5
     message = in_message
     verify = in_verify
     counter = 1
     fn_out = None
 
-    data = """Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
-           incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nost
-           rud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis
-           aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugi
-           at nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culp
-           a qui officia deserunt mollit anim id est laborum. """
+    data = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
     with open(fifo, 'wb', 0) as fh:
         fh.write(pcap_fake_header())
@@ -411,12 +408,14 @@ def extcap_capture(interface, fifo, control_in, control_out, in_delay, in_verify
 
             if (dataPackage * 20 > len(data)):
                 dataPackage = 0
+                fragmentId += 1
             dataSub = data[dataPackage * 20:(dataPackage + 1) * 20]
-            dataPackage += 1
 
-            out = ("%c%s%c%c%c%s%c%s%c" % (len(remote), remote.strip(), dataPackage, dataTotal, len(dataSub), dataSub.strip(), len(message), message.strip(), verify)).encode("utf8")
+            out = ("%c%s%c%c%c%c%s%c%s%c" % (len(remote), remote.strip(), dataPackage, dataTotal, fragmentId, len(dataSub), dataSub.strip(), len(message), message.strip(), verify)).encode("utf8")
             fh.write(pcap_fake_package(out, fake_ip))
             time.sleep(delay)
+
+            dataPackage += 1
 
     thread.join()
     if fn_out is not None:
