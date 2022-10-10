@@ -388,6 +388,19 @@ typedef struct lte_l2_Srv_GETINFO_ACKs {
     char Info[0];
 } lte_l2_Srv_GETINFO_ACKt;
 
+
+/*********************************************
+ * nr5g_l2_Srv_CELL_CONFIG_CMD
+ *********************************************/
+#define nr5g_l2_Srv_CELL_CONFIG_TYPE_PRIMARY    1
+#define nr5g_l2_Srv_CELL_CONFIG_TYPE_SECONDARY  2
+typedef struct
+{
+    uchar                          CellCfgType; /* Flags nr5g_l2_Srv_CELL_CONFIG_TYPE_* */
+    nr5g_rlcmac_Cmac_CellCfg_t     CellCfg;
+} nr5g_rlcmac_Cmac_CellCfg_Section_t;
+
+
 /*********************************************
  * nr5g_l2_Srv_CELL_CONFIG_CMD
  *********************************************/
@@ -400,14 +413,14 @@ typedef struct {
     uchar       Ta;            /* Time Advance Command [TODO, -1 for none] (see MAC par. TODO) */
     uchar       RaInfoValid;   /* To Validate RA Info */
     uchar       RachProbeReq;  /* If 1 RAch probe is requested */
+    uchar       SiSchedulingInfoValid;
     
     /* cell RA configuration */
     nr5g_rlcmac_Cmac_RA_Info_t      RA_Info;
     
     /* cell configuration */
-    
-    nr5g_rlcmac_Cmac_CellCfg_t     CellCfg;
-    
+    nr5g_rlcmac_Cmac_CellCfg_Section_t     CellCfgSection;
+    nr5g_rlcmac_Cmac_SI_SCHED_INFOt SiSchedulingInfo;
 } nr5g_l2_Srv_CELL_CONFIGt;
 
 /*********************************************

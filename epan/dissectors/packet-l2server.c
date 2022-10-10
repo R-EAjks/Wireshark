@@ -391,6 +391,7 @@ static int hf_l2server_rach_probe_req = -1;
 
 static int hf_l2server_rrc_state = -1;
 
+static int hf_l2server_cell_config_cellcfg_type = -1;
 static int hf_l2server_cell_config_cellcfg = -1;
 
 static int hf_l2server_nb_aggr_cell_cfg_common = -1;
@@ -1263,6 +1264,11 @@ static const value_string sr_period_and_offset_is_valid_vals[] = {
     { 0,   NULL }
 };
 
+static const value_string cellconfig_type_vals[] = {
+    { nr5g_l2_Srv_CELL_CONFIG_TYPE_PRIMARY,      "Primary" },
+    { nr5g_l2_Srv_CELL_CONFIG_TYPE_SECONDARY,    "Secondary" },
+    { 0,   NULL }
+};
 
 static const true_false_string nodata_data_vals =
 {
@@ -2081,6 +2087,8 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
     // RachProbeReq
     proto_tree_add_item(tree, hf_l2server_rach_probe_req, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
+    // SiSchedulingInfoValid
+    offset += 1;
 
     // RA_Info (nr5g_rlcmac_Cmac_RA_Info_t) -> (bb_nr5g_CELL_GROUP_CONFIGt in bb-nr5g_struct.h)
     if (ra_info_valid) {
@@ -2093,8 +2101,13 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
     }
 
 
+    // CellCfgSection (nr5g_rlcmac_Cmac_CellCfg_Section_t from nr5g-l2_Srv.h)
+    // CellCfgType
+    proto_tree_add_item(tree, hf_l2server_cell_config_cellcfg_type, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
     // CellCfg (nr5g_rlcmac_Cmac_CellCfg_t from nr5g-rlcmac_Cmac.h ->
-    //          bb_nr5g_CELL_GROUP_CONFIGt from bb-nr5g_struct_macro.h)
+    //          bb_nr5g_CELL_GROUP_CONFIGt from bb-nr5g_struct_macro.h
     gint start_offset = offset;
     proto_item *cellcfg_ti = proto_tree_add_string_format(tree, hf_l2server_cell_config_cellcfg, tvb,
                                                           offset, 4,
@@ -2107,7 +2120,15 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
     //     CellCfgCommon. Is serialized for cmac_config_cmd (last arg).
     offset = dissect_sp_cell_cfg_common(cellcfg_tree, tvb, pinfo, offset, FALSE);
 
+    // TODO:
+    // NbAggrCellCfgCommon
+    offset += 1;
+
+    // AggrCellCfgCommon[]
     proto_item_set_len(cellcfg_ti, offset-start_offset);
+
+    // SiSchedulingInfo
+    // TODO
 }
 
 static void dissect_cell_config_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -2641,14 +2662,18 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     offset += 1;
     // AckNackFeedbackMode_r16
     offset += 1;
+
     // Pdcch_BlindDetection2_r16
     offset += 1;
     // Pdcch_BlindDetection3_r16
     offset += 1;
+
     // BdFactorR_r16
     offset += 1;
+
     // Pdsch_HARQ_ACK_CodebookList_r16[2]
     offset += 2;
+
     // Pad
     proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
     offset += 1;
@@ -8650,6 +8675,10 @@ proto_register_l2server(void)
       { &hf_l2server_rrc_state,
         { "State", "l2server.rrc-state", FT_UINT8, BASE_DEC,
           VALS(rrc_state_vals), 0x0, NULL, HFILL }},
+
+      { &hf_l2server_cell_config_cellcfg_type,
+        { "CellConfig Type", "l2server.cellconfig-type", FT_UINT8, BASE_DEC,
+          VALS(cellconfig_type_vals), 0x0, NULL, HFILL }},
 
       { &hf_l2server_cell_config_cellcfg,
         { "CellCfg", "l2server.cell-config.cellcfg", FT_STRING, BASE_NONE,
