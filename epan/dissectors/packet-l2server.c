@@ -144,6 +144,8 @@ static int hf_l2server_l1cell_dedicated_config_len = -1;
 static int hf_l2server_l2_test_mode = -1;
 static int hf_l2server_l2_cell_dedicated_config = -1;
 static int hf_l2server_l2_cell_dedicated_config_len = -1;
+static int hf_l2server_spcell_config_ded_present = -1;
+static int hf_l2server_mac_cell_dedicated_present = -1;
 
 static int hf_l2server_l1_cell_dedicated_config = -1;
 static int hf_l2server_num_of_rb_cfg = -1;
@@ -369,6 +371,10 @@ static int hf_l2server_log = -1;
 
 static int hf_l2server_spcell_config_ded = -1;
 static int hf_l2server_spcell_config_ded_len = -1;
+static int hf_l2server_config_uplink_present = -1;
+static int hf_l2server_config_sul_uplink_present = -1;
+static int hf_l2server_csi_meas_cfg_present = -1;
+
 
 static int hf_l2server_radio_condition_group = -1;
 static int hf_l2server_radio_condition_profile_index = -1;
@@ -424,10 +430,18 @@ static int hf_l2server_initial_ul_bwp_len = -1;
 
 static int hf_l2server_ul_bwp = -1;
 static int hf_l2server_ul_bwp_len = -1;
+static int hf_l2server_ul_common_cfg_present = -1;
+static int hf_l2server_ul_dedicated_cfg_present = -1;
 
 static int hf_l2server_ul_bwp_common = -1;
 static int hf_l2server_ul_bwp_common_len = -1;
 
+static int hf_l2server_ul_bwp_dedicated = -1;
+static int hf_l2server_ul_bwp_dedicated_len = -1;
+static int hf_l2server_ded_pucch_cfg_present = -1;
+static int hf_l2server_ded_pusch_cfg_present = -1;
+static int hf_l2server_ded_srs_present = -1;
+static int hf_l2server_ded_configured_grant_present = -1;
 
 static int hf_l2server_ul_bwp_common_pdcch = -1;
 static int hf_l2server_ul_bwp_common_search_space_sib1 = -1;
@@ -509,10 +523,12 @@ static int hf_l2server_pdcp_verbosity = -1;
 static int hf_l2server_dl_harq_mode = -1;
 static int hf_l2server_ul_fs_advance = -1;
 static int hf_l2server_max_rach = -1;
+static int hf_l2server_num_lte_cell = -1;
 static int hf_l2server_num_nr_cell = -1;
 
 static int hf_l2server_num_up_stk_ppu = -1;
 static int hf_l2server_num_dwn_stk_ppu = -1;
+static int hf_l2server_num_lte_pro_ppu = -1;
 static int hf_l2server_num_nr_pro_ppu = -1;
 
 static int hf_l2server_up_stk_ppu = -1;
@@ -1338,6 +1354,7 @@ static gint ett_l2server_initial_ul_bwp = -1;
 static gint ett_l2server_ul_bwp = -1;
 static gint ett_l2server_ul_bwp_common = -1;
 static gint ett_l2server_ul_bwp_common_pdcch = -1;
+static gint ett_l2server_ul_bwp_dedicated = -1;
 static gint ett_l2server_bwp_common_pdsch = -1;
 static gint ett_l2server_rach_common = -1;
 static gint ett_l2server_rach_generic = -1;
@@ -6012,9 +6029,13 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
     // Len
     proto_tree_add_item(l2_dedicated_config_tree, hf_l2server_l2_cell_dedicated_config_len, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
+
     // FieldMask (2 bytes)
     guint32 field_mask;
     proto_tree_add_item_ret_uint(l2_dedicated_config_tree, hf_l2server_field_mask_2, tvb, offset, 2, ENC_LITTLE_ENDIAN, &field_mask);
+    gboolean spcell_config_ded_present, mac_cell_group_config_present;
+    proto_tree_add_item_ret_boolean(l2_dedicated_config_tree, hf_l2server_spcell_config_ded_present, tvb, offset, 2, ENC_LITTLE_ENDIAN, &spcell_config_ded_present);
+    proto_tree_add_item_ret_boolean(l2_dedicated_config_tree, hf_l2server_mac_cell_dedicated_present, tvb, offset, 2, ENC_LITTLE_ENDIAN, &mac_cell_group_config_present);
     offset += 2;
 
     // NbSCellCfgDel
@@ -6034,7 +6055,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
     offset += 4;
 
     // SpCellCfgDed (nr5g_rlcmac_Cmac_SERV_CELL_CONFIGt from nr5g-rlcmac_Cmac-bb.h)
-    if (field_mask & nr5g_rlcmac_Cmac_STRUCT_SPCELL_CONFIG_DED_PRESENT) {
+    if (spcell_config_ded_present) {
         guint ded_start_offset = offset;
 
         proto_item *spcell_config_ded_ti = proto_tree_add_string_format(l2_dedicated_config_tree, hf_l2server_spcell_config_ded, tvb,
@@ -6052,6 +6073,10 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         guint32 fieldmask;
         proto_tree_add_item_ret_uint(spcell_config_ded_tree, hf_l2server_field_mask_4, tvb, offset, 4,
                                      ENC_LITTLE_ENDIAN, &fieldmask);
+        gboolean uplink_present, sul_uplink_present, csi_meas_cfg_present;
+        proto_tree_add_item_ret_boolean(spcell_config_ded_tree, hf_l2server_config_uplink_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &uplink_present);
+        proto_tree_add_item_ret_boolean(spcell_config_ded_tree, hf_l2server_config_sul_uplink_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &sul_uplink_present);
+        proto_tree_add_item_ret_boolean(spcell_config_ded_tree, hf_l2server_csi_meas_cfg_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &csi_meas_cfg_present);
         offset += 4;
         // ServCellIdx
         proto_tree_add_item(spcell_config_ded_tree, hf_l2server_serv_cell_idx, tvb, offset, 4, ENC_LITTLE_ENDIAN);
@@ -6062,12 +6087,16 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         // SupplUlRel
         proto_tree_add_item(spcell_config_ded_tree, hf_l2server_supp_ul_rel, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
-        // Spare
+        // FirstActiveDlBwp
+        proto_tree_add_item(spcell_config_ded_tree, hf_l2server_first_active_dl_bwp, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+
+        // Spare[1]
         proto_tree_add_item(spcell_config_ded_tree, hf_l2server_spare2, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-        offset += 2;
+        offset += 1;
 
         // UlCellCfgDed (nr5g_rlcmac_Cmac_UPLINK_DEDICATED_CONFIGt from nr5g-rlcmac_Cmac-bb.h)
-        if (fieldmask & nr5g_rlcmac_Cmac_STRUCT_SERV_CELL_CONFIG_UPLINK_PRESENT) {
+        if (uplink_present) {
 
             guint spcell_config_ded_start = offset;
 
@@ -6118,7 +6147,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                 }
             }
 
-            // InitialUlBwp (nr5g_rlcmac_Cmac_BWP_UPLINKDEDICATEDt)
+            // InitialUlBwp (nr5g_rlcmac_Cmac_BWP_UPLINKDEDICATEDt from nr5g-rlcmac_Cmac-bb.h)
             if (initial_ul_bwp_present) {
 
                 // Subtree.
@@ -6126,7 +6155,6 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                                                                              offset, 0,
                                                                              "", "Initial UL BWP");
                 proto_tree *initial_ul_bwp_tree = proto_item_add_subtree(initial_ul_bwp_ti, ett_l2server_initial_ul_bwp);
-
 
                 // Len
                 guint32 initial_ul_bwp_len;
@@ -6137,6 +6165,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                 guint initial_ul_bwp_fieldmask;
                 proto_tree_add_item_ret_uint(initial_ul_bwp_tree, hf_l2server_field_mask_4, tvb, offset, 4,
                                              ENC_LITTLE_ENDIAN, &initial_ul_bwp_fieldmask);
+                // TODO: show bits!
                 offset += 4;
 
                 // TODO:
@@ -6156,7 +6185,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                     // Subtree.
                     proto_item *pucch_ti = proto_tree_add_string_format(initial_ul_bwp_tree, hf_l2server_uplink_ded_pucch_config, tvb,
                                                                         offset, 0,
-                                                                        "", "PUCCH");
+                                                                        "", "PUCCH Conf Ded");
                     proto_tree *pucch_tree = proto_item_add_subtree(pucch_ti, ett_l2server_uplink_ded_pucch_config);
 
                     // Len
@@ -6277,6 +6306,9 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                 guint ul_bwp_fieldmask;
                 proto_tree_add_item_ret_uint(ul_bwp_tree, hf_l2server_field_mask_4, tvb, offset, 4,
                                              ENC_LITTLE_ENDIAN, &ul_bwp_fieldmask);
+                gboolean common_cfg_present, dedicated_cfg_present;
+                proto_tree_add_item_ret_boolean(ul_bwp_tree, hf_l2server_ul_common_cfg_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &common_cfg_present);
+                proto_tree_add_item_ret_boolean(ul_bwp_tree, hf_l2server_ul_dedicated_cfg_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dedicated_cfg_present);
                 offset += 4;
 
                 // BwpId
@@ -6284,7 +6316,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                 offset += 1;
 
                 // BwpULCommon (nr5g_rlcmac_Cmac_BWP_UPLINKCOMMONt from nr5g-rlcmac_Cmac-bb.h)
-                if (ul_bwp_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_COMMON_CFG_PRESENT) {
+                if (common_cfg_present) {
 
                     guint32 bwp_ul_common_start = offset;
 
@@ -6338,24 +6370,44 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                 }
 
                 // BwpULDed (nr5g_rlcmac_Cmac_BWP_UPLINKDEDICATEDt)
-                if (ul_bwp_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DEDICATED_CFG_PRESENT) {
+                if (dedicated_cfg_present) {
                     guint32 ul_bwp_ded_start = offset;
-                    // TODO: subtree
+
+                    // Subtree.
+                    proto_item *ded_ti = proto_tree_add_string_format(ul_bwp_tree, hf_l2server_ul_bwp_dedicated, tvb,
+                                                                         offset, 0, "", "Dedicated ");
+                    proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_ul_bwp_dedicated);
+
                     // Len
-                    guint32 bwp_ul_ded_len = tvb_get_guint32(tvb, offset, ENC_LITTLE_ENDIAN);
-                    offset += 4;
-                    // FieldMask
+                    guint32 bwp_ul_dedicated_len;
+                    proto_tree_add_item_ret_uint(ded_tree, hf_l2server_ul_bwp_dedicated_len, tvb, offset, 4,
+                                                 ENC_LITTLE_ENDIAN, &bwp_ul_dedicated_len);
                     offset += 4;
 
-                    // TODO:
+                    // FieldMask
+                    guint32 common_fieldmask;
+                    proto_tree_add_item_ret_uint(ded_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                                 ENC_LITTLE_ENDIAN, &common_fieldmask);
+                    gboolean ded_pucch_present, ded_pusch_present, ded_srs_present, ded_configured_grant_present;
+                    proto_tree_add_item_ret_boolean(ded_tree, hf_l2server_ded_pucch_cfg_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &ded_pucch_present);
+                    proto_tree_add_item_ret_boolean(ded_tree, hf_l2server_ded_pusch_cfg_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &ded_pusch_present);
+                    proto_tree_add_item_ret_boolean(ded_tree, hf_l2server_ded_srs_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &ded_srs_present);
+                    proto_tree_add_item_ret_boolean(ded_tree, hf_l2server_ded_configured_grant_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &ded_configured_grant_present);
+                    // TODO: add entry for beam recover too..
+                    offset += 4;
+
+                    // --------------------------------------------------------------
+                    // TODO: !!!!!!!
+                    // --------------------------------------------------------------
                     // PucchConfDed
                     // PuschConfDed
                     // SrsConfDed
                     // GrantConfDed
                     // BeamFailRecConfDed
 
+                    proto_item_set_len(ded_ti, bwp_ul_dedicated_len);
                     // Using length anyway
-                    offset = ul_bwp_ded_start + bwp_ul_ded_len;
+                    offset = ul_bwp_ded_start + bwp_ul_dedicated_len;
                 }
 
                 proto_item_set_len(ul_bwp_ti, bwp_uplink_len);
@@ -6367,12 +6419,12 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         }
 
         // SulCellCfgDed
-        if (fieldmask & nr5g_rlcmac_Cmac_STRUCT_SERV_CELL_CONFIG_SUP_UPLINK_PRESENT) {
+        if (sul_uplink_present) {
             // TODONT
         }
 
         // CsiMeasCfg (nr5g_rlcmac_Cmac_CSI_MEAS_CFGt)
-        if (fieldmask & nr5g_rlcmac_Cmac_STRUCT_CSI_MEAS_CFG_PRESENT) {
+        if (csi_meas_cfg_present) {
             guint32 csi_meas_start = offset;
 
             // Subtree.
@@ -6413,8 +6465,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
     }
 
     // MAC_CellGroupConfig (nr5g_rlcmac_Cmac_MAC_CELL_GROUP_CONFIGt)
-    // TODO: field_mask not as expected!!!!!
-    if (field_mask & nr5g_rlcmac_Cmac_STRUCT_MAC_CELL_GROUP_CONFIG_PRESENT) {
+    if (mac_cell_group_config_present) {
         proto_item *mac_cell_group_ti = proto_tree_add_string_format(l2_dedicated_config_tree, hf_l2server_mac_cell_group_config, tvb,
                                                               offset, 0,
                                                               "", "MAC Cell Group");
@@ -6937,11 +6988,23 @@ static void dissect_setparm_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
     // MaxRach
     proto_tree_add_item(tree, hf_l2server_max_rach, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
+    // LteDlHarqMode
+    offset += 1;
+    // PdcchType
+    offset += 1;
 
-    // SpareC
-    offset += 3;
+    // CatmEnable
+    offset += 1;
+    // LteDlSoftCombining
+    offset += 1;
+    // EnableDynPhRotationCompensation
+    offset += 1;
+
+    // SpareC[2]
+    offset += 2;
     // Spare
-    offset += (19*4);
+    proto_tree_add_item(tree, hf_l2server_spare, tvb, offset, 18*4, ENC_NA);
+    offset += (18*4);
 
     // NumUpStkPpu
     guint numUpStkPpu;
@@ -6952,6 +7015,8 @@ static void dissect_setparm_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
     proto_tree_add_item_ret_uint(tree, hf_l2server_num_dwn_stk_ppu, tvb, offset, 1, ENC_LITTLE_ENDIAN, &numDwnStkPpu);
     offset += 1;
     // NumLteProPpu
+    guint numLteProPpu;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_num_lte_pro_ppu, tvb, offset, 1, ENC_LITTLE_ENDIAN, &numLteProPpu);
     offset += 1;
     // NumNrProPpu
     guint numNrProPpu;
@@ -6959,6 +7024,8 @@ static void dissect_setparm_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
     offset += 1;
 
     // NumLteCell
+    guint32 numLteCell;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_num_lte_cell, tvb, offset, 1, ENC_LITTLE_ENDIAN, &numLteCell);
     offset += 1;
     // NumNrCell
     guint32 numNrCell;
@@ -6970,28 +7037,28 @@ static void dissect_setparm_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
 
     // numUpStkPpu
     for (guint n=0; n < numUpStkPpu; n++) {
+        // N.B. this is a union - but just consider as ppduid?
         proto_tree_add_item(tree, hf_l2server_up_stk_ppu, tvb, offset, 4, ENC_LITTLE_ENDIAN);
         offset += 4;
     }
 
     // numDwnStkPpu
-    for (guint n=0; n < numDwnStkPpu; n++) {
-        proto_tree_add_item(tree, hf_l2server_dwn_stk_ppu, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-        offset += 4;
-    }
+//    for (guint n=0; n < numDwnStkPpu; n++) {
+//        proto_tree_add_item(tree, hf_l2server_dwn_stk_ppu, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+//        offset += 4;
+//    }
 
     // NumNrProPpu
-    for (guint n=0; n < numNrProPpu; n++) {
-        proto_tree_add_item(tree, hf_l2server_nr_pro_ppu, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-        offset += 4;
-    }
-
+//    for (guint n=0; n < numNrProPpu; n++) {
+//        proto_tree_add_item(tree, hf_l2server_nr_pro_ppu, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+//        offset += 4;
+//    }
 
     // NrCellIdList
-    for (guint n=0; n < numNrCell; n++) {
-        proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-        offset += 1;
-    }
+//    for (guint n=0; n < numNrCell; n++) {
+//        proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+//        offset += 1;
+//    }
 }
 
 
@@ -7876,7 +7943,7 @@ proto_register_l2server(void)
         { "Number of preambles sent", "l2server.number-of-preambles-sent", FT_UINT32, BASE_DEC,
           NULL, 0x0, "Number of RACH preambles that were transmitted. Corresponds to parameter PREAMBLE_TRANSMISSION_COUNTER in TS 36.321", HFILL }},
       { &hf_l2server_contention_detected,
-        { "Contention Detected", "l2server.contention-detected", FT_UINT8, BASE_DEC,
+        { "Contention Detected", "l2server.contention-detected", FT_BOOLEAN, BASE_NONE,
           NULL, 0x0, "If set contention was detected for at least one of the transmitted preambles", HFILL }},
       { &hf_l2server_maxuppwr,
         { "MaxUpPwr", "l2server.maxuppwr", FT_UINT32, BASE_DEC,
@@ -8001,6 +8068,12 @@ proto_register_l2server(void)
       { &hf_l2server_l2_cell_dedicated_config_len,
         { "Len", "l2server.l2-cell-dedicated-config.len", FT_UINT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_spcell_config_ded_present,
+        { "SpCell Config Dedicated Present", "l2server.spcell-config-ded-present", FT_BOOLEAN, 16,
+          NULL, nr5g_rlcmac_Cmac_STRUCT_SPCELL_CONFIG_DED_PRESENT, NULL, HFILL }},
+      { &hf_l2server_mac_cell_dedicated_present,
+        { "MAC Cell Dedicated Present", "l2server.mac-cell-ded-present", FT_BOOLEAN, 16,
+          NULL, nr5g_rlcmac_Cmac_STRUCT_MAC_CELL_GROUP_CONFIG_PRESENT, NULL, HFILL }},
 
       { &hf_l2server_l1_cell_dedicated_config,
         { "L1 Cell Dedicated Config", "l2server.l1-cell-dedicated-config", FT_STRING, BASE_NONE,
@@ -8441,7 +8514,7 @@ proto_register_l2server(void)
 
       { &hf_l2server_sp_cell_cfg_common,
         { "SP Cell Cfg Common", "l2server.sp-cell-cfg-common", FT_STRING, BASE_NONE,
-          NULL, 0x0, NULL, HFILL }},
+          NULL, 0x0, "bb_nr5g_SERV_CELL_CONFIG_COMMONt", HFILL }},
 
       { &hf_l2server_serv_cell_freqinfo_dl_present,
         { "FreqInfo DL Present", "l2server.sp-cell-cfg-common.freqinfo-dl-present", FT_BOOLEAN, 32,
@@ -8466,10 +8539,10 @@ proto_register_l2server(void)
           NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_TDD_COMMON_PRESENT, NULL, HFILL }},
       { &hf_l2server_serv_cell_tomatcharound_setup,
         { "LTE CRS Common ToMatchAround Setup", "l2server.sp-cell-cfg-common.lte-common-tomatcharound-setup", FT_BOOLEAN, 32,
-          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_TOMATCHAROUND_SETUP, 0x0, HFILL }},
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_COMMON_TOMATCHAROUND_SETUP, 0x0, HFILL }},
       { &hf_l2server_serv_cell_tomatcharound_release,
         { "LTE CRS Common ToMatchAround Release", "l2server.sp-cell-cfg-common.lte-common-tomatcharound-release", FT_BOOLEAN, 32,
-          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_TOMATCHAROUND_RELEASE, 0x0, HFILL }},
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_COMMON_TOMATCHAROUND_RELEASE, 0x0, HFILL }},
       { &hf_l2server_serv_cell_hs_r16_present,
         { "High Speed Config R16 Present", "l2server.sp-cell-cfg-common.highspeed-config-r16-present", FT_BOOLEAN, 32,
           NULL, bb_nr5g_STRUCT_HIGH_SPEED_CONFIG_R16_PRESENT, 0x0, HFILL }},
@@ -8631,6 +8704,16 @@ proto_register_l2server(void)
         { "Length", "l2server.spcell-config-ded-len", FT_UINT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
 
+      { &hf_l2server_config_uplink_present,
+        { "Uplink Present", "l2server.config-uplink-present", FT_BOOLEAN, 32,
+          NULL, nr5g_rlcmac_Cmac_STRUCT_SERV_CELL_CONFIG_UPLINK_PRESENT, NULL, HFILL }},
+      { &hf_l2server_config_sul_uplink_present,
+        { "SUL Uplink Present", "l2server.config-sul-uplink-present", FT_BOOLEAN, 32,
+          NULL, nr5g_rlcmac_Cmac_STRUCT_SERV_CELL_CONFIG_SUP_UPLINK_PRESENT, NULL, HFILL }},
+      { &hf_l2server_csi_meas_cfg_present,
+        { "CSI Meas Cfg Present", "l2server.csi-meas-cfg-present", FT_BOOLEAN, 32,
+          NULL, nr5g_rlcmac_Cmac_STRUCT_CSI_MEAS_CFG_PRESENT, NULL, HFILL }},
+
       { &hf_l2server_radio_condition_group,
         { "Radio Condition Group", "l2server.radio-condition-group", FT_UINT32, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
@@ -8748,9 +8831,6 @@ proto_register_l2server(void)
         { "UL BWPId to del", "l2server.ul-bwpid-to-del", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
 
-
-
-
       { &hf_l2server_initial_ul_bwp,
         { "Initial Ul BWP", "l2server.initial-ul-bwp", FT_STRING, BASE_NONE,
            NULL, 0x0, "bb_nr5g_BWP_UPLINKCOMMONt", HFILL }},
@@ -8760,17 +8840,42 @@ proto_register_l2server(void)
 
       { &hf_l2server_ul_bwp,
         { "UL BWP", "l2server.ul-bwp", FT_STRING, BASE_NONE,
-           NULL, 0x0, NULL, HFILL }},
+           NULL, 0x0, "nr5g_rlcmac_Cmac_BWP_UPLINKt", HFILL }},
       { &hf_l2server_ul_bwp_len,
         { "Len", "l2server.ul-bwp.len", FT_UINT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_common_cfg_present,
+        { "UL Common Cfg Present", "l2server.ul-common-cfg-present", FT_BOOLEAN, 32,
+           NULL, nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_COMMON_CFG_PRESENT, NULL, HFILL }},
+      { &hf_l2server_ul_dedicated_cfg_present,
+        { "UL Dedicated Cfg Present", "l2server.ul-dedicated-cfg-present", FT_BOOLEAN, 32,
+           NULL, nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DEDICATED_CFG_PRESENT, NULL, HFILL }},
 
       { &hf_l2server_ul_bwp_common,
         { "UL BWP Common", "l2server.ul-bwp-common", FT_STRING, BASE_NONE,
-           NULL, 0x0, NULL, HFILL }},
+           NULL, 0x0, "nr5g_rlcmac_Cmac_BWP_UPLINKCOMMONt", HFILL }},
       { &hf_l2server_ul_bwp_common_len,
         { "Len", "l2server.ul-bwp-common.len", FT_UINT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ul_bwp_dedicated,
+        { "UL BWP Dedicated", "l2server.ul-bwp-dedicated", FT_STRING, BASE_NONE,
+           NULL, 0x0, "nr5g_rlcmac_Cmac_BWP_UPLINKDEDICATEDt", HFILL }},
+      { &hf_l2server_ul_bwp_dedicated_len,
+        { "Len", "l2server.ul-bwp-dedicated.len", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ded_pucch_cfg_present,
+        { "PUCCH Config Present", "l2server.pucch-cfg-present", FT_BOOLEAN, 32,
+           NULL, nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_PUCCH_CFG_PRESENT, NULL, HFILL }},
+      { &hf_l2server_ded_pusch_cfg_present,
+        { "PUCCH Config Present", "l2server.pusch-cfg-present", FT_BOOLEAN, 32,
+           NULL, nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_PUSCH_CFG_PRESENT, NULL, HFILL }},
+      { &hf_l2server_ded_srs_present,
+        { "SRS Config Present", "l2server.srs-cfg-present", FT_BOOLEAN, 32,
+           NULL, nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_SRS_CFG_PRESENT, NULL, HFILL }},
+      { &hf_l2server_ded_configured_grant_present,
+        { "Configured Grant Config Present", "l2server.configured-grant-cfg-present", FT_BOOLEAN, 32,
+           NULL, nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_CONFIGURED_GRANT_PRESENT, NULL, HFILL }},
 
       { &hf_l2server_ul_bwp_common_pdcch,
         { "UL BWP Common PDCCH", "l2server.ul-bwp-common-pdcch", FT_STRING, BASE_NONE,
@@ -8988,6 +9093,9 @@ proto_register_l2server(void)
       { &hf_l2server_max_rach,
         { "Max RACH", "l2server.max-rach", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_num_lte_cell,
+        { "Num Lte Cells", "l2server.num-lte-cells", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_num_nr_cell,
         { "Num Nr Cells", "l2server.num-nr-cells", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
@@ -8997,6 +9105,9 @@ proto_register_l2server(void)
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_num_dwn_stk_ppu,
         { "Num Dwn Stk PPUs", "l2server.num-dwn-stk-ppu", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_num_lte_pro_ppu,
+        { "Num Lte Pro PPUs", "l2server.num-lte-pro-ppu", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_num_nr_pro_ppu,
         { "Num Nr Pro PPUs", "l2server.num-nr-pro-ppu", FT_UINT8, BASE_DEC,
@@ -9025,7 +9136,7 @@ proto_register_l2server(void)
            NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_first_active_dl_bwp,
-        { "First active DL BWP", "l2server.first-active-dl-bwp", FT_INT8, BASE_DEC,
+        { "First Active DL BWP", "l2server.first-active-dl-bwp", FT_INT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_nb_dl_bwp_scs_spec_carrier,
         { "Nb DL BWP Scs Spec Carriers", "l2server.nb-bwp-scs-spec-carrier", FT_UINT8, BASE_DEC,
@@ -9750,6 +9861,7 @@ proto_register_l2server(void)
         &ett_l2server_ul_bwp,
         &ett_l2server_ul_bwp_common,
         &ett_l2server_ul_bwp_common_pdcch,
+        &ett_l2server_ul_bwp_dedicated,
         &ett_l2server_bwp_common_pdsch,
         &ett_l2server_rach_common,
         &ett_l2server_rach_generic,

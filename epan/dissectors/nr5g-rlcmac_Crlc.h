@@ -1,10 +1,10 @@
 #ifndef nr5g_rlcmac_Crlc_DEFINED
 #define nr5g_rlcmac_Crlc_DEFINED
 
-#ifndef tmLTEUU 
-#include "lsu.h"
-#endif
-#include "nr5g.h"
+//#ifndef tmLTEUU
+//#include "lsu.h"
+//#endif
+//#include "nr5g.h"
 
 #define nr5g_rlcmac_Crlc_VERSION   "0.1.1"
 
