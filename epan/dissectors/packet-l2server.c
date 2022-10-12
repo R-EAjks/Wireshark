@@ -443,6 +443,8 @@ static int hf_l2server_ded_pusch_cfg_present = -1;
 static int hf_l2server_ded_srs_present = -1;
 static int hf_l2server_ded_configured_grant_present = -1;
 
+static int hf_l2server_nb_pucch_conf_ded_to_add = -1;
+
 static int hf_l2server_ul_bwp_common_pdcch = -1;
 static int hf_l2server_ul_bwp_common_search_space_sib1 = -1;
 static int hf_l2server_ul_bwp_common_search_space_sib = -1;
@@ -787,6 +789,7 @@ static int hf_l2server_nb_tci_states_to_add = -1;
 static int hf_l2server_uplink_ded_pucch_config = -1;
 static int hf_l2server_uplink_ded_pucch_len = -1;
 static int hf_l2server_nb_sched_req_res_config_to_add = -1;
+static int hf_l2server_nb_resource_ded_to_add = -1;
 
 static int hf_l2server_uplink_ded_pusch_config = -1;
 static int hf_l2server_uplink_ded_pusch_len = -1;
@@ -5729,6 +5732,74 @@ static guint dissect_scheduling_request_res(proto_tree *tree, tvbuff_t *tvb, pac
     return offset;
 }
 
+// nr5g_rlcmac_Cmac_PUCCH_CONF_DEDICATEDt from nr5g-rlcmac_Cmac-bb.h
+static gint dissect_pucch_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                    guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *pucch_ti = proto_tree_add_string_format(tree, hf_l2server_uplink_ded_pucch_config, tvb,
+                                                        offset, 0,
+                                                        "", "PUCCH Conf Ded");
+    proto_tree *pucch_tree = proto_item_add_subtree(pucch_ti, ett_l2server_uplink_ded_pucch_config);
+
+    // Len
+    guint32 pucch_len;
+    proto_tree_add_item_ret_uint(pucch_tree, hf_l2server_uplink_ded_pucch_len, tvb, offset, 4,
+                                 ENC_LITTLE_ENDIAN, &pucch_len);
+    offset += 4;
+
+    // FieldMask
+    guint pucch_fieldmask;
+    proto_tree_add_item_ret_uint(pucch_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                 ENC_LITTLE_ENDIAN, &pucch_fieldmask);
+    offset += 4;
+
+    // NbDlDataToUlAck
+    offset += 1;
+    // DlDataToUlAck
+    offset += 8;
+
+    // NSchedReqResConfigToAdd
+    guint32 nb_sched_req_res_config_to_add;
+    proto_tree_add_item_ret_uint(pucch_tree, hf_l2server_nb_sched_req_res_config_to_add, tvb, offset, 1,
+                                 ENC_LITTLE_ENDIAN, &nb_sched_req_res_config_to_add);
+    offset += 1;
+    // NSchedReqResConfigToDel
+    offset += 1;
+
+    // NbResourceDedToAdd
+    proto_tree_add_item(pucch_tree, hf_l2server_nb_resource_ded_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // NbResourceDedToDel
+    offset += 1;
+
+    // Spare[3]
+    proto_tree_add_item(pucch_tree, hf_l2server_spare, tvb, offset, 3, ENC_NA);
+    offset += 3;
+
+    // PucchConfExtR16
+    if (pucch_fieldmask & nr5g_rlcmac_Cmac_STRUCT_PUCCH_CONF_DEDICATED_R16_IES_PRESENT) {
+        offset += sizeof(nr5g_rlcmac_Cmac_PUCCH_CONF_DEDICATED_R16_IESt);
+    }
+
+    // SchedReqResCfgAdd
+    if (pucch_fieldmask & nr5g_rlcmac_Cmac_STRUCT_PUCCH_CONF_DEDICATED_SR_RES_CFG_PRESENT) {
+        for (uint m=0; m < nb_sched_req_res_config_to_add; m++) {
+            offset = dissect_scheduling_request_res(pucch_tree, tvb, pinfo, offset);
+        }
+    }
+
+    // ResourceDedToDel
+    // TODO:
+
+    // ResourceDedToAdd
+    // TODO:
+
+    proto_item_set_len(pucch_ti, pucch_len);
+    return start_offset + pucch_len;
+}
 
 
 // Type is nr5g_rlcmac_Cmac_CONFIG_CMD_t from nr5g-rlcmac_Cmac.h
@@ -6181,66 +6252,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                 // N.B. So far, no entries set here...
                 if (initial_ul_bwp_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_PUCCH_CFG_PRESENT) {
                     // nr5g_rlcmac_Cmac_PUCCH_CONF_DEDICATEDt
-
-                    // Subtree.
-                    proto_item *pucch_ti = proto_tree_add_string_format(initial_ul_bwp_tree, hf_l2server_uplink_ded_pucch_config, tvb,
-                                                                        offset, 0,
-                                                                        "", "PUCCH Conf Ded");
-                    proto_tree *pucch_tree = proto_item_add_subtree(pucch_ti, ett_l2server_uplink_ded_pucch_config);
-
-                    // Len
-                    guint32 pucch_len;
-                    proto_tree_add_item_ret_uint(pucch_tree, hf_l2server_uplink_ded_pucch_len, tvb, offset, 4,
-                                                 ENC_LITTLE_ENDIAN, &pucch_len);
-                    offset += 4;
-
-                    // FieldMask
-                    guint pucch_fieldmask;
-                    proto_tree_add_item_ret_uint(pucch_tree, hf_l2server_field_mask_4, tvb, offset, 4,
-                                                 ENC_LITTLE_ENDIAN, &pucch_fieldmask);
-                    offset += 4;
-
-                    // NbDlDataToUlAck
-                    offset += 1;
-                    // DlDataToUlAck
-                    offset += 8;
-
-                    // NSchedReqResConfigToAdd
-                    guint32 nb_sched_req_res_config_to_add;
-                    proto_tree_add_item_ret_uint(pucch_tree, hf_l2server_nb_sched_req_res_config_to_add, tvb, offset, 1,
-                                                 ENC_LITTLE_ENDIAN, &nb_sched_req_res_config_to_add);
-                    offset += 1;
-                    // NSchedReqResConfigToDel
-                    offset += 1;
-
-                    // NbResourceDedToAdd
-                    offset += 1;
-                    // NbResourceDedToDel
-                    offset += 1;
-
-                    // Spare[3]
-                    proto_tree_add_item(pucch_tree, hf_l2server_spare, tvb, offset, 3, ENC_NA);
-                    offset += 3;
-
-                    // PucchConfExtR16
-                    if (pucch_fieldmask & nr5g_rlcmac_Cmac_STRUCT_PUCCH_CONF_DEDICATED_R16_IES_PRESENT) {
-                        offset += sizeof(nr5g_rlcmac_Cmac_PUCCH_CONF_DEDICATED_R16_IESt);
-                    }
-
-                    // SchedReqResCfgAdd
-                    if (pucch_fieldmask & nr5g_rlcmac_Cmac_STRUCT_PUCCH_CONF_DEDICATED_SR_RES_CFG_PRESENT) {
-                        for (uint m=0; m < nb_sched_req_res_config_to_add; m++) {
-                            offset = dissect_scheduling_request_res(pucch_tree, tvb, pinfo, offset);
-                        }
-                    }
-
-                    // ResourceDedToDel
-                    // TODO:
-
-                    // ResourceDedToAdd
-                    // TODO:
-
-                    proto_item_set_len(pucch_ti, pucch_len);
+                    offset = dissect_pucch_dedicated(initial_ul_bwp_tree, tvb, pinfo, offset);
                 }
 
                 if (initial_ul_bwp_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_PUSCH_CFG_PRESENT) {
@@ -6312,7 +6324,8 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                 offset += 4;
 
                 // BwpId
-                proto_tree_add_item(ul_bwp_tree, hf_l2server_bwpid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+                gint bwpid;
+                proto_tree_add_item_ret_int(ul_bwp_tree, hf_l2server_bwpid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &bwpid);
                 offset += 1;
 
                 // BwpULCommon (nr5g_rlcmac_Cmac_BWP_UPLINKCOMMONt from nr5g-rlcmac_Cmac-bb.h)
@@ -6399,7 +6412,22 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                     // --------------------------------------------------------------
                     // TODO: !!!!!!!
                     // --------------------------------------------------------------
+                    // NbPucchConfDedToAdd
+                    proto_tree_add_item(ded_tree, hf_l2server_nb_pucch_conf_ded_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+                    offset += 1;
+                    // NbConfigGrantConfigToRel_r16
+                    offset += 1;
+                    // NbConfigGrantConfigToAdd_r16
+                    offset += 1;
+                    // NbConfigGrantConfigType2DeactState_r16
+                    offset += 1;
+
                     // PucchConfDed
+                    if (ded_pucch_present) {
+                        // (nr5g_rlcmac_Cmac_PUCCH_CONF_DEDICATEDt)
+                        offset = dissect_pucch_dedicated(ded_tree, tvb, pinfo, offset);
+                    }
+
                     // PuschConfDed
                     // SrsConfDed
                     // GrantConfDed
@@ -6410,6 +6438,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
                     offset = ul_bwp_ded_start + bwp_ul_dedicated_len;
                 }
 
+                proto_item_append_text(ul_bwp_ti, " (bwpId=%d)", bwpid);
                 proto_item_set_len(ul_bwp_ti, bwp_uplink_len);
                 offset = bwp_uplink_start + bwp_uplink_len;
             }
@@ -8877,6 +8906,10 @@ proto_register_l2server(void)
         { "Configured Grant Config Present", "l2server.configured-grant-cfg-present", FT_BOOLEAN, 32,
            NULL, nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_CONFIGURED_GRANT_PRESENT, NULL, HFILL }},
 
+      { &hf_l2server_nb_pucch_conf_ded_to_add,
+        { "Nb PUCCH Conf Ded To Add", "l2server.nb-pucch-conf-ded-to-add", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
       { &hf_l2server_ul_bwp_common_pdcch,
         { "UL BWP Common PDCCH", "l2server.ul-bwp-common-pdcch", FT_STRING, BASE_NONE,
            NULL, 0x0, NULL, HFILL }},
@@ -9771,6 +9804,9 @@ proto_register_l2server(void)
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_nb_sched_req_res_config_to_add,
        { "Nb Sched Req Res Config To Add", "l2server.nb-sched-req-res-config-to-add", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_resource_ded_to_add,
+       { "Nb Resource Ded To Add", "l2server.nb-resource-ded-to-add", FT_UINT8, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_uplink_ded_pusch_config,
