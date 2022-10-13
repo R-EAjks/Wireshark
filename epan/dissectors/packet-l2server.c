@@ -789,6 +789,7 @@ static int hf_l2server_nb_tci_states_to_add = -1;
 static int hf_l2server_uplink_ded_pucch_config = -1;
 static int hf_l2server_uplink_ded_pucch_len = -1;
 static int hf_l2server_nb_sched_req_res_config_to_add = -1;
+static int hf_l2server_nb_sched_req_res_config_to_del = -1;
 static int hf_l2server_nb_resource_ded_to_add = -1;
 
 static int hf_l2server_uplink_ded_pusch_config = -1;
@@ -5767,6 +5768,9 @@ static gint dissect_pucch_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info
                                  ENC_LITTLE_ENDIAN, &nb_sched_req_res_config_to_add);
     offset += 1;
     // NSchedReqResConfigToDel
+    guint32 nb_sched_req_res_config_to_del;
+    proto_tree_add_item_ret_uint(pucch_tree, hf_l2server_nb_sched_req_res_config_to_del, tvb, offset, 1,
+                                 ENC_LITTLE_ENDIAN, &nb_sched_req_res_config_to_del);
     offset += 1;
 
     // NbResourceDedToAdd
@@ -6761,6 +6765,9 @@ static void dissect_crlc_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
     offset += 4;
     /* RbId */
     proto_tree_add_item(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* LcId */
+    proto_tree_add_item(tree, hf_l2server_lcid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     /* ER */
     proto_tree_add_item(tree, hf_l2server_rlc_er, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -9804,6 +9811,9 @@ proto_register_l2server(void)
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_nb_sched_req_res_config_to_add,
        { "Nb Sched Req Res Config To Add", "l2server.nb-sched-req-res-config-to-add", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_sched_req_res_config_to_del,
+       { "Nb Sched Req Res Config To Del", "l2server.nb-sched-req-res-config-to-del", FT_UINT8, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_nb_resource_ded_to_add,
        { "Nb Resource Ded To Add", "l2server.nb-resource-ded-to-add", FT_UINT8, BASE_DEC,
