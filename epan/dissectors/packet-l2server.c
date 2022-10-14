@@ -520,7 +520,20 @@ static int hf_l2server_tdd_common = -1;
 static int hf_l2server_beamid = -1;
 
 static int hf_l2server_verbosity = -1;
+
 static int hf_l2server_rlcmac_verbosity = -1;
+static int hf_l2server_verbosity_drx_set = -1;
+static int hf_l2server_verbosity_phr_set = -1;
+static int hf_l2server_verbosity_dci_set = -1;
+static int hf_l2server_verbosity_rlc_status_set = -1;
+static int hf_l2server_verbosity_ulsched_set = -1;
+static int hf_l2server_verbosity_l1_set = -1;
+static int hf_l2server_verbosity_rlc_set = -1;
+static int hf_l2server_verbosity_bsr_set = -1;
+static int hf_l2server_verbosity_sr_set = -1;
+static int hf_l2server_verbosity_mac_config_set = -1;
+
+
 static int hf_l2server_pdcp_verbosity = -1;
 static int hf_l2server_dl_harq_mode = -1;
 static int hf_l2server_ul_fs_advance = -1;
@@ -5181,11 +5194,13 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_tomatcharound_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &tomatcharound_setup);
     proto_tree_add_item(config_tree, hf_l2server_serv_cell_tomatcharound_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_hs_r16_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &hs_r16_present);
-
-
     offset += 4;
+
     // ServCellIdx
     proto_tree_add_item(config_tree, hf_l2server_serv_cell_idx, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // PhysCellId
+    proto_tree_add_item(config_tree, hf_l2server_physical_cellid, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
     // SsbPeriodicityServCell
     proto_tree_add_item(config_tree, hf_l2server_ssb_periodicity_serv_cell, tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -5204,9 +5219,9 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
     proto_tree_add_item(config_tree, hf_l2server_n_timing_advance_offset, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
 
-    // Pad
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
-    offset += 1;
+    // Pad[3]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_NA);
+    offset += 3;
 
     // SsbPosInBurst (union)
     switch (ssb_in_burst_type) {
@@ -5267,7 +5282,7 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
             // Spare
             proto_tree_add_item(freq_tree, hf_l2server_spare1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
             offset += 1;
-            // FreqBandList
+            // FreqBandList[]
             guint loops = (serialize) ? nb_freq_band_list : bb_nr5g_MAX_NB_MULTIBANDS;
             for (guint32 n=0; n < loops; n++) {
                 proto_item *ti = proto_tree_add_item(freq_tree, hf_l2server_freq_band_list, tvb, offset, 2, ENC_LITTLE_ENDIAN);
@@ -6996,9 +7011,21 @@ static void dissect_setparm_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
     // Verbosity
     proto_tree_add_item(tree, hf_l2server_verbosity, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
+
     // L2_nr5g_RlcMac_Verbosity
     proto_tree_add_item(tree, hf_l2server_rlcmac_verbosity, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_drx_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_phr_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_dci_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_rlc_status_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_ulsched_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_l1_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_rlc_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_bsr_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_sr_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_mac_config_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
+
     // L2_nr5g_pdcp_Verbosity
     proto_tree_add_item(tree, hf_l2server_pdcp_verbosity, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -8347,7 +8374,7 @@ proto_register_l2server(void)
 
       { &hf_l2server_ph_cell_config,
         { "PH Cell Config", "l2server.ph-cell-config", FT_STRING, BASE_NONE,
-          NULL, 0x0, NULL, HFILL }},
+          NULL, 0x0, "bb_nr5g_PH_CELL_GROUP_CONFIGt", HFILL }},
       { &hf_l2server_ph_cell_dcp_config_setup,
         { "DCP Config Present", "l2server.field-mask.dcp-config-setup", FT_BOOLEAN, 32,
           NULL, bb_nr5g_STRUCT_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16_SETUP, NULL, HFILL }},
@@ -8797,7 +8824,7 @@ proto_register_l2server(void)
 
       { &hf_l2server_cell_config_cellcfg_type,
         { "CellConfig Type", "l2server.cellconfig-type", FT_UINT8, BASE_DEC,
-          VALS(cellconfig_type_vals), 0x0, NULL, HFILL }},
+          VALS(cellconfig_type_vals), 0x0, "bb_nr5g_CELL_GROUP_CONFIGt", HFILL }},
 
       { &hf_l2server_cell_config_cellcfg,
         { "CellCfg", "l2server.cell-config.cellcfg", FT_STRING, BASE_NONE,
@@ -9033,7 +9060,7 @@ proto_register_l2server(void)
 
       { &hf_l2server_freq_info_dl,
         { "Freq Info DL", "l2server.freq-info-dl", FT_STRING, BASE_NONE,
-           NULL, 0x0, NULL, HFILL }},
+           NULL, 0x0, "bb_nr5g_FREQINFO_DLt", HFILL }},
       { &hf_l2server_abs_freq_ssb,
         { "Abs Freq SSB", "l2server.abs-freq-ssb", FT_UINT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
@@ -9091,10 +9118,10 @@ proto_register_l2server(void)
 
       { &hf_l2server_bwp_dl_common,
         { "BWP DL Common", "l2server.bwp-dl-common", FT_STRING, BASE_NONE,
-           NULL, 0x0, NULL, HFILL }},
+           NULL, 0x0, "bb_nr5g_BWP_DOWNLINKCOMMONt", HFILL }},
       { &hf_l2server_freq_info_ul_common,
         { "FreqInfo UL Common", "l2server.freqinfo-ul-common", FT_STRING, BASE_NONE,
-           NULL, 0x0, NULL, HFILL }},
+           NULL, 0x0, "bb_nr5g_FREQINFO_ULt", HFILL }},
       { &hf_l2server_bwp_ul_common,
         { "BWP UL Common", "l2server.bwp-ul-common", FT_STRING, BASE_NONE,
            NULL, 0x0, NULL, HFILL }},
@@ -9106,7 +9133,7 @@ proto_register_l2server(void)
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_tdd_common,
         { "TDD Common", "l2server.tdd-common", FT_STRING, BASE_NONE,
-           NULL, 0x0, NULL, HFILL }},
+           NULL, 0x0, "bb_nr5g_TDD_UL_DL_CONFIG_COMMONt", HFILL }},
 
       { &hf_l2server_beamid,
         { "BeamId", "l2server.beamid", FT_INT32, BASE_DEC,
@@ -9115,18 +9142,48 @@ proto_register_l2server(void)
       { &hf_l2server_verbosity,
         { "Verbosity", "l2server.verbosity", FT_UINT32, BASE_HEX_DEC,
            NULL, 0x0, NULL, HFILL }},
+
       { &hf_l2server_rlcmac_verbosity,
         { "RLCMAC Verbosity", "l2server.rlcmac-verbosity", FT_UINT32, BASE_HEX_DEC,
            NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_verbosity_drx_set,
+        { "DRX", "l2server.rlcmac-verbosity.drx", FT_BOOLEAN, 32,
+           NULL, 0x00010000, NULL, HFILL }},
+      { &hf_l2server_verbosity_phr_set,
+        { "PHR", "l2server.rlcmac-verbosity.phr", FT_BOOLEAN, 32,
+           NULL, 0x00004000, NULL, HFILL }},
+      { &hf_l2server_verbosity_dci_set,
+        { "DCI", "l2server.rlcmac-verbosity.dci", FT_BOOLEAN, 32,
+           NULL, 0x00002000, NULL, HFILL }},
+      { &hf_l2server_verbosity_rlc_status_set,
+        { "RLC Status", "l2server.rlcmac-verbosity.rlc-status", FT_BOOLEAN, 32,
+           NULL, 0x00001000, NULL, HFILL }},
+      { &hf_l2server_verbosity_ulsched_set,
+        { "UL SCHED", "l2server.rlcmac-verbosity.ulsched", FT_BOOLEAN, 32,
+           NULL, 0x00000800, NULL, HFILL }},
+      { &hf_l2server_verbosity_l1_set,
+        { "L2", "l2server.rlcmac-verbosity.l2", FT_BOOLEAN, 32,
+           NULL, 0x00000400, "L1-L2 communication", HFILL }},
+      { &hf_l2server_verbosity_rlc_set,
+        { "RLC", "l2server.rlcmac-verbosity.rlc", FT_BOOLEAN, 32,
+           NULL, 0x00000040, NULL, HFILL }},
+      { &hf_l2server_verbosity_bsr_set,
+        { "BSR", "l2server.rlcmac-verbosity.bsr", FT_BOOLEAN, 32,
+           NULL, 0x00000004, NULL, HFILL }},
+      { &hf_l2server_verbosity_sr_set,
+        { "SR", "l2server.rlcmac-verbosity.sr", FT_BOOLEAN, 32,
+           NULL, 0x00000002, NULL, HFILL }},
+      { &hf_l2server_verbosity_mac_config_set,
+        { "MAC Config", "l2server.rlcmac-verbosity.mac-config", FT_BOOLEAN, 32,
+           NULL, 0x00000001, NULL, HFILL }},
+
       { &hf_l2server_pdcp_verbosity,
         { "PDCP Verbosity", "l2server.pdcp-verbosity", FT_UINT32, BASE_HEX_DEC,
            NULL, 0x0, NULL, HFILL }},
 
-
       { &hf_l2server_dl_harq_mode,
         { "DL HARQ Mode", "l2server.dl-harq-mode", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
-
       { &hf_l2server_ul_fs_advance,
         { "UL FS Advance", "l2server.ul-fs-advance", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
@@ -9513,10 +9570,10 @@ proto_register_l2server(void)
         { "CCE Reg Map Type", "l2server.cce-reg-map-type", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_reg_bundle_size,
-        { "Reg Bundle Size", "l2server.reg-bundle-size", FT_UINT8, BASE_DEC,
+        { "Reg Bundle Size", "l2server.reg-bundle-size", FT_INT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_interleave_size,
-        { "Interleave Size", "l2server.interleave-size", FT_UINT8, BASE_DEC,
+        { "Interleave Size", "l2server.interleave-size", FT_INT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_shift_index,
         { "Shift Index", "l2server.shift-index", FT_INT16, BASE_DEC,
@@ -9670,7 +9727,7 @@ proto_register_l2server(void)
        { "PUCCH Res Common", "l2server.pucch-res-common", FT_INT8, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_pucch_group_hop,
-       { "PUCCH Group Hop", "l2server.pucch-group-hop", FT_UINT8, BASE_DEC,
+       { "PUCCH Group Hop", "l2server.pucch-group-hop", FT_INT8, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_pucch_hopping_id,
        { "PUCCH Hopping Id", "l2server.pucch-hopping-id", FT_UINT16, BASE_DEC,
