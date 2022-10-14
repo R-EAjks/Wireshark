@@ -753,7 +753,9 @@ static int hf_l2server_p0_nom = -1;
 
 static int hf_l2server_ref_sub_car_spacing;
 
+static int hf_l2server_skip_uplink_tx_dynamic = -1;
 static int hf_l2server_ho_flag = -1;
+static int hf_l2server_data_inactivity_timer = -1;
 
 static int hf_l2server_sr_config = -1;
 static int hf_l2server_n_sr_to_add = -1;
@@ -5975,13 +5977,14 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         offset = dissect_sr_config(mac_cgc_tree, tvb, pinfo, offset);
 
         // skipUplinkTxDynamic
+        proto_tree_add_item(mac_cgc_tree, hf_l2server_skip_uplink_tx_dynamic, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
-        // sCellDeactivationTimer
-        proto_tree_add_item(mac_cgc_tree, hf_l2server_scell_deact_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-        offset += 4;
         // HoFlag
         proto_tree_add_item(mac_cgc_tree, hf_l2server_ho_flag, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
+        // DataInactivityTimer
+        proto_tree_add_item(mac_cgc_tree, hf_l2server_data_inactivity_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
     }
 
     // spCellConfig (nr5g_rlcmac_Cmac_SpCellConfig_t from nr5g-rlcmac_Cmac.h)
@@ -6000,6 +6003,9 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         offset += 4;
         // PCMAXc_SUL
         proto_tree_add_item(sp_cell_config_tree, hf_l2server_pcmaxc_sul, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+        // sCellDeactivationTimer
+        proto_tree_add_item(sp_cell_config_tree, hf_l2server_scell_deact_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
         offset += 4;
 
         proto_item_append_text(sp_cell_config_ti, " (sCellIndex=%u)", scellindex);
@@ -9740,8 +9746,14 @@ proto_register_l2server(void)
        { "Ref Sub Carrier Spacing", "l2server.ref-sub-car-spacing", FT_INT8, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
 
+      { &hf_l2server_skip_uplink_tx_dynamic,
+       { "Skip Uplink Tx Dynamic", "l2server.skip-uplink-tx-dynamic", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_ho_flag,
        { "HO Flag", "l2server.ho-flag", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_data_inactivity_timer,
+       { "Data Inactivity Timer", "l2server.data-inactivity-timer", FT_INT32, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_sr_config,
