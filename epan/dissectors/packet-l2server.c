@@ -8430,7 +8430,7 @@ proto_register_l2server(void)
           NULL, bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_SETUP, NULL, HFILL }},
       { &hf_l2server_ph_pdcch_blind_detection_release,
         { "PDCCH Blind Detection Release", "l2server.field-mask.pdcch-blind-detection-release", FT_BOOLEAN, 32,
-          NULL, bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_SETUP, NULL, HFILL }},
+          NULL, bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_RELEASE, NULL, HFILL }},
 
       { &hf_l2server_harq_ack_spatial_bundling_pucch,
         { "HARQ ACK Spacial Bundling PUCCH", "l2server.harq-ack-spatial-bundling-pucch", FT_INT8, BASE_DEC,
@@ -9270,7 +9270,7 @@ proto_register_l2server(void)
 
       { &hf_l2server_mac_config,
         { "MAC Config", "l2server.mac-config", FT_STRING, BASE_NONE,
-           NULL, 0x0, NULL, HFILL }},
+           NULL, 0x0, "nr5g_rlcmac_Cmac_CONFIG_CMD_t", HFILL }},
 
       { &hf_l2server_lch_basedprioritization_r16,
         { "LCH-based Prioritization R16", "l2server.lch-based-prioritization-r16", FT_INT8, BASE_DEC,
@@ -9964,7 +9964,7 @@ proto_register_l2server(void)
 
       { &hf_l2server_csi_meas_cfg,
        { "CSI Meas Cfg", "l2server.csi-meas-config", FT_STRING, BASE_NONE,
-         NULL, 0x0, NULL, HFILL }},
+         NULL, 0x0, "nr5g_rlcmac_Cmac_CSI_MEAS_CFGt", HFILL }},
       { &hf_l2server_csi_meas_cfg_len,
        { "Len", "l2server.csi-meas-config.len", FT_UINT32, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
