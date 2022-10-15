@@ -829,6 +829,11 @@ static int hf_l2server_sps_conf_dedicated = -1;
 
 static int hf_l2server_dbeam = -1;
 
+static int hf_l2server_getinfo_type = -1;
+static int hf_l2server_getinfo_flags = -1;
+static int hf_l2server_getinfo_nos = -1;
+static int hf_l2server_getinfo_info = -1;
+
 static const value_string lch_vals[] =
 {
     { 0x0,   "SPARE" },
@@ -1557,6 +1562,39 @@ static void dissect_open_cell_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *
 {
     /* CellId */
     proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+}
+
+static void dissect_getinfo_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset, guint len _U_)
+{
+    /* Type */
+    proto_tree_add_item(tree, hf_l2server_getinfo_type, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* Flags */
+    proto_tree_add_item(tree, hf_l2server_getinfo_flags, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+}
+
+static void dissect_getinfo_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset, guint len _U_)
+{
+    /* Type */
+    proto_tree_add_item(tree, hf_l2server_getinfo_type, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* Flags */
+    proto_tree_add_item(tree, hf_l2server_getinfo_flags, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* Info[0] - of type lte_l2_Srv_GETINFO_UDG_OSLISTt */
+    /* NOs (number of supported fields */
+    guint32 nos;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_getinfo_nos, tvb, offset, 4, ENC_LITTLE_ENDIAN, &nos);
+    offset += 4;
+    /* Info[] */
+    for (guint n=0; n < nos; n++) {
+        proto_tree_add_item(tree, hf_l2server_getinfo_info, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+    }
 }
 
 static void dissect_cell_parm_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -7343,8 +7381,8 @@ static TYPE_FUN om_type_funs[] =
         { nr5g_l2_Srv_OPEN_CELL_NAK,         "NR5G_L2_SRV_OPEN_CELL_NAK",       dissect_sapi_type_dummy },
 
         // N.B. we send fix bytes ("buffer from log shared by Rocco")
-        { lte_l2_Srv_GETINFO_CMD,            "lte_l2_Srv_GETINFO_CMD",       dissect_sapi_type_dummy },
-        { lte_l2_Srv_GETINFO_ACK,            "lte_l2_Srv_GETINFO_ACK",       dissect_sapi_type_dummy },
+        { lte_l2_Srv_GETINFO_CMD,            "lte_l2_Srv_GETINFO_CMD",       dissect_getinfo_cmd },
+        { lte_l2_Srv_GETINFO_ACK,            "lte_l2_Srv_GETINFO_ACK",       dissect_getinfo_ack },
         { lte_l2_Srv_GETINFO_NAK,            "lte_l2_Srv_GETINFO_NAK",       dissect_sapi_type_dummy },
 
         { nr5g_l2_Srv_CELL_CONFIG_CMD,       "nr5g_l2_Srv_CELL_CONFIG_CMD",       dissect_cell_config_cmd },
@@ -9939,6 +9977,18 @@ proto_register_l2server(void)
        { "Dbeam", "l2server.dbeam", FT_STRING, BASE_NONE,
          NULL, 0x0, NULL, HFILL }},
 
+      { &hf_l2server_getinfo_type,
+       { "Type", "l2server.getinfo-type", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_getinfo_flags,
+       { "Flags", "l2server.getinfo-flags", FT_UINT32, BASE_HEX,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_getinfo_nos,
+       { "NOs", "l2server.getinfo-nos", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_getinfo_info,
+       { "Info", "l2server.getinfo-info", FT_UINT16, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
