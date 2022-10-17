@@ -204,6 +204,7 @@ static int hf_l2server_spare2 = -1;
 static int hf_l2server_spare4 = -1;
 static int hf_l2server_spare = -1;
 static int hf_l2server_pad = -1;
+static int hf_l2server_dummy = -1;
 
 static int hf_l2server_package_type = -1;
 
@@ -250,6 +251,7 @@ static int hf_l2server_tpc_pusch_rnti = -1;
 static int hf_l2server_sp_csi_rnti = -1;
 static int hf_l2server_cs_rnti = -1;
 static int hf_l2server_pdcch_blind_detection = -1;
+static int hf_l2server_bdfactor_r16 = -1;
 
 static int hf_l2server_sp_cell_cfg_ded = -1;
 
@@ -833,6 +835,16 @@ static int hf_l2server_getinfo_type = -1;
 static int hf_l2server_getinfo_flags = -1;
 static int hf_l2server_getinfo_nos = -1;
 static int hf_l2server_getinfo_info = -1;
+
+static int hf_l2server_aper_trigger_state_config = -1;
+static int hf_l2server_nb_ass_rep_cf_info_list = -1;
+
+static int hf_l2server_csi_associated_report_cfg = -1;
+static int hf_l2server_rep_cfg_id = -1;
+static int hf_l2server_csi_im_res_for_interference = -1;
+static int hf_l2server_nzp_csi_rs_res_for_interference = -1;
+
+
 
 static const value_string lch_vals[] =
 {
@@ -1435,6 +1447,8 @@ static gint ett_l2server_sr_resource = -1;
 static gint ett_l2server_csi_meas_cfg = -1;
 static gint ett_l2server_sps_conf_dedicated = -1;
 static gint ett_l2server_dbeam = -1;
+static gint ett_l2server_aper_trigger_stateconfig = -1;
+static gint ett_l2server_csi_associated_report_cfg = -1;
 
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
@@ -2743,6 +2757,7 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     offset += 1;
 
     // BdFactorR_r16
+    proto_tree_add_item(config_tree, hf_l2server_bdfactor_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
 
     // Pdsch_HARQ_ACK_CodebookList_r16[2]
@@ -2751,6 +2766,7 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     // Pad
     proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
     offset += 1;
+
 
     // These 2 are included (0xff) in message even present flags not set..
 
@@ -2761,13 +2777,13 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     }
     offset += sizeof(bb_nr5g_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16t);
 
-
     // Pdcch_BlindDetectionCA_CombIndicator_r16 (bb_nr5g_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16t)
     if (pdcch_blind_detection_setup) {
         // N.B. Size of this is fixed.
         // TODO:
     }
-    offset += sizeof(bb_nr5g_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16t);
+    //offset += sizeof(bb_nr5g_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16t);
+    offset = start_offset + sizeof(bb_nr5g_PH_CELL_GROUP_CONFIGt);
 
     proto_item_set_len(config_ti, offset-start_offset);
     return offset;
@@ -2958,14 +2974,13 @@ static int dissect_pdsch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_
     guint32 fieldmask;
     proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_4, tvb, offset, 4,
                                  ENC_LITTLE_ENDIAN, &fieldmask);
-
     offset += 4;
 
     // TODO:
     // RateMatchPatternGroup1
-    offset += bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS;
+    offset += bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP;
     // RateMatchPatternGroup2
-    offset += bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS;
+    offset += bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP;
 
     // DmrsMappingTypeA
     // DmrsMappingTypeB
@@ -4126,6 +4141,47 @@ static int dissect_csi_rep_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     return offset;
 }
 
+// bb_nr5g_CSI_ASSOCIATED_REPORT_CFG_INFOt (from bb-nr5g_struct.h)
+static int dissect_csi_associated_report_cfg(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                             guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_csi_associated_report_cfg,  tvb,
+                                                         offset, 0,
+                                                          "", "CSI Associated Report Cfg");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_associated_report_cfg);
+
+    // RepCfgId
+    guint32 rep_cfg_id;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_rep_cfg_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &rep_cfg_id);
+    offset += 1;
+    // CsiImResForInterference
+    proto_tree_add_item(config_tree, hf_l2server_csi_im_res_for_interference, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // NzpCsiRsResForInterference
+    proto_tree_add_item(config_tree, hf_l2server_nzp_csi_rs_res_for_interference, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // ResForChannelIsValid
+    offset += 1;
+
+    // ResForChannel
+    offset += 1;
+    // NbQclInfo
+    offset += 1;
+    // Pad[2]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
+    offset += 2;
+    // QclInfo[]
+    offset += bb_nr5g_MAX_NB_AP_CSI_RS_RESOURCES_PER_SET;
+
+    //offset = start_offset + sizeof(bb_nr5g_CSI_ASSOCIATED_REPORT_CFG_INFOt);
+    proto_item_append_text(config_ti, " (RepCfgId=%u)", rep_cfg_id);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
 
 // bb_nr5g_CSI_APERIODIC_TRIGGER_STATE_CFGt (from bb-nr5g_struct.h)
 static int dissect_aper_trigger_state(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -4134,13 +4190,14 @@ static int dissect_aper_trigger_state(proto_tree *tree, tvbuff_t *tvb, packet_in
     guint start_offset = offset;
 
     // Subtree.
-    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_csi_rep_config,  tvb,
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_aper_trigger_state_config,  tvb,
                                                          offset, 0,
                                                           "", "Aperiodic Trigger State Config");
-    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_rep_config);
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_aper_trigger_stateconfig);
 
     // NbAssRepCfInfoList
-    guint32 nb_ass_rep_cf_info_list = tvb_get_guint8(tvb, offset);
+    guint32 nb_ass_rep_cf_info_list;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_ass_rep_cf_info_list, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_ass_rep_cf_info_list);
     offset += 1;
 
     // Pad[3]
@@ -4149,7 +4206,8 @@ static int dissect_aper_trigger_state(proto_tree *tree, tvbuff_t *tvb, packet_in
 
     // AssRepCfInfoList
     for (guint n=0; n < nb_ass_rep_cf_info_list; n++) {
-        offset += sizeof(bb_nr5g_CSI_ASSOCIATED_REPORT_CFG_INFOt);
+        //offset += sizeof(bb_nr5g_CSI_ASSOCIATED_REPORT_CFG_INFOt);
+        offset = dissect_csi_associated_report_cfg(config_tree, tvb, pinfo, offset);
     }
 
     proto_item_set_len(config_ti, offset-start_offset);
@@ -4400,6 +4458,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
     offset += 1;
     // Dummy
     offset += 1;
+    proto_tree_add_item(config_tree, hf_l2server_dummy, tvb, offset, 1, ENC_NA);
     // PathlossRefLinking
     proto_tree_add_item(config_tree, hf_l2server_pathloss_ref_linking, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
@@ -4630,6 +4689,7 @@ static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info 
                                                               offset, sizeof(bb_nr5g_UPLINK_DEDICATED_CONFIGt),
                                                               "", "Cross Carrier Sched");
         //proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_cross_carrier_sched);
+        /* N.B. Fixed size */
         offset += sizeof(bb_nr5g_CROSS_CARRIER_SCHEDULING_CONFIGt);
     }
 
@@ -6627,6 +6687,9 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
         // PhyCellCnf (bb_nr5g_PH_CELL_GROUP_CONFIGt from bb-nr5g_struct.h)
         offset = dissect_ph_cell_config(l1_dedicated_config_tree, tvb, pinfo, offset);
 
+        // RNTICap. TODO: ?
+        offset += sizeof(bb_nr5g_RNTI_CAPABILITIESt);
+
         if (ded_present) {
             // SpCellCfgDed. N.B. offset returned here won't be right yet..
             offset = dissect_sp_cell_cfg_ded(l1_dedicated_config_tree, tvb, pinfo, offset);
@@ -8347,6 +8410,10 @@ proto_register_l2server(void)
       { &hf_l2server_pad,
         { "Pad", "l2server.pad", FT_BYTES, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_dummy,
+        { "Dummy", "l2server.dummy", FT_BYTES, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
 
       { &hf_l2server_package_type,
         { "PackageType", "l2server.package-type", FT_UINT8, BASE_DEC,
@@ -8472,11 +8539,13 @@ proto_register_l2server(void)
       { &hf_l2server_pdcch_blind_detection,
         { "PDCCH Blind Detection", "l2server.pdcch-blind-detection", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
-
+      { &hf_l2server_bdfactor_r16,
+        { "BDFactor r16", "l2server.bdfactor-r16", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_sp_cell_cfg_ded,
         { "SP Cell Cfg Dedicated", "l2server.sp-cell-cfg-ded", FT_STRING, BASE_NONE,
-          NULL, 0x0, NULL, HFILL }},
+          NULL, 0x0, "bb_nr5g_SERV_CELL_CONFIGt", HFILL }},
 
       { &hf_l2server_sp_cell_cfg_tdd_ded_present,
         { "TDD Present", "l2server.sp-cell-cfg-ded.tdd-present", FT_BOOLEAN, 32,
@@ -9324,7 +9393,7 @@ proto_register_l2server(void)
         { "PDSCH ServingCell", "l2server.pdsch-serving-cell", FT_STRING, BASE_NONE,
            NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_xoverhead,
-        { "XOverhead", "l2server.xoverhead", FT_UINT8, BASE_DEC,
+        { "XOverhead", "l2server.xoverhead", FT_INT8, BASE_DEC,
            VALS(xoverhead_vals), 0x0, NULL, HFILL }},
       { &hf_l2server_nb_harq_processes_for_pdsch,
         { "Nb HARQ Processes for PDSCH", "l2server.nb-harq-processes-for-pdsch", FT_UINT8, BASE_DEC,
@@ -9989,6 +10058,26 @@ proto_register_l2server(void)
       { &hf_l2server_getinfo_info,
        { "Info", "l2server.getinfo-info", FT_UINT16, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_aper_trigger_state_config,
+       { "Aperiodic Trigger State Config", "l2server.aperiodic-trigger-state-config", FT_STRING, BASE_NONE,
+         NULL, 0x0, "bb_nr5g_CSI_APERIODIC_TRIGGER_STATE_CFGt", HFILL }},
+      { &hf_l2server_nb_ass_rep_cf_info_list,
+       { "Nb Ass Rep Cf Info List", "l2server.nb-ass-rep-cf-info-list", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_csi_associated_report_cfg,
+       { "CSI Associated Report Cfg", "l2server.csi-associated-report-cfg", FT_STRING, BASE_NONE,
+         NULL, 0x0, "bb_nr5g_CSI_ASSOCIATED_REPORT_CFG_INFOt", HFILL }},
+      { &hf_l2server_rep_cfg_id,
+       { "Rep Cfg Id", "l2server.rep-cfg-id", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_im_res_for_interference,
+       { "CSI IM Res For Interference", "l2server.csi-im-res-for-interference", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nzp_csi_rs_res_for_interference,
+       { "NZP CSI Rs Res For Interference", "l2server.nzp-csi-rs-res-for-interference", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
@@ -10081,7 +10170,9 @@ proto_register_l2server(void)
         &ett_l2server_sr_resource,
         &ett_l2server_csi_meas_cfg,
         &ett_l2server_sps_conf_dedicated,
-        &ett_l2server_dbeam
+        &ett_l2server_dbeam,
+        &ett_l2server_aper_trigger_stateconfig,
+        &ett_l2server_csi_associated_report_cfg
     };
 
     static ei_register_info ei[] = {
