@@ -844,6 +844,8 @@ static int hf_l2server_rep_cfg_id = -1;
 static int hf_l2server_csi_im_res_for_interference = -1;
 static int hf_l2server_nzp_csi_rs_res_for_interference = -1;
 
+static int hf_l2server_code = -1;
+static int hf_l2server_version_hash = -1;
 
 
 static const value_string lch_vals[] =
@@ -6944,8 +6946,15 @@ static void dissect_crlc_config_ack(proto_tree *tree, tvbuff_t *tvb, packet_info
 static void dissect_version_info_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                      guint offset, guint len _U_)
 {
+    // Code (made up name). 1 means real, 0 means debug (and not passed to L1)
+    proto_tree_add_item(tree, hf_l2server_code, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
     // Spare (should be zero)
     proto_tree_add_item(tree, hf_l2server_spare2, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // VersionHash
+    proto_tree_add_item(tree, hf_l2server_version_hash, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
 }
 
 static void dissect_version_info_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -6991,8 +7000,10 @@ static void dissect_ppu_list_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *p
     proto_tree_add_item(tree, hf_l2server_ncelllte, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // NCellNr
-    proto_tree_add_item(tree, hf_l2server_ncellnr, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    guint nCellNr;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_ncellnr, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nCellNr);
     offset += 1;
+
     // NumLteProPdu
     guint32 num_lte_pro_pdu;
     proto_tree_add_item_ret_uint(tree, hf_l2server_numltepropdu, tvb, offset, 1, ENC_LITTLE_ENDIAN, &num_lte_pro_pdu);
@@ -7001,7 +7012,8 @@ static void dissect_ppu_list_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *p
     guint32 num_nr_pro_pdu;
     proto_tree_add_item_ret_uint(tree, hf_l2server_numnrpropdu, tvb, offset, 1, ENC_LITTLE_ENDIAN, &num_nr_pro_pdu);
     offset += 1;
-    // CellIdNrList[].
+
+    // CellIdLteList[].
     for (guint32 n=0; n < num_lte_pro_pdu; n++) {
         proto_tree_add_item(tree, hf_l2server_cellidlteitem, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
@@ -7137,6 +7149,7 @@ static void dissect_setparm_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
     proto_tree_add_item(tree, hf_l2server_pdcp_verbosity, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 
+    // TODO
     // BeamChangeTimer
     offset += 2;
     // FieldTestMode
@@ -7172,7 +7185,7 @@ static void dissect_setparm_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
 
     // SpareC[2]
     offset += 2;
-    // Spare
+    // Spare[18]
     proto_tree_add_item(tree, hf_l2server_spare, tvb, offset, 18*4, ENC_NA);
     offset += (18*4);
 
@@ -7213,22 +7226,22 @@ static void dissect_setparm_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
     }
 
     // numDwnStkPpu
-//    for (guint n=0; n < numDwnStkPpu; n++) {
-//        proto_tree_add_item(tree, hf_l2server_dwn_stk_ppu, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-//        offset += 4;
-//    }
+    for (guint n=0; n < numDwnStkPpu; n++) {
+        proto_tree_add_item(tree, hf_l2server_dwn_stk_ppu, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
 
     // NumNrProPpu
-//    for (guint n=0; n < numNrProPpu; n++) {
-//        proto_tree_add_item(tree, hf_l2server_nr_pro_ppu, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-//        offset += 4;
-//    }
+    for (guint n=0; n < numNrProPpu; n++) {
+        proto_tree_add_item(tree, hf_l2server_nr_pro_ppu, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
 
     // NrCellIdList
-//    for (guint n=0; n < numNrCell; n++) {
-//        proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-//        offset += 1;
-//    }
+    for (guint n=0; n < numNrCell; n++) {
+        proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+    }
 }
 
 
@@ -10077,6 +10090,13 @@ proto_register_l2server(void)
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_nzp_csi_rs_res_for_interference,
        { "NZP CSI Rs Res For Interference", "l2server.nzp-csi-rs-res-for-interference", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_code,
+       { "Code", "l2server.code", FT_UINT16, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_version_hash,
+       { "Version Hash", "l2server.version-hash", FT_UINT32, BASE_HEX,
          NULL, 0x0, NULL, HFILL }},
     };
 
