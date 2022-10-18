@@ -693,9 +693,10 @@ Supersedes “TCP Dup ACK”.
 ==== TCP Ambiguous Interpretations
 
 Some captures are quite difficult to analyze automatically, particularly when the
-time frame may cover both Fast Retransmission and Out-Of-Order packets. A TCP
-preference allows to switch the precedence of these two interpretations at the
-protocol level.
+time frame may cover two or three cases and be interpreted as Retransmission,
+Fast Retransmission and Out-Of-Order packets. The TCP protocol preference
+“Retransmissions preferred over Out-of-Order interpretation” (enabled by default)
+allows to switch the interpretation precedence at the protocol level.
 
 // TCP_A_CONVERSATION_COMPLETENESS
 [discrete]

@@ -494,7 +494,7 @@ static gboolean tcp_exp_options_rfc6994 = TRUE;
  * behavior.
  * When set, we keep the historical interpretation (Fast RT > OOO)
  */
-static gboolean tcp_fastrt_precedence = TRUE;
+static gboolean tcp_retrans_precedence = TRUE;
 
 /* Process info, currently discovered via IPFIX */
 static gboolean tcp_display_process_info = FALSE;
@@ -2394,6 +2394,10 @@ finished_fwd:
      * (tcpd->fwd->nextseq)
      *
      * Note that a simple KeepAlive is not a retransmission
+     *
+     * Avoid obvious cases (Spurious or new data received),
+     * then check all 3 possibilities (FAST-RETRANS/OOO/RETRANS)
+     * before any decision is taken later on.
      */
     if (seglen>0 || flags&(TH_SYN|TH_FIN)) {
         gboolean seq_not_advanced = tcpd->fwd->tcp_analyze_seq_info->nextseq
@@ -2401,6 +2405,7 @@ finished_fwd:
 
         guint64 t;
         guint64 ooo_thres;
+        guint8 errorflag=0;
 
         if(tcpd->ta && (tcpd->ta->flags&TCP_A_KEEP_ALIVE) ) {
             goto finished_checking_retransmission_type;
@@ -2431,65 +2436,54 @@ finished_fwd:
             goto finished_checking_retransmission_type;
         }
 
-        gboolean precedence_count = tcp_fastrt_precedence;
-        do {
-            switch(precedence_count) {
-                case TRUE:
-                    /* If there were >=2 duplicate ACKs in the reverse direction
-                     * (there might be duplicate acks missing from the trace)
-                     * and if this sequence number matches those ACKs
-                     * and if the packet occurs within 20ms of the last
-                     * duplicate ack
-                     * then this is a fast retransmission
-                     */
-                    t=(pinfo->abs_ts.secs-tcpd->rev->tcp_analyze_seq_info->lastacktime.secs)*1000000000;
-                    t=t+(pinfo->abs_ts.nsecs)-tcpd->rev->tcp_analyze_seq_info->lastacktime.nsecs;
-                    if( seq_not_advanced
-                    &&  tcpd->rev->tcp_analyze_seq_info->dupacknum>=2
-                    &&  tcpd->rev->tcp_analyze_seq_info->lastack==seq
-                    &&  t<20000000 ) {
-                        if(!tcpd->ta) {
-                            tcp_analyze_get_acked_struct(pinfo->num, seq, ack, TRUE, tcpd);
-                        }
-                        tcpd->ta->flags|=TCP_A_FAST_RETRANSMISSION;
-                        goto finished_checking_retransmission_type;
-                    }
-                    precedence_count=!precedence_count;
-                    break;
-
-                case FALSE:
-                    /* If the segment came relatively close since the segment with the highest
-                     * seen sequence number and it doesn't look like a retransmission
-                     * then it is an OUT-OF-ORDER segment.
-                     */
-                    t=(pinfo->abs_ts.secs-tcpd->fwd->tcp_analyze_seq_info->nextseqtime.secs)*1000000000;
-                    t=t+(pinfo->abs_ts.nsecs)-tcpd->fwd->tcp_analyze_seq_info->nextseqtime.nsecs;
-                    if (tcpd->ts_first_rtt.nsecs == 0 && tcpd->ts_first_rtt.secs == 0) {
-                        ooo_thres = 3000000;
-                    } else {
-                        ooo_thres = tcpd->ts_first_rtt.nsecs + tcpd->ts_first_rtt.secs*1000000000;
-                    }
-
-                    if( seq_not_advanced // XXX is this neccessary?
-                    && t < ooo_thres
-                    && tcpd->fwd->tcp_analyze_seq_info->nextseq != (seq + seglen + (flags&(TH_SYN|TH_FIN) ? 1 : 0))) {
-                        if(!tcpd->ta) {
-                            tcp_analyze_get_acked_struct(pinfo->num, seq, ack, TRUE, tcpd);
-                        }
-                        tcpd->ta->flags|=TCP_A_OUT_OF_ORDER;
-                        goto finished_checking_retransmission_type;
-                    }
-                    precedence_count=!precedence_count;
-                    break;
+        /* If there were >=2 duplicate ACKs in the reverse direction
+         * (there might be duplicate acks missing from the trace)
+         * and if this sequence number matches those ACKs
+         * and if the packet occurs within 20ms of the last
+         * duplicate ack
+         * then this is a fast retransmission
+         */
+        t=(pinfo->abs_ts.secs-tcpd->rev->tcp_analyze_seq_info->lastacktime.secs)*1000000000;
+        t=t+(pinfo->abs_ts.nsecs)-tcpd->rev->tcp_analyze_seq_info->lastacktime.nsecs;
+        if( seq_not_advanced
+        &&  tcpd->rev->tcp_analyze_seq_info->dupacknum>=2
+        &&  tcpd->rev->tcp_analyze_seq_info->lastack==seq
+        &&  t<20000000 ) {
+            if(!tcpd->ta) {
+                tcp_analyze_get_acked_struct(pinfo->num, seq, ack, TRUE, tcpd);
             }
-        } while (precedence_count!=tcp_fastrt_precedence) ;
+            errorflag|=0x1;
+        }
 
+        /* If the segment came relatively close since the segment with the highest
+         * seen sequence number and it doesn't look like a retransmission
+         * then it is an OUT-OF-ORDER segment.
+         */
+        t=(pinfo->abs_ts.secs-tcpd->fwd->tcp_analyze_seq_info->nextseqtime.secs)*1000000000;
+        t=t+(pinfo->abs_ts.nsecs)-tcpd->fwd->tcp_analyze_seq_info->nextseqtime.nsecs;
+        if (tcpd->ts_first_rtt.nsecs == 0 && tcpd->ts_first_rtt.secs == 0) {
+            ooo_thres = 3000000;
+        } else {
+            ooo_thres = tcpd->ts_first_rtt.nsecs + tcpd->ts_first_rtt.secs*1000000000;
+        }
+
+        if( seq_not_advanced // XXX is this neccessary?
+        && t < ooo_thres
+        && tcpd->fwd->tcp_analyze_seq_info->nextseq != (seq + seglen + (flags&(TH_SYN|TH_FIN) ? 1 : 0))) {
+            if(!tcpd->ta) {
+                tcp_analyze_get_acked_struct(pinfo->num, seq, ack, TRUE, tcpd);
+            }
+            errorflag|=0x2;
+        }
+
+        /* ordinary RETRANS */
         if (seq_not_advanced) {
+            double estimatedRTO=0;
+
             /* Then it has to be a generic retransmission */
             if(!tcpd->ta) {
                 tcp_analyze_get_acked_struct(pinfo->num, seq, ack, TRUE, tcpd);
             }
-            tcpd->ta->flags|=TCP_A_RETRANSMISSION;
 
             /*
              * worst case scenario: if we don't have better than a recent packet,
@@ -2497,6 +2491,7 @@ finished_fwd:
              */
             nstime_delta(&tcpd->ta->rto_ts, &pinfo->abs_ts, &tcpd->fwd->tcp_analyze_seq_info->nextseqtime);
             tcpd->ta->rto_frame=tcpd->fwd->tcp_analyze_seq_info->nextseqframe;
+            estimatedRTO = nstime_to_msec(&pinfo->abs_ts) - nstime_to_msec(&tcpd->fwd->tcp_analyze_seq_info->nextseqtime);
 
             /*
              * better case scenario: if we have a list of the previous unacked packets,
@@ -2505,10 +2500,86 @@ finished_fwd:
              */
             ual = tcpd->fwd->tcp_analyze_seq_info->segments;
             while(ual) {
-                nstime_delta(&tcpd->ta->rto_ts, &pinfo->abs_ts, &ual->ts );
-                tcpd->ta->rto_frame=ual->frame;
+                if(GE_SEQ(ual->seq, seq)) {
+                    nstime_delta(&tcpd->ta->rto_ts, &pinfo->abs_ts, &ual->ts );
+                    tcpd->ta->rto_frame=ual->frame;
+                    estimatedRTO = nstime_to_msec(&pinfo->abs_ts) - nstime_to_msec(&ual->ts);
+                }
                 ual=ual->next;
             }
+
+            // RTO being larger than initial RTT, might be a simple Retransmission
+            if( (estimatedRTO - nstime_to_msec(&tcpd->ts_first_rtt) ) > 0 ) {
+                errorflag|=0x4;
+            }
+        }
+
+        /* According to what was discovered above (potential flags), choose the
+         * most appropriate interpretation. This interpretation is influenced
+         * by the user choice.
+         * Proximal : the immediate neighborhood of the packet has a higher
+         * priority.
+         * Distal : the long story counts more and Retransmissions are
+         * definetely preferred to Fast-Retrans/OOO. Fast-Retrans are in their
+         * turn preferred to OOO.
+         */
+        gboolean isproximal_preferred = FALSE;
+        isproximal_preferred = !tcp_retrans_precedence;
+
+        switch(errorflag ) {
+
+            /* proper Fast Retransmission */
+            case 1:
+                tcpd->ta->flags|=TCP_A_FAST_RETRANSMISSION;
+                break;
+
+            /* proper OOO */
+            case 2:
+                tcpd->ta->flags|=TCP_A_OUT_OF_ORDER;
+                break;
+
+            /* proper Retrans */
+            case 4:
+                tcpd->ta->flags|=TCP_A_RETRANSMISSION;
+                break;
+
+            /* ambiguous OOO/FRT */
+            case 3:
+                if(isproximal_preferred)
+                    tcpd->ta->flags|=TCP_A_OUT_OF_ORDER;
+                else
+                    tcpd->ta->flags|=TCP_A_FAST_RETRANSMISSION;
+                break;
+
+            /* ambiguous FRT/Retrans */
+            case 5:
+                if(isproximal_preferred)
+                    tcpd->ta->flags|=TCP_A_FAST_RETRANSMISSION;
+                else
+                    tcpd->ta->flags|=TCP_A_RETRANSMISSION;
+                break;
+
+            /* ambiguous OOO/Retrans */
+            case 6:
+                if(isproximal_preferred)
+                    tcpd->ta->flags|=TCP_A_OUT_OF_ORDER;
+                else
+                    tcpd->ta->flags|=TCP_A_RETRANSMISSION;
+                break;
+
+            /* ambiguous xmas-tree OOO/FRT/Retrans */
+            case 7:
+                if(isproximal_preferred)
+                    tcpd->ta->flags|=TCP_A_OUT_OF_ORDER;
+                else
+                    tcpd->ta->flags|=TCP_A_RETRANSMISSION;
+                break;
+
+            /* not supposed to happen */
+            case 0:
+            default:
+                break;
+
         }
     }
 
@@ -2559,7 +2630,6 @@ finished_checking_retransmission_type:
             tcpd->fwd->tcp_analyze_seq_info->maxseqtobeacked=tcpd->fwd->tcp_analyze_seq_info->nextseq;
         }
     }
-
 
     /* remember what the ack/window is so we can track window updates and retransmissions */
     tcpd->fwd->window=window;
@@ -9561,9 +9631,9 @@ proto_register_tcp(void)
         "Do not place the TCP Timestamps in the summary line",
         &tcp_ignore_timestamps);
     prefs_register_bool_preference(tcp_module, "fastrt_supersedes_ooo",
-        "Fast Retransmission supersedes Out-of-Order interpretation",
-        "When interpreting ambiguous packets, give precedence to Fast Retransmission or OOO ",
-        &tcp_fastrt_precedence);
+        "Retransmissions preferred over Out-of-Order interpretation",
+        "When interpreting ambiguous packets, give precedence to Retransmissions or OOO",
+        &tcp_retrans_precedence);
 
     prefs_register_bool_preference(tcp_module, "no_subdissector_on_error",
         "Do not call subdissectors for error packets",
