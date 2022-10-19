@@ -2061,6 +2061,7 @@ static void dissect_rlcmac_data_ind(proto_tree *tree, tvbuff_t *tvb, packet_info
     offset++;
     proto_tree_add_item(tree, hf_l2server_numpduforsdu, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset++;
+    // SduInfo
     offset += 4;
 
     /* RlcMacInfo (RlcSn(4) + Info(1) + Frame(2) + Slot(2)) */
@@ -2072,6 +2073,17 @@ static void dissect_rlcmac_data_ind(proto_tree *tree, tvbuff_t *tvb, packet_info
     offset += 2;
     proto_tree_add_item(tree, hf_l2server_slot, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
+
+    // RlcBuffer
+    offset += 4;
+    // RlcStatus
+    offset += 4;
+    // NrCurrentRate
+    offset += 4;
+    // Spare[2]
+    offset += 2*4;
+
+    // Data starts after this...
 
     /* Traffic filter */
     proto_item *traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic, tvb, 0, 0, ENC_NA);
