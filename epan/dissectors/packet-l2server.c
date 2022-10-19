@@ -847,6 +847,10 @@ static int hf_l2server_nzp_csi_rs_res_for_interference = -1;
 static int hf_l2server_code = -1;
 static int hf_l2server_version_hash = -1;
 
+static int hf_l2server_rlcbuffer = -1;
+static int hf_l2server_rlcstatus = -1;
+static int hf_l2server_nrcurrentrate = -1;
+
 
 static const value_string lch_vals[] =
 {
@@ -1977,6 +1981,7 @@ static void dissect_rlcmac_data_cnf(proto_tree *tree, tvbuff_t *tvb, packet_info
     proto_item_set_hidden(traffic_ti);
 }
 
+// nr5g_rlcmac_Data_DATA_IND_t (from nr5g-rlcmac_Data.h)
 static void dissect_rlcmac_data_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
                                     guint offset, guint len _U_, rlc_mode_e mode)
 {
@@ -2075,12 +2080,16 @@ static void dissect_rlcmac_data_ind(proto_tree *tree, tvbuff_t *tvb, packet_info
     offset += 2;
 
     // RlcBuffer
+    proto_tree_add_item(tree, hf_l2server_rlcbuffer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     // RlcStatus
+    proto_tree_add_item(tree, hf_l2server_rlcstatus, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     // NrCurrentRate
+    proto_tree_add_item(tree, hf_l2server_nrcurrentrate, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     // Spare[2]
+    proto_tree_add_item(tree, hf_l2server_spare, tvb, offset, 2*4, ENC_NA);
     offset += 2*4;
 
     // Data starts after this...
@@ -6964,7 +6973,7 @@ static void dissect_version_info_cmd(proto_tree *tree, tvbuff_t *tvb, packet_inf
     // Spare (should be zero)
     proto_tree_add_item(tree, hf_l2server_spare2, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
-    // VersionHash
+    // VersionHash.  L3->L2 version hash.
     proto_tree_add_item(tree, hf_l2server_version_hash, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 }
@@ -10109,6 +10118,16 @@ proto_register_l2server(void)
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_version_hash,
        { "Version Hash", "l2server.version-hash", FT_UINT32, BASE_HEX,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_rlcbuffer,
+       { "RlcBuffer", "l2server.rlcbuffer", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rlcstatus,
+       { "RlcStatus", "l2server.rlcstatus", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nrcurrentrate,
+       { "NrCurrentRate", "l2server.nr-currentrate", FT_UINT32, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
     };
 
