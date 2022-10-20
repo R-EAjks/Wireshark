@@ -725,6 +725,7 @@ static int hf_l2server_agg_lev16  = -1;
 static int hf_l2server_ccs_ext = -1;
 
 static int hf_l2server_nb_pdsch_alloc = -1;
+static int hf_l2server_nb_zp_csi_rs_resource_to_add = -1;
 static int hf_l2server_pdsch_alloc = -1;
 static int hf_l2server_mapping_type = -1;
 static int hf_l2server_start_sym_and_len = -1;
@@ -850,6 +851,16 @@ static int hf_l2server_version_hash = -1;
 static int hf_l2server_rlcbuffer = -1;
 static int hf_l2server_rlcstatus = -1;
 static int hf_l2server_nrcurrentrate = -1;
+
+static int hf_l2server_dmrs_typea_setup_present = -1;
+static int hf_l2server_dmrs_typea_release_present = -1;
+static int hf_l2server_dmrs_typeb_setup_present = -1;
+static int hf_l2server_dmrs_typeb_release_present = -1;
+static int hf_l2server_p_zp_csi_rs_resource_set_setup_present = -1;
+static int hf_l2server_p_zp_csi_rs_resource_set_release_present = -1;
+static int hf_l2server_r16_ies_present = -1;
+static int hf_l2server_timedomainresalloc_setup_present = -1;
+static int hf_l2server_timedomainresalloc_release_present = -1;
 
 
 static const value_string lch_vals[] =
@@ -2967,15 +2978,21 @@ static int dissect_pdsch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_
     proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_pdsch_alloc, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_pdsch_alloc_ded);
     offset += 1;
     // NbRateMatchPatternDedToAdd
+    gint32 nb_rate_match_pattern_ded_to_add;
+    proto_tree_add_item_ret_int(config_tree, hf_l2server_nb_rate_match_pattern_to_add_mod, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_rate_match_pattern_ded_to_add);
     offset += 1;
 
     // NbRateMatchPatternDedToDel
     offset += 1;
     // NbRateMatchPatternGroup1
+    //guint32 nb_rate_match_pattern_group1 = tvb_get_guint8(tvb, offset);
     offset += 1;
     // NbRateMatchPatternGroup2
+    //guint32 nb_rate_match_pattern_group2 = tvb_get_guint8(tvb, offset);
     offset += 1;
     // NbZpCsiRsResourceToAdd
+    guint32 nb_zp_csi_rs_resource_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_zp_csi_rs_resource_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_zp_csi_rs_resource_to_add);
     offset += 1;
 
     // NbZpCsiRsResourceToDel
@@ -2997,19 +3014,48 @@ static int dissect_pdsch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_
     guint32 fieldmask;
     proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_4, tvb, offset, 4,
                                  ENC_LITTLE_ENDIAN, &fieldmask);
+    gboolean dmrs_typea_setup_present, dmrs_typea_release_present,
+             dmrs_typeb_setup_present, dmrs_typeb_release_present;
+    gboolean p_zp_csi_rs_resource_set_setup_present, p_zp_csi_rs_resource_set_release_present,
+             r16_ies_present,
+             timedomainresalloc_setup_present, timedomainresalloc_release_present;
+
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_dmrs_typea_setup_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dmrs_typea_setup_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_dmrs_typea_release_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dmrs_typea_release_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_dmrs_typeb_setup_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dmrs_typeb_setup_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_dmrs_typeb_release_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dmrs_typeb_release_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_p_zp_csi_rs_resource_set_setup_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &p_zp_csi_rs_resource_set_setup_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_p_zp_csi_rs_resource_set_release_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &p_zp_csi_rs_resource_set_release_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_r16_ies_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &r16_ies_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_timedomainresalloc_setup_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &timedomainresalloc_setup_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_timedomainresalloc_release_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &timedomainresalloc_release_present);
     offset += 4;
 
+    //-----------------------------------------------------
     // TODO:
-    // RateMatchPatternGroup1
-    offset += bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP;
-    // RateMatchPatternGroup2
-    offset += bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP;
+    // RateMatchPatternGroup1 (not dynamic)
+    offset += (bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP*1);
+    // RateMatchPatternGroup2  (not dynamic)
+    offset += (bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP*1);
+
+    // Always seralised from this point on, I think
+
 
     // DmrsMappingTypeA
+    if (dmrs_typea_setup_present) {
+        offset += sizeof(bb_nr5g_DMRS_DOWNLINK_CFGt);
+    }
     // DmrsMappingTypeB
+    if (dmrs_typeb_setup_present) {
+        offset += sizeof(bb_nr5g_DMRS_DOWNLINK_CFGt);
+    }
     // PZpCsiRsResSet
+    if (p_zp_csi_rs_resource_set_setup_present) {
+        offset += sizeof(bb_nr5g_ZP_CSI_RS_RES_SETt);
+    }
 
     // PdschConfExtR16
+    offset += sizeof(bb_nr5g_PDSCH_CONF_DEDICATED_R16_IESt);
 
     // TciStatesToAdd
     for (guint n=0; n < nb_tci_states_to_add; n++) {
@@ -3020,12 +3066,18 @@ static int dissect_pdsch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_
     for (guint n=0; n < nb_pdsch_alloc_ded; n++) {
         offset = dissect_pdcsh_time_domain_res_alloc(config_tree, tvb, pinfo, offset, TRUE);
     }
+
+    // TODO:
     // RateMatchPatternDedToAdd
     // RateMatchPatternDedToDel
+
     // ZpCsiRsResourceToAdd
+    offset += (nb_zp_csi_rs_resource_to_add*4);
     // ZpCsiRsResourceToDel
+
     // AperiodicZpCsiRsResSetsToAdd
     // AperiodicZpCsiRsResSetsToDel
+
     // SpZpCsiRsResSetsToAdd
     // SpZpCsiRsResSetsToDel
 
@@ -3178,8 +3230,8 @@ static int dissect_pdsch_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info 
                                  &nb_code_block_group_transmission_r16);
     offset += 1;
 
-    // Pad
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
+    // FieldMask
+    proto_tree_add_item(config_tree, hf_l2server_field_mask_1, tvb, offset, 1, ENC_NA);
     offset += 1;
 
     // CodeBlockGroupTrans (bb_nr5g_PDSCH_CODEBLOCKGROUPTRANSMt)
@@ -3192,7 +3244,6 @@ static int dissect_pdsch_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info 
     //     Pad
     proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
     offset += 2;
-
 
     // CodeBlockGroupTransmissionList_r16 (bb_nr5g_PDSCH_CODEBLOCKGROUPTRANSMt)
     for (guint n=0; n < nb_code_block_group_transmission_r16; n++) {
@@ -8970,8 +9021,8 @@ proto_register_l2server(void)
           VALS(rrc_state_vals), 0x0, NULL, HFILL }},
 
       { &hf_l2server_cell_config_cellcfg_type,
-        { "CellConfig Type", "l2server.cellconfig-type", FT_UINT8, BASE_DEC,
-          VALS(cellconfig_type_vals), 0x0, "bb_nr5g_CELL_GROUP_CONFIGt", HFILL }},
+        { "CellCfgType", "l2server.cellcfgtype", FT_UINT8, BASE_DEC,
+          VALS(cellconfig_type_vals), 0x0, NULL, HFILL }},
 
       { &hf_l2server_cell_config_cellcfg,
         { "CellCfg", "l2server.cell-config.cellcfg", FT_STRING, BASE_NONE,
@@ -9811,6 +9862,9 @@ proto_register_l2server(void)
       { &hf_l2server_nb_pdsch_alloc,
        { "Nb PDSCH Alloc", "l2server.nb-pdsch-alloc", FT_UINT8, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_zp_csi_rs_resource_to_add,
+       { "Nb Zp CSI RS Resource to add", "l2server.nb-zp-csi-rs-resource-to-add", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_pdsch_alloc,
         { "PDSSCH Alloc", "l2server.pdsch-alloc", FT_STRING, BASE_NONE,
            NULL, 0x0, NULL, HFILL }},
@@ -10129,6 +10183,34 @@ proto_register_l2server(void)
       { &hf_l2server_nrcurrentrate,
        { "NrCurrentRate", "l2server.nr-currentrate", FT_UINT32, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_dmrs_typea_setup_present,
+       { "DMRS TypeA Setup Present", "l2server.dmrs-typea-setup-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_DMRS_TYPEA_SETUP, NULL, HFILL }},
+      { &hf_l2server_dmrs_typea_release_present,
+       { "DMRS TypeA Release Present", "l2server.dmrs-typea-release-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_DMRS_TYPEA_RELEASE, NULL, HFILL }},
+      { &hf_l2server_dmrs_typeb_setup_present,
+       { "DMRS TypeB Setup Present", "l2server.dmrs-typeb-setup-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_DMRS_TYPEB_SETUP, NULL, HFILL }},
+      { &hf_l2server_dmrs_typeb_release_present,
+       { "DMRS TypeB Release Present", "l2server.dmrs-typeb-release-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_DMRS_TYPEB_RELEASE, NULL, HFILL }},
+      { &hf_l2server_p_zp_csi_rs_resource_set_setup_present,
+       { "P ZP RS Resource Set Setup Present", "l2server.p-zp-csi-rs-resource-setup-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_P_ZP_CSI_RS_RESOURCE_SET_SETUP, NULL, HFILL }},
+      { &hf_l2server_p_zp_csi_rs_resource_set_release_present,
+       { "P ZP RS Resource Set Release Present", "l2server.p-zp-csi-rs-resource-release-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_P_ZP_CSI_RS_RESOURCE_SET_RELEASE, NULL, HFILL }},
+      { &hf_l2server_r16_ies_present,
+       { "R16 IEs Present", "l2server.r17-ies-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_R16_IES_PRESENT, NULL, HFILL }},
+      { &hf_l2server_timedomainresalloc_setup_present,
+       { "TimeDomainResAlloc Setup Present", "l2server.timedomainresalloc-setup-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_PDSCH_CONF_TIMEDOMAINRESALLOC_SETUP, NULL, HFILL }},
+      { &hf_l2server_timedomainresalloc_release_present,
+       { "TimeDomainResAlloc Release Present", "l2server.timedomainresalloc-release-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_PDSCH_CONF_TIMEDOMAINRESALLOC_RELEASE, NULL, HFILL }},
     };
 
     static gint *ett[] = {
