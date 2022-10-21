@@ -622,7 +622,7 @@ static int hf_l2server_aper_trigger_offset = -1;
 static int hf_l2server_trs_info = -1;
 static int hf_l2server_aper_trigger_offset_r16 = -1;
 static int hf_l2server_nb_nzp_csi_rs_res_lis = -1;
-static int hf_l2server_nzp_csi_rs_res_list = -1;
+static int hf_l2server_nzp_csi_rs_res = -1;
 
 static int hf_l2server_csi_im_res_config = -1;
 
@@ -861,6 +861,10 @@ static int hf_l2server_p_zp_csi_rs_resource_set_release_present = -1;
 static int hf_l2server_r16_ies_present = -1;
 static int hf_l2server_timedomainresalloc_setup_present = -1;
 static int hf_l2server_timedomainresalloc_release_present = -1;
+
+static int hf_l2server_dmrs_mapping = -1;
+static int hf_l2server_p_zp_csi_rs_set = -1;
+static int hf_l2server_tci_state_to_add = -1;
 
 
 static const value_string lch_vals[] =
@@ -1466,6 +1470,8 @@ static gint ett_l2server_sps_conf_dedicated = -1;
 static gint ett_l2server_dbeam = -1;
 static gint ett_l2server_aper_trigger_stateconfig = -1;
 static gint ett_l2server_csi_associated_report_cfg = -1;
+static gint ett_l2server_dmrs_mapping = -1;
+static gint ett_l2server_p_zp_csi_rs_set = -1;
 
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
@@ -3001,11 +3007,12 @@ static int dissect_pdsch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_
     offset += 1;
     // NbAperiodicZpCsiRsResSetsToDel
     offset += 1;
+
     // NbSpZpCsiRsResSetsToAdd
     offset += 1;
-
     // NbSpZpCsiRsResSetsToDel
     offset += 1;
+
     // Spare
     proto_tree_add_item(config_tree, hf_l2server_spare, tvb, offset, 2, ENC_NA);
     offset += 2;
@@ -3043,7 +3050,13 @@ static int dissect_pdsch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_
 
     // DmrsMappingTypeA
     if (dmrs_typea_setup_present) {
+        proto_item *dmrs_ti = proto_tree_add_string_format(config_tree, hf_l2server_dmrs_mapping, tvb,
+                                                              offset, sizeof(bb_nr5g_DMRS_DOWNLINK_CFGt),
+                                                              "", "DMRS Mapping TypeA ");
+        //proto_tree *dmrs_tree = proto_item_add_subtree(dmrs_ti, ett_l2server_dmrs_mapping);
         offset += sizeof(bb_nr5g_DMRS_DOWNLINK_CFGt);
+
+        proto_item_set_len(dmrs_ti, sizeof(bb_nr5g_DMRS_DOWNLINK_CFGt));
     }
     // DmrsMappingTypeB
     if (dmrs_typeb_setup_present) {
@@ -3051,17 +3064,29 @@ static int dissect_pdsch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_
     }
     // PZpCsiRsResSet
     if (p_zp_csi_rs_resource_set_setup_present) {
+        proto_item *p_zp_ti = proto_tree_add_string_format(config_tree, hf_l2server_p_zp_csi_rs_set, tvb,
+                                                              offset, sizeof(bb_nr5g_ZP_CSI_RS_RES_SETt),
+                                                              "", "PZpCsiRsResSet ");
+        //proto_tree *p_zp_tree = proto_item_add_subtree(dmrs_ti, ett_l2server_dmrs_mapping);
         offset += sizeof(bb_nr5g_ZP_CSI_RS_RES_SETt);
+        proto_item_set_len(p_zp_ti, sizeof(bb_nr5g_ZP_CSI_RS_RES_SETt));
     }
 
     // PdschConfExtR16
-    offset += sizeof(bb_nr5g_PDSCH_CONF_DEDICATED_R16_IESt);
+    if (r16_ies_present) {
+        offset += sizeof(bb_nr5g_PDSCH_CONF_DEDICATED_R16_IESt);
+    }
 
     // TciStatesToAdd
     for (guint n=0; n < nb_tci_states_to_add; n++) {
-        // TODO:
+        proto_item *tci_ti = proto_tree_add_string_format(config_tree, hf_l2server_tci_state_to_add, tvb,
+                                                          offset, sizeof(bb_nr5g_TCI_STATEt),
+                                                          "", "TCI State to add");
+        //proto_tree *tci_tree = proto_item_add_subtree(dmrs_ti, ett_l2server_dmrs_mapping);
         offset += sizeof(bb_nr5g_TCI_STATEt);
+        proto_item_set_len(tci_ti, sizeof(bb_nr5g_TCI_STATEt));
     }
+
     // PdschAllocDed
     for (guint n=0; n < nb_pdsch_alloc_ded; n++) {
         offset = dissect_pdcsh_time_domain_res_alloc(config_tree, tvb, pinfo, offset, TRUE);
@@ -3072,7 +3097,7 @@ static int dissect_pdsch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_
     // RateMatchPatternDedToDel
 
     // ZpCsiRsResourceToAdd
-    offset += (nb_zp_csi_rs_resource_to_add*4);
+    offset += (nb_zp_csi_rs_resource_to_add * sizeof(bb_nr5g_ZP_CSI_RS_RESt));
     // ZpCsiRsResourceToDel
 
     // AperiodicZpCsiRsResSetsToAdd
@@ -3374,7 +3399,7 @@ static int dissect_nzp_csi_rs_res_set_config(proto_tree *tree, tvbuff_t *tvb, pa
     offset += 1;
     // NzpCsiRsResList
     for (guint n=0; n < nb_nzp_csi_rs_res_lis; n++) {
-        proto_tree_add_item(config_tree, hf_l2server_nzp_csi_rs_res_list, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(config_tree, hf_l2server_nzp_csi_rs_res, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
     }
     // Unset items (but still encoded).
@@ -3942,7 +3967,7 @@ static int dissect_control_res_set(proto_tree *tree, tvbuff_t *tvb, packet_info 
     offset += 1;
     // TciStates
     for (guint n=0; n < bb_nr5g_MAX_NB_TCI_STATES_PDCCH; n++) {
-        proto_item *ti = proto_tree_add_item(config_tree, hf_l2server_tci_state, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        proto_item *ti = proto_tree_add_item(config_tree, hf_l2server_tci_state_to_add, tvb, offset, 1, ENC_ASCII);
         if (n >= nb_tci_states) {
             proto_item_append_text(ti, " (not set)");
         }
@@ -9606,10 +9631,10 @@ proto_register_l2server(void)
            NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_nb_nzp_csi_rs_res_lis,
-        { "Nb NZP CSI RS Res Lis", "l2server.nb-nzp-csi-rs-res-lis", FT_UINT8, BASE_DEC,
+        { "Nb NZP CSI RS Res", "l2server.nb-nzp-csi-rs-res-list", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
-      { &hf_l2server_nzp_csi_rs_res_list,
-        { "Nb NZP CSI RS Res List", "l2server.nb-nzp-csi-rs-res-list", FT_UINT8, BASE_DEC,
+      { &hf_l2server_nzp_csi_rs_res,
+        { "NZP CSI RS Res", "l2server.nb-nzp-csi-rs-res", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_csi_im_res_config,
@@ -10211,6 +10236,17 @@ proto_register_l2server(void)
       { &hf_l2server_timedomainresalloc_release_present,
        { "TimeDomainResAlloc Release Present", "l2server.timedomainresalloc-release-present", FT_BOOLEAN, 32,
          NULL, bb_nr5g_STRUCT_PDSCH_CONF_TIMEDOMAINRESALLOC_RELEASE, NULL, HFILL }},
+
+      { &hf_l2server_dmrs_mapping,
+       { "DMRS Mapping", "l2server.dmrs-mapping", FT_STRING, FT_NONE,
+         NULL, 0X0, NULL, HFILL }},
+      { &hf_l2server_p_zp_csi_rs_set,
+       { "PZpCsiRsSet", "l2server.p-zp-csi-rs-set", FT_STRING, FT_NONE,
+         NULL, 0X0, NULL, HFILL }},
+      { &hf_l2server_tci_state_to_add,
+       { "TCI State to add", "l2server.tci-state-to-add", FT_STRING, FT_NONE,
+         NULL, 0X0, NULL, HFILL }},
+
     };
 
     static gint *ett[] = {
@@ -10305,7 +10341,9 @@ proto_register_l2server(void)
         &ett_l2server_sps_conf_dedicated,
         &ett_l2server_dbeam,
         &ett_l2server_aper_trigger_stateconfig,
-        &ett_l2server_csi_associated_report_cfg
+        &ett_l2server_csi_associated_report_cfg,
+        &ett_l2server_dmrs_mapping,
+        &ett_l2server_p_zp_csi_rs_set
     };
 
     static ei_register_info ei[] = {
