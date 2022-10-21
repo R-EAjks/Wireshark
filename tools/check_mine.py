@@ -5,6 +5,7 @@
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 
+import sys
 import os
 import signal
 
@@ -37,6 +38,9 @@ dissectors = [ 'packet-ulgrant.c', 'packet-l2server.c',  'packet-dlblock.c',
                'packet-pdcp-uu.c', 'packet-pdcp-gtpu.c', 'packet-ip-udp.c',
                'packet-pacs.c',    'packet-axe-rpc.c',   'packet-textlogger.c',
                'packet-tlv.c',     'packet-elsucopy.c',  'packet-rohc.c' ]
+
+if len(sys.argv) > 1:
+    dissectors = [ sys.argv[1] ]
 
 tools = ['check_tfs.py', 'check_typed_item_calls.py  --consecutive --label --mask', 'check_static.py', 'check_dissector_urls.py', 'check_spelling.py', 'cppcheck/cppcheck.sh']
 

@@ -1548,7 +1548,7 @@ static guint dissect_rlcmac_cmac_ra_info(proto_tree *tree, tvbuff_t *tvb, packet
                                         guint offset, guint len _U_, guint32 *bwpid);
 
 static guint dissect_rlcmac_cmac_ra_info_empty(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
-                                               guint offset _U_, guint len _U_, gboolean from_bwp_mask);
+                                               guint offset, guint len _U_, gboolean from_bwp_mask);
 
 static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset);
