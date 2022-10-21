@@ -1748,7 +1748,7 @@ tvb_get_string_bytes(tvbuff_t *tvb, const gint offset, const gint length,
 	ptr = (gchar*) tvb_get_raw_string(NULL, tvb, offset, length);
 	begin = ptr;
 
-	if (endoff) *endoff = 0;
+	if (endoff) *endoff = offset;
 
 	while (*begin == ' ') begin++;
 
@@ -4571,7 +4571,7 @@ tvb_get_varint(tvbuff_t *tvb, guint offset, guint maxlen, guint64 *value, const 
 
 		for (i = 0; ((i < FT_VARINT_MAX_LEN) && (i < maxlen)); ++i) {
 			b = tvb_get_guint8(tvb, offset++);
-			if ((i == 9) && (*value >= 1ul<<(64-7))) {
+			if ((i == 9) && (*value >= (uint64_t)1<<(64-7))) {
 				// guaranteed overflow, not valid SDNV
 				return 0;
 			}
