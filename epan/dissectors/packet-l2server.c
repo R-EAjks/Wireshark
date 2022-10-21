@@ -628,7 +628,7 @@ static int hf_l2server_csi_im_res_config = -1;
 
 static int hf_l2server_csi_im_res_set_config = -1;
 static int hf_l2server_res_set_id = -1;
-static int hf_l2server_csi_im_res_list = -1;
+static int hf_l2server_nb_csi_im_res_list = -1;
 
 static int hf_l2server_csi_ssb_res_set_config = -1;
 static int hf_l2server_csi_ssb_res_list = -1;
@@ -658,6 +658,7 @@ static int hf_l2server_codebook_subtype1_is_valid = -1;
 
 static int hf_l2server_codebook_config_type1_single_panel = -1;
 static int hf_l2server_nb_of_ant_ports_is_valid = -1;
+static int hf_l2server_typei_single_panel_ri_restr = -1;
 
 static int hf_l2server_aperiodic = -1;
 static int hf_l2server_nb_rep_slow_offset_list = -1;
@@ -3411,7 +3412,7 @@ static int dissect_nzp_csi_rs_res_set_config(proto_tree *tree, tvbuff_t *tvb, pa
 }
 
 
-// bb_nr5g_CSI_IM_RES_CFGt
+// bb_nr5g_CSI_IM_RES_CFGt.  Is serialized.
 static int dissect_csi_im_res_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                      guint offset)
 {
@@ -3432,6 +3433,7 @@ static int dissect_csi_im_res_config(proto_tree *tree, tvbuff_t *tvb, packet_inf
     proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_NA);
     offset += 3;
 
+    // These are always copied though..
     // ResElemPattern
     offset += sizeof(bb_nr5g_CSI_IM_RES_ELEM_PATTERN_CFGt);
     // FreqBand
@@ -3463,16 +3465,15 @@ static int dissect_csi_im_res_set_config(proto_tree *tree, tvbuff_t *tvb, packet
 
     // NbCsiImResList
     guint32 nb_csi_im_res_list;
-    proto_tree_add_item_ret_uint(config_tree, hf_l2server_csi_im_res_list, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_im_res_list);
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_im_res_list, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_im_res_list);
     offset += 1;
 
     // Pad[2]
     proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
     offset += 2;
 
-    // CsiImResList
-    offset += (nb_csi_im_res_list);
-    offset += (bb_nr5g_MAX_NB_CSI_IM_RESOURCES_PER_SET-nb_csi_im_res_list);
+    // CsiImResList (not serialized as dynamic list)
+    offset += bb_nr5g_MAX_NB_CSI_IM_RESOURCES_PER_SET;
 
     proto_item_append_text(config_ti, " (resourceSetId=%u)", res_set_id);
     proto_item_set_len(config_ti, offset-start_offset);
@@ -3629,6 +3630,27 @@ static int dissect_aperiodic(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo
     return offset;
 }
 
+// bb_nr5g_CODEBOOK_SUBTYPE1_TWO_ANT_PORTS_CFGt
+static int dissect_and_ports_two(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.  TODO: own subtree item/ett!
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_codebook_config_type1_single_panel,  tvb,
+                                                         offset, 0,
+                                                          "", "2 Ants");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_codebook_config_type1_single_panel);
+
+    // TwoTXCodebookSubsetRestriction
+    offset += 1;
+    // Pad
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_NA);
+    offset += 3;
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
 // bb_nr5g_CODEBOOK_SUBTYPE1_MORETHANTWO_ANT_PORTS_CFGt
 static int dissect_and_ports_more_than_two(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset)
 {
@@ -3670,6 +3692,8 @@ static int dissect_codebook_type_1_single_panel(proto_tree *tree, tvbuff_t *tvb,
     proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_of_ant_ports_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_of_ant_ports_is_valid);
     offset += 1;
     // TypeISinglePanelRiRestr
+    guint32 typei_single_panel_ri_restr;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_typei_single_panel_ri_restr, tvb, offset, 1, ENC_LITTLE_ENDIAN, &typei_single_panel_ri_restr);
     offset += 1;
     // Pad[2]
     proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
@@ -3677,12 +3701,15 @@ static int dissect_codebook_type_1_single_panel(proto_tree *tree, tvbuff_t *tvb,
 
     switch (nb_of_ant_ports_is_valid) {
         case bb_nr5g_CODEBOOK_SUBTYPE1_NB_ANT_PORTS_TWO:
-            // TODO:
+            offset = dissect_and_ports_two(config_tree, tvb, pinfo, offset);
             break;
         case bb_nr5g_CODEBOOK_SUBTYPE1_NB_ANT_PORTS_MORETHANTWO:
             offset = dissect_and_ports_more_than_two(config_tree, tvb, pinfo, offset);
             break;
     }
+
+    // Offset ends up just being size of struct.
+    offset = start_offset + sizeof(bb_nr5g_CODEBOOK_SUBTYPE1_SINGLE_PANEL_CFGt);
 
     proto_item_set_len(config_ti, offset-start_offset);
     return offset;
@@ -4407,8 +4434,8 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     proto_tree_add_item(config_tree, hf_l2server_report_trigger_size_dci02_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
 
-    // Pad[2]
-    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
+    // FieldMask
+    proto_tree_add_item(config_tree, hf_l2server_field_mask_2, tvb, offset, 2, ENC_NA);
     offset += 2;
 
     //========================================================================================
@@ -4429,7 +4456,7 @@ static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
     }
 
     // CsiImResSetToAdd
-    for (guint n=0; n < nb_csi_ssb_res_set_to_add; n++) {
+    for (guint n=0; n < nb_csi_im_res_set_to_add; n++) {
         offset = dissect_csi_im_res_set_config(config_tree, tvb, pinfo, offset);
     }
 
@@ -9647,8 +9674,8 @@ proto_register_l2server(void)
       { &hf_l2server_res_set_id,
         { "Res Set Id", "l2server.res-set-id", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
-      { &hf_l2server_csi_im_res_list,
-        { "CSI IM Res List", "l2server.csi-im-res-list", FT_UINT8, BASE_DEC,
+      { &hf_l2server_nb_csi_im_res_list,
+        { "Nb CSI IM Res List", "l2server.nb-csi-im-res-list", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_csi_ssb_res_set_config,
@@ -9668,7 +9695,7 @@ proto_register_l2server(void)
         { "CSI Res Type", "l2server.csi-res-type", FT_UINT8, BASE_DEC,
            VALS(csi_res_type_vals), 0x0, NULL, HFILL }},
       { &hf_l2server_csi_rs_res_set_list_is_valid,
-        { "CSI Res Type", "l2server.csi-res-type", FT_UINT8, BASE_DEC,
+        { "CSI Res Set List is Valid", "l2server.csi-res-type-list-is-valid", FT_UINT8, BASE_DEC,
            VALS(csi_rs_res_set_list_is_valid_vals), 0x0, NULL, HFILL }},
 
       { &hf_l2server_csi_rep_config,
@@ -9717,6 +9744,9 @@ proto_register_l2server(void)
       { &hf_l2server_nb_of_ant_ports_is_valid,
         { "Nb Of Ant Posts Is Valid", "l2server.nb-of-ant-ports-is-valid", FT_UINT8, BASE_DEC,
            VALS(nb_of_ant_ports_is_valid_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_typei_single_panel_ri_restr,
+        { "TypeISinglePanelRiRestr", "l2server.typei-single-panel-ri-restr", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_aperiodic,
         { "APeriodic", "l2server.aperiodic", FT_STRING, BASE_NONE,
@@ -9742,7 +9772,7 @@ proto_register_l2server(void)
         { "CSI Reporting Band is valid", "l2server.csi-reporting-band-is-valid", FT_UINT8, BASE_DEC,
            VALS(csi_reporting_band_id_valid_vals), 0x0, NULL, HFILL }},
       { &hf_l2server_csi_reporting_band,
-        { "CSI Reporting Band", "l2server.csi-reporting-band", FT_UINT32, BASE_DEC,
+        { "CSI Reporting Band", "l2server.csi-reporting-band", FT_INT32, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_ul_am_cnf_frame,
