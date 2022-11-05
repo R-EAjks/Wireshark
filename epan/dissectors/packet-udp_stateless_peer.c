@@ -75,8 +75,7 @@ dissect_udp_stateless_peer(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
 
     /* Look for "ixiastream" */
     gboolean trigger = FALSE;
-    gint ixiastream_len = 0;
-    const char *ixiastream = tvb_get_const_stringz(tvb, length-26, &ixiastream_len);
+    const char *ixiastream = tvb_get_stringz_enc(wmem_packet_scope(), tvb, length-26, NULL, ENC_ASCII);
     if (strcmp(ixiastream, "ixiastream") == 0) {
         proto_tree_add_item(udp_stateless_peer_tree,
                             hf_udp_stateless_peer_ixiastream,
