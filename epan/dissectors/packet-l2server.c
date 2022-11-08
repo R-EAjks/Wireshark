@@ -867,6 +867,10 @@ static int hf_l2server_dmrs_mapping = -1;
 static int hf_l2server_p_zp_csi_rs_set = -1;
 static int hf_l2server_tci_state_to_add = -1;
 
+static int hf_l2server_orig_cellid = -1;
+static int hf_l2server_targ_cellid = -1;
+
+
 
 static const value_string lch_vals[] =
 {
@@ -2080,8 +2084,10 @@ static void dissect_rlcmac_data_ind(proto_tree *tree, tvbuff_t *tvb, packet_info
     //proto_tree_add_item(tree, hf_l2server_dllogref, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
+    /* RbId */
     proto_tree_add_item(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset++;
+    /* NumPDUForSDU */
     proto_tree_add_item(tree, hf_l2server_numpduforsdu, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset++;
     // SduInfo
@@ -2148,7 +2154,7 @@ static void dissect_rlcmac_data_ind(proto_tree *tree, tvbuff_t *tvb, packet_info
 
         proto_item_set_hidden(pdcp_ti);
     }
-    else if (global_call_pdcp_for_srb && p_pdcp_nr_info->plane == NR_SIGNALING_PLANE) {
+    else if (global_call_pdcp_for_srb && (p_pdcp_nr_info->plane == NR_SIGNALING_PLANE) && (mode != TM)) {
         tvbuff_t *pdcp_tvb = tvb_new_subset_remaining(tvb, offset);
         p_pdcp_nr_info->pdu_length = tvb_reported_length(pdcp_tvb);
         call_dissector_only(pdcp_nr_handle, pdcp_tvb, pinfo, tree, NULL);
@@ -7526,6 +7532,42 @@ static void dissect_reest_prepare_cmd(proto_tree *tree, tvbuff_t *tvb, packet_in
     }
 }
 
+/* nr5g_l2_Srv_REEST_1_CMDt from nr5g-l2_Srv.h */
+static void dissect_reest_1_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset, guint len _U_)
+{
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* OrigCellId */
+    proto_tree_add_item(tree, hf_l2server_orig_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* TargCellId */
+    proto_tree_add_item(tree, hf_l2server_targ_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+
+    offset += 4;
+}
+
+/* nr5g_l2_Srv_REEST_2_CMDt from nr5g-l2_Srv.h */
+static void dissect_reest_2_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset, guint len _U_)
+{
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+}
+
+/* nr5g_l2_Srv_REEST_3_CMDt from nr5g-l2_Srv.h */
+static void dissect_reest_3_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset, guint len _U_)
+{
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+}
+
+
+
 static void dissect_rrc_state_cfg_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                       guint offset, guint len _U_)
 {
@@ -7617,14 +7659,28 @@ static TYPE_FUN om_type_funs[] =
         { nr5g_l2_Srv_RCP_UE_SET_INDEX_ACK,     "nr5g_l2_Srv_RCP_UE_SET_INDEX_ACK",       dissect_rcp_set_ue_index_ack },
         { nr5g_l2_Srv_RCP_UE_SET_INDEX_NAK,     "nr5g_l2_Srv_RCP_UE_SET_INDEX_NAK",       dissect_sapi_type_dummy },
 
-        { nr5g_l2_Srv_REEST_PREPARE_CMD,        "nr5g_l2_Srv_REEST_PREPARE_CMD",          dissect_reest_prepare_cmd },
-        { nr5g_l2_Srv_REEST_PREPARE_ACK,        "nr5g_l2_Srv_REEST_PREPARE_ACL",          dissect_sapi_type_dummy },
 
-        { nr5g_l2_Srv_HANDOVER_CMD,     "nr5g_l2_Srv_HANDOVER_CMD",       dissect_handover_cmd },
-        /* TODO: what types are these? */
-        { nr5g_l2_Srv_HANDOVER_ACK,     "nr5g_l2_Srv_HANDOVER_ACK",       dissect_handover_ack },
-        { nr5g_l2_Srv_HANDOVER_NAK,     "nr5g_l2_Srv_HANDOVER_NAK",       dissect_handover_ack },
+         /* Handover */
+        { nr5g_l2_Srv_HANDOVER_CMD,             "nr5g_l2_Srv_HANDOVER_CMD",       dissect_handover_cmd },
+        { nr5g_l2_Srv_HANDOVER_ACK,             "nr5g_l2_Srv_HANDOVER_ACK",       dissect_handover_ack },
+        { nr5g_l2_Srv_HANDOVER_NAK,             "nr5g_l2_Srv_HANDOVER_NAK",       dissect_handover_ack },
 
+        /* Reestablishment */
+        { nr5g_l2_Srv_REEST_PREPARE_CMD,        "nr5g_l2_Srv_REEST_PREPARE_CMD",       dissect_reest_prepare_cmd },
+        { nr5g_l2_Srv_REEST_PREPARE_ACK,        "nr5g_l2_Srv_REEST_PREPARE_ACK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_REEST_PREPARE_NAK,        "nr5g_l2_Srv_REEST_PREPARE_NAK",       dissect_sapi_type_dummy },
+
+        { nr5g_l2_Srv_REEST_1_CMD,        "nr5g_l2_Srv_REEST_1_CMD",       dissect_reest_1_cmd },
+        { nr5g_l2_Srv_REEST_1_ACK,        "nr5g_l2_Srv_REEST_1_ACK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_REEST_1_NAK,        "nr5g_l2_Srv_REEST_1_NAK",       dissect_sapi_type_dummy },
+
+        { nr5g_l2_Srv_REEST_2_CMD,        "nr5g_l2_Srv_REEST_2_CMD",       dissect_reest_2_cmd },
+        { nr5g_l2_Srv_REEST_2_ACK,        "nr5g_l2_Srv_REEST_2_ACK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_REEST_2_NAK,        "nr5g_l2_Srv_REEST_2_NAK",       dissect_sapi_type_dummy },
+
+        { nr5g_l2_Srv_REEST_3_CMD,        "nr5g_l2_Srv_REEST_3_CMD",       dissect_reest_3_cmd },
+        { nr5g_l2_Srv_REEST_3_ACK,        "nr5g_l2_Srv_REEST_3_ACK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_REEST_3_NAK,        "nr5g_l2_Srv_REEST_3_NAK",       dissect_sapi_type_dummy },
 
         { 0x00,                               NULL,                             NULL }
 };
@@ -10277,6 +10333,12 @@ proto_register_l2server(void)
        { "TCI State to add", "l2server.tci-state-to-add", FT_STRING, FT_NONE,
          NULL, 0X0, NULL, HFILL }},
 
+      { &hf_l2server_orig_cellid,
+       { "OrigCellId", "l2server.orig-cellid", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_targ_cellid,
+       { "TargCellId", "l2server.target-cellid", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
