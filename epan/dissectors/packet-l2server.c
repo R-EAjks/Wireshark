@@ -870,7 +870,7 @@ static int hf_l2server_tci_state_to_add = -1;
 static int hf_l2server_orig_cellid = -1;
 static int hf_l2server_targ_cellid = -1;
 
-
+static int hf_l2server_err = -1;
 
 static const value_string lch_vals[] =
 {
@@ -1568,21 +1568,50 @@ static int dissect_pdcch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_inf
 static void dissect_login_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                               guint offset, guint len)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* CliName */
     proto_tree_add_item(tree, hf_l2server_client_name, tvb, offset, len, ENC_ASCII);
 }
 
-static void dissect_srv_start_cmd(proto_tree *tree _U_, tvbuff_t *tvb _U_, packet_info *pinfo _U_,
+static void dissect_login_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                              guint offset _U_, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+}
+
+
+static void dissect_srv_start_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset _U_, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* N.B. Seems like the L2 server doesn't like payload, so don't expect it now... */
     /* Type - Not sure if should be like in header...? */
     //proto_tree_add_item(tree, hf_l2server_start_cmd_type, tvb, offset, 2, ENC_NA);
 }
 
+static void dissect_srv_start_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset _U_, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+}
+
 static void dissect_open_cell_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* CellId */
     proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -1602,6 +1631,10 @@ static void dissect_open_cell_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *
 static void dissect_open_cell_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                   guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* CellId */
     proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 }
@@ -1609,6 +1642,10 @@ static void dissect_open_cell_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *
 static void dissect_getinfo_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                 guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* Type */
     proto_tree_add_item(tree, hf_l2server_getinfo_type, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -1620,6 +1657,10 @@ static void dissect_getinfo_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
 static void dissect_getinfo_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                 guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* Type */
     proto_tree_add_item(tree, hf_l2server_getinfo_type, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -1732,6 +1773,10 @@ static void dissect_cell_parm_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *
 static void dissect_rcp_load_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                  guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* RcGroup */
     proto_tree_add_item(tree, hf_l2server_radio_condition_group, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -1744,6 +1789,32 @@ static void dissect_rcp_load_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *p
     /* Fname */
     proto_tree_add_item(tree, hf_l2server_fname, tvb, offset, -1, ENC_ASCII);
 }
+
+static void dissect_rcp_load_end_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                     guint offset _U_, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+}
+
+static void dissect_rcp_load_end_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                     guint offset _U_, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+}
+
+
+static void dissect_rcp_load_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                 guint offset _U_, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+}
+
 
 /* Nr5gId (UEId + CellId + BeamIdx) */
 static guint dissect_nr5gid(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset, guint32 *ueid, guint32 *cellid)
@@ -7076,6 +7147,10 @@ static void dissect_crlc_config_ack(proto_tree *tree, tvbuff_t *tvb, packet_info
 static void dissect_version_info_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                      guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     // Code (made up name). 1 means real, 0 means debug (and not passed to L1)
     proto_tree_add_item(tree, hf_l2server_code, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
@@ -7090,6 +7165,10 @@ static void dissect_version_info_cmd(proto_tree *tree, tvbuff_t *tvb, packet_inf
 static void dissect_version_info_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                      guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     // Package type
     proto_tree_add_item(tree, hf_l2server_package_type, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
@@ -7101,6 +7180,10 @@ static void dissect_version_info_ack(proto_tree *tree, tvbuff_t *tvb, packet_inf
 static void dissect_dbeam_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                               guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* Dbeam Ind filter */
     proto_item *db_ti = proto_tree_add_item(tree, hf_l2server_dbeam_ind, tvb, 0, 0, ENC_ASCII);
     proto_item_set_hidden(db_ti);
@@ -7122,10 +7205,23 @@ static void dissect_dbeam_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinf
     offset += 4;
 }
 
+/* nr5g_l2_Srv_CELL_PPU_LIST_CMDt */
+static void dissect_ppu_list_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                 guint offset _U_, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+}
+
 /* nr5g_l2_Srv_CELL_PPU_LIST_ACKt */
 static void dissect_ppu_list_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                  guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     // NCellLte
     proto_tree_add_item(tree, hf_l2server_ncelllte, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
@@ -7153,7 +7249,6 @@ static void dissect_ppu_list_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *p
         proto_tree_add_item(tree, hf_l2server_cellidnritem, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
     }
-
 }
 
 // Showing nr5g_l2_Srv_CFG_02t from L2ServerMesages.h
@@ -7161,6 +7256,10 @@ static void dissect_ppu_list_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *p
 static void dissect_l2_srv_cfg_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                    guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     // Type (i.e. which type of struct this is).
     proto_tree_add_item(tree, hf_l2server_config_cmd_type, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
@@ -7230,14 +7329,26 @@ static void dissect_l2_srv_cfg_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info 
     // L2MaintenanceFlags
     offset += 4;
 
-
     // TODO:
 }
+
+static void dissect_l2_srv_cfg_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                   guint offset _U_, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+}
+
 
 // nr5g_l2_Srv_SETPARM_03t (from L2ServerMessages.h)
 static void dissect_setparm_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                 guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     // Type
     proto_tree_add_item(tree, hf_l2server_setparm_cmd_type, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
@@ -7374,7 +7485,13 @@ static void dissect_setparm_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
     }
 }
 
-
+static void dissect_setparm_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset _U_, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+}
 
 static void dissect_rlcmac_error_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                      guint offset, guint len _U_)
@@ -7419,6 +7536,10 @@ static void dissect_cmac_status_ind(proto_tree *tree, tvbuff_t *tvb, packet_info
 static void dissect_cmac_cell_status_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                          guint offset, guint len _U_)
 {
+    // Add log filter
+    proto_item *log_ti = proto_tree_add_item(tree, hf_l2server_log, tvb, 0, 0, ENC_ASCII);
+    proto_item_set_hidden(log_ti);
+
     /* Spare */
     proto_tree_add_item(tree, hf_l2server_spare4, tvb, offset, 4, ENC_NA);
     offset += 4;
@@ -7440,6 +7561,10 @@ static void dissect_cmac_cell_status_ind(proto_tree *tree, tvbuff_t *tvb, packet
 static void dissect_rcp_ue_set_group_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                          guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* UEId */
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -7451,6 +7576,10 @@ static void dissect_rcp_ue_set_group_cmd(proto_tree *tree, tvbuff_t *tvb, packet
 static void dissect_rcp_ue_set_group_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                          guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* UEId */
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -7459,6 +7588,10 @@ static void dissect_rcp_ue_set_group_ack(proto_tree *tree, tvbuff_t *tvb, packet
 static void dissect_rcp_set_ue_set_index_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                          guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
     /* UEId */
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -7467,13 +7600,37 @@ static void dissect_rcp_set_ue_set_index_cmd(proto_tree *tree, tvbuff_t *tvb, pa
     offset += 4;
 }
 
+/* lte_l2_Srv_ACKt */
 static void dissect_rcp_set_ue_index_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                          guint offset, guint len _U_)
 {
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* N.B. this is a union (UeId|CelllId|RcGroup) */
     /* UEId */
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 }
+
+static void dissect_rcp_set_ue_index_nak(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                         guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* N.B. this is a union (UeId|CelllId|RcGroup) */
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* Err */
+    proto_tree_add_item(tree, hf_l2server_err, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+}
+
 
 static void dissect_cmac_reset_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                    guint offset, guint len _U_)
@@ -7593,55 +7750,55 @@ static TYPE_FUN srv_error_type_funs[] =
 static TYPE_FUN om_type_funs[] =
 {
         { lte_l2_Srv_LOGIN_CMD,              "lte_L2_Srv_LOGIN_CMD",       dissect_login_cmd },
-        { lte_l2_Srv_LOGIN_ACK,              "lte_L2_Srv_LOGIN_ACK",       dissect_sapi_type_dummy /* TODO */},
+        { lte_l2_Srv_LOGIN_ACK,              "lte_L2_Srv_LOGIN_ACK",       dissect_login_ack },
         { lte_l2_Srv_LOGIN_NAK,              "lte_L2_Srv_LOGIN_NAK",       dissect_sapi_type_dummy /* TODO */},
 
-        { lte_l2_Srv_VERSION_INFO_CMD,       "lte_l2_Srv_VERSION_INFO_CMD",       dissect_version_info_cmd},
-        { lte_l2_Srv_VERSION_INFO_ACK,       "lte_l2_Srv_VERSION_INFO_ACK",       dissect_version_info_ack},
+        { lte_l2_Srv_VERSION_INFO_CMD,       "lte_l2_Srv_VERSION_INFO_CMD",       dissect_version_info_cmd },
+        { lte_l2_Srv_VERSION_INFO_ACK,       "lte_l2_Srv_VERSION_INFO_ACK",       dissect_version_info_ack },
         { lte_l2_Srv_VERSION_INFO_NAK,       "lte_l2_Srv_VERSION_INFO_NAK",       dissect_sapi_type_dummy /* TODO */},
 
         { nr5g_l2_Srv_BASE_TYPE,             "nr5g_l2_Srv_BASE_TYPE",       dissect_sapi_type_dummy /* TODO */},
 
-        { nr5g_l2_Srv_CFG_CMD,               "nr5g_l2_Srv_CFG_CMD",       dissect_l2_srv_cfg_cmd},
-        { nr5g_l2_Srv_CFG_ACK,               "nr5g_l2_Srv_CFG_ACK",       dissect_sapi_type_dummy /* TODO */},
+        { nr5g_l2_Srv_CFG_CMD,               "nr5g_l2_Srv_CFG_CMD",       dissect_l2_srv_cfg_cmd },
+        { nr5g_l2_Srv_CFG_ACK,               "nr5g_l2_Srv_CFG_ACK",       dissect_l2_srv_cfg_ack },
         { nr5g_l2_Srv_CFG_NAK,               "nr5g_l2_Srv_CFG_NAK",       dissect_sapi_type_dummy /* TODO */},
 
-        { nr5g_l2_Srv_CELL_PPU_LIST_CMD,     "nr5g_l2_Srv_CELL_PPU_LIST_CMD",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_CELL_PPU_LIST_CMD,     "nr5g_l2_Srv_CELL_PPU_LIST_CMD",       dissect_ppu_list_cmd },
         { nr5g_l2_Srv_CELL_PPU_LIST_ACK,     "nr5g_l2_Srv_CELL_PPU_LIST_ACK",       dissect_ppu_list_ack },
-        { nr5g_l2_Srv_CELL_PPU_LIST_NAK,     "nr5g_l2_Srv_CELL_PPU_LIST_NAK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_CELL_PPU_LIST_NAK,     "nr5g_l2_Srv_CELL_PPU_LIST_NAK",       dissect_sapi_type_dummy  /* TODO */},
 
         { nr5g_l2_Srv_SETPARM_CMD,           "nr5g_l2_Srv_SETPARM_CMD",       dissect_setparm_cmd },
-        { nr5g_l2_Srv_SETPARM_ACK,           "nr5g_l2_Srv_SETPARM_ACK",       dissect_sapi_type_dummy },
-        { nr5g_l2_Srv_SETPARM_NAK,           "nr5g_l2_Srv_SETPARM_NAK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_SETPARM_ACK,           "nr5g_l2_Srv_SETPARM_ACK",       dissect_setparm_ack },
+        { nr5g_l2_Srv_SETPARM_NAK,           "nr5g_l2_Srv_SETPARM_NAK",       dissect_sapi_type_dummy  /* TODO */},
 
         { lte_l2_Srv_START_CMD,              "lte_l2_Srv_START_CMD",       dissect_srv_start_cmd },
-        { lte_l2_Srv_START_ACK,              "lte_l2_Srv_START_ACK",       dissect_sapi_type_dummy },
+        { lte_l2_Srv_START_ACK,              "lte_l2_Srv_START_ACK",       dissect_srv_start_ack },
         { lte_l2_Srv_START_NAK,              "lte_l2_Srv_START_NAK",       dissect_sapi_type_dummy },
 
         { nr5g_l2_Srv_OPEN_CELL_CMD,         "NR5G_L2_SRV_OPEN_CELL_CMD",       dissect_open_cell_cmd},
         { nr5g_l2_Srv_OPEN_CELL_ACK,         "NR5G_L2_SRV_OPEN_CELL_ACK",       dissect_open_cell_ack /* TODO */},
-        { nr5g_l2_Srv_OPEN_CELL_NAK,         "NR5G_L2_SRV_OPEN_CELL_NAK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_OPEN_CELL_NAK,         "NR5G_L2_SRV_OPEN_CELL_NAK",       dissect_sapi_type_dummy  /* TODO */},
 
         // N.B. we send fix bytes ("buffer from log shared by Rocco")
         { lte_l2_Srv_GETINFO_CMD,            "lte_l2_Srv_GETINFO_CMD",       dissect_getinfo_cmd },
         { lte_l2_Srv_GETINFO_ACK,            "lte_l2_Srv_GETINFO_ACK",       dissect_getinfo_ack },
-        { lte_l2_Srv_GETINFO_NAK,            "lte_l2_Srv_GETINFO_NAK",       dissect_sapi_type_dummy },
+        { lte_l2_Srv_GETINFO_NAK,            "lte_l2_Srv_GETINFO_NAK",       dissect_sapi_type_dummy  /* TODO */},
 
         { nr5g_l2_Srv_CELL_CONFIG_CMD,       "nr5g_l2_Srv_CELL_CONFIG_CMD",       dissect_cell_config_cmd },
         { nr5g_l2_Srv_CELL_CONFIG_ACK,       "nr5g_l2_Srv_CELL_CONFIG_ACK",       dissect_cell_config_ack },
-        { nr5g_l2_Srv_CELL_CONFIG_NAK,       "nr5g_l2_Srv_CELL_CONFIG_NAK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_CELL_CONFIG_NAK,       "nr5g_l2_Srv_CELL_CONFIG_NAK",       dissect_sapi_type_dummy  /* TODO */},
 
         { nr5g_l2_Srv_RCP_LOAD_CMD,       "nr5g_l2_Srv_RCP_LOAD_CMD",       dissect_rcp_load_cmd },
-        { nr5g_l2_Srv_RCP_LOAD_ACK,       "nr5g_l2_Srv_RCP_LOAD_ACK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_RCP_LOAD_ACK,       "nr5g_l2_Srv_RCP_LOAD_ACK",       dissect_rcp_load_ack },
         { nr5g_l2_Srv_RCP_LOAD_NAK,       "nr5g_l2_Srv_RCP_LOAD_NAK",       dissect_sapi_type_dummy },
 
-        { nr5g_l2_Srv_RCP_LOAD_END_CMD,       "nr5g_l2_Srv_RCP_LOAD_END_CMD",       dissect_sapi_type_dummy },
-        { nr5g_l2_Srv_RCP_LOAD_END_ACK,       "nr5g_l2_Srv_RCP_LOAD_END_ACK",       dissect_sapi_type_dummy },
-        { nr5g_l2_Srv_RCP_LOAD_END_NAK,       "nr5g_l2_Srv_RCP_LOAD_END_NAK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_RCP_LOAD_END_CMD,       "nr5g_l2_Srv_RCP_LOAD_END_CMD",       dissect_rcp_load_end_cmd },
+        { nr5g_l2_Srv_RCP_LOAD_END_ACK,       "nr5g_l2_Srv_RCP_LOAD_END_ACK",       dissect_rcp_load_end_ack },
+        { nr5g_l2_Srv_RCP_LOAD_END_NAK,       "nr5g_l2_Srv_RCP_LOAD_END_NAK",       dissect_sapi_type_dummy  /* TODO */},
 
         { nr5g_l2_Srv_CELL_PARM_CMD,         "nr5g_l2_Srv_CELL_PARM_CMD",       dissect_cell_parm_cmd },
         { nr5g_l2_Srv_CELL_PARM_ACK,         "nr5g_l2_Srv_CELL_PARM_ACK",       dissect_cell_parm_ack },
-        { nr5g_l2_Srv_CELL_PARM_NAK,         "nr5g_l2_Srv_CELL_PARM_NAK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_CELL_PARM_NAK,         "nr5g_l2_Srv_CELL_PARM_NAK",       dissect_sapi_type_dummy  /* TODO */},
 
         { nr5g_l2_Srv_CREATE_UE_CMD,            "nr5g_l2_Srv_CREATE_UE_CMD",       dissect_create_ue_cmd },
         { nr5g_l2_Srv_CREATE_UE_ACK,            "nr5g_l2_Srv_CREATE_UE_ACK",       dissect_create_ue_ack },
@@ -7653,11 +7810,11 @@ static TYPE_FUN om_type_funs[] =
 
         { nr5g_l2_Srv_RCP_UE_SET_GROUP_CMD,     "nr5g_l2_Srv_RCP_UE_SET_GROUP_CMD",       dissect_rcp_ue_set_group_cmd },
         { nr5g_l2_Srv_RCP_UE_SET_GROUP_ACK,     "nr5g_l2_Srv_RCP_UE_SET_GROUP_ACK",       dissect_rcp_ue_set_group_ack },
-        { nr5g_l2_Srv_RCP_UE_SET_GROUP_NAK,     "nr5g_l2_Srv_RCP_UE_SET_GROUP_NAK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_RCP_UE_SET_GROUP_NAK,     "nr5g_l2_Srv_RCP_UE_SET_GROUP_NAK",       dissect_sapi_type_dummy  /* TODO */},
 
         { nr5g_l2_Srv_RCP_UE_SET_INDEX_CMD,     "nr5g_l2_Srv_RCP_UE_SET_INDEX_CMD",       dissect_rcp_set_ue_set_index_cmd },
         { nr5g_l2_Srv_RCP_UE_SET_INDEX_ACK,     "nr5g_l2_Srv_RCP_UE_SET_INDEX_ACK",       dissect_rcp_set_ue_index_ack },
-        { nr5g_l2_Srv_RCP_UE_SET_INDEX_NAK,     "nr5g_l2_Srv_RCP_UE_SET_INDEX_NAK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_RCP_UE_SET_INDEX_NAK,     "nr5g_l2_Srv_RCP_UE_SET_INDEX_NAK",       dissect_rcp_set_ue_index_nak },
 
 
          /* Handover */
@@ -10338,6 +10495,10 @@ proto_register_l2server(void)
          NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_targ_cellid,
        { "TargCellId", "l2server.target-cellid", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_err,
+       { "Err", "l2server.err", FT_INT16, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
     };
 
