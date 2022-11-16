@@ -37,7 +37,8 @@ signal.signal(signal.SIGINT, signal_handler)
 dissectors = [ 'packet-ulgrant.c', 'packet-l2server.c',  'packet-dlblock.c',
                'packet-pdcp-uu.c', 'packet-pdcp-gtpu.c', 'packet-ip-udp.c',
                'packet-pacs.c',    'packet-axe-rpc.c',   'packet-textlogger.c',
-               'packet-tlv.c',     'packet-elsucopy.c',  'packet-rohc.c' ]
+               'packet-tlv.c',     'packet-elsucopy.c',  'packet-rohc.c',
+               'packet-oran.c' ]
 
 if len(sys.argv) > 1:
     dissectors = [ sys.argv[1] ]
