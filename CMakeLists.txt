@@ -634,23 +634,20 @@ else() # ! MSVC
 		# -O<X> and -g get set by the CMAKE_BUILD_TYPE
 		-Wall
 		-Wextra
-		-Wendif-labels
 		-Wpointer-arith
 		-Wformat-security
 		-fwrapv
 		-fno-strict-overflow
 		-Wvla
-		-Waddress
 		-Wattributes
-		-Wdiv-by-zero
-		-Wignored-qualifiers
-		-Wpragmas
-		-Wno-overlength-strings
-		-Wno-long-long
-		-Wheader-guard
-		-Wcomma
-		-Wshorten-64-to-32
+		-Wpragmas		# Clang-only
+		-Wheader-guard		# Clang-only
+		-Wcomma			# Clang-only
+		-Wshorten-64-to-32	# Clang-only
 		-Wredundant-decls
+		-Wunreachable-code	# Clang-only
+		-Wdocumentation		# Clang-only
+		-Wlogical-op		# GCC-only
 		#
 		# Disable errors unconditionally for some static analysis warnings
 		# that are dormant at lower optimizations levels and also
@@ -706,20 +703,7 @@ else() # ! MSVC
 		-Wshadow
 		-Wold-style-definition
 		-Wstrict-prototypes
-		#
-		# Some versions of GCC, such as 4.3.2 and 4.4.5,
-		# generate logical-op warnings when strchr() is given a
-		# constant string.  The autoconf script checked for that;
-		# we don't.
-		#
-		-Wlogical-op
 		-Wjump-misses-init
-		#
-		# Implicit function declarations are an error in C++ and most
-		# likely a programming error in C. Turn -Wimplicit-int and
-		# -Wimplicit-function-declaration into an error by default.
-		#
-		-Werror=implicit
 	)
 
 	#
@@ -740,7 +724,7 @@ else() # ! MSVC
 
 
 	list(APPEND WIRESHARK_CXX_ONLY_FLAGS
-		-Wextra-semi
+		-Wextra-semi	# Clang-only
 	)
 
 	#
@@ -751,6 +735,8 @@ else() # ! MSVC
 		list(APPEND WIRESHARK_COMMON_FLAGS
 			# The following are for C and C++
 			-Wpedantic
+			-Wno-overlength-strings
+			-Wno-long-long
 			#
 			# As we use variadic macros, we don't want warnings
 			# about them, even with -Wpedantic.
@@ -781,18 +767,13 @@ else() # ! MSVC
 			#
 			-Wcast-align
 			#
-			# Works only with Clang
+			# Doesn't warn of interesting issues. Usually the
+			# duplicated branches are protocol constants that
+			# happen to be equal and are relevant for documentation
+			# and readability and are trivially optimized by the
+			# compiler.
 			#
-			-Wunreachable-code
-			#
-			# Works only with Clang but generates a lot of warnings
-			# (about glib library not using Doxygen)
-			#
-			-Wdocumentation
-			#
-			# Works only with GCC 7
-			#
-			-Wduplicated-branches
+			-Wduplicated-branches		# GCC-only
 			#
 			# No longer supported by El Capitan clang on C++
 			# XXX - is this one of those where CMake's check
