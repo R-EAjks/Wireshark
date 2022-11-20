@@ -872,6 +872,8 @@ static int hf_l2server_targ_cellid = -1;
 
 static int hf_l2server_err = -1;
 
+static int hf_l2server_si_sched_info = -1;
+
 static const value_string lch_vals[] =
 {
     { 0x0,   "SPARE" },
@@ -1477,6 +1479,7 @@ static gint ett_l2server_aper_trigger_stateconfig = -1;
 static gint ett_l2server_csi_associated_report_cfg = -1;
 static gint ett_l2server_dmrs_mapping = -1;
 static gint ett_l2server_p_zp_csi_rs_set = -1;
+static gint ett_l2server_si_sched_info = -1;
 
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
@@ -2268,6 +2271,27 @@ static void dissect_rlcmac_data_ind_am(proto_tree *tree, tvbuff_t *tvb, packet_i
 }
 
 
+/* nr5g_rlcmac_Cmac_SI_SCHED_INFOt (from nr5g-rlcmac_Cmac.h) */
+static guint dissect_si_scheduling_info(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                        guint offset, gboolean si_scheduling_info_valid)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *si_sched_ti = proto_tree_add_string_format(tree, hf_l2server_si_sched_info, tvb,
+                                                          offset, sizeof(nr5g_rlcmac_Cmac_SI_SCHED_INFOt),
+                                                          "", "SI Scheduling Info ");
+    //proto_tree *si_sched_tree = proto_item_add_subtree(si_sched_ti, ett_l2server_si_sched_info);
+
+    if (!si_scheduling_info_valid) {
+        proto_item_append_text(si_sched_ti, " (not present)");
+    }
+
+    return start_offset + sizeof(nr5g_rlcmac_Cmac_SI_SCHED_INFOt);
+}
+
+
+
 // nr5g_l2_Srv_CELL_CONFIGt from L2ServerMessages.h
 static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                     guint offset, guint len _U_)
@@ -2294,6 +2318,8 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
     proto_tree_add_item(tree, hf_l2server_rach_probe_req, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // SiSchedulingInfoValid
+    // TODO: as field
+    gboolean si_scheduling_info_valid = tvb_get_guint8(tvb, offset);
     offset += 1;
 
     // RA_Info (nr5g_rlcmac_Cmac_RA_Info_t) -> (bb_nr5g_CELL_GROUP_CONFIGt in bb-nr5g_struct.h)
@@ -2314,7 +2340,7 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
 
     // CellCfg (nr5g_rlcmac_Cmac_CellCfg_t from nr5g-rlcmac_Cmac.h ->
     //          bb_nr5g_CELL_GROUP_CONFIGt from bb-nr5g_struct_macro.h
-    gint start_offset = offset;
+    gint cell_cfg_start_offset = offset;
     proto_item *cellcfg_ti = proto_tree_add_string_format(tree, hf_l2server_cell_config_cellcfg, tvb,
                                                           offset, 4,
                                                           "", "CellCfg ");
@@ -2326,15 +2352,16 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
     //     CellCfgCommon. Is serialized for cmac_config_cmd (last arg).
     offset = dissect_sp_cell_cfg_common(cellcfg_tree, tvb, pinfo, offset, FALSE);
 
-    // TODO:
+    // TODO: removed from 23.0 ?
     // NbAggrCellCfgCommon
-    offset += 1;
-
+    //offset += 1;
     // AggrCellCfgCommon[]
-    proto_item_set_len(cellcfg_ti, offset-start_offset);
+
+    offset = cell_cfg_start_offset + sizeof(nr5g_rlcmac_Cmac_CellCfg_t);
+    proto_item_set_len(cellcfg_ti, offset-cell_cfg_start_offset);
 
     // SiSchedulingInfo
-    // TODO
+    offset = dissect_si_scheduling_info(tree, tvb, pinfo, offset, si_scheduling_info_valid);
 }
 
 static void dissect_cell_config_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -2755,7 +2782,7 @@ static guint dissect_rlcmac_cmac_ra_info_empty(proto_tree *tree, tvbuff_t *tvb, 
                                                           offset, sizeof(nr5g_rlcmac_Cmac_RA_Info_t),
                                                           "", "RA Info ");
 
-    proto_item_append_text(ra_info_ti, (from_bwp_mask) ? " (Not in bwpMask)" : " (Not present)");
+    proto_item_append_text(ra_info_ti, (from_bwp_mask) ? " (Not in bwpMask)" : " (not present)");
 
     // Move to start of next one..
     offset = ra_start + sizeof(nr5g_rlcmac_Cmac_RA_Info_t);
@@ -5705,6 +5732,7 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
     proto_item_set_len(config_ti, offset-start_offset);
     return offset;
 }
+
 
 static guint dissect_tx_lch_info(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                  guint offset)
@@ -10500,6 +10528,10 @@ proto_register_l2server(void)
       { &hf_l2server_err,
        { "Err", "l2server.err", FT_INT16, BASE_DEC,
          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_si_sched_info,
+       { "SI Scheduling Info", "l2server.si-scheduling-info", FT_STRING, FT_NONE,
+         NULL, 0X0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
@@ -10596,7 +10628,8 @@ proto_register_l2server(void)
         &ett_l2server_aper_trigger_stateconfig,
         &ett_l2server_csi_associated_report_cfg,
         &ett_l2server_dmrs_mapping,
-        &ett_l2server_p_zp_csi_rs_set
+        &ett_l2server_p_zp_csi_rs_set,
+        &ett_l2server_si_sched_info
     };
 
     static ei_register_info ei[] = {
