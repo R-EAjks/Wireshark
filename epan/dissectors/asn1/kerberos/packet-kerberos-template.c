@@ -2736,7 +2736,7 @@ decrypt_krb5_data(proto_tree *tree, packet_info *pinfo,
 		 */
 		TRY {
 			id_offset = get_ber_identifier(encr_tvb, CONFOUNDER_PLUS_CHECKSUM, &cls, &pc, &tag);
-			offset = get_ber_length(encr_tvb, id_offset, &item_len, &ind);
+			offset = get_ber_length(NULL, NULL, encr_tvb, id_offset, &item_len, &ind);
 		}
 		CATCH_BOUNDS_ERRORS {
 			tvb_free(encr_tvb);

@@ -2665,7 +2665,7 @@ de_facility(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset,
         /* Get the length of the component there can be more than one component in a facility message */
 
         header_end_offset = get_ber_identifier(tvb, offset, &appclass, &pc, &comp_type_tag);
-        header_end_offset = get_ber_length(tvb, header_end_offset, &component_len, &ind);
+        header_end_offset = get_ber_length(NULL, NULL, tvb, header_end_offset, &component_len, &ind);
         header_len = header_end_offset - offset;
         component_len = header_len + component_len;
         /*

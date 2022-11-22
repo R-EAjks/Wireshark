@@ -1232,7 +1232,7 @@ dissect_gbcs_message_mac_header(tvbuff_t *tvb, proto_tree *tree, guint *offset)
     dissect_gbcs_message_element(mac_header_tree, hf_gbcs_message_mac_header_key_info, tvb, offset); // key-info - always none
 
     offset_start = *offset;
-    *offset = get_ber_length(tvb, *offset, &len, NULL);
+    *offset = get_ber_length(NULL, NULL, tvb, *offset, &len, NULL);
     proto_tree_add_uint(mac_header_tree, hf_gbcs_message_element_length, tvb, offset_start, *offset - offset_start, len);
 
     proto_tree_add_item(mac_header_tree, hf_gbcs_message_mac_header_security_control_byte, tvb, *offset, 1, ENC_NA);
@@ -1273,7 +1273,7 @@ dissect_gbcs_message_grouping_header(tvbuff_t *tvb, packet_info *pinfo, proto_tr
             *offset, 1, ett_gbcs_message_grouping_header_other_info, &other_info_ti, "Other Information");
 
     offset_start = *offset;
-    *offset = get_ber_length(tvb, *offset, &other_info_len, NULL);
+    *offset = get_ber_length(NULL, NULL, tvb, *offset, &other_info_len, NULL);
     proto_tree_add_uint(other_info_tree, hf_gbcs_message_element_length, tvb, offset_start, *offset - offset_start, other_info_len);
 
     proto_tree_add_item_ret_uint(other_info_tree, hf_gbcs_message_grouping_header_message_code,
@@ -1313,7 +1313,7 @@ dissect_gbcs_message_grouping_header(tvbuff_t *tvb, packet_info *pinfo, proto_tr
     proto_item_set_end(other_info_ti, tvb, *offset);
 
     offset_start = *offset;
-    *offset = get_ber_length(tvb, *offset, len, NULL);
+    *offset = get_ber_length(NULL, NULL, tvb, *offset, len, NULL);
     proto_tree_add_uint(grouping_header_tree, hf_gbcs_message_element_length, tvb, offset_start, *offset - offset_start, *len);
 
     proto_item_set_end(grouping_header_ti, tvb, *offset);
@@ -1348,7 +1348,7 @@ dissect_gbcs_message_routing_header(tvbuff_t *tvb, proto_tree *tree, guint *offs
             *offset, 1, ett_gbcs_message_routing_header_other_info, &other_info_ti, "Other Information");
 
     offset_start = *offset;
-    *offset = get_ber_length(tvb, *offset, &other_info_len, NULL);
+    *offset = get_ber_length(NULL, NULL, tvb, *offset, &other_info_len, NULL);
     proto_tree_add_uint(other_info_tree, hf_gbcs_message_element_length, tvb, offset_start, *offset - offset_start, other_info_len);
 
     proto_tree_add_item(other_info_tree, hf_gbcs_message_routing_header_message_code, tvb, *offset, 2, ENC_BIG_ENDIAN);
@@ -1357,7 +1357,7 @@ dissect_gbcs_message_routing_header(tvbuff_t *tvb, proto_tree *tree, guint *offs
     dissect_gbcs_message_element(routing_header_tree, hf_gbcs_message_routing_header_key_info, tvb, offset); // key-info - always none
 
     offset_start = *offset;
-    *offset = get_ber_length(tvb, *offset, &len, NULL);
+    *offset = get_ber_length(NULL, NULL, tvb, *offset, &len, NULL);
     proto_tree_add_uint(routing_header_tree, hf_gbcs_message_element_length, tvb, offset_start, *offset - offset_start, len);
 
     proto_tree_add_item(routing_header_tree, hf_gbcs_message_routing_header_security_control_byte, tvb, *offset, 1, ENC_NA);
@@ -1402,7 +1402,7 @@ dissect_gbcs_message_gbt_header(tvbuff_t *tvb, proto_tree *tree, guint *offset,
     *offset += 2;
 
     offset_start = *offset;
-    *offset = get_ber_length(tvb, *offset, len, NULL);
+    *offset = get_ber_length(NULL, NULL, tvb, *offset, len, NULL);
     proto_tree_add_uint(gbt_header_tree, hf_gbcs_message_element_length, tvb, offset_start, *offset - offset_start, *len);
 
     proto_item_set_end(ti, tvb, *offset);

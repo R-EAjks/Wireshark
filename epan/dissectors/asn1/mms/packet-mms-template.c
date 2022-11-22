@@ -229,7 +229,7 @@ dissect_mms_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, voi
 		/* MMS requires length after tag so not MMS if indefinite length*/
 		return FALSE;
 
-	offset = get_ber_length(tvb, offset, &length, NULL);
+	offset = get_ber_length(NULL, NULL, tvb, offset, &length, NULL);
 	/* do we have enough bytes? */
 	if (!tvb_bytes_exist(tvb, offset, length))
 		return FALSE;

@@ -373,7 +373,7 @@ static int strip_octet_string(tvbuff_t *tvb)
   /* before proceeding */
 
   offset = get_ber_identifier(tvb, 0, &ber_class, &pc, &tag);
-  offset = get_ber_length(tvb, offset, &len, &ind);
+  offset = get_ber_length(NULL, NULL, tvb, offset, &len, &ind);
 
   if((ber_class == BER_CLASS_UNI) && (tag == BER_UNI_TAG_OCTETSTRING))
     return offset;

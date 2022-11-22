@@ -108,13 +108,13 @@ dissect_credssp_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree,
   if(tvb_captured_length(tvb) > 7) {
     offset = get_ber_identifier(tvb, offset, &ber_class, &pc, &tag);
     if((ber_class == BER_CLASS_UNI) && (tag == BER_UNI_TAG_SEQUENCE) && (pc == TRUE)) {
-      offset = get_ber_length(tvb, offset, NULL, NULL);
+      offset = get_ber_length(NULL, NULL, tvb, offset, NULL, NULL);
       offset = get_ber_identifier(tvb, offset, &ber_class, &pc, &tag);
       if((ber_class == BER_CLASS_CON) && (tag == 0)) {
-        offset = get_ber_length(tvb, offset, NULL, NULL);
+        offset = get_ber_length(NULL, NULL, tvb, offset, NULL, NULL);
         offset = get_ber_identifier(tvb, offset, &ber_class, &pc, &tag);
         if((ber_class == BER_CLASS_UNI) && (tag == BER_UNI_TAG_INTEGER)) {
-          offset = get_ber_length(tvb, offset, &length, NULL);
+          offset = get_ber_length(NULL, NULL, tvb, offset, &length, NULL);
           ver = tvb_get_guint8(tvb, offset);
           if((length == 1) && (ver > 1) && (ver < 99)) {
             if (have_tap_listener(exported_pdu_tap)) {

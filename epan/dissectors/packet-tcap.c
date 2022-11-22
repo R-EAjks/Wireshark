@@ -3742,7 +3742,7 @@ dissect_tcap_param(asn1_ctx_t *actx, proto_tree *tree, tvbuff_t *tvb, int offset
 
     offset = get_ber_identifier(tvb, offset, &ber_class, &pc, &tag);
     tag_offset = offset;
-    offset = get_ber_length(tvb, offset, &len, &ind_field);
+    offset = get_ber_length(NULL, NULL, tvb, offset, &len, &ind_field);
     len_offset = offset;
 
     tag_length = tag_offset - saved_offset;

@@ -1893,7 +1893,7 @@ check_ScopedPdu(tvbuff_t* tvb)
 	guint32 len;
 
 	offset = get_ber_identifier(tvb, 0, &ber_class, &pc, &tag);
-	offset = get_ber_length(tvb, offset, NULL, NULL);
+	offset = get_ber_length(NULL, NULL, tvb, offset, NULL, NULL);
 
 	if ( ! (((ber_class!=BER_CLASS_APP) && (ber_class!=BER_CLASS_PRI) )
 			&& ( (!pc) || (ber_class!=BER_CLASS_UNI) || (tag!=BER_UNI_TAG_ENUMERATED) )
@@ -1905,7 +1905,7 @@ check_ScopedPdu(tvbuff_t* tvb)
 	hoffset = offset;
 
 	offset = get_ber_identifier(tvb, offset, &ber_class, &pc, &tag);
-	offset = get_ber_length(tvb, offset, &len, NULL);
+	offset = get_ber_length(NULL, NULL, tvb, offset, &len, NULL);
 	eoffset = offset + len;
 
 	if (eoffset <= hoffset) return FALSE;
@@ -2036,7 +2036,7 @@ dissect_snmp_pdu(tvbuff_t *tvb, int offset, packet_info *pinfo,
 	 */
 	offset = get_ber_identifier(tvb, offset, &ber_class, &pc, &tag);
 	/*Get the total octet length of the SNMP data*/
-	offset = get_ber_length(tvb, offset, &len, &ind);
+	offset = get_ber_length(NULL, NULL, tvb, offset, &len, &ind);
 	message_length = len + offset;
 
 	/*Get the SNMP version data*/
@@ -2139,7 +2139,7 @@ dissect_snmp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
 		return 0;
 	}
 	/* then comes a length which spans the rest of the tvb */
-	offset = get_ber_length(tvb, offset, &tmp_length, &tmp_ind);
+	offset = get_ber_length(NULL, NULL, tvb, offset, &tmp_length, &tmp_ind);
 	/* if(tmp_length!=(guint32)tvb_reported_length_remaining(tvb, offset)) {
 	 * Loosen the heuristic a bit to handle the case where data has intentionally
 	 * been added after the snmp PDU ( UDP case)

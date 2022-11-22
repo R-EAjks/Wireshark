@@ -1617,7 +1617,7 @@ static int dissect_cops_pr_object_data(tvbuff_t *tvb, packet_info *pinfo, guint3
         asn_tree = proto_tree_add_subtree(tree, tvb, offset, len, ett_cops_asn1, NULL, "Contents:");
 
         offset = get_ber_identifier(tvb, offset, &ber_class, &ber_pc, &ber_tag);
-        offset = get_ber_length(tvb, offset, &encoid_len, NULL);
+        offset = get_ber_length(NULL, NULL, tvb, offset, &encoid_len, NULL);
 
         /* TODO: check pc, class and tag */
 
@@ -1686,7 +1686,7 @@ static int dissect_cops_pr_object_data(tvbuff_t *tvb, packet_info *pinfo, guint3
             int hfid;
 
             offset = get_ber_identifier(tvb, offset, &ber_class, &ber_pc, &ber_tag);
-            offset = get_ber_length(tvb, offset, &ber_length, &ber_ind);
+            offset = get_ber_length(NULL, NULL, tvb, offset, &ber_length, &ber_ind);
 
             if (oid_info) {
                 /*
