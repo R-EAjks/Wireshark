@@ -2641,6 +2641,29 @@ static void dissect_re_est_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pin
     proto_item_set_hidden(reest_ti);
 }
 
+
+
+static void dissect_rlc_entity_create_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
+                                          guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* Nr5gId (UEId + CellId + BeamIdx) */
+    guint32 ueid, cellid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid, &cellid);
+
+    /* RbType */
+    proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* RbId */
+    proto_tree_add_item(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+}
+
+
+
 static void dissect_l1t_log_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                 guint offset, guint len _U_)
 {
@@ -7883,6 +7906,15 @@ static TYPE_FUN aux_type_funs[] =
     { nr5g_rlcmac_Data_RE_EST_END_IND,       "nr5g_rlcmac_Data_RE_EST_END_IND",       dissect_re_est_ind /* TODO */},
     //{ nr5g_rlcmac_Data_RLC_BUFFER_REQ,       "nr5g_rlcmac_Data_RLC_BUFFER_REQ",       dissect_sapi_type_dummy /* TODO */},
     //{ nr5g_rlcmac_Data_RLC_BUFFER_IND,       "nr5g_rlcmac_Data_RLC_BUFFER_IND",       dissect_sapi_type_dummy /* TODO */},
+
+    // TODO: these 3 belong in a error SAP, but not sure which one!!!!
+    { nr5g_rlcmac_Crlc_ERROR_IND,         "nr5g_rlcmac_Crlc_ERROR_IND",               dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Crlc_REJECT_IND,        "nr5g_rlcmac_Crlc_REJECT_IND",              dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Crlc_NC_ERROR_IND,      "nr5g_rlcmac_Crlc_NC_ERROR_IND",            dissect_sapi_type_dummy /* TODO */},
+
+
+    { nr5g_rlcmac_Data_RLC_ENTITY_CREATE_IND,  "nr5g_rlcmac_Data_RLC_ENTITY_CREATE_IND",    dissect_rlc_entity_create_ind },
+    { nr5g_rlcmac_Data_SI_IND,                 "nr5g_rlcmac_Data_SI_IND",                   dissect_sapi_type_dummy /* TODO */},
     { 0x00,                               NULL,                             NULL }
 };
 #define MAX_AUX_TYPE_VALS      array_length(aux_type_funs)
