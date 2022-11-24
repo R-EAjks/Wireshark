@@ -874,6 +874,23 @@ static int hf_l2server_err = -1;
 
 static int hf_l2server_si_sched_info = -1;
 
+static int hf_l2server_bwp_dl_common_pdcch_setup_present = -1;
+static int hf_l2server_bwp_dl_common_pdcch_release_present = -1;
+static int hf_l2server_bwp_dl_common_pdsch_setup_present = -1;
+static int hf_l2server_bwp_dl_common_pdsch_release_present = -1;
+
+static int hf_l2server_bwp_ul_common_rach_setup_present = -1;
+static int hf_l2server_bwp_ul_common_rach_release_present = -1;
+static int hf_l2server_bwp_ul_common_pusch_setup_present = -1;
+static int hf_l2server_bwp_ul_common_pusch_release_present = -1;
+static int hf_l2server_bwp_ul_common_pucch_setup_present = -1;
+static int hf_l2server_bwp_ul_common_pucch_release_present = -1;
+
+static int hf_l2server_tdd_ul_dl_pattern1_present = -1;
+static int hf_l2server_tdd_ul_dl_pattern2_present = -1;
+
+
+
 static const value_string lch_vals[] =
 {
     { 0x0,   "SPARE" },
@@ -3940,18 +3957,23 @@ static int dissect_bwp_downlinkcommon(proto_tree *tree, tvbuff_t *tvb, packet_in
         guint32 field_mask_4;
         proto_tree_add_item_ret_uint(bwp_dl_common_tree, hf_l2server_field_mask_4, tvb, offset, 4,
                                      ENC_LITTLE_ENDIAN, &field_mask_4);
+        gboolean pdcch_setup_present, pdsch_setup_present;
+        proto_tree_add_item_ret_boolean(bwp_dl_common_ti, hf_l2server_bwp_dl_common_pdcch_setup_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &pdcch_setup_present);
+        proto_tree_add_item(bwp_dl_common_ti,             hf_l2server_bwp_dl_common_pdcch_release_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item_ret_boolean(bwp_dl_common_ti, hf_l2server_bwp_dl_common_pdsch_setup_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &pdsch_setup_present);
+        proto_tree_add_item(bwp_dl_common_ti,             hf_l2server_bwp_dl_common_pdsch_release_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
         offset += 4;
 
         // GenBwp (bb_nr5g_BWPt)
         offset = dissect_genbwp(bwp_dl_common_tree, tvb, pinfo, offset);
 
         // PdcchConfCommon (bb_nr5g_PDCCH_CONF_COMMONt)
-        if (field_mask_4 & bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDCCH_CFG_SETUP) {
+        if (pdcch_setup_present) {
             offset = dissect_pdcch_conf_common(bwp_dl_common_tree, tvb, pinfo, offset, FALSE);
         }
 
         // PdschConfCommon (bb_nr5g_PDSCH_CONF_COMMONt) (apparently present regardless!)
-        if (field_mask_4 & bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDSCH_CFG_SETUP) {
+        if (pdsch_setup_present) {
             gint pdsch_offset = offset;
 
             // Subtree.
@@ -3976,8 +3998,10 @@ static int dissect_bwp_downlinkcommon(proto_tree *tree, tvbuff_t *tvb, packet_in
             proto_item_set_len(pdsch_ti, offset-pdsch_offset);
         }
     }
-    else {
-        offset += sizeof(bb_nr5g_BWP_DOWNLINKCOMMONt);
+
+    // Regardless (of present), if this isn't serialized, add whole size
+    if (!serialized) {
+        offset = start_offset + sizeof(bb_nr5g_BWP_DOWNLINKCOMMONt);
     }
 
     proto_item_set_len(bwp_dl_common_ti, offset-start_offset);
@@ -5186,7 +5210,8 @@ static int dissect_pusch_timedomainresalloc(proto_tree *tree, tvbuff_t *tvb, pac
 
 // bb_nr5g_RACH_CONF_COMMONt
 // N.B. unchanged by serialization.
-static int dissect_rach_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset)
+static int dissect_rach_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset,
+                                    gboolean present)
 {
     gint start_offset = offset;
 
@@ -5195,103 +5220,109 @@ static int dissect_rach_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_info
                                                        offset, 1, "", "RACH_CONF_COMMON");
     proto_tree *rach_tree = proto_item_add_subtree(rach_ti, ett_l2server_rach_common);
 
-    // FieldMask
-    guint32 rach_fieldmask;
-    proto_tree_add_item_ret_uint(rach_tree, hf_l2server_field_mask_4, tvb, offset, 4,
-                                 ENC_LITTLE_ENDIAN, &rach_fieldmask);
-    offset += 4;
+    if (present) {
+        // FieldMask
+        guint32 rach_fieldmask;
+        proto_tree_add_item_ret_uint(rach_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                     ENC_LITTLE_ENDIAN, &rach_fieldmask);
+        offset += 4;
 
-    //--------------------------------
-    // RachConfGeneric
+        //--------------------------------
+        // RachConfGeneric
 
-    // Subtree.
-    proto_item *generic_ti = proto_tree_add_string_format(rach_tree, hf_l2server_rach_generic, tvb,
-                                                         offset, 1, "", "RACH Generic ");
-    proto_tree *generic_tree = proto_item_add_subtree(generic_ti, ett_l2server_rach_generic);
+        // Subtree.
+        proto_item *generic_ti = proto_tree_add_string_format(rach_tree, hf_l2server_rach_generic, tvb,
+                                                             offset, 1, "", "RACH Generic ");
+        proto_tree *generic_tree = proto_item_add_subtree(generic_ti, ett_l2server_rach_generic);
 
-    // PrachConfigIndex
-    proto_tree_add_item(generic_tree, hf_l2server_prach_configindex, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-    offset += 2;
-    // Msg1FDM
-    proto_tree_add_item(generic_tree, hf_l2server_msg1_fdm, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
-    // Msg1FrequencyStart
-    proto_tree_add_item(generic_tree, hf_l2server_msg1_frequency_start, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-    offset += 2;
-    // ZeroCorrZone
-    proto_tree_add_item(generic_tree, hf_l2server_zero_corr_zone, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
-    // PreambleRecTargetPwr
-    proto_tree_add_item(generic_tree, hf_l2server_preamble_rec_target_pwr, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-    offset += 2;
-
-    proto_item_set_len(generic_ti, sizeof(bb_nr5g_RACH_CONF_GENERICt));
-    //--------------------------------
-
-    // NbOfRaPreambles
-    proto_tree_add_item(rach_tree, hf_l2server_totalnumberofra_preambles, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
-    // Msg1SubCarrSpacing
-    proto_tree_add_item(rach_tree, hf_l2server_msg1_subcarrier_spacing, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
-    // RestSetConf
-    proto_tree_add_item(rach_tree, hf_l2server_rest_set_conf, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
-    // Msg3TranfPrecoding
-    proto_tree_add_item(rach_tree, hf_l2server_msg3_tranform_precoding, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
-    // RsrpThresholdSsb
-    proto_tree_add_item(rach_tree, hf_l2server_rsrp_threshold_ssb, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
-
-    // RsrpThresholdSsbSul
-    proto_tree_add_item(rach_tree, hf_l2server_rsrp_threshold_ssb_sul, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
-    // PrachRootSeqIndexIsValid
-    proto_tree_add_item(rach_tree, hf_l2server_prach_root_seq_index_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
-    // SsbPerRachIsValid
-    proto_tree_add_item(rach_tree, hf_l2server_ssb_per_rach_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
-    // PrachRootSeqIndex
-    proto_tree_add_item(rach_tree, hf_l2server_prach_root_seq_index, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-    offset += 2;
-    // SsbPerRach
-    proto_tree_add_item(rach_tree, hf_l2server_ssb_per_rach, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
-
-    // GroupBconfigure
-    {
-        proto_item *group_b_ti = proto_tree_add_string_format(rach_tree, hf_l2server_group_b_configured, tvb,
-                                                             offset, 3, "", "Group B Configured");
-        proto_tree *group_b_tree = proto_item_add_subtree(group_b_ti, ett_l2server_group_b_configured);
-
-        // Ra_Msg3SizeGroupA
-        proto_tree_add_item(group_b_tree, hf_l2server_ra_msg3_size_group_a, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        // PrachConfigIndex
+        proto_tree_add_item(generic_tree, hf_l2server_prach_configindex, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+        // Msg1FDM
+        proto_tree_add_item(generic_tree, hf_l2server_msg1_fdm, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
-        // MessagePowerOffsetGroupB
-        proto_tree_add_item(group_b_tree, hf_l2server_message_power_offset_group_b, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        // Msg1FrequencyStart
+        proto_tree_add_item(generic_tree, hf_l2server_msg1_frequency_start, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+        // ZeroCorrZone
+        proto_tree_add_item(generic_tree, hf_l2server_zero_corr_zone, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
-        // NumberOfRA_PreamblesGroupA
-        proto_tree_add_item(group_b_tree, hf_l2server_number_of_ra_preambles_group_a, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        // PreambleRecTargetPwr
+        proto_tree_add_item(generic_tree, hf_l2server_preamble_rec_target_pwr, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+
+        proto_item_set_len(generic_ti, sizeof(bb_nr5g_RACH_CONF_GENERICt));
+        //--------------------------------
+
+        // NbOfRaPreambles
+        proto_tree_add_item(rach_tree, hf_l2server_totalnumberofra_preambles, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // Msg1SubCarrSpacing
+        proto_tree_add_item(rach_tree, hf_l2server_msg1_subcarrier_spacing, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // RestSetConf
+        proto_tree_add_item(rach_tree, hf_l2server_rest_set_conf, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // Msg3TranfPrecoding
+        proto_tree_add_item(rach_tree, hf_l2server_msg3_tranform_precoding, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // RsrpThresholdSsb
+        proto_tree_add_item(rach_tree, hf_l2server_rsrp_threshold_ssb, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
 
-        // TODO: get vals & summary?
-    }
+        // RsrpThresholdSsbSul
+        proto_tree_add_item(rach_tree, hf_l2server_rsrp_threshold_ssb_sul, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // PrachRootSeqIndexIsValid
+        proto_tree_add_item(rach_tree, hf_l2server_prach_root_seq_index_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // SsbPerRachIsValid
+        proto_tree_add_item(rach_tree, hf_l2server_ssb_per_rach_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // PrachRootSeqIndex
+        proto_tree_add_item(rach_tree, hf_l2server_prach_root_seq_index, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+        // SsbPerRach
+        proto_tree_add_item(rach_tree, hf_l2server_ssb_per_rach, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
 
-    // Ra_ContentionResolutionTimer
-    proto_tree_add_item(rach_tree, hf_l2server_ra_contention_resolution_timer, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
-    // Pad
-    proto_tree_add_item(rach_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
-    offset += 1;
+        // GroupBconfigure
+        {
+            proto_item *group_b_ti = proto_tree_add_string_format(rach_tree, hf_l2server_group_b_configured, tvb,
+                                                                 offset, 3, "", "Group B Configured");
+            proto_tree *group_b_tree = proto_item_add_subtree(group_b_ti, ett_l2server_group_b_configured);
 
-    // RaPrioritizationForAccessIdentity_r16 (bb_nr5g_RA_PRIO_FOR_ACCESS_ID_R16t)
-    if (rach_fieldmask & bb_nr5g_STRUCT_RA_PRIO_FOR_ACCESS_IDENTITY_PRESENT) {
-        offset += sizeof(bb_nr5g_RA_PRIO_FOR_ACCESS_ID_R16t);
+            // Ra_Msg3SizeGroupA
+            proto_tree_add_item(group_b_tree, hf_l2server_ra_msg3_size_group_a, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            // MessagePowerOffsetGroupB
+            proto_tree_add_item(group_b_tree, hf_l2server_message_power_offset_group_b, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            // NumberOfRA_PreamblesGroupA
+            proto_tree_add_item(group_b_tree, hf_l2server_number_of_ra_preambles_group_a, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+
+            // TODO: get vals & summary?
+        }
+
+        // Ra_ContentionResolutionTimer
+        proto_tree_add_item(rach_tree, hf_l2server_ra_contention_resolution_timer, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // Pad
+        proto_tree_add_item(rach_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
+        offset += 1;
+
+        // RaPrioritizationForAccessIdentity_r16 (bb_nr5g_RA_PRIO_FOR_ACCESS_ID_R16t)
+        if (rach_fieldmask & bb_nr5g_STRUCT_RA_PRIO_FOR_ACCESS_IDENTITY_PRESENT) {
+            offset += sizeof(bb_nr5g_RA_PRIO_FOR_ACCESS_ID_R16t);
+        }
+        else {
+            offset += sizeof(bb_nr5g_RA_PRIO_FOR_ACCESS_ID_R16t);
+        }
     }
     else {
-        offset += sizeof(bb_nr5g_RA_PRIO_FOR_ACCESS_ID_R16t);
+        offset += sizeof(bb_nr5g_RACH_CONF_COMMONt);
+        proto_item_append_text(rach_ti, " (not set)");
     }
 
     proto_item_set_len(rach_ti, offset-start_offset);
@@ -5299,7 +5330,8 @@ static int dissect_rach_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_info
 }
 
 // bb_nr5g_PUSCH_CONF_COMMONt
-static int dissect_pusch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset)
+static int dissect_pusch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset,
+                                     gboolean present)
 {
     gint start_offset = offset;
 
@@ -5308,28 +5340,34 @@ static int dissect_pusch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_inf
                                                        offset, sizeof(bb_nr5g_PUSCH_CONF_COMMONt), "", "PUSCH_CONF_COMMON");
     proto_tree *pusch_tree = proto_item_add_subtree(pusch_ti, ett_l2server_pusch_common);
 
-    // GroupHopEnabledTransfPrecoding
-    proto_tree_add_item(pusch_tree, hf_l2server_group_hop_enabled_transf_precoding, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
-    // Msg3DeltaPreamble
-    proto_tree_add_item(pusch_tree, hf_l2server_msg3_delta_preamble, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
-    // P0NomWithGrant
-    proto_tree_add_item(pusch_tree, hf_l2server_p0_nom_with_grant, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-    offset += 2;
-    // NbPuschTimeDomResAlloc
-    guint32 nb_pusch_time_dom_res_alloc;
-    proto_tree_add_item_ret_uint(pusch_tree, hf_l2server_nb_pusch_time_dom_res_alloc, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_pusch_time_dom_res_alloc);
-    offset += 1;
+    if (present) {
+        // GroupHopEnabledTransfPrecoding
+        proto_tree_add_item(pusch_tree, hf_l2server_group_hop_enabled_transf_precoding, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // Msg3DeltaPreamble
+        proto_tree_add_item(pusch_tree, hf_l2server_msg3_delta_preamble, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // P0NomWithGrant
+        proto_tree_add_item(pusch_tree, hf_l2server_p0_nom_with_grant, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+        // NbPuschTimeDomResAlloc
+        guint32 nb_pusch_time_dom_res_alloc;
+        proto_tree_add_item_ret_uint(pusch_tree, hf_l2server_nb_pusch_time_dom_res_alloc, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_pusch_time_dom_res_alloc);
+        offset += 1;
 
-    // Spare[3]
-    proto_tree_add_item(pusch_tree, hf_l2server_spare, tvb, offset, 3, ENC_NA);
-    offset += 3;
+        // Spare[3]
+        proto_tree_add_item(pusch_tree, hf_l2server_spare, tvb, offset, 3, ENC_NA);
+        offset += 3;
 
-    // PuschTimeDomResAlloc (bb_nr5g_PUSCH_TIMEDOMAINRESALLOCt entries)
-    for (uint n=0; n < bb_nr5g_MAX_NB_UL_ALLOCS; n++) {
-        offset = dissect_pusch_timedomainresalloc(pusch_tree, tvb, pinfo, offset,
-                                                  n < nb_pusch_time_dom_res_alloc);
+        // PuschTimeDomResAlloc (bb_nr5g_PUSCH_TIMEDOMAINRESALLOCt entries)
+        for (uint n=0; n < bb_nr5g_MAX_NB_UL_ALLOCS; n++) {
+            offset = dissect_pusch_timedomainresalloc(pusch_tree, tvb, pinfo, offset,
+                                                      n < nb_pusch_time_dom_res_alloc);
+        }
+    }
+    else {
+        offset += sizeof(bb_nr5g_PUSCH_CONF_COMMONt);
+        proto_item_append_text(pusch_ti, " (not set)");
     }
 
     proto_item_set_len(pusch_ti, offset-start_offset);
@@ -5338,7 +5376,7 @@ static int dissect_pusch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_inf
 
 
 // bb_nr5g_PUCCH_CONF_COMMONt
-static int dissect_pucch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset)
+static int dissect_pucch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset, gboolean present)
 {
     gint start_offset = offset;
 
@@ -5347,21 +5385,27 @@ static int dissect_pucch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_inf
                                                        offset, sizeof(bb_nr5g_PUCCH_CONF_COMMONt), "", "PUCCH_CONF_COMMON");
     proto_tree *pucch_tree = proto_item_add_subtree(pucch_ti, ett_l2server_pucch_common);
 
-    // PucchResCommon
-    proto_tree_add_item(pucch_tree, hf_l2server_pucch_res_common, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
-    // PucchGroupHop
-    proto_tree_add_item(pucch_tree, hf_l2server_pucch_group_hop, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
-    // HoppingId
-    proto_tree_add_item(pucch_tree, hf_l2server_pucch_hopping_id, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-    offset += 2;
-    // P0Nom
-    proto_tree_add_item(pucch_tree, hf_l2server_p0_nom, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-    offset += 2;
-    // Spare[2]
-    proto_tree_add_item(pucch_tree, hf_l2server_spare, tvb, offset, 2, ENC_NA);
-    offset += 2;
+    if (present) {
+        // PucchResCommon
+        proto_tree_add_item(pucch_tree, hf_l2server_pucch_res_common, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // PucchGroupHop
+        proto_tree_add_item(pucch_tree, hf_l2server_pucch_group_hop, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // HoppingId
+        proto_tree_add_item(pucch_tree, hf_l2server_pucch_hopping_id, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+        // P0Nom
+        proto_tree_add_item(pucch_tree, hf_l2server_p0_nom, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+        // Spare[2]
+        proto_tree_add_item(pucch_tree, hf_l2server_spare, tvb, offset, 2, ENC_NA);
+        offset += 2;
+    }
+    else {
+        offset += sizeof(bb_nr5g_PUCCH_CONF_COMMONt);
+        proto_item_append_text(pucch_ti, " (not set)");
+    }
 
     proto_item_set_len(pucch_ti, offset-start_offset);
     return offset;
@@ -5376,8 +5420,8 @@ static int dissect_bwp_uplinkcommon(proto_tree *tree, tvbuff_t *tvb, packet_info
 
     // Subtree.
     proto_item *ul_bwp_ti = proto_tree_add_string(tree, hf_l2server_initial_ul_bwp, tvb,
-                                                          offset, sizeof(bb_nr5g_BWP_UPLINKCOMMONt),
-                                                          label);
+                                                  offset, sizeof(bb_nr5g_BWP_UPLINKCOMMONt),
+                                                  label);
     proto_tree *ul_bwp_tree = proto_item_add_subtree(ul_bwp_ti, ett_l2server_initial_ul_bwp);
 
     if (present) {
@@ -5386,6 +5430,13 @@ static int dissect_bwp_uplinkcommon(proto_tree *tree, tvbuff_t *tvb, packet_info
         guint32 init_ul_bwp_fieldmask;
         proto_tree_add_item_ret_uint(ul_bwp_tree, hf_l2server_field_mask_4, tvb, offset, 4,
                                      ENC_LITTLE_ENDIAN, &init_ul_bwp_fieldmask);
+        gboolean rach_setup, pusch_setup, pucch_setup;
+        proto_tree_add_item_ret_boolean(ul_bwp_tree, hf_l2server_bwp_ul_common_rach_setup_present,   tvb, offset, 4, ENC_LITTLE_ENDIAN, &rach_setup);
+        proto_tree_add_item(ul_bwp_tree, hf_l2server_bwp_ul_common_rach_release_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item_ret_boolean(ul_bwp_tree, hf_l2server_bwp_ul_common_pusch_setup_present,   tvb, offset, 4, ENC_LITTLE_ENDIAN, &pusch_setup);
+        proto_tree_add_item(ul_bwp_tree, hf_l2server_bwp_ul_common_pusch_release_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item_ret_boolean(ul_bwp_tree, hf_l2server_bwp_ul_common_pucch_setup_present,   tvb, offset, 4, ENC_LITTLE_ENDIAN, &pucch_setup);
+        proto_tree_add_item(ul_bwp_tree, hf_l2server_bwp_ul_common_pucch_release_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
         offset += 4;
 
         // UseInterlacePUCCH_PUSCH_r16
@@ -5399,15 +5450,16 @@ static int dissect_bwp_uplinkcommon(proto_tree *tree, tvbuff_t *tvb, packet_info
         offset = dissect_genbwp(ul_bwp_tree, tvb, pinfo, offset);
 
         // Serialize just writes all of these..
+        // TODO: pass in 'set' flag.
 
         // RachCfgCommon (bb_nr5g_RACH_CONF_COMMONt)
-        offset = dissect_rach_conf_common(ul_bwp_tree, tvb, pinfo, offset);
+        offset = dissect_rach_conf_common(ul_bwp_tree, tvb, pinfo, offset, rach_setup);
 
         // PuschCfgCommon (tm_bb_nr5g_PUSCH_CONF_COMMONt)
-        offset = dissect_pusch_conf_common(ul_bwp_tree, tvb, pinfo, offset);
+        offset = dissect_pusch_conf_common(ul_bwp_tree, tvb, pinfo, offset, pusch_setup);
 
         // PucchCfgCommon (bb_nr5g_PUCCH_CONF_COMMONt)
-        offset = dissect_pucch_conf_common(ul_bwp_tree, tvb, pinfo, offset);
+        offset = dissect_pucch_conf_common(ul_bwp_tree, tvb, pinfo, offset, pucch_setup);
     }
     else {
         // Not dissecting..
@@ -5717,15 +5769,18 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
         guint32 tdd_fieldmask;
         proto_tree_add_item_ret_uint(tdd_tree, hf_l2server_field_mask_4, tvb, offset, 4,
                                      ENC_LITTLE_ENDIAN, &tdd_fieldmask);
+        gboolean patt1_present, patt2_present;
+        proto_tree_add_item_ret_boolean(tdd_tree, hf_l2server_tdd_ul_dl_pattern1_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &patt1_present);
+        proto_tree_add_item_ret_boolean(tdd_tree, hf_l2server_tdd_ul_dl_pattern2_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &patt2_present);
 
         // Pattern1
-        if (!serialize || (tdd_fieldmask & bb_nr5g_STRUCT_TDD_UL_DL_CONFIG_COMMON_PATT1_PRESENT)) {
+        if (!serialize || (tdd_fieldmask & patt1_present)) {
             offset = dissect_tdd_ul_dl_pattern(tdd_tree, tvb, pinfo, offset, "Pattern1",
                                                tdd_fieldmask & bb_nr5g_STRUCT_TDD_UL_DL_CONFIG_COMMON_PATT1_PRESENT);
         }
 
         // Pattern2
-        if (!serialize || (tdd_fieldmask & bb_nr5g_STRUCT_TDD_UL_DL_CONFIG_COMMON_PATT2_PRESENT)) {
+        if (!serialize || (tdd_fieldmask & patt1_present)) {
             offset = dissect_tdd_ul_dl_pattern(tdd_tree, tvb, pinfo, offset, "Pattern2",
                                                tdd_fieldmask & bb_nr5g_STRUCT_TDD_UL_DL_CONFIG_COMMON_PATT1_PRESENT);
         }
@@ -6732,7 +6787,7 @@ static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, pack
 
                     // RachCfgCommon (bb_nr5g_RACH_CONF_COMMONt)
                     if (common_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_COMMON_RACH_CFG_PRESENT) {
-                        offset = dissect_rach_conf_common(common_tree, tvb, pinfo, offset);
+                        offset = dissect_rach_conf_common(common_tree, tvb, pinfo, offset, TRUE);
                     }
 
                     // PuschCfgCommon (nr5g_rlcmac_Cmac_PUSCH_CONF_COMMONt)
@@ -9418,7 +9473,7 @@ proto_register_l2server(void)
            NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_initial_ul_bwp,
-        { "Initial Ul BWP", "l2server.initial-ul-bwp", FT_STRING, BASE_NONE,
+        { "Initial UL BWP", "l2server.initial-ul-bwp", FT_STRING, BASE_NONE,
            NULL, 0x0, "bb_nr5g_BWP_UPLINKCOMMONt", HFILL }},
       { &hf_l2server_initial_ul_bwp_len,
         { "Len", "l2server.initial-ul-bwp.len", FT_UINT32, BASE_DEC,
@@ -10564,6 +10619,48 @@ proto_register_l2server(void)
       { &hf_l2server_si_sched_info,
        { "SI Scheduling Info", "l2server.si-scheduling-info", FT_STRING, FT_NONE,
          NULL, 0X0, NULL, HFILL }},
+
+      { &hf_l2server_bwp_dl_common_pdcch_setup_present,
+       { "PDCCH Setup", "l2server.dl-common-pdcch.setup", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDCCH_CFG_SETUP, NULL, HFILL }},
+      { &hf_l2server_bwp_dl_common_pdcch_release_present,
+       { "PDCCH Release", "l2server.dl-common-pdcch.release", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDCCH_CFG_RELEASE, NULL, HFILL }},
+      { &hf_l2server_bwp_dl_common_pdsch_setup_present,
+       { "PDSCH Setup", "l2server.dl-common-pdsch.setup", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDSCH_CFG_SETUP, NULL, HFILL }},
+      { &hf_l2server_bwp_dl_common_pdsch_release_present,
+       { "PDSCH Release", "l2server.dl-common-pdsch.release", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDSCH_CFG_RELEASE, NULL, HFILL }},
+
+      { &hf_l2server_bwp_ul_common_rach_setup_present,
+       { "RACH Setup", "l2server.ul-common-rach.setup", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_UPLINK_COMMON_RACH_CFG_SETUP, NULL, HFILL }},
+      { &hf_l2server_bwp_ul_common_rach_release_present,
+       { "RACH Release", "l2server.ul-common-rach.release", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_UPLINK_COMMON_RACH_CFG_RELEASE, NULL, HFILL }},
+
+      { &hf_l2server_bwp_ul_common_pusch_setup_present,
+       { "PUSCH Setup", "l2server.ul-common-pusch.setup", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_UPLINK_COMMON_PUSCH_CFG_SETUP, NULL, HFILL }},
+      { &hf_l2server_bwp_ul_common_pusch_release_present,
+       { "PUSCH Release", "l2server.ul-common-pusch.release", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_UPLINK_COMMON_PUSCH_CFG_RELEASE, NULL, HFILL }},
+
+      { &hf_l2server_bwp_ul_common_pucch_setup_present,
+       { "PUCCH Setup", "l2server.ul-common-pucch.setup", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_UPLINK_COMMON_PUCCH_CFG_SETUP, NULL, HFILL }},
+      { &hf_l2server_bwp_ul_common_pucch_release_present,
+       { "PUCCH Release", "l2server.ul-common-pucch.release", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_UPLINK_COMMON_PUCCH_CFG_RELEASE, NULL, HFILL }},
+
+      { &hf_l2server_tdd_ul_dl_pattern1_present,
+       { "Pattern1 present", "l2server.tdd-ul-dl.pattern1-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_TDD_UL_DL_CONFIG_COMMON_PATT1_PRESENT, NULL, HFILL }},
+      { &hf_l2server_tdd_ul_dl_pattern2_present,
+       { "Pattern2 present", "l2server.tdd-ul-dl.pattern2-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_TDD_UL_DL_CONFIG_COMMON_PATT2_PRESENT, NULL, HFILL }},
+
     };
 
     static gint *ett[] = {
