@@ -7247,6 +7247,34 @@ static void dissect_crlc_config_ack(proto_tree *tree, tvbuff_t *tvb, packet_info
     /* RbId */
     proto_tree_add_item(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
+    /* LCId */
+    proto_tree_add_item(tree, hf_l2server_lcid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+}
+
+// nr5g_rlcmac_Crlc_NAK_t (from nr5g-rlcmac_Crlc.h)
+static void dissect_crlc_config_nak(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                    guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* RbType */
+    proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* RbId */
+    proto_tree_add_item(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* LCId */
+    proto_tree_add_item(tree, hf_l2server_lcid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* Err */
+    proto_tree_add_item(tree, hf_l2server_err, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 2;
 }
 
 
@@ -7264,7 +7292,8 @@ static void dissect_version_info_cmd(proto_tree *tree, tvbuff_t *tvb, packet_inf
     proto_tree_add_item(tree, hf_l2server_spare2, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
     // VersionHash.  L3->L2 version hash.
-    proto_tree_add_item(tree, hf_l2server_version_hash, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_item *vh_ti = proto_tree_add_item(tree, hf_l2server_version_hash, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_item_append_text(vh_ti, " (L3->L2 hash from eLSU code version)");
     offset += 4;
 }
 
@@ -7300,15 +7329,25 @@ static void dissect_dbeam_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinf
     // CellId
     proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
+
     // DbeamId
     proto_tree_add_item(tree, hf_l2server_dbeamid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
+
     // Status
     proto_tree_add_item(tree, hf_l2server_dbeam_status, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
+
+    // phy_cell_id
+    proto_tree_add_item(tree, hf_l2server_physical_cellid, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // SsbArfcn
+    proto_tree_add_item(tree, hf_l2server_ssb_arfcn, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
     // NumBeam
     proto_tree_add_item(tree, hf_l2server_num_beams, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
+    // Beam[]
 }
 
 /* nr5g_l2_Srv_CELL_PPU_LIST_CMDt */
@@ -7320,7 +7359,7 @@ static void dissect_ppu_list_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *p
     proto_item_set_hidden(config_ti);
 }
 
-/* nr5g_l2_Srv_CELL_PPU_LIST_ACKt */
+/* nr5g_l2_Srv_CELL_PPU_LIST_ACKt (from nr5g-l2_Srv.h) */
 static void dissect_ppu_list_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                                  guint offset, guint len _U_)
 {
@@ -7345,13 +7384,17 @@ static void dissect_ppu_list_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *p
     proto_tree_add_item_ret_uint(tree, hf_l2server_numnrpropdu, tvb, offset, 1, ENC_LITTLE_ENDIAN, &num_nr_pro_pdu);
     offset += 1;
 
-    // CellIdLteList[].
+    // TODO: this still isn't right..
+
+    // PPDUs come next..
+
+    // CellIdLteList[].  This will always be empty!!!
     for (guint32 n=0; n < num_lte_pro_pdu; n++) {
         proto_tree_add_item(tree, hf_l2server_cellidlteitem, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
     }
     // CellIdNrList[].
-    for (guint32 n=0; n < num_nr_pro_pdu; n++) {
+    for (guint32 n=0; n < nCellNr; n++) {
         proto_tree_add_item(tree, hf_l2server_cellidnritem, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
     }
@@ -8134,7 +8177,7 @@ static TYPE_FUN nr_rlcmac_crlc_type_funs[] =
 {
     { nr5g_rlcmac_Crlc_CONFIG_CMD,         "nr5g_rlcmac_Crlc_CONFIG_CMD",       dissect_crlc_config_cmd },
     { nr5g_rlcmac_Crlc_CONFIG_ACK,         "nr5g_rlcmac_Crlc_CONFIG_ACK",       dissect_crlc_config_ack },
-    { nr5g_rlcmac_Crlc_CONFIG_NAK,         "nr5g_rlcmac_Crlc_CONFIG_NAK",       dissect_crlc_config_ack },
+    { nr5g_rlcmac_Crlc_CONFIG_NAK,         "nr5g_rlcmac_Crlc_CONFIG_NAK",       dissect_crlc_config_nak },
 
     { 0x00,                               NULL,                             NULL }
 };
