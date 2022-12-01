@@ -404,7 +404,6 @@ dissect_pdcp_uu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data 
     proto_item *ti;
 
     /* Protocol column */
-    /* Protocol column */
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "PDCP-UU|");
     col_set_fence(pinfo->cinfo, COL_PROTOCOL);
 

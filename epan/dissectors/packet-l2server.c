@@ -396,6 +396,7 @@ static int hf_l2server_num_pdcp_actions = -1;
 static int hf_l2server_ta = -1;
 static int hf_l2server_ra_info_valid = -1;
 static int hf_l2server_rach_probe_req = -1;
+static int hf_l2server_si_scheduling_info_valid = -1;
 
 static int hf_l2server_rrc_state = -1;
 
@@ -2335,7 +2336,7 @@ static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info
     proto_tree_add_item(tree, hf_l2server_rach_probe_req, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // SiSchedulingInfoValid
-    // TODO: as field
+    proto_tree_add_item(tree, hf_l2server_si_scheduling_info_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     gboolean si_scheduling_info_valid = tvb_get_guint8(tvb, offset);
     offset += 1;
 
@@ -9437,6 +9438,9 @@ proto_register_l2server(void)
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_rach_probe_req,
         { "RACH Probe Req", "l2server.rach-probe-req", FT_BOOLEAN, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_si_scheduling_info_valid,
+        { "SI Scheduling Info Valid", "l2server.si-scheduling-info-valid", FT_BOOLEAN, BASE_NONE,
           NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_rrc_state,
