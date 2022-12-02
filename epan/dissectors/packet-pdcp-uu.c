@@ -167,8 +167,6 @@ static const enum_val_t pdcp_drb_col_vals[] = {
 };
 static gint global_call_pdcp_for_drb = (gint)PDCP_drb_SN_12;
 
-
-static gboolean global_skip_mystery_byte = FALSE;
 static gboolean global_call_rohc = FALSE;
 
 #if 0
@@ -437,8 +435,8 @@ dissect_pdcp_uu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data 
     }
 
 
-    /* Skip it if configured to! */
-    if (global_skip_mystery_byte) {
+    /* Skip extra tag (0x04 and 0x05 I think) if found */
+    if (tvb_get_guint8(tvb, offset) <= 0x05) {
         offset++;
     }
 
@@ -827,9 +825,7 @@ proto_register_pdcp_uu(void)
         "",
         &global_call_pdcp_for_drb, pdcp_drb_col_vals, FALSE);
 
-    prefs_register_bool_preference(pdcp_uu_module, "skip_mystery_byte", "Skip mystery byte (CSCS_UE_RLCPRIM_TAG?)",
-        "This appears to be CSCS_UE_RLCPRIM_TAG (value 0x05), which will be seen if the message comes through the proxy",
-        &global_skip_mystery_byte);
+    prefs_register_obsolete_preference(pdcp_uu_module, "skip_mystery_byte");
 
     prefs_register_bool_preference(pdcp_uu_module, "call_rohc", "ROHC (RTP profile)",
         "Call ROHC dissector for DRB payloads",
