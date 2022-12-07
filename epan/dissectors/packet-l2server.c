@@ -251,6 +251,9 @@ static int hf_l2server_tpc_pusch_rnti = -1;
 static int hf_l2server_sp_csi_rnti = -1;
 static int hf_l2server_cs_rnti = -1;
 static int hf_l2server_pdcch_blind_detection = -1;
+// :
+static int hf_l2server_nbpdsch_harq_ack_codebooklist_r16 = -1;
+// :
 static int hf_l2server_bdfactor_r16 = -1;
 
 static int hf_l2server_sp_cell_cfg_ded = -1;
@@ -2933,6 +2936,7 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     // DownlinkAssignmentIndexDCI_1_2_r16
     offset += 1;
     // NbPdsch_HARQ_ACK_CodebookList_r16
+    proto_tree_add_item(config_tree, hf_l2server_nbpdsch_harq_ack_codebooklist_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     // AckNackFeedbackMode_r16
     offset += 1;
@@ -5161,6 +5165,7 @@ static int dissect_scs_spec_carrier(proto_tree *tree, tvbuff_t *tvb, packet_info
         proto_tree_add_item(ssc_tree, hf_l2server_offset_to_carrier, tvb, offset, 2, ENC_LITTLE_ENDIAN);
         offset += 2;
         // CarrierBandwidth
+        proto_tree_add_item(ssc_tree, hf_l2server_carrier_bandwidth, tvb, offset, 2, ENC_LITTLE_ENDIAN);
         offset += 2;
         // Spare[2]
         proto_tree_add_item(ssc_tree, hf_l2server_spare2, tvb, offset, 2, ENC_LITTLE_ENDIAN);
@@ -5768,11 +5773,12 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
         offset += 1;
         // FieldMask
         guint32 tdd_fieldmask;
-        proto_tree_add_item_ret_uint(tdd_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+        proto_tree_add_item_ret_uint(tdd_tree, hf_l2server_field_mask_2, tvb, offset, 2,
                                      ENC_LITTLE_ENDIAN, &tdd_fieldmask);
         gboolean patt1_present, patt2_present;
-        proto_tree_add_item_ret_boolean(tdd_tree, hf_l2server_tdd_ul_dl_pattern1_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &patt1_present);
-        proto_tree_add_item_ret_boolean(tdd_tree, hf_l2server_tdd_ul_dl_pattern2_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &patt2_present);
+        proto_tree_add_item_ret_boolean(tdd_tree, hf_l2server_tdd_ul_dl_pattern1_present, tvb, offset, 2, ENC_LITTLE_ENDIAN, &patt1_present);
+        proto_tree_add_item_ret_boolean(tdd_tree, hf_l2server_tdd_ul_dl_pattern2_present, tvb, offset, 2, ENC_LITTLE_ENDIAN, &patt2_present);
+        offset += 2;
 
         // Pattern1
         if (!serialize || (tdd_fieldmask & patt1_present)) {
@@ -9047,6 +9053,9 @@ proto_register_l2server(void)
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_pdcch_blind_detection,
         { "PDCCH Blind Detection", "l2server.pdcch-blind-detection", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nbpdsch_harq_ack_codebooklist_r16,
+        { "Nb PDSCH Harq Ack Codebooklist r16", "l2server.nbpdsch-harq-ack-codebooklist-r16", FT_INT8, BASE_DEC,
           NULL, 0x0, NULL, HFILL }},
       { &hf_l2server_bdfactor_r16,
         { "BDFactor r16", "l2server.bdfactor-r16", FT_INT8, BASE_DEC,
