@@ -5197,13 +5197,14 @@ static int dissect_pusch_timedomainresalloc(proto_tree *tree, tvbuff_t *tvb, pac
         proto_tree_add_item(config_tree, hf_l2server_mapping_type, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         offset += 1;
         // StartSymbAndLen
-        proto_tree_add_item(config_tree, hf_l2server_start_sym_and_len, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        guint32 start_symb_and_len;
+        proto_tree_add_item_ret_uint(config_tree, hf_l2server_start_sym_and_len, tvb, offset, 1, ENC_LITTLE_ENDIAN, &start_symb_and_len);
         offset += 1;
         // Pad
         proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
         offset += 1;
 
-        proto_item_append_text(config_ti, " (K2=%u)", k2);
+        proto_item_append_text(config_ti, " (K2=%u  StartSymbAndLen=%u)", k2, start_symb_and_len);
     }
     else {
         proto_item_append_text(config_ti, " (not set)");
@@ -7248,8 +7249,10 @@ static void dissect_crlc_config_ack(proto_tree *tree, tvbuff_t *tvb, packet_info
     /* UEId */
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
-    /* RbType */
-    proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    ///* RbType */
+    //proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    /* RbId */
+    proto_tree_add_item(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
     /* RbId */
     proto_tree_add_item(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
