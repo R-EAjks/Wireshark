@@ -76,7 +76,6 @@ get_elsucopy_message_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void
 static int
 dissect_elsucopy_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 {
-    //printf("%s()\n", __func__);
     proto_tree *elsucopy_tree;
     proto_item *root_ti;
     gint offset = 0;
@@ -87,15 +86,17 @@ dissect_elsucopy_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                                                tvb_reported_length(tvb), tvb_reported_length(tvb));
     add_new_data_source(pinfo, elsu_tvb, "L2 Message");
 
-    /* Protocol column */
-    col_clear(pinfo->cinfo, COL_PROTOCOL);
-    col_clear(pinfo->cinfo, COL_INFO);
-
     /* Add divider if not first PDU in this frame */
     gboolean *already_set = (gboolean*)p_get_proto_data(wmem_file_scope(), pinfo, proto_elsucopy, 0);
-    if (already_set && *already_set) {
+    //printf("%u: visited=%u  %p %u\n", pinfo->num, PINFO_FD_VISITED(pinfo), already_set, *already_set);
+    if (*already_set) {
          col_append_str(pinfo->cinfo, COL_PROTOCOL, "|");
          col_append_str(pinfo->cinfo, COL_INFO, "  ||  ");
+         //printf("dividers\n");
+    }
+    else {
+        col_clear(pinfo->cinfo, COL_PROTOCOL);
+        col_clear(pinfo->cinfo, COL_INFO);
     }
 
     col_append_str(pinfo->cinfo, COL_PROTOCOL, "elsucopy");
@@ -114,7 +115,6 @@ dissect_elsucopy_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                      COL_ADD_LSTR_TERMINATOR);
         return tvb_reported_length(tvb);
     }
-
 
     /* Code */
     guint32 code;
@@ -136,8 +136,11 @@ dissect_elsucopy_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
     col_set_fence(pinfo->cinfo, COL_INFO);
 
     /* Record that at least one PDU has already been seen in this frame */
-    static gboolean true_value = TRUE;
-    p_add_proto_data(wmem_file_scope(), pinfo, proto_elsucopy, 0, &true_value);
+    if (!(*already_set)) {
+        static gboolean true_value = TRUE;
+        p_add_proto_data(wmem_file_scope(), pinfo, proto_elsucopy, 0, &true_value);
+        //printf("%u: store TRUE\n", pinfo->num);
+    }
 
     return offset+len;
 }

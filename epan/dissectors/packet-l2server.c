@@ -911,6 +911,8 @@ static const value_string rb_type_vals[] =
 {
     { 1,   "nr5g_SIG" },
     { 2,   "nr5g_UP" },
+    { 3,   "nr5g_PBT_SPARE_0" },
+//    { 3,   "nr5g_RbTypeNum" },
     { 0x0,   NULL }
 };
 
@@ -1742,7 +1744,7 @@ static void dissect_cell_parm_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *
     /* dlEarfcn[2]*/
     proto_tree_add_item(tree, hf_l2server_dl_earfcn_0, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
-    proto_tree_add_item(tree, hf_l2server_dl_earfcn_0, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_dl_earfcn_1, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 
     /* ulFreq[2] */
@@ -1754,7 +1756,7 @@ static void dissect_cell_parm_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *
     /* ulEarfcn[2] */
     proto_tree_add_item(tree, hf_l2server_ul_earfcn_0, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
-    proto_tree_add_item(tree, hf_l2server_ul_earfcn_0, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_ul_earfcn_1, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 
     /* SsbArfcn */
@@ -7249,14 +7251,11 @@ static void dissect_crlc_config_ack(proto_tree *tree, tvbuff_t *tvb, packet_info
     /* UEId */
     proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
-    ///* RbType */
-    //proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     /* RbId */
     proto_tree_add_item(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
-    /* RbId */
-    proto_tree_add_item(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-    offset += 1;
+    /* RbType */
+    proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     /* LCId */
     proto_tree_add_item(tree, hf_l2server_lcid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
