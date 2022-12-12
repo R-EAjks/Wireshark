@@ -578,6 +578,9 @@ static int hf_l2server_bwp_dl_dedicated = -1;
 static int hf_l2server_nb_sps_conf_to_add_r16 = -1;
 static int hf_l2server_nb_config_deactivation_state_r16 = -1;
 
+//static int hf_l2server_bwp_dl_common = -1;
+
+
 static int hf_l2server_pdsch_serving_cell = -1;
 static int hf_l2server_xoverhead = -1;
 static int hf_l2server_nb_harq_processes_for_pdsch = -1;
@@ -893,7 +896,7 @@ static int hf_l2server_bwp_ul_common_pucch_release_present = -1;
 static int hf_l2server_tdd_ul_dl_pattern1_present = -1;
 static int hf_l2server_tdd_ul_dl_pattern2_present = -1;
 
-
+static int hf_l2server_codebook_config_type1_two_ports = -1;
 
 static const value_string lch_vals[] =
 {
@@ -1516,6 +1519,8 @@ static gint ett_l2server_csi_associated_report_cfg = -1;
 static gint ett_l2server_dmrs_mapping = -1;
 static gint ett_l2server_p_zp_csi_rs_set = -1;
 static gint ett_l2server_si_sched_info = -1;
+//static gint ett_l2server_bwp_dl_common = -1;
+static gint ett_l2server_codebook_config_type1_two_ports = -1;
 
 
 static expert_field ei_l2server_sapi_unknown = EI_INIT;
@@ -2866,14 +2871,21 @@ static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *
     proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_4, tvb, offset, 4,
                                  ENC_LITTLE_ENDIAN, &fieldmask);
     gboolean dcp_config_setup, pdcch_blind_detection_setup;
-    // TODO: add
-    // bb_nr5g_STRUCT_PH_CELL_GROUP_CS_RNTI_SETUP
-    // bb_nr5g_STRUCT_PH_CELL_GROUP_CS_RNTI_RELEASE
-    // + other bits!
-    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_ph_cell_dcp_config_setup,         tvb, offset, 4, ENC_LITTLE_ENDIAN, &dcp_config_setup);
-    proto_tree_add_item(config_tree, hf_l2server_ph_cell_dcp_config_release,       tvb, offset, 4, ENC_LITTLE_ENDIAN);
+
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_CS_RNTI_SETUP
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_CS_RNTI_RELEASE
     proto_tree_add_item_ret_boolean(config_tree, hf_l2server_ph_pdcch_blind_detection_setup,   tvb, offset, 4, ENC_LITTLE_ENDIAN, &pdcch_blind_detection_setup);
     proto_tree_add_item(config_tree, hf_l2server_ph_pdcch_blind_detection_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION2_SETUP
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION2_RELEASE
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION3_SETUP
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION3_RELEASE
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_PDSCH_HARQ_CODEBOOK_SETUP
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_PDSCH_HARQ_CODEBOOK_SETUP
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_ph_cell_dcp_config_setup,         tvb, offset, 4, ENC_LITTLE_ENDIAN, &dcp_config_setup);
+    proto_tree_add_item(config_tree, hf_l2server_ph_cell_dcp_config_release,       tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_SETUP
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_RELEASE
     offset += 4;
 
     // HarqACKSpatialBundlingPUCCH
@@ -3215,6 +3227,8 @@ static int dissect_pdsch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_
 
     // DmrsMappingTypeA
     if (dmrs_typea_setup_present) {
+        proto_item_append_text(config_ti, " (DmrsMappingTypeA)");
+
         proto_item *dmrs_ti = proto_tree_add_string_format(config_tree, hf_l2server_dmrs_mapping, tvb,
                                                               offset, sizeof(bb_nr5g_DMRS_DOWNLINK_CFGt),
                                                               "", "DMRS Mapping TypeA ");
@@ -3225,10 +3239,12 @@ static int dissect_pdsch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_
     }
     // DmrsMappingTypeB
     if (dmrs_typeb_setup_present) {
+        proto_item_append_text(config_ti, " (DmrsMappingTypeB)");
         offset += sizeof(bb_nr5g_DMRS_DOWNLINK_CFGt);
     }
     // PZpCsiRsResSet
     if (p_zp_csi_rs_resource_set_setup_present) {
+        proto_item_append_text(config_ti, " (PZpCsiRsResSet)");
         proto_item *p_zp_ti = proto_tree_add_string_format(config_tree, hf_l2server_p_zp_csi_rs_set, tvb,
                                                               offset, sizeof(bb_nr5g_ZP_CSI_RS_RES_SETt),
                                                               "", "PZpCsiRsResSet ");
@@ -3276,7 +3292,7 @@ static int dissect_pdsch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_
 }
 
 // bb_nr5g_BWP_DOWNLINKDEDICATEDt from bb-nr5g_struct.h
-// TODO: think it needs serialization flag...
+// TODO: think it needs to use serialization flag?
 static int dissect_bwp_dl_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
                                     guint offset, const char *title, gboolean serialized _U_)
 {
@@ -3799,11 +3815,11 @@ static int dissect_and_ports_two(proto_tree *tree, tvbuff_t *tvb, packet_info *p
 {
     guint start_offset = offset;
 
-    // Subtree.  TODO: own subtree item/ett!
-    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_codebook_config_type1_single_panel,  tvb,
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_codebook_config_type1_two_ports,  tvb,
                                                          offset, 0,
                                                           "", "2 Ants");
-    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_codebook_config_type1_single_panel);
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_codebook_config_type1_two_ports);
 
     // TwoTXCodebookSubsetRestriction
     offset += 1;
@@ -3820,7 +3836,7 @@ static int dissect_and_ports_more_than_two(proto_tree *tree, tvbuff_t *tvb, pack
 {
     guint start_offset = offset;
 
-    // Subtree.  TODO: own subtree item/ett!
+    // Subtree.
     proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_codebook_config_type1_single_panel,  tvb,
                                                          offset, 0,
                                                           "", "More than 2 Ants");
@@ -3952,6 +3968,7 @@ static int dissect_codebook_config(proto_tree *tree, tvbuff_t *tvb, packet_info 
             break;
         default:
             // TODO: error?
+            printf("%u: unexpected value of CodeBookTypeIsValid (%u)\n", pinfo->num, codebook_type_is_valid);
             break;
     }
 
@@ -3994,6 +4011,8 @@ static int dissect_bwp_downlinkcommon(proto_tree *tree, tvbuff_t *tvb, packet_in
 
         // PdschConfCommon (bb_nr5g_PDSCH_CONF_COMMONt) (apparently present regardless!)
         if (pdsch_setup_present) {
+            proto_item_append_text(bwp_dl_common_ti, " (PDSCH-Setup)");
+
             gint pdsch_offset = offset;
 
             // Subtree.
@@ -4034,11 +4053,11 @@ static int dissect_bwp_downlink(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
 {
     guint start_offset = offset;
 
-    // Subtree.  TODO: own subtree item & ett
-    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_codebook_config,  tvb,
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_bwp_dl_common,  tvb,
                                                          offset, 0,
                                                           "", "BWP Downlink");
-    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_codebook_config);
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_bwp_dl_common);
 
     // BwpId
     gint32 bwpid;
@@ -4060,6 +4079,7 @@ static int dissect_bwp_downlink(proto_tree *tree, tvbuff_t *tvb, packet_info *pi
     // BwpDLDed
     if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DEDICATED_CFG_PRESENT) {
         // TODO: bb_nr5g_BWP_DOWNLINKDEDICATEDt
+        dissect_bwp_dl_dedicated(config_tree, tvb, pinfo, offset, "BwpDLDed", TRUE);
     }
 
     proto_item_append_text(config_ti, " (bwpId=%d)", bwpid);
@@ -9996,6 +10016,9 @@ proto_register_l2server(void)
         { "Nb code block group transmission r16", "l2server.nb-code-block-group-transmission-r16", FT_UINT8, BASE_DEC,
            NULL, 0x0, NULL, HFILL }},
 
+//      { &hf_l2server_bwp_dl_common,
+//        { "BWP DL Common", "l2server.bwp-dl-common", FT_STRING, BASE_NONE,
+//           NULL, 0x0, NULL, HFILL }},
 
       { &hf_l2server_pdcch_serving_cell,
         { "PDCCH ServingCell", "l2server.pdcch-serving-cell", FT_STRING, BASE_NONE,
@@ -10774,6 +10797,9 @@ proto_register_l2server(void)
        { "Pattern2 present", "l2server.tdd-ul-dl.pattern2-present", FT_BOOLEAN, 32,
          NULL, bb_nr5g_STRUCT_TDD_UL_DL_CONFIG_COMMON_PATT2_PRESENT, NULL, HFILL }},
 
+      { &hf_l2server_codebook_config_type1_two_ports,
+       { "Two POrts", "l2server.codebook-config-type1-two-ports", FT_STRING, FT_NONE,
+         NULL, 0X0, NULL, HFILL }},
     };
 
     static gint *ett[] = {
@@ -10871,7 +10897,9 @@ proto_register_l2server(void)
         &ett_l2server_csi_associated_report_cfg,
         &ett_l2server_dmrs_mapping,
         &ett_l2server_p_zp_csi_rs_set,
-        &ett_l2server_si_sched_info
+        &ett_l2server_si_sched_info,
+        //&ett_l2server_bwp_dl_common,
+        &ett_l2server_codebook_config_type1_two_ports
     };
 
     static ei_register_info ei[] = {
