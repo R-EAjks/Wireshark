@@ -1022,6 +1022,7 @@ static const value_string version_server_type_vals[] =
     { 0,   NULL }
 };
 
+/* nr5g_rlcmac_Cmac_DBEAM_STATUS_e */
 static const value_string dbeam_status_vals[] =
 {
     { nr5g_rlcmac_Cmac_STATUS_DBEAM_BOOTING_UP,       "Booting Up"},
@@ -1032,6 +1033,18 @@ static const value_string dbeam_status_vals[] =
     { nr5g_rlcmac_Cmac_STATUS_DBEAM_SYNC_UNLOCKED,    "Sync Unlocked"},
     { 0,   NULL }
 };
+
+#if 0
+/* nr5g_rlcmac_Cmac_CELL_STATUS_v */
+static const value_string cell_status_vals[] =
+{
+    { nr5g_rlcmac_Cmac_CELL_STATUS_NONE,                "None"},
+    { nr5g_rlcmac_Cmac_CELL_STATUS_IN_SERVICE,          "In Service"},
+    { nr5g_rlcmac_Cmac_CELL_STATUS_RACH_PROBE_FAILURE,  "RACH Probe Failure"},
+    { 0,   NULL }
+};
+#endif
+
 
 static const value_string bot_layer_vals[] =
 {
@@ -5669,6 +5682,10 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
     if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_DL_COMMON_PRESENT)) {
         guint32 freq_info_dl_start = offset;
 
+        if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_DL_COMMON_PRESENT) {
+            proto_item_append_text(config_ti, " (FreqInfoDL)");
+        }
+
         // Subtree.
         proto_item *freq_ti = proto_tree_add_string_format(config_tree, hf_l2server_freq_info_dl, tvb,
                                                            offset, 0,
@@ -5722,6 +5739,10 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
 
     // InitDLBWP (bb_nr5g_BWP_DOWNLINKCOMMONt).
     if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_DL_COMMON_PRESENT)) {
+        if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_DL_COMMON_PRESENT) {
+            proto_item_append_text(config_ti, " (InitDLBWP)");
+        }
+
         offset = dissect_bwp_downlinkcommon(config_tree, tvb, pinfo, offset, "INIT DL BWP Common",
                                             fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_DL_COMMON_PRESENT,
                                             serialize);
@@ -5729,6 +5750,10 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
 
     // FreqInfoUL (bb_nr5g_FREQINFO_ULt). Just memcpy'd by serialization.
     if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_UL_COMMON_PRESENT)) {
+        if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_UL_COMMON_PRESENT) {
+            proto_item_append_text(config_ti, " (FreqInfoUL)");
+        }
+
         offset = dissect_freqinfo_ul(config_tree, tvb, pinfo, offset,
                                      "Freq Info UL Common",
                                      fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_UL_COMMON_PRESENT,
@@ -5737,6 +5762,10 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
 
     // InitULBWP (bb_nr5g_BWP_UPLINKCOMMONt)
     if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_UL_COMMON_PRESENT)) {
+        if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_UL_COMMON_PRESENT) {
+            proto_item_append_text(config_ti, " (InitULBWP)");
+        }
+
         offset = dissect_bwp_uplinkcommon(config_tree, tvb, pinfo, offset,
                                           "Initial UL BWP",
                                           fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_UL_COMMON_PRESENT,
@@ -5745,6 +5774,10 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
 
     // FreqInfoSUL (bb_nr5g_FREQINFO_ULt)
     if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_SUL_COMMON_PRESENT)) {
+        if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_SUL_COMMON_PRESENT) {
+            proto_item_append_text(config_ti, " (FreqInfoSUL)");
+        }
+
         offset = dissect_freqinfo_ul(config_tree, tvb, pinfo, offset,
                                      "Freq Info SUL Common",
                                      fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_SUL_COMMON_PRESENT,
@@ -5753,6 +5786,10 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
 
     // InitSULBWP (bb_nr5g_BWP_UPLINKCOMMONt)
     if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_SUL_COMMON_PRESENT)) {
+        if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_SUL_COMMON_PRESENT) {
+            proto_item_append_text(config_ti, " (InitSULBWP)");
+        }
+
         offset = dissect_bwp_uplinkcommon(config_tree, tvb, pinfo, offset,
                                           "Initial BWP SUL Common",
                                           fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_SUL_COMMON_PRESENT,
@@ -5761,6 +5798,10 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
 
     // TddDlUlConfCommon (bb_nr5g_TDD_UL_DL_CONFIG_COMMONt)
     if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_TDD_COMMON_PRESENT)) {
+        if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_TDD_COMMON_PRESENT) {
+            proto_item_append_text(config_ti, " (TddDlUlConfCommon)");
+        }
+
         gint tdd_offset = offset;
 
         proto_item *tdd_ti = proto_tree_add_string_format(config_tree, hf_l2server_tdd_common, tvb,
@@ -5808,11 +5849,19 @@ static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_in
 
     // LteCrsToMatchAround
     if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_COMMON_TOMATCHAROUND_SETUP)) {
+        if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_COMMON_TOMATCHAROUND_SETUP) {
+            proto_item_append_text(config_ti, " (LteCrsToMatchAround)");
+        }
+
         // TODO:
         offset += sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt);
     }
     // HighSpeedConfig_r16
     if (!serialize || (fieldmask & bb_nr5g_STRUCT_HIGH_SPEED_CONFIG_R16_PRESENT)) {
+        if (fieldmask & bb_nr5g_STRUCT_HIGH_SPEED_CONFIG_R16_PRESENT) {
+            proto_item_append_text(config_ti, " (HighSpeedConfig_r16)");
+        }
+
         // TODO:
         offset += sizeof(bb_nr5g_HIGH_SPEED_CONFIG_R16t);
     }
@@ -7321,6 +7370,7 @@ static void dissect_version_info_ack(proto_tree *tree, tvbuff_t *tvb, packet_inf
     // AmmVerion (up to 60 bytes)
 }
 
+/* nr5g_rlcmac_Cmac_DBEAM_IND_t from nr5g-rlcmac_Cmac.h */
 static void dissect_dbeam_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
                               guint offset, guint len _U_)
 {
@@ -7343,7 +7393,7 @@ static void dissect_dbeam_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinf
     proto_tree_add_item(tree, hf_l2server_dbeamid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
 
-    // Status
+    // Status info
     proto_tree_add_item(tree, hf_l2server_dbeam_status, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 1;
 
@@ -7353,10 +7403,15 @@ static void dissect_dbeam_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinf
     // SsbArfcn
     proto_tree_add_item(tree, hf_l2server_ssb_arfcn, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
+
     // NumBeam
-    proto_tree_add_item(tree, hf_l2server_num_beams, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    guint32 num_beam;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_num_beams, tvb, offset, 4, ENC_LITTLE_ENDIAN, &num_beam);
     offset += 4;
     // Beam[]
+    for (guint n=0; n < num_beam; n++) {
+        // TODO (nr5g_rlcmac_Cmac_BEAM_STATUS_t)
+    }
 }
 
 /* nr5g_l2_Srv_CELL_PPU_LIST_CMDt */
