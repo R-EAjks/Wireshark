@@ -141,6 +141,7 @@ static gboolean catapult_dct2000_dissect_mac_lte_oob_messages = TRUE;
 static gboolean catapult_dct2000_dissect_old_protocol_names = FALSE;
 static gboolean catapult_dct2000_dissect_pdcp_nr_payloads = FALSE;
 static gboolean catapult_dct2000_use_protocol_name_as_dissector_name = FALSE;
+static gboolean catapult_dct2000_dissect_pdcp = TRUE;
 
 /* Protocol subtree. */
 static int ett_catapult_dct2000 = -1;
@@ -3144,7 +3145,7 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                 /* Look for logged PDCP-NR PDU */
                 const char *pdcp_pattern = "NRPDCP PDU: ";
                 start = strstr(string, pdcp_pattern);
-                if (start) {
+                if (start && catapult_dct2000_dissect_pdcp) {
 
                     struct pdcp_nr_info *p_pdcp_nr_info;
 
@@ -4579,6 +4580,12 @@ void proto_register_catapult_dct2000(void)
                                    "that dissector. This may be slow, so should be "
                                    "disabled unless you are using this feature.",
                                    &catapult_dct2000_use_protocol_name_as_dissector_name);
+
+    /* Determines whether LTE RRC messages should be dissected */
+    prefs_register_bool_preference(catapult_dct2000_module, "decode_pdcp",
+                                   "Attempt to decode PDCP frames",
+                                   "When set, attempt to decode PDCP frames from the lines written by PDCP state machine",
+                                   &catapult_dct2000_dissect_pdcp);
 }
 
 /*
