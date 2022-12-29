@@ -24,9 +24,13 @@ class case_syntax(unittest.TestCase):
         dfilter = "ip.proto == 6"
         checkDFilterCount(dfilter, 1)
 
-    def test_commute_2(self, checkDFilterFail):
+    def test_commute_2(self, checkDFilterCount):
         dfilter = "6 == ip.proto"
-        error = "Left side of \"==\" expression must be a field or function"
+        checkDFilterCount(dfilter, 1)
+
+    def test_commute_3(self, checkDFilterFail):
+        dfilter = "6 == 7"
+        error = "Constant expression is invalid"
         checkDFilterFail(dfilter, error)
 
     def test_func_1(self, checkDFilterCount):
@@ -128,6 +132,12 @@ class case_syntax(unittest.TestCase):
         dfilter = '\ttcp.stream \r\n== 1'
         checkDFilterSucceed(dfilter)
 
+    def test_func_name_clash1(self, checkDFilterFail):
+        # "tcp" is a (non-existent) function, not a protocol
+        error = "Function 'tcp' does not exist"
+        dfilter = 'frame == tcp()'
+        checkDFilterFail(dfilter, error)
+
 @fixtures.uses_fixtures
 class case_equality(unittest.TestCase):
     trace_file = "sip.pcapng"
@@ -227,10 +237,13 @@ class case_unary_minus(unittest.TestCase):
         dfilter = "tcp.window_size_scalefactor == +tcp.dstport"
         checkDFilterCount(dfilter, 0)
 
-    def test_unary_3(self, checkDFilterFail):
-        error = 'Constant arithmetic expression on the LHS is invalid'
+    def test_unary_3(self, checkDFilterCount):
         dfilter = "-2 == tcp.dstport"
-        checkDFilterFail(dfilter, error)
+        checkDFilterCount(dfilter, 0)
+
+    def test_unary_4(self, checkDFilterCount):
+        dfilter = "tcp.window_size_scalefactor == -{tcp.dstport * 20}"
+        checkDFilterCount(dfilter, 0)
 
 @fixtures.uses_fixtures
 class case_arithmetic(unittest.TestCase):
@@ -248,9 +261,18 @@ class case_arithmetic(unittest.TestCase):
         dfilter = "udp.dstport == 66+1"
         checkDFilterCount(dfilter, 2)
 
-    def test_add_3(self, checkDFilterFail):
-        error = 'Constant arithmetic expression on the LHS is invalid'
-        dfilter = "2 + 3 == frame.number"
+    def test_add_4(self, checkDFilterCount):
+        dfilter = "1 + 2 == frame.number"
+        checkDFilterCount(dfilter, 1)
+
+    def test_add_5(self, checkDFilterFail):
+        error = 'Constant expression is invalid'
+        dfilter = "1 + 2 == 2 + 1"
+        checkDFilterFail(dfilter, error)
+
+    def test_add_6(self, checkDFilterFail):
+        error = 'Constant expression is invalid'
+        dfilter = "1 - 2"
         checkDFilterFail(dfilter, error)
 
     def test_sub_1(self, checkDFilterCount):
@@ -294,7 +316,7 @@ class case_field_reference(unittest.TestCase):
         checkDFilterCountWithSelectedFrame(dfilter, 1, 1)
 
 @fixtures.uses_fixtures
-class case_field_reference(unittest.TestCase):
+class case_layer(unittest.TestCase):
     trace_file = "ipoipoip.pcap"
 
     def test_layer_1(self, checkDFilterCount):

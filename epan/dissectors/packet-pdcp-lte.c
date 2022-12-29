@@ -136,7 +136,7 @@ static int hf_pdcp_lte_security_count = -1;
 static int hf_pdcp_lte_security_cipher_key = -1;
 static int hf_pdcp_lte_security_integrity_key = -1;
 
-
+static int hf_pdcp_lte_security_deciphered_data = -1;
 
 /* Protocol subtree. */
 static int ett_pdcp = -1;
@@ -2479,6 +2479,12 @@ static int dissect_pdcp_lte(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     payload_tvb = decipher_payload(tvb, pinfo, &offset, &pdu_security_settings, p_pdcp_info,
                                    pdu_security ? pdu_security->seen_next_ul_pdu: FALSE, &payload_deciphered);
 
+    /* Add deciphered data as a filterable field */
+    if (payload_deciphered) {
+        proto_tree_add_item(pdcp_tree, hf_pdcp_lte_security_deciphered_data,
+                            payload_tvb, 0, tvb_reported_length(payload_tvb), ENC_NA);
+    }
+
     if (p_pdcp_info->plane == SIGNALING_PLANE) {
         guint32 data_length;
         guint32 mac;
@@ -3039,6 +3045,12 @@ void proto_register_pdcp_lte(void)
         { &hf_pdcp_lte_security_integrity_key,
             { "INTEGRITY KEY",
               "pdcp-lte.security-config.integrity-key", FT_STRING, BASE_NONE, NULL, 0x0,
+              NULL, HFILL
+            }
+        },
+        { &hf_pdcp_lte_security_deciphered_data,
+            { "Deciphered Data",
+              "pdcp-lte.deciphered-data", FT_BYTES, BASE_NONE, NULL, 0x0,
               NULL, HFILL
             }
         }
