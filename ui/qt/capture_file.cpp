@@ -21,6 +21,7 @@ capture_file cfile;
 #include "file.h"
 
 #include "epan/epan_dissect.h"
+#include "wsutil/wmem/wmem.h"
 
 #include "ui/capture.h"
 
@@ -384,3 +385,27 @@ void CaptureFile::captureSessionEvent(int event, capture_session *cap_session)
     }
 }
 #endif // HAVE_LIBPCAP
+
+QStringList CaptureFile::protocols() const
+{
+    QStringList protocols;
+    if (!cap_file_)
+        return protocols;
+
+	wmem_list_frame_t *protos = wmem_list_head(cap_file_->edt->pi.layers);
+
+    /* Walk the list of a available protocols in the packet and
+        attempt to find the specified protocol. */
+    while (protos != NULL)
+    {
+        int proto_id = GPOINTER_TO_INT(wmem_list_frame_data(protos));
+        QString name = QString(proto_get_protocol_filter_name(proto_id));
+
+        if (!protocols.contains(name))
+            protocols << name;
+
+        protos = wmem_list_frame_next(protos);
+    }
+
+    return protocols;
+}

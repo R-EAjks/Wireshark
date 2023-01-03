@@ -58,6 +58,7 @@
 #include <QMainWindow>
 #include <QPointer>
 #include <QTextCodec>
+#include <QMutex>
 
 #ifdef _WIN32
 # include <QTimer>
@@ -197,6 +198,8 @@ private:
 #endif
 
     QPoint dragStartPosition;
+
+    QMutex _menuMutex;
 
     void freeze();
     void thaw();
