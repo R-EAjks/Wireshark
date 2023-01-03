@@ -188,6 +188,11 @@ class case_equality(unittest.TestCase):
         dfilter = 'frame[37] == :fc'
         checkDFilterCount(dfilter, 1)
 
+    def test_rhs_bias_3(self, checkDFilterCount):
+        # Byte 0xFC on the RHS
+        dfilter = 'frame[37] == fc:'
+        checkDFilterCount(dfilter, 1)
+
     def test_rhs_literal_bias_4(self, checkDFilterCount):
         # Protocol "Fibre Channel" on the RHS
         dfilter = 'frame[37] == .fc'
@@ -237,9 +242,10 @@ class case_unary_minus(unittest.TestCase):
         dfilter = "tcp.window_size_scalefactor == +tcp.dstport"
         checkDFilterCount(dfilter, 0)
 
-    def test_unary_3(self, checkDFilterCount):
+    def test_unary_3(self, checkDFilterFail):
+        error = 'Constant expression is invalid on the LHS'
         dfilter = "-2 == tcp.dstport"
-        checkDFilterCount(dfilter, 0)
+        checkDFilterFail(dfilter, error)
 
     def test_unary_4(self, checkDFilterCount):
         dfilter = "tcp.window_size_scalefactor == -{tcp.dstport * 20}"
@@ -261,9 +267,10 @@ class case_arithmetic(unittest.TestCase):
         dfilter = "udp.dstport == 66+1"
         checkDFilterCount(dfilter, 2)
 
-    def test_add_4(self, checkDFilterCount):
+    def test_add_4(self, checkDFilterFail):
+        error = 'Constant expression is invalid on the LHS'
         dfilter = "1 + 2 == frame.number"
-        checkDFilterCount(dfilter, 1)
+        checkDFilterFail(dfilter, error)
 
     def test_add_5(self, checkDFilterFail):
         error = 'Constant expression is invalid'

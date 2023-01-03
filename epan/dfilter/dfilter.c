@@ -121,14 +121,6 @@ dfilter_init(void)
 	/* Allocate an instance of our Lemon-based parser */
 	ParserObj = DfilterAlloc(g_malloc);
 
-/* Enable parser tracing by defining AM_CFLAGS
- * so that it contains "-DDFTRACE".
- */
-#ifdef DFTRACE
-	/* Trace parser */
-	DfilterTrace(stdout, "lemon> ");
-#endif
-
 	/* Initialize the syntax-tree sub-sub-system */
 	sttype_init();
 
@@ -157,12 +149,10 @@ dfilter_new(GPtrArray *deprecated)
 
 	df = g_new0(dfilter_t, 1);
 	df->insns = NULL;
-
+	df->function_stack = NULL;
+	df->warnings = NULL;
 	if (deprecated)
 		df->deprecated = g_ptr_array_ref(deprecated);
-
-	df->function_stack = NULL;
-
 	return df;
 }
 
@@ -204,6 +194,9 @@ dfilter_free(dfilter_t *df)
 		g_slist_free(df->function_stack);
 	}
 
+	if (df->warnings)
+		g_slist_free_full(df->warnings, g_free);
+
 	g_free(df->registers);
 	g_free(df->attempted_load);
 	g_free(df->free_registers);
@@ -225,6 +218,7 @@ dfwork_new(void)
 	dfwork_t *dfw = g_new0(dfwork_t, 1);
 
 	dfw_error_init(&dfw->error);
+	dfw->warnings = NULL;
 
 	dfw->references =
 		g_hash_table_new_full(g_direct_hash, g_direct_equal,
@@ -272,6 +266,9 @@ dfwork_free(dfwork_t *dfw)
 
 	if (dfw->deprecated)
 		g_ptr_array_unref(dfw->deprecated);
+
+	if (dfw->warnings)
+		g_slist_free_full(dfw->warnings, g_free);
 
 	g_free(dfw->expanded_text);
 
@@ -347,6 +344,16 @@ add_deprecated_token(dfwork_t *dfw, const char *token)
 	g_ptr_array_add(deprecated, g_strdup(token));
 }
 
+void
+add_compile_warning(dfwork_t *dfw, const char *format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+	char *msg = ws_strdup_vprintf(format, ap);
+	va_end(ap);
+	dfw->warnings = g_slist_prepend(dfw->warnings, msg);
+}
+
 char *
 dfilter_expand(const char *expr, char **err_ret)
 {
@@ -406,21 +413,32 @@ dfilter_compile_real(const gchar *text, dfilter_t **dfp,
 		ws_noisy("Verbatim text: %s", dfw->expanded_text);
 	}
 
-	if (df_lex_init(&scanner) != 0) {
+	if (df_yylex_init(&scanner) != 0) {
 		dfw_error_set_msg(errpp, "Can't initialize scanner: %s", g_strerror(errno));
 		goto FAILURE;
 	}
 
-	in_buffer = df__scan_string(dfw->expanded_text, scanner);
+	in_buffer = df_yy_scan_string(dfw->expanded_text, scanner);
 
 	memset(&state, 0, sizeof(state));
 	state.dfw = dfw;
 
-	df_set_extra(&state, scanner);
+	df_yyset_extra(&state, scanner);
+
+	/* Enable/disable debugging for Flex. */
+	df_yyset_debug(flags & DF_DEBUG_FLEX, scanner);
+
+#ifndef NDEBUG
+	/* Enable/disable debugging for Lemon. */
+	DfilterTrace(flags & DF_DEBUG_LEMON ? stderr : NULL, "lemon> ");
+#else
+	if (flags & DF_DEBUG_LEMON) {
+		ws_message("Compile Wireshark without NDEBUG to enable Lemon debug traces");
+	}
+#endif
 
 	while (1) {
-		df_lval = stnode_new_empty(STTYPE_UNINITIALIZED);
-		token = df_lex(scanner);
+		token = df_yylex(scanner);
 
 		/* Check for scanner failure */
 		if (token == SCAN_FAILED) {
@@ -437,12 +455,12 @@ dfilter_compile_real(const gchar *text, dfilter_t **dfp,
 
 		ws_noisy("(%u) Token %d %s %s",
 				++token_count, token, tokenstr(token),
-				stnode_token(df_lval));
+				stnode_token(state.df_lval));
 
 		/* Give the token to the parser */
-		Dfilter(ParserObj, token, df_lval, dfw);
+		Dfilter(ParserObj, token, state.df_lval, dfw);
 		/* The parser has freed the lval for us. */
-		df_lval = NULL;
+		state.df_lval = NULL;
 
 		if (dfw->parse_failure) {
 			failure = TRUE;
@@ -453,9 +471,9 @@ dfilter_compile_real(const gchar *text, dfilter_t **dfp,
 
 	/* If we created a df_lval_t but didn't use it, free it; the
 	 * parser doesn't know about it and won't free it for us. */
-	if (df_lval) {
-		stnode_free(df_lval);
-		df_lval = NULL;
+	if (state.df_lval) {
+		stnode_free(state.df_lval);
+		state.df_lval = NULL;
 	}
 
 	/* Tell the parser that we have reached the end of input; that
@@ -473,8 +491,8 @@ dfilter_compile_real(const gchar *text, dfilter_t **dfp,
 	/* Free scanner state */
 	if (state.quoted_string != NULL)
 		g_string_free(state.quoted_string, TRUE);
-	df__delete_buffer(in_buffer, scanner);
-	df_lex_destroy(scanner);
+	df_yy_delete_buffer(in_buffer, scanner);
+	df_yylex_destroy(scanner);
 
 	if (failure)
 		goto FAILURE;
@@ -515,6 +533,8 @@ dfilter_compile_real(const gchar *text, dfilter_t **dfp,
 		dfw->references = NULL;
 		dfilter->raw_references = dfw->raw_references;
 		dfw->raw_references = NULL;
+		dfilter->warnings = dfw->warnings;
+		dfw->warnings = NULL;
 
 		if (flags & DF_SAVE_TREE) {
 			ws_assert(tree_str);
@@ -599,6 +619,12 @@ dfilter_deprecated_tokens(dfilter_t *df) {
 		return df->deprecated;
 	}
 	return NULL;
+}
+
+GSList *
+dfilter_get_warnings(dfilter_t *df)
+{
+	return df->warnings;
 }
 
 void

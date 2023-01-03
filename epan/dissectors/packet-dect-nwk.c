@@ -1301,7 +1301,7 @@ static const value_string dect_nwk_s_ie_fl_release_reason_val[] = {
 static const value_string dect_nwk_s_ie_fl_signal_value_val[] = {
 	{ DECT_NWK_S_IE_FL_SIGNAL_VALUE_DIAL_TONE_ON,               "Dial tone on" },
 	{ DECT_NWK_S_IE_FL_SIGNAL_VALUE_RINGBACK_TONE_ON,           "Ring-back tone on" },
-	{ DECT_NWK_S_IE_FL_SIGNAL_VALUE_INTERCEPT_TONE_ON,          "Intercep tone on " },
+	{ DECT_NWK_S_IE_FL_SIGNAL_VALUE_INTERCEPT_TONE_ON,          "Intercept tone on " },
 	{ DECT_NWK_S_IE_FL_SIGNAL_VALUE_NETWORK_CONGESTION_TONE_ON, "Network congestion tone on" },
 	{ DECT_NWK_S_IE_FL_SIGNAL_VALUE_BUSY_TONE_ON,               "Busy tone on" },
 	{ DECT_NWK_S_IE_FL_SIGNAL_VALUE_CONFIRM_TONE_ON,            "Confirm tone on" },
@@ -1531,7 +1531,7 @@ static const value_string dect_nwk_arc_type_val[] = {
 
 /* Section 7.7.23 */
 static const value_string dect_nwk_s_ie_iwu_to_iwu_protocol_discriminator_type_val[] = {
-	{ DECT_NWK_S_IE_IWU_TO_IWU_PROTOCOL_DISCRIMINATOR_USER_SPECIFIC,     "User specifid" },
+	{ DECT_NWK_S_IE_IWU_TO_IWU_PROTOCOL_DISCRIMINATOR_USER_SPECIFIC,     "User specific" },
 	{ DECT_NWK_S_IE_IWU_TO_IWU_PROTOCOL_DISCRIMINATOR_OSI_HIGH_LAYER,    "OSI high layer protocols" },
 	{ DECT_NWK_S_IE_IWU_TO_IWU_PROTOCOL_DISCRIMINATOR_X263,              "ITU-T X.263" },
 	{ DECT_NWK_S_IE_IWU_TO_IWU_PROTOCOL_DISCRIMINATOR_LIST_ACCESS,       "List Access" },
@@ -1819,8 +1819,8 @@ static const dgt_set_t Dgt0_9_bcd = {
 
 #define DECT_NWK_S_IE_LOCATION_AREA_LI_EXTENDED_INCLUDED_MASK 0x80
 #define DECT_NWK_S_IE_LOCATION_AREA_LI_EXTENDED_INCLUDED_SHIFT 7
-#define DECT_NWK_S_IE_LOCATION_AREA_ELI_TYPE_MASK 0xE0
-#define DECT_NWK_S_IE_LOCATION_AREA_ELI_TYPE_SHIFT 5
+#define DECT_NWK_S_IE_LOCATION_AREA_ELI_TYPE_MASK 0xF0
+#define DECT_NWK_S_IE_LOCATION_AREA_ELI_TYPE_SHIFT 4
 
 #define DECT_NWK_S_IE_TERMINAL_CAPABILITY_STORED_DISPLAY_CHARACTERS_MASK 0x7F
 
@@ -2151,7 +2151,7 @@ static int dissect_dect_nwk_s_ie_terminal_capability(tvbuff_t *tvb, guint offset
 {
 	gboolean octet_group_extension;
 	guint octet_identifier, next_element_offset;
-	guint16 stored_display_characters;
+	guint16 stored_display_characters = 0;
 
 	static int* const slot_type_flags[] = {
 		&hf_dect_nwk_s_ie_terminal_capability_slot_type_double,
@@ -2802,7 +2802,7 @@ static void fmt_dect_nwk_ipei(gchar *ipei_string, guint64 ipei) {
 	psn = ipei & 0xFFFFF;
 
 	digit_divisor = 100000000000;
-	ipei_digits = emc * 10000000 + psn;
+	ipei_digits = emc * (guint64)10000000 + psn;
 	check_digit = 0;
 	for(guint8 i = 1; i <= 12; i++) {
 		check_digit += (guint16)( ( ipei_digits / digit_divisor ) * i );
@@ -3180,7 +3180,7 @@ void proto_register_dect_nwk(void)
 		},
 		{ &hf_dect_nwk_s_ie_location_area_eli_type,
 			{ "ELI-Type", "dect_nwk.s.ie.location_area.eli_type", FT_UINT8, BASE_HEX,
-				VALS(dect_nwk_s_ie_location_area_eli_type_val), 0xF0, "Extended Location Information type", HFILL
+				VALS(dect_nwk_s_ie_location_area_eli_type_val), DECT_NWK_S_IE_LOCATION_AREA_ELI_TYPE_MASK, "Extended Location Information type", HFILL
 			}
 		},
 		{ &hf_dect_nwk_s_ie_location_area_lac,
