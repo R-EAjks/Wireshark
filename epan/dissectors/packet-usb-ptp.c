@@ -129,6 +129,18 @@ usb_ptp_flavor(packet_info *pinfo, void* data)
         case USB_PTP_VENDOR_OLYMPUS:
             flavor |= USB_PTP_FLAVOR_OLYMPUS;
             break;
+        case USB_PTP_VENDOR_LEICA:
+            flavor |= USB_PTP_FLAVOR_LEICA;
+            break;
+        case USB_PTP_VENDOR_PARROT:
+            flavor |= USB_PTP_FLAVOR_PARROT;
+            break;
+        case USB_PTP_VENDOR_PANASONIC:
+            flavor |= USB_PTP_FLAVOR_PANASONIC;
+            break;
+        case USB_PTP_VENDOR_SONY:
+            flavor |= USB_PTP_FLAVOR_SONY;
+            break;
         default:
             break;
     }
@@ -613,7 +625,7 @@ proto_register_usb_ptp(void)
         NULL                                          , 0x0                                     , NULL      , HFILL}}   ,
         { &hf_devinfo_vendorextensionid               ,
         { "Vendor Extension ID"                       , "usb-ptp.device.vendorextensionid"      , FT_UINT32 , BASE_HEX  ,
-        VALS(usb_ptp_devinfo_vendorextensionid_vals) , 0x0                                     , NULL      , HFILL}}   ,
+        VALS(usb_ptp_vendor_vals)                     , 0x0                                     , NULL      , HFILL}}   ,
         { &hf_devinfo_vendorextensionversion          ,
         { "Vendor Extension Version"                  , "usb-ptp.device.vendorextensionversion" , FT_UINT16 , BASE_HEX  ,
         NULL                                          , 0x0                                     , NULL      , HFILL}}   ,
