@@ -321,14 +321,6 @@ WS_DLL_PUBLIC
 const gchar *
 try_rval64_to_str_idx(const guint64 val, const range_string *rs, gint *idx);
 
-/* MASKED VALUE STRINGS */
-typedef struct _value_string_masked {
-    guint32       mask;
-    guint32       value;
-    const gchar   *strptr;
-} value_string_masked_t;
-
-
 /* BYTES TO STRING MATCHING */
 
 typedef struct _bytes_string {
