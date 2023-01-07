@@ -448,6 +448,21 @@ static const value_string beam_group_type_vals[] = {
     {0, NULL}
 };
 
+
+/* Overall state of a flow (eAxC) */
+typedef struct {
+    guint32  last_cplane_frame;
+    nstime_t last_cplane_frame_ts;
+    /* TODO: add udCompHdr info for subsequence U-Plane frames? */
+
+    /* First U-PLane frame following 'last_cplane' frame */
+    guint32  first_uplane_frame;
+    nstime_t first_uplane_frame_ts;
+} flow_state_t;
+
+//static GHashTable *flow_states_hash = NULL;
+
+
 #if 0
 static const range_string bfw_comp_parms[] = {
     {0, 0, NULL}
@@ -2917,6 +2932,8 @@ proto_register_oran(void)
         "When enabled, for U-Plane frames show each I and Q value in PRB.", &pref_showIQSampleValues);
 
     prefs_register_obsolete_preference(oran_module, "oran.num_bf_weights");
+
+    //flow_states_hash = wmem_tree_new_autoreset(wmem_epan_scope(), wmem_file_scope());
 }
 
 /* Simpler form of proto_reg_handoff_oran which can be used if there are
