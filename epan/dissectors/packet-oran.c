@@ -448,8 +448,8 @@ static const value_string beam_group_type_vals[] = {
     {0, NULL}
 };
 
-
-/* Overall state of a flow (eAxC) */
+/*******************************************************/
+/* Overall state of a flow (eAxC)                      */
 typedef struct {
     guint32  last_cplane_frame;
     nstime_t last_cplane_frame_ts;
@@ -460,7 +460,8 @@ typedef struct {
     nstime_t first_uplane_frame_ts;
 } flow_state_t;
 
-//static GHashTable *flow_states_hash = NULL;
+/* Table maintained on first pass from eAxC (guint16) -> flow_state_t* */
+static wmem_tree_t *flow_states_table = NULL;
 
 
 #if 0
@@ -523,7 +524,7 @@ write_section_info(proto_item *section_heading, packet_info *pinfo, proto_item *
 
 /* 3.1.3.1.6 (real time control data / IQ data transfer message series identifier */
 static void
-addPcOrRtcid(tvbuff_t *tvb, proto_tree *tree, gint *offset, const char *name)
+addPcOrRtcid(tvbuff_t *tvb, proto_tree *tree, gint *offset, const char *name, guint16 *eAxC)
 {
     /* Subtree */
     proto_item *item;
@@ -531,8 +532,9 @@ addPcOrRtcid(tvbuff_t *tvb, proto_tree *tree, gint *offset, const char *name)
     guint64 duPortId, bandSectorId, ccId, ruPortId = 0;
     gint id_offset = *offset;
 
-    if (!((pref_du_port_id_bits > 0) && (pref_bandsector_id_bits > 0) && (pref_cc_id_bits > 0) && (pref_ru_port_id_bits > 0) && /* all parts above 0 */
-         ((pref_du_port_id_bits + pref_bandsector_id_bits + pref_cc_id_bits + pref_ru_port_id_bits) == 16))) {                  /* and adding up to 16 bits */
+    /* All parts of eAxC should be above 0, and should total 16 bits */
+    if (!((pref_du_port_id_bits > 0) && (pref_bandsector_id_bits > 0) && (pref_cc_id_bits > 0) && (pref_ru_port_id_bits > 0) &&
+         ((pref_du_port_id_bits + pref_bandsector_id_bits + pref_cc_id_bits + pref_ru_port_id_bits) == 16))) {
         expert_add_info(NULL, tree, &ei_oran_invalid_eaxc_bit_width);
         *offset += 2;
         return;
@@ -541,6 +543,7 @@ addPcOrRtcid(tvbuff_t *tvb, proto_tree *tree, gint *offset, const char *name)
     guint bit_offset = *offset * 8;
 
     /* N.B. For sequence analysis / tapping, just interpret these 2 bytes as eAxC ID... */
+    *eAxC = tvb_get_guint16(tvb, *offset, ENC_BIG_ENDIAN);
 
     /* DU Port ID */
     proto_tree_add_bits_ret_val(oran_pcid_tree, hf_oran_du_port_id, tvb, bit_offset, pref_du_port_id_bits, &duPortId, ENC_BIG_ENDIAN);
@@ -1467,7 +1470,17 @@ static int dissect_oran_c(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
     proto_item_append_text(protocol_item, "-C");
     proto_tree *oran_tree = proto_item_add_subtree(protocol_item, ett_oran);
 
-    addPcOrRtcid(tvb, oran_tree, &offset, "ecpriRtcid");
+    guint16 eAxC;
+    addPcOrRtcid(tvb, oran_tree, &offset, "ecpriRtcid", &eAxC);
+
+    if (!PINFO_FD_VISITED(pinfo)) {
+        /* TODO: create or update conversation for stream eAxC */
+    }
+    else {
+        /* TODO: show stored state for this stream */
+    }
+
+    /* Message identifier */
     addSeqid(tvb, oran_tree, &offset);
 
     proto_item *sectionHeading;
@@ -1625,7 +1638,16 @@ dissect_oran_u(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
 
     /* Transport header */
     /* Real-time control data / IQ data transfer message series identifier */
-    addPcOrRtcid(tvb, oran_tree, &offset, "ecpriPcid");
+    guint16 eAxC;
+    addPcOrRtcid(tvb, oran_tree, &offset, "ecpriPcid", &eAxC);
+
+    if (!PINFO_FD_VISITED(pinfo)) {
+        /* TODO: create or update conversation for stream eAxC */
+    }
+    else {
+        /* TODO: show stored state for this stream */
+    }
+
     /* Message identifier */
     addSeqid(tvb, oran_tree, &offset);
 
@@ -2933,7 +2955,7 @@ proto_register_oran(void)
 
     prefs_register_obsolete_preference(oran_module, "oran.num_bf_weights");
 
-    //flow_states_hash = wmem_tree_new_autoreset(wmem_epan_scope(), wmem_file_scope());
+    flow_states_table = wmem_tree_new_autoreset(wmem_epan_scope(), wmem_file_scope());
 }
 
 /* Simpler form of proto_reg_handoff_oran which can be used if there are
