@@ -26,6 +26,8 @@
  * - tap stats by flow?
  * - for U-Plane, track back to last C-Plane frame for that eAxC
  *     - use upCompHdr values from C-Plane if not overridden by U-Plane?
+ * - Radio transport layer (eCPRI) fragmentation / reassembly
+ * - Not handling M-plane setting for "little endian byte order" as applied to IQ samples and beam weights
  */
 
 /* Prototypes */
@@ -98,6 +100,7 @@ static int hf_oran_lbtResult = -1;
 static int hf_oran_lteTxopSymbols = -1;
 static int hf_oran_initialPartialSF = -1;
 static int hf_oran_reserved = -1;
+static int hf_oran_ext11_reserved = -1;
 static int hf_oran_reserved_bits = -1;
 
 /* static int hf_oran_bfwCompParam = -1; */
@@ -763,7 +766,6 @@ static guint32 dissect_bfw_bundle(tvbuff_t *tvb, proto_tree *tree, packet_info *
         /* Get bits, and convert to float. */
         guint32 bits = tvb_get_bits(tvb, bit_offset, iq_width, ENC_BIG_ENDIAN);
         gfloat value = decompress_value(bits, bfwcomphdr_comp_meth, iq_width, exponent);
-
         /* Add to tree. */
         proto_tree_add_float_format_value(bfw_tree, hf_oran_bfw_i, tvb, bit_offset/8, (iq_width+7)/8, value, "#%u=%f", m, value);
         bit_offset += iq_width;
@@ -826,7 +828,7 @@ static int dissect_oran_c_section(tvbuff_t *tvb, proto_tree *tree, packet_info *
         proto_tree_add_item_ret_uint(oran_tree, hf_oran_numSymbol, tvb, offset, 1, ENC_NA, &numSymbol);
         offset++;
 
-        /* ef (extension flag) */
+        /* [ef] (extension flag) */
         switch (sectionType) {
             case SEC_C_NORMAL:            /* Section Type "1" */
             case SEC_C_PRACH:             /* Section Type "3" */
@@ -1248,11 +1250,12 @@ static int dissect_oran_c_section(tvbuff_t *tvb, proto_tree *tree, packet_info *
                 if (disableBFWs) {
                     proto_item_append_text(extension_ti, " (disableBFWs)");
                 }
-
                 /* RAD */
                 proto_tree_add_item(extension_tree, hf_oran_rad,
                                     tvb, offset, 1, ENC_BIG_ENDIAN);
                 /* 6 reserved bits */
+                proto_tree_add_item(extension_tree, hf_oran_ext11_reserved, tvb,
+                                    offset, 1, ENC_BIG_ENDIAN);
                 offset++;
 
                 /* numBundPrb */
@@ -1851,7 +1854,7 @@ proto_register_oran(void)
          { "DU Port ID", "oran_fh_cus.du_port_id",
            FT_UINT16, BASE_DEC,
            NULL, 0x0,
-           NULL, HFILL }
+           "Width set in dissector preference", HFILL }
        },
 
        /* Section 3.1.3.1.6 */
@@ -1859,7 +1862,7 @@ proto_register_oran(void)
          { "BandSector ID", "oran_fh_cus.bandsector_id",
            FT_UINT16, BASE_DEC,
            NULL, 0x0,
-           NULL, HFILL }
+           "Width set in dissector preference", HFILL }
        },
 
        /* Section 3.1.3.1.6 */
@@ -1867,7 +1870,7 @@ proto_register_oran(void)
          { "CC ID", "oran_fh_cus.cc_id",
            FT_UINT16, BASE_DEC,
            NULL, 0x0,
-           NULL, HFILL }
+           "Width set in dissector preference", HFILL }
        },
 
         /* Section 3.1.3.1.6 */
@@ -1875,7 +1878,7 @@ proto_register_oran(void)
           { "RU Port ID", "oran_fh_cus.ru_port_id",
             FT_UINT16, BASE_DEC,
             NULL, 0x0,
-            NULL, HFILL }
+            "Width set in dissector preference", HFILL }
         },
 
         /* Section 3.1.3.1.7 */
@@ -2477,6 +2480,14 @@ proto_register_oran(void)
           HFILL}
         },
 
+        {&hf_oran_ext11_reserved,
+         {"Reserved", "oran_fh_cus.reserved",
+          FT_UINT8, BASE_HEX,
+          NULL, 0x3f,
+          NULL,
+          HFILL}
+        },
+
         /* Section 5.4.7.1.1 */
         {&hf_oran_bfwCompHdr_iqWidth,
          {"IQ Bit Width", "oran_fh_cus.bfwCompHdr_iqWidth",
@@ -2778,7 +2789,7 @@ proto_register_oran(void)
           { "Num weights per bundle", "oran_fh_cus.num_weights_per_bundle",
             FT_UINT16, BASE_DEC,
             NULL, 0x0,
-            "From preference",
+            "From dissector preference",
             HFILL }
         },
 
@@ -2915,13 +2926,13 @@ proto_register_oran(void)
 
     /* Register bit width/compression preferences separately by direction. */
     prefs_register_uint_preference(oran_module, "oran.du_port_id_bits", "DU Port ID bits [a]",
-        "The bit width of DU Port ID, sum of a,b,c&d must be 16", 10, &pref_du_port_id_bits);
+        "The bit width of DU Port ID - sum of a,b,c&d (eAxC) must be 16", 10, &pref_du_port_id_bits);
     prefs_register_uint_preference(oran_module, "oran.bandsector_id_bits", "BandSector ID bits [b]",
-        "The bit width of BandSector ID, sum of a,b,c&d must be 16", 10, &pref_bandsector_id_bits);
+        "The bit width of BandSector ID - sum of a,b,c&d (eAxC) must be 16", 10, &pref_bandsector_id_bits);
     prefs_register_uint_preference(oran_module, "oran.cc_id_bits", "CC ID bits [c]",
-        "The bit width of CC ID, sum of a,b,c&d must be 16", 10, &pref_cc_id_bits);
+        "The bit width of CC ID - sum of a,b,c&d (eAxC) must be 16", 10, &pref_cc_id_bits);
     prefs_register_uint_preference(oran_module, "oran.ru_port_id_bits", "RU Port ID bits [d]",
-        "The bit width of RU Port ID, sum of a,b,c&d must be 16", 10, &pref_ru_port_id_bits);
+        "The bit width of RU Port ID - sum of a,b,c&d (eAxC) must be 16", 10, &pref_ru_port_id_bits);
 
     prefs_register_uint_preference(oran_module, "oran.iq_bitwidth_up", "IQ Bitwidth Uplink",
         "The bit width of a sample in the Uplink (if no udcompHdr)", 10, &pref_sample_bit_width_uplink);
