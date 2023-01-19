@@ -2605,6 +2605,14 @@ Enable dissection of heuristic protocol.
 Disable dissection of heuristic protocol.
 --
 
+--machine-readable::
++
+--
+Print raw (machine readable) values for conversation statistics (*-z conv*).
+By default *TShark* prints numeric values with human-readable SI suffixes
+for byte counts.
+--
+
 include::diagnostic-options.adoc[]
 
 == CAPTURE FILTER SYNTAX
