@@ -698,7 +698,7 @@ else() # ! MSVC
 	if((CMAKE_C_COMPILER_ID STREQUAL "GNU" AND CMAKE_C_COMPILER_VERSION VERSION_LESS "5.1") OR
 	   (CMAKE_C_COMPILER_ID STREQUAL "Clang" AND CMAKE_C_COMPILER_VERSION VERSION_LESS "6.0") OR
 	   (CMAKE_C_COMPILER_ID STREQUAL "AppleClang" AND CMAKE_C_COMPILER_VERSION VERSION_LESS "12.0"))
-		if(NOT CMAKE_C_COMPILER_ID STREQUAL "GNU" OR CMAKE_C_COMPILER_VERSION VERSION_LESS "4.7")
+		if(NOT CMAKE_C_COMPILER_ID STREQUAL "GNU" OR CMAKE_C_COMPILER_VERSION VERSION_LESS "5.0")
 			list(APPEND WIRESHARK_C_ONLY_FLAGS -Wno-missing-field-initializers)
 		endif()
 		# Silence warnings for initialization of nested structs like
@@ -1926,22 +1926,21 @@ set(INSTALL_DIRS
 
 # Installed into ${DATAFILE_DIR}
 set(INSTALL_FILES
-	Acknowledgements.md
-	docbook/ws.css
 	enterprises.tsv
-	gpl-2.0-standalone.html
 	manuf
 	resources/share/wireshark/cfilters
 	resources/share/wireshark/colorfilters
 	resources/share/wireshark/dfilter_macros
 	resources/share/wireshark/dfilters
-	resources/share/wireshark/pdml2html.xsl
 	resources/share/wireshark/smi_modules
 	services
 	wka
 )
 set(DOC_FILES
 	resources/share/doc/wireshark/ipmap.html
+	resources/share/doc/wireshark/pdml2html.xsl
+	doc/README.xml-output
+	docbook/ws.css
 )
 
 if (BUILD_logray)
@@ -1953,9 +1952,6 @@ if (BUILD_logray)
 endif()
 
 if (ASCIIDOCTOR_FOUND)
-	list(APPEND INSTALL_FILES
-		${CMAKE_BINARY_DIR}/doc/AUTHORS-SHORT
-	)
 	list(APPEND DOC_FILES
 		${CMAKE_BINARY_DIR}/doc/androiddump.html
 		${CMAKE_BINARY_DIR}/doc/udpdump.html
@@ -3800,6 +3796,13 @@ install(
 		${CMAKE_INSTALL_DATADIR}
 )
 
+install(
+	FILES
+		${DOC_FILES}
+	DESTINATION
+		${CMAKE_INSTALL_DOCDIR}
+)
+
 set(SHARK_PUBLIC_HEADERS
 	cfile.h
 	cli_main.h
@@ -4081,7 +4084,7 @@ if (GIT_EXECUTABLE)
 	# Update AUTHORS file with entries from git shortlog
 	add_custom_target(
 		gen-authors
-		COMMAND ${PYTHON_EXECUTABLE} tools/generate_authors.py AUTHORS.src > AUTHORS
+		COMMAND ${PYTHON_EXECUTABLE} tools/generate_authors.py AUTHORS
 		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 	)
 else (GIT_EXECUTABLE)
