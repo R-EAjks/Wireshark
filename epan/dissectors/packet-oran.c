@@ -275,6 +275,7 @@ static const range_string filter_indices[] = {
     {0, 0, NULL}
 };
 
+/* Section types from Table 7.3.1-1 */
 enum section_c_types {
     SEC_C_UNUSED_RB = 0,
     SEC_C_NORMAL = 1,
@@ -283,31 +284,34 @@ enum section_c_types {
     SEC_C_RSVD4 = 4,
     SEC_C_UE_SCHED = 5,
     SEC_C_CH_INFO = 6,
-    SEC_C_LAA = 7
+    SEC_C_LAA = 7,
+    SEC_C_ACK_NACK_FEEDBACK = 8
 };
 
 static const range_string section_types[] = {
-    {SEC_C_UNUSED_RB,   SEC_C_UNUSED_RB, "Unused Resource Blocks or symbols in Downlink or Uplink"},
-    {SEC_C_NORMAL,      SEC_C_NORMAL,    "Most DL/UL radio channels"},
-    {SEC_C_RSVD2,       SEC_C_RSVD2,     "Reserved for future use"},
-    {SEC_C_PRACH,       SEC_C_PRACH,     "PRACH and mixed-numerology channels"},
-    {SEC_C_RSVD4,       SEC_C_RSVD4,     "Reserved for future use"},
-    {SEC_C_UE_SCHED,    SEC_C_UE_SCHED,  "UE scheduling information(UE-ID assignment to section)"},
-    {SEC_C_CH_INFO,     SEC_C_CH_INFO,   "Channel information"},
-    {SEC_C_LAA,         SEC_C_LAA,       "LAA"},
-    {8,                 255,             "Reserved for future use"},
+    {SEC_C_UNUSED_RB,         SEC_C_UNUSED_RB,         "Unused Resource Blocks or symbols in Downlink or Uplink"},
+    {SEC_C_NORMAL,            SEC_C_NORMAL,            "Most DL/UL radio channels"},
+    {SEC_C_RSVD2,             SEC_C_RSVD2,             "Reserved for future use"},
+    {SEC_C_PRACH,             SEC_C_PRACH,             "PRACH and mixed-numerology channels"},
+    {SEC_C_RSVD4,             SEC_C_RSVD4,             "Reserved for future use"},
+    {SEC_C_UE_SCHED,          SEC_C_UE_SCHED,          "UE scheduling information (UE-ID assignment to section)"},
+    {SEC_C_CH_INFO,           SEC_C_CH_INFO,           "Channel information"},
+    {SEC_C_LAA,               SEC_C_LAA,               "LAA"},
+    {SEC_C_ACK_NACK_FEEDBACK, SEC_C_ACK_NACK_FEEDBACK, "ACK/NACK Feedback"},
+    {9,                       255,                     "Reserved for future use"},
     {0, 0, NULL} };
 
 static const range_string section_types_short[] = {
-    { SEC_C_UNUSED_RB,  SEC_C_UNUSED_RB,    "(Unused RBs)" },
-    { SEC_C_NORMAL,     SEC_C_NORMAL,       "(Most channels)" },
-    { SEC_C_RSVD2,      SEC_C_RSVD2,        "(reserved)" },
-    { SEC_C_PRACH,      SEC_C_PRACH,        "(PRACH/mixed-\u03bc)" },
-    { SEC_C_RSVD4,      SEC_C_RSVD4,        "(reserved)" },
-    { SEC_C_UE_SCHED,   SEC_C_UE_SCHED,     "(UE scheduling info)" },
-    { SEC_C_CH_INFO,    SEC_C_CH_INFO,      "(Channel info)" },
-    { SEC_C_LAA,        SEC_C_LAA,          "(LAA)" },
-    { 8,                255,                "Reserved for future use" },
+    { SEC_C_UNUSED_RB,         SEC_C_UNUSED_RB,         "(Unused RBs)" },
+    { SEC_C_NORMAL,            SEC_C_NORMAL,            "(Most channels)" },
+    { SEC_C_RSVD2,             SEC_C_RSVD2,             "(reserved)" },
+    { SEC_C_PRACH,             SEC_C_PRACH,             "(PRACH/mixed-\u03bc)" },
+    { SEC_C_RSVD4,             SEC_C_RSVD4,             "(reserved)" },
+    { SEC_C_UE_SCHED,          SEC_C_UE_SCHED,          "(UE scheduling info)" },
+    { SEC_C_CH_INFO,           SEC_C_CH_INFO,           "(Channel info)" },
+    { SEC_C_LAA,               SEC_C_LAA,               "(LAA)" },
+    { SEC_C_ACK_NACK_FEEDBACK, SEC_C_ACK_NACK_FEEDBACK, "(ACK/NACK)"},
+    { 9,                       255,                     "Reserved for future use" },
     { 0, 0, NULL }
 };
 
@@ -330,14 +334,15 @@ static const range_string ud_comp_header_meth[] = {
 
 static const range_string frame_structure_fft[] = {
     {0,  0,  "Reserved(no FFT / iFFT processing)"},
-    {1,  7,  "Reserved"},
+    {1,  6,  "Reserved"},
+    {7,  7,  "FFT size 128"},
     {8,  8,  "FFT size 256"},
     {9,  9,  "FFT size 512"},
     {10, 10, "FFT size 1024"},
     {11, 11, "FFT size 2048"},
     {12, 12, "FFT size 4096"},
     {13, 13, "FFT size 1536"},
-    {14, 14, "FFT size 128"},
+    {14, 14, "FFT size 3072"},
     {15, 15, "Reserved"},
     {0, 0, NULL}
 };
@@ -358,11 +363,14 @@ static const range_string subcarrier_spacings[] = {
 };
 
 static const range_string laaMsgTypes[] = {
-    {0, 0,  "LBT_PDSCH_REQ - lls - CU to RU request to obtain a PDSCH channel"},
-    {1, 1,  "LBT_DRS_REQ - lls - CU to RU request to obtain the channel and send DRS"},
-    {2, 2,  "LBT_PDSCH_RSP - RU to lls - CU response, channel acq success or failure"},
-    {3, 3,  "LBT_DRS_RSP - RU to lls - CU response, DRS sending success or failure"},
-    {4, 15, "reserved for future methods"},
+    {0, 0,  "LBT_PDSCH_REQ - lls - O-DU to O-RU request to obtain a PDSCH channel"},
+    {1, 1,  "LBT_DRS_REQ - lls - O-DU to O-RU request to obtain the channel and send DRS"},
+    {2, 2,  "LBT_PDSCH_RSP - O-RU to O-DU response, channel acq success or failure"},
+    {3, 3,  "LBT_DRS_RSP - O-RU to O-DU response, DRS sending success or failure"},
+    {4, 4,  "LBT_Buffer_Error - O-RU to O-DU response, reporting buffer overflow"},
+    {5, 5,  "LBT_CWCONFIG_REQ - O-DU to O-RU request, congestion window configuration"},
+    {6, 6,  "LBT_CWCONFIG_REQ - O-RU to O-DU request, congestion window config"},
+    {8, 15, "reserved for future methods"},
     {0, 0, NULL}
 };
 
