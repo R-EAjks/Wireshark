@@ -29,7 +29,9 @@
  * - for U-Plane, track back to last C-Plane frame for that eAxC
  *     - use upCompHdr values from C-Plane if not overridden by U-Plane?
  * - Radio transport layer (eCPRI) fragmentation / reassembly
+ * - Detect signs of application layer fragmentation?
  * - Not handling M-plane setting for "little endian byte order" as applied to IQ samples and beam weights
+ * - Really long long text in some items will not be displayed.  Try to summarise/truncate.
  */
 
 /* Prototypes */
@@ -521,6 +523,7 @@ static void write_pdu_label_and_info(proto_item *ti1, proto_item *ti2,
     }
 }
 
+/* Add section (type + PRB range) for C-Plane, U-Plane */
 static void
 write_section_info(proto_item *section_heading, packet_info *pinfo, proto_item *protocol_item, guint32 section_id, guint32 start_prbx, guint32 num_prbx)
 {
@@ -841,11 +844,9 @@ static int dissect_oran_c_section(tvbuff_t *tvb, proto_tree *tree, packet_info *
         proto_tree_add_item(oran_tree, hf_oran_symInc, tvb, offset, 1, ENC_NA);
         /* startPrbc */
         proto_tree_add_item_ret_uint(oran_tree, hf_oran_startPrbc, tvb, offset, 2, ENC_BIG_ENDIAN, &startPrbc);
-        proto_item_append_text(sectionHeading, ", startPrbc: %u", startPrbc);
         offset += 2;
         /* numPrbc */
         proto_tree_add_item_ret_uint(oran_tree, hf_oran_numPrbc, tvb, offset, 1, ENC_NA, &numPrbc);
-        proto_item_append_text(sectionHeading, ", numPrbc: %u", numPrbc);
         offset += 1;
         /* reMask */
         proto_tree_add_item(oran_tree, hf_oran_reMask, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -941,11 +942,9 @@ static int dissect_oran_c_section(tvbuff_t *tvb, proto_tree *tree, packet_info *
         proto_tree_add_item(oran_tree, hf_oran_symInc, tvb, offset, 1, ENC_NA);
         /* startPrbc */
         proto_tree_add_item_ret_uint(oran_tree, hf_oran_startPrbc, tvb, offset, 2, ENC_BIG_ENDIAN, &startPrbc);
-        proto_item_append_text(sectionHeading, ", startPrbc: %u", startPrbc);
         offset += 2;
         /* numPrbc */
         proto_tree_add_item_ret_uint(oran_tree, hf_oran_numPrbc, tvb, offset, 1, ENC_NA, &numPrbc);
-        proto_item_append_text(sectionHeading, ", numPrbc: %u", numPrbc);
         offset += 1;
 
         /* ciIsample,ciQsample pairs */
