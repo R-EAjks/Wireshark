@@ -313,6 +313,22 @@ field_widths = {
     'FT_INT64'   : 64
 }
 
+def is_ignored_consecutive_hf(hf):
+    ignore_patterns = [
+        re.compile(r'^hf_ns_trcdbg_val(\d+)_.*'),
+        re.compile(r'^hf_netlogon_dummy_string(\d+)'),
+        re.compile(r'^hf_6lowpan_6lorhc_address_hop\d'),
+        re.compile(r'^hf_mpls_pm_timestamp\d_r_.*'),
+        re.compile(r'^hf_opa_reserved\d+'),
+        re.compile(r'^hf_dnp3_al_.*\d+')
+    ]
+
+    for patt in ignore_patterns:
+        if patt.match(hf):
+            return True
+    return False
+
+
 
 # The relevant parts of an hf item.  Used as value in dict where hf variable name is key.
 class Item:
@@ -336,9 +352,10 @@ class Item:
         if check_consecutive:
             if Item.previousItem and Item.previousItem.filter == filter:
                 if label != Item.previousItem.label:
-                    print('Warning:', filename, hf, ': - filter "' + filter +
-                          '" appears consecutively - labels are "' + Item.previousItem.label + '" and "' + label + '"')
-                    warnings_found += 1
+                    if not is_ignored_consecutive_hf(self.hf):
+                        print('Warning:', filename, hf, ': - filter "' + filter +
+                            '" appears consecutively - labels are "' + Item.previousItem.label + '" and "' + label + '"')
+                        warnings_found += 1
 
             Item.previousItem = self
 
