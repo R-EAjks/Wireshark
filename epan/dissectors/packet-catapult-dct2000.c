@@ -30,7 +30,9 @@
 #include "packet-pdcp-lte.h"
 
 #include "packet-mac-nr.h"
+#include "packet-rlc-nr.h"
 #include "packet-pdcp-nr.h"
+
 
 void proto_reg_handoff_catapult_dct2000(void);
 void proto_register_catapult_dct2000(void);
@@ -129,13 +131,17 @@ static int hf_catapult_dct2000_rawtraffic_direction = -1;
 static int hf_catapult_dct2000_rawtraffic_pdu = -1;
 
 
+static int hf_catapult_dct2000_pdcp_nr_context = -1;
+
 /* Variables used for preferences */
 static gboolean catapult_dct2000_try_ipprim_heuristic = TRUE;
 static gboolean catapult_dct2000_try_sctpprim_heuristic = TRUE;
 static gboolean catapult_dct2000_dissect_lte_rrc = TRUE;
 static gboolean catapult_dct2000_dissect_mac_lte_oob_messages = TRUE;
 static gboolean catapult_dct2000_dissect_old_protocol_names = FALSE;
+static gboolean catapult_dct2000_dissect_pdcp_nr_payloads = FALSE;
 static gboolean catapult_dct2000_use_protocol_name_as_dissector_name = FALSE;
+static gboolean catapult_dct2000_dissect_pdcp = TRUE;
 
 /* Protocol subtree. */
 static int ett_catapult_dct2000 = -1;
@@ -333,6 +339,8 @@ extern int proto_umts_rlc;
 extern int proto_rlc_lte;
 extern int proto_pdcp_lte;
 
+extern int proto_rlc_nr;
+extern int proto_pdcp_nr;
 
 static dissector_handle_t mac_lte_handle;
 static dissector_handle_t rlc_lte_handle;
@@ -341,8 +349,12 @@ static dissector_handle_t catapult_dct2000_handle;
 static dissector_handle_t nrup_handle;
 
 static dissector_handle_t mac_nr_handle;
+static dissector_handle_t rlc_nr_handle;
+static dissector_handle_t pdcp_nr_handle;
+static dissector_handle_t ip_handle;
 
 static dissector_handle_t eth_handle;
+static dissector_handle_t l2server_handle;
 
 static dissector_handle_t look_for_dissector(const char *protocol_name);
 static guint parse_outhdr_string(const guchar *outhdr_string, gint outhdr_length, guint *outhdr_values);
@@ -1031,6 +1043,7 @@ static void dissect_rrc_lte_nr(tvbuff_t *tvb, gint offset,
 
         default:
             /* Unexpected tag */
+            printf("Unexpected tag: %02x\n", tag);
             return;
     }
 
@@ -2195,6 +2208,67 @@ static void attach_pdcp_lte_info(packet_info *pinfo, guint *outhdr_values,
     p_add_proto_data(wmem_file_scope(), pinfo, proto_pdcp_lte, 0, p_pdcp_lte_info);
 }
 
+/* Fill in a MAC NR packet info struct and attach it to the packet for that
+   dissector to use */
+static void attach_mac_nr_info(packet_info *pinfo, guint *outhdr_values, guint outhdr_values_found _U_)
+{
+    struct mac_nr_info *p_mac_nr_info;
+    unsigned int         i = 0;
+
+    /* Only need to set info once per session. */
+    p_mac_nr_info = get_mac_nr_proto_data(pinfo);
+    if (p_mac_nr_info != NULL) {
+        return;
+    }
+
+    /* Allocate & zero struct */
+    p_mac_nr_info = wmem_new0(wmem_file_scope(), struct mac_nr_info);
+
+    /* Populate the struct from outhdr values */
+    p_mac_nr_info->radioType = outhdr_values[i++] + 1;        // 1
+    p_mac_nr_info->rntiType = outhdr_values[i++];             // 2
+    p_mac_nr_info->direction = outhdr_values[i++];            // 3
+    p_mac_nr_info->rnti = outhdr_values[i++];                 // 4
+    p_mac_nr_info->ueid = outhdr_values[i++];                 // 5
+    p_mac_nr_info->phr_type2_othercell = outhdr_values[i++];  // 6
+    p_mac_nr_info->length = outhdr_values[i++];               // 7
+
+    /* Store info in packet */
+    set_mac_nr_proto_data(pinfo, p_mac_nr_info);
+}
+
+/* Fill in a RLC NR packet info struct and attach it to the packet for that
+   dissector to use */
+static void attach_rlc_nr_info(packet_info *pinfo, guint *outhdr_values,
+                               guint outhdr_values_found _U_)
+{
+    struct rlc_nr_info *p_rlc_nr_info;
+    unsigned int         i = 0;
+
+    /* Only need to set info once per session. */
+    p_rlc_nr_info = (rlc_nr_info *)p_get_proto_data(wmem_file_scope(), pinfo, proto_rlc_nr, 0);
+    if (p_rlc_nr_info != NULL) {
+        return;
+    }
+
+    /* Allocate & zero struct */
+    p_rlc_nr_info = wmem_new0(wmem_file_scope(), rlc_nr_info);
+
+    p_rlc_nr_info->rlcMode = outhdr_values[i++];
+    p_rlc_nr_info->direction = outhdr_values[i++];
+    p_rlc_nr_info->sequenceNumberLength = outhdr_values[i++];
+    p_rlc_nr_info->bearerType = outhdr_values[i++];
+    p_rlc_nr_info->bearerId = outhdr_values[i++];
+
+    p_rlc_nr_info->ueid = outhdr_values[i++];
+    p_rlc_nr_info->pduLength = outhdr_values[i];
+
+    /* Store info in packet */
+    p_add_proto_data(wmem_file_scope(), pinfo, proto_rlc_nr, 0, p_rlc_nr_info);
+}
+
+
+
 
 /* Attempt to show tty (raw character messages) as text lines. */
 static void dissect_tty_lines(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
@@ -2599,6 +2673,19 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
         attach_pdcp_lte_info(pinfo, outhdr_values, outhdr_values_found);
     }
 
+    else if (strcmp(protocol_name, "mac_r15_nr") == 0) {
+        outhdr_values_found = parse_outhdr_string(outhdr_string, outhdr_length,
+                                                  outhdr_values);
+        attach_mac_nr_info(pinfo, outhdr_values, outhdr_values_found);
+    }
+
+    else if (strcmp(protocol_name, "rlc_r15_nr") == 0) {
+        outhdr_values_found = parse_outhdr_string(outhdr_string, outhdr_length,
+                                                  outhdr_values);
+        attach_rlc_nr_info(pinfo, outhdr_values, outhdr_values_found);
+    }
+
+
     else if ((strcmp(protocol_name, "nas_rrc_r8_lte") == 0) ||
              (strcmp(protocol_name, "nas_rrc_r9_lte") == 0) ||
              (strcmp(protocol_name, "nas_rrc_r10_lte") == 0) ||
@@ -2831,6 +2918,16 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                 return tvb_captured_length(tvb);
             }
 
+            else
+            if (strcmp(protocol_name, "mac_r15_nr") == 0) {
+                protocol_handle = mac_nr_handle;
+            }
+
+            else
+            if (strcmp(protocol_name, "rlc_r15_nr") == 0) {
+                protocol_handle = rlc_nr_handle;
+            }
+
 
             /* Work with generic XML protocol. */
             else
@@ -2849,6 +2946,11 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
             else
             if (strcmp(protocol_name, "sipprim") == 0) {
                 protocol_handle = find_dissector("sipprim");
+            }
+
+            else
+            if (strcmp(protocol_name, "pacs") == 0) {
+                protocol_handle = find_dissector("pacs");
             }
 
             else
@@ -2883,6 +2985,7 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                 */
                 int dir, rntiType, rnti, ueid, sn, sfn, length;
 
+
                 if ((sscanf(string, "L1_App: NRMAC PDU: direction=%d rntiType=%d rnti=%d ueid=%d SN=%d  SFN=%d length=%d $",
                             &dir, &rntiType, &rnti, &ueid, &sn, &sfn, &length) == 7) ||
                     (sscanf(string, "NRMAC PDU: direction=%d rntiType=%d rnti=%d ueid=%d SN=%d  SFN=%d length=%d $",
@@ -2890,8 +2993,10 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                 {
                     struct mac_nr_info *p_mac_nr_info;
 
+
                     /* Only need to set info once per session? */
                     /* p_mac_nr_info = get_mac_nr_proto_data(pinfo); */
+
 
                     /* Allocate & zero struct */
                     p_mac_nr_info = wmem_new0(wmem_file_scope(), struct mac_nr_info);
@@ -2942,6 +3047,7 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                         }
                     }
 
+
                     /* Convert data to hex. */
                     char *mac_data = (char *)wmem_alloc(pinfo->pool, 2 + (strlen(string)-data_offset)/2);
                     int idx, m;
@@ -2986,11 +3092,11 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                         }
                     }
 
-                    /* Create separate NRUP tvb */
+                    // Create separate NRUP tvb
                     tvbuff_t *nrup_tvb = tvb_new_real_data(nrup_data, length, length);
                     add_new_data_source(pinfo, nrup_tvb, "NRUP Payload");
 
-                    /* Call the dissector! */
+                    // Call the dissector!
                     call_dissector_only(nrup_handle, nrup_tvb, pinfo, tree, NULL);
                 }
 
@@ -3022,6 +3128,372 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                         g_free(key);
                     }
                 }
+
+
+                /* Look for logged PDCP-NR PDU */
+                const char *pdcp_pattern = "NRPDCP PDU: ";
+                start = strstr(string, pdcp_pattern);
+                if (start && catapult_dct2000_dissect_pdcp) {
+
+                    struct pdcp_nr_info *p_pdcp_nr_info;
+
+                    // What, if anything, should the payload be dissected as?
+                    gboolean is_pdcp = TRUE;
+                    gboolean really_not_pdcp = FALSE;
+                    gboolean is_ip = FALSE;
+
+                    gboolean is_lte = FALSE;
+
+                    // Do we need to hunt for 0x41 tag for start of PDCP data?
+                    gboolean rlcPrim_present = FALSE;
+
+                    /* Only need to set info once per session. */
+                    p_pdcp_nr_info = (pdcp_nr_info *)p_get_proto_data(wmem_file_scope(), pinfo, proto_pdcp_nr, 0);
+                    if (p_pdcp_nr_info == NULL) {
+                        /* Allocate & zero struct */
+                        p_pdcp_nr_info = wmem_new0(wmem_file_scope(), struct pdcp_nr_info);
+                    }
+
+                    start += strlen(pdcp_pattern);
+
+                    int off = 0;
+
+                    gboolean found_data = FALSE;
+                    while (!found_data) {
+
+                        /* Get next label+value pair */
+                        char label[64];
+                        int label_offset = 0;
+                        char value[64];
+                        int value_offset = 0;
+
+                        /* Label is everything until '=' */
+                        while (start[off] != '=') {
+                            // Part of label
+                            label[label_offset++] = start[off++];
+                        }
+                        label[label_offset] = '\0';
+                        //printf("**** label=%s\n", label);
+
+                        // skip '=' itself.
+                        off++;
+
+                        /* Value is everything until ',' or '$' */
+                        while (start[off] != ','   &&   start[off] != '$') {
+                            // Part of label
+                            value[value_offset++] = start[off++];
+                        }
+                        if (start[off] == '$') {
+                            found_data = TRUE;
+                        }
+
+                        // Terminate value, but first trim off any trailing space..
+                        if (value[value_offset-1] == ' ') {
+                            --value_offset;
+                        }
+                        value[value_offset] = '\0';
+                        //printf("**** value=%s\n", value);
+
+                        /* Skip comma and any spaces */
+                        while (start[off] == ' ' || start[off] == ',') {
+                            off++;
+                        }
+
+                        //printf("%u: label=(%s), value=(%s)\n", pinfo->num, label, value);
+
+                        // Work out what this means and update content struct!
+                        if (strcmp(label, "context")==0) {
+
+                            // Add to tree, probably useful as a custom column.
+                            proto_tree_add_string(tree, hf_catapult_dct2000_pdcp_nr_context,
+                                                  tvb, 0, 0, value);
+
+
+                            if (strcmp(value, "Before DL Decrypt") == 0) {
+                                // Is encrypted payload - no header!
+                                //is_pdcp = FALSE;
+                            }
+
+                            else if (strcmp(value, "Before UL Encrypt") == 0) {
+                                // Is encrypted payload - no header!
+                                //is_pdcp = FALSE;
+                                p_pdcp_nr_info->ciphering_disabled = TRUE;
+                            }
+
+                            else if (strcmp(value, "processUlDrbFrame") == 0) {
+                                // Is actually IP frame!
+                                //is_pdcp = FALSE;
+                                is_ip = TRUE;
+                            }
+
+                            else if (strcmp(value, "security walk before decrypt") == 0) {
+                                really_not_pdcp = TRUE;
+                            }
+
+                            else if (strcmp(value, "Incoming RLC Frame") == 0) {
+                                // Is actually IP frame!
+                                //is_pdcp = FALSE;
+                                is_ip = TRUE;
+                            }
+
+                            else if (strcmp(value, "processUlSrbFrame after clip") == 0) {
+                                // Supposed to be UL RRC..
+                            }
+
+                            else if (strcmp(value, "tx_rlc_frame") == 0) {
+                                // RLC payload?
+                            }
+
+                            else if (strcmp(value, "After DL Decrypt") == 0) {
+                                // IP payload.
+                                //is_pdcp = FALSE;
+                                is_ip = TRUE;
+                                p_pdcp_nr_info->ciphering_disabled = TRUE;
+                            }
+
+                            else if (strcmp(value, "DL send frame UP") == 0) {
+                                // IP payload.
+                                //is_pdcp = FALSE;
+                                is_ip = TRUE;
+                            }
+
+                            else if (strcmp(value, "processUlSrbFrame") == 0) {
+                                // PDCP payload.
+                                //is_pdcp = TRUE;
+                                //printf("%u: is_pdcp set!\n", pinfo->num);
+                                //is_ip = TRUE;
+                            }
+                        }
+
+                        // Direction
+                        else if (strcmp(label, "dir")==0) {
+                            // Direction
+                            if (strcmp(value, "UL") == 0) {
+                                p_pdcp_nr_info->direction = PDCP_NR_DIRECTION_UPLINK;
+                            }
+                            else {
+                                p_pdcp_nr_info->direction = PDCP_NR_DIRECTION_DOWNLINK;
+                            }
+                        }
+                        // UEId
+                        else if (strcmp(label, "ueid")==0) {
+                            if (!ws_strtoi16(value, NULL, &p_pdcp_nr_info->ueid)) {
+                                //printf("Invalid UEId %s\n", value);
+                            }
+                        }
+                        // BearerType
+                        else if (strcmp(label, "bearType")==0) {
+                            // Assuming that we won't see anything else..
+                            p_pdcp_nr_info->bearerType = Bearer_DCCH;
+                        }
+                        // Plane
+                        else if (strcmp(label, "plane")==0) {
+                            if (strcmp(value, "SIGNALLING") == 0) {
+                                p_pdcp_nr_info->plane = NR_SIGNALING_PLANE;
+                            }
+                            else {
+                                p_pdcp_nr_info->plane = NR_USER_PLANE;
+                            }
+                        }
+                        // bearerId
+                        else if (strcmp(label, "bearerId")==0) {
+                            if (!ws_strtoi8(value, NULL, &p_pdcp_nr_info->bearerId)) {
+                                //printf("Invalid bearerId %s\n", value);
+                            }
+                        }
+                        // seqnumLen
+                        else if (strcmp(label, "seqnumLen")==0) {
+                            if (!ws_strtoi8(value, NULL, &p_pdcp_nr_info->seqnum_length)) {
+                                //printf("Invalid seqnum length %s\n", value);
+                            }
+                        }
+                        // sdapPresent
+                        else if (strcmp(label, "sdapPresent")==0) {
+                            guint8 flags = 0;
+                            if (!ws_strtoi8(value, NULL, &flags)) {
+                            }
+                            if (flags) {
+                                p_pdcp_nr_info->sdap_header = PDCP_NR_UL_SDAP_HEADER_PRESENT | PDCP_NR_DL_SDAP_HEADER_PRESENT;
+                            }
+                        }
+                        // pduLength
+                        else if (strcmp(label, "pduLength")==0) {
+                            if (!ws_strtoi16(value, NULL, &p_pdcp_nr_info->pdu_length)) {
+                                //printf("Invalid PDU length (%s)\n", value);
+                            }
+                            length = p_pdcp_nr_info->pdu_length;
+                        }
+                        // encryptAlg
+                        else if (strcmp(label, "encryptAlg")==0) {
+                            // TODO: not yet in pdcp_nr_info.
+                        }
+                        // MacIPresent
+                        else if (strcmp(label, "MacIPresent")==0) {
+                            if (!ws_strtoi8(value, NULL, (guint8*)&p_pdcp_nr_info->maci_present)) {
+                                //printf("Invalid maci present %s\n", value);
+                            }
+                        }
+                        // RLCPrim
+                        else if (strcmp(label, "RLCPrim")==0) {
+                            if (!ws_strtoi8(value, NULL, (guint8*)&rlcPrim_present)) {
+                                //printf("Invalid RLCPrim (%s)\n", value);
+                            }
+                        }
+                        // PdcpHdr
+                        else if (strcmp(label, "PdcpHdr")==0) {
+                            if (!ws_strtoi8(value, NULL, (guint8*)&is_pdcp)) {
+                                //printf("Invalid PdcpHdr (%s)\n", value);
+                            }
+                        }
+                        // Release
+                        else if (strcmp(label, "release")==0) {
+                            if (strncmp(value, "LTE", 3) == 0) {
+                                is_lte = TRUE;
+                            }
+                        }
+                        else if (strcmp(label, "tid")==0) {
+                            // Ignoring..
+                        }
+                        else if (strcmp(label, "rohcv1")==0) {
+                            guint profile, mode;
+                            if (sscanf(value, "%u:%u", &profile, &mode) == 2) {
+                                /* Switch it on */
+                                p_pdcp_nr_info->rohc.rohc_compression = TRUE;
+                                /* Probably doesn't matter */
+                                p_pdcp_nr_info->rohc.rohc_ip_version = 4;
+                                p_pdcp_nr_info->rohc.profile = profile;
+                                /* Only gives preferred mode - cid context might have different? */
+                                p_pdcp_nr_info->rohc.mode = mode;
+                            }
+                        }
+
+                        else {
+                            printf("%u: NOT HANDLING PDCP label: %s (%s) !!!!!!\n", pinfo->num, label, value);
+                        }
+                    }
+
+                    if (p_pdcp_nr_info->plane == NR_SIGNALING_PLANE) {
+                        p_pdcp_nr_info->maci_present = TRUE;
+                    }
+
+                    // These are not set by any label:value so assume default.
+                    //p_pdcp_nr_info->sdap_header = 0;
+                    //p_pdcp_nr_info->rohc.rohc_compression = FALSE;
+                    p_pdcp_nr_info->is_retx = FALSE;
+
+                    /* Payload is from $ to end of string.   */
+                    int data_offset = 0;
+
+                    string = start+off;
+
+                    /* Find start of data */
+                    for (unsigned int n=0; n < strlen(string); n++) {
+                        if (string[n] == '$') {
+                            data_offset = n+1;
+                            break;
+                        }
+                    }
+
+                    // If we have a PDCP PDU, find it in the rest of the line.
+                    if (is_pdcp && !really_not_pdcp) {
+
+                        // Convert data to hex.
+                        static guint8 pdcp_data[12000];
+                        int idx, m;
+
+                        int start_of_data = data_offset;
+
+                        //printf("%u: inside is_pdcp, rlcPrim_present is %u\n", pinfo->num, rlcPrim_present);
+                        if (rlcPrim_present) {
+                            gboolean data_marker_seen = FALSE;
+
+                            for (idx=0, m=data_offset; string[m] != '\0'; m+=2, idx++) {
+                                if ((string[m] == '4') && (string[m+1] == '1')) {
+                                    data_marker_seen = TRUE;
+                                    // Skip past "41" itself.
+                                    data_offset = m+2;
+                                    break;
+                                }
+                            }
+
+                            if (!data_marker_seen) {
+                                //printf("Didn't find 0x41 tag!!!!\n");
+                                data_offset = start_of_data;
+                            }
+                        }
+
+                        // The rest (or all) is data!
+                        length = (int)strlen(string+data_offset) / 2;
+                        for (idx=0, m=data_offset; string[m] != '\0'; m+=2, idx++) {
+                            pdcp_data[idx] = (hex_from_char(string[m]) << 4) + hex_from_char(string[m+1]);
+                        }
+
+                        // Create separate PDCP tvb
+                        tvbuff_t *pdcp_tvb = tvb_new_real_data(pdcp_data, length, length);
+
+                        // Call the dissector!
+                        if (!is_lte) {
+                            // NR
+                            //printf("%u: calling for NR\n", pinfo->num);
+                            /* Store struct info in packet */
+                            p_add_proto_data(wmem_file_scope(), pinfo, proto_pdcp_nr, 0, p_pdcp_nr_info);
+
+                            add_new_data_source(pinfo, pdcp_tvb, "PDCP-NR Payload");
+                            sub_dissector_result = call_dissector_only(pdcp_nr_handle, pdcp_tvb, pinfo, tree, NULL);
+                        }
+                        else {
+                            // LTE.
+
+                            // Allocate struct.
+                            /* Only need to set info once per session. */
+                            pdcp_lte_info *p_pdcp_lte_info = (pdcp_lte_info *)p_get_proto_data(wmem_file_scope(), pinfo, proto_pdcp_lte, 0);
+                            if (p_pdcp_lte_info == NULL) {
+                                /* Allocate & zero struct */
+                                p_pdcp_lte_info = wmem_new0(wmem_file_scope(), struct pdcp_lte_info);
+                            }
+
+                            // Copy equivalent fields over from NR struct.
+                            p_pdcp_lte_info->direction = p_pdcp_nr_info->direction;
+                            p_pdcp_lte_info->ueid = p_pdcp_nr_info->ueid;
+                            p_pdcp_lte_info->channelType = Channel_DCCH;
+                            p_pdcp_lte_info->channelId = p_pdcp_nr_info->bearerId;
+                            p_pdcp_lte_info->plane = (p_pdcp_nr_info->plane == NR_SIGNALING_PLANE) ? SIGNALING_PLANE : USER_PLANE;
+                            p_pdcp_lte_info->no_header_pdu = FALSE;
+                            p_pdcp_lte_info->seqnum_length = p_pdcp_nr_info->seqnum_length;
+                            p_pdcp_lte_info->rohc = p_pdcp_nr_info->rohc;
+                            p_pdcp_lte_info->is_retx = p_pdcp_nr_info->is_retx;
+                            p_pdcp_lte_info->pdu_length = p_pdcp_nr_info->pdu_length;
+
+                            /* Store struct info in packet */
+                            p_add_proto_data(wmem_file_scope(), pinfo, proto_pdcp_lte, 0, p_pdcp_lte_info);
+
+                            add_new_data_source(pinfo, pdcp_tvb, "PDCP-LTE Payload");
+                            sub_dissector_result = call_dissector_only(pdcp_lte_handle, pdcp_tvb, pinfo, tree, NULL);
+                        }
+
+                    }
+                    else if (is_ip && catapult_dct2000_dissect_pdcp_nr_payloads) {
+                        // TODO: call IP dissector.
+                        // Convert data to hex.
+                        static guint8 ip_data[12000];
+                        int idx, m;
+
+                        //int start_of_data = data_offset;
+
+                        // All data will be IP payload.
+                        length = (int)strlen(string+data_offset) / 2;
+                        for (idx=0, m=data_offset; string[m] != '\0'; m+=2, idx++) {
+                            ip_data[idx] = (hex_from_char(string[m]) << 4) + hex_from_char(string[m+1]);
+                        }
+
+                        // Create separate IP tvb
+                        tvbuff_t *ip_nr_tvb = tvb_new_real_data(ip_data, length, length);
+                        add_new_data_source(pinfo, ip_nr_tvb, "IP Payload");
+                        // Call the dissector!
+                        sub_dissector_result = call_dissector_only(ip_handle, ip_nr_tvb, pinfo, tree, NULL);
+                    }
+                }
+
 
                 /* 'raw' (ethernet) frames logged as text comments */
                 int raw_interface;
@@ -3065,8 +3537,32 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                    call_dissector_only(eth_handle, raw_traffic_tvb, pinfo, tree, NULL);
                 }
 
+                /* Look for logged L2 PDUs */
+                const char *l2_pattern = "L2 PDU: ";
+                start = strstr(string, l2_pattern);
+                if (start) {
+                    /* Find $, after which is data */
+                    for (int n=0; string[n]; n++) {
+                        if (string[n] == '$') {
+                            /* Convert string to hex. */
+                            static guint8 l2_data[36000];
+                            int idx, m;
+                            for (idx=0, m=n+1; idx<36000 && string[m] != '\0'; m+=2, idx++) {
+                                l2_data[idx] = (hex_from_char(string[m]) << 4) + hex_from_char(string[m+1]);
+                            }
+
+                            /* Create tvb */
+                            tvbuff_t *l2_traffic_tvb = tvb_new_real_data(l2_data, idx, idx);
+
+                            /* Call the dissector! */
+                            sub_dissector_result = call_dissector_only(l2server_handle, l2_traffic_tvb, pinfo, tree, NULL);
+                            break;
+                        }
+                    }
+                }
                 return tvb_captured_length(tvb);
             }
+
 
             else
             if (strcmp(protocol_name, "sprint") == 0) {
@@ -3128,6 +3624,7 @@ dissect_catapult_dct2000(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                 port_type    type_of_port = PT_NONE;
                 guint16      conn_id_offset = 0;
                 int          offset_before_ipprim_header = offset;
+
 
                 /* For ipprim, want to show ipprim header even if can't find dissector to call for payload.. */
                 if (find_ipprim_data_offset(tvb, &offset, direction,
@@ -3463,9 +3960,15 @@ void proto_reg_handoff_catapult_dct2000(void)
     pdcp_lte_handle = find_dissector("pdcp-lte");
 
     mac_nr_handle = find_dissector("mac-nr");
+    rlc_nr_handle = find_dissector("rlc-nr");
+    pdcp_nr_handle = find_dissector("pdcp-nr");
+    nrup_handle = find_dissector("nrup");
+    ip_handle = find_dissector_add_dependency("ip", proto_pdcp_nr);
+    eth_handle = find_dissector("eth_withoutfcs");
     nrup_handle = find_dissector("nrup");
     eth_handle = find_dissector("eth_withoutfcs");
     nrup_handle = find_dissector("nrup");
+    l2server_handle = find_dissector("l2server-message");
 }
 
 /****************************************/
@@ -3940,6 +4443,13 @@ void proto_register_catapult_dct2000(void)
             }
         },
 
+        { &hf_catapult_dct2000_pdcp_nr_context,
+            { "PDCP NR Context",
+              "dct2000.pdcp-nr-context", FT_STRING, BASE_NONE, NULL, 0x0,
+              NULL, HFILL
+            }
+        },
+
         { &hf_catapult_dct2000_rawtraffic_interface,
             { "Interface",
               "dct2000.rawtraffic.interface", FT_UINT8, BASE_DEC, NULL, 0x0,
@@ -4043,6 +4553,12 @@ void proto_register_catapult_dct2000(void)
                                    "they may be matched with wireshark dissectors.",
                                    &catapult_dct2000_dissect_old_protocol_names);
 
+    /* Whether IP dissector should be called for pdcp-nr logged payloads. */
+    prefs_register_bool_preference(catapult_dct2000_module, "pdcp_nr_dissect_payload_ip",
+                                   "Call IP dissector for logged PDCP-NR payloads",
+                                   "",
+                                   &catapult_dct2000_dissect_pdcp_nr_payloads);
+
     /* Determines if the protocol field in the DCT2000 shall be used to lookup for disector*/
     prefs_register_bool_preference(catapult_dct2000_module, "use_protocol_name_as_dissector_name",
                                    "Look for a dissector using the protocol name in the "
@@ -4052,6 +4568,12 @@ void proto_register_catapult_dct2000(void)
                                    "that dissector. This may be slow, so should be "
                                    "disabled unless you are using this feature.",
                                    &catapult_dct2000_use_protocol_name_as_dissector_name);
+
+    /* Determines whether LTE RRC messages should be dissected */
+    prefs_register_bool_preference(catapult_dct2000_module, "decode_pdcp",
+                                   "Attempt to decode PDCP frames",
+                                   "When set, attempt to decode PDCP frames from the lines written by PDCP state machine",
+                                   &catapult_dct2000_dissect_pdcp);
 }
 
 /*

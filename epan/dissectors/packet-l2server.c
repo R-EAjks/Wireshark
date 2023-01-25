@@ -1,0 +1,10974 @@
+/* packet-l2server.c
+ *
+ * TCP-based protocol between adaptor and L2 server.
+ * This is based upon the TM 23.0 header files.
+ *
+ * TODO:
+ * - add release wherever setup appears
+ * - use consistent flags scheme (using bools) for FieldMask bits
+ *
+ * Wireshark - Network traffic analyzer
+ * By Gerald Combs <gerald@wireshark.org>
+ * Copyright 1998 Gerald Combs
+ *
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ */
+#include <stdio.h>
+#include "config.h"
+
+#include <epan/conversation.h>
+#include <epan/expert.h>
+#include <epan/prefs.h>
+#include <epan/dissectors/packet-tcp.h>
+#include <epan/proto_data.h>
+
+#include "packet-pdcp-nr.h"
+
+#ifdef WIN32
+typedef char          int8_t;
+//typedef unsigned      int16_t;
+typedef unsigned long ulong;
+#endif
+typedef guint8        uint8_t;
+typedef guint16       uint16_t;
+typedef guint32       uint32_t;
+typedef guint64       uint64_t;
+typedef unsigned char uchar;
+
+typedef guint32 comgen_qnxPPUIDt;
+
+#include "L2ServerMessages.h"
+
+//#include "lte-l2_Srv.h"        // causes conflicts...
+#include "lte-l2_Sap.h"
+#include "nr5g-rlcmac_Data.h"
+//#include "nr5g-rlcmac_Crlc.h"  // causes conflicts
+//#include "nr5g-pdcp_Ctrl.h"    // nope
+
+
+void proto_register_l2server(void);
+
+static int proto_l2server = -1;
+
+/* SAPI Header */
+static int hf_l2server_header = -1;
+static int hf_l2server_sapi = -1;
+static int hf_l2server_type = -1;
+static int hf_l2server_len = -1;
+static int hf_l2server_payload = -1;
+
+/* Fields from message payloads */
+static int hf_l2server_cellid = -1;
+static int hf_l2server_physical_cellid = -1;
+static int hf_l2server_l1verbosity = -1;
+static int hf_l2server_l1ulreport = -1;
+static int hf_l2server_enablecapstest = -1;
+
+static int hf_l2server_client_name = -1;
+static int hf_l2server_start_cmd_type = -1;
+
+static int hf_l2server_nr5gid = -1;
+static int hf_l2server_ueid = -1;
+static int hf_l2server_beamidx = -1;
+static int hf_l2server_rbtype = -1;
+static int hf_l2server_rbid = -1;
+static int hf_l2server_reestablish_rlc = -1;
+static int hf_l2server_lch = -1;
+static int hf_l2server_ref = -1;
+static int hf_l2server_mui = -1;
+static int hf_l2server_datavolume = -1;
+static int hf_l2server_scgid = -1;
+static int hf_l2server_lcid = -1;
+static int hf_l2server_ullogref = -1;
+static int hf_l2server_reest = -1;
+static int hf_l2server_esbf = -1;
+static int hf_l2server_dllogref = -1;
+
+static int hf_l2server_rlcsn = -1;
+static int hf_l2server_info = -1;
+static int hf_l2server_frame = -1;
+static int hf_l2server_slot = -1;
+static int hf_l2server_numpduforsdu = -1;
+
+static int hf_l2server_ueflags = -1;
+static int hf_l2server_stkinst = -1;
+static int hf_l2server_udg_stkinst = -1;
+
+static int hf_l2server_crnti = -1;
+static int hf_l2server_result_code = -1;
+static int hf_l2server_ra_res = -1;
+static int hf_l2server_no_preambles_sent = -1;
+static int hf_l2server_contention_detected = -1;
+
+static int hf_l2server_maxuppwr = -1;
+static int hf_l2server_brsrp = -1;
+static int hf_l2server_ue_category = -1;
+static int hf_l2server_ra_flags = -1;
+static int hf_l2server_ra_rnti = -1;
+static int hf_l2server_discard_rar_num = -1;
+static int hf_l2server_ul_subcarrier_spacing = -1;
+static int hf_l2server_no_data = -1;
+static int hf_l2server_msg3_data = -1;
+static int hf_l2server_crid = -1;
+static int hf_l2server_rel_cellid = -1;
+static int hf_l2server_add_cellid = -1;
+static int hf_l2server_scg_type = -1;
+static int hf_l2server_drb_continue_rohc = -1;
+static int hf_l2server_mac_config_len = -1;
+
+static int hf_l2server_bwpmask = -1;
+static int hf_l2server_ra_info = -1;
+static int hf_l2server_bwpid = -1;
+static int hf_l2server_prach_configindex = -1;
+static int hf_l2server_preamble_receive_target_power = -1;
+static int hf_l2server_rsrp_thresholdssb = -1;
+static int hf_l2server_csirs_threshold = -1;
+static int hf_l2server_sul_rsrp_threshold = -1;
+static int hf_l2server_ra_preambleindex = -1;
+static int hf_l2server_preamble_power_ramping_step = -1;
+static int hf_l2server_ra_ssb_occasion_mask_index = -1;
+static int hf_l2server_preamble_tx_max = -1;
+static int hf_l2server_totalnumberofra_preambles = -1;
+
+static int hf_l2server_ssb_perrach_occasion = -1;
+static int hf_l2server_cb_preamblesperssb = -1;
+static int hf_l2server_ra_msg3sizegroupa = -1;
+static int hf_l2server_numberofra_preamblesgroupa = -1;
+static int hf_l2server_delta_preamble_msg3 = -1;
+static int hf_l2server_message_power_offset_groupb = -1;
+static int hf_l2server_ra_responsewindow = -1;
+static int hf_l2server_ra_contentionresolutiontimer = -1;
+
+static int hf_l2server_l1cell_dedicated_config_len = -1;
+static int hf_l2server_l2_test_mode = -1;
+static int hf_l2server_l2_cell_dedicated_config = -1;
+static int hf_l2server_l2_cell_dedicated_config_len = -1;
+static int hf_l2server_spcell_config_ded_present = -1;
+static int hf_l2server_mac_cell_dedicated_present = -1;
+
+static int hf_l2server_l1_cell_dedicated_config = -1;
+static int hf_l2server_num_of_rb_cfg = -1;
+static int hf_l2server_rb_config =-1;
+static int hf_l2server_num_of_rb_rel = -1;
+static int hf_l2server_rb_rel =-1;
+
+static int hf_l2server_rl_failure_timer;
+static int hf_l2server_rl_syncon_timer;
+static int hf_l2server_seg_cnt;
+static int hf_l2server_enable_pmi_reporting;
+static int hf_l2server_ra_for_sul;
+static int hf_l2server_rlc_mode;
+static int hf_l2server_rlc_er;
+
+static int hf_l2server_mac_cell_group_config =-1;
+static int hf_l2server_spcell_config =-1;
+static int hf_l2server_pcmaxc = -1;
+static int hf_l2server_pcmaxc_sul = -1;
+
+static int hf_l2server_scell_list =-1;
+static int hf_l2server_scell = -1;
+
+static int hf_l2server_pdcp_pdu = -1;
+static int hf_l2server_traffic = -1;
+static int hf_l2server_traffic_tm = -1;
+static int hf_l2server_traffic_um = -1;
+static int hf_l2server_traffic_am = -1;
+static int hf_l2server_traffic_cnf = -1;
+static int hf_l2server_traffic_ul = -1;
+static int hf_l2server_traffic_dl = -1;
+static int hf_l2server_traffic_bch = -1;
+
+static int hf_l2server_config = -1;
+
+static int hf_l2server_rach = -1;
+static int hf_l2server_reestablishment = -1;
+static int hf_l2server_params = -1;
+
+static int hf_l2server_rlc_config_tx = -1;
+static int hf_l2server_rlc_config_rx = -1;
+static int hf_l2server_rlc_tx_active_flag = -1;
+static int hf_l2server_rlc_rx_active_flag = -1;
+
+static int hf_l2server_rlc_snlength = -1;
+static int hf_l2server_rlc_t_poll_retransmit = -1;
+static int hf_l2server_rlc_poll_pdu = -1;
+static int hf_l2server_rlc_poll_byte = -1;
+static int hf_l2server_rlc_max_retx_threshold = -1;
+static int hf_l2server_rlc_discard_timer = -1;
+static int hf_l2server_rlc_t_reassembly = -1;
+static int hf_l2server_rlc_t_status_prohibit = -1;
+
+static int hf_l2server_spare1 = -1;
+static int hf_l2server_spare2 = -1;
+static int hf_l2server_spare4 = -1;
+static int hf_l2server_spare = -1;
+static int hf_l2server_pad = -1;
+static int hf_l2server_dummy = -1;
+
+static int hf_l2server_package_type = -1;
+
+static int hf_l2server_dbeam_ind = -1;
+static int hf_l2server_dbeamid = -1;
+static int hf_l2server_dbeam_status = -1;
+static int hf_l2server_num_beams = -1;
+static int hf_l2server_logstr = -1;
+
+static int hf_l2server_ncelllte = -1;
+static int hf_l2server_ncellnr = -1;
+static int hf_l2server_numltepropdu = -1;
+static int hf_l2server_numnrpropdu = -1;
+static int hf_l2server_cellidlteitem = -1;
+static int hf_l2server_cellidnritem = -1;
+
+static int hf_l2server_field_mask_1 = -1;
+static int hf_l2server_field_mask_1_ded_present = -1;
+static int hf_l2server_field_mask_1_common_present = -1;
+static int hf_l2server_field_mask_2 = -1;
+static int hf_l2server_field_mask_4 = -1;
+
+static int hf_l2server_nb_scell_cfg_add = -1;
+static int hf_l2server_nb_scell_cfg_del = -1;
+static int hf_l2server_scell_cfg_del = -1;
+
+
+static int hf_l2server_ph_cell_config = -1;
+static int hf_l2server_ph_cell_dcp_config_setup = -1;
+static int hf_l2server_ph_cell_dcp_config_release = -1;
+static int hf_l2server_ph_pdcch_blind_detection_setup = -1;
+static int hf_l2server_ph_pdcch_blind_detection_release = -1;
+static int hf_l2server_harq_ack_spatial_bundling_pucch = -1;
+static int hf_l2server_harq_ack_spatial_bundling_pusch = -1;
+static int hf_l2server_pmax_nr = -1;
+static int hf_l2server_pdsch_harq_ack_codebook = -1;
+static int hf_l2server_mcs_crnti_valid = -1;
+static int hf_l2server_mcs_crnti = -1;
+static int hf_l2server_pue_fr1 = -1;
+
+static int hf_l2server_tpc_srs_rnti = -1;
+static int hf_l2server_tpc_pucch_rnti = -1;
+static int hf_l2server_tpc_pusch_rnti = -1;
+static int hf_l2server_sp_csi_rnti = -1;
+static int hf_l2server_cs_rnti = -1;
+static int hf_l2server_pdcch_blind_detection = -1;
+// :
+static int hf_l2server_nbpdsch_harq_ack_codebooklist_r16 = -1;
+// :
+static int hf_l2server_bdfactor_r16 = -1;
+
+static int hf_l2server_sp_cell_cfg_ded = -1;
+
+static int hf_l2server_sp_cell_cfg_tdd_ded_present = -1;
+static int hf_l2server_sp_cell_cfg_dl_ded_present = -1;
+static int hf_l2server_sp_cell_cfg_ul_ded_present = -1;
+static int hf_l2server_sp_cell_cfg_sup_ul_present = -1;
+static int hf_l2server_sp_cell_cfg_cross_carrier_sched_present = -1;
+static int hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_setup = -1;
+static int hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_release = -1;
+static int hf_l2server_sp_cell_cfg_dormantbwp_setup = -1;
+static int hf_l2server_sp_cell_cfg_dormantbwp_release = -1;
+static int hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_setup = -1;
+static int hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_release = -1;
+static int hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_setup = -1;
+static int hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_release = -1;
+
+static int hf_l2server_sp_cell_cfg_tdd = -1;
+static int hf_l2server_sp_cell_cfg_dl = -1;
+static int hf_l2server_sp_cell_cfg_ul = -1;
+static int hf_l2server_sp_cell_cfg_sup_ul = -1;
+static int hf_l2server_sp_cell_cfg_cross_carrier_sched = -1;
+static int hf_l2server_sp_cell_cfg_lte_crs_tomatcharound = -1;
+static int hf_l2server_sp_cell_cfg_dormantbwp = -1;
+static int hf_l2server_sp_cell_cfg_lte_crs_pattern_list1 = -1;
+static int hf_l2server_sp_cell_cfg_lte_crs_pattern_list2 = -1;
+
+
+static int hf_l2server_tdd_ul_dl_pattern = -1;
+static int hf_l2server_dl_ul_transm_periodicity_is_valid = -1;
+static int hf_l2server_dl_ul_transm_periodicity = -1;
+static int hf_l2server_nr_dl_slots = -1;
+static int hf_l2server_nr_dl_symbols = -1;
+static int hf_l2server_nr_ul_symbols = -1;
+static int hf_l2server_nr_ul_slots = -1;
+
+
+static int hf_l2server_serv_cell_idx = -1;
+static int hf_l2server_bwp_inactivity_timer = -1;
+static int hf_l2server_tag_id = -1;
+static int hf_l2server_scell_deact_timer = -1;
+static int hf_l2server_pathloss_ref_linking = -1;
+static int hf_l2server_serv_cell_mo = -1;
+static int hf_l2server_default_dl_bwpid = -1;
+static int hf_l2server_supp_ul_rel = -1;
+static int hf_l2server_ca_slot_offset_is_valid = -1;
+static int hf_l2server_nb_lte_srs_patternlist_1 = -1;
+static int hf_l2server_nb_lte_srs_patternlist_2 = -1;
+static int hf_l2server_ca_slot_offset_r16 = -1;
+
+static int hf_l2server_csi_rs_valid_with_dci_r16 = -1;
+static int hf_l2server_crs_rate_match_per_coreset_poolidx_r16 = -1;
+static int hf_l2server_first_active_ul_bwp_pcell = -1;
+
+static int hf_l2server_sp_cell_cfg_common = -1;
+static int hf_l2server_serv_cell_freqinfo_dl_present = -1;
+static int hf_l2server_serv_cell_bwp_dl_present = -1;
+static int hf_l2server_serv_cell_freqinfo_ul_present = -1;
+static int hf_l2server_serv_cell_bwp_ul_present = -1;
+static int hf_l2server_serv_cell_freqinfo_sul_present = -1;
+static int hf_l2server_serv_cell_bwp_sul_present = -1;
+static int hf_l2server_serv_cell_tdd_present = -1;
+static int hf_l2server_serv_cell_tomatcharound_setup= -1;
+static int hf_l2server_serv_cell_tomatcharound_release= -1;
+static int hf_l2server_serv_cell_hs_r16_present = -1;
+
+static int hf_l2server_config_cmd_type = -1;
+static int hf_l2server_side = -1;
+static int hf_l2server_bot_layer = -1;
+static int hf_l2server_trf = -1;
+static int hf_l2server_technology = -1;
+static int hf_l2server_enbsim = -1;
+
+static int hf_l2server_rx_lch_info = -1;
+static int hf_l2server_tx_lch_info = -1;
+static int hf_l2server_lcg = -1;
+static int hf_l2server_priority = -1;
+static int hf_l2server_prioritized_bit_rate = -1;
+static int hf_l2server_bucket_size_duration = -1;
+static int hf_l2server_allowed_serving_cells = -1;
+static int hf_l2server_allowed_scs_list = -1;
+static int hf_l2server_max_pusch_duration = -1;
+static int hf_l2server_configured_grant_type_allowed = -1;
+static int hf_l2server_logical_channel_sr_mask = -1;
+static int hf_l2server_logical_channel_sr_delay_timer_configured = -1;
+static int hf_l2server_request_duplicates_from_pdcp = -1;
+static int hf_l2server_scheduling_request_id = -1;
+static int hf_l2server_bit_rate_query_prohibit_timer = -1;
+static int hf_l2server_allowed_phy_priority_index = -1;
+
+static int hf_l2server_setparm_cmd_type = -1;
+static int hf_l2server_max_ue = -1;
+static int hf_l2server_max_pdcp = -1;
+static int hf_l2server_max_nat = -1;
+static int hf_l2server_max_udg_sess = -1;
+static int hf_l2server_max_cntr = -1;
+
+static int hf_l2server_mac_cell_group_len = -1;
+
+static int hf_l2server_cmac_status = -1;
+static int hf_l2server_cmac_cell_status = -1;
+
+static int hf_l2server_drx_config = -1;
+static int hf_l2server_drx_len = -1;
+static int hf_l2server_drx_ondurationtimer_isvalid = -1;
+static int hf_l2server_drx_ondurationtimer = -1;
+static int hf_l2server_drx_inactivitytimer = -1;
+static int hf_l2server_drx_harq_rtt_timerdl = -1;
+static int hf_l2server_drx_harq_rtt_timerul = -1;
+static int hf_l2server_drx_retransmission_timerdl = -1;
+static int hf_l2server_drx_retransmission_timerul = -1;
+static int hf_l2server_drx_longcyclestartoffset_isvalid = -1;
+static int hf_l2server_drx_longcyclestartoffset = -1;
+static int hf_l2server_drx_short_cycle = -1;
+static int hf_l2server_drx_short_cycle_timer = -1;
+static int hf_l2server_drx_slot_offset = -1;
+
+static int hf_l2server_log = -1;
+
+static int hf_l2server_spcell_config_ded = -1;
+static int hf_l2server_spcell_config_ded_len = -1;
+static int hf_l2server_config_uplink_present = -1;
+static int hf_l2server_config_sul_uplink_present = -1;
+static int hf_l2server_csi_meas_cfg_present = -1;
+
+
+static int hf_l2server_radio_condition_group = -1;
+static int hf_l2server_radio_condition_profile_index = -1;
+
+static int hf_l2server_fname = -1;
+
+static int hf_l2server_nbslotspeccfg_addmod = -1;
+static int hf_l2server_nbslotspeccfg_del = -1;
+
+static int hf_l2server_nbdlbwpidtoadd = -1;
+static int hf_l2server_nbdlbwpidtodel = -1;
+
+static int hf_l2server_sibfilterflag = -1;
+
+static int hf_l2server_num_pdcp_actions = -1;
+
+static int hf_l2server_ta = -1;
+static int hf_l2server_ra_info_valid = -1;
+static int hf_l2server_rach_probe_req = -1;
+static int hf_l2server_si_scheduling_info_valid = -1;
+
+static int hf_l2server_rrc_state = -1;
+
+static int hf_l2server_cell_config_cellcfg_type = -1;
+static int hf_l2server_cell_config_cellcfg = -1;
+
+static int hf_l2server_nb_aggr_cell_cfg_common = -1;
+
+static int hf_l2server_dlfreq_0 = -1;
+static int hf_l2server_dlfreq_1 = -1;
+static int hf_l2server_dl_earfcn_0 = -1;
+static int hf_l2server_dl_earfcn_1 = -1;
+static int hf_l2server_ulfreq_0 = -1;
+static int hf_l2server_ulfreq_1 = -1;
+static int hf_l2server_ul_earfcn_0 = -1;
+static int hf_l2server_ul_earfcn_1 = -1;
+static int hf_l2server_ssb_arfcn = -1;
+static int hf_l2server_num_dbeam = -1;
+
+static int hf_l2server_ppu = -1;
+
+static int hf_l2server_ul_cell_cfg_ded = -1;
+static int hf_l2server_ul_cell_cfg_ded_len = -1;
+static int hf_l2server_initial_ul_bwp_present = -1;
+static int hf_l2server_pusch_present = -1;
+static int hf_l2server_first_active_ul_bwp = -1;
+static int hf_l2server_num_ul_bwpid_to_add = -1;
+static int hf_l2server_num_ul_bwpid_to_del = -1;
+static int hf_l2server_ul_bwpid_to_del = -1;
+
+
+static int hf_l2server_initial_ul_bwp = -1;
+static int hf_l2server_initial_ul_bwp_len = -1;
+
+static int hf_l2server_ul_bwp = -1;
+static int hf_l2server_ul_bwp_len = -1;
+static int hf_l2server_ul_common_cfg_present = -1;
+static int hf_l2server_ul_dedicated_cfg_present = -1;
+
+static int hf_l2server_ul_bwp_common = -1;
+static int hf_l2server_ul_bwp_common_len = -1;
+
+static int hf_l2server_ul_bwp_dedicated = -1;
+static int hf_l2server_ul_bwp_dedicated_len = -1;
+static int hf_l2server_ded_pucch_cfg_present = -1;
+static int hf_l2server_ded_pusch_cfg_present = -1;
+static int hf_l2server_ded_srs_present = -1;
+static int hf_l2server_ded_configured_grant_present = -1;
+
+static int hf_l2server_nb_pucch_conf_ded_to_add = -1;
+
+static int hf_l2server_ul_bwp_common_pdcch = -1;
+static int hf_l2server_ul_bwp_common_search_space_sib1 = -1;
+static int hf_l2server_ul_bwp_common_search_space_sib = -1;
+static int hf_l2server_ul_bwp_common_pag_search_space = -1;
+static int hf_l2server_ul_bwp_common_ra_search_space = -1;
+static int hf_l2server_ul_bwp_common_ra_ctrl_res_set = -1;
+static int hf_l2server_ul_bwp_common_nb_common_ctrl_res_sets = -1;
+static int hf_l2server_ul_bwp_common_nb_common_search_spaces = -1;
+static int hf_l2server_ul_bwp_common_control_resource_set_zero = -1;
+static int hf_l2server_ul_bwp_common_search_space_zero = -1;
+static int hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po_valid = -1;
+static int hf_l2server_ul_bwp_common_nb_first_pdcch_monit_occ_of_po = -1;
+static int hf_l2server_ul_bwp_common_nb_common_search_spaces_ext = -1;
+
+static int hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po = -1;
+
+static int hf_l2server_bwp_common_pdsch = -1;
+
+
+static int hf_l2server_rach_common = -1;
+
+static int hf_l2server_rach_generic = -1;
+static int hf_l2server_msg1_fdm = -1;
+static int hf_l2server_msg1_frequency_start = -1;
+static int hf_l2server_zero_corr_zone = -1;
+static int hf_l2server_preamble_rec_target_pwr = -1;
+
+static int hf_l2server_msg1_subcarrier_spacing = -1;
+static int hf_l2server_rest_set_conf = -1;
+static int hf_l2server_msg3_tranform_precoding = -1;
+static int hf_l2server_rsrp_threshold_ssb = -1;
+static int hf_l2server_rsrp_threshold_ssb_sul = -1;
+static int hf_l2server_prach_root_seq_index_is_valid = -1;
+static int hf_l2server_ssb_per_rach_is_valid = -1;
+static int hf_l2server_prach_root_seq_index = -1;
+static int hf_l2server_ssb_per_rach = -1;
+
+static int hf_l2server_group_b_configured = -1;
+static int hf_l2server_ra_msg3_size_group_a = -1;
+static int hf_l2server_message_power_offset_group_b = -1;
+static int hf_l2server_number_of_ra_preambles_group_a = -1;
+
+static int hf_l2server_ra_contention_resolution_timer = -1;
+
+
+static int hf_l2server_freq_info_dl = -1;
+static int hf_l2server_abs_freq_ssb = -1;
+static int hf_l2server_abs_freq_point_a = -1;
+static int hf_l2server_ssb_subcarrier_offset = -1;
+static int hf_l2server_nb_freq_band_list = -1;
+static int hf_l2server_nb_scs_spec_carrier = -1;
+static int hf_l2server_freq_band_list = -1;
+
+static int hf_l2server_ssb_periodicity_serv_cell = -1;
+static int hf_l2server_dmrs_type_a_pos = -1;
+static int hf_l2server_sub_car_spacing = -1;
+static int hf_l2server_ssb_pos_in_burst_is_valid = -1;
+static int hf_l2server_n_timing_advance_offset = -1;
+static int hf_l2server_ssb_pos_in_burst_short = -1;
+static int hf_l2server_ssb_pos_in_burst_medium = -1;
+static int hf_l2server_ssb_pos_in_burst_long = -1;
+static int hf_l2server_pbch_block_power = -1;
+static int hf_l2server_nb_rate_match_pattern_to_add_mod = -1;
+static int hf_l2server_nb_rate_match_pattern_to_del = -1;
+
+static int hf_l2server_bwp_dl_common = -1;
+static int hf_l2server_freq_info_ul_common = -1;
+static int hf_l2server_bwp_ul_common = -1;
+static int hf_l2server_freq_info_sul_common = -1;
+static int hf_l2server_bwp_sul_common = -1;
+static int hf_l2server_tdd_common = -1;
+
+static int hf_l2server_beamid = -1;
+
+static int hf_l2server_verbosity = -1;
+
+static int hf_l2server_rlcmac_verbosity = -1;
+static int hf_l2server_verbosity_drx_set = -1;
+static int hf_l2server_verbosity_phr_set = -1;
+static int hf_l2server_verbosity_dci_set = -1;
+static int hf_l2server_verbosity_rlc_status_set = -1;
+static int hf_l2server_verbosity_ulsched_set = -1;
+static int hf_l2server_verbosity_l1_set = -1;
+static int hf_l2server_verbosity_rlc_set = -1;
+static int hf_l2server_verbosity_bsr_set = -1;
+static int hf_l2server_verbosity_sr_set = -1;
+static int hf_l2server_verbosity_mac_config_set = -1;
+
+
+static int hf_l2server_pdcp_verbosity = -1;
+static int hf_l2server_dl_harq_mode = -1;
+static int hf_l2server_ul_fs_advance = -1;
+static int hf_l2server_max_rach = -1;
+static int hf_l2server_num_lte_cell = -1;
+static int hf_l2server_num_nr_cell = -1;
+
+static int hf_l2server_num_up_stk_ppu = -1;
+static int hf_l2server_num_dwn_stk_ppu = -1;
+static int hf_l2server_num_lte_pro_ppu = -1;
+static int hf_l2server_num_nr_pro_ppu = -1;
+
+static int hf_l2server_up_stk_ppu = -1;
+static int hf_l2server_dwn_stk_ppu = -1;
+static int hf_l2server_nr_pro_ppu = -1;
+
+static int hf_l2server_setup_reconf = -1;
+
+static int hf_l2server_mac_config = -1;
+
+static int hf_l2server_lch_basedprioritization_r16 = -1;
+
+static int hf_l2server_initial_dl_bwp_present = -1;
+static int hf_l2server_pdsch_setup = -1;
+static int hf_l2server_pdsch_release = -1;
+static int hf_l2server_pdcch_setup = -1;
+static int hf_l2server_pdcch_release = -1;
+static int hf_l2server_csi_meas_config_setup = -1;
+static int hf_l2server_csi_meas_config_release = -1;
+
+static int hf_l2server_first_active_dl_bwp = -1;
+static int hf_l2server_nb_dl_bwp_scs_spec_carrier = -1;
+static int hf_l2server_dl_bwp_id_to_del = -1;
+
+static int hf_l2server_bwp_dl_dedicated = -1;
+static int hf_l2server_nb_sps_conf_to_add_r16 = -1;
+static int hf_l2server_nb_config_deactivation_state_r16 = -1;
+
+//static int hf_l2server_bwp_dl_common = -1;
+
+
+static int hf_l2server_pdsch_serving_cell = -1;
+static int hf_l2server_xoverhead = -1;
+static int hf_l2server_nb_harq_processes_for_pdsch = -1;
+static int hf_l2server_pucch_cell = -1;
+static int hf_l2server_max_mimo_layers = -1;
+static int hf_l2server_processing_type2_enabled = -1;
+
+static int hf_l2server_max_code_block_groups_per_tb = -1;
+static int hf_l2server_code_block_group_flush_indicator = -1;
+
+static int hf_l2server_nb_code_block_group_transmission_r16 = -1;
+
+static int hf_l2server_pdcch_serving_cell = -1;
+
+static int hf_l2server_csi_meas_config = -1;
+static int hf_l2server_nb_nzp_csi_rs_res_to_add = -1;
+static int hf_l2server_nb_nzp_csi_rs_res_to_del = -1;
+static int hf_l2server_nb_nzp_csi_rs_res_set_to_add = -1;
+static int hf_l2server_nb_nzp_csi_rs_res_set_to_del = -1;
+static int hf_l2server_nb_csi_im_res_to_add = -1;
+static int hf_l2server_nb_csi_im_res_to_del = -1;
+static int hf_l2server_nb_csi_im_res_set_to_add = -1;
+static int hf_l2server_nb_csi_im_res_set_to_del = -1;
+static int hf_l2server_nb_csi_ssb_res_set_to_add = -1;
+static int hf_l2server_nb_csi_ssb_res_set_to_del = -1;
+static int hf_l2server_nb_csi_res_cfg_to_add = -1;
+static int hf_l2server_nb_csi_res_cfg_to_del = -1;
+static int hf_l2server_nb_csi_rep_cfg_to_add = -1;
+static int hf_l2server_nb_csi_rep_cfg_to_del = -1;
+static int hf_l2server_nb_aper_trigger_state_list = -1;
+static int hf_l2server_nb_sp_on_pusch_trigger_state = -1;
+static int hf_l2server_report_trigger_size = -1;
+static int hf_l2server_report_trigger_size_dci02_r16 = -1;
+
+static int hf_l2server_nzp_csi_rs_res_config = -1;
+static int hf_l2server_resource_id = -1;
+static int hf_l2server_power_control_offset = -1;
+static int hf_l2server_power_control_offset_ss = -1;
+static int hf_l2server_qcl_info_periodic_csi_rs = -1;
+static int hf_l2server_scramblingid = -1;
+
+static int hf_l2server_nzp_csi_rs_res_set_config = -1;
+static int hf_l2server_resource_set_id = -1;
+static int hf_l2server_repetition = -1;
+static int hf_l2server_aper_trigger_offset = -1;
+static int hf_l2server_trs_info = -1;
+static int hf_l2server_aper_trigger_offset_r16 = -1;
+static int hf_l2server_nb_nzp_csi_rs_res_lis = -1;
+static int hf_l2server_nzp_csi_rs_res = -1;
+
+static int hf_l2server_csi_im_res_config = -1;
+
+static int hf_l2server_csi_im_res_set_config = -1;
+static int hf_l2server_res_set_id = -1;
+static int hf_l2server_nb_csi_im_res_list = -1;
+
+static int hf_l2server_csi_ssb_res_set_config = -1;
+static int hf_l2server_csi_ssb_res_list = -1;
+
+static int hf_l2server_csi_res_config = -1;
+static int hf_l2server_csi_res_id = -1;
+static int hf_l2server_csi_res_type = -1;
+static int hf_l2server_csi_rs_res_set_list_is_valid = -1;
+
+static int hf_l2server_csi_rep_config = -1;
+static int hf_l2server_carrier = -1;
+static int hf_l2server_csi_rep_config_id = -1;
+
+static int hf_l2server_nb_mon_pmi_port_ind = -1;
+
+static int hf_l2server_report_config_type_is_valid = -1;
+static int hf_l2server_report_quantity_is_valid = -1;
+static int hf_l2server_cri_ri_pmi_cqi = -1;
+
+static int hf_l2server_semipersistent_on_pucch = -1;
+
+static int hf_l2server_codebook_config = -1;
+static int hf_l2server_codebook_type_is_valid = -1;
+
+static int hf_l2server_codebook_config_type1 = -1;
+static int hf_l2server_codebook_subtype1_is_valid = -1;
+
+static int hf_l2server_codebook_config_type1_single_panel = -1;
+static int hf_l2server_nb_of_ant_ports_is_valid = -1;
+static int hf_l2server_typei_single_panel_ri_restr = -1;
+
+static int hf_l2server_aperiodic = -1;
+static int hf_l2server_nb_rep_slow_offset_list = -1;
+static int hf_l2server_nb_rep_slow_offset = -1;
+
+static int hf_l2server_csi_report_freq_config = -1;
+static int hf_l2server_cqi_cmd_indicator = -1;
+static int hf_l2server_pmi_cmd_indicator = -1;
+static int hf_l2server_csi_reporting_band_is_valid = -1;
+static int hf_l2server_csi_reporting_band = -1;
+
+static int hf_l2server_ul_am_cnf_frame = -1;
+static int hf_l2server_ul_am_req_frame = -1;
+static int hf_l2server_ul_am_req_time_delta = -1;
+
+
+static int hf_l2server_nzp_csi_rs_res_to_del = -1;
+static int hf_l2server_nzp_csi_rs_res_set_to_del = -1;
+static int hf_l2server_csi_im_res_to_del = -1;
+static int hf_l2server_csi_im_res_set_to_del = -1;
+static int hf_l2server_csi_ssb_res_set_to_del = -1;
+static int hf_l2server_csi_res_cfg_to_del = -1;
+static int hf_l2server_csi_rep_cfg_to_del = -1;
+
+static int hf_l2server_control_res_set = -1;
+static int hf_l2server_control_res_set_id = -1;
+static int hf_l2server_control_res_set_duration = -1;
+static int hf_l2server_prec_granualarity = -1;
+static int hf_l2server_cce_reg_map_type = -1;
+static int hf_l2server_reg_bundle_size = -1;
+static int hf_l2server_interleave_size = -1;
+static int hf_l2server_shift_index = -1;
+static int hf_l2server_freq_dom_res = -1;
+
+static int hf_l2server_search_space = -1;
+static int hf_l2server_search_space_id = -1;
+
+static int hf_l2server_n1n2 = -1;
+
+static int hf_l2server_scellindex = -1;
+static int hf_l2server_lsucellid = -1;
+
+static int hf_l2server_scs_spec_carrier = -1;
+static int hf_l2server_k0 = -1;
+static int hf_l2server_offset_to_carrier = -1;
+static int hf_l2server_carrier_bandwidth = -1;
+
+static int hf_l2server_pdcch_dmrs_scrambling_id = -1;
+static int hf_l2server_pdcch_dmrs_scrambling_id_is_valid = -1;
+static int hf_l2server_tci_present_in_dci = -1;
+static int hf_l2server_nb_tci_states = -1;
+static int hf_l2server_tci_state = -1;
+
+static int hf_l2server_monitor_symbs_in_slot = -1;
+static int hf_l2server_monitor_slot_is_valid = -1;
+static int hf_l2server_search_space_type_is_valid  = -1;
+static int hf_l2server_monitor_slot  = -1;
+
+static int hf_l2server_agg_lev1  = -1;
+static int hf_l2server_agg_lev2  = -1;
+static int hf_l2server_agg_lev4  = -1;
+static int hf_l2server_agg_lev8  = -1;
+static int hf_l2server_agg_lev16  = -1;
+
+static int hf_l2server_ccs_ext = -1;
+
+static int hf_l2server_nb_pdsch_alloc = -1;
+static int hf_l2server_nb_zp_csi_rs_resource_to_add = -1;
+static int hf_l2server_pdsch_alloc = -1;
+static int hf_l2server_mapping_type = -1;
+static int hf_l2server_start_sym_and_len = -1;
+
+static int hf_l2server_add_spectrum_emission = -1;
+static int hf_l2server_freq_shift_7p5khz = -1;
+static int hf_l2server_pmax = -1;
+static int hf_l2server_freq_band = -1;
+
+static int hf_l2server_genbwp = -1;
+static int hf_l2server_loc_and_bw = -1;
+static int hf_l2server_cyclic_prefix = -1;
+
+static int hf_l2server_pusch_common = -1;
+static int hf_l2server_group_hop_enabled_transf_precoding = -1;
+static int hf_l2server_msg3_delta_preamble = -1;
+static int hf_l2server_p0_nom_with_grant = -1;
+static int hf_l2server_nb_pusch_time_dom_res_alloc = -1;
+
+static int hf_l2server_pusch_time_domain_res_alloc = -1;
+static int hf_l2server_k2 = -1;
+
+static int hf_l2server_pucch_common = -1;
+static int hf_l2server_pucch_res_common = -1;
+static int hf_l2server_pucch_group_hop = -1;
+static int hf_l2server_pucch_hopping_id = -1;
+static int hf_l2server_p0_nom = -1;
+
+static int hf_l2server_ref_sub_car_spacing;
+
+static int hf_l2server_skip_uplink_tx_dynamic = -1;
+static int hf_l2server_ho_flag = -1;
+static int hf_l2server_data_inactivity_timer = -1;
+
+static int hf_l2server_sr_config = -1;
+static int hf_l2server_n_sr_to_add = -1;
+static int hf_l2server_sr = -1;
+static int hf_l2server_sr_config_index = -1;
+static int hf_l2server_sr_prohibit_timer = -1;
+static int hf_l2server_sr_transmax = -1;
+static int hf_l2server_n_sr_to_del = -1;
+static int hf_l2server_sr_to_del = -1;
+
+static int hf_l2server_bsr_config = -1;
+static int hf_l2server_periodicbsr_timer = -1;
+static int hf_l2server_retxbsr_timer = -1;
+static int hf_l2server_logicalchannelsr_delaytimer = -1;
+
+
+static int hf_l2server_tag_config = -1;
+static int hf_l2server_time_alignment_timer = -1;
+
+static int hf_l2server_phr_config = -1;
+static int hf_l2server_phr_periodic_timer = -1;
+static int hf_l2server_phr_prohibit_timer = -1;
+static int hf_l2server_phr_tx_power_factor_change = -1;
+static int hf_l2server_phr_multiple_phr = -1;
+static int hf_l2server_phr_type2_spcell = -1;
+static int hf_l2server_phr_type2_othercell = -1;
+static int hf_l2server_phr_mode_other_cg = -1;
+
+static int hf_l2server_pdcch_conf_dedicated = -1;
+static int hf_l2server_nb_ded_ctrl_res_sets_to_add = -1;
+static int hf_l2server_nb_ded_ctrl_res_sets_to_del = -1;
+static int hf_l2server_nb_ded_search_spaces_to_add = -1;
+static int hf_l2server_nb_ded_search_spaces_to_del = -1;
+
+static int hf_l2server_pdsch_conf_dedicated = -1;
+static int hf_l2server_data_scr_identity = -1;
+static int hf_l2server_vrb_to_prb_interl = -1;
+static int hf_l2server_res_alloc_scope = -1;
+static int hf_l2server_aggregation_factor = -1;
+static int hf_l2server_rbg_size = -1;
+static int hf_l2server_mcs_table = -1;
+static int hf_l2server_max_cw_sched_by_dci = -1;
+static int hf_l2server_nb_tci_states_to_add = -1;
+
+
+static int hf_l2server_uplink_ded_pucch_config = -1;
+static int hf_l2server_uplink_ded_pucch_len = -1;
+static int hf_l2server_nb_sched_req_res_config_to_add = -1;
+static int hf_l2server_nb_sched_req_res_config_to_del = -1;
+static int hf_l2server_nb_resource_ded_to_add = -1;
+
+static int hf_l2server_uplink_ded_pusch_config = -1;
+static int hf_l2server_uplink_ded_pusch_len = -1;
+
+
+static int hf_l2server_sr_resource = -1;
+static int hf_l2server_sr_resource_len = -1;
+static int hf_l2server_sr_resource_id = -1;
+static int hf_l2server_sr_id = -1;
+static int hf_l2server_sr_period_and_offset_is_valid = -1;
+static int hf_l2server_sr_period_and_offset = -1;
+
+static int hf_l2server_bindump_version = -1;
+static int hf_l2server_bindump_event_dl = -1;
+static int hf_l2server_bindump_event_ul = -1;
+
+static int hf_l2server_csi_meas_cfg = -1;
+static int hf_l2server_csi_meas_cfg_len = -1;
+
+static int hf_l2server_sps_conf_dedicated = -1;
+
+static int hf_l2server_dbeam = -1;
+
+static int hf_l2server_getinfo_type = -1;
+static int hf_l2server_getinfo_flags = -1;
+static int hf_l2server_getinfo_nos = -1;
+static int hf_l2server_getinfo_info = -1;
+
+static int hf_l2server_aper_trigger_state_config = -1;
+static int hf_l2server_nb_ass_rep_cf_info_list = -1;
+
+static int hf_l2server_csi_associated_report_cfg = -1;
+static int hf_l2server_rep_cfg_id = -1;
+static int hf_l2server_csi_im_res_for_interference = -1;
+static int hf_l2server_nzp_csi_rs_res_for_interference = -1;
+
+static int hf_l2server_code = -1;
+static int hf_l2server_version_hash = -1;
+
+static int hf_l2server_rlcbuffer = -1;
+static int hf_l2server_rlcstatus = -1;
+static int hf_l2server_nrcurrentrate = -1;
+
+static int hf_l2server_dmrs_typea_setup_present = -1;
+static int hf_l2server_dmrs_typea_release_present = -1;
+static int hf_l2server_dmrs_typeb_setup_present = -1;
+static int hf_l2server_dmrs_typeb_release_present = -1;
+static int hf_l2server_p_zp_csi_rs_resource_set_setup_present = -1;
+static int hf_l2server_p_zp_csi_rs_resource_set_release_present = -1;
+static int hf_l2server_r16_ies_present = -1;
+static int hf_l2server_timedomainresalloc_setup_present = -1;
+static int hf_l2server_timedomainresalloc_release_present = -1;
+
+static int hf_l2server_dmrs_mapping = -1;
+static int hf_l2server_p_zp_csi_rs_set = -1;
+static int hf_l2server_tci_state_to_add = -1;
+
+static int hf_l2server_orig_cellid = -1;
+static int hf_l2server_targ_cellid = -1;
+
+static int hf_l2server_err = -1;
+
+static int hf_l2server_si_sched_info = -1;
+
+static int hf_l2server_bwp_dl_common_pdcch_setup_present = -1;
+static int hf_l2server_bwp_dl_common_pdcch_release_present = -1;
+static int hf_l2server_bwp_dl_common_pdsch_setup_present = -1;
+static int hf_l2server_bwp_dl_common_pdsch_release_present = -1;
+
+static int hf_l2server_bwp_ul_common_rach_setup_present = -1;
+static int hf_l2server_bwp_ul_common_rach_release_present = -1;
+static int hf_l2server_bwp_ul_common_pusch_setup_present = -1;
+static int hf_l2server_bwp_ul_common_pusch_release_present = -1;
+static int hf_l2server_bwp_ul_common_pucch_setup_present = -1;
+static int hf_l2server_bwp_ul_common_pucch_release_present = -1;
+
+static int hf_l2server_tdd_ul_dl_pattern1_present = -1;
+static int hf_l2server_tdd_ul_dl_pattern2_present = -1;
+
+static int hf_l2server_codebook_config_type1_two_ports = -1;
+
+static const value_string lch_vals[] =
+{
+    { 0x0,   "SPARE" },
+    { 0x1,   "BCCHHoBCH" },
+    { 0x2,   "BCCHoDLSCH" },
+    { 0x3,   "PCCH" },
+    { 0x4,   "CCCH" },
+    { 0x5,   "DCCH" },
+    { 0x6,   "DTCH" },
+    { 0x0,   NULL }
+};
+
+static const value_string rb_type_vals[] =
+{
+    { 1,   "nr5g_SIG" },
+    { 2,   "nr5g_UP" },
+    { 3,   "nr5g_PBT_SPARE_0" },
+//    { 3,   "nr5g_RbTypeNum" },
+    { 0x0,   NULL }
+};
+
+static const value_string ra_res_vals[] =
+{
+    { 1,   "RA Success" },
+    { 2,   "RA Recover from Problem" },
+    { 3,   "RA Unsuccessful" },
+    { 4,   "CR Unsuccessful" },
+    { 0x0,   NULL }
+};
+
+static const value_string ul_subcarrier_spacing_vals[] =
+{
+    { 0,     "kHz15"},
+    { 1,     "kHz30"},
+    { 2,     "kHz60"},
+    { 3,     "kHz120"},
+    { 4,     "kHz240"},
+    { 255,   "none"},
+    { 0x0,   NULL }
+};
+
+static const value_string discard_rar_num_vals[] =
+{
+    { 0,     "Do not discard any RAR (default)"},
+    { 1,     "Discard 1 RAR"},
+    { 2,     "Discard 2 RARs"},
+    { 3,     "Discard 3 RARs"},
+    { 4,     "Discard 4 RARs"},
+    { 5,     "Discard 5 RARs"},
+    { 6,     "Discard 6 RARs"},
+    { 7,     "Discard 7 RARs"},
+    { 8,     "Discard 8 RARs"},
+    { 9,     "Discard 9 RARs"},
+    { 10,    "Discard 10 RARs"},
+    /* TODO: more if see them IRL */
+    { 0xFF,  "Discard all RARs"},
+    { 0x0,   NULL }
+};
+
+static const value_string l2_test_mode_vals[] =
+{
+    { 0,   "No test mode" },
+    { 1,   "UL and DL are active, RA not expected" },
+    { 2,   "RA without contention" },
+    { 0,   NULL }
+};
+
+static const value_string rlc_mode_vals[] =
+{
+    { nr5g_TM,   "TM" },
+    { nr5g_UM,   "UM" },
+    { nr5g_AM,   "AM" },
+    { 0,   NULL }
+};
+
+/* nr5g_rlcmac_Crlc_ER_v from n45g-rlcmac_Crlc.h */
+static const value_string rlc_er_vals[] =
+{
+    { 0,          "Void / no action" },
+    { 1,          "Establish" },
+    { 2,          "Re-establish" },
+    { 3,          "Modify" },
+    { 4,          "Release" },
+    { 5,          "Suspend" },
+    { 6,          "Resume" },
+    { 0,   NULL }
+};
+
+static const value_string config_cmd_type_vals[] =
+{
+    { nr5g_l2_Srv_CFG_01tTYPE,     "nr5g_l2_Srv_CFG_01tTYPE" },
+    { nr5g_l2_Srv_CFG_02tTYPE,     "nr5g_l2_Srv_CFG_02tTYPE" },
+    // TODO: not sure if others (starting with Type) are alternatives..
+    { 0,   NULL }
+};
+
+static const value_string setparm_cmd_type_vals[] =
+{
+    { nr5g_l2_Srv_SETPARM_03,     "nr5g_l2_Srv_SETPARM_03" },
+    // TODO: not sure if others (starting with Type) are alternatives..
+    { 0,   NULL }
+};
+
+
+static const value_string interface_side_vals[] =
+{
+    { lte_USER,     "User" },
+    { lte_NET,      "Net" },
+    { lte_DEB_USER, "Debug User" },
+    { lte_DEB_NET,  "Debug Net" },
+    { 0,   NULL }
+};
+
+static const value_string technology_vals[] =
+{
+    { nr5g_l2_Srv_LTE,     "LTE" },
+    { nr5g_l2_Srv_NR,      "NR" },
+    { 0,   NULL }
+};
+
+
+static const value_string version_server_type_vals[] =
+{
+    { 1,   "MULTI OS" },
+    { 0,   NULL }
+};
+
+/* nr5g_rlcmac_Cmac_DBEAM_STATUS_e */
+static const value_string dbeam_status_vals[] =
+{
+    { nr5g_rlcmac_Cmac_STATUS_DBEAM_BOOTING_UP,       "Booting Up"},
+    { nr5g_rlcmac_Cmac_STATUS_DBEAM_SYNC,             "Sync"},
+    { nr5g_rlcmac_Cmac_STATUS_DBEAM_NO_SIGNAL,        "No Signal"},
+    { nr5g_rlcmac_Cmac_STATUS_DBEAM_SYNC_NOT_FOUND,   "Sync Not Found"},
+    { nr5g_rlcmac_Cmac_STATUS_DBEAM_UNSTABLE_CLOCK,   "Unstable Clock"},
+    { nr5g_rlcmac_Cmac_STATUS_DBEAM_SYNC_UNLOCKED,    "Sync Unlocked"},
+    { 0,   NULL }
+};
+
+#if 0
+/* nr5g_rlcmac_Cmac_CELL_STATUS_v */
+static const value_string cell_status_vals[] =
+{
+    { nr5g_rlcmac_Cmac_CELL_STATUS_NONE,                "None"},
+    { nr5g_rlcmac_Cmac_CELL_STATUS_IN_SERVICE,          "In Service"},
+    { nr5g_rlcmac_Cmac_CELL_STATUS_RACH_PROBE_FAILURE,  "RACH Probe Failure"},
+    { 0,   NULL }
+};
+#endif
+
+
+static const value_string bot_layer_vals[] =
+{
+    { nr5g_BOT_PDCP,     "PDCP" },
+    { nr5g_BOT_RLCMAC,   "RLCMAC" },
+    { nr5g_BOT_PHY,      "PHY" },
+    { 0,   NULL }
+};
+
+static const value_string trf_vals[] =
+{
+    { nr5g_TRF_PDCP,         "PDCP" },
+    { nr5g_TRF_UDG,          "UDG" },
+    { nr5g_TRF_CNTR_UDG,     "CNTR_UDG" },
+    { nr5g_TRF_TM_HARQ,      "TM_HARQ" },
+    { nr5g_TRF_TM_MAC,       "TM_MAC" },
+    { nr5g_TRF_TM_RLC,       "TM_RLC" },
+    { nr5g_TRF_TM_PDCP,      "TM_PDCP" },
+    { nr5g_TRF_TM_NAS,       "TM_NAS" },
+    { nr5g_TRF_RLC,          "TM_RLC" },
+    { 0,   NULL }
+};
+
+static const value_string enbsim_vals[] =
+{
+    { nr5g_l2_Srv_ENBSIM_00,     "ENBSIM_00" },
+    { nr5g_l2_Srv_ENBSIM_01,      "ENBSIM_01" },
+    { 0,   NULL }
+};
+
+static const value_string cmac_status_vals[] =
+{
+    { nr5g_rlcmac_Cmac_STATUS_NONE,                      "None" },
+    { nr5g_rlcmac_Cmac_STATUS_RA_RECOVER_FROM_PROBLEM,   "RA Recover From Problem" },
+    { nr5g_rlcmac_Cmac_STATUS_PUCCH_SRS_RELEASE,         "PUCCH SRS Release" },
+    { nr5g_rlcmac_Cmac_STATUS_RNTI_DUP_RELEASE,          "RNTI DUP Release" },
+    { nr5g_rlcmac_Cmac_STATUS_LOWER_LAYER_NAK,           "Lower Layer NAK" },
+    { nr5g_rlcmac_Cmac_STATUS_RLF_HARQ_CSI_OFF,          "RLF HARQ CSI Off" },
+    { nr5g_rlcmac_Cmac_STATUS_RL_SYNC_ON,                "RL Sync On" },
+    { 0,   NULL }
+};
+
+static const value_string drx_onduration_timer_long_cycle_vals[] =
+{
+    { nr5g_rlcmac_Cmac_DRX_ON_DURATION_TIMER_SUBMILLISEC,    "SubMillisec" },
+    { nr5g_rlcmac_Cmac_DRX_ON_DURATION_TIMER_MILLISEC,       "Millisec" },
+    { 0,   NULL }
+};
+
+static const value_string drx_long_cycle_start_offset_vals[] =
+{
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS10,    "ms10" },
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS20,    "ms20" },
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS32,    "ms32" },
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS40,    "ms40" },
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS60,    "ms60" },
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS64,    "ms64" },
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS70,    "ms70" },
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS80,    "ms80" },
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS128,   "ms128" },
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS160,   "ms160" },
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS256,   "ms256" },
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS320,   "ms320" },
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS512,   "ms512" },
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS640,   "ms640" },
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS1024,  "ms1024" },
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS1280,  "ms1280" },
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS2048,  "ms2048" },
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS2560,  "ms2560" },
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS5120,  "ms5120" },
+    { nr5g_rlcmac_Cmac_DRX_LONG_CYCLE_MS10240, "ms10240" },
+    { 0,   NULL }
+};
+
+static const value_string  drx_inactivity_timer_vals[] =
+{
+    { 0,    "ms0" },
+    { 1,    "ms1" },
+    { 2,    "ms2" },
+    { 3,    "ms3" },
+    { 4,    "ms4" },
+    { 5,    "ms5" },
+    { 6,    "ms6" },
+    { 7,    "ms8" },
+    { 8,    "ms10" },
+    { 9,    "ms20" },
+    { 10,   "ms30" },
+    { 11,   "ms40" },
+    { 12,   "ms50" },
+    { 13,   "ms60" },
+    { 14,   "ms80" },
+    { 15,   "ms100" },
+    { 16,   "ms200" },
+    { 17,   "ms300" },
+    { 18,   "ms400" },
+    { 19,   "ms500" },
+    { 20,   "ms600" },
+    { 21,   "ms800" },
+    { 22,   "ms1000" },
+    { 23,   "ms1200" },
+    { 35,   "ms1600" },
+    { 0,   NULL }
+};
+
+static const value_string  drx_retransmission_timer_vals[] =
+{
+    { 0,    "sl0" },
+    { 1,    "sl1" },
+    { 2,    "sl2" },
+    { 3,    "sl4" },
+    { 4,    "sl16" },
+    { 5,    "sl24" },
+    { 6,    "sl33" },
+    { 7,    "sl40" },
+    { 8,    "sl64" },
+    { 9,    "sl80" },
+    { 10,   "sl96" },
+    { 11,   "sl112" },
+    { 12,   "sl128" },
+    { 13,   "sl160" },
+    { 14,   "sl320" },
+    { 0,   NULL }
+};
+
+static const value_string  drx_short_cycle_vals[] =
+{
+    { 0,    "ms2" },
+    { 1,    "ms3" },
+    { 2,    "ms4" },
+    { 3,    "ms5" },
+    { 4,    "ms6" },
+    { 5,    "ms7" },
+    { 6,    "ms10" },
+    { 7,    "ms14" },
+    { 8,    "ms16" },
+    { 9,    "ms20" },
+    { 10,   "ms30" },
+    { 11,   "ms32" },
+    { 12,   "ms40" },
+    { 13,   "ms64" },
+    { 14,   "ms80" },
+    { 15,   "ms128" },
+    { 16,   "ms160" },
+    { 17,   "ms256" },
+    { 18,   "ms320" },
+    { 19,   "ms512" },
+    { 20,   "ms640" },
+    { 0,   NULL }
+};
+
+static const value_string  rrc_state_vals[] =
+{
+    { nr5g_rlcmac_Cmac_Rrc_State_IDLE,       "IDLE" },
+    { nr5g_rlcmac_Cmac_Rrc_State_MAC_RESET,  "MAC_RESET" },
+    { 0,   NULL }
+};
+
+
+static const value_string  sib_folder_flag_vals[] =
+{
+    { 0,    "Legacy" },
+    { 0,   NULL }
+};
+
+static const value_string ssb_perrach_occasion_vals[] = {
+    { nr5g_lc_Cmac_oneEighth,  "oneEighth" },
+    { nr5g_lc_Cmac_oneFourth,  "oneFourth" },
+    { nr5g_lc_Cmac_oneHalf,    "oneHalf" },
+    { nr5g_lc_Cmac_one,        "one" },
+    { nr5g_lc_Cmac_two,        "two" },
+    { nr5g_lc_Cmac_four,       "four" },
+    { nr5g_lc_Cmac_eight,      "eight" },
+    { nr5g_lc_Cmac_sixteen,    "sixteen" },
+    { 0,   NULL }
+};
+
+static const value_string ssb_pos_in_burst_vals[] = {
+    { bb_nr5g_SSB_POS_IN_BURST_SHORT,    "Short" },
+    { bb_nr5g_SSB_POS_IN_BURST_MEDIUM,   "Medium" },
+    { bb_nr5g_SSB_POS_IN_BURST_LONG,     "Long" },
+    { bb_nr5g_SSB_POS_IN_BURST_DEFAULT,  "Default" },
+    { 0,   NULL }
+};
+
+static const value_string scg_type_vals[] = {
+    { 1,    "SCG NR" },
+    { 0,   NULL }
+};
+
+static const value_string setup_reconf_vals[] = {
+    { 1,    "RRC-setup" },
+    { 2,    "RRC-Reconfiguration" },
+    { 0,   NULL }
+};
+
+static const value_string xoverhead_vals[] = {
+    { 0,    "x0h6" },
+    { 1,    "x0h12" },
+    { 2,    "x0h18" },
+    { 0,   NULL }
+};
+
+static const value_string csi_rs_res_set_list_is_valid_vals[] = {
+    { bb_nr5g_CSI_RESOURCE_CFG_RES_SET_LIST_NZP_CSI_RS_SSB,    "NZP CSI RS SSB" },
+    { bb_nr5g_CSI_RESOURCE_CFG_RES_SET_LIST_CSI_IM,            "CSI IM" },
+    { bb_nr5g_CSI_RESOURCE_CFG_RES_SET_LIST_DEFAULT,           "DEFAULT" },
+    { 0,   NULL }
+};
+
+
+static const value_string report_config_type_is_valid_vals[] = {
+    { bb_nr5g_CSI_REPORT_CFG_TYPE_PERIODIC,                    "Periodic" },
+    { bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUCCH,      "Semi-persistent-on-pucch" },
+    { bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUSCH,      "Semi-persistent-on-pusch" },
+    { bb_nr5g_CSI_REPORT_CFG_TYPE_APERIODIC,                   "Aperiodic" },
+    { bb_nr5g_CSI_REPORT_CFG_TYPE_DEFAULT,                     "Default" },
+    { 0,   NULL }
+};
+
+static const value_string report_quantity_is_valid_vals[] = {
+    { bb_nr5g_CSI_REPORT_CFG_QUANTITY_NONE,                    "NONE" },
+    { bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_PMI_CQI,          "CRI RI PMI CQI" },
+    { bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_I1,               "CRI RI T1" },
+    { bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_I1_CQI,           "CRI TI T1 CQI" },
+    { bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_CQI,              "CRI RI CQI" },
+    { bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RSRP,                "CRI RSRP" },
+    { bb_nr5g_CSI_REPORT_CFG_QUANTITY_SSBINDEX_RSRP,           "SSBINDEX RSRP" },
+    { bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_LII_PMI_CQI,      "RI LTI PMI CQI" },
+    { bb_nr5g_CSI_REPORT_CFG_QUANTITY_R16_CRI_SINR,            "R16 CRI SINR" },
+    { bb_nr5g_CSI_REPORT_CFG_QUANTITY_R16_SSB_INDEX_SINR,      "R16 SSB Index SINR" },
+    { bb_nr5g_CSI_REPORT_CFG_QUANTITY_DEFAULT,                 "Default" },
+    { 0,   NULL }
+};
+
+static const value_string codebook_type_is_valid_vals[] = {
+    { bb_nr5g_CODEBOOK_TYPE_1,    "Type 1" },
+    { bb_nr5g_CODEBOOK_TYPE_2,    "Type 2" },
+    { 0,   NULL }
+};
+
+static const value_string cqi_fmt_indicator_vals[] = {
+    { 0,    "widebandCQI" },
+    { 1,    "subbandCQI" },
+    { 0,   NULL }
+};
+
+static const value_string pmi_fmt_indicator_vals[] = {
+    { 0,    "widebandPMI" },
+    { 1,    "subbandPMI" },
+    { 0,   NULL }
+};
+
+static const value_string csi_reporting_band_id_valid_vals[] = {
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_3,       "subband3" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_4,       "subband4" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_5,       "subband5" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_6,       "subband6" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_7,       "subband7" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_8,       "subband8" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_9,       "subband9" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_10,      "subband10" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_11,      "subband11" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_12,      "subband12" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_13,      "subband13" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_14,      "subband14" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_15,      "subband15" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_16,      "subband16" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_17,      "subband17" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_18,      "subband18" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_19,      "subband19" },
+    { bb_nr5g_CSI_REPORT_FREQ_CSI_REPORT_SUBBAND_DEFAULT, "DEFAULT" },
+    { 0,   NULL }
+};
+
+static const value_string subtype1_is_valid_vals[] = {
+    { bb_nr5g_CODEBOOK_TYPE1_SUBTYPE_I_SINGLE_PANEL,    "Single Panel" },
+    { bb_nr5g_CODEBOOK_TYPE1_SUBTYPE_I_MULTI_PANEL,     "Multi Panel" },
+    { bb_nr5g_CODEBOOK_TYPE1_SUBTYPE_DEFAULT,           "DEFAULT" },
+    { 0,   NULL }
+};
+
+static const value_string csi_res_type_vals[] = {
+    { 0,    "Aperiodic" },
+    { 1,    "Semi-persistent" },
+    { 2,    "Periodic" },
+    { 0,   NULL }
+};
+
+static const value_string cmac_cell_status_vals[] = {
+    { nr5g_rlcmac_Cmac_CELL_STATUS_NONE,                "NONE" },
+    { nr5g_rlcmac_Cmac_CELL_STATUS_IN_SERVICE,          "In Service" },
+    { nr5g_rlcmac_Cmac_CELL_STATUS_RACH_PROBE_FAILURE,  "RACH Probe Failure" },
+    { 0,   NULL }
+};
+
+static const value_string pdcch_moni_occ_of_po_valid_vals[] = {
+    { bb_nr5g_FIRST_PDCCH_MON_OCC_SCS15KHZoneT,                "SCS15KHZoneT" },
+    { bb_nr5g_FIRST_PDCCH_MON_OCC_SCS30KHZoneT_SCS15KHZhalfT,  "SCS30KHZoneT_SCS15KHZhalfT" },
+    { bb_nr5g_FIRST_PDCCH_MON_OCC_SCS60KHZoneT_SCS30KHZhalfT_SCS15KHZquarterT,                "SCS60KHZoneT_SCS30KHZhalfT_SCS15KHZquarterT" },
+    { bb_nr5g_FIRST_PDCCH_MON_OCC_SCS120KHZoneT_SCS60KHZhalfT_SCS30KHZquarterT_SCS15KHZoneEighthT,                "SCS120KHZoneT_SCS60KHZhalfT_SCS30KHZquarterT_SCS15KHZoneEighthT" },
+    { bb_nr5g_FIRST_PDCCH_MON_OCC_SCS120KHZhalfT_SCS60KHZquarterT_SCS30KHZoneEighthT_SCS15KHZoneSixteenthT,                "SCS120KHZhalfT_SCS60KHZquarterT_SCS30KHZoneEighthT_SCS15KHZoneSixteenthT" },
+    { bb_nr5g_FIRST_PDCCH_MON_OCC_SCS120KHZquarterT_SCS60KHZoneEighthT_SCS30KHZoneSixteenthT,                "SCS120KHZquarterT_SCS60KHZoneEighthT_SCS30KHZoneSixteenthT" },
+    { bb_nr5g_FIRST_PDCCH_MON_OCC_SCS120KHZoneEighthT_SCS60KHZoneSixteenthT,                "SCS120KHZoneEighthT_SCS60KHZoneSixteenthT" },
+    { bb_nr5g_FIRST_PDCCH_MON_OCC_SCS120KHZoneSixteenthT,                "SCS120KHZoneSixteenthT" },
+    { bb_nr5g_FIRST_PDCCH_MON_OCC_DEFAULT,                "DEFAULT" },
+    { 0,   NULL }
+};
+
+static const value_string nb_of_ant_ports_is_valid_vals[] = {
+    { bb_nr5g_CODEBOOK_SUBTYPE1_NB_ANT_PORTS_TWO,          "Two" },
+    { bb_nr5g_CODEBOOK_SUBTYPE1_NB_ANT_PORTS_MORETHANTWO,  "More Than Two" },
+    { bb_nr5g_CODEBOOK_SUBTYPE1_NB_ANT_PORTS_DEFAULT,      "Default" },
+    { 0,   NULL }
+};
+
+static const value_string sr_period_and_offset_is_valid_vals[] = {
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SYM2,          "SYM2" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SYM6_7,        "SYM6_7" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT1,         "SLOT1" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT2,         "SLOT2" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT4,         "SLOT4" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT5,         "SLOT5" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT8,         "SLOT8" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT10,        "SLOT10" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT16,        "SLOT16" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT20,        "SLOT20" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT40,        "SLOT40" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT80,        "SLOT80" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT160,       "SLOT60" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT320,       "SLOT320" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_SLOT640,       "SLOT640" },
+    { bb_nr5g_SR_PERIODICITYANDOFFSET_DEFAULT,       "DEFAULT" },
+    { 0,   NULL }
+};
+
+static const value_string cellconfig_type_vals[] = {
+    { nr5g_l2_Srv_CELL_CONFIG_TYPE_PRIMARY,      "Primary" },
+    { nr5g_l2_Srv_CELL_CONFIG_TYPE_SECONDARY,    "Secondary" },
+    { 0,   NULL }
+};
+
+static const true_false_string nodata_data_vals =
+{
+    "No Msg3 bytes present",
+    "Msg3 bytes present"
+};
+
+static const true_false_string continue_rohc_vls =
+{
+    "true",
+    "Not configured/false"
+};
+
+//--------------------------------------------------------------------------------
+// Want to check for UL AM frames that have no CNF
+static gpointer mui_key(guint16 ueid, guint8 cellid _U_, guint8 rbid, guint8 lct, guint mui)
+{
+    // cellid not being set in CNF...
+    return GUINT_TO_POINTER(ueid | /*(cellid << 12) |*/ (rbid<<18) | (lct<<26) | (guint64)mui<<32);
+}
+
+// Type with framenum + ts
+typedef struct {
+    guint32   framenum;
+    nstime_t  ts;
+} DataReqInfo_t;
+
+// mui_key -> DataReqInfo_t*
+static wmem_map_t *ul_req_table = NULL;
+// mui_key -> frame_number
+static wmem_map_t *ul_cnf_table = NULL;
+
+
+
+/* Subtrees */
+static gint ett_l2server = -1;
+static gint ett_l2server_header = -1;
+static gint ett_l2server_nr5gid = -1;
+static gint ett_l2server_ra_info = -1;
+static gint ett_l2server_params = -1;
+static gint ett_l2server_l2_cell_dedicated_config = -1;
+static gint ett_l2server_l1_cell_dedicated_config = -1;
+static gint ett_l2server_rb_config = -1;
+static gint ett_l2server_rb_release = -1;
+static gint ett_l2server_rlc_config_tx = -1;
+static gint ett_l2server_rlc_config_rx = -1;
+static gint ett_l2server_ph_cell_config = -1;
+static gint ett_l2server_sp_cell_cfg_ded = -1;
+static gint ett_l2server_sp_cell_cfg_common = -1;
+static gint ett_l2server_rx_lch_info = -1;
+static gint ett_l2server_tx_lch_info = -1;
+static gint ett_l2server_drx_config = -1;
+static gint ett_l2server_mac_cell_group_config = -1;
+static gint ett_l2server_spcell_config_ded = -1;
+static gint ett_l2server_sp_cell_cfg_tdd = -1;
+static gint ett_l2server_sp_cell_cfg_dl = -1;
+static gint ett_l2server_sp_cell_cfg_ul = -1;
+static gint ett_l2server_sp_cell_cfg_sup_ul = -1;
+static gint ett_l2server_sp_cell_cfg_cross_carrier_sched = -1;
+static gint ett_l2server_sp_cell_cfg_lte_crs_tomatcharound = -1;
+static gint ett_l2server_sp_cell_cfg_dormantbwp = -1;
+static gint ett_l2server_sp_cell_cfg_lte_crs_pattern_list1 = -1;
+static gint ett_l2server_sp_cell_cfg_lte_crs_pattern_list2 = -1;
+static gint ett_l2server_cell_config_cellcfg = -1;
+static gint ett_l2server_ul_ded_config = -1;
+static gint ett_l2server_initial_ul_bwp = -1;
+static gint ett_l2server_ul_bwp = -1;
+static gint ett_l2server_ul_bwp_common = -1;
+static gint ett_l2server_ul_bwp_common_pdcch = -1;
+static gint ett_l2server_ul_bwp_dedicated = -1;
+static gint ett_l2server_bwp_common_pdsch = -1;
+static gint ett_l2server_rach_common = -1;
+static gint ett_l2server_rach_generic = -1;
+static gint ett_l2server_freq_info_dl = -1;
+
+static gint ett_l2server_bwp_dl_common = -1;
+static gint ett_l2server_freq_info_ul_common = -1;
+static gint ett_l2server_bwp_ul_common = -1;
+static gint ett_l2server_freq_info_sul_common = -1;
+static gint ett_l2server_bwp_sul_common = -1;
+static gint ett_l2server_tdd_common = -1;
+static gint ett_l2server_mac_config = -1;
+static gint ett_l2server_bwp_dl_dedicated = -1;
+static gint ett_l2server_pdsch_serving_cell = -1;
+static gint ett_l2server_pdcch_serving_cell = -1;
+static gint ett_l2server_csi_meas_config = -1;
+static gint ett_l2server_nzp_csi_rs_res_config = -1;
+static gint ett_l2server_nzp_csi_rs_res_set_config = -1;
+static gint ett_l2server_csi_im_res_config = -1;
+static gint ett_l2server_csi_im_res_set_config = -1;
+static gint ett_l2server_csi_ssb_res_set_config = -1;
+static gint ett_l2server_csi_res_config = -1;
+static gint ett_l2server_csi_rep_config = -1;
+static gint ett_l2server_semipersistent_on_pucch = -1;
+static gint ett_l2server_codebook_config = -1;
+static gint ett_l2server_codebook_config_type1 = -1;
+static gint ett_l2server_codebook_config_type1_single_panel = -1;
+static gint ett_l2server_aperiodic = -1;
+static gint ett_l2server_csi_report_freq_config = -1;
+static gint ett_l2server_control_res_set = -1;
+static gint ett_l2server_search_space = -1;
+static gint ett_l2server_scell_list = -1;
+static gint ett_l2server_scell = -1;
+static gint ett_l2server_scs_spec_carrier = -1;
+static gint ett_l2server_ccs_ext = -1;
+static gint ett_l2server_pdsch_alloc = -1;
+static gint ett_l2server_genbwp = -1;
+static gint ett_l2server_pusch_common = -1;
+static gint ett_l2server_pusch_time_domain_res_alloc = -1;
+static gint ett_l2server_pucch_common = -1;
+static gint ett_l2server_sr_config = -1;
+static gint ett_l2server_sr = -1;
+static gint ett_l2server_bsr_config = -1;
+static gint ett_l2server_tag_config = -1;
+static gint ett_l2server_phr_config = -1;
+static gint ett_l2server_tdd_ul_dl_pattern = -1;
+static gint ett_l2server_spcell_config = -1;
+static gint ett_l2server_group_b_configured = -1;
+static gint ett_l2server_pdcch_conf_dedicated = -1;
+static gint ett_l2server_pdsch_conf_dedicated = -1;
+static gint ett_l2server_uplink_ded_pucch_config = -1;
+static gint ett_l2server_uplink_ded_pusch_config = -1;
+static gint ett_l2server_sr_resource = -1;
+static gint ett_l2server_csi_meas_cfg = -1;
+static gint ett_l2server_sps_conf_dedicated = -1;
+static gint ett_l2server_dbeam = -1;
+static gint ett_l2server_aper_trigger_stateconfig = -1;
+static gint ett_l2server_csi_associated_report_cfg = -1;
+static gint ett_l2server_dmrs_mapping = -1;
+static gint ett_l2server_p_zp_csi_rs_set = -1;
+static gint ett_l2server_si_sched_info = -1;
+//static gint ett_l2server_bwp_dl_common = -1;
+static gint ett_l2server_codebook_config_type1_two_ports = -1;
+
+
+static expert_field ei_l2server_sapi_unknown = EI_INIT;
+static expert_field ei_l2server_type_unknown = EI_INIT;
+static expert_field ei_l2server_ul_no_cnf = EI_INIT;
+static expert_field ei_l2server_ul_no_req = EI_INIT;
+
+extern int proto_pdcp_nr;
+
+static dissector_handle_t l2server_handle;
+static dissector_handle_t l2server_message_handle;
+static dissector_handle_t pdcp_nr_handle;
+
+void proto_reg_handoff_l2server(void);
+
+
+/* Preferences */
+static gboolean global_call_pdcp_for_drb = TRUE;
+static gboolean global_call_pdcp_for_srb = TRUE;
+static gboolean global_call_pdcp_for_tm = TRUE;
+
+// Configure number of DRB SN sequence bits?
+enum pdcp_for_drb {
+    PDCP_drb_SN_7=7,
+    PDCP_drb_SN_12=12,
+    PDCP_drb_SN_15=15,
+    PDCP_drb_SN_18=18
+};
+static const enum_val_t pdcp_drb_col_vals[] = {
+    {"pdcp-drb-sn-12",         "12-bit SN",           PDCP_drb_SN_12},
+    {"pdcp-drb-sn-18",         "18-bit SN",           PDCP_drb_SN_18},
+    {NULL, NULL, -1}
+};
+static gint global_pdcp_drb_sn_length = (gint)PDCP_drb_SN_18;
+
+
+
+
+/* Using the same tabular approach in packet-prisma-sdr (from Lucio) */
+typedef  void (*flds_funct)(proto_tree *, tvbuff_t *tvb, packet_info *, guint, guint);
+
+typedef struct type_fun
+{
+    guint32      type;
+    const gchar *prim_name;
+    flds_funct   prim_fun;
+} TYPE_FUN;
+
+
+typedef struct sapi_fun
+{
+    guint32      sapi;
+    const gchar *sapi_name;
+    TYPE_FUN    *sapi_funs;
+} SAPI_FUN;
+
+
+
+/************************************************************************************/
+/* Dissector functions for individual struct/message types                          */
+static void dissect_sapi_type_dummy(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                    guint offset, guint len)
+{
+    /* Payload (undissected) */
+    proto_tree_add_item(tree, hf_l2server_payload, tvb, offset, len, ENC_NA);
+}
+
+/* Forward declarations */
+static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                           guint offset, guint len _U_);
+
+static guint dissect_rlcmac_cmac_ra_info(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                        guint offset, guint len _U_, guint32 *bwpid);
+
+static guint dissect_rlcmac_cmac_ra_info_empty(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                               guint offset, guint len _U_, gboolean from_bwp_mask);
+
+static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset);
+
+static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
+                                      guint offset, gboolean serialize _U_);
+static int dissect_genbwp(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset);
+static int dissect_pdcch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
+                                     guint offset, gboolean serialize);
+
+
+
+static void dissect_login_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                              guint offset, guint len)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* CliName */
+    proto_tree_add_item(tree, hf_l2server_client_name, tvb, offset, len, ENC_ASCII);
+}
+
+static void dissect_login_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                              guint offset _U_, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+}
+
+
+static void dissect_srv_start_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset _U_, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* N.B. Seems like the L2 server doesn't like payload, so don't expect it now... */
+    /* Type - Not sure if should be like in header...? */
+    //proto_tree_add_item(tree, hf_l2server_start_cmd_type, tvb, offset, 2, ENC_NA);
+}
+
+static void dissect_srv_start_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset _U_, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+}
+
+static void dissect_open_cell_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* CellId */
+    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* L1Verbosity */
+    proto_tree_add_item(tree, hf_l2server_l1verbosity, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* L1Ulreport */
+    proto_tree_add_item(tree, hf_l2server_l1ulreport, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* EnableCapsTest */
+    proto_tree_add_item(tree, hf_l2server_enablecapstest, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+}
+
+static void dissect_open_cell_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* CellId */
+    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+}
+
+static void dissect_getinfo_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* Type */
+    proto_tree_add_item(tree, hf_l2server_getinfo_type, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* Flags */
+    proto_tree_add_item(tree, hf_l2server_getinfo_flags, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+}
+
+static void dissect_getinfo_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* Type */
+    proto_tree_add_item(tree, hf_l2server_getinfo_type, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* Flags */
+    proto_tree_add_item(tree, hf_l2server_getinfo_flags, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* Info[0] - of type lte_l2_Srv_GETINFO_UDG_OSLISTt */
+    /* NOs (number of supported fields */
+    guint32 nos;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_getinfo_nos, tvb, offset, 4, ENC_LITTLE_ENDIAN, &nos);
+    offset += 4;
+    /* Info[] */
+    for (guint n=0; n < nos; n++) {
+        proto_tree_add_item(tree, hf_l2server_getinfo_info, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+    }
+}
+
+static void dissect_cell_parm_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* CellId (but only 1 byte!) */
+    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+}
+
+// nr5g_l2_Srv_CELL_PARM_ACKt from L2ServerMessages.h
+static void dissect_cell_parm_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* CellId (1 byte) */
+    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    /**********************************/
+    /* Parm (nr5g_l2_Srv_Cell_Parm_t) */
+    /* phy_cell_id */
+    proto_tree_add_item(tree, hf_l2server_physical_cellid, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+
+    /* dlFreq[2] */
+    proto_tree_add_item(tree, hf_l2server_dlfreq_0, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    proto_tree_add_item(tree, hf_l2server_dlfreq_1, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* dlEarfcn[2]*/
+    proto_tree_add_item(tree, hf_l2server_dl_earfcn_0, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    proto_tree_add_item(tree, hf_l2server_dl_earfcn_1, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* ulFreq[2] */
+    proto_tree_add_item(tree, hf_l2server_ulfreq_0, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    proto_tree_add_item(tree, hf_l2server_ulfreq_1, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* ulEarfcn[2] */
+    proto_tree_add_item(tree, hf_l2server_ul_earfcn_0, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    proto_tree_add_item(tree, hf_l2server_ul_earfcn_1, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* SsbArfcn */
+    proto_tree_add_item(tree, hf_l2server_ssb_arfcn, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+
+    /* NumDbeam */
+    gint32 num_dbeams;
+    proto_tree_add_item_ret_int(tree, hf_l2server_num_dbeam, tvb, offset, 4, ENC_LITTLE_ENDIAN, &num_dbeams);
+    offset += 4;
+    /* Dbeam[nr5g_MaxDbeam] */
+    for (int n=0; n < nr5g_MaxDbeam; n++) {
+        // Subtree.
+        proto_item *dbeam_ti = proto_tree_add_string_format(tree, hf_l2server_dbeam, tvb,
+                                                              offset, sizeof(nr5g_l2_Srv_Dbeam_t),
+                                                              "", "Dbeam ");
+        proto_tree *dbeam_tree = proto_item_add_subtree(dbeam_ti, ett_l2server_dbeam);
+
+        if (n < num_dbeams) {
+            /* Ppu (comgen_qnxPPUIDt from qnx_gen.h) */
+            guint32 ppu;
+            proto_tree_add_item_ret_uint(dbeam_tree, hf_l2server_ppu, tvb, offset, 4, ENC_LITTLE_ENDIAN, &ppu);
+            offset += 4;
+            /* DbeamId */
+            guint32 dbeamid;
+            proto_tree_add_item_ret_uint(dbeam_tree, hf_l2server_dbeamid, tvb, offset, 2, ENC_LITTLE_ENDIAN, &dbeamid);
+            offset += 2;
+
+            proto_item_append_text(dbeam_ti, " (ppu=%u, dbeamid=%u)", ppu, dbeamid);
+        }
+        else {
+            proto_item_append_text(dbeam_ti, " (not set)");
+            offset += sizeof(nr5g_l2_Srv_Dbeam_t);
+        }
+    }
+}
+
+/* This is nr5g_l2_Srv_RCP_LOADt from nr5g-l2_Srv.h */
+static void dissect_rcp_load_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                 guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* RcGroup */
+    proto_tree_add_item(tree, hf_l2server_radio_condition_group, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* CellId */
+    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* DbeamId */
+    proto_tree_add_item(tree, hf_l2server_dbeamid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* Fname */
+    proto_tree_add_item(tree, hf_l2server_fname, tvb, offset, -1, ENC_ASCII);
+}
+
+static void dissect_rcp_load_end_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                     guint offset _U_, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+}
+
+static void dissect_rcp_load_end_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                     guint offset _U_, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+}
+
+
+static void dissect_rcp_load_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                 guint offset _U_, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+}
+
+
+/* Nr5gId (UEId + CellId + BeamIdx) */
+static guint dissect_nr5gid(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset, guint32 *ueid, guint32 *cellid)
+{
+    proto_item *nr5gid_ti = proto_tree_add_string_format(tree, hf_l2server_nr5gid, tvb,
+                                                          offset, 12,
+                                                          "", "Nr5gId ");
+    proto_tree *nr5gid_tree = proto_item_add_subtree(nr5gid_ti, ett_l2server_nr5gid);
+
+    proto_tree_add_item_ret_int(nr5gid_tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN, ueid);
+    offset += 4;
+    proto_tree_add_item_ret_int(nr5gid_tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN, cellid);
+    offset += 4;
+    gint beamidx;
+    proto_tree_add_item_ret_int(nr5gid_tree, hf_l2server_beamidx, tvb, offset, 4, ENC_LITTLE_ENDIAN, &beamidx);
+    offset += 4;
+
+    proto_item_append_text(nr5gid_ti, "(UeId=%u, cellId=%d, beamIdx=%d)", *ueid, *cellid, beamidx);
+    return offset;
+}
+
+
+typedef enum rlc_mode_e { TM, UM, AM } rlc_mode_e;
+
+static void dissect_rlcmac_data_req(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                    guint offset, guint len _U_,
+                                    rlc_mode_e mode)
+{
+    /* Create pdcp-nr context info in case we are set to call dissector */
+    struct pdcp_nr_info  *p_pdcp_nr_info = NULL;
+    /* Allocate & zero struct (NR) */
+    p_pdcp_nr_info = wmem_new0(wmem_file_scope(), pdcp_nr_info);
+    /* Store info in packet */
+    p_add_proto_data(wmem_file_scope(), pinfo, proto_pdcp_nr, 0, p_pdcp_nr_info);
+    /* Look this up so can update channel info */
+    p_pdcp_nr_info = (struct pdcp_nr_info *)p_get_proto_data(wmem_file_scope(), pinfo, proto_pdcp_nr, 0);
+    p_pdcp_nr_info->direction = PDCP_NR_DIRECTION_UPLINK;
+
+    /* Nr5gId (UEId + CellId + BeamIdx) */
+    guint32 cellid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, (guint32*)&p_pdcp_nr_info->ueid, &cellid);
+
+    /* RbType */
+    guint32 rbtype;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN, &rbtype);
+    offset += 1;
+    /* enums align.. */
+    p_pdcp_nr_info->plane = (enum pdcp_nr_plane)rbtype;
+
+    /* SN Length */
+    p_pdcp_nr_info->seqnum_length = global_pdcp_drb_sn_length;
+
+    /* RbId */
+    proto_tree_add_item_ret_uint(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN,
+                                 (guint32*)&p_pdcp_nr_info->bearerId);
+    offset++;
+    /* LCH */
+    guint32 lch;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_lch, tvb, offset, 1, ENC_LITTLE_ENDIAN, &lch);
+    offset += 1;
+
+    if (p_pdcp_nr_info->plane == NR_USER_PLANE) {
+        p_pdcp_nr_info->bearerType = Bearer_DCCH;
+    }
+    else {
+        p_pdcp_nr_info->seqnum_length = 12;
+
+        // TODO: switch on all types (allowed in this direction).
+        switch (lch) {
+            case 0x4:
+                p_pdcp_nr_info->bearerType = Bearer_CCCH;
+                break;
+            default:
+                p_pdcp_nr_info->bearerType = Bearer_DCCH;
+                break;
+        }
+    }
+
+    /* Ref(erence for CNF) */
+    proto_tree_add_item(tree, hf_l2server_ref, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* MUI */
+    guint32 mui;
+    proto_item *mui_ti = proto_tree_add_item_ret_uint(tree, hf_l2server_mui, tvb, offset, 1, ENC_LITTLE_ENDIAN, &mui);
+    offset += 1;
+    /* DataVolume */
+    proto_tree_add_item(tree, hf_l2server_datavolume, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* ScGid */
+    proto_tree_add_item(tree, hf_l2server_scgid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* Lcid */
+    proto_tree_add_item(tree, hf_l2server_lcid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* UlLogRef */
+    proto_tree_add_item(tree, hf_l2server_ullogref, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // Store these on first pass.
+    if ((mode == AM) && !PINFO_FD_VISITED(pinfo)) {
+        DataReqInfo_t *req_info = wmem_new0(wmem_file_scope(), DataReqInfo_t);
+        req_info->framenum = pinfo->num;
+        req_info->ts = pinfo->abs_ts;
+
+        wmem_map_insert(ul_req_table,
+                        mui_key(p_pdcp_nr_info->ueid, cellid, p_pdcp_nr_info->bearerId, lch, mui),
+                        req_info);
+    }
+    // Look up CNF on further passes.
+    else {
+        guint32 *cnf_frame = (guint32*)wmem_map_lookup(ul_cnf_table,
+                                                       mui_key(p_pdcp_nr_info->ueid, cellid, p_pdcp_nr_info->bearerId, lch, mui));
+        if (cnf_frame) {
+            proto_tree_add_uint(tree, hf_l2server_ul_am_cnf_frame,
+                                tvb, 0, 0, GPOINTER_TO_UINT(cnf_frame));
+        }
+        else {
+            // Add expert info
+            expert_add_info_format(pinfo, mui_ti, &ei_l2server_ul_no_cnf,
+                                   "No CNF received for MUI (%u)", mui);
+        }
+    }
+
+    /* Traffic filter */
+    proto_item *traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(traffic_ti);
+    traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic_ul, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(traffic_ti);
+
+    switch (mode) {
+        case TM:
+            traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic_tm, tvb, 0, 0, ENC_NA);
+            proto_item_set_hidden(traffic_ti);
+            p_pdcp_nr_info->seqnum_length = 0;
+            p_pdcp_nr_info->maci_present = FALSE;
+            break;
+        case UM:
+            traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic_um, tvb, 0, 0, ENC_NA);
+            proto_item_set_hidden(traffic_ti);
+            break;
+        case AM:
+            traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic_am, tvb, 0, 0, ENC_NA);
+            proto_item_set_hidden(traffic_ti);
+            break;
+    }
+
+    proto_item *pdcp_ti = proto_tree_add_item(tree, hf_l2server_pdcp_pdu, tvb, offset, len+8-offset, ENC_NA);
+
+    /* Optionally call pdcp-nr dissector for this payload. */
+
+    if (global_call_pdcp_for_drb && p_pdcp_nr_info->plane == NR_USER_PLANE) {
+        // User-plane.
+        tvbuff_t *pdcp_tvb = tvb_new_subset_remaining(tvb, offset);
+        p_pdcp_nr_info->pdu_length = tvb_reported_length(pdcp_tvb);
+        call_dissector_only(pdcp_nr_handle, pdcp_tvb, pinfo, tree, NULL);
+
+        proto_item_set_hidden(pdcp_ti);
+    }
+    else if (global_call_pdcp_for_srb && p_pdcp_nr_info->plane == NR_SIGNALING_PLANE) {
+        tvbuff_t *pdcp_tvb = tvb_new_subset_remaining(tvb, offset);
+        p_pdcp_nr_info->pdu_length = tvb_reported_length(pdcp_tvb);
+        call_dissector_only(pdcp_nr_handle, pdcp_tvb, pinfo, tree, NULL);
+
+        proto_item_set_hidden(pdcp_ti);
+    }
+}
+
+static void dissect_rlcmac_data_req_tm(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                       guint offset, guint len _U_)
+{
+    dissect_rlcmac_data_req(tree, tvb, pinfo, offset, len, TM);
+}
+
+static void dissect_rlcmac_data_req_um(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                       guint offset, guint len _U_)
+{
+    dissect_rlcmac_data_req(tree, tvb, pinfo, offset, len, UM);
+}
+
+
+static void dissect_rlcmac_data_req_am(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                       guint offset, guint len _U_)
+{
+    dissect_rlcmac_data_req(tree, tvb, pinfo, offset, len, AM);
+}
+
+
+static gint32 get_ms_diff(nstime_t begin, nstime_t end)
+{
+    time_t milli_begin = (begin.secs*1000) + (time_t)(begin.nsecs/1000000.0);
+    time_t milli_end =   (end.secs*1000) +   (time_t)(end.nsecs / 1000000.0);
+
+    return (gint32)(milli_end-milli_begin);
+}
+
+// nr5g_rlcmac_Data_MUI_t (from nr5g-rlcmac_Data.h)
+static void dissect_rlcmac_data_cnf(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                    guint offset, guint len _U_)
+{
+    /* Nr5gId (UEId + CellId + BeamIdx) */
+    guint32 ueid, cellid, rbid, lct;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid, &cellid);
+
+    /* RbType */
+    proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* RbId */
+    proto_tree_add_item_ret_uint(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &rbid);
+    offset++;
+    /* LCH */
+    proto_tree_add_item_ret_uint(tree, hf_l2server_lch, tvb, offset, 1, ENC_LITTLE_ENDIAN, &lct);
+    offset += 1;
+    /* Ref(erence for CNF) */
+    proto_tree_add_item(tree, hf_l2server_ref, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* ScGid */
+    proto_tree_add_item(tree, hf_l2server_scgid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* MUI */
+    guint32 mui;
+    proto_item *mui_ti = proto_tree_add_item_ret_uint(tree, hf_l2server_mui, tvb, offset, 1, ENC_LITTLE_ENDIAN, &mui);
+    offset += 1;
+
+    // Store these on first pass.
+    if (!PINFO_FD_VISITED(pinfo)) {
+        wmem_map_insert(ul_cnf_table,
+                        mui_key(ueid, cellid, rbid, lct, mui),
+                        GUINT_TO_POINTER(pinfo->num));
+    }
+    // Look up REQ on further passes.
+    else {
+         DataReqInfo_t *req_frame = (DataReqInfo_t*)wmem_map_lookup(ul_req_table,
+                                                                    mui_key(ueid, cellid, rbid, lct, mui));
+        if (req_frame) {
+            proto_item *ti = proto_tree_add_uint(tree, hf_l2server_ul_am_req_frame, tvb, 0, 0, req_frame->framenum);
+            proto_item_set_generated(ti);
+            gint32 ms_delta = get_ms_diff(req_frame->ts, pinfo->abs_ts);
+            // N.B. this is a bit of a hack, to avoid confusing situation where SN=0 and status PDU both have MUI=0...
+            if (ms_delta > 0) {
+                ti = proto_tree_add_uint(tree, hf_l2server_ul_am_req_time_delta, tvb, 0, 0, (guint32)ms_delta);
+                proto_item_set_generated(ti);
+            }
+        }
+        else {
+            // Add expert info
+            expert_add_info_format(pinfo, mui_ti, &ei_l2server_ul_no_req,
+                                   "No REQ received for MUI (%u) see in CNF", mui);
+        }
+    }
+
+    /* Traffic filters */
+    proto_item *traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(traffic_ti);
+    traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic_am, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(traffic_ti);
+    traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic_cnf, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(traffic_ti);
+}
+
+// nr5g_rlcmac_Data_DATA_IND_t (from nr5g-rlcmac_Data.h)
+static void dissect_rlcmac_data_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
+                                    guint offset, guint len _U_, rlc_mode_e mode)
+{
+    /* Create pdcp-nr context info in case we are set to call dissector */
+    struct pdcp_nr_info  *p_pdcp_nr_info = NULL;
+    /* Allocate & zero struct (NR) */
+    p_pdcp_nr_info = wmem_new0(wmem_file_scope(), pdcp_nr_info);
+    /* Store info in packet */
+    p_add_proto_data(wmem_file_scope(), pinfo, proto_pdcp_nr, 0, p_pdcp_nr_info);
+    /* Look this up so can update channel info */
+    p_pdcp_nr_info = (struct pdcp_nr_info *)p_get_proto_data(wmem_file_scope(), pinfo, proto_pdcp_nr, 0);
+    p_pdcp_nr_info->direction = PDCP_NR_DIRECTION_DOWNLINK;
+
+    /* Nr5gId (UEId + CellId + BeamIdx) */
+    guint32 cellid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, (uint32_t*)&p_pdcp_nr_info->ueid, &cellid);
+
+    /* RbType */
+    guint32 rbtype;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN, &rbtype);
+    offset += 1;
+
+    /* RbId */
+    proto_tree_add_item_ret_uint(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN,
+                                 (guint32*)&p_pdcp_nr_info->bearerId);
+    offset++;
+    /* LCH */
+    guint32 lch;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_lch, tvb, offset, 1, ENC_LITTLE_ENDIAN, &lch);
+    offset += 1;
+
+    /* Filter for BCH traffic */
+    switch (lch) {
+        case 0x1:
+        case 0x2:
+        {
+            proto_item *bch_ti = proto_tree_add_item(tree, hf_l2server_traffic_bch, tvb, 0, 0, ENC_NA);
+            proto_item_set_hidden(bch_ti);
+            break;
+        }
+        default:
+            break;
+    }
+
+    /* enums align.. */
+    p_pdcp_nr_info->plane = (enum pdcp_nr_plane)rbtype;
+    if (p_pdcp_nr_info->plane == NR_USER_PLANE) {
+        p_pdcp_nr_info->bearerType = Bearer_DCCH;
+    }
+    else {
+        p_pdcp_nr_info->seqnum_length = 12;
+
+        // TODO: switch with all types (allowed in this direction).
+        if (lch == 0x4) {
+            p_pdcp_nr_info->bearerType = Bearer_CCCH;
+        }
+        else if (lch == 0x2) {
+            p_pdcp_nr_info->bearerType = Bearer_BCCH_DL_SCH;
+        }
+        else if (lch ==  0x1) {
+            // TODO: what about SIBs and PCH?
+            p_pdcp_nr_info->bearerType = Bearer_BCCH_BCH;
+        }
+        else {
+            p_pdcp_nr_info->bearerType = Bearer_DCCH;
+        }
+    }
+
+
+    /* ReEst */
+    proto_tree_add_item(tree, hf_l2server_reest, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* Esbf */
+    proto_tree_add_item(tree, hf_l2server_esbf, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+
+    /* DlLogRef (UeId(4) + RbId(1) + numPduForSdu(1) + SduInfo(4)) */
+    //proto_tree_add_item(tree, hf_l2server_dllogref, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* RbId */
+    proto_tree_add_item(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+    /* NumPDUForSDU */
+    proto_tree_add_item(tree, hf_l2server_numpduforsdu, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+    // SduInfo
+    offset += 4;
+
+    /* RlcMacInfo (RlcSn(4) + Info(1) + Frame(2) + Slot(2)) */
+    proto_tree_add_item(tree, hf_l2server_rlcsn, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    proto_tree_add_item(tree, hf_l2server_info, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    proto_tree_add_item(tree, hf_l2server_frame, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    proto_tree_add_item(tree, hf_l2server_slot, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+
+    // RlcBuffer
+    proto_tree_add_item(tree, hf_l2server_rlcbuffer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // RlcStatus
+    proto_tree_add_item(tree, hf_l2server_rlcstatus, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // NrCurrentRate
+    proto_tree_add_item(tree, hf_l2server_nrcurrentrate, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // Spare[2]
+    proto_tree_add_item(tree, hf_l2server_spare, tvb, offset, 2*4, ENC_NA);
+    offset += 2*4;
+
+    // Data starts after this...
+
+    /* Traffic filter */
+    proto_item *traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(traffic_ti);
+    traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic_dl, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(traffic_ti);
+
+    switch (mode) {
+        case TM:
+            traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic_tm, tvb, 0, 0, ENC_NA);
+            proto_item_set_hidden(traffic_ti);
+            p_pdcp_nr_info->seqnum_length = 0;
+            break;
+        case UM:
+            traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic_um, tvb, 0, 0, ENC_NA);
+            proto_item_set_hidden(traffic_ti);
+            break;
+        case AM:
+            traffic_ti = proto_tree_add_item(tree, hf_l2server_traffic_am, tvb, 0, 0, ENC_NA);
+            proto_item_set_hidden(traffic_ti);
+            break;
+    }
+
+    proto_item *pdcp_ti = proto_tree_add_item(tree, hf_l2server_pdcp_pdu, tvb, offset, len+8-offset, ENC_NA);
+
+    /* Optionally call pdcp-nr dissector for this payload. */
+    if (global_call_pdcp_for_drb && p_pdcp_nr_info->plane == NR_USER_PLANE) {
+        /* SN Length */
+        p_pdcp_nr_info->seqnum_length = global_pdcp_drb_sn_length;
+
+        /* Call dissector with data */
+        tvbuff_t *pdcp_tvb = tvb_new_subset_remaining(tvb, offset);
+        p_pdcp_nr_info->pdu_length = tvb_reported_length(pdcp_tvb);
+        call_dissector_only(pdcp_nr_handle, pdcp_tvb, pinfo, tree, NULL);
+
+        proto_item_set_hidden(pdcp_ti);
+    }
+    else if (global_call_pdcp_for_srb && (p_pdcp_nr_info->plane == NR_SIGNALING_PLANE) && (mode != TM)) {
+        tvbuff_t *pdcp_tvb = tvb_new_subset_remaining(tvb, offset);
+        p_pdcp_nr_info->pdu_length = tvb_reported_length(pdcp_tvb);
+        call_dissector_only(pdcp_nr_handle, pdcp_tvb, pinfo, tree, NULL);
+
+        proto_item_set_hidden(pdcp_ti);
+    }
+
+
+    if (global_call_pdcp_for_tm && (mode == TM)) {
+        p_pdcp_nr_info->maci_present = FALSE;
+
+        /* Call dissector with data */
+        tvbuff_t *pdcp_tvb;
+
+        pdcp_tvb = tvb_new_subset_remaining(tvb, offset);
+        p_pdcp_nr_info->pdu_length = tvb_reported_length(pdcp_tvb);
+        call_dissector_only(pdcp_nr_handle, pdcp_tvb, pinfo, tree, NULL);
+
+        proto_item_set_hidden(pdcp_ti);
+    }
+}
+
+static void dissect_rlcmac_data_ind_tm(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                       guint offset, guint len _U_)
+{
+    dissect_rlcmac_data_ind(tree, tvb, pinfo, offset, len, TM);
+}
+
+static void dissect_rlcmac_data_ind_um(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                       guint offset, guint len _U_)
+{
+    dissect_rlcmac_data_ind(tree, tvb, pinfo, offset, len, UM);
+}
+
+
+static void dissect_rlcmac_data_ind_am(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                       guint offset, guint len _U_)
+{
+    dissect_rlcmac_data_ind(tree, tvb, pinfo, offset, len, AM);
+}
+
+
+/* nr5g_rlcmac_Cmac_SI_SCHED_INFOt (from nr5g-rlcmac_Cmac.h) */
+static guint dissect_si_scheduling_info(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                        guint offset, gboolean si_scheduling_info_valid)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *si_sched_ti = proto_tree_add_string_format(tree, hf_l2server_si_sched_info, tvb,
+                                                          offset, sizeof(nr5g_rlcmac_Cmac_SI_SCHED_INFOt),
+                                                          "", "SI Scheduling Info ");
+    //proto_tree *si_sched_tree = proto_item_add_subtree(si_sched_ti, ett_l2server_si_sched_info);
+
+    if (!si_scheduling_info_valid) {
+        proto_item_append_text(si_sched_ti, " (not present)");
+    }
+
+    return start_offset + sizeof(nr5g_rlcmac_Cmac_SI_SCHED_INFOt);
+}
+
+
+
+// nr5g_l2_Srv_CELL_CONFIGt from L2ServerMessages.h
+static void dissect_cell_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                    guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    // Spare
+    proto_tree_add_item(tree, hf_l2server_spare4, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // CellId
+    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // TA
+    proto_tree_add_item(tree, hf_l2server_ta, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // RaInfoValid
+    gboolean ra_info_valid;
+    proto_tree_add_item_ret_boolean(tree, hf_l2server_ra_info_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &ra_info_valid);
+    offset += 1;
+    // RachProbeReq
+    proto_tree_add_item(tree, hf_l2server_rach_probe_req, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // SiSchedulingInfoValid
+    proto_tree_add_item(tree, hf_l2server_si_scheduling_info_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    gboolean si_scheduling_info_valid = tvb_get_guint8(tvb, offset);
+    offset += 1;
+
+    // RA_Info (nr5g_rlcmac_Cmac_RA_Info_t) -> (bb_nr5g_CELL_GROUP_CONFIGt in bb-nr5g_struct.h)
+    if (ra_info_valid) {
+        guint32 bwpid = 0;
+        offset = dissect_rlcmac_cmac_ra_info(tree, tvb, pinfo, offset, len, &bwpid);
+    }
+    else {
+        // Still there, but skip.
+        offset = dissect_rlcmac_cmac_ra_info_empty(tree, tvb, pinfo, offset, len, FALSE);
+    }
+
+
+    // CellCfgSection (nr5g_rlcmac_Cmac_CellCfg_Section_t from nr5g-l2_Srv.h)
+    // CellCfgType
+    proto_tree_add_item(tree, hf_l2server_cell_config_cellcfg_type, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // CellCfg (nr5g_rlcmac_Cmac_CellCfg_t from nr5g-rlcmac_Cmac.h ->
+    //          bb_nr5g_CELL_GROUP_CONFIGt from bb-nr5g_struct_macro.h
+    gint cell_cfg_start_offset = offset;
+    proto_item *cellcfg_ti = proto_tree_add_string_format(tree, hf_l2server_cell_config_cellcfg, tvb,
+                                                          offset, 4,
+                                                          "", "CellCfg ");
+    proto_tree *cellcfg_tree = proto_item_add_subtree(cellcfg_ti, ett_l2server_cell_config_cellcfg);
+
+    //     PhyCellConf.  Never serialized!
+    offset = dissect_ph_cell_config(cellcfg_tree, tvb, pinfo, offset);
+
+    //     CellCfgCommon. Is serialized for cmac_config_cmd (last arg).
+    offset = dissect_sp_cell_cfg_common(cellcfg_tree, tvb, pinfo, offset, FALSE);
+
+    // TODO: removed from 23.0 ?
+    // NbAggrCellCfgCommon
+    //offset += 1;
+    // AggrCellCfgCommon[]
+
+    offset = cell_cfg_start_offset + sizeof(nr5g_rlcmac_Cmac_CellCfg_t);
+    proto_item_set_len(cellcfg_ti, offset-cell_cfg_start_offset);
+
+    // SiSchedulingInfo
+    offset = dissect_si_scheduling_info(tree, tvb, pinfo, offset, si_scheduling_info_valid);
+}
+
+static void dissect_cell_config_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                    guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    // CellId
+    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+}
+
+static void dissect_create_ue_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* UeId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* CellId */
+    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* UeFlags */
+    proto_tree_add_item(tree, hf_l2server_ueflags, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* StkInst */
+    proto_tree_add_item(tree, hf_l2server_stkinst, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* UdgStkInst */
+    proto_tree_add_item(tree, hf_l2server_udg_stkinst, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+}
+
+static void dissect_create_ue_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* UeId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+}
+
+// TODO: can't find full description
+static void dissect_create_ue_nak(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset, guint len _U_)
+{
+    /* UeId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    /* TODO: 2 more bytes */
+}
+
+static void dissect_delete_ue_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* UeId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+}
+
+static void dissect_delete_ue_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* UeId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+}
+
+// Can't find full description
+static void dissect_delete_ue_nak(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset, guint len _U_)
+{
+    /* UeId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    /* TODO: 2 more bytes */
+}
+
+// nr5g_l2_Srv_SCG_REL_AND_ADDt (nr5g_l2_Srv_HANDOVERt) from L2ServerMessages.h
+static void dissect_handover_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                 guint offset, guint len _U_)
+{
+    /* UeId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* RelCellId */
+    proto_tree_add_item(tree, hf_l2server_rel_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* AddCellId */
+    proto_tree_add_item(tree, hf_l2server_add_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* ScgType */
+    proto_tree_add_item(tree, hf_l2server_scg_type, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* drb_ContinueROHC */
+    proto_tree_add_item(tree, hf_l2server_drb_continue_rohc, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* MacConfigLen */
+    guint32 mac_config_len;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_mac_config_len,
+                                 tvb, offset, 4, ENC_LITTLE_ENDIAN, &mac_config_len);
+    offset += 4;
+
+    /* The rest of the message is CMAC_Config_cmd body */
+    proto_item *mac_ti = proto_tree_add_string_format(tree, hf_l2server_mac_config, tvb,
+                                                          offset, mac_config_len,
+                                                          "", "MAC Config ");
+    proto_tree *mac_tree = proto_item_add_subtree(mac_ti, ett_l2server_mac_config);
+
+    dissect_rlcmac_cmac_config_cmd(mac_tree, tvb, pinfo, offset, mac_config_len);
+}
+
+static void dissect_handover_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                 guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* UeId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+}
+
+/* nr5g_rlcmac_Data_RA_REQ_t in nr5g-rlcmac_Data.h */
+static void dissect_ra_req(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
+                           guint offset, guint len _U_)
+{
+    /* Nr5gId (UEId + CellId + BeamIdx) */
+    guint32 ueid, cellid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid, &cellid);
+
+    /* RbType */
+    proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* RbId */
+    proto_tree_add_item(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+    /* Lch */
+    proto_tree_add_item(tree, hf_l2server_lch, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+
+    /* MaxUpPwr */
+    proto_tree_add_item(tree, hf_l2server_maxuppwr, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* BRSRP */
+    proto_tree_add_item(tree, hf_l2server_brsrp, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* UE Category */
+    proto_tree_add_item(tree, hf_l2server_ue_category, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* Flags */
+    proto_tree_add_item(tree, hf_l2server_ra_flags, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* ScGid */
+    proto_tree_add_item(tree, hf_l2server_scgid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* Spare 11 bytes */
+    proto_tree_add_item(tree, hf_l2server_spare, tvb, offset, 11, ENC_NA);
+    offset += 11;
+    /* Rt_Preamble */
+    offset ++;
+    /* Rt_RaRnti */
+    proto_tree_add_item(tree, hf_l2server_ra_rnti, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* UlSubCarrSpacing */
+    proto_tree_add_item(tree, hf_l2server_ul_subcarrier_spacing, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+    /* DiscardRarNum */
+    proto_tree_add_item(tree, hf_l2server_discard_rar_num, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+    /* NoData */
+    gboolean nodata;
+    proto_tree_add_item_ret_boolean(tree, hf_l2server_no_data, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nodata);
+    offset++;
+
+    /* Data/msg3... */
+    if (!nodata) {
+        proto_tree_add_string_format(tree, hf_l2server_msg3_data, tvb, offset,
+                                     -1, "", "Msg3");
+
+        /* Don't want RRC dissector to overwrite Info column */
+        col_set_writable(pinfo->cinfo, COL_INFO, FALSE);
+
+        /* Call UL CCCH dissector for these bytes */
+        dissector_handle_t msg3_handle = find_dissector_add_dependency("nr-rrc.ul.ccch", proto_pdcp_nr);
+        tvbuff_t *msg3_payload_tvb = tvb_new_subset_length(tvb, offset, -1);
+        call_dissector_only(msg3_handle, msg3_payload_tvb, pinfo, tree, NULL);
+
+        col_set_writable(pinfo->cinfo, COL_INFO, FALSE);
+    }
+
+    // Add rach filter
+    proto_item *rach_ti = proto_tree_add_item(tree, hf_l2server_rach, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(rach_ti);
+}
+
+static void dissect_ra_cnf(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
+                           guint offset, guint len _U_)
+{
+    /* Nr5gId (UEId + CellId + BeamIdx) */
+    guint32 ueid, cellid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid, &cellid);
+
+    /* Result code */
+    proto_tree_add_item(tree, hf_l2server_result_code, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    /* RaRes */
+    proto_tree_add_item(tree, hf_l2server_ra_res, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* Crnti */
+    proto_tree_add_item(tree, hf_l2server_crnti, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* numberOfPreamblesSent */
+    proto_tree_add_item(tree, hf_l2server_no_preambles_sent, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* contentionDetected */
+    proto_tree_add_item(tree, hf_l2server_contention_detected, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+
+    // Add rach filter
+    proto_item *rach_ti = proto_tree_add_item(tree, hf_l2server_rach, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(rach_ti);
+}
+
+static void dissect_ra_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
+                           guint offset, guint len _U_)
+{
+    /* Nr5gId (UEId + CellId + BeamIdx) */
+    guint32 ueid, cellid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid, &cellid);
+
+    /* Result code */
+    proto_tree_add_item(tree, hf_l2server_result_code, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    /* Crnti */
+    proto_tree_add_item(tree, hf_l2server_crnti, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* CR Id */
+    proto_tree_add_item(tree, hf_l2server_crid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // Add rach filter
+    proto_item *rach_ti = proto_tree_add_item(tree, hf_l2server_rach, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(rach_ti);
+}
+
+
+/* Also format for RE_EST_END_IND */
+static void dissect_re_est_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
+                               guint offset, guint len _U_)
+{
+    /* Nr5gId (UEId + CellId + BeamIdx) */
+    guint32 ueid, cellid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid, &cellid);
+
+    /* RbType */
+    proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* RbId */
+    proto_tree_add_item(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+
+    proto_item *reest_ti = proto_tree_add_item(tree, hf_l2server_reestablishment, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(reest_ti);
+}
+
+
+
+static void dissect_rlc_entity_create_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
+                                          guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* Nr5gId (UEId + CellId + BeamIdx) */
+    guint32 ueid, cellid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid, &cellid);
+
+    /* RbType */
+    proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* RbId */
+    proto_tree_add_item(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+}
+
+
+
+static void dissect_l1t_log_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset, guint len _U_)
+{
+    /* Log filter */
+    proto_item *log_ti = proto_tree_add_item(tree, hf_l2server_log, tvb, 0, 0, ENC_ASCII);
+    proto_item_set_hidden(log_ti);
+
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // bbInst (CellId + DbeamId)
+    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    proto_tree_add_item(tree, hf_l2server_dbeamid, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // LogStr
+    proto_tree_add_item(tree, hf_l2server_logstr, tvb, offset, 8+len-offset, ENC_ASCII);
+
+    col_set_str(pinfo->cinfo, COL_INFO,
+                tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 8+len-offset, ENC_UTF_8|ENC_NA));
+}
+
+static void dissect_bindump_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset, guint len _U_)
+{
+    /* Version */
+    proto_tree_add_item(tree, hf_l2server_bindump_version, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* EventDumpDL */
+    proto_tree_add_item(tree, hf_l2server_bindump_event_dl, tvb, offset, 8, ENC_LITTLE_ENDIAN);
+    offset += 8;
+
+    /* EventDumpUL */
+    proto_tree_add_item(tree, hf_l2server_bindump_event_ul, tvb, offset, 8, ENC_LITTLE_ENDIAN);
+    offset += 8;
+
+}
+
+
+
+
+// nr5g_rlcmac_Cmac_RA_Info_t (from nr5g-rlcmac_Cmac.h)
+static guint dissect_rlcmac_cmac_ra_info(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                        guint offset, guint len _U_, guint32 *bwpid)
+{
+    int ra_start = offset;
+
+    /* Subtree */
+    proto_item *ra_info_ti = proto_tree_add_string_format(tree, hf_l2server_ra_info, tvb,
+                                                          offset, sizeof(nr5g_rlcmac_Cmac_RA_Info_t),
+                                                          "", "RA Info ");
+    proto_tree *ra_info_tree = proto_item_add_subtree(ra_info_ti, ett_l2server_ra_info);
+
+    // bwpId
+    proto_tree_add_item_ret_int(ra_info_tree, hf_l2server_bwpid, tvb, offset, 4, ENC_LITTLE_ENDIAN, bwpid);
+    offset += 4;
+    // prach_ConfigIndex
+    proto_tree_add_item(ra_info_tree, hf_l2server_prach_configindex, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // preambleReceivedTargetPower
+    proto_tree_add_item(ra_info_tree, hf_l2server_preamble_receive_target_power, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // rsrp_ThresholdSSB
+    proto_tree_add_item(ra_info_tree, hf_l2server_rsrp_thresholdssb, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // csirs_Threshold
+    proto_tree_add_item(ra_info_tree, hf_l2server_csirs_threshold, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // sul_RSRP_Threshold
+    proto_tree_add_item(ra_info_tree, hf_l2server_sul_rsrp_threshold, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // raPreambleIndex
+    gint32 ra_preamble_index;
+    proto_tree_add_item_ret_int(ra_info_tree, hf_l2server_ra_preambleindex, tvb, offset, 1, ENC_LITTLE_ENDIAN, &ra_preamble_index);
+    offset++;
+    // preamblePowerRampingStep
+    proto_tree_add_item(ra_info_tree, hf_l2server_preamble_power_ramping_step, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // ra_ssb_OccasionMaskIndex
+    proto_tree_add_item(ra_info_tree, hf_l2server_ra_ssb_occasion_mask_index, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // preambleTxMax
+    proto_tree_add_item(ra_info_tree, hf_l2server_preamble_tx_max, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // totalNumberOfRA_Preambles
+    gint32 num_preambles;
+    proto_tree_add_item_ret_int(ra_info_tree, hf_l2server_totalnumberofra_preambles, tvb, offset, 1, ENC_LITTLE_ENDIAN, &num_preambles);
+    offset++;
+    // ssb_perRACH_Occasion
+    proto_tree_add_item(ra_info_tree, hf_l2server_ssb_perrach_occasion, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+    // CB_PreamblesPerSSB
+    proto_tree_add_item(ra_info_tree, hf_l2server_cb_preamblesperssb, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // groupBconfigured
+    //   ra_Msg3SizeGroupA
+    proto_tree_add_item(ra_info_tree, hf_l2server_ra_msg3sizegroupa, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    //   numberofRA_PreamblesGroupA
+    proto_tree_add_item(ra_info_tree, hf_l2server_numberofra_preamblesgroupa, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+    //   deltaPreambleMsg3
+    proto_tree_add_item(ra_info_tree, hf_l2server_delta_preamble_msg3, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+    //   messagePowerOffsetGroupB
+    proto_tree_add_item(ra_info_tree, hf_l2server_message_power_offset_groupb, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // ra_ResponseWindow
+    proto_tree_add_item(ra_info_tree, hf_l2server_ra_responsewindow, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // ra_ContentionResolutionTimer
+    proto_tree_add_item(ra_info_tree, hf_l2server_ra_contentionresolutiontimer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // Add rach filter
+    proto_item *rach_ti = proto_tree_add_item(ra_info_tree, hf_l2server_rach, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(rach_ti);
+
+    // Summary.
+    proto_item_append_text(ra_info_ti, " (BwpId=%d, ra-preambleIndex=%d, totalNumberOfRA_Preambles=%d)",
+                           *bwpid, ra_preamble_index, num_preambles);
+
+    // Move to start of next one..
+    offset = ra_start + sizeof(nr5g_rlcmac_Cmac_RA_Info_t);
+    return offset;
+}
+
+static guint dissect_rlcmac_cmac_ra_info_empty(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                               guint offset, guint len _U_, gboolean from_bwp_mask)
+{
+    int ra_start = offset;
+
+    /* Subtree */
+    proto_item *ra_info_ti = proto_tree_add_string_format(tree, hf_l2server_ra_info, tvb,
+                                                          offset, sizeof(nr5g_rlcmac_Cmac_RA_Info_t),
+                                                          "", "RA Info ");
+
+    proto_item_append_text(ra_info_ti, (from_bwp_mask) ? " (Not in bwpMask)" : " (not present)");
+
+    // Move to start of next one..
+    offset = ra_start + sizeof(nr5g_rlcmac_Cmac_RA_Info_t);
+    return offset;
+}
+
+// bb_nr5g_PH_CELL_GROUP_CONFIGt (from bb-nr5g_struct.h)
+// N.B. Not changed by serialization.
+static int dissect_ph_cell_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_ph_cell_config, tvb,
+                                                         offset, 0,
+                                                          "", "PH Cell Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_ph_cell_config);
+
+    // Fieldmask
+    guint32 fieldmask;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                 ENC_LITTLE_ENDIAN, &fieldmask);
+    gboolean dcp_config_setup, pdcch_blind_detection_setup;
+
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_CS_RNTI_SETUP
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_CS_RNTI_RELEASE
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_ph_pdcch_blind_detection_setup,   tvb, offset, 4, ENC_LITTLE_ENDIAN, &pdcch_blind_detection_setup);
+    proto_tree_add_item(config_tree, hf_l2server_ph_pdcch_blind_detection_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION2_SETUP
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION2_RELEASE
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION3_SETUP
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION3_RELEASE
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_PDSCH_HARQ_CODEBOOK_SETUP
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_PDSCH_HARQ_CODEBOOK_SETUP
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_ph_cell_dcp_config_setup,         tvb, offset, 4, ENC_LITTLE_ENDIAN, &dcp_config_setup);
+    proto_tree_add_item(config_tree, hf_l2server_ph_cell_dcp_config_release,       tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_SETUP
+    // TODO: bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_RELEASE
+    offset += 4;
+
+    // HarqACKSpatialBundlingPUCCH
+    proto_tree_add_item(config_tree, hf_l2server_harq_ack_spatial_bundling_pucch, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // HarqACKSpatialBundlingPUSCH
+    proto_tree_add_item(config_tree, hf_l2server_harq_ack_spatial_bundling_pusch, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // PmaxNR
+    proto_tree_add_item(config_tree, hf_l2server_pmax_nr, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // PdschHarqACKCodebook
+    proto_tree_add_item(config_tree, hf_l2server_pdsch_harq_ack_codebook, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // McsRntValid
+    proto_tree_add_item(config_tree, hf_l2server_mcs_crnti_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // McsCRnti
+    proto_tree_add_item(config_tree, hf_l2server_mcs_crnti, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+
+    // PUE_FR1 [-30..33]
+    proto_tree_add_item(config_tree, hf_l2server_pue_fr1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // TpcSrsRNTI
+    proto_tree_add_item(config_tree, hf_l2server_tpc_srs_rnti, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // TpcPucchRNTI
+    proto_tree_add_item(config_tree, hf_l2server_tpc_pucch_rnti, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // TpcPuschRNTI
+    proto_tree_add_item(config_tree, hf_l2server_tpc_pusch_rnti, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // SpCsiRNTI
+    proto_tree_add_item(config_tree, hf_l2server_sp_csi_rnti, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // CsRNTI
+    proto_tree_add_item(config_tree, hf_l2server_cs_rnti, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // Pdcch_BlindDetection (1..15)
+    proto_tree_add_item(config_tree, hf_l2server_pdcch_blind_detection, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // TODO (but not really interested in r16...)
+    // Harq_ACK_SpatialBundlingPUCCH_secondaryPUCCHgroup_r16
+    offset += 1;
+    // Harq_ACK_SpatialBundlingPUSCH_secondaryPUCCHgroup_r16
+    offset += 1;
+    // Pdsch_HARQ_ACK_Codebook_secondaryPUCCHgroup_r16
+    offset += 1;
+    // P_NR_FR2_r16
+    offset += 1;
+    // P_UE_FR2_r16
+    offset += 1;
+    // Nrdc_PCmode_FR1_r16
+    offset += 1;
+    // Nrdc_PCmode_FR2_r16
+    offset += 1;
+    // Pdsch_HARQ_ACK_Codebook_r16
+    offset += 1;
+    // Nfi_TotalDAI_Included_r16
+    offset += 1;
+    // Ul_TotalDAI_Included_r16
+    offset += 1;
+    // Pdsch_HARQ_ACK_OneShotFeedback_r16
+    offset += 1;
+    // pdsch_HARQ_ACK_OneShotFeedbackNDI_r16
+    offset += 1;
+    // pdsch_HARQ_ACK_OneShotFeedbackCBG_r16
+    offset += 1;
+    // DownlinkAssignmentIndexDCI_0_2_r16
+    offset += 1;
+    // DownlinkAssignmentIndexDCI_1_2_r16
+    offset += 1;
+    // NbPdsch_HARQ_ACK_CodebookList_r16
+    proto_tree_add_item(config_tree, hf_l2server_nbpdsch_harq_ack_codebooklist_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // AckNackFeedbackMode_r16
+    offset += 1;
+
+    // Pdcch_BlindDetection2_r16
+    offset += 1;
+    // Pdcch_BlindDetection3_r16
+    offset += 1;
+
+    // BdFactorR_r16
+    proto_tree_add_item(config_tree, hf_l2server_bdfactor_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // Pdsch_HARQ_ACK_CodebookList_r16[2]
+    offset += 2;
+
+    // Pad
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
+    offset += 1;
+
+
+    // These 2 are included (0xff) in message even present flags not set..
+
+    // Dcp_Config_r16 (bb_nr5g_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16t)
+    if (dcp_config_setup) {
+        // N.B. Size of this is fixed.
+        // TODO:
+    }
+    offset += sizeof(bb_nr5g_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16t);
+
+    // Pdcch_BlindDetectionCA_CombIndicator_r16 (bb_nr5g_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16t)
+    if (pdcch_blind_detection_setup) {
+        // N.B. Size of this is fixed.
+        // TODO:
+    }
+    //offset += sizeof(bb_nr5g_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16t);
+    offset = start_offset + sizeof(bb_nr5g_PH_CELL_GROUP_CONFIGt);
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_PDCCH_CONF_DEDICATEDt (from bb-nrg5_struct.h)
+static int dissect_pdcch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                        guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_pdcch_conf_dedicated, tvb,
+                                                         offset, 0,
+                                                          "", "PDCCH Conf Dedicated");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_pdcch_conf_dedicated);
+
+
+    // FieldMask
+    guint32 field_mask;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_1, tvb, offset, 1,
+                                 ENC_LITTLE_ENDIAN, &field_mask);
+    offset += 1;
+
+    // NbDedCtrlResSetsToAdd
+    guint32 nb_ded_ctrl_res_sets_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_ded_ctrl_res_sets_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_ded_ctrl_res_sets_to_add);
+    offset += 1;
+    // NbDedCtrlResSetsToDel
+    //guint32 nb_ded_ctrl_res_sets_to_del;
+    proto_tree_add_item(config_tree, hf_l2server_nb_ded_ctrl_res_sets_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // NbDedSearchSpacesToAdd
+    guint32 nb_ded_search_spaces_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_ded_search_spaces_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_ded_search_spaces_to_add);
+    offset += 1;
+    // NbDedSearchSpacesToDel
+    guint32 nb_ded_search_spaces_to_del;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_ded_search_spaces_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_ded_search_spaces_to_del);
+    offset += 1;
+
+    // DedCtrlResSetsIdToDel (fixed size - but not all valid).
+    offset += (bb_nr5g_DED_CTRL_RES_SET_SIZE*1);
+
+    // DownlinkPreemption
+    if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_DOWNLINK_PREEMPTION_SETUP) {
+        offset += sizeof(bb_nr5g_DOWNLINK_PREEMPTIONt);
+    }
+    // TpcPusch
+    if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_PUSCH_SETUP) {
+        offset += sizeof(bb_nr5g_PUSCH_TPC_CFGt);
+    }
+    // TpcPucch
+    if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_PUCCH_SETUP) {
+        offset += sizeof(bb_nr5g_PUCCH_TPC_CFGt);
+    }
+    // TpcSrs
+    if (field_mask & bb_nr5g_STRUCT_PDCCH_CONF_DEDICATED_TPC_SRS_SETUP) {
+        offset += sizeof(bb_nr5g_SRS_TPC_CFGt);
+    }
+
+    // DedCtrlResSetsToAdd
+    offset += (nb_ded_ctrl_res_sets_to_add * sizeof(bb_nr5g_CTRL_RES_SETt));
+    // DedSearchSpacesToAdd
+    offset += (nb_ded_search_spaces_to_add * sizeof(bb_nr5g_SEARCH_SPACEt));
+    // DedSearchSpacesIdToDel
+    offset += (nb_ded_search_spaces_to_del * 4);
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt
+static gint dissect_pdcsh_time_domain_res_alloc(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                                guint offset, gboolean valid)
+{
+    // Subtree.
+    proto_item *pdsch_alloc_ti = proto_tree_add_string_format(tree, hf_l2server_pdsch_alloc, tvb,
+                                                              offset, sizeof(bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt),
+                                                              "", "PdschAlloc ");
+    proto_tree *pdsch_alloc_tree = proto_item_add_subtree(pdsch_alloc_ti, ett_l2server_pdsch_alloc);
+
+    if (valid) {
+        // K0
+        proto_tree_add_item(pdsch_alloc_tree, hf_l2server_k0, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // MappingType
+        proto_tree_add_item(pdsch_alloc_tree, hf_l2server_mapping_type, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // StartSymAndLen
+        guint32 start_symbol_and_length;
+        proto_tree_add_item_ret_uint(pdsch_alloc_tree, hf_l2server_start_sym_and_len, tvb, offset, 1, ENC_LITTLE_ENDIAN, &start_symbol_and_length);
+        offset += 1;
+        // Spare
+        proto_tree_add_item(pdsch_alloc_tree, hf_l2server_spare1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+
+        proto_item_append_text(pdsch_alloc_ti, " (StartSymAndLen=%u)", start_symbol_and_length);
+    }
+    else {
+        offset += sizeof(bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt);
+        proto_item_append_text(pdsch_alloc_ti, " (not set)");
+    }
+
+    return offset;
+}
+
+
+// bb_nr5g_PDSCH_CONF_DEDICATEDt (from bb-nrg5_struct.h)
+static int dissect_pdsch_conf_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                        guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_pdsch_conf_dedicated, tvb,
+                                                         offset, 0,
+                                                          "", "PDSCH Conf Dedicated");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_pdsch_conf_dedicated);
+
+    // DataScrIdentity
+    proto_tree_add_item(config_tree, hf_l2server_data_scr_identity, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // VrbToPrbInterl
+    proto_tree_add_item(config_tree, hf_l2server_vrb_to_prb_interl, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // ResAllocType
+    proto_tree_add_item(config_tree, hf_l2server_res_alloc_scope, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // AggregationFactor
+    proto_tree_add_item(config_tree, hf_l2server_aggregation_factor, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // RbgSize
+    proto_tree_add_item(config_tree, hf_l2server_rbg_size, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // McsTable
+    proto_tree_add_item(config_tree, hf_l2server_mcs_table, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // MaxCwSchedByDCI
+    proto_tree_add_item(config_tree, hf_l2server_max_cw_sched_by_dci, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // PrbBundlTypeIsValid
+    offset += 1;
+
+    // PrbBundlType
+    offset += 2;  // widest part of union
+    // TODO: ?
+
+    // NbTciStatesToAdd
+    guint32 nb_tci_states_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_tci_states_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_tci_states_to_add);
+    offset += 1;
+    // NbTciStatesToDel
+    offset += 1;
+    // NbPdschAllocDed
+    guint32 nb_pdsch_alloc_ded;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_pdsch_alloc, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_pdsch_alloc_ded);
+    offset += 1;
+    // NbRateMatchPatternDedToAdd
+    gint32 nb_rate_match_pattern_ded_to_add;
+    proto_tree_add_item_ret_int(config_tree, hf_l2server_nb_rate_match_pattern_to_add_mod, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_rate_match_pattern_ded_to_add);
+    offset += 1;
+
+    // NbRateMatchPatternDedToDel
+    offset += 1;
+    // NbRateMatchPatternGroup1
+    //guint32 nb_rate_match_pattern_group1 = tvb_get_guint8(tvb, offset);
+    offset += 1;
+    // NbRateMatchPatternGroup2
+    //guint32 nb_rate_match_pattern_group2 = tvb_get_guint8(tvb, offset);
+    offset += 1;
+    // NbZpCsiRsResourceToAdd
+    guint32 nb_zp_csi_rs_resource_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_zp_csi_rs_resource_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_zp_csi_rs_resource_to_add);
+    offset += 1;
+
+    // NbZpCsiRsResourceToDel
+    offset += 1;
+    // NbAperiodicZpCsiRsResSetsToAdd
+    offset += 1;
+    // NbAperiodicZpCsiRsResSetsToDel
+    offset += 1;
+
+    // NbSpZpCsiRsResSetsToAdd
+    offset += 1;
+    // NbSpZpCsiRsResSetsToDel
+    offset += 1;
+
+    // Spare
+    proto_tree_add_item(config_tree, hf_l2server_spare, tvb, offset, 2, ENC_NA);
+    offset += 2;
+
+    // FieldMask
+    guint32 fieldmask;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                 ENC_LITTLE_ENDIAN, &fieldmask);
+    gboolean dmrs_typea_setup_present, dmrs_typea_release_present,
+             dmrs_typeb_setup_present, dmrs_typeb_release_present;
+    gboolean p_zp_csi_rs_resource_set_setup_present, p_zp_csi_rs_resource_set_release_present,
+             r16_ies_present,
+             timedomainresalloc_setup_present, timedomainresalloc_release_present;
+
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_dmrs_typea_setup_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dmrs_typea_setup_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_dmrs_typea_release_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dmrs_typea_release_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_dmrs_typeb_setup_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dmrs_typeb_setup_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_dmrs_typeb_release_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dmrs_typeb_release_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_p_zp_csi_rs_resource_set_setup_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &p_zp_csi_rs_resource_set_setup_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_p_zp_csi_rs_resource_set_release_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &p_zp_csi_rs_resource_set_release_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_r16_ies_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &r16_ies_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_timedomainresalloc_setup_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &timedomainresalloc_setup_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_timedomainresalloc_release_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &timedomainresalloc_release_present);
+    offset += 4;
+
+    //-----------------------------------------------------
+    // TODO:
+    // RateMatchPatternGroup1 (not dynamic)
+    offset += (bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP*1);
+    // RateMatchPatternGroup2  (not dynamic)
+    offset += (bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS_PER_GROUP*1);
+
+    // Always seralised from this point on, I think
+
+
+    // DmrsMappingTypeA
+    if (dmrs_typea_setup_present) {
+        proto_item_append_text(config_ti, " (DmrsMappingTypeA)");
+
+        proto_item *dmrs_ti = proto_tree_add_string_format(config_tree, hf_l2server_dmrs_mapping, tvb,
+                                                              offset, sizeof(bb_nr5g_DMRS_DOWNLINK_CFGt),
+                                                              "", "DMRS Mapping TypeA ");
+        //proto_tree *dmrs_tree = proto_item_add_subtree(dmrs_ti, ett_l2server_dmrs_mapping);
+        offset += sizeof(bb_nr5g_DMRS_DOWNLINK_CFGt);
+
+        proto_item_set_len(dmrs_ti, sizeof(bb_nr5g_DMRS_DOWNLINK_CFGt));
+    }
+    // DmrsMappingTypeB
+    if (dmrs_typeb_setup_present) {
+        proto_item_append_text(config_ti, " (DmrsMappingTypeB)");
+        offset += sizeof(bb_nr5g_DMRS_DOWNLINK_CFGt);
+    }
+    // PZpCsiRsResSet
+    if (p_zp_csi_rs_resource_set_setup_present) {
+        proto_item_append_text(config_ti, " (PZpCsiRsResSet)");
+        proto_item *p_zp_ti = proto_tree_add_string_format(config_tree, hf_l2server_p_zp_csi_rs_set, tvb,
+                                                              offset, sizeof(bb_nr5g_ZP_CSI_RS_RES_SETt),
+                                                              "", "PZpCsiRsResSet ");
+        //proto_tree *p_zp_tree = proto_item_add_subtree(dmrs_ti, ett_l2server_dmrs_mapping);
+        offset += sizeof(bb_nr5g_ZP_CSI_RS_RES_SETt);
+        proto_item_set_len(p_zp_ti, sizeof(bb_nr5g_ZP_CSI_RS_RES_SETt));
+    }
+
+    // PdschConfExtR16
+    if (r16_ies_present) {
+        offset += sizeof(bb_nr5g_PDSCH_CONF_DEDICATED_R16_IESt);
+    }
+
+    // TciStatesToAdd
+    for (guint n=0; n < nb_tci_states_to_add; n++) {
+        proto_item *tci_ti = proto_tree_add_string_format(config_tree, hf_l2server_tci_state_to_add, tvb,
+                                                          offset, sizeof(bb_nr5g_TCI_STATEt),
+                                                          "", "TCI State to add");
+        //proto_tree *tci_tree = proto_item_add_subtree(dmrs_ti, ett_l2server_dmrs_mapping);
+        offset += sizeof(bb_nr5g_TCI_STATEt);
+        proto_item_set_len(tci_ti, sizeof(bb_nr5g_TCI_STATEt));
+    }
+
+    // PdschAllocDed
+    for (guint n=0; n < nb_pdsch_alloc_ded; n++) {
+        offset = dissect_pdcsh_time_domain_res_alloc(config_tree, tvb, pinfo, offset, TRUE);
+    }
+
+    // TODO:
+    // RateMatchPatternDedToAdd
+    // RateMatchPatternDedToDel
+
+    // ZpCsiRsResourceToAdd
+    offset += (nb_zp_csi_rs_resource_to_add * sizeof(bb_nr5g_ZP_CSI_RS_RESt));
+    // ZpCsiRsResourceToDel
+
+    // AperiodicZpCsiRsResSetsToAdd
+    // AperiodicZpCsiRsResSetsToDel
+
+    // SpZpCsiRsResSetsToAdd
+    // SpZpCsiRsResSetsToDel
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_BWP_DOWNLINKDEDICATEDt from bb-nr5g_struct.h
+// TODO: think it needs to use serialization flag?
+static int dissect_bwp_dl_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
+                                    guint offset, const char *title, gboolean serialized _U_)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_bwp_dl_dedicated, tvb,
+                                                         offset, 0,
+                                                          "Initial DL BWP", "%s", title);
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_bwp_dl_dedicated);
+
+    // FieldMask
+    guint32 field_mask;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN, &field_mask);
+    // TODO: add individual flag fields.
+    offset += 4;
+
+    // NbSpsConfToAdd_r16
+    guint32 nb_sps_conf_to_add_r16;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_sps_conf_to_add_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_sps_conf_to_add_r16);
+    offset += 1;
+
+    // NbConfigDeactivationState_r16
+    guint32 nb_config_deactivation_state_r16;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_config_deactivation_state_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_config_deactivation_state_r16);
+    offset += 1;
+
+    // Pad[2]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
+    offset += 2;
+
+    // N.B. These 3 appear regardless of flag!!!!!
+    // PdcchConfDed
+    //if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDCCH_CFG_PRESENT) {
+        // bb_nr5g_PDCCH_CONF_DEDICATEDt (serialized)
+        offset = dissect_pdcch_conf_dedicated(config_tree, tvb, pinfo, offset);
+    //}
+    // PdschConfDed (bb_nr5g_PDSCH_CONF_DEDICATEDt)
+    //if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDSCH_CFG_PRESENT) {
+        // TODO: still serialised, so will be smaller than sizeof() !
+        offset = dissect_pdsch_conf_dedicated(config_tree, tvb, pinfo, offset);
+        //offset += sizeof(bb_nr5g_PDSCH_CONF_DEDICATEDt);
+    //}
+    // SpsConfDed (bb_nr5g_SPS_CONF_DEDICATEDt)
+    //if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_SPS_CFG_PRESENT) {
+    {
+        // Subtree.
+        proto_item *sps_ti = proto_tree_add_string_format(tree, hf_l2server_sps_conf_dedicated, tvb,
+                                                          offset, 0,
+                                                          "", "SPS Config Dedicated");
+        proto_tree *sps_tree = proto_item_add_subtree(sps_ti, ett_l2server_sps_conf_dedicated);
+
+        // TODO:
+        // Periodicity
+        offset += 1;
+        // NbHarqProcesses
+        offset += 1;
+        // McsTable
+        offset += 1;
+        // N1PucchAn
+        offset += 1;
+        // Sps_ConfigIndex_r16
+        offset += 1;
+        // Harq_ProcID_Offset_r16
+        offset += 1;
+        // PeriodicityExt_r16
+        offset += 2;
+        // Harq_CodebookID_r16
+        offset += 1;
+        // Pdsch_AggregationFactor_r16
+        offset += 1;
+        // Pad[2]
+        proto_tree_add_item(sps_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
+        offset += 2;
+
+        proto_item_set_len(sps_ti, sizeof(bb_nr5g_SPS_CONF_DEDICATEDt));
+        //offset += sizeof(bb_nr5g_SPS_CONF_DEDICATEDt);
+    }
+
+    // These 2 use the present flag when serialised!
+
+    // SpsConfToDel_r16
+    if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_SPS_CFG_R16_PRESENT) {
+        // TODO: (bb_nr5g_SPS_CONFIG_INDEXt)
+        offset += sizeof(bb_nr5g_SPS_CONFIG_INDEXt);
+    }
+    // PdcchConfDedR16
+    if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DED_PDCCH_CONF_DEDICATED_R16_PRESENT) {
+        // TODO: (bb_nr5g_PDCCH_CONF_DEDICATED_R16t)
+        offset += sizeof(bb_nr5g_PDCCH_CONF_DEDICATED_R16t);
+    }
+
+    // These arrays may be serialised.
+
+    // SpsConfToAdd_r16
+    for (guint n=0; n < nb_sps_conf_to_add_r16; n++) {
+        // TODO:
+        offset += sizeof(bb_nr5g_SPS_CONF_DEDICATEDt);
+    }
+    // ConfigDeactivationState_r16
+    for (guint n=0; n < nb_config_deactivation_state_r16; n++) {
+        // TODO:
+        offset += sizeof(bb_nr5g_SPS_CONFIG_INDEXt);
+    }
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_PDSCH_SERVING_CELL_CFGt from bb-nr5g_struct.h
+static int dissect_pdsch_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                   guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_pdsch_serving_cell,  tvb,
+                                                         offset, 0,
+                                                          "", "PDSCH Serving Cell");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_pdsch_serving_cell);
+
+    // xOverhead
+    proto_tree_add_item(config_tree, hf_l2server_xoverhead, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // NbHarqProcessesForPDSCH
+    proto_tree_add_item(config_tree, hf_l2server_nb_harq_processes_for_pdsch, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // PucchCell
+    proto_tree_add_item(config_tree, hf_l2server_pucch_cell, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // MaxMimoLayers
+    proto_tree_add_item(config_tree, hf_l2server_max_mimo_layers, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // ProcessingType2Enabled
+    proto_tree_add_item(config_tree, hf_l2server_processing_type2_enabled, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // NbCodeBlockGroupTransmission_r16
+    guint32 nb_code_block_group_transmission_r16;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_code_block_group_transmission_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN,
+                                 &nb_code_block_group_transmission_r16);
+    offset += 1;
+
+    // FieldMask
+    proto_tree_add_item(config_tree, hf_l2server_field_mask_1, tvb, offset, 1, ENC_NA);
+    offset += 1;
+
+    // CodeBlockGroupTrans (bb_nr5g_PDSCH_CODEBLOCKGROUPTRANSMt)
+    //    MaxCodeBlockGroupsPerTB
+    proto_tree_add_item(config_tree, hf_l2server_max_code_block_groups_per_tb, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    //    CodeBlockGroupFlushIndicator
+    proto_tree_add_item(config_tree, hf_l2server_code_block_group_flush_indicator, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    //     Pad
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
+    offset += 2;
+
+    // CodeBlockGroupTransmissionList_r16 (bb_nr5g_PDSCH_CODEBLOCKGROUPTRANSMt)
+    for (guint n=0; n < nb_code_block_group_transmission_r16; n++) {
+        offset += sizeof(bb_nr5g_PDSCH_CODEBLOCKGROUPTRANSMt);
+    }
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_PDCCH_SERVING_CELL_CFGt (-> bb_nr5g_SLOT_FMT_INDICATORt) from bb-nr5g_struct.h
+static int dissect_pdcch_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                   guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_pdcch_serving_cell,  tvb,
+                                                         offset, 0,
+                                                          "", "PDCCH Serving Cell");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_pdcch_serving_cell);
+
+    // DciPayloadSize
+    offset += 1;
+    // NbSlotFormatCombToAdd
+    guint32 nb_slot_format_comb_to_add = tvb_get_guint8(tvb, offset);
+    offset += 1;
+    // NbSlotFormatCombToDel
+    guint32 nb_slot_format_comb_to_del = tvb_get_guint8(tvb, offset);
+    offset += 1;
+
+    // Pad
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
+    offset += 1;
+
+    // Rnti
+    offset += 2;
+
+    // SlotFormatCombToDel
+    offset += (nb_slot_format_comb_to_del & sizeof(uint32_t));
+    // slotFormatCombToAdd
+    offset += (nb_slot_format_comb_to_add & sizeof(bb_nr5g_SLOT_FMT_COMBSPERCELLt));
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+
+// bb_nr5g_NZP_CSI_RS_RES_CFGt
+static int dissect_nzp_csi_rs_res_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                         guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_nzp_csi_rs_res_config,  tvb,
+                                                         offset, 0,
+                                                          "", "NZP CSI RS Res Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_nzp_csi_rs_res_config);
+
+    // ResourceId
+    guint32 resource_id;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_resource_id, tvb, offset, 1, ENC_LITTLE_ENDIAN, &resource_id);
+    offset += 1;
+    // PwrCtrlOffset
+    proto_tree_add_item(config_tree, hf_l2server_power_control_offset, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // PwrCtrlOffsetSS
+    proto_tree_add_item(config_tree, hf_l2server_power_control_offset_ss, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // QclInfoPeriodicCsiRs
+    proto_tree_add_item(config_tree, hf_l2server_qcl_info_periodic_csi_rs, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // ScramblingID
+    proto_tree_add_item(config_tree, hf_l2server_scramblingid, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // Pad[2]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
+    offset += 2;
+
+    // TODO:
+    // ResourceMapping
+    offset += sizeof(bb_nr5g_CSI_RS_RES_MAPPINGt);
+    // PeriodicityAndOffset
+    offset += sizeof(bb_nr5g_CSI_RES_PERIODICITYANDOFFSETt);
+
+    proto_item_append_text(config_ti, " (resourceId=%u)", resource_id);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_NZP_CSI_RS_RES_SET_CFGt
+static int dissect_nzp_csi_rs_res_set_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                             guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_nzp_csi_rs_res_set_config,  tvb,
+                                                         offset, 0,
+                                                          "", "NZP CSI RS Res Set Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_nzp_csi_rs_res_set_config);
+
+    // ResSetId
+    guint32 resource_set_id;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_resource_set_id, tvb, offset, 1, ENC_LITTLE_ENDIAN, &resource_set_id);
+    offset += 1;
+    // Repetition
+    proto_tree_add_item(config_tree, hf_l2server_repetition, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // AperTriggerOffset
+    proto_tree_add_item(config_tree, hf_l2server_aper_trigger_offset, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // TrsInfo
+    proto_tree_add_item(config_tree, hf_l2server_trs_info, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // AperTriggerOffset_r16
+    proto_tree_add_item(config_tree, hf_l2server_aper_trigger_offset_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // Pad[2]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
+    offset += 2;
+
+    // NbNzpCsiRsResLis.
+    guint32 nb_nzp_csi_rs_res_lis;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_nzp_csi_rs_res_lis, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_nzp_csi_rs_res_lis);
+    offset += 1;
+    // NzpCsiRsResList
+    for (guint n=0; n < nb_nzp_csi_rs_res_lis; n++) {
+        proto_tree_add_item(config_tree, hf_l2server_nzp_csi_rs_res, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+    }
+    // Unset items (but still encoded).
+    offset += (bb_nr5g_MAX_NB_NZP_CSI_RS_RESOURCES_PER_SET-nb_nzp_csi_rs_res_lis);
+
+    proto_item_append_text(config_ti, " (resourceSetId=%u)", resource_set_id);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+
+// bb_nr5g_CSI_IM_RES_CFGt.  Is serialized.
+static int dissect_csi_im_res_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                     guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_nzp_csi_rs_res_set_config,  tvb,
+                                                         offset, 0,
+                                                          "", "CSI IM Res Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_im_res_config);
+
+    // ResourceId
+    guint32 resource_id;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_resource_id, tvb, offset, 1, ENC_LITTLE_ENDIAN, &resource_id);
+    offset += 1;
+
+    // Pad[3]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_NA);
+    offset += 3;
+
+    // These are always copied though..
+    // ResElemPattern
+    offset += sizeof(bb_nr5g_CSI_IM_RES_ELEM_PATTERN_CFGt);
+    // FreqBand
+    offset += sizeof(bb_nr5g_CSI_FREQUENCY_OCCt);
+    // PeriodicityAndOffset
+    offset += sizeof(bb_nr5g_CSI_RES_PERIODICITYANDOFFSETt);
+
+    proto_item_append_text(config_ti, " (resourceId=%u)", resource_id);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_CSI_IM_RES_SET_CFGt
+static int dissect_csi_im_res_set_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                         guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_nzp_csi_rs_res_set_config,  tvb,
+                                                         offset, 0,
+                                                          "", "CSI IM Res Set Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_im_res_set_config);
+
+    // ResSetId
+    guint32 res_set_id;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_res_set_id, tvb, offset, 1, ENC_LITTLE_ENDIAN, &res_set_id);
+    offset += 1;
+
+    // NbCsiImResList
+    guint32 nb_csi_im_res_list;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_im_res_list, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_im_res_list);
+    offset += 1;
+
+    // Pad[2]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
+    offset += 2;
+
+    // CsiImResList (not serialized as dynamic list)
+    offset += bb_nr5g_MAX_NB_CSI_IM_RESOURCES_PER_SET;
+
+    proto_item_append_text(config_ti, " (resourceSetId=%u)", res_set_id);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_CSI_SSB_RES_SET_CFGt
+static int dissect_csi_ssb_res_set_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                         guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_csi_ssb_res_set_config,  tvb,
+                                                         offset, 0,
+                                                          "", "CSI SSB Res Set Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_ssb_res_set_config);
+
+    // ResSetId
+    guint32 res_set_id;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_res_set_id, tvb, offset, 1, ENC_LITTLE_ENDIAN, &res_set_id);
+    offset += 1;
+
+    // NbCsiSsbResList
+    guint32 nb_csi_ssb_res_list;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_csi_ssb_res_list, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_ssb_res_list);
+    offset += 1;
+
+    // Pad[2]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
+    offset += 2;
+
+    // CsiSsbResList
+    offset += (nb_csi_ssb_res_list);
+    offset += (bb_nr5g_MAX_NB_CSI_SSB_RESOURCES_PER_SET-nb_csi_ssb_res_list);
+
+    proto_item_append_text(config_ti, " (resourceSetId=%u)", res_set_id);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+
+// bb_nr5g_CSI_RESOURCE_CFGt
+static int dissect_csi_res_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_csi_res_config,  tvb,
+                                                         offset, 0,
+                                                          "", "CSI Res Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_res_config);
+
+    // CsiResId
+    guint32 csi_res_id;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_csi_res_id, tvb, offset, 1, ENC_LITTLE_ENDIAN, &csi_res_id);
+    offset += 1;
+
+    // BwpId
+    gint32 bwpid;
+    proto_tree_add_item_ret_int(config_tree, hf_l2server_bwpid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &bwpid);
+    offset += 1;
+
+    // CsiResType
+    proto_tree_add_item(config_tree, hf_l2server_csi_res_type, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // CsiRsResSetListIsValid
+    guint32 csi_rs_res_set_list_is_valid;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_csi_rs_res_set_list_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &csi_rs_res_set_list_is_valid);
+    offset += 1;
+
+    // CsiRsResSetListType
+    switch (csi_rs_res_set_list_is_valid) {
+        case bb_nr5g_CSI_RESOURCE_CFG_RES_SET_LIST_NZP_CSI_RS_SSB:
+            // NzpCsiRsSsbResSetType
+            offset += sizeof(bb_nr5g_CSI_RESOURCE_CFG_NZP_CSI_RS_SSBt);
+            break;
+        case  bb_nr5g_CSI_RESOURCE_CFG_RES_SET_LIST_CSI_IM:
+            // CsiImResSetType
+            offset += sizeof(bb_nr5g_CSI_RESOURCE_CFG_CSI_IMt);
+            break;
+    }
+
+    proto_item_append_text(config_ti, " (CsiResId=%u, BwpId=%d)", csi_res_id, bwpid);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUCCHt
+static int dissect_semipersistent_on_pucch(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                           guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_semipersistent_on_pucch,  tvb,
+                                                         offset, 0,
+                                                          "", "Semi-persistent on PUCCH");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_semipersistent_on_pucch);
+
+    // NbPucchCsiResList
+    guint32 nb_pucch_csi_res_list;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_csi_rs_res_set_list_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_pucch_csi_res_list);
+    offset += 1;
+
+    // Pad[3]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_NA);
+    offset += 3;
+
+    // RepSlotCfg
+    offset += sizeof(bb_nr5g_CSI_REPORT_PERIODICITYANDOFFSETt);
+
+    // PucchCsiResList (bb_nr5g_MAX_NB_BWPS entries?)
+    offset += (nb_pucch_csi_res_list * sizeof(bb_nr5g_PUCCH_CSI_RESOURCEt));
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+
+// bb_nr5g_CSI_REPORT_CFG_TYPE_APERIODICt. Just memcpy'd in serialization.
+static int dissect_aperiodic(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_aperiodic,  tvb,
+                                                         offset, 0,
+                                                          "", "APeriodic");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_aperiodic);
+
+    // NbRepSlotOffsetList
+    guint32 nb_rep_slow_offset_list;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_rep_slow_offset_list, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_rep_slow_offset_list);
+    offset += 1;
+
+    // Pad[3]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_NA);
+    offset += 3;
+
+    // RepSlotOffsetList (bb_nr5g_MAX_NB_UL_ALLOCS entries?)
+    // TODO: nb_rep_slow_offset_list elements instead?
+    for (guint n=0; n < bb_nr5g_MAX_NB_UL_ALLOCS; n++) {
+        proto_item *ti = proto_tree_add_item(config_tree, hf_l2server_nb_rep_slow_offset, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        if (n >= nb_rep_slow_offset_list) {
+            proto_item_append_text(ti, " (no in use)");
+        }
+        offset++;
+    }
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_CODEBOOK_SUBTYPE1_TWO_ANT_PORTS_CFGt
+static int dissect_and_ports_two(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_codebook_config_type1_two_ports,  tvb,
+                                                         offset, 0,
+                                                          "", "2 Ants");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_codebook_config_type1_two_ports);
+
+    // TwoTXCodebookSubsetRestriction
+    offset += 1;
+    // Pad
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_NA);
+    offset += 3;
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_CODEBOOK_SUBTYPE1_MORETHANTWO_ANT_PORTS_CFGt
+static int dissect_and_ports_more_than_two(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_codebook_config_type1_single_panel,  tvb,
+                                                         offset, 0,
+                                                          "", "More than 2 Ants");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_codebook_config_type1_single_panel);
+
+    // N1N2IsValid
+    offset += 1;
+    // TypeISinglePanelCodebookSubsetRestrI2IsValid
+    offset += 1;
+    // TypeISinglePanelCodebookSubsetRestrI2
+    offset += 2;
+    // N1N2[32]
+    proto_tree_add_item(config_tree, hf_l2server_n1n2, tvb, offset, 32, ENC_NA);
+    offset += 32;
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_CODEBOOK_SUBTYPE1_SINGLE_PANEL_CFGt
+static int dissect_codebook_type_1_single_panel(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_codebook_config_type1_single_panel,  tvb,
+                                                         offset, 0,
+                                                          "", "Single Panel");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_codebook_config_type1_single_panel);
+
+    // NbOfAntPortsIsValid
+    guint32 nb_of_ant_ports_is_valid;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_of_ant_ports_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_of_ant_ports_is_valid);
+    offset += 1;
+    // TypeISinglePanelRiRestr
+    guint32 typei_single_panel_ri_restr;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_typei_single_panel_ri_restr, tvb, offset, 1, ENC_LITTLE_ENDIAN, &typei_single_panel_ri_restr);
+    offset += 1;
+    // Pad[2]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
+    offset += 2;
+
+    switch (nb_of_ant_ports_is_valid) {
+        case bb_nr5g_CODEBOOK_SUBTYPE1_NB_ANT_PORTS_TWO:
+            offset = dissect_and_ports_two(config_tree, tvb, pinfo, offset);
+            break;
+        case bb_nr5g_CODEBOOK_SUBTYPE1_NB_ANT_PORTS_MORETHANTWO:
+            offset = dissect_and_ports_more_than_two(config_tree, tvb, pinfo, offset);
+            break;
+    }
+
+    // Offset ends up just being size of struct.
+    offset = start_offset + sizeof(bb_nr5g_CODEBOOK_SUBTYPE1_SINGLE_PANEL_CFGt);
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_CODEBOOK_TYPE1_CFGt
+static int dissect_codebook_type_1(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_codebook_config_type1,  tvb,
+                                                         offset, 0,
+                                                          "", "Codebook Type 1");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_codebook_config_type1);
+
+    // CodeBookSubType1IsValid
+    guint32 codebook_subtype1_is_valid;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_codebook_subtype1_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &codebook_subtype1_is_valid);
+    offset += 1;
+
+    // CodebookMode
+    offset += 1;
+
+    // Pad[2]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
+    offset += 2;
+
+    // CodeBookSubType1 (union)
+    switch (codebook_subtype1_is_valid) {
+        case bb_nr5g_CODEBOOK_TYPE1_SUBTYPE_I_SINGLE_PANEL:
+            offset = dissect_codebook_type_1_single_panel(config_tree, tvb, pinfo, offset);
+            break;
+        case bb_nr5g_CODEBOOK_TYPE1_SUBTYPE_I_MULTI_PANEL:
+            offset += sizeof(bb_nr5g_CODEBOOK_SUBTYPE1_MULTI_PANEL_CFGt);
+            break;
+
+        case bb_nr5g_CODEBOOK_TYPE1_SUBTYPE_DEFAULT:
+            break;
+    }
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_CODEBOOK_CFGt
+static int dissect_codebook_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                   guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_codebook_config,  tvb,
+                                                         offset, 0,
+                                                          "", "Codebook Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_codebook_config);
+
+    // CodeBookTypeIsValid
+    guint32 codebook_type_is_valid;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_codebook_type_is_valid, tvb, offset, 1,
+                                 ENC_LITTLE_ENDIAN, &codebook_type_is_valid);
+    offset += 1;
+
+    // Pad[3]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_NA);
+    offset += 3;
+
+    // CodebookType
+    switch (codebook_type_is_valid) {
+        case bb_nr5g_CODEBOOK_TYPE_1:
+            // TODO: bb_nr5g_CODEBOOK_TYPE1_CFGt (variable size)
+            offset = dissect_codebook_type_1(config_tree, tvb, pinfo, offset);
+            break;
+        case bb_nr5g_CODEBOOK_TYPE_2:
+            // TODO: bb_nr5g_CODEBOOK_TYPE2_CFGt
+            break;
+        default:
+            // TODO: error?
+            printf("%u: unexpected value of CodeBookTypeIsValid (%u)\n", pinfo->num, codebook_type_is_valid);
+            break;
+    }
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_BWP_DOWNLINKCOMMONt (from bb-nr5g_struct.h)
+static int dissect_bwp_downlinkcommon(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                      guint offset, const char* label, gboolean present, gboolean serialized _U_)
+{
+    gint start_offset = offset;
+
+    // Subtree.
+    proto_item *bwp_dl_common_ti = proto_tree_add_string(tree, hf_l2server_bwp_dl_common, tvb,
+                                                                offset, sizeof(bb_nr5g_BWP_DOWNLINKCOMMONt),
+                                                                label);
+    proto_tree *bwp_dl_common_tree = proto_item_add_subtree(bwp_dl_common_ti, ett_l2server_bwp_dl_common);
+
+    if (present) {
+
+        // FieldMask
+        guint32 field_mask_4;
+        proto_tree_add_item_ret_uint(bwp_dl_common_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                     ENC_LITTLE_ENDIAN, &field_mask_4);
+        gboolean pdcch_setup_present, pdsch_setup_present;
+        proto_tree_add_item_ret_boolean(bwp_dl_common_ti, hf_l2server_bwp_dl_common_pdcch_setup_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &pdcch_setup_present);
+        proto_tree_add_item(bwp_dl_common_ti,             hf_l2server_bwp_dl_common_pdcch_release_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item_ret_boolean(bwp_dl_common_ti, hf_l2server_bwp_dl_common_pdsch_setup_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &pdsch_setup_present);
+        proto_tree_add_item(bwp_dl_common_ti,             hf_l2server_bwp_dl_common_pdsch_release_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+
+        // GenBwp (bb_nr5g_BWPt)
+        offset = dissect_genbwp(bwp_dl_common_tree, tvb, pinfo, offset);
+
+        // PdcchConfCommon (bb_nr5g_PDCCH_CONF_COMMONt)
+        if (pdcch_setup_present) {
+            offset = dissect_pdcch_conf_common(bwp_dl_common_tree, tvb, pinfo, offset, FALSE);
+        }
+
+        // PdschConfCommon (bb_nr5g_PDSCH_CONF_COMMONt) (apparently present regardless!)
+        if (pdsch_setup_present) {
+            proto_item_append_text(bwp_dl_common_ti, " (PDSCH-Setup)");
+
+            gint pdsch_offset = offset;
+
+            // Subtree.
+            proto_item *pdsch_ti = proto_tree_add_string_format(bwp_dl_common_tree, hf_l2server_bwp_common_pdsch, tvb,
+                                                                offset, 1, "", "PDSCH ");
+            proto_tree *pdsch_tree = proto_item_add_subtree(pdsch_ti, ett_l2server_bwp_common_pdsch);
+
+            // NbPdschAlloc
+            guint32 nb_pdsch_alloc;
+            proto_tree_add_item_ret_uint(pdsch_tree, hf_l2server_nb_pdsch_alloc, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_pdsch_alloc);
+
+            offset += 1;
+
+            // Spare[3]
+            proto_tree_add_item(pdsch_tree, hf_l2server_spare, tvb, offset, 3, ENC_NA);
+            offset += 3;
+
+            // PdschAlloc (bb_nr5g_PDSCH_TIMEDOMAINRESALLOCt)
+            for (guint n=0; n < bb_nr5g_MAX_NB_DL_ALLOCS; n++) {
+                offset = dissect_pdcsh_time_domain_res_alloc(pdsch_tree, tvb, pinfo, offset, n < nb_pdsch_alloc);
+            }
+            proto_item_set_len(pdsch_ti, offset-pdsch_offset);
+        }
+    }
+
+    // Regardless (of present), if this isn't serialized, add whole size
+    if (!serialized) {
+        offset = start_offset + sizeof(bb_nr5g_BWP_DOWNLINKCOMMONt);
+    }
+
+    proto_item_set_len(bwp_dl_common_ti, offset-start_offset);
+
+    return offset;
+}
+
+// bb_nr5g_BWP_DOWNLINKt
+static int dissect_bwp_downlink(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_bwp_dl_common,  tvb,
+                                                         offset, 0,
+                                                          "", "BWP Downlink");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_bwp_dl_common);
+
+    // BwpId
+    gint32 bwpid;
+    proto_tree_add_item_ret_int(config_tree, hf_l2server_bwpid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &bwpid);
+    offset += 1;
+    // Spare
+    proto_tree_add_item(config_tree, hf_l2server_spare1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // Fieldmask
+    guint32 field_mask;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_2, tvb, offset, 2, ENC_LITTLE_ENDIAN, &field_mask);
+    offset += 2;
+
+    // BwpDLCommon (bb_nr5g_BWP_DOWNLINKCOMMONt)
+    if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_CFG_PRESENT) {
+        offset = dissect_bwp_downlinkcommon(config_tree, tvb, pinfo, offset, "BWP DL Common", TRUE, FALSE);
+    }
+
+    // BwpDLDed
+    if (field_mask & bb_nr5g_STRUCT_BWP_DOWNLINK_DEDICATED_CFG_PRESENT) {
+        // TODO: bb_nr5g_BWP_DOWNLINKDEDICATEDt
+        dissect_bwp_dl_dedicated(config_tree, tvb, pinfo, offset, "BwpDLDed", TRUE);
+    }
+
+    proto_item_append_text(config_ti, " (bwpId=%d)", bwpid);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+
+
+
+// bb_nr5g_CSI_REPORT_FREQ_CFGt
+static int dissect_rep_freq_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                   guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_csi_report_freq_config,  tvb,
+                                                         offset, 0,
+                                                          "", "Report Freq Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_report_freq_config);
+
+    // CqiFmtIndicator
+    proto_tree_add_item(config_tree, hf_l2server_cqi_cmd_indicator, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // PmiFmtIndicator
+    proto_tree_add_item(config_tree, hf_l2server_pmi_cmd_indicator, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // CsiReportingBandIsValid
+    proto_tree_add_item(config_tree, hf_l2server_csi_reporting_band_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // Pad
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
+    offset += 1;
+
+    // CsiReportingBand
+    // TODO: need to infer how many bits and shift/mask to get encoded value...
+    proto_tree_add_item(config_tree, hf_l2server_csi_reporting_band, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_CTRL_RES_SETt. N.B. serialization is just memset().
+static int dissect_control_res_set(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                   guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_control_res_set,  tvb,
+                                                         offset, 0,
+                                                          "", "Control Res Set");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_control_res_set);
+
+    // CtrlResSetId
+    guint32 ctrl_res_set_id;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_control_res_set_id, tvb, offset, 1, ENC_LITTLE_ENDIAN, &ctrl_res_set_id);
+    offset += 1;
+    // CtrlResSetDuration
+    proto_tree_add_item(config_tree, hf_l2server_control_res_set_duration, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // PrecGranularity
+    proto_tree_add_item(config_tree, hf_l2server_prec_granualarity, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // CceRegMapType
+    proto_tree_add_item(config_tree, hf_l2server_cce_reg_map_type, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // RegBundleSize
+    proto_tree_add_item(config_tree, hf_l2server_reg_bundle_size, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // InterleaverSize
+    proto_tree_add_item(config_tree, hf_l2server_interleave_size, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // ShiftIndex
+    proto_tree_add_item(config_tree, hf_l2server_shift_index, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // FreqDomRes
+    proto_tree_add_item(config_tree, hf_l2server_freq_dom_res, tvb, offset, 8, ENC_LITTLE_ENDIAN);
+    offset += 8;
+    // PdcchDMRSScramblingId
+    proto_tree_add_item(config_tree, hf_l2server_pdcch_dmrs_scrambling_id, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // PdcchDMRSScramblingIdIsValid
+    proto_tree_add_item(config_tree, hf_l2server_pdcch_dmrs_scrambling_id_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // TciPresentInDci
+    proto_tree_add_item(config_tree, hf_l2server_tci_present_in_dci, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // NbTciStates
+    guint32 nb_tci_states;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_tci_states, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_tci_states);
+    offset += 1;
+    // TODO:
+    // RbOffset_r16
+    offset += 1;
+    // TciPresentDCI_r16
+    offset += 1;
+    // CoresetPoolIndex_r16
+    offset += 1;
+    // TciStates
+    for (guint n=0; n < bb_nr5g_MAX_NB_TCI_STATES_PDCCH; n++) {
+        proto_item *ti = proto_tree_add_item(config_tree, hf_l2server_tci_state_to_add, tvb, offset, 1, ENC_ASCII);
+        if (n >= nb_tci_states) {
+            proto_item_append_text(ti, " (not set)");
+        }
+        offset += 1;
+    }
+
+    proto_item_append_text(config_ti, " (id=%u)", ctrl_res_set_id);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+
+// bb_nr5g_SEARCH_SPACEt
+// N.B. sertialization is just to memcpy whole struct...
+static int dissect_search_space(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset, gboolean do_dissect)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_search_space,  tvb,
+                                                         offset, 0,
+                                                          "", "Search Space");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_search_space);
+
+    if (do_dissect) {
+
+        // SearchSpaceId
+        guint32 search_space_id;
+        proto_tree_add_item_ret_uint(config_tree, hf_l2server_search_space_id, tvb, offset, 1, ENC_LITTLE_ENDIAN, &search_space_id);
+        offset += 1;
+
+        // CtrlResSetId
+        proto_tree_add_item(config_tree, hf_l2server_control_res_set_id, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+
+        // MonitorSymbsInSlot
+        proto_tree_add_item(config_tree, hf_l2server_monitor_symbs_in_slot, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+
+        // MonitorSlotIsValid
+        proto_tree_add_item(config_tree, hf_l2server_monitor_slot_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+
+        // SearchSpaceTypeIsValid
+        guint32 search_space_type_is_valid;
+        proto_tree_add_item_ret_uint(config_tree, hf_l2server_search_space_type_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &search_space_type_is_valid);
+        offset += 1;
+
+        // MonitorSlot (union)
+        proto_tree_add_item(config_tree, hf_l2server_monitor_slot, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+
+        // NbCandidates (bb_nr5g_MONITOR_NBCANDIDATESt)
+        //   AggLev1
+        proto_tree_add_item(config_tree, hf_l2server_agg_lev1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        //   AggLev2
+        proto_tree_add_item(config_tree, hf_l2server_agg_lev2, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        //   AggLev4
+        proto_tree_add_item(config_tree, hf_l2server_agg_lev4, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        //   AggLev8
+        proto_tree_add_item(config_tree, hf_l2server_agg_lev8, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        //   AggLev16
+        proto_tree_add_item(config_tree, hf_l2server_agg_lev16, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        //   Spare[3]
+        proto_tree_add_item(config_tree, hf_l2server_spare, tvb, offset, 3, ENC_NA);
+        offset += 3;
+
+        // SearchSpaceType
+        switch (search_space_type_is_valid) {
+            case bb_nr5g_SEARCH_SPACE_TYPE_COMMON:
+                //offset += sizeof(bb_nr5g_SEARCH_SPACETYPE_COMMONt);
+                break;
+            case bb_nr5g_SEARCH_SPACE_TYPE_DEDICATED:
+                //offset += sizeof(bb_nr5g_SEARCH_SPACETYPE_DEDICATEDt);
+                break;
+            case bb_nr5g_SEARCH_SPACE_TYPE_DEFAULT:
+                // Error/absent?
+                break;
+        }
+        offset += MAX(sizeof(bb_nr5g_SEARCH_SPACETYPE_COMMONt),
+                             sizeof(bb_nr5g_SEARCH_SPACETYPE_DEDICATEDt));
+
+        // SearchSpaceDuration
+        offset += 2;
+
+        // Pad[2]
+        proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
+        offset += 2;
+
+        proto_item_append_text(config_ti, " (id=%u)", search_space_id);
+    }
+    else {
+        offset += sizeof(bb_nr5g_SEARCH_SPACEt);
+        proto_item_append_text(config_ti, " (not set)");
+    }
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+
+
+// bb_nr5g_CSI_REPORT_CFGt (from bb-nr5g_struct.h)
+static int dissect_csi_rep_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_csi_rep_config,  tvb,
+                                                         offset, 0,
+                                                          "", "CSI Report Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_rep_config);
+
+    // FieldMask
+    guint32 fieldmask;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                 ENC_LITTLE_ENDIAN, &fieldmask);
+    offset += 4;
+
+    // CsiRepConfigId
+    guint32 csi_rep_config_id;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_csi_rep_config_id, tvb, offset, 1, ENC_LITTLE_ENDIAN, &csi_rep_config_id);
+    offset += 1;
+
+    // ResForChannelMeas
+    offset += 1;
+    // CsiIMResForInterference
+    offset += 1;
+    // NzpCsiRSResForInterference
+    offset += 1;
+
+    // Carrier (serving cell identifier)
+    proto_tree_add_item(config_tree, hf_l2server_carrier, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // TimeRestForChannelMeas
+    offset += 1;
+    // TimeRestForInterferenceMeas
+    offset += 1;
+    // NrOfCQIsPerReport
+    offset += 1;
+    // GroupBasedBeamRepIsValid
+    offset += 1;
+    // GroupBasedBeamRepValue
+    offset += 1;
+    // CqiTable
+    offset += 1;
+    // SubBandSize
+    offset += 1;
+    // NbNonPmiPortInd
+    guint32 nb_mon_pmi_port_ind;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_mon_pmi_port_ind, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_mon_pmi_port_ind);
+    offset += 1;
+    // ReportConfigTypeIsValid
+    guint32 report_config_type_is_valid;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_report_config_type_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &report_config_type_is_valid);
+    offset += 1;
+    // ReportQuantityIsValid
+    guint32 report_quantity_is_valid;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_report_quantity_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &report_quantity_is_valid);
+    offset += 1;
+
+    // ReportQuantity (union)
+    switch (report_quantity_is_valid) {
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_NONE:
+            // None
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_PMI_CQI:
+            // CriRiPmiCqi
+            proto_tree_add_item(config_tree, hf_l2server_cri_ri_pmi_cqi, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_I1:
+            // CriRiI1
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_I1_CQI:
+            // CriRiI1Cqi
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_CQI:
+            // CriRiCqi
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RSRP:
+            // CriRsrp
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_SSBINDEX_RSRP:
+            // SsbIdxRsrp
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_CRI_RI_LII_PMI_CQI:
+            // CriRiLiPmiCqi
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_R16_CRI_SINR:
+            // CriSinr_r16
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_R16_SSB_INDEX_SINR:
+            // IndexSinr_r16
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_QUANTITY_DEFAULT:
+            break;
+    }
+    offset += 1;
+
+    // ReportConfigType
+    guint report_config_type_offset = offset;
+    switch (report_config_type_is_valid) {
+        case bb_nr5g_CSI_REPORT_CFG_TYPE_PERIODIC:
+            offset += sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_PERIODICt);
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUCCH:
+            offset = dissect_semipersistent_on_pucch(config_tree, tvb, pinfo, offset);
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUSCH:
+            offset += sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUSCHt);
+            break;
+        case bb_nr5g_CSI_REPORT_CFG_TYPE_APERIODIC:
+            offset = dissect_aperiodic(config_tree, tvb, pinfo, offset);
+            break;
+        default:
+            // TODO: error?
+            printf("Unknown report config type (%u)\n", report_config_type_is_valid);
+            break;
+    }
+
+    // Serialization skips to write next at &out->RepFreqCfg
+    // Advance by larges part of (anonymous) union.
+    guint report_config_type_len = MAX(sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_PERIODICt),
+                                       sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUCCHt));
+    report_config_type_len = MAX(report_config_type_len,
+                                 sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUSCHt));
+    report_config_type_len = MAX(report_config_type_len,
+                                 sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_APERIODICt));
+    offset = report_config_type_offset + report_config_type_len;
+
+    // RepFreqCfg (bb_nr5g_CSI_REPORT_FREQ_CFGt)
+    offset = dissect_rep_freq_config(config_tree, tvb, pinfo, offset);
+
+    // CodebookCfg (bb_nr5g_CODEBOOK_CFGt, variable size...)
+    offset = dissect_codebook_config(config_tree, tvb, pinfo, offset);
+
+    // SemiPersistentOnPUSCH_v1530
+    if (fieldmask & bb_nr5g_STRUCT_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUSCH_v1530_PRESENT) {
+        offset += sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUSCH_v1530t);
+    }
+
+    // SemiPersistentOnPUSCH_v1610
+    if (fieldmask & bb_nr5g_STRUCT_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUSCH_v1610_PRESENT) {
+        offset += sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUSCH_v1610t);
+    }
+
+    // Aperiodic_v1610
+    if (fieldmask & bb_nr5g_STRUCT_CSI_REPORT_CFG_TYPE_APERIODIC_v1610_PRESENT) {
+        // TODO: wrong type at bb-nr5g_struct.h:2696 ?
+        offset += sizeof(bb_nr5g_CSI_REPORT_CFG_TYPE_SEMIPERSISTENT_ONPUSCH_v1610t);
+    }
+
+    // CodebookType2Cfg_r16
+    if (fieldmask & bb_nr5g_STRUCT_CODEBOOK_CFG_TYPE2_R16_PRESENT) {
+        offset += sizeof(bb_nr5g_CODEBOOK_TYPE2_CFG_R16t);
+    }
+
+    // NonPmiPortInd
+    offset += (nb_mon_pmi_port_ind * sizeof(bb_nr5g_PORT_INDEX_FOR8RANKSt));
+
+    proto_item_append_text(config_ti, " (CsiRepConfigId=%u)", csi_rep_config_id);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_CSI_ASSOCIATED_REPORT_CFG_INFOt (from bb-nr5g_struct.h)
+static int dissect_csi_associated_report_cfg(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                             guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_csi_associated_report_cfg,  tvb,
+                                                         offset, 0,
+                                                          "", "CSI Associated Report Cfg");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_associated_report_cfg);
+
+    // RepCfgId
+    guint32 rep_cfg_id;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_rep_cfg_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &rep_cfg_id);
+    offset += 1;
+    // CsiImResForInterference
+    proto_tree_add_item(config_tree, hf_l2server_csi_im_res_for_interference, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // NzpCsiRsResForInterference
+    proto_tree_add_item(config_tree, hf_l2server_nzp_csi_rs_res_for_interference, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // ResForChannelIsValid
+    offset += 1;
+
+    // ResForChannel
+    offset += 1;
+    // NbQclInfo
+    offset += 1;
+    // Pad[2]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 2, ENC_NA);
+    offset += 2;
+    // QclInfo[]
+    offset += bb_nr5g_MAX_NB_AP_CSI_RS_RESOURCES_PER_SET;
+
+    //offset = start_offset + sizeof(bb_nr5g_CSI_ASSOCIATED_REPORT_CFG_INFOt);
+    proto_item_append_text(config_ti, " (RepCfgId=%u)", rep_cfg_id);
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+
+// bb_nr5g_CSI_APERIODIC_TRIGGER_STATE_CFGt (from bb-nr5g_struct.h)
+static int dissect_aper_trigger_state(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_aper_trigger_state_config,  tvb,
+                                                         offset, 0,
+                                                          "", "Aperiodic Trigger State Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_aper_trigger_stateconfig);
+
+    // NbAssRepCfInfoList
+    guint32 nb_ass_rep_cf_info_list;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_ass_rep_cf_info_list, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_ass_rep_cf_info_list);
+    offset += 1;
+
+    // Pad[3]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_NA);
+    offset += 3;
+
+    // AssRepCfInfoList
+    for (guint n=0; n < nb_ass_rep_cf_info_list; n++) {
+        //offset += sizeof(bb_nr5g_CSI_ASSOCIATED_REPORT_CFG_INFOt);
+        offset = dissect_csi_associated_report_cfg(config_tree, tvb, pinfo, offset);
+    }
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+
+
+// bb_nr5g_CSI_MEAS_CFGt from bb-nr5g_struct.h
+static int dissect_csi_meas_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                   guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_csi_meas_config,  tvb,
+                                                         offset, 0,
+                                                          "", "CSI Meas Config");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_csi_meas_config);
+
+    // Counts
+
+    // NbNzpCsiRsResToAdd
+    guint32 nb_nzp_csi_rs_res_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_nzp_csi_rs_res_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_nzp_csi_rs_res_to_add);
+    offset += 1;
+    // NbNzpCsiRsResToDel
+    guint32 nb_nzp_csi_rs_res_to_del;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_nzp_csi_rs_res_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_nzp_csi_rs_res_to_del);
+    offset += 1;
+
+    // NbNzpCsiRsResSetToAdd
+    guint32 nb_nzp_csi_rs_res_set_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_nzp_csi_rs_res_set_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_nzp_csi_rs_res_set_to_add);
+    offset += 1;
+    // NbNzpCsiRsResSetToDel
+    guint32 nb_nzp_csi_rs_res_set_to_del;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_nzp_csi_rs_res_set_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_nzp_csi_rs_res_set_to_del);
+    offset += 1;
+
+    // NbCsiImResToAdd
+    guint nb_csi_im_res_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_im_res_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_im_res_to_add);
+    offset += 1;
+    // NbCsiImResToDel
+    guint nb_csi_im_res_to_del;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_im_res_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_im_res_to_del);
+    offset += 1;
+
+    // NbCsiImResSetToAdd
+    guint32 nb_csi_im_res_set_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_im_res_set_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_im_res_set_to_add);
+    offset += 1;
+    // NbCsiImResSetToDel
+    guint32 nb_csi_im_res_set_to_del;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_im_res_set_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_im_res_set_to_del);
+    offset += 1;
+
+    // NbCsiSsbResSetToAdd
+    guint32 nb_csi_ssb_res_set_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_ssb_res_set_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_ssb_res_set_to_add);
+    offset += 1;
+    // NbCsiSsbResSetToDel
+    guint32 nb_csi_ssb_res_set_to_del;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_ssb_res_set_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_ssb_res_set_to_del);
+    offset += 1;
+
+    // NbCsiResCfgToAdd
+    guint32 nb_csi_res_cfg_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_res_cfg_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_res_cfg_to_add);
+    offset += 1;
+    // NbCsiResCfgToDel
+    guint32 nb_csi_res_cfg_to_del;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_res_cfg_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_res_cfg_to_del);
+    offset += 1;
+
+    // NbCsiRepCfgToAdd
+    guint32 nb_csi_rep_cfg_to_add;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_rep_cfg_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_rep_cfg_to_add);
+    offset += 1;
+    // NbCsiRepCfgToDel
+    guint32 nb_csi_rep_cfg_to_del;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_csi_rep_cfg_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_csi_rep_cfg_to_del);
+    offset += 1;
+
+    // NbAperTriggerStateList
+    guint32 nb_aper_trigger_state_list;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_aper_trigger_state_list, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_aper_trigger_state_list);
+    offset += 1;
+    // NbSPOnPuschTriggerStateList
+    guint32 nb_sp_on_pusch_trigger_state_list;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_nb_sp_on_pusch_trigger_state, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_sp_on_pusch_trigger_state_list);
+    offset += 1;
+    // ReportTriggerSize
+    proto_tree_add_item(config_tree, hf_l2server_report_trigger_size, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // ReportTriggerSizeDCI02_r16
+    proto_tree_add_item(config_tree, hf_l2server_report_trigger_size_dci02_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // FieldMask
+    proto_tree_add_item(config_tree, hf_l2server_field_mask_2, tvb, offset, 2, ENC_NA);
+    offset += 2;
+
+    //========================================================================================
+    // Added items
+
+    // NzpCsiRsResToAdd
+    for (guint n=0; n < nb_nzp_csi_rs_res_to_add; n++) {
+        offset = dissect_nzp_csi_rs_res_config(config_tree, tvb, pinfo, offset);
+    }
+    // NzpCsiRsResSetToAdd
+    for (guint n=0; n < nb_nzp_csi_rs_res_set_to_add; n++) {
+        offset = dissect_nzp_csi_rs_res_set_config(config_tree, tvb, pinfo, offset);
+    }
+
+    // CsiImResToAdd
+    for (guint n=0; n < nb_csi_im_res_to_add; n++) {
+        offset = dissect_csi_im_res_config(config_tree, tvb, pinfo, offset);
+    }
+
+    // CsiImResSetToAdd
+    for (guint n=0; n < nb_csi_im_res_set_to_add; n++) {
+        offset = dissect_csi_im_res_set_config(config_tree, tvb, pinfo, offset);
+    }
+
+    // CsiSsbResSetToAdd
+    for (guint n=0; n < nb_csi_ssb_res_set_to_add; n++) {
+        offset = dissect_csi_ssb_res_set_config(config_tree, tvb, pinfo, offset);
+    }
+
+    // CsiResCfgToAdd
+    for (guint n=0; n < nb_csi_res_cfg_to_add; n++) {
+        offset = dissect_csi_res_config(config_tree, tvb, pinfo, offset);
+    }
+
+    // CsiRepCfgToAdd
+    for (guint n=0; n < nb_csi_rep_cfg_to_add; n++) {
+        offset = dissect_csi_rep_config(config_tree, tvb, pinfo, offset);
+    }
+
+    // AperTriggerStateList
+    for (guint n=0; n < nb_aper_trigger_state_list; n++) {
+        offset = dissect_aper_trigger_state(config_tree, tvb, pinfo, offset);
+    }
+
+    // TODO:
+    // SPOnPuschTriggerStateList (fixed size)
+    offset += (nb_sp_on_pusch_trigger_state_list * sizeof(bb_nr5g_CSI_SEMIPERSISTENT_ONPUSCH_TRIGGER_STATE_CFGt));
+    //-----------------------------------------------------------------------------------------
+
+
+    //-----------------------------------------------------------------------------------------
+    // Deleted items
+
+    // NzpCsiRsResToDel
+    for (guint n=0; n < nb_nzp_csi_rs_res_to_del; n++) {
+        proto_tree_add_item(config_tree, hf_l2server_nzp_csi_rs_res_to_del, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
+
+    // NzpCsiRsResSetToDel
+    for (guint n=0; n < nb_nzp_csi_rs_res_set_to_del; n++) {
+        proto_tree_add_item(config_tree, hf_l2server_nzp_csi_rs_res_set_to_del, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
+
+    // CsiImResToDel
+    for (guint n=0; n < nb_csi_im_res_to_del; n++) {
+        proto_tree_add_item(config_tree, hf_l2server_csi_im_res_to_del, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
+
+    // CsiImResSetToDel
+    for (guint n=0; n < nb_csi_im_res_set_to_del; n++) {
+        proto_tree_add_item(config_tree, hf_l2server_csi_im_res_set_to_del, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
+
+    // CsiSsbResSetToDel
+    for (guint n=0; n < nb_csi_ssb_res_set_to_del; n++) {
+        proto_tree_add_item(config_tree, hf_l2server_csi_ssb_res_set_to_del, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
+
+    // CsiResCfgToDel
+    for (guint n=0; n < nb_csi_res_cfg_to_del; n++) {
+        proto_tree_add_item(config_tree, hf_l2server_csi_res_cfg_to_del, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
+
+    // CsiRepCfgToDel
+    for (guint n=0; n < nb_csi_rep_cfg_to_del; n++) {
+        proto_tree_add_item(config_tree, hf_l2server_csi_rep_cfg_to_del, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
+    //-----------------------------------------------------------------------------------------
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_SERV_CELL_CONFIGt (from bb-nr5g_struct.h)
+static int dissect_sp_cell_cfg_ded(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                  guint offset)
+{
+    guint start_spcell_cfg_ded_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_sp_cell_cfg_ded, tvb,
+                                                         offset, 0,
+                                                          "", "SP Cell Cfg Dedicated");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_sp_cell_cfg_ded);
+
+    // FieldMask
+    proto_tree_add_item(config_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+
+    gboolean tdd_ded_present, dl_ded_present, ul_ded_present, sup_ul_present;
+    gboolean cross_carrier_sched_present, lte_crs_tomatcharound_setup;
+    gboolean dormantbwp_setup, lte_crs_pattern_list1_setup, lte_crs_pattern_list2_setup;
+
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_tdd_ded_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &tdd_ded_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_dl_ded_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dl_ded_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_ul_ded_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &ul_ded_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_sup_ul_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &sup_ul_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_cross_carrier_sched_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &cross_carrier_sched_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &lte_crs_tomatcharound_setup);
+    proto_tree_add_item(config_tree, hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_dormantbwp_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dormantbwp_setup);
+    proto_tree_add_item(config_tree, hf_l2server_sp_cell_cfg_dormantbwp_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &lte_crs_pattern_list1_setup);
+    proto_tree_add_item(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &lte_crs_pattern_list2_setup);
+    proto_tree_add_item(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // ServCellIdx
+    proto_tree_add_item(config_tree, hf_l2server_serv_cell_idx, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // BwpInactivityTimer
+    proto_tree_add_item(config_tree, hf_l2server_bwp_inactivity_timer, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // TagId
+    proto_tree_add_item(config_tree, hf_l2server_tag_id, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // SCellDeactTimer
+    proto_tree_add_item(config_tree, hf_l2server_scell_deact_timer, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // Dummy
+    offset += 1;
+    proto_tree_add_item(config_tree, hf_l2server_dummy, tvb, offset, 1, ENC_NA);
+    // PathlossRefLinking
+    proto_tree_add_item(config_tree, hf_l2server_pathloss_ref_linking, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // ServCellMO
+    proto_tree_add_item(config_tree, hf_l2server_serv_cell_mo, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // DefaultDlBwpId
+    proto_tree_add_item(config_tree, hf_l2server_default_dl_bwpid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // SupplUlRel
+    proto_tree_add_item(config_tree, hf_l2server_supp_ul_rel, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // CaSlotOffsetIsValid
+    proto_tree_add_item(config_tree, hf_l2server_ca_slot_offset_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // NbLteSrsPatternList1_r16
+    proto_tree_add_item(config_tree, hf_l2server_nb_lte_srs_patternlist_1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // NbLteCrsPatternList2_r16
+    proto_tree_add_item(config_tree, hf_l2server_nb_lte_srs_patternlist_2, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // CaSlotOffset_r16 (actually a union)
+    proto_tree_add_item(config_tree, hf_l2server_ca_slot_offset_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // N.B. Not really interested in r16-only fields for now..
+    // CsiRsValidWithDCI_r16
+    proto_tree_add_item(config_tree, hf_l2server_csi_rs_valid_with_dci_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // TODO:
+    // CrsRateMatchPerCORESETPoolIdx_r16
+    offset += 1;
+    // EnableTwoDefaultTCIStates_r16
+    offset += 1;
+    // EnableDefTCIStatePerCoresetPoolIdx_r16
+    offset += 1;
+    // EnableBeamSwitchTiming_r16
+    offset += 1;
+    // CbgTxDiffTBsProcessingType1_r16
+    offset += 1;
+    // CbgTxDiffTBsProcessingType2_r16
+    offset += 1;
+    // FirstActiveUlBwp_pCell
+    proto_tree_add_item(config_tree, hf_l2server_first_active_ul_bwp_pcell, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // These groups all depend upon fieldmask's present flags.
+
+    // TddDlUlConfDed (bb_nr5g_TDD_UL_DL_CONFIG_DEDICATEDt)
+    if (tdd_ded_present) {
+        guint32 start_offset = offset;
+        proto_item *ded_ti = proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_tdd, tvb,
+                                                          offset, sizeof(bb_nr5g_TDD_UL_DL_CONFIG_DEDICATEDt),
+                                                          "", "TDD UL DL Config");
+        proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_tdd);
+
+        // NbSlotSpecCfgAddMod
+        uint32_t nbSlotSpecCfgAddMod;
+        proto_tree_add_item_ret_uint(ded_tree, hf_l2server_nbslotspeccfg_addmod, tvb, offset, 2, ENC_LITTLE_ENDIAN, &nbSlotSpecCfgAddMod);
+        offset += 2;
+        // NbSlotSpecCfgDel
+        uint32_t nbSlotSpecCfgDel;
+        proto_tree_add_item_ret_uint(ded_tree, hf_l2server_nbslotspeccfg_del, tvb, offset, 2, ENC_LITTLE_ENDIAN, &nbSlotSpecCfgDel);
+        offset += 2;
+        // SlotSpecCfgAddMod
+        offset += (nbSlotSpecCfgAddMod * sizeof(bb_nr5g_TDD_UL_DL_SLOT_CONFIGt));
+        // SlotSpecCfgDel
+        offset += (nbSlotSpecCfgDel * sizeof(uint32_t));
+
+        proto_item_set_len(ded_ti, offset-start_offset);
+    }
+
+    // DlCellCfgDed (bb_nr5g_DOWNLINK_DEDICATED_CONFIGt from bb-nr5g_struct.h)
+    if (dl_ded_present) {
+        guint start_offset = offset;
+        proto_item *ded_ti = proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_dl, tvb,
+                                                              offset, 0,
+                                                              "", "DL Config");
+        proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_dl);
+
+        // FieldMask
+        guint32 field_mask;
+        proto_tree_add_item_ret_uint(ded_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN, &field_mask);
+        proto_tree_add_item(ded_tree, hf_l2server_initial_dl_bwp_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(ded_tree, hf_l2server_pdsch_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(ded_tree, hf_l2server_pdsch_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(ded_tree, hf_l2server_pdcch_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(ded_tree, hf_l2server_pdcch_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(ded_tree, hf_l2server_csi_meas_config_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item(ded_tree, hf_l2server_csi_meas_config_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+
+        // FirstActiveDlBwp
+        proto_tree_add_item(ded_tree, hf_l2server_first_active_dl_bwp, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // DefaultDlBwp
+        proto_tree_add_item(ded_tree, hf_l2server_default_dl_bwpid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+
+        // NbDlBwpIdToDel
+        guint32 nbDlBwpIdToDel;
+        proto_tree_add_item_ret_uint(ded_tree, hf_l2server_nbdlbwpidtodel, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nbDlBwpIdToDel);
+        offset += 1;
+        // NbDlBwpIdToAdd
+        guint32 nbDlBwpIdToAdd;
+        proto_tree_add_item_ret_uint(ded_tree, hf_l2server_nbdlbwpidtoadd, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nbDlBwpIdToAdd);
+        offset += 1;
+        // NbDlBwpScsSpecCarrier
+        guint32 nbDlBwpScsSpecCarrier;
+        proto_tree_add_item_ret_uint(ded_tree, hf_l2server_nb_dl_bwp_scs_spec_carrier, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nbDlBwpScsSpecCarrier);
+        offset += 1;
+
+        // NbRateMatchPatternDedToAdd
+        gint32 nbRateMatchPatternDedToAdd;
+        proto_tree_add_item_ret_int(ded_tree, hf_l2server_nb_rate_match_pattern_to_add_mod, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nbRateMatchPatternDedToAdd);
+        offset += 1;
+        // NbRateMatchPatternDedToDel
+        gint32 nbRateMatchPatternDedToDel;
+        proto_tree_add_item_ret_int(ded_tree, hf_l2server_nb_rate_match_pattern_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nbRateMatchPatternDedToDel);
+        offset += 1;
+
+        // Pad
+        proto_tree_add_item(ded_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
+        offset += 1;
+
+        // DlBwpIdToDel
+        for (guint n=0; n < bb_nr5g_MAX_NB_BWPS; n++) {
+            proto_item *del_ti = proto_tree_add_item(ded_tree, hf_l2server_dl_bwp_id_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            if (n >= nbDlBwpIdToDel) {
+                proto_item_append_text(del_ti, " (not in use)");
+            }
+            offset++;
+        }
+
+        // Optional fields.
+
+        // InitialDlBwp
+        if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_INITIAL_DL_BWP_PRESENT) {
+            offset = dissect_bwp_dl_dedicated(ded_tree, tvb, pinfo, offset, "Initial DL BWP", TRUE);
+        }
+        // PdschServingCellCfg
+        if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDSCH_SETUP) {
+            offset = dissect_pdsch_dedicated(ded_tree, tvb, pinfo, offset);
+        }
+        // PdcchServingCellCfg
+        if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDCCH_SETUP) {
+            offset = dissect_pdcch_dedicated(ded_tree, tvb, pinfo, offset);
+
+        }
+        // CsiMeasCfg
+        if (field_mask & bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_CSI_MEAS_CFG_SETUP) {
+            offset = dissect_csi_meas_config(ded_tree, tvb, pinfo, offset);
+        }
+
+        // TODO: still quite a lot to do here...
+
+        // DlBwpIdToAdd (bb_nr5g_BWP_DOWNLINKt entries)
+        for (guint n=0; n < nbDlBwpIdToAdd; n++) {
+            offset = dissect_bwp_downlink(ded_tree, tvb, pinfo, offset);
+        }
+
+        // DlChannelBwPerScs (fixed size)
+        offset += (nbDlBwpScsSpecCarrier * sizeof(bb_nr5g_SCS_SPEC_CARRIERt));
+        // RateMatchPatternDedToAdd (fixed size)
+        offset += (nbRateMatchPatternDedToAdd * sizeof(bb_nr5g_RATE_MATCH_PATTERNt));
+        // RateMatchPatternDedToDel
+        offset += (nbRateMatchPatternDedToDel * sizeof(uint32_t));
+
+        proto_item_set_len(ded_ti, offset-start_offset);
+    }
+
+    // N.B. Can't start UL config yet as offset after DL won't be correct yet!!!!!!
+
+    // UlCellCfgDed (bb_nr5g_UPLINK_DEDICATED_CONFIGt from bb-nr5g_struct.h)
+    if (false && ul_ded_present) {
+        guint start_offset = offset;
+        proto_item *ded_ti = proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_ul, tvb,
+                                                              offset, sizeof(bb_nr5g_UPLINK_DEDICATED_CONFIGt),
+                                                              "", "UL Config");
+        proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_ul);
+
+        // FieldMask
+        guint32 field_mask;
+        proto_tree_add_item_ret_uint(ded_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN, &field_mask);
+        offset += 4;
+        // FirstActiveUlBwp
+        proto_tree_add_item(ded_tree, hf_l2server_first_active_ul_bwp, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // PowerBoostPi2BPSK
+        offset += 1;
+        // NbUlBwpIdToDel
+        offset += 1;
+        // NbUlBwpIdToAdd
+        offset += 1;
+        // NbUlBwpScsSpecCarrier
+        offset += 1;
+        // Pad
+        proto_tree_add_item(ded_tree, hf_l2server_pad, tvb, offset, 3, ENC_NA);
+        offset += 3;
+        // UlBwpIdToDel
+        offset += (bb_nr5g_MAX_NB_BWPS * 1);
+
+        // InitialUlBwp
+        if (field_mask & bb_nr5g_STRUCT_UPLINK_DEDICATED_CONFIG_INITIAL_UL_BWP_PRESENT) {
+            // TODO: bb_nr5g_BWP_UPLINKDEDICATEDt
+            // A lot of FieldMask bits and other types inside here...
+            printf("handle bb_nr5g_BWP_UPLINKDEDICATEDt here\n");
+        }
+
+
+        proto_item_set_len(ded_ti, offset-start_offset);
+    }
+
+    // SulCellCfgDed (bb_nr5g_UPLINK_DEDICATED_CONFIGt)
+    if (sup_ul_present) {
+        /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_sup_ul, tvb,
+                                                              offset, sizeof(bb_nr5g_UPLINK_DEDICATED_CONFIGt),
+                                                              "", "SUP UL Config");
+        //proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_sup_ul);
+        offset += sizeof(bb_nr5g_UPLINK_DEDICATED_CONFIGt);
+    }
+
+    // CrossCarrierSchedulingConfig (bb_nr5g_CROSS_CARRIER_SCHEDULING_CONFIGt)
+    if (cross_carrier_sched_present) {
+        /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_cross_carrier_sched, tvb,
+                                                              offset, sizeof(bb_nr5g_UPLINK_DEDICATED_CONFIGt),
+                                                              "", "Cross Carrier Sched");
+        //proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_cross_carrier_sched);
+        /* N.B. Fixed size */
+        offset += sizeof(bb_nr5g_CROSS_CARRIER_SCHEDULING_CONFIGt);
+    }
+
+    // LteCrsToMatchAround (bb_nr5g_RATE_MATCH_PATTERN_LTEt)
+    if (lte_crs_tomatcharound_setup) {
+        /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_lte_crs_tomatcharound, tvb,
+                                                              offset, sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt),
+                                                              "", "tomatcharound");
+        //proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_lte_crs_tomatcharound);
+        offset += sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt);
+    }
+
+    // DormantBWP_Config_r16 (bb_nr5g_DORMANTBWP_CONFIGt)
+    if (dormantbwp_setup) {
+        /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_dormantbwp, tvb,
+                                                              offset, sizeof(bb_nr5g_DORMANTBWP_CONFIGt),
+                                                              "", "Dormant-BWP Config");
+        //proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_dormantbwp);
+        offset += sizeof(bb_nr5g_DORMANTBWP_CONFIGt);
+    }
+
+    // LteCrsPatternList1_r16 (bb_nr5g_RATE_MATCH_PATTERN_LTEt)
+    if (lte_crs_pattern_list1_setup) {
+        /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list1, tvb,
+                                                              offset, sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt),
+                                                              "", "LTE CRS Pattern List1");
+        //proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_lte_crs_pattern_list1);
+        offset += sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt);
+    }
+
+    // LteCrsPatternList2_r16 (bb_nr5g_RATE_MATCH_PATTERN_LTEt)
+    if (lte_crs_pattern_list2_setup) {
+        /*proto_item *ded_ti =*/ proto_tree_add_string_format(config_tree, hf_l2server_sp_cell_cfg_lte_crs_pattern_list2, tvb,
+                                                              offset, sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt),
+                                                              "", "LTE CRS Pattern List2");
+        //proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_sp_cell_cfg_lte_crs_pattern_list2);
+        offset += sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt);
+    }
+
+    proto_item_set_len(config_ti, offset-start_spcell_cfg_ded_offset);
+
+    return offset;
+}
+
+// bb_nr5g_BWPt
+static int dissect_genbwp(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset)
+{
+    proto_item *genbwp_ti = proto_tree_add_string_format(tree, hf_l2server_genbwp, tvb,
+                                                         offset, sizeof(bb_nr5g_BWPt),
+                                                          "", "GenBwp");
+    proto_tree *genbwp_tree = proto_item_add_subtree(genbwp_ti, ett_l2server_genbwp);
+
+    // LocAndBw
+    guint32 loc_and_bw;
+    proto_tree_add_item_ret_uint(genbwp_tree, hf_l2server_loc_and_bw, tvb, offset, 2, ENC_LITTLE_ENDIAN, &loc_and_bw);
+    offset += 2;
+
+    // SubCarSpacing
+    gint32 sub_carr_spacing;
+    proto_tree_add_item_ret_int(genbwp_tree, hf_l2server_sub_car_spacing, tvb, offset, 1, ENC_LITTLE_ENDIAN, &sub_carr_spacing);
+    offset += 1;
+    // CyclicPrefix
+    proto_tree_add_item(genbwp_tree, hf_l2server_cyclic_prefix, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    proto_item_append_text(genbwp_ti, " (LowAndBw=%u, SCS=%d)", loc_and_bw, sub_carr_spacing);
+
+    return offset;
+}
+
+
+
+// bb_nr5g_PDCCH_CONF_COMMONt
+static int dissect_pdcch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
+                                     guint offset, gboolean serialize)
+{
+    gint pdcch_offset = offset;
+
+    // Subtree.
+    proto_item *pdcch_ti = proto_tree_add_string_format(tree, hf_l2server_ul_bwp_common_pdcch, tvb,
+                                                        offset, 1, "", "PDCCH");
+    proto_tree *pdcch_tree = proto_item_add_subtree(pdcch_ti, ett_l2server_ul_bwp_common_pdcch);
+
+    // SearchSpaceSIB1
+    proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_search_space_sib1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // SearchSpaceSIB
+    proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_search_space_sib, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // PagSearchSpace
+    proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_pag_search_space, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // RaSearchSpace
+    proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_ra_search_space, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // RaCtrlResSet
+    proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_ra_ctrl_res_set, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // NbCommonCtrlResSets
+    guint32 nb_common_ctrl_res_sets;
+    proto_tree_add_item_ret_uint(pdcch_tree, hf_l2server_ul_bwp_common_nb_common_ctrl_res_sets, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_common_ctrl_res_sets);
+    offset += 1;
+    // NbCommonSearchSpaces
+    guint32 nb_common_search_spaces;
+    proto_tree_add_item_ret_uint(pdcch_tree, hf_l2server_ul_bwp_common_nb_common_search_spaces, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_common_search_spaces);
+    offset += 1;
+    // ControlResourceSetZero
+    proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_control_resource_set_zero, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // SearchSpaceZero
+    proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_search_space_zero, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // FirstPdcchMonitOccOfPOIsValid
+    guint32 first_pdcch_moni_occ_of_po_valid;
+    proto_tree_add_item_ret_uint(pdcch_tree, hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &first_pdcch_moni_occ_of_po_valid);
+    offset += 1;
+    // NbFirstPdcchMonitOccOfPO
+    guint32 nb_first_pdcch_moni_occ_of_po;
+    proto_tree_add_item_ret_uint(pdcch_tree, hf_l2server_ul_bwp_common_nb_first_pdcch_monit_occ_of_po, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_first_pdcch_moni_occ_of_po);
+    offset += 1;
+    // NbCommonSearchSpacesExt
+    guint32 nb_common_search_spaces_ext;
+    proto_tree_add_item_ret_uint(pdcch_tree, hf_l2server_ul_bwp_common_nb_common_search_spaces_ext, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_common_search_spaces_ext);
+    offset += 1;
+
+    // CommonCtrlResSets
+    guint loops = (serialize) ? nb_common_ctrl_res_sets : bb_nr5g_COMMON_CTRL_RES_SET_SIZE;
+    for (guint32 ccrs=0; ccrs < loops; ccrs++) {
+        offset = dissect_control_res_set(pdcch_tree, tvb, pinfo, offset);
+    }
+
+    // CommonSearchSpaces
+    loops = (serialize) ? nb_common_search_spaces : bb_nr5g_COMMON_SEARCH_SPACE_SIZE;
+    for (guint32 ccs=0; ccs < loops; ccs++) {
+        // bb_nr5g_SEARCH_SPACEt
+        offset = dissect_search_space(pdcch_tree, tvb, pinfo, offset, ccs < nb_common_search_spaces);
+    }
+
+    // FirstPdcchMonitOccOfPO
+    loops = (serialize) ? nb_first_pdcch_moni_occ_of_po : bb_nr5g_MAX_PO_PERPF;
+    for (guint32 mon_occ=0; mon_occ < loops; mon_occ++) {
+        proto_item *ti = proto_tree_add_item(pdcch_tree, hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        if (mon_occ >= nb_first_pdcch_moni_occ_of_po) {
+            proto_item_append_text(ti, " (not set)");
+        }
+        offset += 2;
+    }
+
+    // CommonSearchSpacesExt_r16
+    loops = (serialize) ? nb_common_search_spaces_ext : bb_nr5g_COMMON_SEARCH_SPACE_SIZE;
+    for (guint32 ss_ext=0; ss_ext < loops; ss_ext++) {
+        // Subtree.
+        proto_item *css_ext_ti = proto_tree_add_string_format(pdcch_tree, hf_l2server_ccs_ext, tvb,
+                                                              offset, sizeof(bb_nr5g_SEARCH_SPACE_EXTt),
+                                                              "", "CommonSearchSpacesExt_r16");
+        proto_tree *css_ext_tree = proto_item_add_subtree(css_ext_ti, ett_l2server_ccs_ext);
+
+        if (ss_ext >= nb_common_search_spaces_ext) {
+            proto_item_append_text(css_ext_ti, " (not set)");
+        }
+        else {
+            // FieldMask
+            proto_tree_add_item(css_ext_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+            // TODO:
+        }
+        // N.B. fixed size, even in serialized case.
+        offset += sizeof(bb_nr5g_SEARCH_SPACE_EXTt);
+    }
+
+    proto_item_set_len(pdcch_ti, offset-pdcch_offset);
+    return offset;
+}
+
+
+static int dissect_scs_spec_carrier(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                    guint offset, gboolean is_set)
+{
+    proto_item *ssc_ti = proto_tree_add_string_format(tree, hf_l2server_scs_spec_carrier, tvb,
+                                                      offset, sizeof(bb_nr5g_SCS_SPEC_CARRIERt),
+                                                      "", "SCS Spec Carrier ");
+    proto_tree *ssc_tree = proto_item_add_subtree(ssc_ti, ett_l2server_scs_spec_carrier);
+
+    if (is_set) {
+        // SubCarrSpacing
+        proto_tree_add_item(ssc_tree, hf_l2server_sub_car_spacing, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // K0
+        proto_tree_add_item(ssc_tree, hf_l2server_k0, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // OffsetToCarrier
+        proto_tree_add_item(ssc_tree, hf_l2server_offset_to_carrier, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+        // CarrierBandwidth
+        proto_tree_add_item(ssc_tree, hf_l2server_carrier_bandwidth, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+        // Spare[2]
+        proto_tree_add_item(ssc_tree, hf_l2server_spare2, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+    }
+    else {
+        proto_item_append_text(ssc_ti, " (not set)");
+        offset += sizeof(bb_nr5g_SCS_SPEC_CARRIERt);
+    }
+
+    return offset;
+}
+
+// bb_nr5g_PUSCH_TIMEDOMAINRESALLOCt
+static int dissect_pusch_timedomainresalloc(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                            guint offset, gboolean is_set)
+{
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_pusch_time_domain_res_alloc, tvb,
+                                                      offset, sizeof(bb_nr5g_PUSCH_TIMEDOMAINRESALLOCt),
+                                                      "", "PUSCH TimeDomainResAlloc");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_pusch_time_domain_res_alloc);
+
+    if (is_set) {
+        // K2
+        guint32 k2;
+        proto_tree_add_item_ret_uint(config_tree, hf_l2server_k2, tvb, offset, 1, ENC_LITTLE_ENDIAN, &k2);
+        offset += 1;
+        // MappingType
+        proto_tree_add_item(config_tree, hf_l2server_mapping_type, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // StartSymbAndLen
+        guint32 start_symb_and_len;
+        proto_tree_add_item_ret_uint(config_tree, hf_l2server_start_sym_and_len, tvb, offset, 1, ENC_LITTLE_ENDIAN, &start_symb_and_len);
+        offset += 1;
+        // Pad
+        proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
+        offset += 1;
+
+        proto_item_append_text(config_ti, " (K2=%u  StartSymbAndLen=%u)", k2, start_symb_and_len);
+    }
+    else {
+        proto_item_append_text(config_ti, " (not set)");
+        offset += sizeof(bb_nr5g_PUSCH_TIMEDOMAINRESALLOCt);
+    }
+
+    return offset;
+}
+
+
+// bb_nr5g_RACH_CONF_COMMONt
+// N.B. unchanged by serialization.
+static int dissect_rach_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset,
+                                    gboolean present)
+{
+    gint start_offset = offset;
+
+    // Subtree.
+    proto_item *rach_ti = proto_tree_add_string_format(tree, hf_l2server_rach_common, tvb,
+                                                       offset, 1, "", "RACH_CONF_COMMON");
+    proto_tree *rach_tree = proto_item_add_subtree(rach_ti, ett_l2server_rach_common);
+
+    if (present) {
+        // FieldMask
+        guint32 rach_fieldmask;
+        proto_tree_add_item_ret_uint(rach_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                     ENC_LITTLE_ENDIAN, &rach_fieldmask);
+        offset += 4;
+
+        //--------------------------------
+        // RachConfGeneric
+
+        // Subtree.
+        proto_item *generic_ti = proto_tree_add_string_format(rach_tree, hf_l2server_rach_generic, tvb,
+                                                             offset, 1, "", "RACH Generic ");
+        proto_tree *generic_tree = proto_item_add_subtree(generic_ti, ett_l2server_rach_generic);
+
+        // PrachConfigIndex
+        proto_tree_add_item(generic_tree, hf_l2server_prach_configindex, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+        // Msg1FDM
+        proto_tree_add_item(generic_tree, hf_l2server_msg1_fdm, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // Msg1FrequencyStart
+        proto_tree_add_item(generic_tree, hf_l2server_msg1_frequency_start, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+        // ZeroCorrZone
+        proto_tree_add_item(generic_tree, hf_l2server_zero_corr_zone, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // PreambleRecTargetPwr
+        proto_tree_add_item(generic_tree, hf_l2server_preamble_rec_target_pwr, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+
+        proto_item_set_len(generic_ti, sizeof(bb_nr5g_RACH_CONF_GENERICt));
+        //--------------------------------
+
+        // NbOfRaPreambles
+        proto_tree_add_item(rach_tree, hf_l2server_totalnumberofra_preambles, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // Msg1SubCarrSpacing
+        proto_tree_add_item(rach_tree, hf_l2server_msg1_subcarrier_spacing, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // RestSetConf
+        proto_tree_add_item(rach_tree, hf_l2server_rest_set_conf, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // Msg3TranfPrecoding
+        proto_tree_add_item(rach_tree, hf_l2server_msg3_tranform_precoding, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // RsrpThresholdSsb
+        proto_tree_add_item(rach_tree, hf_l2server_rsrp_threshold_ssb, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+
+        // RsrpThresholdSsbSul
+        proto_tree_add_item(rach_tree, hf_l2server_rsrp_threshold_ssb_sul, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // PrachRootSeqIndexIsValid
+        proto_tree_add_item(rach_tree, hf_l2server_prach_root_seq_index_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // SsbPerRachIsValid
+        proto_tree_add_item(rach_tree, hf_l2server_ssb_per_rach_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // PrachRootSeqIndex
+        proto_tree_add_item(rach_tree, hf_l2server_prach_root_seq_index, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+        // SsbPerRach
+        proto_tree_add_item(rach_tree, hf_l2server_ssb_per_rach, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+
+        // GroupBconfigure
+        {
+            proto_item *group_b_ti = proto_tree_add_string_format(rach_tree, hf_l2server_group_b_configured, tvb,
+                                                                 offset, 3, "", "Group B Configured");
+            proto_tree *group_b_tree = proto_item_add_subtree(group_b_ti, ett_l2server_group_b_configured);
+
+            // Ra_Msg3SizeGroupA
+            proto_tree_add_item(group_b_tree, hf_l2server_ra_msg3_size_group_a, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            // MessagePowerOffsetGroupB
+            proto_tree_add_item(group_b_tree, hf_l2server_message_power_offset_group_b, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            // NumberOfRA_PreamblesGroupA
+            proto_tree_add_item(group_b_tree, hf_l2server_number_of_ra_preambles_group_a, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+
+            // TODO: get vals & summary?
+        }
+
+        // Ra_ContentionResolutionTimer
+        proto_tree_add_item(rach_tree, hf_l2server_ra_contention_resolution_timer, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // Pad
+        proto_tree_add_item(rach_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
+        offset += 1;
+
+        // RaPrioritizationForAccessIdentity_r16 (bb_nr5g_RA_PRIO_FOR_ACCESS_ID_R16t)
+        if (rach_fieldmask & bb_nr5g_STRUCT_RA_PRIO_FOR_ACCESS_IDENTITY_PRESENT) {
+            offset += sizeof(bb_nr5g_RA_PRIO_FOR_ACCESS_ID_R16t);
+        }
+        else {
+            offset += sizeof(bb_nr5g_RA_PRIO_FOR_ACCESS_ID_R16t);
+        }
+    }
+    else {
+        offset += sizeof(bb_nr5g_RACH_CONF_COMMONt);
+        proto_item_append_text(rach_ti, " (not set)");
+    }
+
+    proto_item_set_len(rach_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_PUSCH_CONF_COMMONt
+static int dissect_pusch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset,
+                                     gboolean present)
+{
+    gint start_offset = offset;
+
+    // Subtree.
+    proto_item *pusch_ti = proto_tree_add_string_format(tree, hf_l2server_pusch_common   , tvb,
+                                                       offset, sizeof(bb_nr5g_PUSCH_CONF_COMMONt), "", "PUSCH_CONF_COMMON");
+    proto_tree *pusch_tree = proto_item_add_subtree(pusch_ti, ett_l2server_pusch_common);
+
+    if (present) {
+        // GroupHopEnabledTransfPrecoding
+        proto_tree_add_item(pusch_tree, hf_l2server_group_hop_enabled_transf_precoding, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // Msg3DeltaPreamble
+        proto_tree_add_item(pusch_tree, hf_l2server_msg3_delta_preamble, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // P0NomWithGrant
+        proto_tree_add_item(pusch_tree, hf_l2server_p0_nom_with_grant, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+        // NbPuschTimeDomResAlloc
+        guint32 nb_pusch_time_dom_res_alloc;
+        proto_tree_add_item_ret_uint(pusch_tree, hf_l2server_nb_pusch_time_dom_res_alloc, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_pusch_time_dom_res_alloc);
+        offset += 1;
+
+        // Spare[3]
+        proto_tree_add_item(pusch_tree, hf_l2server_spare, tvb, offset, 3, ENC_NA);
+        offset += 3;
+
+        // PuschTimeDomResAlloc (bb_nr5g_PUSCH_TIMEDOMAINRESALLOCt entries)
+        for (uint n=0; n < bb_nr5g_MAX_NB_UL_ALLOCS; n++) {
+            offset = dissect_pusch_timedomainresalloc(pusch_tree, tvb, pinfo, offset,
+                                                      n < nb_pusch_time_dom_res_alloc);
+        }
+    }
+    else {
+        offset += sizeof(bb_nr5g_PUSCH_CONF_COMMONt);
+        proto_item_append_text(pusch_ti, " (not set)");
+    }
+
+    proto_item_set_len(pusch_ti, offset-start_offset);
+    return offset;
+}
+
+
+// bb_nr5g_PUCCH_CONF_COMMONt
+static int dissect_pucch_conf_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset, gboolean present)
+{
+    gint start_offset = offset;
+
+    // Subtree.
+    proto_item *pucch_ti = proto_tree_add_string_format(tree, hf_l2server_pucch_common   , tvb,
+                                                       offset, sizeof(bb_nr5g_PUCCH_CONF_COMMONt), "", "PUCCH_CONF_COMMON");
+    proto_tree *pucch_tree = proto_item_add_subtree(pucch_ti, ett_l2server_pucch_common);
+
+    if (present) {
+        // PucchResCommon
+        proto_tree_add_item(pucch_tree, hf_l2server_pucch_res_common, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // PucchGroupHop
+        proto_tree_add_item(pucch_tree, hf_l2server_pucch_group_hop, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // HoppingId
+        proto_tree_add_item(pucch_tree, hf_l2server_pucch_hopping_id, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+        // P0Nom
+        proto_tree_add_item(pucch_tree, hf_l2server_p0_nom, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+        // Spare[2]
+        proto_tree_add_item(pucch_tree, hf_l2server_spare, tvb, offset, 2, ENC_NA);
+        offset += 2;
+    }
+    else {
+        offset += sizeof(bb_nr5g_PUCCH_CONF_COMMONt);
+        proto_item_append_text(pucch_ti, " (not set)");
+    }
+
+    proto_item_set_len(pucch_ti, offset-start_offset);
+    return offset;
+}
+
+// bb_nr5g_BWP_UPLINKCOMMONt (from bb-nr5g_struct.h)
+static int dissect_bwp_uplinkcommon(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                    guint offset, const char *label,
+                                    gboolean present, gboolean serialize _U_)
+{
+    gint ul_bwp_start = offset;
+
+    // Subtree.
+    proto_item *ul_bwp_ti = proto_tree_add_string(tree, hf_l2server_initial_ul_bwp, tvb,
+                                                  offset, sizeof(bb_nr5g_BWP_UPLINKCOMMONt),
+                                                  label);
+    proto_tree *ul_bwp_tree = proto_item_add_subtree(ul_bwp_ti, ett_l2server_initial_ul_bwp);
+
+    if (present) {
+
+        // FieldMask
+        guint32 init_ul_bwp_fieldmask;
+        proto_tree_add_item_ret_uint(ul_bwp_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                     ENC_LITTLE_ENDIAN, &init_ul_bwp_fieldmask);
+        gboolean rach_setup, pusch_setup, pucch_setup;
+        proto_tree_add_item_ret_boolean(ul_bwp_tree, hf_l2server_bwp_ul_common_rach_setup_present,   tvb, offset, 4, ENC_LITTLE_ENDIAN, &rach_setup);
+        proto_tree_add_item(ul_bwp_tree, hf_l2server_bwp_ul_common_rach_release_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item_ret_boolean(ul_bwp_tree, hf_l2server_bwp_ul_common_pusch_setup_present,   tvb, offset, 4, ENC_LITTLE_ENDIAN, &pusch_setup);
+        proto_tree_add_item(ul_bwp_tree, hf_l2server_bwp_ul_common_pusch_release_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item_ret_boolean(ul_bwp_tree, hf_l2server_bwp_ul_common_pucch_setup_present,   tvb, offset, 4, ENC_LITTLE_ENDIAN, &pucch_setup);
+        proto_tree_add_item(ul_bwp_tree, hf_l2server_bwp_ul_common_pucch_release_present, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+
+        // UseInterlacePUCCH_PUSCH_r16
+        offset += 1;
+
+        // Pad[3]
+        proto_tree_add_item(ul_bwp_tree, hf_l2server_pad, tvb, offset, 3, ENC_NA);
+        offset += 3;
+
+        // GenBwp (bb_nr5g_BWPt)
+        offset = dissect_genbwp(ul_bwp_tree, tvb, pinfo, offset);
+
+        // Serialize just writes all of these..
+        // TODO: pass in 'set' flag.
+
+        // RachCfgCommon (bb_nr5g_RACH_CONF_COMMONt)
+        offset = dissect_rach_conf_common(ul_bwp_tree, tvb, pinfo, offset, rach_setup);
+
+        // PuschCfgCommon (tm_bb_nr5g_PUSCH_CONF_COMMONt)
+        offset = dissect_pusch_conf_common(ul_bwp_tree, tvb, pinfo, offset, pusch_setup);
+
+        // PucchCfgCommon (bb_nr5g_PUCCH_CONF_COMMONt)
+        offset = dissect_pucch_conf_common(ul_bwp_tree, tvb, pinfo, offset, pucch_setup);
+    }
+    else {
+        // Not dissecting..
+        offset += sizeof(bb_nr5g_BWP_UPLINKCOMMONt);
+        proto_item_append_text(ul_bwp_ti, " (not set)");
+    }
+
+    proto_item_set_len(ul_bwp_ti, offset-ul_bwp_start);
+
+    return offset;
+}
+
+
+// bb_nr5g_FREQINFO_ULt (from bb-nr5g_struct.h)
+static int dissect_freqinfo_ul(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                               guint offset, const char *label, gboolean present, gboolean serialize _U_)
+{
+    gint freq_info_ul_offset = offset;
+
+    // Subtree.
+    proto_item *freq_info_ul_common_ti = proto_tree_add_string(tree, hf_l2server_freq_info_ul_common, tvb,
+                                                               offset, sizeof(bb_nr5g_FREQINFO_ULt),
+                                                               label);
+    proto_tree *freq_info_ul_common_tree = proto_item_add_subtree(freq_info_ul_common_ti, ett_l2server_freq_info_ul_common);
+
+    if (present) {
+        // AbsFreqPointA
+        proto_tree_add_item(freq_info_ul_common_ti, hf_l2server_abs_freq_point_a, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+        // AddSpectrumEmission
+        proto_tree_add_item(freq_info_ul_common_ti, hf_l2server_add_spectrum_emission, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // FreqShift7p5khz
+        proto_tree_add_item(freq_info_ul_common_ti, hf_l2server_freq_shift_7p5khz, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // PMax
+        proto_tree_add_item(freq_info_ul_common_ti, hf_l2server_pmax, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // NbFreqBandList
+        guint32 nb_freq_band_list;
+        proto_tree_add_item_ret_uint(freq_info_ul_common_ti, hf_l2server_nb_freq_band_list, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_freq_band_list);
+        offset += 1;
+        // NbScsSpecCarrier
+        gint32 nb_scs_spec_carrier;
+        proto_tree_add_item_ret_int(freq_info_ul_common_ti, hf_l2server_nb_scs_spec_carrier, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_scs_spec_carrier);
+        offset += 1;
+        // Spare[3]
+        proto_tree_add_item(freq_info_ul_common_tree, hf_l2server_spare, tvb, offset, 3, ENC_NA);
+        offset += 3;
+
+        // FreqBandList
+        for (guint n=0; n < bb_nr5g_MAX_NB_MULTIBANDS; n++) {
+            proto_item *ti = proto_tree_add_item(freq_info_ul_common_ti, hf_l2server_freq_band, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+            if (n >= nb_freq_band_list) {
+                proto_item_append_text(ti, " (not set)");
+            }
+            offset += 2;
+        }
+
+        // ScsSpecCarrier
+        for (gint n=0; n < bb_nr5g_MAX_SCS; n++) {
+            offset = dissect_scs_spec_carrier(freq_info_ul_common_tree, tvb, pinfo, offset, n<nb_scs_spec_carrier);
+        }
+    }
+    else {
+        proto_item_append_text(freq_info_ul_common_ti, " (not set)");
+        offset += sizeof(bb_nr5g_FREQINFO_ULt);
+    }
+
+    proto_item_set_len(freq_info_ul_common_ti, offset-freq_info_ul_offset);
+
+    return offset;
+}
+
+// bb_nr5g_TDD_UL_DL_CONFIG_COMMONt
+static gint dissect_tdd_ul_dl_pattern(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, gint offset,
+                                      const char *label, gboolean present)
+{
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string(tree, hf_l2server_tdd_ul_dl_pattern, tvb,
+                                                  offset, sizeof(bb_nr5g_TDD_UL_DL_PATTERNt),
+                                                  label);
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_tdd_ul_dl_pattern);
+
+    if (present) {
+        // DlULTransmPeriodicityIsValid
+        proto_tree_add_item(config_tree, hf_l2server_dl_ul_transm_periodicity_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // DlULTransmPeriodicity
+        proto_tree_add_item(config_tree, hf_l2server_dl_ul_transm_periodicity, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // NrDLSlots
+        proto_tree_add_item(config_tree, hf_l2server_nr_dl_slots, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+        // NrDLSymbols
+        proto_tree_add_item(config_tree, hf_l2server_nr_dl_symbols, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // NrULSymbols
+        proto_tree_add_item(config_tree, hf_l2server_nr_ul_symbols, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // NrULSlots
+        proto_tree_add_item(config_tree, hf_l2server_nr_ul_slots, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 2;
+    }
+    else {
+        offset += sizeof(bb_nr5g_TDD_UL_DL_CONFIG_COMMONt);
+        proto_item_append_text(config_ti, " (not set)");
+    }
+
+    return offset;
+}
+
+// bb_nr5g_SERV_CELL_CONFIG_COMMONt (from bb-nr5g_struct.h)
+static int dissect_sp_cell_cfg_common(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
+                                      guint offset, gboolean serialize)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *config_ti = proto_tree_add_string_format(tree, hf_l2server_sp_cell_cfg_common, tvb,
+                                                         offset, 0,
+                                                          "", "SP Cell Cfg Common");
+    proto_tree *config_tree = proto_item_add_subtree(config_ti, ett_l2server_sp_cell_cfg_common);
+
+    // FieldMask
+    guint32 fieldmask;
+    gboolean freqinfo_dl_present, bwp_dl_present, freqinfo_ul_present, bwp_ul_present, freqinfo_sul_present, bwp_sul_present,
+             tdd_present, tomatcharound_setup, hs_r16_present;
+    proto_tree_add_item_ret_uint(config_tree, hf_l2server_field_mask_4, tvb, offset, 4, ENC_LITTLE_ENDIAN, &fieldmask);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_freqinfo_dl_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &freqinfo_dl_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_bwp_dl_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &bwp_dl_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_freqinfo_ul_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &freqinfo_ul_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_bwp_ul_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &bwp_ul_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_freqinfo_sul_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &freqinfo_sul_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_bwp_sul_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &bwp_sul_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_tdd_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &tdd_present);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_tomatcharound_setup, tvb, offset, 4, ENC_LITTLE_ENDIAN, &tomatcharound_setup);
+    proto_tree_add_item(config_tree, hf_l2server_serv_cell_tomatcharound_release, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item_ret_boolean(config_tree, hf_l2server_serv_cell_hs_r16_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &hs_r16_present);
+    offset += 4;
+
+    // ServCellIdx
+    proto_tree_add_item(config_tree, hf_l2server_serv_cell_idx, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // PhysCellId
+    proto_tree_add_item(config_tree, hf_l2server_physical_cellid, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // SsbPeriodicityServCell
+    proto_tree_add_item(config_tree, hf_l2server_ssb_periodicity_serv_cell, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // DmrsTypeAPos
+    proto_tree_add_item(config_tree, hf_l2server_dmrs_type_a_pos, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // SubCarSpacing
+    proto_tree_add_item(config_tree, hf_l2server_sub_car_spacing, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // SsbPosInBurstIsValid
+    gint32 ssb_in_burst_type;
+    proto_tree_add_item_ret_int(config_tree, hf_l2server_ssb_pos_in_burst_is_valid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &ssb_in_burst_type);
+    offset += 1;
+    // NTimingAdvanceOffset
+    proto_tree_add_item(config_tree, hf_l2server_n_timing_advance_offset, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // Pad[3]
+    proto_tree_add_item(config_tree, hf_l2server_pad, tvb, offset, 3, ENC_NA);
+    offset += 3;
+
+    // SsbPosInBurst (union)
+    switch (ssb_in_burst_type) {
+        case bb_nr5g_SSB_POS_IN_BURST_SHORT:
+            offset += 7;
+            proto_tree_add_item(config_tree, hf_l2server_ssb_pos_in_burst_short, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            break;
+        case bb_nr5g_SSB_POS_IN_BURST_MEDIUM:
+            offset += 7;
+            proto_tree_add_item(config_tree, hf_l2server_ssb_pos_in_burst_medium, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            break;
+        case bb_nr5g_SSB_POS_IN_BURST_LONG:
+            proto_tree_add_item(config_tree, hf_l2server_ssb_pos_in_burst_long, tvb, offset, 8, ENC_LITTLE_ENDIAN);
+            offset += 8;
+            break;
+    }
+
+    // PBCHBlockPower
+    proto_tree_add_item(config_tree, hf_l2server_pbch_block_power, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // NbRateMatchPatternToAddMod
+    proto_tree_add_item(config_tree, hf_l2server_nb_rate_match_pattern_to_add_mod, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // NbRateMatchPatternToDel
+    proto_tree_add_item(config_tree, hf_l2server_nb_rate_match_pattern_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // FreqInfoDL (bb_nr5g_FREQINFO_DLt)
+    if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_DL_COMMON_PRESENT)) {
+        guint32 freq_info_dl_start = offset;
+
+        if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_DL_COMMON_PRESENT) {
+            proto_item_append_text(config_ti, " (FreqInfoDL)");
+        }
+
+        // Subtree.
+        proto_item *freq_ti = proto_tree_add_string_format(config_tree, hf_l2server_freq_info_dl, tvb,
+                                                           offset, 0,
+                                                           "", "Freq Info DL");
+        proto_tree *freq_tree = proto_item_add_subtree(freq_ti, ett_l2server_freq_info_dl);
+
+        if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_DL_COMMON_PRESENT) {
+            // AbsFreqSSB
+            proto_tree_add_item(freq_tree, hf_l2server_abs_freq_ssb, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+            offset += 4;
+            // AbsFreqPointA
+            proto_tree_add_item(freq_tree, hf_l2server_abs_freq_point_a, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+            offset += 4;
+            // SsbSubcarrierOffset
+            proto_tree_add_item(freq_tree, hf_l2server_ssb_subcarrier_offset, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            // NbFreqBandList
+            guint32 nb_freq_band_list;
+            proto_tree_add_item_ret_uint(freq_tree, hf_l2server_nb_freq_band_list, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_freq_band_list);
+            offset += 1;
+            // NbScsSpecCarrier
+            gint32 nb_scs_spec_carrier;
+            proto_tree_add_item_ret_int(freq_tree, hf_l2server_nb_scs_spec_carrier, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nb_scs_spec_carrier);
+            offset += 1;
+            // Spare
+            proto_tree_add_item(freq_tree, hf_l2server_spare1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            // FreqBandList[]
+            guint loops = (serialize) ? nb_freq_band_list : bb_nr5g_MAX_NB_MULTIBANDS;
+            for (guint32 n=0; n < loops; n++) {
+                proto_item *ti = proto_tree_add_item(freq_tree, hf_l2server_freq_band_list, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+                if (n >= nb_freq_band_list) {
+                    proto_item_append_text(ti, " (not set)");
+                }
+                offset += 2;
+            }
+
+            // ScsSpecCarrier (entries are bb_nr5g_SCS_SPEC_CARRIERt)
+            loops = (serialize) ? nb_scs_spec_carrier : bb_nr5g_MAX_SCS;
+            for (gint n=0; n < (gint)loops; n++) {
+                offset = dissect_scs_spec_carrier(freq_tree, tvb, pinfo, offset, n<nb_scs_spec_carrier);
+            }
+
+        }
+        else {
+            offset += sizeof(bb_nr5g_FREQINFO_DLt);
+        }
+
+        proto_item_set_len(freq_ti, offset-freq_info_dl_start);
+    }
+
+    // InitDLBWP (bb_nr5g_BWP_DOWNLINKCOMMONt).
+    if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_DL_COMMON_PRESENT)) {
+        if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_DL_COMMON_PRESENT) {
+            proto_item_append_text(config_ti, " (InitDLBWP)");
+        }
+
+        offset = dissect_bwp_downlinkcommon(config_tree, tvb, pinfo, offset, "INIT DL BWP Common",
+                                            fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_DL_COMMON_PRESENT,
+                                            serialize);
+    }
+
+    // FreqInfoUL (bb_nr5g_FREQINFO_ULt). Just memcpy'd by serialization.
+    if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_UL_COMMON_PRESENT)) {
+        if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_UL_COMMON_PRESENT) {
+            proto_item_append_text(config_ti, " (FreqInfoUL)");
+        }
+
+        offset = dissect_freqinfo_ul(config_tree, tvb, pinfo, offset,
+                                     "Freq Info UL Common",
+                                     fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_UL_COMMON_PRESENT,
+                                     serialize);
+    }
+
+    // InitULBWP (bb_nr5g_BWP_UPLINKCOMMONt)
+    if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_UL_COMMON_PRESENT)) {
+        if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_UL_COMMON_PRESENT) {
+            proto_item_append_text(config_ti, " (InitULBWP)");
+        }
+
+        offset = dissect_bwp_uplinkcommon(config_tree, tvb, pinfo, offset,
+                                          "Initial UL BWP",
+                                          fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_UL_COMMON_PRESENT,
+                                          serialize);
+    }
+
+    // FreqInfoSUL (bb_nr5g_FREQINFO_ULt)
+    if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_SUL_COMMON_PRESENT)) {
+        if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_SUL_COMMON_PRESENT) {
+            proto_item_append_text(config_ti, " (FreqInfoSUL)");
+        }
+
+        offset = dissect_freqinfo_ul(config_tree, tvb, pinfo, offset,
+                                     "Freq Info SUL Common",
+                                     fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_SUL_COMMON_PRESENT,
+                                     serialize);
+    }
+
+    // InitSULBWP (bb_nr5g_BWP_UPLINKCOMMONt)
+    if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_SUL_COMMON_PRESENT)) {
+        if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_SUL_COMMON_PRESENT) {
+            proto_item_append_text(config_ti, " (InitSULBWP)");
+        }
+
+        offset = dissect_bwp_uplinkcommon(config_tree, tvb, pinfo, offset,
+                                          "Initial BWP SUL Common",
+                                          fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_SUL_COMMON_PRESENT,
+                                          serialize);
+    }
+
+    // TddDlUlConfCommon (bb_nr5g_TDD_UL_DL_CONFIG_COMMONt)
+    if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_TDD_COMMON_PRESENT)) {
+        if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_TDD_COMMON_PRESENT) {
+            proto_item_append_text(config_ti, " (TddDlUlConfCommon)");
+        }
+
+        gint tdd_offset = offset;
+
+        proto_item *tdd_ti = proto_tree_add_string_format(config_tree, hf_l2server_tdd_common, tvb,
+                                                          offset, 1,
+                                                          "", "TDD DL UL Config Common");
+        proto_tree *tdd_tree = proto_item_add_subtree(tdd_ti, ett_l2server_tdd_common);
+
+        // RefSubCarSpacing
+        proto_tree_add_item(tdd_tree, hf_l2server_ref_sub_car_spacing, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // Pad
+        proto_tree_add_item(tdd_tree, hf_l2server_pad, tvb, offset, 1, ENC_NA);
+        offset += 1;
+        // FieldMask
+        guint32 tdd_fieldmask;
+        proto_tree_add_item_ret_uint(tdd_tree, hf_l2server_field_mask_2, tvb, offset, 2,
+                                     ENC_LITTLE_ENDIAN, &tdd_fieldmask);
+        gboolean patt1_present, patt2_present;
+        proto_tree_add_item_ret_boolean(tdd_tree, hf_l2server_tdd_ul_dl_pattern1_present, tvb, offset, 2, ENC_LITTLE_ENDIAN, &patt1_present);
+        proto_tree_add_item_ret_boolean(tdd_tree, hf_l2server_tdd_ul_dl_pattern2_present, tvb, offset, 2, ENC_LITTLE_ENDIAN, &patt2_present);
+        offset += 2;
+
+        // Pattern1
+        if (!serialize || (tdd_fieldmask & patt1_present)) {
+            offset = dissect_tdd_ul_dl_pattern(tdd_tree, tvb, pinfo, offset, "Pattern1",
+                                               tdd_fieldmask & bb_nr5g_STRUCT_TDD_UL_DL_CONFIG_COMMON_PATT1_PRESENT);
+        }
+
+        // Pattern2
+        if (!serialize || (tdd_fieldmask & patt1_present)) {
+            offset = dissect_tdd_ul_dl_pattern(tdd_tree, tvb, pinfo, offset, "Pattern2",
+                                               tdd_fieldmask & bb_nr5g_STRUCT_TDD_UL_DL_CONFIG_COMMON_PATT1_PRESENT);
+        }
+
+        if (!tdd_present) {
+            proto_item_append_text(tdd_ti, " (not set)");
+        }
+        proto_item_set_len(tdd_ti, offset-tdd_offset);
+    }
+
+    // RateMatchPatternToDel
+    offset += (bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS * 1);
+    // RateMatchPatternToAddMod
+    offset += (bb_nr5g_MAX_NB_RATE_MATCH_PATTERNS * sizeof(bb_nr5g_RATE_MATCH_PATTERNt));
+
+    // LteCrsToMatchAround
+    if (!serialize || (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_COMMON_TOMATCHAROUND_SETUP)) {
+        if (fieldmask & bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_COMMON_TOMATCHAROUND_SETUP) {
+            proto_item_append_text(config_ti, " (LteCrsToMatchAround)");
+        }
+
+        // TODO:
+        offset += sizeof(bb_nr5g_RATE_MATCH_PATTERN_LTEt);
+    }
+    // HighSpeedConfig_r16
+    if (!serialize || (fieldmask & bb_nr5g_STRUCT_HIGH_SPEED_CONFIG_R16_PRESENT)) {
+        if (fieldmask & bb_nr5g_STRUCT_HIGH_SPEED_CONFIG_R16_PRESENT) {
+            proto_item_append_text(config_ti, " (HighSpeedConfig_r16)");
+        }
+
+        // TODO:
+        offset += sizeof(bb_nr5g_HIGH_SPEED_CONFIG_R16t);
+    }
+
+    proto_item_set_len(config_ti, offset-start_offset);
+    return offset;
+}
+
+
+static guint dissect_tx_lch_info(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                 guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *lch_info_ti = proto_tree_add_string_format(tree, hf_l2server_tx_lch_info, tvb,
+                                                          offset, sizeof(nr5g_rlcmac_Cmac_TxLchInfo_t),
+                                                          "", "TxLchInfo ");
+    proto_tree *lch_info_tree = proto_item_add_subtree(lch_info_ti, ett_l2server_tx_lch_info);
+
+    // logicalChannelIdentity
+    proto_tree_add_item(lch_info_tree, hf_l2server_lcid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // logicalChannelGroup
+    proto_tree_add_item(lch_info_tree, hf_l2server_lcg, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // priority
+    proto_tree_add_item(lch_info_tree, hf_l2server_priority, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // prioritisedBitRate
+    proto_tree_add_item(lch_info_tree, hf_l2server_prioritized_bit_rate, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // bucketSizeDuration
+    proto_tree_add_item(lch_info_tree, hf_l2server_bucket_size_duration, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // allowedServingCells
+    proto_tree_add_item(lch_info_tree, hf_l2server_allowed_serving_cells, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // allowedSCS_List
+    proto_tree_add_item(lch_info_tree, hf_l2server_allowed_scs_list, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // maxPUSCH_Duration
+    proto_tree_add_item(lch_info_tree, hf_l2server_max_pusch_duration, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // configuredGrantTypeAllowed
+    proto_tree_add_item(lch_info_tree, hf_l2server_configured_grant_type_allowed, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // logicalChannelSR_Mask
+    proto_tree_add_item(lch_info_tree, hf_l2server_logical_channel_sr_mask, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // logicalChannelSR_DelayTimerConfigured
+    proto_tree_add_item(lch_info_tree, hf_l2server_logical_channel_sr_delay_timer_configured, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // requestDuplicatesFromPDCP
+    proto_tree_add_item(lch_info_tree, hf_l2server_request_duplicates_from_pdcp, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // schedulingRequestID
+    proto_tree_add_item(lch_info_tree, hf_l2server_scheduling_request_id, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // bitRateQueryProhibitTimer
+    proto_tree_add_item(lch_info_tree, hf_l2server_bit_rate_query_prohibit_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // allowedPHY_PriorityIndex
+    proto_tree_add_item(lch_info_tree, hf_l2server_allowed_phy_priority_index, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    return start_offset + sizeof(nr5g_rlcmac_Cmac_TxLchInfo_t);
+}
+
+static guint dissect_rx_lch_info(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                 guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree
+    proto_item *lch_info_ti = proto_tree_add_string_format(tree, hf_l2server_rx_lch_info, tvb,
+                                                          offset, sizeof(nr5g_rlcmac_Cmac_RxLchInfo_t),
+                                                          "", "RxLchInfo ");
+    proto_tree *lch_info_tree = proto_item_add_subtree(lch_info_ti, ett_l2server_rx_lch_info);
+
+    // logicalChannelIdentity
+    proto_tree_add_item(lch_info_tree, hf_l2server_lcid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    return start_offset + sizeof(nr5g_rlcmac_Cmac_RxLchInfo_t);
+}
+
+// nr5g_rlcmac_Cmac_DRX_CONFIGt (from nr5g-rlcmac_Cmac-bb.h)
+static int dissect_rlcmac_drx_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                     guint offset)
+{
+    int start_offset = offset;
+
+    // Subtree
+    proto_item *drx_ti = proto_tree_add_string_format(tree, hf_l2server_drx_config, tvb,
+                                                          offset, sizeof(nr5g_rlcmac_Cmac_DRX_CONFIGt),
+                                                          "", "DRX Config ");
+    proto_tree *drx_tree = proto_item_add_subtree(drx_ti, ett_l2server_drx_config);
+
+    // Len
+    proto_tree_add_item(drx_tree, hf_l2server_drx_len, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // Spare
+    proto_tree_add_item(drx_tree, hf_l2server_spare4, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // drx_onDurationTimer_IsValid
+    proto_tree_add_item(drx_tree, hf_l2server_drx_ondurationtimer_isvalid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // drx_onDurationTimer
+    proto_tree_add_item(drx_tree, hf_l2server_drx_ondurationtimer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // drx_InactivityTimer
+    proto_tree_add_item(drx_tree, hf_l2server_drx_inactivitytimer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // drx_HARQ_RTT_TimerDL
+    proto_tree_add_item(drx_tree, hf_l2server_drx_harq_rtt_timerdl, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // drx_HARQ_RTT_TimerUL
+    proto_tree_add_item(drx_tree, hf_l2server_drx_harq_rtt_timerul, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // drx_RetransmissionTimerDL
+    proto_tree_add_item(drx_tree, hf_l2server_drx_retransmission_timerdl, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // drx_RetransmissionTimerUL
+    proto_tree_add_item(drx_tree, hf_l2server_drx_retransmission_timerul, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // drx_LongCycleStartOffset_IsValid
+    proto_tree_add_item(drx_tree, hf_l2server_drx_longcyclestartoffset_isvalid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // drx_LongCycleStartOffset
+    guint long_cycle_start_offset;
+    proto_tree_add_item_ret_uint(drx_tree, hf_l2server_drx_longcyclestartoffset, tvb, offset, 4, ENC_LITTLE_ENDIAN, &long_cycle_start_offset);
+    offset += 4;
+    // drx_ShortCycle
+    proto_tree_add_item(drx_tree, hf_l2server_drx_short_cycle, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // drx_ShortCycleTimer
+    proto_tree_add_item(drx_tree, hf_l2server_drx_short_cycle_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // drx_SlotOffset
+    guint32 slot_offset;
+    proto_tree_add_item_ret_uint(drx_tree, hf_l2server_drx_slot_offset, tvb, offset, 1, ENC_LITTLE_ENDIAN, &slot_offset);
+    offset += 1;
+
+    proto_item_append_text(drx_ti, " (longCycleStartOffset=%u, slotOffset=%u)", long_cycle_start_offset, slot_offset);
+    return start_offset + sizeof(nr5g_rlcmac_Cmac_DRX_CONFIGt);
+}
+
+// nr5g_rlcmac_Cmac_SR_Configuration_t
+static guint dissect_sr_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                               guint offset _U_)
+{
+    // Subtree.
+    proto_item *sr_config_ti = proto_tree_add_string_format(tree, hf_l2server_sr_config, tvb,
+                                                            offset, sizeof(nr5g_rlcmac_Cmac_SR_Configuration_t),
+                                                            "", "SR Config");
+    proto_tree *sr_config_tree = proto_item_add_subtree(sr_config_ti, ett_l2server_sr_config);
+
+    // NSrToAdd
+    guint32 n_sr_to_add;
+    proto_tree_add_item_ret_uint(sr_config_tree, hf_l2server_n_sr_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &n_sr_to_add);
+    offset += 1;
+    // SrToAdd
+    for (guint n=0; n < nr5g_rlcmac_Cmac_SR_MAX; n++) {
+        // Subtree.
+        proto_item *sr_ti = proto_tree_add_string_format(sr_config_tree, hf_l2server_sr, tvb,
+                                                         offset, sizeof(schedulingRequestToAdd),
+                                                         "", "SR");
+        proto_tree *sr_tree = proto_item_add_subtree(sr_ti, ett_l2server_sr);
+
+        if (n < n_sr_to_add) {
+            // srConfigIndex
+            guint32 sr_config_index;
+            proto_tree_add_item_ret_uint(sr_tree, hf_l2server_sr_config_index, tvb, offset, 1, ENC_LITTLE_ENDIAN, &sr_config_index);
+            offset += 1;
+            // srProhibitTimer
+            guint32 sr_prohibit_timer;
+            proto_tree_add_item_ret_uint(sr_tree, hf_l2server_sr_prohibit_timer, tvb, offset, 1, ENC_LITTLE_ENDIAN, &sr_prohibit_timer);
+            offset += 1;
+            // srTransMax
+            guint32 sr_transmax;
+            proto_tree_add_item_ret_uint(sr_tree, hf_l2server_sr_transmax, tvb, offset, 1, ENC_LITTLE_ENDIAN, &sr_transmax);
+            offset += 1;
+
+            // Summary
+            proto_item_append_text(sr_ti, " (srConfigIndex=%u, srProhibitTimer=%u, srTransMax=%u)",
+                                   sr_config_index, sr_prohibit_timer, sr_transmax);
+        }
+        else {
+            offset += sizeof(schedulingRequestToAdd);
+            proto_item_append_text(sr_ti, " (not set)");
+        }
+    }
+
+    // NSrToDel
+    guint32 n_sr_to_del;
+    proto_tree_add_item_ret_uint(sr_config_tree, hf_l2server_n_sr_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &n_sr_to_del);
+    offset += 1;
+    // SrToDel
+    for (guint n=0; n < nr5g_rlcmac_Cmac_SR_MAX; n++) {
+        proto_item *ti = proto_tree_add_item(sr_config_tree, hf_l2server_sr_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+
+        if (n >= n_sr_to_del) {
+            proto_item_append_text(ti, " (not set)");
+        }
+    }
+
+    proto_item_append_text(sr_config_ti, " (%u added, %u deleted)", n_sr_to_add, n_sr_to_del);
+    return offset;
+}
+
+// nr5g_rlcmac_Cmac_BSR_Configuration_t (nr5g-rlcmac_Cmac.h)
+static guint dissect_bsr_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset _U_)
+{
+    // Subtree.
+    proto_item *bsr_config_ti = proto_tree_add_string_format(tree, hf_l2server_bsr_config, tvb,
+                                                            offset, sizeof(nr5g_rlcmac_Cmac_BSR_Configuration_t),
+                                                            "", "BSR Config");
+    proto_tree *bsr_config_tree = proto_item_add_subtree(bsr_config_ti, ett_l2server_bsr_config);
+
+    // periodicBSR_Timer
+    proto_tree_add_item(bsr_config_tree, hf_l2server_periodicbsr_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // retxBSR_Timer
+    proto_tree_add_item(bsr_config_tree, hf_l2server_retxbsr_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // logicalChannelSR_DelayTimer (-2 means none)
+    gint32 delay_timer;
+    proto_item *ti = proto_tree_add_item_ret_int(bsr_config_tree, hf_l2server_logicalchannelsr_delaytimer, tvb, offset, 4, ENC_LITTLE_ENDIAN, &delay_timer);
+    if (delay_timer == -2) {
+        proto_item_append_text(ti, " (none)");
+    }
+    offset += 4;
+
+    return offset;
+}
+
+// nr5g_rlcmac_Cmac_TAG_Configuration_t
+static guint dissect_tag_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset _U_)
+{
+    // Subtree.
+    proto_item *tag_config_ti = proto_tree_add_string_format(tree, hf_l2server_tag_config, tvb,
+                                                            offset, sizeof(nr5g_rlcmac_Cmac_TAG_Configuration_t),
+                                                            "", "TAG Config");
+    proto_tree *tag_config_tree = proto_item_add_subtree(tag_config_ti, ett_l2server_tag_config);
+
+    // tagId
+    guint32 tagid;
+    proto_tree_add_item_ret_uint(tag_config_tree, hf_l2server_tag_id, tvb, offset, 4, ENC_LITTLE_ENDIAN, &tagid);
+    offset += 4;
+    // timeAlignmentTimer
+    proto_tree_add_item(tag_config_tree, hf_l2server_time_alignment_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    proto_item_append_text(tag_config_ti, " (tagId=%u)", tagid);
+
+    return offset;
+}
+
+// nr5g_rlcmac_Cmac_PHR_Config_t
+static guint dissect_phr_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset _U_)
+{
+    // Subtree.
+    proto_item *phr_config_ti = proto_tree_add_string_format(tree, hf_l2server_phr_config, tvb,
+                                                            offset, 0,
+                                                            "", "PHR Config");
+    proto_tree *phr_config_tree = proto_item_add_subtree(phr_config_ti, ett_l2server_phr_config);
+
+    // phr_PeriodicTimer
+    proto_tree_add_item(phr_config_tree, hf_l2server_phr_periodic_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // phr_ProhibitTimer
+    proto_tree_add_item(phr_config_tree, hf_l2server_phr_prohibit_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // phr_Tx_PowerFactorChange
+    proto_tree_add_item(phr_config_tree, hf_l2server_phr_tx_power_factor_change, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // multiplePHR
+    guint32 multi_phr;
+    proto_tree_add_item_ret_uint(phr_config_tree, hf_l2server_phr_multiple_phr, tvb, offset, 4, ENC_LITTLE_ENDIAN, &multi_phr);
+    offset += 4;
+    // phr_Type2SpCell
+    proto_tree_add_item(phr_config_tree, hf_l2server_phr_type2_spcell, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // phr_Type2OtherCell
+    proto_tree_add_item(phr_config_tree, hf_l2server_phr_type2_othercell, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // phr_ModeOtherCG
+    proto_tree_add_item(phr_config_tree, hf_l2server_phr_mode_other_cg, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // Spare
+    proto_tree_add_item(phr_config_tree, hf_l2server_spare, tvb, offset, 4, ENC_NA);
+    offset += 4;
+
+    proto_item_append_text(phr_config_ti, " (multi-PHR=%s)", multi_phr ? "true" : "false");
+    proto_item_set_len(phr_config_ti, sizeof(nr5g_rlcmac_Cmac_PHR_Config_t));
+    return offset;
+}
+
+// nr5g_rlcmac_Cmac_SR_RESOURCE_CFGt
+static guint dissect_scheduling_request_res(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                            guint offset)
+{
+    // Subtree.
+    proto_item *sr_resource_ti = proto_tree_add_string_format(tree, hf_l2server_sr_resource, tvb,
+                                                            offset, 0,
+                                                            "", "SR Resource");
+    proto_tree *sr_resource_tree = proto_item_add_subtree(sr_resource_ti, ett_l2server_sr_resource);
+
+
+    // Len
+    guint32 len;
+    proto_tree_add_item_ret_uint(sr_resource_tree, hf_l2server_sr_resource_len, tvb, offset, 4, ENC_LITTLE_ENDIAN, &len);
+    offset += 4;
+    // Spare
+    proto_tree_add_item(sr_resource_tree, hf_l2server_spare, tvb, offset, 4, ENC_NA);
+    offset += 4;
+    // SRResourceId
+    guint32 sr_resource_id;
+    proto_tree_add_item_ret_uint(sr_resource_tree, hf_l2server_sr_resource_id, tvb, offset, 1, ENC_NA, &sr_resource_id);
+    offset += 1;
+    // SRId
+    guint32 sr_id;
+    proto_tree_add_item_ret_uint(sr_resource_tree, hf_l2server_sr_id, tvb, offset, 1, ENC_NA, &sr_id);
+    offset += 1;
+    // ResourceId
+    guint32 resource_id;
+    proto_tree_add_item_ret_uint(sr_resource_tree, hf_l2server_resource_id, tvb, offset, 1, ENC_NA, &resource_id);
+    offset += 1;
+    // SRPeriodAndOffsetIsValid
+    guint32 sr_period_and_offset_is_valid;
+    proto_tree_add_item_ret_uint(sr_resource_tree, hf_l2server_sr_period_and_offset_is_valid, tvb, offset, 1, ENC_NA,
+                                 &sr_period_and_offset_is_valid);
+    offset += 1;
+
+    // SRPeriodAndOffset
+    guint sr_offset;
+    proto_tree_add_item_ret_uint(sr_resource_tree, hf_l2server_sr_period_and_offset, tvb, offset, 2, ENC_LITTLE_ENDIAN, &sr_offset);
+    offset += 2;
+
+    // Summary
+    proto_item_append_text(sr_resource_ti, " (SRResourceId=%u, srId=%u, resourceId=%u, periodicity=%s, offset=%u)",
+                           sr_resource_id, sr_id, resource_id,
+                           val_to_str_const(sr_period_and_offset_is_valid, sr_period_and_offset_is_valid_vals, "Unknown"),
+                           sr_offset);
+    proto_item_set_len(sr_resource_ti, len);
+
+    return offset;
+}
+
+// nr5g_rlcmac_Cmac_PUCCH_CONF_DEDICATEDt from nr5g-rlcmac_Cmac-bb.h
+static gint dissect_pucch_dedicated(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                    guint offset)
+{
+    guint start_offset = offset;
+
+    // Subtree.
+    proto_item *pucch_ti = proto_tree_add_string_format(tree, hf_l2server_uplink_ded_pucch_config, tvb,
+                                                        offset, 0,
+                                                        "", "PUCCH Conf Ded");
+    proto_tree *pucch_tree = proto_item_add_subtree(pucch_ti, ett_l2server_uplink_ded_pucch_config);
+
+    // Len
+    guint32 pucch_len;
+    proto_tree_add_item_ret_uint(pucch_tree, hf_l2server_uplink_ded_pucch_len, tvb, offset, 4,
+                                 ENC_LITTLE_ENDIAN, &pucch_len);
+    offset += 4;
+
+    // FieldMask
+    guint pucch_fieldmask;
+    proto_tree_add_item_ret_uint(pucch_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                 ENC_LITTLE_ENDIAN, &pucch_fieldmask);
+    offset += 4;
+
+    // NbDlDataToUlAck
+    offset += 1;
+    // DlDataToUlAck
+    offset += 8;
+
+    // NSchedReqResConfigToAdd
+    guint32 nb_sched_req_res_config_to_add;
+    proto_tree_add_item_ret_uint(pucch_tree, hf_l2server_nb_sched_req_res_config_to_add, tvb, offset, 1,
+                                 ENC_LITTLE_ENDIAN, &nb_sched_req_res_config_to_add);
+    offset += 1;
+    // NSchedReqResConfigToDel
+    guint32 nb_sched_req_res_config_to_del;
+    proto_tree_add_item_ret_uint(pucch_tree, hf_l2server_nb_sched_req_res_config_to_del, tvb, offset, 1,
+                                 ENC_LITTLE_ENDIAN, &nb_sched_req_res_config_to_del);
+    offset += 1;
+
+    // NbResourceDedToAdd
+    proto_tree_add_item(pucch_tree, hf_l2server_nb_resource_ded_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // NbResourceDedToDel
+    offset += 1;
+
+    // Spare[3]
+    proto_tree_add_item(pucch_tree, hf_l2server_spare, tvb, offset, 3, ENC_NA);
+    offset += 3;
+
+    // PucchConfExtR16
+    if (pucch_fieldmask & nr5g_rlcmac_Cmac_STRUCT_PUCCH_CONF_DEDICATED_R16_IES_PRESENT) {
+        offset += sizeof(nr5g_rlcmac_Cmac_PUCCH_CONF_DEDICATED_R16_IESt);
+    }
+
+    // SchedReqResCfgAdd
+    if (pucch_fieldmask & nr5g_rlcmac_Cmac_STRUCT_PUCCH_CONF_DEDICATED_SR_RES_CFG_PRESENT) {
+        for (uint m=0; m < nb_sched_req_res_config_to_add; m++) {
+            offset = dissect_scheduling_request_res(pucch_tree, tvb, pinfo, offset);
+        }
+    }
+
+    // ResourceDedToDel
+    // TODO:
+
+    // ResourceDedToAdd
+    // TODO:
+
+    proto_item_set_len(pucch_ti, pucch_len);
+    return start_offset + pucch_len;
+}
+
+
+// Type is nr5g_rlcmac_Cmac_CONFIG_CMD_t from nr5g-rlcmac_Cmac.h
+static void dissect_rlcmac_cmac_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                           guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    // UEId
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    //------------------------------------------------------------------
+    // Params (of type nr5g_rlcmac_Cmac_CfgParams_t)
+    /* Subtree */
+    guint params_offset = offset;
+    proto_item *params_ti = proto_tree_add_string_format(tree, hf_l2server_params, tvb,
+                                                          offset, sizeof(nr5g_rlcmac_Cmac_CfgParams_t),
+                                                          "", "Params");
+    proto_tree *params_tree = proto_item_add_subtree(params_ti, ett_l2server_params);
+
+    // Beam Id
+    proto_tree_add_item(params_tree, hf_l2server_beamid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // Crnti
+    gint32 crnti;
+    proto_tree_add_item_ret_int(params_tree, hf_l2server_crnti, tvb, offset, 4, ENC_LITTLE_ENDIAN, &crnti);
+    proto_item_append_text(params_ti, " (C-RNTI=%d", crnti);
+    offset += 4;
+    // BwpMask
+    guint32 bwpmask;
+    proto_tree_add_item_ret_uint(params_tree, hf_l2server_bwpmask, tvb, offset, 4, ENC_LITTLE_ENDIAN, &bwpmask);
+    offset += 4;
+
+    // RA_Info array (type nr5g_rlcmac_Cmac_RA_Info_t)
+    // Only dissect those positions with bwpmask fields set
+    for (int n=0; n < bb_nr5g_MAX_NB_BWPS+1; n++) {
+        if (bwpmask & (1 << n)) {
+            guint32 bwpid;
+            offset = dissect_rlcmac_cmac_ra_info(params_tree, tvb, pinfo, offset, len, &bwpid);
+            /* Add summary to params root */
+            proto_item_append_text(params_ti, " RAInfo(BwpId=%u)", bwpid);
+        }
+        else {
+            offset = dissect_rlcmac_cmac_ra_info_empty(params_tree, tvb, pinfo, offset, len, TRUE);
+            //offset += sizeof(nr5g_rlcmac_Cmac_RA_Info_t);
+        }
+    }
+
+    //-----------------------------------------------------------------
+    // RbIE
+    // NumOfRbCfg
+    guint32 num_of_rb_cfg;
+    proto_tree_add_item_ret_uint(params_tree, hf_l2server_num_of_rb_cfg, tvb, offset, 1, ENC_LITTLE_ENDIAN, &num_of_rb_cfg);
+    offset++;
+
+    // RbCfg[]
+    for (guint n=0; n < num_of_rb_cfg; n++) {
+        // Entries are nr5g_rlcmac_Cmac_RbCfg_t
+
+        // Subtree.
+        proto_item *rb_config_ti = proto_tree_add_string_format(params_tree, hf_l2server_rb_config, tvb,
+                                                              offset, sizeof(nr5g_rlcmac_Cmac_RbCfg_t),
+                                                              "", "RBConfig ");
+        proto_tree *rb_info_tree = proto_item_add_subtree(rb_config_ti, ett_l2server_rb_config);
+
+        // RbType
+        guint32 rbtype;
+        proto_tree_add_item_ret_uint(rb_info_tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN, &rbtype);
+        offset += 1;
+        // RbId
+        guint32 rbid;
+        proto_tree_add_item_ret_uint(rb_info_tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &rbid);
+        offset += 1;
+        // reestablishRLC
+        proto_tree_add_item(rb_info_tree, hf_l2server_reestablish_rlc, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // RbMappingInfo
+
+        // TxLchInfo
+        offset = dissect_tx_lch_info(rb_info_tree, tvb, pinfo, offset);
+        // RxLchInfo
+        offset = dissect_rx_lch_info(rb_info_tree, tvb, pinfo, offset);
+        //zoffset += sizeof(nr5g_rlcmac_Cmac_RbMappingInfo_t);
+
+        proto_item_append_text(rb_config_ti, "(%s-%u)", (rbtype==1) ? "SRB" : "DRB", rbid);
+        proto_item_append_text(params_ti, " RBCfg(%s-%u)", (rbtype==1) ? "SRB" : "DRB", rbid);
+    }
+    // Remaining unused entries.
+    for (guint n=num_of_rb_cfg; n < nr5g_MaxNrOfRB; n++) {
+        // Subtree.
+        /*proto_item *rb_config_ti = */ proto_tree_add_string_format(params_tree, hf_l2server_rb_config, tvb,
+                                                              offset, sizeof(nr5g_rlcmac_Cmac_RbCfg_t),
+                                                              "", "RBConfig %u (not in use)", n+1);
+        //proto_tree *ra_info_tree = proto_item_add_subtree(ra_info_ti, ett_l2server_rb_config);
+
+        offset += sizeof(nr5g_rlcmac_Cmac_RbCfg_t);
+    }
+
+    // NumOfRbRel
+    guint32 num_of_rb_rel;
+    proto_tree_add_item_ret_uint(params_tree, hf_l2server_num_of_rb_rel, tvb, offset, 1, ENC_LITTLE_ENDIAN, &num_of_rb_rel);
+    offset++;
+    for (guint n=0; n < num_of_rb_rel; n++) {
+        // Subtree.
+        proto_item *rb_del_ti = proto_tree_add_string_format(params_tree, hf_l2server_rb_rel, tvb,
+                                                             offset, 2,
+                                                              "", "RBDel");
+        proto_tree *rb_info_tree = proto_item_add_subtree(rb_del_ti, ett_l2server_rb_release);
+
+        // RbType
+        guint32 rbtype;
+        proto_tree_add_item_ret_uint(rb_info_tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN, &rbtype);
+        offset += 1;
+        // RbId
+        guint32 rbid;
+        proto_tree_add_item_ret_uint(rb_info_tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &rbid);
+        offset += 1;
+
+        proto_item_append_text(rb_del_ti, "(%s-%u)", (rbtype==1) ? "SRB" : "DRB", rbid);
+        proto_item_append_text(params_ti, " RBRel(%s-%u)", (rbtype==1) ? "SRB" : "DRB", rbid);
+    }
+    // Remaining unused entries.
+    for (guint n=num_of_rb_rel; n < nr5g_MaxNrOfRB; n++) {
+        // Subtree.
+        /*proto_item *rb_config_ti = */ proto_tree_add_string_format(params_tree, hf_l2server_rb_rel, tvb,
+                                                              offset, sizeof(nr5g_rlcmac_Cmac_RbRel_t),
+                                                              "", "RBRel %u (not in use)", n+1);
+        //proto_tree *ra_info_tree = proto_item_add_subtree(ra_info_ti, ett_l2server_rb_release);
+
+        offset += sizeof(nr5g_rlcmac_Cmac_RbRel_t);
+    }
+    proto_item_append_text(params_ti, ")");
+    //-----------------------------------------------------------------
+
+
+    // mac_CellGroupConfig (nr5g_rlcmac_Cmac_MAC_CellGroupConfig_t from nr5g-rlcmac_Cmac.h)
+    {
+        // Subtree.
+        proto_item *mac_cgc_ti = proto_tree_add_string_format(params_tree, hf_l2server_mac_cell_group_config, tvb,
+                                                              offset, sizeof(nr5g_rlcmac_Cmac_MAC_CellGroupConfig_t),
+                                                              "", "MAC Cell Group Config");
+        proto_tree *mac_cgc_tree = proto_item_add_subtree(mac_cgc_ti, ett_l2server_mac_cell_group_config);
+
+        // bsr_Config
+        offset = dissect_bsr_config(mac_cgc_tree, tvb, pinfo, offset);
+        // tag_Config
+        offset = dissect_tag_config(mac_cgc_tree, tvb, pinfo, offset);
+        // phr_Config
+        offset = dissect_phr_config(mac_cgc_tree, tvb, pinfo, offset);
+        // Sr_Config (nr5g_rlcmac_Cmac_SR_Configuration_t)
+        offset = dissect_sr_config(mac_cgc_tree, tvb, pinfo, offset);
+
+        // skipUplinkTxDynamic
+        proto_tree_add_item(mac_cgc_tree, hf_l2server_skip_uplink_tx_dynamic, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // HoFlag
+        proto_tree_add_item(mac_cgc_tree, hf_l2server_ho_flag, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // DataInactivityTimer
+        proto_tree_add_item(mac_cgc_tree, hf_l2server_data_inactivity_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
+
+    // spCellConfig (nr5g_rlcmac_Cmac_SpCellConfig_t from nr5g-rlcmac_Cmac.h)
+    {
+        proto_item *sp_cell_config_ti = proto_tree_add_string_format(params_tree, hf_l2server_spcell_config, tvb,
+                                                                     offset, sizeof(nr5g_rlcmac_Cmac_SpCellConfig_t),
+                                                                      "", "spCell Config");
+        proto_tree *sp_cell_config_tree = proto_item_add_subtree(sp_cell_config_ti, ett_l2server_spcell_config);
+
+        // SCellIndex
+        guint scellindex;
+        proto_tree_add_item_ret_uint(sp_cell_config_tree, hf_l2server_scellindex, tvb, offset, 1, ENC_LITTLE_ENDIAN, &scellindex);
+        offset += 1;
+        // PCMAXc
+        proto_tree_add_item(sp_cell_config_tree, hf_l2server_pcmaxc, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+        // PCMAXc_SUL
+        proto_tree_add_item(sp_cell_config_tree, hf_l2server_pcmaxc_sul, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+        // sCellDeactivationTimer
+        proto_tree_add_item(sp_cell_config_tree, hf_l2server_scell_deact_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+
+        proto_item_append_text(sp_cell_config_ti, " (sCellIndex=%u)", scellindex);
+    }
+
+    // sCellList (nr5g_rlcmac_Cmac_SCellList_t from nr5g-rlcmac_Cmac.h)
+    {
+        // subtree
+        proto_item *scell_list_ti = proto_tree_add_string_format(params_tree, hf_l2server_scell_list, tvb,
+                                                              offset, sizeof(nr5g_rlcmac_Cmac_SCellList_t),
+                                                              "", "sCell List");
+        proto_tree *scell_list_tree = proto_item_add_subtree(scell_list_ti, ett_l2server_scell_list);
+
+        // NumOfSCellAdd
+        guint32 nbSCellCfgAdd;
+        proto_tree_add_item_ret_uint(scell_list_tree, hf_l2server_nb_scell_cfg_add, tvb, offset, 1,
+                                     ENC_LITTLE_ENDIAN, &nbSCellCfgAdd);
+        offset += 1;
+
+        // SCellConfig (nr5g_rlcmac_Cmac_SCellConfig_t) entries
+        for (guint n=0; n < nr5g_rlcmac_Com_MaxNumSCells; n++) {
+
+            proto_item *scell_ti = proto_tree_add_string_format(scell_list_tree, hf_l2server_scell, tvb,
+                                                                offset, sizeof(nr5g_rlcmac_Cmac_SCellConfig_t),
+                                                                "", "sCell");
+            proto_tree *scell_tree = proto_item_add_subtree(scell_ti, ett_l2server_scell);
+
+            // SCellConfig (nr5g_rlcmac_Cmac_SCellConfig_t)
+            if (n < nbSCellCfgAdd) {
+                // ScellIndex
+                guint32 scellIndex;
+                proto_tree_add_item_ret_uint(scell_tree, hf_l2server_scellindex, tvb, offset, 1, ENC_LITTLE_ENDIAN, &scellIndex);
+                offset += 1;
+                // LsuCellId
+                guint32 lsuCellId;
+                proto_tree_add_item_ret_uint(scell_tree, hf_l2server_lsucellid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &lsuCellId);
+                offset += 1;
+                // PCMAXc
+                proto_tree_add_item(scell_tree, hf_l2server_pcmaxc, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+                offset += 4;
+                // PCMAXc_SUL
+                proto_tree_add_item(scell_tree, hf_l2server_pcmaxc_sul, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+                offset += 4;
+
+                proto_item_append_text(scell_ti, " (sCellIndex=%u, lsuCellId=%u)", scellIndex, lsuCellId);
+            }
+            else {
+                proto_item_append_text(scell_ti, " (not set)");
+                offset += sizeof(nr5g_rlcmac_Cmac_SCellConfig_t);
+            }
+        }
+
+        // NumOfScellRel
+        guint32 nbSCellCfgDel;
+        proto_tree_add_item_ret_uint(scell_list_tree, hf_l2server_nb_scell_cfg_del, tvb, offset, 1,
+                                     ENC_LITTLE_ENDIAN, &nbSCellCfgDel);
+        offset++;
+
+        // SCellRel
+        for (guint n=0; n < nr5g_rlcmac_Com_MaxNumSCells; n++) {
+            proto_item *ti = proto_tree_add_item(scell_list_tree, hf_l2server_scell_cfg_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            if (n >= nbSCellCfgDel) {
+                proto_item_append_text(ti, " (not set)");
+            }
+        }
+
+        proto_item_append_text(scell_list_ti, " (%u added, %u deleted)", nbSCellCfgAdd, nbSCellCfgDel);
+    }
+
+    // At the end of params now.
+    offset = params_offset + sizeof(nr5g_rlcmac_Cmac_CfgParams_t);
+
+    //------------------------------------------------------------------
+
+    // L2TestMode (not set by rrcCOM.c)
+    proto_tree_add_item(tree, hf_l2server_l2_test_mode, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+    // RL_Failure_Timer
+    proto_tree_add_item(tree, hf_l2server_rl_failure_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // RL_SyncOn_Timer
+    proto_tree_add_item(tree, hf_l2server_rl_syncon_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // SegCnt (apparently not set?)
+    proto_tree_add_item(tree, hf_l2server_seg_cnt, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+    // enablePmiReporting
+    proto_tree_add_item(tree, hf_l2server_enable_pmi_reporting, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // RA_InfoIsForSUL
+    proto_tree_add_item(tree, hf_l2server_ra_for_sul, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // Spare1[2]
+    proto_tree_add_item(tree, hf_l2server_spare2, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // Spare[3]
+    proto_tree_add_item(tree, hf_l2server_spare, tvb, offset, 3*4, ENC_NA);
+    offset += (3*4);
+
+    // L1CellDedicatedConfig_Len (apparently not set in rrcCOM.c)
+    int l1cell_dedicated_config_len;
+    proto_tree_add_item_ret_int(tree, hf_l2server_l1cell_dedicated_config_len, tvb, offset, 4, ENC_LITTLE_ENDIAN, &l1cell_dedicated_config_len);
+    offset += 4;
+
+    //---------------------------------------------------------------
+    // L2CellDedicatedConfig (nr5g_rlcmac_Cmac_CELL_DEDICATED_CONFIGt from nr5g-rlcmac_Cmac-bb.h)
+    guint32 dedicated_start = offset;
+
+    guint32 l2_len = tvb_get_guint32(tvb, offset, ENC_LITTLE_ENDIAN);
+    proto_item *l2_dedicated_config_ti = proto_tree_add_string_format(tree, hf_l2server_l2_cell_dedicated_config, tvb,
+                                                          offset, l2_len,
+                                                          "", "L2 Cell Dedicated Config");
+    proto_tree *l2_dedicated_config_tree = proto_item_add_subtree(l2_dedicated_config_ti, ett_l2server_l2_cell_dedicated_config);
+
+    // Len
+    proto_tree_add_item(l2_dedicated_config_tree, hf_l2server_l2_cell_dedicated_config_len, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // FieldMask (2 bytes)
+    guint32 field_mask;
+    proto_tree_add_item_ret_uint(l2_dedicated_config_tree, hf_l2server_field_mask_2, tvb, offset, 2, ENC_LITTLE_ENDIAN, &field_mask);
+    gboolean spcell_config_ded_present, mac_cell_group_config_present;
+    proto_tree_add_item_ret_boolean(l2_dedicated_config_tree, hf_l2server_spcell_config_ded_present, tvb, offset, 2, ENC_LITTLE_ENDIAN, &spcell_config_ded_present);
+    proto_tree_add_item_ret_boolean(l2_dedicated_config_tree, hf_l2server_mac_cell_dedicated_present, tvb, offset, 2, ENC_LITTLE_ENDIAN, &mac_cell_group_config_present);
+    offset += 2;
+
+    // NbSCellCfgDel
+    guint32 nbSCellCfgAdd;
+    proto_tree_add_item_ret_uint(l2_dedicated_config_tree, hf_l2server_nb_scell_cfg_add, tvb, offset, 1,
+                                 ENC_LITTLE_ENDIAN, &nbSCellCfgAdd);
+    offset += 1;
+
+    // NbSCellCgDel
+    guint32 nbSCellCfgDel;
+    proto_tree_add_item_ret_uint(l2_dedicated_config_tree, hf_l2server_nb_scell_cfg_del, tvb, offset, 1,
+                                 ENC_LITTLE_ENDIAN, &nbSCellCfgDel);
+    offset += 1;
+
+    // PhyCellConfig (CsRNTI)
+    proto_tree_add_item(l2_dedicated_config_tree, hf_l2server_cs_rnti, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // SpCellCfgDed (nr5g_rlcmac_Cmac_SERV_CELL_CONFIGt from nr5g-rlcmac_Cmac-bb.h)
+    if (spcell_config_ded_present) {
+        guint ded_start_offset = offset;
+
+        proto_item *spcell_config_ded_ti = proto_tree_add_string_format(l2_dedicated_config_tree, hf_l2server_spcell_config_ded, tvb,
+                                                                        offset, 0,
+                                                              "", "spCell Config Dedicated");
+        proto_tree *spcell_config_ded_tree = proto_item_add_subtree(spcell_config_ded_ti, ett_l2server_spcell_config_ded);
+
+        // Len
+        guint32 ded_len;
+        proto_tree_add_item_ret_uint(spcell_config_ded_tree, hf_l2server_spcell_config_ded_len, tvb, offset, 4,
+                                     ENC_LITTLE_ENDIAN, &ded_len);
+        offset += 4;
+
+        // FieldMask
+        guint32 fieldmask;
+        proto_tree_add_item_ret_uint(spcell_config_ded_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                     ENC_LITTLE_ENDIAN, &fieldmask);
+        gboolean uplink_present, sul_uplink_present, csi_meas_cfg_present;
+        proto_tree_add_item_ret_boolean(spcell_config_ded_tree, hf_l2server_config_uplink_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &uplink_present);
+        proto_tree_add_item_ret_boolean(spcell_config_ded_tree, hf_l2server_config_sul_uplink_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &sul_uplink_present);
+        proto_tree_add_item_ret_boolean(spcell_config_ded_tree, hf_l2server_csi_meas_cfg_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &csi_meas_cfg_present);
+        offset += 4;
+        // ServCellIdx
+        proto_tree_add_item(spcell_config_ded_tree, hf_l2server_serv_cell_idx, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+        // DefaultDlBwpId
+        proto_tree_add_item(spcell_config_ded_tree, hf_l2server_default_dl_bwpid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // SupplUlRel
+        proto_tree_add_item(spcell_config_ded_tree, hf_l2server_supp_ul_rel, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // FirstActiveDlBwp
+        proto_tree_add_item(spcell_config_ded_tree, hf_l2server_first_active_dl_bwp, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+
+        // Spare[1]
+        proto_tree_add_item(spcell_config_ded_tree, hf_l2server_spare2, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        offset += 1;
+
+        // UlCellCfgDed (nr5g_rlcmac_Cmac_UPLINK_DEDICATED_CONFIGt from nr5g-rlcmac_Cmac-bb.h)
+        if (uplink_present) {
+
+            guint spcell_config_ded_start = offset;
+
+            // Subtree.
+            proto_item *ul_ded_config_ti = proto_tree_add_string_format(spcell_config_ded_tree, hf_l2server_ul_cell_cfg_ded, tvb,
+                                                                        offset, 0,
+                                                                  "", "UL Cell Cfg Dedicated");
+            proto_tree *ul_ded_config_tree = proto_item_add_subtree(ul_ded_config_ti, ett_l2server_ul_ded_config);
+
+            // Len
+            guint32 ul_len;
+            proto_tree_add_item_ret_uint(ul_ded_config_tree, hf_l2server_ul_cell_cfg_ded_len, tvb, offset, 4, ENC_LITTLE_ENDIAN, &ul_len);
+            offset += 4;
+            // FieldMask
+            guint ul_fieldmask;
+            proto_tree_add_item_ret_uint(ul_ded_config_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                         ENC_LITTLE_ENDIAN, &ul_fieldmask);
+            // Show individual flags
+            gboolean initial_ul_bwp_present, pusch_present;
+            proto_tree_add_item_ret_boolean(ul_ded_config_tree, hf_l2server_initial_ul_bwp_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &initial_ul_bwp_present);
+            proto_tree_add_item_ret_boolean(ul_ded_config_tree, hf_l2server_pusch_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &pusch_present);
+            offset += 4;
+
+            // FirstActiveUlBwp
+            proto_tree_add_item(ul_ded_config_tree, hf_l2server_first_active_ul_bwp, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+            offset += 1;
+            // Spare
+            proto_tree_add_item(ul_ded_config_tree, hf_l2server_spare, tvb, offset, 1, ENC_NA);
+            offset += 1;
+
+            // NbUlBwpIdToDel
+            guint32 num_bwpid_to_del;
+            proto_tree_add_item_ret_uint(ul_ded_config_tree, hf_l2server_num_ul_bwpid_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN, &num_bwpid_to_del);
+            offset += 1;
+
+            // NbUlBwpIdToAdd
+            guint32 num_bwpid_to_add;
+            proto_tree_add_item_ret_uint(ul_ded_config_tree, hf_l2server_num_ul_bwpid_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN, &num_bwpid_to_add);
+            offset += 1;
+
+            // UlBwpIdToDel[] (all present when serialized)
+            for (guint32 n=0; n < bb_nr5g_MAX_NB_BWPS; n++) {
+                proto_item *del_ti = proto_tree_add_item(ul_ded_config_tree, hf_l2server_ul_bwpid_to_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+                offset += 1;
+
+                if (n >= num_bwpid_to_del) {
+                    proto_item_append_text(del_ti, " (not set)");
+                }
+            }
+
+            // InitialUlBwp (nr5g_rlcmac_Cmac_BWP_UPLINKDEDICATEDt from nr5g-rlcmac_Cmac-bb.h)
+            if (initial_ul_bwp_present) {
+
+                // Subtree.
+                proto_item *initial_ul_bwp_ti = proto_tree_add_string_format(ul_ded_config_tree, hf_l2server_initial_ul_bwp, tvb,
+                                                                             offset, 0,
+                                                                             "", "Initial UL BWP");
+                proto_tree *initial_ul_bwp_tree = proto_item_add_subtree(initial_ul_bwp_ti, ett_l2server_initial_ul_bwp);
+
+                // Len
+                guint32 initial_ul_bwp_len;
+                proto_tree_add_item_ret_uint(initial_ul_bwp_tree, hf_l2server_initial_ul_bwp_len, tvb, offset, 4, ENC_LITTLE_ENDIAN, &initial_ul_bwp_len);
+                offset += 4;
+
+                // FieldMask
+                guint initial_ul_bwp_fieldmask;
+                proto_tree_add_item_ret_uint(initial_ul_bwp_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                             ENC_LITTLE_ENDIAN, &initial_ul_bwp_fieldmask);
+                // TODO: show bits!
+                offset += 4;
+
+                // TODO:
+                // NbPucchConfDedToAdd
+                offset += 1;
+                // NbConfigGrantConfigToRel_r16
+                offset += 1;
+                // NbConfigGrantConfigToAdd_r16
+                offset += 1;
+                // NbConfigGrantConfigType2DeactState_r16
+                offset += 1;
+
+                // N.B. So far, no entries set here...
+                if (initial_ul_bwp_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_PUCCH_CFG_PRESENT) {
+                    // nr5g_rlcmac_Cmac_PUCCH_CONF_DEDICATEDt
+                    offset = dissect_pucch_dedicated(initial_ul_bwp_tree, tvb, pinfo, offset);
+                }
+
+                if (initial_ul_bwp_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_PUSCH_CFG_PRESENT) {
+                    // nr5g_rlcmac_Cmac_PUSCH_CONF_DEDICATEDt
+
+                    // Subtree.
+                    proto_item *pusch_ti = proto_tree_add_string_format(initial_ul_bwp_tree, hf_l2server_uplink_ded_pusch_config, tvb,
+                                                                        offset, 0,
+                                                                        "", "PUSCH");
+                    proto_tree *pusch_tree = proto_item_add_subtree(pusch_ti, ett_l2server_uplink_ded_pusch_config);
+
+                    // Len
+                    guint32 pusch_len;
+                    proto_tree_add_item_ret_uint(pusch_tree, hf_l2server_uplink_ded_pusch_len, tvb, offset, 4,
+                                                 ENC_LITTLE_ENDIAN, &pusch_len);
+                    offset += 4;
+
+                    // FieldMask
+                    guint pusch_fieldmask;
+                    proto_tree_add_item_ret_uint(pusch_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                                 ENC_LITTLE_ENDIAN, &pusch_fieldmask);
+                    offset += 4;
+
+                    // TODO:
+                    proto_item_set_len(pusch_ti, pusch_len);
+                }
+
+                if (initial_ul_bwp_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_SRS_CFG_PRESENT) {
+                    // nr5g_rlcmac_Cmac_SRS_CONF_DEDICATEDt
+                }
+
+                if (initial_ul_bwp_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_CONFIGURED_GRANT_PRESENT) {
+                }
+
+                if (initial_ul_bwp_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_BEAM_RECOVERY_CFG_PRESENT) {
+                }
+
+                proto_item_set_len(initial_ul_bwp_ti, initial_ul_bwp_len);
+            }
+
+            // PuschServingCellCfg
+            if (pusch_present) {
+                // TODO
+            }
+
+
+            // UlBwpIdToAdd (entries are nr5g_rlcmac_Cmac_BWP_UPLINKt from nr5g-rlcmac_Cmac-bb.h)
+            for (guint32 n=0; n < num_bwpid_to_add; n++) {
+                guint bwp_uplink_start = offset;
+
+                // Subtree.
+                proto_item *ul_bwp_ti = proto_tree_add_string_format(ul_ded_config_tree, hf_l2server_ul_bwp, tvb,
+                                                                             offset, 0,
+                                                                             "", "UL BWP");
+                proto_tree *ul_bwp_tree = proto_item_add_subtree(ul_bwp_ti, ett_l2server_ul_bwp);
+
+                // Len
+                int bwp_uplink_len;
+                proto_tree_add_item_ret_uint(ul_bwp_tree, hf_l2server_ul_bwp_len, tvb, offset, 4, ENC_LITTLE_ENDIAN, &bwp_uplink_len);
+                offset += 4;
+
+                // FieldMask
+                guint ul_bwp_fieldmask;
+                proto_tree_add_item_ret_uint(ul_bwp_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                             ENC_LITTLE_ENDIAN, &ul_bwp_fieldmask);
+                gboolean common_cfg_present, dedicated_cfg_present;
+                proto_tree_add_item_ret_boolean(ul_bwp_tree, hf_l2server_ul_common_cfg_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &common_cfg_present);
+                proto_tree_add_item_ret_boolean(ul_bwp_tree, hf_l2server_ul_dedicated_cfg_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &dedicated_cfg_present);
+                offset += 4;
+
+                // BwpId
+                gint bwpid;
+                proto_tree_add_item_ret_int(ul_bwp_tree, hf_l2server_bwpid, tvb, offset, 1, ENC_LITTLE_ENDIAN, &bwpid);
+                offset += 1;
+
+                // BwpULCommon (nr5g_rlcmac_Cmac_BWP_UPLINKCOMMONt from nr5g-rlcmac_Cmac-bb.h)
+                if (common_cfg_present) {
+
+                    guint32 bwp_ul_common_start = offset;
+
+                    // Subtree.
+                    proto_item *common_ti = proto_tree_add_string_format(ul_bwp_tree, hf_l2server_ul_bwp_common, tvb,
+                                                                         offset, 0, "", "Common ");
+                    proto_tree *common_tree = proto_item_add_subtree(common_ti, ett_l2server_ul_bwp_common);
+
+                    // Len
+                    guint32 bwp_ul_common_len;
+                    proto_tree_add_item_ret_uint(common_tree, hf_l2server_ul_bwp_common_len, tvb, offset, 4,
+                                                 ENC_LITTLE_ENDIAN, &bwp_ul_common_len);
+                    offset += 4;
+
+                    // FieldMask
+                    guint32 common_fieldmask;
+                    proto_tree_add_item_ret_uint(common_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                                 ENC_LITTLE_ENDIAN, &common_fieldmask);
+                    offset += 4;
+
+                    // GenBwp (bb_nr5g_BWPt)
+                    offset = dissect_genbwp(common_tree, tvb, pinfo, offset);
+
+                    // RachCfgCommon (bb_nr5g_RACH_CONF_COMMONt)
+                    if (common_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_COMMON_RACH_CFG_PRESENT) {
+                        offset = dissect_rach_conf_common(common_tree, tvb, pinfo, offset, TRUE);
+                    }
+
+                    // PuschCfgCommon (nr5g_rlcmac_Cmac_PUSCH_CONF_COMMONt)
+                    if (common_fieldmask & nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_COMMON_PUSCH_CFG_PRESENT) {
+                        // TODO (variable-length)
+                        gint pusch_start_offset = offset;
+
+                        // Len
+                        guint32 pusch_len = tvb_get_guint32(tvb, offset, ENC_LITTLE_ENDIAN);
+                        offset += 4;
+                        // Spare
+                        offset += 4;
+                        // NbPuschTimeDomResAlloc
+                        guint32 nb_pusch_time_dom_res_alloc = tvb_get_guint8(tvb, offset);
+                        offset += 1;
+                        // PuschTimeDomResAlloc
+                        offset += (nb_pusch_time_dom_res_alloc * sizeof(bb_nr5g_PUSCH_TIMEDOMAINRESALLOCt));
+
+                        // Using length anyway.
+                        offset = pusch_start_offset + pusch_len;
+                    }
+
+                    proto_item_set_len(common_ti, bwp_ul_common_len);
+                    offset = bwp_ul_common_start + bwp_ul_common_len;
+                }
+
+                // BwpULDed (nr5g_rlcmac_Cmac_BWP_UPLINKDEDICATEDt)
+                if (dedicated_cfg_present) {
+                    guint32 ul_bwp_ded_start = offset;
+
+                    // Subtree.
+                    proto_item *ded_ti = proto_tree_add_string_format(ul_bwp_tree, hf_l2server_ul_bwp_dedicated, tvb,
+                                                                         offset, 0, "", "Dedicated ");
+                    proto_tree *ded_tree = proto_item_add_subtree(ded_ti, ett_l2server_ul_bwp_dedicated);
+
+                    // Len
+                    guint32 bwp_ul_dedicated_len;
+                    proto_tree_add_item_ret_uint(ded_tree, hf_l2server_ul_bwp_dedicated_len, tvb, offset, 4,
+                                                 ENC_LITTLE_ENDIAN, &bwp_ul_dedicated_len);
+                    offset += 4;
+
+                    // FieldMask
+                    guint32 common_fieldmask;
+                    proto_tree_add_item_ret_uint(ded_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                                 ENC_LITTLE_ENDIAN, &common_fieldmask);
+                    gboolean ded_pucch_present, ded_pusch_present, ded_srs_present, ded_configured_grant_present;
+                    proto_tree_add_item_ret_boolean(ded_tree, hf_l2server_ded_pucch_cfg_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &ded_pucch_present);
+                    proto_tree_add_item_ret_boolean(ded_tree, hf_l2server_ded_pusch_cfg_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &ded_pusch_present);
+                    proto_tree_add_item_ret_boolean(ded_tree, hf_l2server_ded_srs_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &ded_srs_present);
+                    proto_tree_add_item_ret_boolean(ded_tree, hf_l2server_ded_configured_grant_present, tvb, offset, 4, ENC_LITTLE_ENDIAN, &ded_configured_grant_present);
+                    // TODO: add entry for beam recover too..
+                    offset += 4;
+
+                    // --------------------------------------------------------------
+                    // TODO: !!!!!!!
+                    // --------------------------------------------------------------
+                    // NbPucchConfDedToAdd
+                    proto_tree_add_item(ded_tree, hf_l2server_nb_pucch_conf_ded_to_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+                    offset += 1;
+                    // NbConfigGrantConfigToRel_r16
+                    offset += 1;
+                    // NbConfigGrantConfigToAdd_r16
+                    offset += 1;
+                    // NbConfigGrantConfigType2DeactState_r16
+                    offset += 1;
+
+                    // PucchConfDed
+                    if (ded_pucch_present) {
+                        // (nr5g_rlcmac_Cmac_PUCCH_CONF_DEDICATEDt)
+                        offset = dissect_pucch_dedicated(ded_tree, tvb, pinfo, offset);
+                    }
+
+                    // PuschConfDed
+                    // SrsConfDed
+                    // GrantConfDed
+                    // BeamFailRecConfDed
+
+                    proto_item_set_len(ded_ti, bwp_ul_dedicated_len);
+                    // Using length anyway
+                    offset = ul_bwp_ded_start + bwp_ul_dedicated_len;
+                }
+
+                proto_item_append_text(ul_bwp_ti, " (bwpId=%d)", bwpid);
+                proto_item_set_len(ul_bwp_ti, bwp_uplink_len);
+                offset = bwp_uplink_start + bwp_uplink_len;
+            }
+
+            offset = spcell_config_ded_start + ul_len;
+            proto_item_set_len(ul_ded_config_ti, ul_len);
+        }
+
+        // SulCellCfgDed
+        if (sul_uplink_present) {
+            // TODONT
+        }
+
+        // CsiMeasCfg (nr5g_rlcmac_Cmac_CSI_MEAS_CFGt)
+        if (csi_meas_cfg_present) {
+            guint32 csi_meas_start = offset;
+
+            // Subtree.
+            proto_item *csi_meas_ti = proto_tree_add_string_format(spcell_config_ded_tree, hf_l2server_csi_meas_cfg, tvb,
+                                                                 offset, 0, "", "CSI Meas Config ");
+            proto_tree *csi_meas_tree = proto_item_add_subtree(csi_meas_ti, ett_l2server_csi_meas_cfg);
+
+            // Len
+            guint32 csi_meas_len;
+            proto_tree_add_item_ret_uint(csi_meas_tree, hf_l2server_csi_meas_cfg_len, tvb, offset, 4,
+                                         ENC_LITTLE_ENDIAN, &csi_meas_len);
+            offset += 4;
+
+            // Spare
+            proto_tree_add_item(csi_meas_tree, hf_l2server_spare, tvb, offset, 4, ENC_NA);
+            offset += 4;
+
+            // NbCsiRepCfgToDel
+            guint32 nb_csi_rep_cfg_to_del;
+            proto_tree_add_item_ret_uint(csi_meas_tree, hf_l2server_nb_csi_rep_cfg_to_del, tvb, offset, 1, ENC_NA, &nb_csi_rep_cfg_to_del);
+            offset += 1;
+            // NbCsiRepCfgToAdd
+            guint32 nb_csi_rep_cfg_to_add;
+            proto_tree_add_item_ret_uint(csi_meas_tree, hf_l2server_nb_csi_rep_cfg_to_add, tvb, offset, 1, ENC_NA, &nb_csi_rep_cfg_to_add);
+            offset += 1;
+
+            // TODO:
+            // CsiRepCfgToDel (uint32_t)
+            // CsiRepCfgToAdd (nr5g_rlcmac_Cmac_CSI_REPORT_CFGt)
+
+            // Using length anyway
+            offset = csi_meas_start + csi_meas_len;
+            proto_item_set_len(csi_meas_ti, csi_meas_len);
+        }
+
+        proto_item_set_len(spcell_config_ded_ti, ded_len);
+        offset = ded_start_offset + ded_len;
+    }
+
+    // MAC_CellGroupConfig (nr5g_rlcmac_Cmac_MAC_CELL_GROUP_CONFIGt)
+    if (mac_cell_group_config_present) {
+        proto_item *mac_cell_group_ti = proto_tree_add_string_format(l2_dedicated_config_tree, hf_l2server_mac_cell_group_config, tvb,
+                                                              offset, 0,
+                                                              "", "MAC Cell Group");
+        proto_tree *mac_cell_group_tree = proto_item_add_subtree(mac_cell_group_ti, ett_l2server_mac_cell_group_config);
+
+        // Len
+        guint32 mac_cell_group_len;
+        proto_tree_add_item_ret_uint(mac_cell_group_tree, hf_l2server_mac_cell_group_len, tvb, offset, 4,
+                                     ENC_LITTLE_ENDIAN, &mac_cell_group_len);
+        offset += 4;
+
+        // FieldMask
+        guint32 field_mask_4;
+        proto_tree_add_item_ret_uint(mac_cell_group_tree, hf_l2server_field_mask_4, tvb, offset, 4,
+                                     ENC_LITTLE_ENDIAN, &field_mask_4);
+        offset += 4;
+
+        // lch_BasedPrioritization_r16
+        proto_tree_add_item(mac_cell_group_tree, hf_l2server_lch_basedprioritization_r16, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+
+        offset += 1;
+        // Spare[3]
+        proto_tree_add_item(mac_cell_group_tree, hf_l2server_spare, tvb, offset, 3, ENC_NA);
+        offset += 3;
+
+        //------------------------------------
+        // DrxConfig here (nr5g_rlcmac_Cmac_DRX_CONFIGt)
+        if (field_mask_4 & nr5g_rlcmac_Cmac_STRUCT_DRX_CONFIG_PRESENT) {
+            offset = dissect_rlcmac_drx_config(mac_cell_group_tree, tvb, pinfo, offset);
+            proto_item_append_text(mac_cell_group_ti, " (DRX)");
+        }
+
+        proto_item_set_len(mac_cell_group_ti, mac_cell_group_len);
+    }
+
+    // Skip to pass this.
+    offset = dedicated_start +  l2_len;
+
+
+    //---------------------------------------------------------------
+    // L1CellDedicatedConfig (bb_nr5g_CELL_DEDICATED_CONFIGt from bb-nr5g_struct.h)
+    if (l1cell_dedicated_config_len > 0) {
+        dedicated_start = offset;
+        proto_item *l1_dedicated_config_ti = proto_tree_add_string_format(tree, hf_l2server_l1_cell_dedicated_config, tvb,
+                                                              offset, l1cell_dedicated_config_len,
+                                                              "", "L1 Cell Dedicated Config");
+        proto_tree *l1_dedicated_config_tree = proto_item_add_subtree(l1_dedicated_config_ti, ett_l2server_l1_cell_dedicated_config);
+
+        // NbSCellCfgAdd
+        proto_tree_add_item(l1_dedicated_config_tree, hf_l2server_nb_scell_cfg_add, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+        // NbSCellCfgDel
+        proto_tree_add_item(l1_dedicated_config_tree, hf_l2server_nb_scell_cfg_del, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+
+        // FieldMask
+        proto_tree_add_item(l1_dedicated_config_tree, hf_l2server_field_mask_1, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        gboolean ded_present, common_present;
+        proto_tree_add_item_ret_boolean(l1_dedicated_config_tree, hf_l2server_field_mask_1_ded_present, tvb, offset, 1, ENC_LITTLE_ENDIAN, &ded_present);
+        proto_tree_add_item_ret_boolean(l1_dedicated_config_tree, hf_l2server_field_mask_1_common_present, tvb, offset, 1, ENC_LITTLE_ENDIAN, &common_present);
+        offset += 1;
+
+        // SetupReconf
+        proto_tree_add_item(l1_dedicated_config_tree, hf_l2server_setup_reconf, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+
+        // PhyCellCnf (bb_nr5g_PH_CELL_GROUP_CONFIGt from bb-nr5g_struct.h)
+        offset = dissect_ph_cell_config(l1_dedicated_config_tree, tvb, pinfo, offset);
+
+        // RNTICap. TODO: ?
+        offset += sizeof(bb_nr5g_RNTI_CAPABILITIESt);
+
+        if (ded_present) {
+            // SpCellCfgDed. N.B. offset returned here won't be right yet..
+            offset = dissect_sp_cell_cfg_ded(l1_dedicated_config_tree, tvb, pinfo, offset);
+        }
+
+        if (common_present) {
+            // SpCellCfgCommon
+            offset = dissect_sp_cell_cfg_common(l1_dedicated_config_tree, tvb, pinfo, offset, TRUE);
+        }
+
+        // SCellCfgAdd
+        for (guint32 n=0; n<nbSCellCfgAdd; n++) {
+            // TODO: dissect bb_nr5g_SCELL_CONFIGt
+            // Type depends upon FieldMask present flags, etc..
+        }
+
+        // SCellCfgDel
+        for (guint32 n=0; n<nbSCellCfgDel; n++) {
+            // TODO: dissect uint32_t
+            offset += 4;
+        }
+
+        // Skip to pass this.
+        offset = dedicated_start + l1cell_dedicated_config_len;
+    }
+}
+
+// I don't actually see a type for this message!!!!
+static void dissect_rlcmac_cmac_config_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                           guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    // UEId
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    //offset += 4;
+
+    // TODO: another 8 bytes.
+}
+
+
+//  "To Debug Rach Access" - we don't seem to be sending it.
+static void dissect_cmac_rach_cfg_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                      guint offset, guint len _U_)
+{
+    /* Nr5gId (UEId + CellId + BeamIdx) */
+    guint32 ueid, cellid;
+    offset = dissect_nr5gid(tree, tvb, pinfo, offset, &ueid, &cellid);
+
+    // RA_Info
+    guint32 bwpid;
+    dissect_rlcmac_cmac_ra_info(tree, tvb, pinfo, offset, len, &bwpid);
+}
+
+// nr5g_rlcmac_Crlc_TmParm_t (from nr5g-rlcmac_Crlc.h)
+static void dissect_crlc_tm_config(proto_tree *tree _U_, tvbuff_t *tvb _U_, packet_info *pinfo _U_,
+                                   guint offset _U_)
+{
+    /* TODO */
+
+    // TxActiveFlag
+    offset += 1;
+    // Tx
+    offset += sizeof(nr5g_rlcmac_Crlc_TxTmParm_t);
+    // RxActiveFlag
+    offset += 1;
+    // Rx
+    offset += sizeof(nr5g_rlcmac_Crlc_RxTmParm_t);
+}
+
+// nr5g_rlcmac_Crlc_UmParm_t
+static void dissect_crlc_um_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint offset)
+{
+    // TxActiveFlag
+    gboolean tx_active_flag;
+    proto_tree_add_item_ret_boolean(tree, hf_l2server_rlc_tx_active_flag, tvb, offset, 1, ENC_LITTLE_ENDIAN, &tx_active_flag);
+    offset += 1;
+
+    /* Tx (nr5g_rlcmac_Crlc_TxUmParm_t) */
+    proto_item *tx_ti = proto_tree_add_string_format(tree, hf_l2server_rlc_config_tx, tvb,
+                                                          offset, sizeof(nr5g_rlcmac_Crlc_TxUmParm_t),
+                                                          "", "Tx");
+    proto_tree *tx_tree = proto_item_add_subtree(tx_ti, ett_l2server_rlc_config_tx);
+
+    if (tx_active_flag) {
+        // SnLength
+        guint32 sn_length;
+        proto_tree_add_item_ret_uint(tx_tree, hf_l2server_rlc_snlength, tvb, offset, 1, ENC_LITTLE_ENDIAN, &sn_length);
+        offset += 1;
+        /* discardTimer */
+        proto_tree_add_item(tx_tree, hf_l2server_rlc_discard_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+
+        proto_item_append_text(tx_ti, " (SN-Length=%u)", sn_length);
+    }
+    else {
+        offset += sizeof(nr5g_rlcmac_Crlc_TxUmParm_t);
+        proto_item_append_text(tx_ti, " (not set)");
+    }
+
+
+    // RxActiveFlag
+    gboolean rx_active_flag;
+    proto_tree_add_item_ret_boolean(tree, hf_l2server_rlc_rx_active_flag, tvb, offset, 1, ENC_LITTLE_ENDIAN, &rx_active_flag);
+    offset += 1;
+
+    /* Rx (nr5g_rlcmac_Crlc_RxUmParm_t) */
+    proto_item *rx_ti = proto_tree_add_string_format(tree, hf_l2server_rlc_config_rx, tvb,
+                                                          offset, sizeof(nr5g_rlcmac_Crlc_RxUmParm_t),
+                                                          "", "Rx");
+    proto_tree *rx_tree = proto_item_add_subtree(rx_ti, ett_l2server_rlc_config_rx);
+
+    if (rx_active_flag) {
+        // SnLength
+        guint32 sn_length;
+        proto_tree_add_item_ret_uint(tx_tree, hf_l2server_rlc_snlength, tvb, offset, 1, ENC_LITTLE_ENDIAN, &sn_length);
+        offset += 1;
+        /* t_Reassembly */
+        proto_tree_add_item(rx_tree, hf_l2server_rlc_t_reassembly, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+
+        proto_item_append_text(rx_ti, " (SN-Length=%u)", sn_length);
+    }
+    else {
+        offset += sizeof(nr5g_rlcmac_Crlc_RxUmParm_t);
+        proto_item_append_text(rx_ti, " (not set)");
+    }
+}
+
+// nr5g_rlcmac_Crlc_AmParm_t
+static void dissect_crlc_am_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                   guint offset)
+{
+    /* Tx (nr5g_rlcmac_Crlc_TxAmParm_t) */
+    proto_item *tx_ti = proto_tree_add_string_format(tree, hf_l2server_rlc_config_tx, tvb,
+                                                          offset, sizeof(nr5g_rlcmac_Crlc_TxAmParm_t),
+                                                          "", "Tx");
+    proto_tree *tx_tree = proto_item_add_subtree(tx_ti, ett_l2server_rlc_config_tx);
+
+    /* SnLength */
+    guint32 sn_length;
+    proto_tree_add_item_ret_uint(tx_tree, hf_l2server_rlc_snlength, tvb, offset, 1, ENC_LITTLE_ENDIAN, &sn_length);
+    offset += 1;
+    /* t_PollRetransmit */
+    proto_tree_add_item(tx_tree, hf_l2server_rlc_t_poll_retransmit, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* pollPDU */
+    proto_tree_add_item(tx_tree, hf_l2server_rlc_poll_pdu, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* pollByte */
+    proto_tree_add_item(tx_tree, hf_l2server_rlc_poll_byte, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    /* maxRetxThreshold */
+    proto_tree_add_item(tx_tree, hf_l2server_rlc_max_retx_threshold, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* discardTimer */
+    proto_tree_add_item(tx_tree, hf_l2server_rlc_discard_timer, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    proto_item_append_text(tx_ti, " (SN-Length=%u)", sn_length);
+
+
+    /* Rx (nr5g_rlcmac_Crlc_RxAmParm_t) */
+    proto_item *rx_ti = proto_tree_add_string_format(tree, hf_l2server_rlc_config_rx, tvb,
+                                                          offset, sizeof(nr5g_rlcmac_Crlc_RxAmParm_t),
+                                                          "", "Rx");
+    proto_tree *rx_tree = proto_item_add_subtree(rx_ti, ett_l2server_rlc_config_rx);
+
+    /* SnLength */
+    proto_tree_add_item_ret_uint(rx_tree, hf_l2server_rlc_snlength, tvb, offset, 1, ENC_LITTLE_ENDIAN, &sn_length);
+    offset += 1;
+    /* t_Reassembly */
+    proto_tree_add_item(rx_tree, hf_l2server_rlc_t_reassembly, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* t_StatusProhibit */
+    proto_tree_add_item(rx_tree, hf_l2server_rlc_t_status_prohibit, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    proto_item_append_text(rx_ti, " (SN-Length=%u)", sn_length);
+}
+
+
+/* nr5g_rlcmac_Crlc_CONFIG_CMD_t from nr5g-rlcmac_Crlc.h */
+static void dissect_crlc_config_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                      guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* RbId */
+    proto_tree_add_item(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* LcId */
+    proto_tree_add_item(tree, hf_l2server_lcid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* ER */
+    proto_tree_add_item(tree, hf_l2server_rlc_er, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* RbType */
+    proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* RlcMode */
+    guint32 rlc_mode;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_rlc_mode, tvb, offset, 1, ENC_LITTLE_ENDIAN, &rlc_mode);
+    offset += 1;
+
+    /* TODO: not filled in if doing e.g. release? */
+    /* Parm */
+    switch (rlc_mode) {
+        case nr5g_TM:
+            /* (nr5g_rlcmac_Crlc_TmParm_t) */
+            dissect_crlc_tm_config(tree, tvb, pinfo, offset);
+            break;
+        case nr5g_UM:
+            /* (nr5g_rlcmac_Crlc_UmParm_t) */
+            dissect_crlc_um_config(tree, tvb, pinfo, offset);
+            break;
+        case nr5g_AM:
+            /* (nr5g_rlcmac_Crlc_AmParm_t) */
+            dissect_crlc_am_config(tree, tvb, pinfo, offset);
+            break;
+    }
+}
+
+// nr5g_rlcmac_Crlc_ACK_t (from nr5g-rlcmac_Crlc.h)
+// Doesn't seem to match properly though... (params ordered changed? One of them is ER?)
+static void dissect_crlc_config_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                    guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* RbId */
+    proto_tree_add_item(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* RbType */
+    proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    /* LCId */
+    proto_tree_add_item(tree, hf_l2server_lcid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+}
+
+// nr5g_rlcmac_Crlc_NAK_t (from nr5g-rlcmac_Crlc.h)
+static void dissect_crlc_config_nak(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                    guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* RbType */
+    proto_tree_add_item(tree, hf_l2server_rbtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* RbId */
+    proto_tree_add_item(tree, hf_l2server_rbid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* LCId */
+    proto_tree_add_item(tree, hf_l2server_lcid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    /* Err */
+    proto_tree_add_item(tree, hf_l2server_err, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 2;
+}
+
+
+static void dissect_version_info_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                     guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    // Code (made up name). 1 means real, 0 means debug (and not passed to L1)
+    proto_tree_add_item(tree, hf_l2server_code, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // Spare (should be zero)
+    proto_tree_add_item(tree, hf_l2server_spare2, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // VersionHash.  L3->L2 version hash.
+    proto_item *vh_ti = proto_tree_add_item(tree, hf_l2server_version_hash, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_item_append_text(vh_ti, " (L3->L2 hash from eLSU code version)");
+    offset += 4;
+}
+
+static void dissect_version_info_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                     guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    // Package type
+    proto_tree_add_item(tree, hf_l2server_package_type, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // N.B. L2 doesn't seem to encode these!
+    // PackageVersion (up to 60 bytes)
+    // AmmVerion (up to 60 bytes)
+}
+
+/* nr5g_rlcmac_Cmac_DBEAM_IND_t from nr5g-rlcmac_Cmac.h */
+static void dissect_dbeam_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                              guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* Dbeam Ind filter */
+    proto_item *db_ti = proto_tree_add_item(tree, hf_l2server_dbeam_ind, tvb, 0, 0, ENC_ASCII);
+    proto_item_set_hidden(db_ti);
+
+    // Spare
+    proto_tree_add_item(tree, hf_l2server_spare4, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // CellId
+    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // DbeamId
+    proto_tree_add_item(tree, hf_l2server_dbeamid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // Status info
+    proto_tree_add_item(tree, hf_l2server_dbeam_status, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // phy_cell_id
+    proto_tree_add_item(tree, hf_l2server_physical_cellid, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // SsbArfcn
+    proto_tree_add_item(tree, hf_l2server_ssb_arfcn, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // NumBeam
+    guint32 num_beam;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_num_beams, tvb, offset, 4, ENC_LITTLE_ENDIAN, &num_beam);
+    offset += 4;
+    // Beam[]
+    for (guint n=0; n < num_beam; n++) {
+        // TODO (nr5g_rlcmac_Cmac_BEAM_STATUS_t)
+    }
+}
+
+/* nr5g_l2_Srv_CELL_PPU_LIST_CMDt */
+static void dissect_ppu_list_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                 guint offset _U_, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+}
+
+/* nr5g_l2_Srv_CELL_PPU_LIST_ACKt (from nr5g-l2_Srv.h) */
+static void dissect_ppu_list_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                 guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    // NCellLte
+    proto_tree_add_item(tree, hf_l2server_ncelllte, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // NCellNr
+    guint nCellNr;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_ncellnr, tvb, offset, 1, ENC_LITTLE_ENDIAN, &nCellNr);
+    offset += 1;
+
+    // NumLteProPdu
+    guint32 num_lte_pro_pdu;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_numltepropdu, tvb, offset, 1, ENC_LITTLE_ENDIAN, &num_lte_pro_pdu);
+    offset += 1;
+    // NumNrProPdu
+    guint32 num_nr_pro_pdu;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_numnrpropdu, tvb, offset, 1, ENC_LITTLE_ENDIAN, &num_nr_pro_pdu);
+    offset += 1;
+
+    // TODO: this still isn't right..
+
+    // PPDUs come next..
+
+    // CellIdLteList[].  This will always be empty!!!
+    for (guint32 n=0; n < num_lte_pro_pdu; n++) {
+        proto_tree_add_item(tree, hf_l2server_cellidlteitem, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+    }
+    // CellIdNrList[].
+    for (guint32 n=0; n < nCellNr; n++) {
+        proto_tree_add_item(tree, hf_l2server_cellidnritem, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+    }
+}
+
+// Showing nr5g_l2_Srv_CFG_02t from L2ServerMesages.h
+// (variation controlled by type field)
+static void dissect_l2_srv_cfg_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                   guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    // Type (i.e. which type of struct this is).
+    proto_tree_add_item(tree, hf_l2server_config_cmd_type, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // Side (lte_Side_v)
+    proto_tree_add_item(tree, hf_l2server_side, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // BotLayer
+    proto_tree_add_item(tree, hf_l2server_bot_layer, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // Trf
+    proto_tree_add_item(tree, hf_l2server_trf, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // TODO:
+    // UDG timeout configuration
+    // Alive
+    offset += 4;
+    // TxErr
+    offset += 4;
+    // StartTO
+    offset += 4;
+    // TermTO
+    offset += 4;
+    // TermAckTO
+    offset += 4;
+    // NLost
+    offset += 4;
+    // NStartRetry
+    offset += 4;
+    // NTermRetry
+    offset += 4;
+
+    // UDG Tamp config
+    // TstMsk
+    offset += 4;
+    // UlBLim
+    offset += 4;
+    // UlRampDt
+    offset += 4;
+    // DlBLim
+    offset += 4;
+    // DlRmpDt
+    offset += 4;
+    // SendBuf
+    offset += 4;
+    // RecvBuf
+    offset += 4;
+
+    // En (Interface number)
+    offset += 4;
+    // GiIp
+    offset += 4;
+    // GiMask
+    offset += 4;
+    // GiIp6
+    offset += 16;
+    // Prefix
+    offset += 4;
+    // Technology (LTE=1, NR=2)
+    proto_tree_add_item(tree, hf_l2server_technology, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // EnbSim
+    proto_tree_add_item(tree, hf_l2server_enbsim, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // Flags
+    offset += 4;
+    // L2MaintenanceFlags
+    offset += 4;
+
+    // TODO:
+}
+
+static void dissect_l2_srv_cfg_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                   guint offset _U_, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+}
+
+
+// nr5g_l2_Srv_SETPARM_03t (from L2ServerMessages.h)
+static void dissect_setparm_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    // Type
+    proto_tree_add_item(tree, hf_l2server_setparm_cmd_type, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+    // MaxUE
+    proto_tree_add_item(tree, hf_l2server_max_ue, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // MaxPdcp
+    proto_tree_add_item(tree, hf_l2server_max_pdcp, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // MaxNat
+    proto_tree_add_item(tree, hf_l2server_max_nat, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // MaxUdgSess
+    proto_tree_add_item(tree, hf_l2server_max_udg_sess, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    // MaxCntr
+    proto_tree_add_item(tree, hf_l2server_max_cntr, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // Verbosity
+    proto_tree_add_item(tree, hf_l2server_verbosity, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // L2_nr5g_RlcMac_Verbosity
+    proto_tree_add_item(tree, hf_l2server_rlcmac_verbosity, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_drx_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_phr_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_dci_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_rlc_status_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_ulsched_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_l1_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_rlc_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_bsr_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_sr_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_l2server_verbosity_mac_config_set, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // L2_nr5g_pdcp_Verbosity
+    proto_tree_add_item(tree, hf_l2server_pdcp_verbosity, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    // TODO
+    // BeamChangeTimer
+    offset += 2;
+    // FieldTestMode
+    offset += 1;
+
+    // DlHarqMode
+    proto_tree_add_item(tree, hf_l2server_dl_harq_mode, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    // MeasMode
+    offset += 1;
+    // UlFsAdvance
+    proto_tree_add_item(tree, hf_l2server_ul_fs_advance, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // DeltaNumLdpcIteration
+    offset += 1;
+    // DlSoftCombining
+    offset += 1;
+    // MaxRach
+    proto_tree_add_item(tree, hf_l2server_max_rach, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+    // LteDlHarqMode
+    offset += 1;
+    // PdcchType
+    offset += 1;
+
+    // CatmEnable
+    offset += 1;
+    // LteDlSoftCombining
+    offset += 1;
+    // EnableDynPhRotationCompensation
+    offset += 1;
+
+    // SpareC[2]
+    offset += 2;
+    // Spare[18]
+    proto_tree_add_item(tree, hf_l2server_spare, tvb, offset, 18*4, ENC_NA);
+    offset += (18*4);
+
+    // NumUpStkPpu
+    guint numUpStkPpu;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_num_up_stk_ppu, tvb, offset, 1, ENC_LITTLE_ENDIAN, &numUpStkPpu);
+    offset += 1;
+    // NumDwnStkPpu
+    guint numDwnStkPpu;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_num_dwn_stk_ppu, tvb, offset, 1, ENC_LITTLE_ENDIAN, &numDwnStkPpu);
+    offset += 1;
+    // NumLteProPpu
+    guint numLteProPpu;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_num_lte_pro_ppu, tvb, offset, 1, ENC_LITTLE_ENDIAN, &numLteProPpu);
+    offset += 1;
+    // NumNrProPpu
+    guint numNrProPpu;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_num_nr_pro_ppu, tvb, offset, 1, ENC_LITTLE_ENDIAN, &numNrProPpu);
+    offset += 1;
+
+    // NumLteCell
+    guint32 numLteCell;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_num_lte_cell, tvb, offset, 1, ENC_LITTLE_ENDIAN, &numLteCell);
+    offset += 1;
+    // NumNrCell
+    guint32 numNrCell;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_num_nr_cell, tvb, offset, 1, ENC_LITTLE_ENDIAN, &numNrCell);
+    offset += 1;
+
+    //--------------------------------------------
+    // Variable-sized array items.
+
+    // numUpStkPpu
+    for (guint n=0; n < numUpStkPpu; n++) {
+        // N.B. this is a union - but just consider as ppduid?
+        proto_tree_add_item(tree, hf_l2server_up_stk_ppu, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
+
+    // numDwnStkPpu
+    for (guint n=0; n < numDwnStkPpu; n++) {
+        proto_tree_add_item(tree, hf_l2server_dwn_stk_ppu, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
+
+    // NumNrProPpu
+    for (guint n=0; n < numNrProPpu; n++) {
+        proto_tree_add_item(tree, hf_l2server_nr_pro_ppu, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+    }
+
+    // NrCellIdList
+    for (guint n=0; n < numNrCell; n++) {
+        proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+        offset += 1;
+    }
+}
+
+static void dissect_setparm_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset _U_, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+}
+
+static void dissect_rlcmac_error_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                     guint offset, guint len _U_)
+{
+    /* Log filter */
+    proto_item *log_ti = proto_tree_add_item(tree, hf_l2server_log, tvb, 0, 0, ENC_ASCII);
+    proto_item_set_hidden(log_ti);
+
+    // Not sure what this is...
+    offset += 2;
+    // LogStr
+    proto_tree_add_item(tree, hf_l2server_logstr, tvb, offset, len-offset+8, ENC_ASCII);
+
+    col_set_str(pinfo->cinfo, COL_INFO,
+                tvb_get_string_enc(wmem_packet_scope(), tvb, offset, len-offset+8, ENC_UTF_8|ENC_NA));
+
+}
+
+
+
+static void dissect_cmac_status_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                    guint offset, guint len _U_)
+{
+    /* Log filter */
+    proto_item *log_ti = proto_tree_add_item(tree, hf_l2server_log, tvb, 0, 0, ENC_ASCII);
+    proto_item_set_hidden(log_ti);
+
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* Cmac Status. */
+    guint32 status;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_cmac_status, tvb, offset, 1, ENC_LITTLE_ENDIAN, &status);
+    offset += 1;
+
+    col_set_str(pinfo->cinfo, COL_INFO, "CMAC Status Ind - ");
+    col_set_str(pinfo->cinfo, COL_INFO, val_to_str_const(status, cmac_status_vals, "Unknown"));
+}
+
+
+static void dissect_cmac_cell_status_ind(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                         guint offset, guint len _U_)
+{
+    // Add log filter
+    proto_item *log_ti = proto_tree_add_item(tree, hf_l2server_log, tvb, 0, 0, ENC_ASCII);
+    proto_item_set_hidden(log_ti);
+
+    /* Spare */
+    proto_tree_add_item(tree, hf_l2server_spare4, tvb, offset, 4, ENC_NA);
+    offset += 4;
+
+    /* cellid */
+    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* Cell Status. */
+    guint32 status;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_cmac_cell_status, tvb, offset, 1, ENC_LITTLE_ENDIAN, &status);
+    offset += 1;
+
+    col_set_str(pinfo->cinfo, COL_INFO, "CMAC Cell Status Ind - ");
+    col_set_str(pinfo->cinfo, COL_INFO, val_to_str_const(status, cmac_cell_status_vals, "Unknown"));
+}
+
+
+static void dissect_rcp_ue_set_group_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                         guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* Radio condition group */
+    proto_tree_add_item(tree, hf_l2server_radio_condition_group, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+}
+
+static void dissect_rcp_ue_set_group_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                         guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+}
+
+static void dissect_rcp_set_ue_set_index_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                         guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* Radio Condition Profile Index */
+    proto_tree_add_item(tree, hf_l2server_radio_condition_profile_index, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+}
+
+/* lte_l2_Srv_ACKt */
+static void dissect_rcp_set_ue_index_ack(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                         guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* N.B. this is a union (UeId|CelllId|RcGroup) */
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+}
+
+static void dissect_rcp_set_ue_index_nak(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                         guint offset, guint len _U_)
+{
+    // Add config filter
+    proto_item *config_ti = proto_tree_add_item(tree, hf_l2server_config, tvb, 0, 0, ENC_NA);
+    proto_item_set_hidden(config_ti);
+
+    /* N.B. this is a union (UeId|CelllId|RcGroup) */
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* Err */
+    proto_tree_add_item(tree, hf_l2server_err, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+}
+
+
+static void dissect_cmac_reset_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                   guint offset, guint len _U_)
+{
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+}
+
+// N.B. also used for ack, where type is identical.
+static void dissect_sib_filter_act_act_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                           guint offset, guint len _U_)
+{
+    /* CellId */
+    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* SibFilterFlag */
+    proto_tree_add_item(tree, hf_l2server_sibfilterflag, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+}
+
+static void dissect_sib_filter_act_act_nak(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                           guint offset, guint len _U_)
+{
+    /* CellId */
+    proto_tree_add_item(tree, hf_l2server_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* TODO: Err */
+    offset += 2;
+}
+
+/* nr5g_l2_Srv_REEST_PREPAREt from nr5g-l2_Srv.h */
+static void dissect_reest_prepare_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                      guint offset, guint len _U_)
+{
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* Num PdcpAction_t (to up 32) */
+    guint32 num_pdcp_actions;
+    proto_tree_add_item_ret_uint(tree, hf_l2server_num_pdcp_actions, tvb, offset, 4, ENC_LITTLE_ENDIAN, &num_pdcp_actions);
+    offset += 4;
+
+    for (guint n=0; n < num_pdcp_actions; n++) {
+        // Entry is of type nr5g_pdcp_Com_Action_t
+
+        // RbType
+        offset += 1;
+        // Rbid
+        offset += 1;
+        // Action
+        offset += 1;
+
+        //offset += sizeof(nr5g_pdcp_Com_Action_t);
+    }
+}
+
+/* nr5g_l2_Srv_REEST_1_CMDt from nr5g-l2_Srv.h */
+static void dissect_reest_1_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset, guint len _U_)
+{
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* OrigCellId */
+    proto_tree_add_item(tree, hf_l2server_orig_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+    /* TargCellId */
+    proto_tree_add_item(tree, hf_l2server_targ_cellid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+
+    offset += 4;
+}
+
+/* nr5g_l2_Srv_REEST_2_CMDt from nr5g-l2_Srv.h */
+static void dissect_reest_2_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset, guint len _U_)
+{
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+}
+
+/* nr5g_l2_Srv_REEST_3_CMDt from nr5g-l2_Srv.h */
+static void dissect_reest_3_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                guint offset, guint len _U_)
+{
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+}
+
+
+
+static void dissect_rrc_state_cfg_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
+                                      guint offset, guint len _U_)
+{
+    /* UEId */
+    proto_tree_add_item(tree, hf_l2server_ueid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* State */
+    proto_tree_add_item(tree, hf_l2server_rrc_state, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+}
+
+
+/************************************************************************************/
+
+/* SRV Error */
+static TYPE_FUN srv_error_type_funs[] =
+{
+        { 0x0402,                            "UNKNOWN_ERROR_IND",               dissect_sapi_type_dummy },
+        { 0x00,                               NULL,                             NULL }
+};
+
+/* OM */
+static TYPE_FUN om_type_funs[] =
+{
+        { lte_l2_Srv_LOGIN_CMD,              "lte_L2_Srv_LOGIN_CMD",       dissect_login_cmd },
+        { lte_l2_Srv_LOGIN_ACK,              "lte_L2_Srv_LOGIN_ACK",       dissect_login_ack },
+        { lte_l2_Srv_LOGIN_NAK,              "lte_L2_Srv_LOGIN_NAK",       dissect_sapi_type_dummy /* TODO */},
+
+        { lte_l2_Srv_VERSION_INFO_CMD,       "lte_l2_Srv_VERSION_INFO_CMD",       dissect_version_info_cmd },
+        { lte_l2_Srv_VERSION_INFO_ACK,       "lte_l2_Srv_VERSION_INFO_ACK",       dissect_version_info_ack },
+        { lte_l2_Srv_VERSION_INFO_NAK,       "lte_l2_Srv_VERSION_INFO_NAK",       dissect_sapi_type_dummy /* TODO */},
+
+        { nr5g_l2_Srv_BASE_TYPE,             "nr5g_l2_Srv_BASE_TYPE",       dissect_sapi_type_dummy /* TODO */},
+
+        { nr5g_l2_Srv_CFG_CMD,               "nr5g_l2_Srv_CFG_CMD",       dissect_l2_srv_cfg_cmd },
+        { nr5g_l2_Srv_CFG_ACK,               "nr5g_l2_Srv_CFG_ACK",       dissect_l2_srv_cfg_ack },
+        { nr5g_l2_Srv_CFG_NAK,               "nr5g_l2_Srv_CFG_NAK",       dissect_sapi_type_dummy /* TODO */},
+
+        { nr5g_l2_Srv_CELL_PPU_LIST_CMD,     "nr5g_l2_Srv_CELL_PPU_LIST_CMD",       dissect_ppu_list_cmd },
+        { nr5g_l2_Srv_CELL_PPU_LIST_ACK,     "nr5g_l2_Srv_CELL_PPU_LIST_ACK",       dissect_ppu_list_ack },
+        { nr5g_l2_Srv_CELL_PPU_LIST_NAK,     "nr5g_l2_Srv_CELL_PPU_LIST_NAK",       dissect_sapi_type_dummy  /* TODO */},
+
+        { nr5g_l2_Srv_SETPARM_CMD,           "nr5g_l2_Srv_SETPARM_CMD",       dissect_setparm_cmd },
+        { nr5g_l2_Srv_SETPARM_ACK,           "nr5g_l2_Srv_SETPARM_ACK",       dissect_setparm_ack },
+        { nr5g_l2_Srv_SETPARM_NAK,           "nr5g_l2_Srv_SETPARM_NAK",       dissect_sapi_type_dummy  /* TODO */},
+
+        { lte_l2_Srv_START_CMD,              "lte_l2_Srv_START_CMD",       dissect_srv_start_cmd },
+        { lte_l2_Srv_START_ACK,              "lte_l2_Srv_START_ACK",       dissect_srv_start_ack },
+        { lte_l2_Srv_START_NAK,              "lte_l2_Srv_START_NAK",       dissect_sapi_type_dummy },
+
+        { nr5g_l2_Srv_OPEN_CELL_CMD,         "NR5G_L2_SRV_OPEN_CELL_CMD",       dissect_open_cell_cmd},
+        { nr5g_l2_Srv_OPEN_CELL_ACK,         "NR5G_L2_SRV_OPEN_CELL_ACK",       dissect_open_cell_ack /* TODO */},
+        { nr5g_l2_Srv_OPEN_CELL_NAK,         "NR5G_L2_SRV_OPEN_CELL_NAK",       dissect_sapi_type_dummy  /* TODO */},
+
+        // N.B. we send fix bytes ("buffer from log shared by Rocco")
+        { lte_l2_Srv_GETINFO_CMD,            "lte_l2_Srv_GETINFO_CMD",       dissect_getinfo_cmd },
+        { lte_l2_Srv_GETINFO_ACK,            "lte_l2_Srv_GETINFO_ACK",       dissect_getinfo_ack },
+        { lte_l2_Srv_GETINFO_NAK,            "lte_l2_Srv_GETINFO_NAK",       dissect_sapi_type_dummy  /* TODO */},
+
+        { nr5g_l2_Srv_CELL_CONFIG_CMD,       "nr5g_l2_Srv_CELL_CONFIG_CMD",       dissect_cell_config_cmd },
+        { nr5g_l2_Srv_CELL_CONFIG_ACK,       "nr5g_l2_Srv_CELL_CONFIG_ACK",       dissect_cell_config_ack },
+        { nr5g_l2_Srv_CELL_CONFIG_NAK,       "nr5g_l2_Srv_CELL_CONFIG_NAK",       dissect_sapi_type_dummy  /* TODO */},
+
+        { nr5g_l2_Srv_RCP_LOAD_CMD,       "nr5g_l2_Srv_RCP_LOAD_CMD",       dissect_rcp_load_cmd },
+        { nr5g_l2_Srv_RCP_LOAD_ACK,       "nr5g_l2_Srv_RCP_LOAD_ACK",       dissect_rcp_load_ack },
+        { nr5g_l2_Srv_RCP_LOAD_NAK,       "nr5g_l2_Srv_RCP_LOAD_NAK",       dissect_sapi_type_dummy },
+
+        { nr5g_l2_Srv_RCP_LOAD_END_CMD,       "nr5g_l2_Srv_RCP_LOAD_END_CMD",       dissect_rcp_load_end_cmd },
+        { nr5g_l2_Srv_RCP_LOAD_END_ACK,       "nr5g_l2_Srv_RCP_LOAD_END_ACK",       dissect_rcp_load_end_ack },
+        { nr5g_l2_Srv_RCP_LOAD_END_NAK,       "nr5g_l2_Srv_RCP_LOAD_END_NAK",       dissect_sapi_type_dummy  /* TODO */},
+
+        { nr5g_l2_Srv_CELL_PARM_CMD,         "nr5g_l2_Srv_CELL_PARM_CMD",       dissect_cell_parm_cmd },
+        { nr5g_l2_Srv_CELL_PARM_ACK,         "nr5g_l2_Srv_CELL_PARM_ACK",       dissect_cell_parm_ack },
+        { nr5g_l2_Srv_CELL_PARM_NAK,         "nr5g_l2_Srv_CELL_PARM_NAK",       dissect_sapi_type_dummy  /* TODO */},
+
+        { nr5g_l2_Srv_CREATE_UE_CMD,            "nr5g_l2_Srv_CREATE_UE_CMD",       dissect_create_ue_cmd },
+        { nr5g_l2_Srv_CREATE_UE_ACK,            "nr5g_l2_Srv_CREATE_UE_ACK",       dissect_create_ue_ack },
+        { nr5g_l2_Srv_CREATE_UE_NAK,            "nr5g_l2_Srv_CREATE_UE_NAK",       dissect_create_ue_nak },
+
+        { lte_l2_Srv_DELETE_UE_CMD,            "nr5g_l2_Srv_DELETE_UE_CMD",       dissect_delete_ue_cmd },
+        { lte_l2_Srv_DELETE_UE_ACK,            "nr5g_l2_Srv_DELETE_UE_ACK",       dissect_delete_ue_ack },
+        { lte_l2_Srv_DELETE_UE_NAK,            "nr5g_l2_Srv_DELETE_UE_NAK",       dissect_delete_ue_nak },
+
+        { nr5g_l2_Srv_RCP_UE_SET_GROUP_CMD,     "nr5g_l2_Srv_RCP_UE_SET_GROUP_CMD",       dissect_rcp_ue_set_group_cmd },
+        { nr5g_l2_Srv_RCP_UE_SET_GROUP_ACK,     "nr5g_l2_Srv_RCP_UE_SET_GROUP_ACK",       dissect_rcp_ue_set_group_ack },
+        { nr5g_l2_Srv_RCP_UE_SET_GROUP_NAK,     "nr5g_l2_Srv_RCP_UE_SET_GROUP_NAK",       dissect_sapi_type_dummy  /* TODO */},
+
+        { nr5g_l2_Srv_RCP_UE_SET_INDEX_CMD,     "nr5g_l2_Srv_RCP_UE_SET_INDEX_CMD",       dissect_rcp_set_ue_set_index_cmd },
+        { nr5g_l2_Srv_RCP_UE_SET_INDEX_ACK,     "nr5g_l2_Srv_RCP_UE_SET_INDEX_ACK",       dissect_rcp_set_ue_index_ack },
+        { nr5g_l2_Srv_RCP_UE_SET_INDEX_NAK,     "nr5g_l2_Srv_RCP_UE_SET_INDEX_NAK",       dissect_rcp_set_ue_index_nak },
+
+
+         /* Handover */
+        { nr5g_l2_Srv_HANDOVER_CMD,             "nr5g_l2_Srv_HANDOVER_CMD",       dissect_handover_cmd },
+        { nr5g_l2_Srv_HANDOVER_ACK,             "nr5g_l2_Srv_HANDOVER_ACK",       dissect_handover_ack },
+        { nr5g_l2_Srv_HANDOVER_NAK,             "nr5g_l2_Srv_HANDOVER_NAK",       dissect_handover_ack },
+
+        /* Reestablishment */
+        { nr5g_l2_Srv_REEST_PREPARE_CMD,        "nr5g_l2_Srv_REEST_PREPARE_CMD",       dissect_reest_prepare_cmd },
+        { nr5g_l2_Srv_REEST_PREPARE_ACK,        "nr5g_l2_Srv_REEST_PREPARE_ACK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_REEST_PREPARE_NAK,        "nr5g_l2_Srv_REEST_PREPARE_NAK",       dissect_sapi_type_dummy },
+
+        { nr5g_l2_Srv_REEST_1_CMD,        "nr5g_l2_Srv_REEST_1_CMD",       dissect_reest_1_cmd },
+        { nr5g_l2_Srv_REEST_1_ACK,        "nr5g_l2_Srv_REEST_1_ACK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_REEST_1_NAK,        "nr5g_l2_Srv_REEST_1_NAK",       dissect_sapi_type_dummy },
+
+        { nr5g_l2_Srv_REEST_2_CMD,        "nr5g_l2_Srv_REEST_2_CMD",       dissect_reest_2_cmd },
+        { nr5g_l2_Srv_REEST_2_ACK,        "nr5g_l2_Srv_REEST_2_ACK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_REEST_2_NAK,        "nr5g_l2_Srv_REEST_2_NAK",       dissect_sapi_type_dummy },
+
+        { nr5g_l2_Srv_REEST_3_CMD,        "nr5g_l2_Srv_REEST_3_CMD",       dissect_reest_3_cmd },
+        { nr5g_l2_Srv_REEST_3_ACK,        "nr5g_l2_Srv_REEST_3_ACK",       dissect_sapi_type_dummy },
+        { nr5g_l2_Srv_REEST_3_NAK,        "nr5g_l2_Srv_REEST_3_NAK",       dissect_sapi_type_dummy },
+
+        { 0x00,                               NULL,                             NULL }
+};
+#define MAX_OM_TYPE_VALS      array_length(om_type_funs)
+static value_string  om_type_vals[MAX_OM_TYPE_VALS];
+
+
+/* NR RLCMAC AUX */
+static TYPE_FUN aux_type_funs[] =
+{
+    { nr5g_rlcmac_Data_RA_REQ,               "nr5g_rlcmac_Data_RA_REQ",               dissect_ra_req},
+    { nr5g_rlcmac_Data_RA_CNF,               "nr5g_rlcmac_Data_RA_CNF",               dissect_ra_cnf},
+    { nr5g_rlcmac_Data_RA_IND,               "nr5g_rlcmac_Data_RA_IND",               dissect_ra_ind},
+    { nr5g_rlcmac_Data_RE_EST_IND,           "nr5g_rlcmac_Data_RE_EST_IND",           dissect_re_est_ind /* TODO */},
+    { nr5g_rlcmac_Data_RE_EST_END_IND,       "nr5g_rlcmac_Data_RE_EST_END_IND",       dissect_re_est_ind /* TODO */},
+    //{ nr5g_rlcmac_Data_RLC_BUFFER_REQ,       "nr5g_rlcmac_Data_RLC_BUFFER_REQ",       dissect_sapi_type_dummy /* TODO */},
+    //{ nr5g_rlcmac_Data_RLC_BUFFER_IND,       "nr5g_rlcmac_Data_RLC_BUFFER_IND",       dissect_sapi_type_dummy /* TODO */},
+
+    // TODO: these 3 belong in a error SAP, but not sure which one!!!!
+    { nr5g_rlcmac_Crlc_ERROR_IND,         "nr5g_rlcmac_Crlc_ERROR_IND",               dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Crlc_REJECT_IND,        "nr5g_rlcmac_Crlc_REJECT_IND",              dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Crlc_NC_ERROR_IND,      "nr5g_rlcmac_Crlc_NC_ERROR_IND",            dissect_sapi_type_dummy /* TODO */},
+
+
+    { nr5g_rlcmac_Data_RLC_ENTITY_CREATE_IND,  "nr5g_rlcmac_Data_RLC_ENTITY_CREATE_IND",    dissect_rlc_entity_create_ind },
+    { nr5g_rlcmac_Data_SI_IND,                 "nr5g_rlcmac_Data_SI_IND",                   dissect_sapi_type_dummy /* TODO */},
+    { 0x00,                               NULL,                             NULL }
+};
+#define MAX_AUX_TYPE_VALS      array_length(aux_type_funs)
+static value_string  aux_type_vals[MAX_AUX_TYPE_VALS];
+
+
+/* NR RLCMAC TM */
+static TYPE_FUN nr_rlcmac_tm_type_funs[] =
+{
+    { nr5g_rlcmac_Data_TM_DATA_REQ,    "nr5g_rlcmac_Data_TM_DATA_REQ",       dissect_rlcmac_data_req_tm },
+    { nr5g_rlcmac_Data_TM_DATA_IND,    "nr5g_rlcmac_Data_TM_DATA_IND",       dissect_rlcmac_data_ind_tm },
+    { 0x00,                               NULL,                             NULL }
+};
+#define MAX_NR_RLCMAC_TM_TYPE_VALS      array_length(nr_rlcmac_tm_type_funs)
+static value_string  nr_rlcmac_tm_type_vals[MAX_NR_RLCMAC_TM_TYPE_VALS];
+
+
+/* NR RLCMAC UM */
+static TYPE_FUN nr_rlcmac_um_type_funs[] =
+{
+    { nr5g_rlcmac_Data_UM_DATA_REQ,    "nr5g_rlcmac_Data_UM_DATA_REQ",    dissect_rlcmac_data_req_um },
+    { nr5g_rlcmac_Data_UM_DATA_IND,    "nr5g_rlcmac_Data_UM_DATA_IND",    dissect_rlcmac_data_ind_um },
+    { 0x00,                               NULL,                           NULL }
+};
+#define MAX_NR_RLCMAC_UM_TYPE_VALS      array_length(nr_rlcmac_um_type_funs)
+static value_string  nr_rlcmac_um_type_vals[MAX_NR_RLCMAC_UM_TYPE_VALS];
+
+
+/* NR RLCMAC AM */
+static TYPE_FUN nr_rlcmac_am_type_funs[] =
+{
+    { nr5g_rlcmac_Data_AM_DATA_REQ,     "nr5g_rlcmac_Data_AM_DATA_REQ",       dissect_rlcmac_data_req_am },
+    { nr5g_rlcmac_Data_AM_DATA_CNF,     "nr5g_rlcmac_Data_AM_DATA_CNF",       dissect_rlcmac_data_cnf },
+    { nr5g_rlcmac_Data_AM_DATA_IND,     "nr5g_rlcmac_Data_AM_DATA_IND",       dissect_rlcmac_data_ind_am },
+    { nr5g_rlcmac_Data_AM_MAX_RETX_IND, "nr5g_rlcmac_Data_AM_MAX_RETX_IND",   dissect_sapi_type_dummy /* TODO */},
+    { 0x00,                               NULL,                             NULL }
+};
+#define MAX_NR_RLCMAC_AM_TYPE_VALS      array_length(nr_rlcmac_am_type_funs)
+static value_string  nr_rlcmac_am_type_vals[MAX_NR_RLCMAC_AM_TYPE_VALS];
+
+
+
+
+/* NR RLCMAC L1 TEST */
+static TYPE_FUN nr_rlcmac_l1_test_type_funs[] =
+{
+    { nr5g_rlcmac_Cmac_L1T_START_TEST_CMD,    "nr5g_rlcmac_Cmac_L1T_START_TEST_CMD",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1T_START_TEST_ACK,    "nr5g_rlcmac_Cmac_L1T_START_TEST_ACK",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1T_START_TEST_NAK,    "nr5g_rlcmac_Cmac_L1T_START_TEST_NAK",       dissect_sapi_type_dummy /* TODO */},
+
+    { nr5g_rlcmac_Cmac_L1T_STOP_TEST_CMD,    "nr5g_rlcmac_Cmac_L1T_STOP_TEST_CMD",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1T_STOP_TEST_ACK,    "nr5g_rlcmac_Cmac_L1T_STOP_TEST_ACK",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1T_STOP_TEST_NAK,    "nr5g_rlcmac_Cmac_L1T_STOP_TEST_NAK",       dissect_sapi_type_dummy /* TODO */},
+
+    { nr5g_rlcmac_Cmac_L1T_LOG_IND,    "nr5g_rlcmac_Cmac_L1T_LOG_IND",       dissect_l1t_log_ind},
+
+    { nr5g_rlcmac_Cmac_L1L2T_START_TEST_CMD,    "nr5g_rlcmac_Cmac_L1L2T_START_TEST_CMD",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1L2T_START_TEST_ACK,    "nr5g_rlcmac_Cmac_L1L2T_START_TEST_ACK",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1L2T_START_TEST_NAK,    "nr5g_rlcmac_Cmac_L1L2T_START_TEST_NAK",       dissect_sapi_type_dummy /* TODO */},
+
+    { nr5g_rlcmac_Cmac_L1L2T_STOP_TEST_CMD,    "nr5g_rlcmac_Cmac_L1L2T_STOP_TEST_CMD",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1L2T_STOP_TEST_ACK,    "nr5g_rlcmac_Cmac_L1L2T_STOP_TEST_ACK",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1L2T_STOP_TEST_NAK,    "nr5g_rlcmac_Cmac_L1L2T_STOP_TEST_NAK",       dissect_sapi_type_dummy /* TODO */},
+
+    { nr5g_rlcmac_Cmac_L1T_DEBUG_CFG_CMD,    "nr5g_rlcmac_Cmac_L1T_DEBUG_CFG_CMD",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1T_DEBUG_CFG_ACK,    "nr5g_rlcmac_Cmac_L1T_DEBUG_CFG_ACK",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1T_DEBUG_CFG_NAK,    "nr5g_rlcmac_Cmac_L1T_DEBUG_CFG_NAK",       dissect_sapi_type_dummy /* TODO */},
+
+    { nr5g_rlcmac_Cmac_L1L2T_CONF_START_TEST_CMD,    "nr5g_rlcmac_Cmac_L1L2T_CONF_START_TEST_CMD",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1L2T_CONF_START_TEST_ACK,    "nr5g_rlcmac_Cmac_L1L2T_CONF_START_TEST_ACK",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1L2T_CONF_START_TEST_NAK,    "nr5g_rlcmac_Cmac_L1L2T_CONF_START_TEST_NAK",       dissect_sapi_type_dummy /* TODO */},
+
+    { nr5g_rlcmac_Cmac_L1L2T_CONF_STOP_TEST_CMD,    "nr5g_rlcmac_Cmac_L1L2T_CONF_STOP_TEST_CMD",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1L2T_CONF_STOP_TEST_ACK,    "nr5g_rlcmac_Cmac_L1L2T_CONF_STOP_TEST_ACK",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1L2T_CONF_STOP_TEST_NAK,    "nr5g_rlcmac_Cmac_L1L2T_CONF_STOP_TEST_NAK",       dissect_sapi_type_dummy /* TODO */},
+
+    /* ... */
+
+    { nr5g_rlcmac_Cmac_L1T_BINDUMP_CMD,    "nr5g_rlcmac_Cmac_L1T_BINDUMP_CMD",       dissect_bindump_cmd /* TODO */},
+    { nr5g_rlcmac_Cmac_L1T_BINDUMP_ACK,    "nr5g_rlcmac_Cmac_L1T_BINDUMP_ACK",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1T_BINDUMP_NAK,    "nr5g_rlcmac_Cmac_L1T_BINDUMP_NAK",       dissect_sapi_type_dummy /* TODO */},
+
+    { nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_CMD,    "nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_CMD",       dissect_bindump_cmd /* TODO */},
+    { nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_ACK,    "nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_ACK",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_NAK,    "nr5g_rlcmac_Cmac_L1T_L2_BINDUMP_CFG_NAK",       dissect_sapi_type_dummy /* TODO */},
+
+    { 0x00,                               NULL,                             NULL }
+};
+#define MAX_NR_RLCMAC_L1_TEST_TYPE_VALS      array_length(nr_rlcmac_l1_test_type_funs)
+static value_string  nr_rlcmac_l1_test_type_vals[MAX_NR_RLCMAC_L1_TEST_TYPE_VALS];
+
+static TYPE_FUN nr_rlcmac_error_type_funs[] =
+{
+    // TODO: these Type values are probably not right...
+    { nr5g_rlcmac_Cmac_STAT_UE_HI_IND,    "lte_l2_Sap_NR_RLCMAC_ERROR",     dissect_sapi_type_dummy},
+    { nr5g_rlcmac_Cmac_STAT_UE_LO_IND,    "lte_l2_Sap_NR_RLCMAC_ERROR",     dissect_rlcmac_error_ind},
+    { 0x00,                               NULL,                             NULL }
+};
+#define MAX_NR_RLCMAC_ERROR_TYPE_VALS      array_length(nr_rlcmac_error_type_funs)
+static value_string  nr_rlcmac_error_type_vals[MAX_NR_RLCMAC_ERROR_TYPE_VALS];
+
+
+
+
+
+
+/* NR RLCMAC CMAC */
+static TYPE_FUN nr_rlcmac_cmac_type_funs[] =
+{
+    { nr5g_rlcmac_Cmac_DBEAM_IND,    "nr5g_rlcmac_Cmac_DBEAM_IND",       dissect_dbeam_ind },
+
+    { nr5g_rlcmac_Cmac_CONFIG_CMD,     "nr5g_rlcmac_Cmac_CONFIG_CMD",       dissect_rlcmac_cmac_config_cmd },
+    { nr5g_rlcmac_Cmac_CONFIG_ACK,     "nr5g_rlcmac_Cmac_CONFIG_ACK",       dissect_rlcmac_cmac_config_ack },
+    { nr5g_rlcmac_Cmac_CONFIG_NAK,     "nr5g_rlcmac_Cmac_CONFIG_NAK",       dissect_rlcmac_cmac_config_ack },
+    { nr5g_rlcmac_Cmac_SEG_CONFIG_REQ, "nr5g_rlcmac_Cmac_SEG_CONFIG_REQ",       dissect_sapi_type_dummy /* TODO */},
+
+    { nr5g_rlcmac_Cmac_RRC_STATE_CFG_CMD, "nr5g_rlcmac_Cmac_RRC_STATE_CFG_CMD",       dissect_rrc_state_cfg_cmd },
+    { nr5g_rlcmac_Cmac_RRC_STATE_CFG_ACK, "nr5g_rlcmac_Cmac_RRC_STATE_CFG_ACK",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_RRC_STATE_CFG_NAK, "nr5g_rlcmac_Cmac_RRC_STATE_CFG_NAK",       dissect_sapi_type_dummy /* TODO */},
+
+    { nr5g_rlcmac_Cmac_CELL_RRC_STATE_CFG_CMD, "nr5g_rlcmac_Cmac_CELL_RRC_STATE_CFG_CMD",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_CELL_RRC_STATE_CFG_ACK, "nr5g_rlcmac_Cmac_CELL_RRC_STATE_CFG_ACK",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_CELL_RRC_STATE_CFG_NAK, "nr5g_rlcmac_Cmac_CELL_RRC_STATE_CFG_NAK",       dissect_sapi_type_dummy /* TODO */},
+
+    { nr5g_rlcmac_Cmac_RESET_CMD, "nr5g_rlcmac_Cmac_RESET_CMD",       dissect_cmac_reset_cmd },
+    { nr5g_rlcmac_Cmac_RESET_ACK, "nr5g_rlcmac_Cmac_RESET_ACK",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_RESET_NAK, "nr5g_rlcmac_Cmac_RESET_NAK",       dissect_sapi_type_dummy /* TODO */},
+
+    { nr5g_rlcmac_Cmac_RELEASE_CMD, "nr5g_rlcmac_Cmac_RELEASE_CMD",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_RELEASE_ACK, "nr5g_rlcmac_Cmac_RELEASE_ACK",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_RELEASE_NAK, "nr5g_rlcmac_Cmac_RELEASE_NAK",       dissect_sapi_type_dummy /* TODO */},
+
+    { nr5g_rlcmac_Cmac_STATUS_REQ, "nr5g_rlcmac_Cmac_STATUS_REQ",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_STATUS_IND, "nr5g_rlcmac_Cmac_STATUS_IND",       dissect_cmac_status_ind},
+    { nr5g_rlcmac_Cmac_CELL_STATUS_REQ, "nr5g_rlcmac_Cmac_CELL_STATUS_REQ",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_CELL_STATUS_CNF, "nr5g_rlcmac_Cmac_CELL_STATUS_CNF",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_CELL_STATUS_IND, "nr5g_rlcmac_Cmac_CELL_STATUS_IND",       dissect_cmac_cell_status_ind },
+    { nr5g_rlcmac_Cmac_STATUS_CNF, "nr5g_rlcmac_Cmac_STATUS_CNF",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_DBEAM_IND, "nr5g_rlcmac_Cmac_DBEAM_IND",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_DCI_IND, "nr5g_rlcmac_Cmac_DCI_IND",       dissect_sapi_type_dummy /* TODO */},
+
+    { nr5g_rlcmac_Cmac_MEAS_SET_REQ, "nr5g_rlcmac_Cmac_MEAS_SET_REQ",       dissect_sapi_type_dummy /* TODO */},
+
+    { nr5g_rlcmac_Cmac_RACH_CFG_CMD, "nr5g_rlcmac_Cmac_RACH_CFG_CMD",       dissect_cmac_rach_cfg_cmd },
+    { nr5g_rlcmac_Cmac_RACH_CFG_ACK, "nr5g_rlcmac_Cmac_RACH_CFG_ACK",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_RACH_CFG_NAK, "nr5g_rlcmac_Cmac_RACH_CFG_NAK",       dissect_sapi_type_dummy /* TODO */},
+
+    { nr5g_rlcmac_Cmac_RACH_ACC_CMD, "nr5g_rlcmac_Cmac_RACH_ACC_CMD",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_RACH_ACC_ACK, "nr5g_rlcmac_Cmac_RACH_ACC_ACK",       dissect_sapi_type_dummy /* TODO */},
+    { nr5g_rlcmac_Cmac_RACH_ACC_NAK, "nr5g_rlcmac_Cmac_RACH_ACC_NAK",       dissect_sapi_type_dummy /* TODO */},
+
+    { nr5g_rlcmac_Cmac_RACH_ACC_IND, "nr5g_rlcmac_Cmac_RACH_ACC_IND",       dissect_sapi_type_dummy /* TODO */},
+
+    { 0x00,                               NULL,                             NULL }
+};
+#define MAX_NR_RLCMAC_CMAC_TYPE_VALS      array_length(nr_rlcmac_cmac_type_funs)
+static value_string  nr_rlcmac_cmac_type_vals[MAX_NR_RLCMAC_CMAC_TYPE_VALS];
+
+
+/* NR RLCMAC CRLC */
+static TYPE_FUN nr_rlcmac_crlc_type_funs[] =
+{
+    { nr5g_rlcmac_Crlc_CONFIG_CMD,         "nr5g_rlcmac_Crlc_CONFIG_CMD",       dissect_crlc_config_cmd },
+    { nr5g_rlcmac_Crlc_CONFIG_ACK,         "nr5g_rlcmac_Crlc_CONFIG_ACK",       dissect_crlc_config_ack },
+    { nr5g_rlcmac_Crlc_CONFIG_NAK,         "nr5g_rlcmac_Crlc_CONFIG_NAK",       dissect_crlc_config_nak },
+
+    { 0x00,                               NULL,                             NULL }
+};
+#define MAX_NR_RLCMAC_CRLC_TYPE_VALS      array_length(nr_rlcmac_crlc_type_funs)
+static value_string  nr_rlcmac_crlc_type_vals[MAX_NR_RLCMAC_CRLC_TYPE_VALS];
+
+
+/* LTE PDCP CTRL */
+static TYPE_FUN lte_pdcp_ctrl_type_funs[] =
+{
+    { nr5g_pdcp_Ctrl_SIB_FILTER_ACT_CMD,           "nr5g_pdcp_Ctrl_SIB_FILTER_ACT_CMD",       dissect_sib_filter_act_act_cmd },
+    { nr5g_pdcp_Ctrl_SIB_FILTER_ACT_ACK,           "nr5g_pdcp_Ctrl_SIB_FILTER_ACT_ACK",       dissect_sib_filter_act_act_cmd },
+    { nr5g_pdcp_Ctrl_SIB_FILTER_ACT_NAK,           "nr5g_pdcp_Ctrl_SIB_FILTER_ACT_NAK",       dissect_sib_filter_act_act_nak },
+    { nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_CMD,         "nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_CMD",     dissect_sib_filter_act_act_cmd },
+    { nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_ACK,         "nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_ACK",     dissect_sib_filter_act_act_cmd },
+    { nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_NAK,         "nr5g_pdcp_Ctrl_SIB_FILTER_DEACT_NAK",     dissect_sib_filter_act_act_nak },
+
+    { 0x00,                               NULL,                             NULL }
+};
+#define MAX_LTE_PDCP_CTRL_TYPE_VALS      array_length(lte_pdcp_ctrl_type_funs)
+static value_string  lte_pdcp_ctrl_type_vals[MAX_LTE_PDCP_CTRL_TYPE_VALS];
+
+
+
+
+static SAPI_FUN sapi_fun_vals[] = {
+    /* Server */
+    { lte_l2_Sap_SRV_ERROR,         "SRV ERROR", srv_error_type_funs },
+    { lte_l2_Sap_OM,                "OM", om_type_funs  },
+    { lte_l2_Sap_LIC,               "LIC", NULL  },
+    { lte_l2_Sap_OM_TM,             "OM TM", NULL  },
+
+    /* RLCMAC */
+    { lte_l2_Sap_RLCMAC_ERROR,      "RLCMAC ERROR", NULL  },
+    { lte_l2_Sap_RLCMAC_CMAC,       "RLCMAC CMAC", NULL  },
+    { lte_l2_Sap_RLCMAC_CRLC,       "RLCMAC CRLC", NULL  },
+    { lte_l2_Sap_RLCMAC_STAT,       "RLCMAC STAT", NULL  },
+    { lte_l2_Sap_RLCMAC_TEST,       "RLCMAC TEST", NULL  },
+    { lte_l2_Sap_RLCMAC_CMAC_TM,    "RLCMAC CMAC TM", NULL  },
+    { lte_l2_Sap_RLCMAC_CRLC_TM,    "RLCMAC RLC TM", NULL  },
+    { lte_l2_Sap_RLCMAC_SCHED,      "RLCMAC SCHED", NULL  },
+    { lte_l2_Sap_RLCMAC_MBMS,       "RLCMAC MBMS", NULL  },
+    { lte_l2_Sap_RLCMAC_DRLC_TM,    "RLCMAC DRLC TM", NULL  },
+    { lte_l2_Sap_RLCMAC_STAT_TM,    "RLCMAC STAT TM", NULL  },
+
+    /* PDCP */
+    { lte_l2_Sap_PDCP_ERROR,        "PDCP ERROR", NULL  },
+    { lte_l2_Sap_PDCP_CTRL,         "PDCP CTRL", lte_pdcp_ctrl_type_funs  },
+    { lte_l2_Sap_PDCP_AUX,          "PDCP AUX", NULL  },
+    { lte_l2_Sap_PDCP_DATA,         "PDCP DATA", NULL  },
+    { lte_l2_Sap_PDCP_STAT,         "PDCP STAT", NULL  },
+    { lte_l2_Sap_PDCP_CTRL_TM,      "PDCP CTRL TM", NULL  },
+    { lte_l2_Sap_NR_PDCP_CTRL,      "NR PDCP CTRL", NULL  },
+    { lte_l2_Sap_NR_PDCP_AUX,       "NR PDCP AUX", NULL  },
+    { lte_l2_Sap_NR_PDCP_DATA,      "NR PDCP DATA", NULL  },
+    { lte_l2_Sap_NR_PDCP_STAT,      "NR PDCP STAT", NULL  },
+    { lte_l2_Sap_NR_PDCP_CTRL_TM,   "NR PDCP CTRL TM", NULL  },
+
+    /* UUDG */
+    { lte_l2_Sap_UUDG_ERROR,       "UUGD ERROR", NULL  },
+    { lte_l2_Sap_UUDG_UUDG,        "UUGD UUDG", NULL  },
+    { lte_l2_Sap_UUDG_NAT,         "UUGD NAT", NULL  },
+    { lte_l2_Sap_UUDG_NAT6,        "UUGD NAT6", NULL  },
+    { lte_l2_Sap_UUDG_ICMP6,       "UUGD IGMP6", NULL  },
+    { lte_l2_Sap_UUDG_CTL,         "UUGD CTL", NULL  },
+
+    /* NUDG */
+    { lte_l2_Sap_NUDG_ERROR,       "NUDG ERROR", NULL  },
+    { lte_l2_Sap_NUDG_NUDG,        "NUDG NUDH", NULL  },
+    { lte_l2_Sap_NUDG_GI,          "NUDG GI", NULL  },
+    { lte_l2_Sap_NUDG_GI6,         "NUDG GI6", NULL  },
+    { lte_l2_Sap_NUDG_CTL,         "NUDG CTL", NULL  },
+
+    /* Data Source for TM */
+    { lte_l2_Sap_TM_DATA_ERROR,      "TM DATA ERROR", NULL  },
+    { lte_l2_Sap_TM_DATA_PATT,       "TM DATA PATT", NULL  },
+    { lte_l2_Sap_TM_DATA_LOOP,       "TM DATA LOOP", NULL  },
+    { lte_l2_Sap_TM_DATA_PRBS,       "TM DATA PRBS", NULL  },
+    { lte_l2_Sap_TM_DATA_XTRN,       "TM DATA XTRN", NULL  },
+    { lte_l2_Sap_TM_DATA_TSRV,       "TM DATA TSRV", NULL  },
+
+    /* CNTR */
+    { lte_l2_Sap_CNTR_ERROR,           "CNTR ERROR", NULL  },
+    { lte_l2_Sap_CNTR_CNTR,            "CNTR CNTR", NULL  },
+
+    /* MSWITCH */
+    { lte_l2_Sap_MSWITCH_ERROR,       "MSWITCH ERROR", NULL  },
+    { lte_l2_Sap_MSWITCH_MSWITCH,     "MSWITCH MSWITCH", NULL  },
+
+    /* ROHC */
+    { lte_l2_Sap_ROHC_ERROR,            "ROHC ERROR", NULL  },
+    { lte_l2_Sap_ROHC_ROHC,             "ROHC ROHC", NULL  },
+
+    /* NR RLCMAC */
+    { lte_l2_Sap_NR_RLCMAC_ERROR,        "NR RLCMAC ERROR",  nr_rlcmac_error_type_funs  },
+    { lte_l2_Sap_NR_RLCMAC_L1_TEST,      "NR RLCMAC L1 TEST",  nr_rlcmac_l1_test_type_funs  },
+    { lte_l2_Sap_NR_RLCMAC_CMAC,         "NR RLCMAC CMAC", nr_rlcmac_cmac_type_funs  },
+    { lte_l2_Sap_NR_RLCMAC_CRLC,         "NR RLCMAC CRLC", nr_rlcmac_crlc_type_funs  },
+    { lte_l2_Sap_NR_RLCMAC_CMAC_TM,      "NR RLCMAC CMAC TM", NULL  },
+    { lte_l2_Sap_NR_RLCMAC_CRLC_TM,      "NR RLCMAC CRLC TM", NULL  },
+    { lte_l2_Sap_NR_RLCMAC_DRLC_TM,      "NR RLCMAC dRLC TM", NULL  },
+    { lte_l2_Sap_NR_RLCMAC_AUX,          "NR RLCMAC AUX", aux_type_funs  },
+    { lte_l2_Sap_NR_RLCMAC_TM,           "NR RLCMAC TM", nr_rlcmac_tm_type_funs  },
+    { lte_l2_Sap_NR_RLCMAC_UM,           "NR RLCMAC UM", nr_rlcmac_um_type_funs  },
+    { lte_l2_Sap_NR_RLCMAC_AM,           "NR RLCMAC AM", nr_rlcmac_am_type_funs  },
+    { lte_l2_Sap_NR_RLCMAC_STAT,         "NR RLCMAC STAT", NULL  },
+    { lte_l2_Sap_NR_RLCMAC_STAT_TM,      "NR RLCMAC STAT TM", NULL  },
+    { lte_l2_Sap_NR_SCG_RLCMAC_CMAC,     "NR SCG RLCMAC CMAC", NULL  },
+    { lte_l2_Sap_NR_SCG_RLCMAC_CRLC,     "NR SCG RLCMAC CRLC", NULL  },
+    { lte_l2_Sap_NR_SCG_RLCMAC_CMAC_TM,  "NR SCG RLCMAC CMAC TM", NULL  },
+    { lte_l2_Sap_NR_SCG_RLCMAC_CRLC_TM,  "NR SCG RLCMAC CRLC TM", NULL  },
+    { lte_l2_Sap_NR_SCG_RLCMAC_DRLC_TM,  "NR SCG RLCMAC DRLC TM", NULL  },
+    { lte_l2_Sap_NR_SCG_RLCMAC_STAT,     "NR SCG RLCMAC STAT", NULL  },
+    { 0x00,          	 NULL,                             NULL }
+};
+#define MAX_SAPI_VALS      array_length(sapi_fun_vals)
+
+static value_string  sapi_vals[MAX_SAPI_VALS]; /* sapi_fun_vals table is 0 terminated */
+
+static void init_sapi_value_string(value_string *vals, SAPI_FUN *msg, guint max_msg)
+{
+    guint i;
+
+    for(i = 0; i < max_msg; i++) {
+	vals[i].value = msg[i].sapi;
+	vals[i].strptr = msg[i].sapi_name;
+    }
+}
+
+static void init_prim_value_string(value_string *vals, TYPE_FUN *msg, guint max_msg)
+{
+    guint i;
+
+    for(i = 0; i < max_msg; i++) {
+	vals[i].value = msg[i].type;
+	vals[i].strptr = msg[i].prim_name;
+    }
+}
+
+static TYPE_FUN *get_type_fun(guint32 type, TYPE_FUN *tbl)
+{
+    if (tbl == NULL)
+	return NULL;
+
+    while (tbl->prim_name != NULL) {
+	if (tbl->type == type)
+	    return tbl;
+
+	tbl++;
+    }
+    return NULL;
+}
+
+static SAPI_FUN *get_sapi_fun(guint32 sapi, SAPI_FUN *tbl)
+{
+    if (tbl == NULL)
+	return NULL;
+
+    while(tbl->sapi_name !=NULL) {
+	if(tbl->sapi == sapi)
+	    return tbl;
+
+	tbl++;
+    }
+    return NULL;
+};
+
+
+
+/* User definable values */
+static range_t *global_l2server_port_range = NULL;
+
+
+/* Bytes 4-7 have the PDU length in little-endian order */
+static guint
+get_l2server_message_len(packet_info *pinfo _U_, tvbuff_t *tvb, int offset, void *data _U_) {
+    return 8 + (guint)tvb_get_guint32(tvb, offset + 4, ENC_LITTLE_ENDIAN);
+}
+
+/* Dissect one PDU.  Guaranteed that the tvb is the right size */
+static int
+dissect_l2server_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
+{
+    proto_tree *l2server_tree;
+    proto_item *root_ti;
+    gint offset = 0;
+
+    /* Create a data source just for L2 payload.  This makes it easier to spot offsets inside message */
+    /* TODO: there must be a more elegant way to do this? */
+    tvbuff_t *l2_tvb = tvb_new_child_real_data(tvb, tvb_get_ptr(tvb, 0, tvb_reported_length(tvb)),
+                                               tvb_reported_length(tvb), tvb_reported_length(tvb));
+    add_new_data_source(pinfo, l2_tvb, "L2 Message");
+
+    /* Protocol column */
+    col_clear(pinfo->cinfo, COL_PROTOCOL);
+    col_clear(pinfo->cinfo, COL_INFO);
+
+    /* Add divider if not first PDU in this frame */
+    gboolean *already_set = (gboolean*)p_get_proto_data(wmem_file_scope(), pinfo, proto_l2server, 0);
+    if (already_set && *already_set) {
+         col_append_str(pinfo->cinfo, COL_PROTOCOL, "|");
+         col_append_str(pinfo->cinfo, COL_INFO, "  ||  ");
+    }
+
+    col_append_str(pinfo->cinfo, COL_PROTOCOL, "L2Server");
+
+    /* Protocol root */
+    root_ti = proto_tree_add_item(tree, proto_l2server, l2_tvb, offset, -1, ENC_NA);
+    l2server_tree = proto_item_add_subtree(root_ti, ett_l2server);
+
+    /* Header subtree */
+    proto_item *header_ti = proto_tree_add_string_format(l2server_tree, hf_l2server_header, l2_tvb, offset, 8, "", "Header  ");
+    proto_tree *header_tree = proto_item_add_subtree(header_ti, ett_l2server_header);
+
+    /* SAPI */
+    guint32 sapi;
+    proto_item *sapi_ti = proto_tree_add_item_ret_uint(header_tree, hf_l2server_sapi, l2_tvb, offset, 2, ENC_LITTLE_ENDIAN, &sapi);
+    offset += 2;
+    /* Type */
+    guint32 type;
+    proto_item *type_ti = proto_tree_add_item_ret_uint(header_tree, hf_l2server_type, l2_tvb, offset, 2, ENC_LITTLE_ENDIAN, &type);
+    offset += 2;
+    /* Len */
+    guint32 len;
+    proto_tree_add_item_ret_uint(header_tree, hf_l2server_len, l2_tvb, offset, 4, ENC_LITTLE_ENDIAN, &len);
+    offset += 4;
+
+    /**********************************/
+    /* Now parse payload using tables */
+    SAPI_FUN *sapi2fun = NULL;
+    TYPE_FUN *type2fun = NULL;
+
+    /* Lookup SAPI */
+    sapi2fun = get_sapi_fun((guint32)sapi, sapi_fun_vals);
+    if (sapi2fun == NULL) {
+        expert_add_info_format(pinfo, sapi_ti, &ei_l2server_sapi_unknown,
+                               "L2Server SAPI not recognised (%u)", sapi);
+        return tvb_captured_length(l2_tvb);
+    }
+    else {
+        /* Lookup dissector function from type (for this SAPI) */
+        type2fun = get_type_fun(type, sapi2fun->sapi_funs);
+        if (type2fun == NULL) {
+            expert_add_info_format(pinfo, type_ti, &ei_l2server_type_unknown,
+                                   "L2Server Type (%u) not recognised for SAPI %u", type, sapi);
+            return tvb_captured_length(l2_tvb);
+        }
+
+        /* Header summary */
+        proto_item_append_text(header_ti, "%s(0x%x) %s(0x%x) len=%u",
+                               val_to_str_const(sapi, sapi_vals, "Unknown"), sapi,
+                               type2fun->prim_name, type,
+                               len);
+
+        /* Add summary to Info column */
+        col_append_fstr(pinfo->cinfo, COL_INFO, "Sapi=%18s,  %30s (0x%x),  Len=%4u",
+                        val_to_str_const(sapi, sapi_vals, "Unknown"),
+                        (type2fun) ? type2fun->prim_name : "Unknown", type, len);
+        proto_item_append_text(root_ti, " (%s, type=%s (0x%x), len=%u)", val_to_str_const(sapi, sapi_vals, "Unknown"),
+                               (type2fun) ? type2fun->prim_name : "Unknown",
+                               type, len);
+
+        /* Call dissector function for this sapi/type? */
+        if (type2fun->prim_fun) {
+                (*type2fun->prim_fun)(l2server_tree, l2_tvb, pinfo, 8, len);
+        }
+        //col_append_fstr(pinfo->cinfo, COL_INFO, " - %s", type2fun->prim_name);
+        proto_item_append_text(type_ti, " (%s)", type2fun->prim_name);
+    }
+
+    col_set_fence(pinfo->cinfo, COL_PROTOCOL);
+    col_set_fence(pinfo->cinfo, COL_INFO);
+
+    /* Record that at least one PDU has already been seen in this frame */
+    static gboolean true_value = TRUE;
+    p_add_proto_data(wmem_file_scope(), pinfo, proto_l2server, 0, &true_value);
+
+    return offset+len;
+}
+
+
+/******************************/
+/* Main dissection function.  */
+static int
+dissect_l2server(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
+{
+    /* Frame starts off with no PDUs seen */
+    static gboolean false_value = FALSE;
+    p_add_proto_data(wmem_file_scope(), pinfo, proto_l2server, 0, &false_value);
+
+    /* Find whole PDUs and send them to dissect_l2server_message() */
+    tcp_dissect_pdus(tvb, pinfo, tree, TRUE, /* desegment */
+                     8, get_l2server_message_len,
+                     dissect_l2server_message, data);
+    return tvb_reported_length(tvb);
+}
+
+
+void
+proto_register_l2server(void)
+{
+    init_sapi_value_string(sapi_vals, sapi_fun_vals, MAX_SAPI_VALS);
+
+    init_prim_value_string(om_type_vals, om_type_funs, MAX_OM_TYPE_VALS);
+    init_prim_value_string(aux_type_vals, aux_type_funs, MAX_AUX_TYPE_VALS);
+    init_prim_value_string(nr_rlcmac_tm_type_vals, nr_rlcmac_tm_type_funs, MAX_NR_RLCMAC_TM_TYPE_VALS);
+    init_prim_value_string(nr_rlcmac_um_type_vals, nr_rlcmac_um_type_funs, MAX_NR_RLCMAC_UM_TYPE_VALS);
+    init_prim_value_string(nr_rlcmac_am_type_vals, nr_rlcmac_am_type_funs, MAX_NR_RLCMAC_AM_TYPE_VALS);
+    init_prim_value_string(nr_rlcmac_cmac_type_vals, nr_rlcmac_cmac_type_funs, MAX_NR_RLCMAC_CMAC_TYPE_VALS);
+    init_prim_value_string(nr_rlcmac_crlc_type_vals, nr_rlcmac_crlc_type_funs, MAX_NR_RLCMAC_CRLC_TYPE_VALS);
+    init_prim_value_string(nr_rlcmac_l1_test_type_vals, nr_rlcmac_l1_test_type_funs, MAX_NR_RLCMAC_L1_TEST_TYPE_VALS);
+    init_prim_value_string(nr_rlcmac_error_type_vals, nr_rlcmac_error_type_funs, MAX_NR_RLCMAC_ERROR_TYPE_VALS);
+    init_prim_value_string(lte_pdcp_ctrl_type_vals, lte_pdcp_ctrl_type_funs, MAX_LTE_PDCP_CTRL_TYPE_VALS);
+
+    static hf_register_info hf[] = {
+      { &hf_l2server_header,
+        { "Header", "l2server.header", FT_STRING, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_sapi,
+        { "SAPI", "l2server.sapi", FT_UINT16, BASE_DEC,
+          VALS(sapi_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_type,
+        { "Type", "l2server.type", FT_UINT16, BASE_HEX_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_len,
+        { "Len", "l2server.len", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_payload,
+        { "Payload", "l2server.payload", FT_BYTES, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_cellid,
+        { "CellId", "l2server.cellid", FT_INT32, BASE_DEC, /* UINT so can show -1 */
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_physical_cellid,
+        { "Physical CellId", "l2server.physical-cellid", FT_INT16, BASE_DEC, /* UINT so can show -1 */
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_l1verbosity,
+        { "L1Verbosity", "l2server.l1verbosity", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_l1ulreport,
+        { "L1UlReport", "l2server.l1ulreport", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_enablecapstest,
+        { "EnableCapsTest", "l2server.enablecapstest", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_client_name,
+        { "Client Name", "l2server.client-name", FT_STRINGZ, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_start_cmd_type,
+        { "Type", "l2server.start-cmd-type", FT_UINT16, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nr5gid,
+        { "Nr5gId", "l2server.nr5gid", FT_STRING, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ueid,
+        { "UeId", "l2server.UeId", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_beamidx,
+        { "BeamIdx", "l2server.BeamIdx", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rbtype,
+        { "RbType", "l2server.RbType", FT_UINT8, BASE_DEC,
+          VALS(rb_type_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_rbid,
+        { "RbId", "l2server.RbId", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_reestablish_rlc,
+        { "Reestablish RLC", "l2server.reestablish-rlc", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_lch,
+        { "Logical Channel Type", "l2server.Lch", FT_UINT32, BASE_DEC,
+          VALS(lch_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_ref,
+        { "Ref", "l2server.ref", FT_UINT32, BASE_DEC,
+          NULL, 0x0, "Reference for CNF", HFILL }},
+      { &hf_l2server_mui,
+        { "MUI", "l2server.mui", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_datavolume,
+        { "DataVolume", "l2server.datavolume", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_scgid,
+        { "ScGid", "l2server.scgid", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_lcid,
+        { "LcId", "l2server.lcid", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ullogref,
+        { "UlLogRef", "l2server.ullogref", FT_UINT32, BASE_DEC,
+          NULL, 0x0, "Actually PDCP SN", HFILL }},
+      { &hf_l2server_reest,
+        { "Reest", "l2server.reest", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_esbf,
+        { "Ebsf", "l2server.esbf", FT_INT16, BASE_DEC,
+          NULL, 0x0, "Extended L1 SFN/SBF number", HFILL }},
+      { &hf_l2server_dllogref,
+        { "DlLogRef", "l2server.dllogref", FT_UINT32, BASE_DEC,
+          NULL, 0x0, "Actually PDCP SN", HFILL }},
+      { &hf_l2server_rlcsn,
+        { "RlcSn", "l2server.rlcsn", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_info,
+        { "Info", "l2server.info", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_frame,
+        { "Frame", "l2server.frame", FT_UINT16, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_slot,
+        { "Slot", "l2server.slot", FT_UINT16, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_numpduforsdu,
+        { "Num PDU for SDU", "l2server.numpduforsdu", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ueflags,
+        { "UeFlags", "l2server.ueflags", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_stkinst,
+        { "StkInst", "l2server.stkinst", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_udg_stkinst,
+        { "UdgStkInst", "l2server.udg-stkinst", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_crnti,
+        { "C-RNTI", "l2server.crnti", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_result_code,
+        { "Result Code", "l2server.res", FT_UINT16, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ra_res,
+        { "RA Result Code", "l2server.ra-res", FT_UINT8, BASE_DEC,
+          VALS(ra_res_vals), 0x0, NULL, HFILL }},
+
+      { &hf_l2server_no_preambles_sent,
+        { "Number of preambles sent", "l2server.number-of-preambles-sent", FT_UINT32, BASE_DEC,
+          NULL, 0x0, "Number of RACH preambles that were transmitted. Corresponds to parameter PREAMBLE_TRANSMISSION_COUNTER in TS 36.321", HFILL }},
+      { &hf_l2server_contention_detected,
+        { "Contention Detected", "l2server.contention-detected", FT_BOOLEAN, BASE_NONE,
+          NULL, 0x0, "If set contention was detected for at least one of the transmitted preambles", HFILL }},
+      { &hf_l2server_maxuppwr,
+        { "MaxUpPwr", "l2server.maxuppwr", FT_UINT32, BASE_DEC,
+          NULL, 0x0, "Maximum uplink power (in dBm)", HFILL }},
+      { &hf_l2server_brsrp,
+        { "BRSRP", "l2server.brsrp", FT_UINT32, BASE_HEX,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ue_category,
+        { "UE Category", "l2server.ue-category", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ra_flags,
+        { "Flags", "l2server.ra-flags", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ra_rnti,
+        { "RA-RNTI", "l2server.rarnti", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_subcarrier_spacing,
+        { "UL Subcarrier Spacing", "l2server.ul-subcarrier-spacing", FT_UINT8, BASE_DEC,
+          VALS(ul_subcarrier_spacing_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_discard_rar_num,
+        { "Discard RAR Num", "l2server.discard-rar-num", FT_UINT8, BASE_DEC,
+          VALS(discard_rar_num_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_no_data,
+        { "NoData", "l2server.no-data", FT_BOOLEAN, 1,
+          TFS(&nodata_data_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_msg3_data,
+        { "NoData", "l2server.msg3-data", FT_STRING, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_crid,
+        { "CRId", "l2server.cr-id", FT_UINT8, BASE_DEC,
+          NULL, 0x0, "Contention Resolution Id", HFILL }},
+      { &hf_l2server_rel_cellid,
+        { "RelCellId", "l2server.rel-cellid", FT_UINT32, BASE_DEC,
+          NULL, 0x0, "Cell Identifier for release", HFILL }},
+      { &hf_l2server_add_cellid,
+        { "AddCellId", "l2server.add-cellid", FT_UINT32, BASE_DEC,
+          NULL, 0x0, "Cell Identifier for addition", HFILL }},
+      { &hf_l2server_scg_type,
+        { "SCG Type", "l2server.scg-type", FT_UINT32, BASE_DEC,
+          VALS(scg_type_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_drb_continue_rohc,
+        { "drb-ContinueROHC", "l2server.drb-continue-rohc", FT_BOOLEAN, 1,
+          TFS(&continue_rohc_vls), 0x0, NULL, HFILL }},
+      { &hf_l2server_mac_config_len,
+        { "MacConfig Length", "l2server.mac-config-len", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_bwpmask,
+        { "BwpMask", "l2server.bwpmask", FT_UINT32, BASE_HEX,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ra_info,
+        { "RA Info", "l2server.ra-info", FT_STRING, BASE_NONE,
+          NULL, 0x0, "nr5g_rlcmac_Cmac_RA_Info_t", HFILL }},
+      { &hf_l2server_bwpid,
+        { "BwpId", "l2server.bwpid", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_prach_configindex,
+        { "PRACH ConfigIndex", "l2server.prach-configindex", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_preamble_receive_target_power,
+        { "Preamble Receive Target Power", "l2server.preamble-receive-target-power", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rsrp_thresholdssb,
+        { "RSRP ThresholdSSB", "l2server.rsrp-threshold-ssb", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csirs_threshold,
+        { "CSIRS Threshold", "l2server.csirs-threshold", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sul_rsrp_threshold,
+        { "SUL RSRP Threshold", "l2server.sul-rsrp-threshold", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ra_preambleindex,
+        { "RA PreambleIndex", "l2server.ra_preambleindex", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_preamble_power_ramping_step,
+         { "Preamble Power Ramping Step", "l2server.preamble-power-ramping-step", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ra_ssb_occasion_mask_index,
+         { "RA SSB Occasion Mask Index", "l2server.ra-ssb-occasion-mask-index", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_preamble_tx_max,
+         { "Preamble Tx Max", "l2server.preamble-tx-max", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_totalnumberofra_preambles,
+        { "totalNumberOfRA-Preambles", "l2server.totalnumberofra-preambles", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ssb_perrach_occasion,
+        { "ssb perRACH Occasion", "l2server.ssb-perrach-occasion", FT_INT8, BASE_DEC,
+          VALS(ssb_perrach_occasion_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_cb_preamblesperssb,
+        { "CB PreamblesPerSSB", "l2server.cb-preambles-per-ssb", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ra_msg3sizegroupa,
+        { "Msg3 Size Group A", "l2server.msg3-size-groupa", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_numberofra_preamblesgroupa,
+        { "NumberofRA Preambles GroupA", "l2server.numberofra-preambles-groupa", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_delta_preamble_msg3,
+        { "Delta Preamble Msg3", "l2server.delta-preamble-msg3", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_message_power_offset_groupb,
+        { "Message Power Offset GroupB", "l2server.message-power-offset-groupb", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ra_responsewindow,
+        { "RA ResponseWindow", "l2server.ra-response-window", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ra_contentionresolutiontimer,
+        { "RA ContentionResolutionTimer", "l2server.ra-contention-resolution-timer", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_l1cell_dedicated_config_len,
+        { "L1CellDedicatedConfig-Len", "l2server.l1cell-dedicated-config-len", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_l2_test_mode,
+        { "L2 Test Mode", "l2server.l2_test_mode", FT_UINT8, BASE_DEC,
+          VALS(l2_test_mode_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_l2_cell_dedicated_config,
+        { "L2 Cell Dedicated Config", "l2server.l2-cell-dedicated-config", FT_STRING, BASE_NONE,
+          NULL, 0x0, "nr5g_rlcmac_Cmac_CELL_DEDICATED_CONFIGt", HFILL }},
+      { &hf_l2server_l2_cell_dedicated_config_len,
+        { "Len", "l2server.l2-cell-dedicated-config.len", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_spcell_config_ded_present,
+        { "SpCell Config Dedicated Present", "l2server.spcell-config-ded-present", FT_BOOLEAN, 16,
+          NULL, nr5g_rlcmac_Cmac_STRUCT_SPCELL_CONFIG_DED_PRESENT, NULL, HFILL }},
+      { &hf_l2server_mac_cell_dedicated_present,
+        { "MAC Cell Dedicated Present", "l2server.mac-cell-ded-present", FT_BOOLEAN, 16,
+          NULL, nr5g_rlcmac_Cmac_STRUCT_MAC_CELL_GROUP_CONFIG_PRESENT, NULL, HFILL }},
+
+      { &hf_l2server_l1_cell_dedicated_config,
+        { "L1 Cell Dedicated Config", "l2server.l1-cell-dedicated-config", FT_STRING, BASE_NONE,
+          NULL, 0x0, "bb_nr5g_CELL_DEDICATED_CONFIGt", HFILL }},
+
+
+      { &hf_l2server_num_of_rb_cfg,
+        { "Number of RBs add/mod", "l2server.num-rb-cfg", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rb_config,
+        { "RB Config", "l2server.rb-config", FT_STRING, BASE_NONE,
+          NULL, 0x0, "nr5g_rlcmac_Cmac_RbCfg_t", HFILL }},
+      { &hf_l2server_num_of_rb_rel,
+        { "Number of RBs to release", "l2server.num-rb-rel", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rb_rel,
+        { "RB Release", "l2server.rb-rel", FT_STRING, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_rl_failure_timer,
+        { "RL Failure Timer", "l2server.rl-failure-timer", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rl_syncon_timer,
+        { "RL SyncOn Timer", "l2server.rl-syncon-timer", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_seg_cnt,
+        { "SegCnt", "l2server.seg-cnt", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_enable_pmi_reporting,
+        { "Enable PMI Reporting", "l2server.enable-pmi-reporting", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ra_for_sul,
+        { "RA Info is for SUL", "l2server.ra-info-is-for-sul", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_rlc_mode,
+        { "RLC Mode", "l2server.rlc-mode", FT_UINT8, BASE_DEC,
+          VALS(rlc_mode_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_rlc_er,
+        { "Establish-Release", "l2server.rlc-er", FT_UINT8, BASE_DEC,
+          VALS(rlc_er_vals), 0x0, NULL, HFILL }},
+
+
+      { &hf_l2server_mac_cell_group_config,
+        { "MAC Cell Group Config", "l2server.mac-cell-group-config", FT_STRING, BASE_NONE,
+          NULL, 0x0, "nr5g_rlcmac_Cmac_MAC_CellGroupConfig_t", HFILL }},
+      { &hf_l2server_spcell_config,
+        { "spCell Config", "l2server.spcell-config", FT_STRING, BASE_NONE,
+          NULL, 0x0, "nr5g_rlcmac_Cmac_SpCellConfig_t", HFILL }},
+
+      { &hf_l2server_pcmaxc,
+        { "PcMaxC", "l2server.pcmaxc", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pcmaxc_sul,
+        { "PcMaxC SUL", "l2server.pcmaxc-sul", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_scell_list,
+        { "sCell List", "l2server.scell-list", FT_STRING, BASE_NONE,
+          NULL, 0x0, "nr5g_rlcmac_Cmac_SCellList_t", HFILL }},
+      { &hf_l2server_scell,
+        { "sCell", "l2server.scell", FT_STRING, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+
+
+      { &hf_l2server_traffic,
+        { "Traffic", "l2server.traffic", FT_NONE, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_traffic_tm,
+        { "Traffic TM", "l2server.traffic.tm", FT_NONE, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_traffic_um,
+        { "Traffic UM", "l2server.traffic.um", FT_NONE, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_traffic_am,
+        { "Traffic AM", "l2server.traffic.am", FT_NONE, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_traffic_cnf,
+        { "Traffic CNF", "l2server.traffic.cnf", FT_NONE, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_traffic_ul,
+        { "Traffic UL", "l2server.traffic.ul", FT_NONE, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_traffic_dl,
+        { "Traffic DL", "l2server.traffic.dl", FT_NONE, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_traffic_bch,
+        { "Traffic BCH", "l2server.traffic.bch", FT_NONE, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+
+      { &hf_l2server_pdcp_pdu,
+        { "PDCP PDU", "l2server.pdcp-pdu", FT_BYTES, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_config,
+        { "Config", "l2server.config", FT_NONE, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_rach,
+        { "RACH", "l2server.rach", FT_NONE, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_reestablishment,
+        { "Reestablishment", "l2server.reestablishment", FT_NONE, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_params,
+        { "Params", "l2server.params", FT_STRING, FT_NONE,
+          NULL, 0x0, "nr5g_rlcmac_Cmac_CfgParams_t", HFILL }},
+
+      { &hf_l2server_rlc_config_tx,
+        { "Tx", "l2server.rlc-config.tx", FT_STRING, FT_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rlc_config_rx,
+        { "Rx", "l2server.rlc-config.rx", FT_STRING, FT_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_rlc_tx_active_flag,
+        { "Tx Active Flag", "l2server.tx-active-flag", FT_BOOLEAN, 8,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rlc_rx_active_flag,
+        { "Rx Active Flag", "l2server.rx-active-flag", FT_BOOLEAN, 8,
+          NULL, 0x0, NULL, HFILL }},
+
+
+      { &hf_l2server_rlc_snlength,
+        { "SN Length", "l2server.rlc-config.snlength", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rlc_t_poll_retransmit,
+        { "t_PollRetransmit", "l2server.rlc-config.t-pollretransmit", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rlc_poll_pdu,
+        { "Poll PDU", "l2server.rlc-config.poll-pdu", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rlc_poll_byte,
+        { "Poll Byte", "l2server.rlc-config.poll-byte", FT_UINT16, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rlc_max_retx_threshold,
+        { "Max Retx Threshold", "l2server.rlc-config.max-retx-threshold", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rlc_discard_timer,
+        { "Discard Timer", "l2server.rlc-config.discard-timer", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_rlc_t_reassembly,
+        { "t-Reassembly", "l2server.rlc-config.t-reassembly", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rlc_t_status_prohibit,
+        { "t-StatusProhibit", "l2server.rlc-config.t-status-prohibit", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_spare1,
+        { "Spare", "l2server.spare", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_spare2,
+        { "Spare", "l2server.spare", FT_INT16, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_spare4,
+        { "Spare", "l2server.spare", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_spare,
+        { "Spare", "l2server.spare", FT_BYTES, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pad,
+        { "Pad", "l2server.pad", FT_BYTES, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_dummy,
+        { "Dummy", "l2server.dummy", FT_BYTES, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+
+      { &hf_l2server_package_type,
+        { "PackageType", "l2server.package-type", FT_UINT8, BASE_DEC,
+          VALS(version_server_type_vals), 0x0, NULL, HFILL }},
+
+
+      { &hf_l2server_dbeam_ind,
+         { "DBeam Ind", "l2server.dbeam-ind", FT_STRING, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_dbeamid,
+         { "DbeamId", "l2server.dbeamid", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_dbeam_status,
+         { "Status", "l2server.dbeam-status", FT_UINT8, BASE_DEC,
+          VALS(dbeam_status_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_num_beams,
+         { "Num beams", "l2server.num-beams", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_logstr,
+         { "LogStr", "l2server.logstr", FT_STRINGZ, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_field_mask_1,
+        { "FieldMask", "l2server.field-mask", FT_UINT8, BASE_HEX,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_field_mask_1_ded_present,
+        { "Dedicated Present", "l2server.field-mask.dedicated-present", FT_BOOLEAN, 8,
+          NULL, 0x1, NULL, HFILL }},
+      { &hf_l2server_field_mask_1_common_present,
+        { "Common Present", "l2server.field-mask.common-present", FT_BOOLEAN, 8,
+          NULL, 0x2, NULL, HFILL }},
+
+      { &hf_l2server_field_mask_2,
+        { "FieldMask", "l2server.field-mask", FT_UINT16, BASE_HEX,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_field_mask_4,
+        { "FieldMask", "l2server.field-mask", FT_UINT32, BASE_HEX,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ncelllte,
+        { "NCellLte", "l2server.ncelllte", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ncellnr,
+        { "NCellNr", "l2server.ncellnr", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_numltepropdu,
+        { "NumLteProPdu", "l2server.numltepropdu", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_numnrpropdu,
+        { "NumNrProPdu", "l2server.numnrpropdu", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_cellidlteitem,
+        { "CellIdLteItem", "l2server.cellidlteitem", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_cellidnritem,
+        { "CellIdNrItem", "l2server.cellidnritem", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nb_scell_cfg_add,
+        { "NbSCellCfgAdd", "l2server.number-scell-cfg-add", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_scell_cfg_del,
+        { "NbSCellCfgDel", "l2server.number-scell-cfg-del", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_scell_cfg_del,
+        { "SCell Rel", "l2server.scell-rel", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ph_cell_config,
+        { "PH Cell Config", "l2server.ph-cell-config", FT_STRING, BASE_NONE,
+          NULL, 0x0, "bb_nr5g_PH_CELL_GROUP_CONFIGt", HFILL }},
+      { &hf_l2server_ph_cell_dcp_config_setup,
+        { "DCP Config Present", "l2server.field-mask.dcp-config-setup", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16_SETUP, NULL, HFILL }},
+      { &hf_l2server_ph_cell_dcp_config_release,
+        { "DCP Config Release", "l2server.field-mask.dcp-config-release", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_PH_CELL_GROUP_CONFIG_DCP_CONFIG_R16_RELEASE, NULL, HFILL }},
+      { &hf_l2server_ph_pdcch_blind_detection_setup,
+        { "PDCCH Blind Detection Setup", "l2server.field-mask.pdcch-blind-detection-setup", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_SETUP, NULL, HFILL }},
+      { &hf_l2server_ph_pdcch_blind_detection_release,
+        { "PDCCH Blind Detection Release", "l2server.field-mask.pdcch-blind-detection-release", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_PH_CELL_GROUP_PDCCH_BLIND_DETECTION_CA_COMB_INDICATOR_R16_RELEASE, NULL, HFILL }},
+
+      { &hf_l2server_harq_ack_spatial_bundling_pucch,
+        { "HARQ ACK Spacial Bundling PUCCH", "l2server.harq-ack-spatial-bundling-pucch", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_harq_ack_spatial_bundling_pusch,
+        { "HARQ ACK Spacial Bundling PUSCH", "l2server.harq-ack-spatial-bundling-pusch", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pmax_nr,
+        { "pMax NR", "l2server.pmax-nr", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pdsch_harq_ack_codebook,
+        { "PDSCH HARQ ACK Codebook", "l2server.pdsch-harq-ack-codebook", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_mcs_crnti_valid,
+        { "MCS CRNTI Valid", "l2server.mcs-crnti-valid", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_mcs_crnti,
+        { "MCS CRNTI", "l2server.mcs-crnti", FT_UINT16, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pue_fr1,
+        { "PUE FR1", "l2server.pue-fr1", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_tpc_srs_rnti,
+        { "TPC SRS RNTI", "l2server.tpc-srs-rnti", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_tpc_pucch_rnti,
+        { "TPC PUCCH RNTI", "l2server.tpc-pucch-rnti", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_tpc_pusch_rnti,
+        { "TPC PUSCH RNTI", "l2server.tpc-pusch-rnti", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sp_csi_rnti,
+        { "SP CSI RNTI", "l2server.sp-csi-rnti", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_cs_rnti,
+        { "CS RNTI", "l2server.cs-rnti", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pdcch_blind_detection,
+        { "PDCCH Blind Detection", "l2server.pdcch-blind-detection", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nbpdsch_harq_ack_codebooklist_r16,
+        { "Nb PDSCH Harq Ack Codebooklist r16", "l2server.nbpdsch-harq-ack-codebooklist-r16", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_bdfactor_r16,
+        { "BDFactor r16", "l2server.bdfactor-r16", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_sp_cell_cfg_ded,
+        { "SP Cell Cfg Dedicated", "l2server.sp-cell-cfg-ded", FT_STRING, BASE_NONE,
+          NULL, 0x0, "bb_nr5g_SERV_CELL_CONFIGt", HFILL }},
+
+      { &hf_l2server_sp_cell_cfg_tdd_ded_present,
+        { "TDD Present", "l2server.sp-cell-cfg-ded.tdd-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_TDD_DED_PRESENT, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_dl_ded_present,
+        { "DL Present", "l2server.sp-cell-cfg-ded.dl-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_DOWNLINK_PRESENT, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_ul_ded_present,
+        { "UL Present", "l2server.sp-cell-cfg-ded.ul-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_UPLINK_PRESENT, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_sup_ul_present,
+        { "SUP UL Present", "l2server.sp-cell-cfg-ded.sup-ul-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_SUP_UPLINK_PRESENT, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_cross_carrier_sched_present,
+        { "Cross Carriers Sched Present", "l2server.sp-cell-cfg-ded.cross-carrier-sched-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_CROSS_CARRIER_SCHED_PRESENT, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_setup,
+        { "LTE CRS tomatcharound Setup", "l2server.sp-cell-cfg-ded.lte-crs-tomatcharound-setup", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_TOMATCHAROUND_SETUP, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_lte_crs_tomatcharound_release,
+        { "LTE CRS tomatcharound Release", "l2server.sp-cell-cfg-ded.lte-crs-tomatcharound-release", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_TOMATCHAROUND_RELEASE, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_dormantbwp_setup,
+        { "DormantBWP Setup", "l2server.sp-cell-cfg-ded.dormantbwp-setup", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_DORMANTBWP_CONFIG_SETUP, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_dormantbwp_release,
+        { "DormantBWP Release", "l2server.sp-cell-cfg-ded.dormantbwp-release", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_DORMANTBWP_CONFIG_RELEASE, NULL, HFILL }},
+
+      { &hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_setup,
+        { "CRS Pattern List1 Setup", "l2server.sp-cell-cfg-ded.crs-pattern-list1-setup", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_PATTERN_LIST1_SETUP, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_lte_crs_pattern_list1_release,
+        { "CRS Pattern List1 Release", "l2server.sp-cell-cfg-ded.crs-pattern-list1-release", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_PATTERN_LIST1_RELEASE, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_setup,
+        { "CRS Pattern List2 Setup", "l2server.sp-cell-cfg-ded.crs-pattern-list2-setup", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_PATTERN_LIST2_SETUP, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_lte_crs_pattern_list2_release,
+        { "CRS Pattern List2 Release", "l2server.sp-cell-cfg-ded.crs-pattern-list2-release", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_PATTERN_LIST2_RELEASE, NULL, HFILL }},
+
+      { &hf_l2server_tdd_ul_dl_pattern,
+        { "TDD UL DL Pattern", "l2server.tdd-ul-dl-pattern", FT_STRING, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_dl_ul_transm_periodicity_is_valid,
+        { "DL UL Transm Periodicity is valid", "l2server.dl-ul-tranms-periodicity-is-valid", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_dl_ul_transm_periodicity,
+        { "DL UL Transm Periodicity", "l2server.dl-ul-tranms-periodicity", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nr_dl_slots,
+        { "Nr DL Slots", "l2server.nr-dl-slots", FT_INT16, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nr_dl_symbols,
+        { "Nr DL Symbols", "l2server.nr-dl-symbols", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nr_ul_symbols,
+        { "Nr UL Symbols", "l2server.nr-ul-symbols", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nr_ul_slots,
+        { "Nr UL Slots", "l2server.nr-ul-slots", FT_INT16, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_sp_cell_cfg_tdd,
+        { "TDD dedicated", "l2server.sp-cell-cfg-ded.tdd", FT_STRING, FT_NONE,
+          NULL, 0X0, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_dl,
+        { "DL dedicated", "l2server.sp-cell-cfg-ded.dl", FT_STRING, FT_NONE,
+          NULL, 0X0, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_ul,
+        { "UL dedicated", "l2server.sp-cell-cfg-ded.ul", FT_STRING, FT_NONE,
+          NULL, 0X0, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_sup_ul,
+        { "SUP UL", "l2server.sp-cell-cfg-ded.sup-ul", FT_STRING, FT_NONE,
+          NULL, 0X0, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_cross_carrier_sched,
+        { "Cross carrier SChed", "l2server.sp-cell-cfg-ded.cross-carrier-sched", FT_STRING, FT_NONE,
+          NULL, 0X0, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_lte_crs_tomatcharound,
+        { "LTE CRS tomatcharound", "l2server.sp-cell-cfg-ded.lte-crs-tomatcharound", FT_STRING, FT_NONE,
+          NULL, 0X0, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_dormantbwp,
+        { "DormantBWP", "l2server.sp-cell-cfg-ded.dormantBWP", FT_STRING, FT_NONE,
+          NULL, 0X0, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_lte_crs_pattern_list1,
+        { "LTE CRS PatternList1", "l2server.sp-cell-cfg-ded.lte-crs-patternlist1", FT_STRING, FT_NONE,
+          NULL, 0X0, NULL, HFILL }},
+      { &hf_l2server_sp_cell_cfg_lte_crs_pattern_list2,
+        { "LTE CRS PatternList2", "l2server.sp-cell-cfg-ded.lte-crs-patternlist2", FT_STRING, FT_NONE,
+          NULL, 0X0, NULL, HFILL }},
+
+
+      { &hf_l2server_serv_cell_idx,
+        { "ServCellIdx", "l2server.serving-cell-index", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_bwp_inactivity_timer,
+        { "BwpInactivityTimer", "l2server.bwp-inactivity-timer", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_tag_id,
+        { "TagId", "l2server.tag-id", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_scell_deact_timer,
+        { "SCell Deact Timer", "l2server.scell-deact-timer", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pathloss_ref_linking,
+        { "Pathloss Ref Linking", "l2server.pathloss-ref-linking", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_serv_cell_mo,
+        { "Serv Cell MO", "l2server.serv-cell-mo", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_default_dl_bwpid,
+        { "Default DL Bwpid", "l2server.default-dl-bwpid", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_supp_ul_rel,
+        { "Supp UL Rel", "l2server.supp-ul-rel", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ca_slot_offset_is_valid,
+        { "CA Slot Offset Is Valid", "l2server.ca-slot-offset-is-valid", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_lte_srs_patternlist_1,
+        { "Nb LTE SRS PatternList 1", "l2server.nb-lte-srs-patternlist-1", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_lte_srs_patternlist_2,
+        { "Nb LTE SRS PatternList 2", "l2server.nb-lte-srs-patternlist-2", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ca_slot_offset_r16,
+        { "CA Slot Offset R16", "l2server.ca-slot-offset-r16", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_csi_rs_valid_with_dci_r16,
+        { "CsiRsValidWithDCI-r16", "l2server.csi-rs-valid-with-dci-r16", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_crs_rate_match_per_coreset_poolidx_r16,
+        { "CrsRateMatchPerCORESETPoolIdx-r16", "l2server.crs-rate-match-per-coreset-poolidx-r16", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_first_active_ul_bwp_pcell,
+        { "First Active UL BWP pCell", "l2server.first-active-ul-bwp-pcell", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+
+      { &hf_l2server_sp_cell_cfg_common,
+        { "SP Cell Cfg Common", "l2server.sp-cell-cfg-common", FT_STRING, BASE_NONE,
+          NULL, 0x0, "bb_nr5g_SERV_CELL_CONFIG_COMMONt", HFILL }},
+
+      { &hf_l2server_serv_cell_freqinfo_dl_present,
+        { "FreqInfo DL Present", "l2server.sp-cell-cfg-common.freqinfo-dl-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_DL_COMMON_PRESENT, NULL, HFILL }},
+      { &hf_l2server_serv_cell_bwp_dl_present,
+        { "BWP DL Present", "l2server.sp-cell-cfg-common.bwp-dl-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_DL_COMMON_PRESENT, NULL, HFILL }},
+      { &hf_l2server_serv_cell_freqinfo_ul_present,
+        { "FreqInfo UL Present", "l2server.sp-cell-cfg-common.freqinfo-ul-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_UL_COMMON_PRESENT, NULL, HFILL }},
+      { &hf_l2server_serv_cell_bwp_ul_present,
+        { "BWP UL Present", "l2server.sp-cell-cfg-common.bwp-ul-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_UL_COMMON_PRESENT, NULL, HFILL }},
+      { &hf_l2server_serv_cell_freqinfo_sul_present,
+        { "FreqInfo SUL Present", "l2server.sp-cell-cfg-common.freqinfo-sul-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_FREQINFO_SUL_COMMON_PRESENT, NULL, HFILL }},
+      { &hf_l2server_serv_cell_bwp_sul_present,
+        { "BWP SUL Present", "l2server.sp-cell-cfg-common.bwp-sul-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_BWP_SUL_COMMON_PRESENT, NULL, HFILL }},
+      { &hf_l2server_serv_cell_tdd_present,
+        { "TDD Common Present", "l2server.sp-cell-cfg-common.tdd-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_TDD_COMMON_PRESENT, NULL, HFILL }},
+      { &hf_l2server_serv_cell_tomatcharound_setup,
+        { "LTE CRS Common ToMatchAround Setup", "l2server.sp-cell-cfg-common.lte-common-tomatcharound-setup", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_COMMON_TOMATCHAROUND_SETUP, 0x0, HFILL }},
+      { &hf_l2server_serv_cell_tomatcharound_release,
+        { "LTE CRS Common ToMatchAround Release", "l2server.sp-cell-cfg-common.lte-common-tomatcharound-release", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_SERV_CELL_CONFIG_LTE_CRS_COMMON_TOMATCHAROUND_RELEASE, 0x0, HFILL }},
+      { &hf_l2server_serv_cell_hs_r16_present,
+        { "High Speed Config R16 Present", "l2server.sp-cell-cfg-common.highspeed-config-r16-present", FT_BOOLEAN, 32,
+          NULL, bb_nr5g_STRUCT_HIGH_SPEED_CONFIG_R16_PRESENT, 0x0, HFILL }},
+
+      { &hf_l2server_config_cmd_type,
+        { "Type", "l2server.config-cmd-type", FT_UINT16, BASE_DEC,
+          VALS(config_cmd_type_vals), 0x0, NULL, HFILL }},
+
+      { &hf_l2server_side,
+        { "Interface Side", "l2server.side", FT_UINT8, BASE_DEC,
+          VALS(interface_side_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_bot_layer,
+        { "Bot Layer", "l2server.bot-layer", FT_UINT8, BASE_DEC,
+          VALS(bot_layer_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_trf,
+        { "Trf", "l2server.trf", FT_UINT8, BASE_DEC,
+          VALS(trf_vals), 0x0, NULL, HFILL }},
+
+      { &hf_l2server_technology,
+        { "Technology", "l2server.technology", FT_UINT8, BASE_DEC,
+          VALS(technology_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_enbsim,
+        { "ENbSim", "l2server.enbsim", FT_UINT8, BASE_DEC,
+          VALS(enbsim_vals), 0x0, "Control simulation of LTE Uu on eNB. (18)", HFILL }},
+
+      { &hf_l2server_rx_lch_info,
+        { "RxLchInfo", "l2server.rx-lch-info", FT_STRING, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_tx_lch_info,
+        { "TxLchInfo", "l2server.tx-lch-info", FT_STRING, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_lcg,
+        { "Logical Channel Group", "l2server.lcg", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_priority,
+        { "Priority", "l2server.priority", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_prioritized_bit_rate,
+        { "Prioritized bit rate", "l2server.prioritized-bit-rate", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_bucket_size_duration,
+        { "Bucket Size Duration", "l2server.bucket-size-duration", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_allowed_serving_cells,
+        { "Allowed Serving Cells", "l2server.allowed-serving-cells", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_allowed_scs_list,
+        { "Allowed SCS List", "l2server.allowed-scs-list", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_max_pusch_duration,
+        { "Max PUSCH Duration", "l2server.max-pusch-duration", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_configured_grant_type_allowed,
+        { "Configured Grant Type Allowed", "l2server.configured-grant-type-allowed", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_logical_channel_sr_mask,
+        { "Logical Channel SR Mask", "l2server.logical-channel-sr-mask", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_logical_channel_sr_delay_timer_configured,
+        { "Logical Channel SR Delay Timer Configured", "l2server.logical-channel-sr-delay-timer-configured", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_request_duplicates_from_pdcp,
+        { "Request Duplicates from PDCP", "l2server.request-duplicates-from-pdcp", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_scheduling_request_id,
+        { "Scheduling Request ID", "l2server.scheduling-request-id", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_bit_rate_query_prohibit_timer,
+        { "Bit Rate Query Prohibit Timer", "l2server.bit-rate-query-prohibit-timer", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_allowed_phy_priority_index,
+        { "Allowed PHY Priority Index", "l2server.allowed-phy-priority-index", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_setparm_cmd_type,
+        { "Type", "l2server.setparm-cmd-type", FT_UINT16, BASE_DEC,
+          VALS(setparm_cmd_type_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_max_ue,
+        { "Max Ue", "l2server.max-ue", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_max_pdcp,
+        { "Max PDCP", "l2server.max-pdcp", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_max_nat,
+        { "Max Nat bearers", "l2server.max-nat", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_max_udg_sess,
+        { "Max UDG Sess", "l2server.max-udg-sess", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_max_cntr,
+        { "Max Cntr", "l2server.max-cntr", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_cmac_status,
+        { "CMAC Status", "l2server.cmac-status", FT_UINT8, BASE_DEC,
+          VALS(cmac_status_vals), 0x0, NULL, HFILL }},
+
+      { &hf_l2server_cmac_cell_status,
+        { "CMAC Cell Status", "l2server.cmac-cell-status", FT_UINT8, BASE_DEC,
+          VALS(cmac_cell_status_vals), 0x0, NULL, HFILL }},
+
+
+      /* DRX config */
+      { &hf_l2server_drx_config,
+        { "DRX Config", "l2server.drx-config", FT_STRING, BASE_NONE,
+          NULL, 0x0, "nr5g_rlcmac_Cmac_DRX_CONFIGt", HFILL }},
+      { &hf_l2server_drx_len,
+        { "Length", "l2server.drx-lenth", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_drx_ondurationtimer_isvalid,
+        { "onDurationTimer_IsValid", "l2server.ondurationtimer-isvalid", FT_UINT8, BASE_DEC,
+          VALS(drx_onduration_timer_long_cycle_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_drx_ondurationtimer,
+        { "onDurationTimer", "l2server.ondurationtimer", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_drx_inactivitytimer,
+        { "InactivityTimer", "l2server.inactivitytimer", FT_UINT32, BASE_DEC,
+          VALS(drx_inactivity_timer_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_drx_harq_rtt_timerdl,
+        { "Harq RTT Timer DL", "l2server.harq-rtt-timerdl", FT_UINT8, BASE_DEC,
+          NULL, 0x0,  "(0..56). Value in number of symbols", HFILL }},
+      { &hf_l2server_drx_harq_rtt_timerul,
+        { "Harq RTT Timer UL", "l2server.harq-rtt-timerul", FT_UINT8, BASE_DEC,
+          NULL, 0x0,  "(0..56). Value in number of symbols", HFILL }},
+      { &hf_l2server_drx_retransmission_timerdl,
+        { "Retransmission Timer DL", "l2server.retransmission-timerdl", FT_UINT32, BASE_DEC,
+          VALS(drx_retransmission_timer_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_drx_retransmission_timerul,
+        { "Retransmission Timer UL", "l2server.retransmission-timerul", FT_UINT32, BASE_DEC,
+          VALS(drx_retransmission_timer_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_drx_longcyclestartoffset_isvalid,
+        { "LongCycleStartOffset isValid", "l2server.longcyclestartoffset-isvalid", FT_UINT8, BASE_DEC,
+          VALS(drx_long_cycle_start_offset_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_drx_longcyclestartoffset,
+        { "LongCycleStartOffset", "l2server.longcyclestartoffset", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_drx_short_cycle,
+        { "ShortCycle", "l2server.shortcycle", FT_INT32, BASE_DEC,
+          VALS(drx_short_cycle_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_drx_short_cycle_timer,
+        { "ShortCycleTimer", "l2server.shortcycletimer", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_drx_slot_offset,
+        { "SlotOffset", "l2server.slotoffset", FT_UINT8, BASE_DEC,
+          NULL, 0x0, "(0..31). Value is 1/32 ms", HFILL }},
+
+      { &hf_l2server_log,
+        { "Log", "l2server.log", FT_STRING, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_mac_cell_group_len,
+        { "Length", "l2server.mac-cell-group-len", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_spcell_config_ded,
+        { "spCell Config Dedicated", "l2server.spcell-config-ded", FT_STRING, BASE_NONE,
+          NULL, 0x0, "nr5g_rlcmac_Cmac_SERV_CELL_CONFIGt", HFILL }},
+      { &hf_l2server_spcell_config_ded_len,
+        { "Length", "l2server.spcell-config-ded-len", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_config_uplink_present,
+        { "Uplink Present", "l2server.config-uplink-present", FT_BOOLEAN, 32,
+          NULL, nr5g_rlcmac_Cmac_STRUCT_SERV_CELL_CONFIG_UPLINK_PRESENT, NULL, HFILL }},
+      { &hf_l2server_config_sul_uplink_present,
+        { "SUL Uplink Present", "l2server.config-sul-uplink-present", FT_BOOLEAN, 32,
+          NULL, nr5g_rlcmac_Cmac_STRUCT_SERV_CELL_CONFIG_SUP_UPLINK_PRESENT, NULL, HFILL }},
+      { &hf_l2server_csi_meas_cfg_present,
+        { "CSI Meas Cfg Present", "l2server.csi-meas-cfg-present", FT_BOOLEAN, 32,
+          NULL, nr5g_rlcmac_Cmac_STRUCT_CSI_MEAS_CFG_PRESENT, NULL, HFILL }},
+
+      { &hf_l2server_radio_condition_group,
+        { "Radio Condition Group", "l2server.radio-condition-group", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_radio_condition_profile_index,
+        { "Index", "l2server.radio-condition-profile-index", FT_UINT32, BASE_DEC,
+          NULL, 0x0, "Radio Condition Profile Index", HFILL }},
+
+      { &hf_l2server_fname,
+        { "fname", "l2server.fname", FT_STRING, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nbslotspeccfg_addmod,
+        { "NbSlotSpecCfg AddMod", "l2server.nbslotspeccfg-addmod", FT_UINT16, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nbslotspeccfg_del,
+        { "NbSlotSpecCfg Del", "l2server.nbslotspeccfg-del", FT_UINT16, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nbdlbwpidtoadd,
+        { "Nb DL BwpId to add", "l2server.nbsdlbwpidtoadd", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nbdlbwpidtodel,
+        { "Nb DL BwpId to del", "l2server.nbsdlbwpidtodel", FT_UINT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sibfilterflag,
+        { "SibFilterFlag", "l2server.sib-filter-flag", FT_UINT32, BASE_DEC,
+          VALS(sib_folder_flag_vals), 0x0, NULL, HFILL }},
+
+      { &hf_l2server_num_pdcp_actions,
+        { "Number of PDCP Actions", "l2server.num-pdcp-actions", FT_UINT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ta,
+        { "TA", "l2server.ta", FT_INT8, BASE_DEC,
+          NULL, 0x0, "Timing Advance (-1 for none)", HFILL }},
+      { &hf_l2server_ra_info_valid,
+        { "RA Info Valid", "l2server.ra-info-valid", FT_BOOLEAN, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rach_probe_req,
+        { "RACH Probe Req", "l2server.rach-probe-req", FT_BOOLEAN, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_si_scheduling_info_valid,
+        { "SI Scheduling Info Valid", "l2server.si-scheduling-info-valid", FT_BOOLEAN, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_rrc_state,
+        { "State", "l2server.rrc-state", FT_UINT8, BASE_DEC,
+          VALS(rrc_state_vals), 0x0, NULL, HFILL }},
+
+      { &hf_l2server_cell_config_cellcfg_type,
+        { "CellCfgType", "l2server.cellcfgtype", FT_UINT8, BASE_DEC,
+          VALS(cellconfig_type_vals), 0x0, NULL, HFILL }},
+
+      { &hf_l2server_cell_config_cellcfg,
+        { "CellCfg", "l2server.cell-config.cellcfg", FT_STRING, BASE_NONE,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_aggr_cell_cfg_common,
+        { "NbAggrCellCfgCommon", "l2server.number-of-nb-aggr-cell-cfg-common", FT_INT8, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_dlfreq_0,
+        { "DL Freq[0]", "l2server.dl-freq-0", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_dlfreq_1,
+        { "DL Freq[1]", "l2server.dl-freq-1", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_dl_earfcn_0,
+        { "DL Earfcn[0]", "l2server.dl-earfcn-0", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_dl_earfcn_1,
+        { "DL Earfcn[1]", "l2server.dl-earfcn-1", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ulfreq_0,
+        { "UL Freq[0]", "l2server.ul-freq-0", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ulfreq_1,
+        { "UL Freq[1]", "l2server.ul-freq-1", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_earfcn_0,
+        { "UL Earfcn[0]", "l2server.ul-earfcn-0", FT_INT32, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_earfcn_1,
+        { "UL Earfcn[1]", "l2server.ul-earfcn-1", FT_INT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ssb_arfcn,
+        { "SSB Arfcn", "l2server.ssb-arfcn", FT_INT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_num_dbeam,
+        { "Num Dbeam", "l2server.num-dbeam", FT_INT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ppu,
+        { "PPU", "l2server.ppu", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ul_cell_cfg_ded,
+        { "UL Cell Cfg Dedicated", "l2server.ul-cell-cfg-ded", FT_STRING, BASE_NONE,
+           NULL, 0x0, "nr5g_rlcmac_Cmac_UPLINK_DEDICATED_CONFIGt", HFILL }},
+      { &hf_l2server_ul_cell_cfg_ded_len,
+        { "Len", "l2server.ul-cell-cfg-ded.len", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_initial_ul_bwp_present,
+        { "Initial UL Bwp Present", "l2server.initial-ul-bwp-present", FT_BOOLEAN, 32,
+           NULL, nr5g_rlcmac_Cmac_STRUCT_UPLINK_DEDICATED_CONFIG_INITIAL_UL_BWP_PRESENT, NULL, HFILL }},
+      { &hf_l2server_pusch_present,
+        { "PUSCH Present", "l2server.pusch-present", FT_BOOLEAN, 32,
+           NULL, nr5g_rlcmac_Cmac_STRUCT_UPLINK_DEDICATED_CONFIG_PUSCH_PRESENT, NULL, HFILL }},
+
+      { &hf_l2server_first_active_ul_bwp,
+        { "First active UL BWP", "l2server.first-active-ul-bwp", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_num_ul_bwpid_to_add,
+        { "Number of UL BWPIds to add", "l2server.num-ul-bwpids-to-add", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_num_ul_bwpid_to_del,
+        { "Number of UL BWPIds to del", "l2server.num-ul-bwpids-to-del", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwpid_to_del,
+        { "UL BWPId to del", "l2server.ul-bwpid-to-del", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_initial_ul_bwp,
+        { "Initial UL BWP", "l2server.initial-ul-bwp", FT_STRING, BASE_NONE,
+           NULL, 0x0, "bb_nr5g_BWP_UPLINKCOMMONt", HFILL }},
+      { &hf_l2server_initial_ul_bwp_len,
+        { "Len", "l2server.initial-ul-bwp.len", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ul_bwp,
+        { "UL BWP", "l2server.ul-bwp", FT_STRING, BASE_NONE,
+           NULL, 0x0, "nr5g_rlcmac_Cmac_BWP_UPLINKt", HFILL }},
+      { &hf_l2server_ul_bwp_len,
+        { "Len", "l2server.ul-bwp.len", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_common_cfg_present,
+        { "UL Common Cfg Present", "l2server.ul-common-cfg-present", FT_BOOLEAN, 32,
+           NULL, nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_COMMON_CFG_PRESENT, NULL, HFILL }},
+      { &hf_l2server_ul_dedicated_cfg_present,
+        { "UL Dedicated Cfg Present", "l2server.ul-dedicated-cfg-present", FT_BOOLEAN, 32,
+           NULL, nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DEDICATED_CFG_PRESENT, NULL, HFILL }},
+
+      { &hf_l2server_ul_bwp_common,
+        { "UL BWP Common", "l2server.ul-bwp-common", FT_STRING, BASE_NONE,
+           NULL, 0x0, "nr5g_rlcmac_Cmac_BWP_UPLINKCOMMONt", HFILL }},
+      { &hf_l2server_ul_bwp_common_len,
+        { "Len", "l2server.ul-bwp-common.len", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ul_bwp_dedicated,
+        { "UL BWP Dedicated", "l2server.ul-bwp-dedicated", FT_STRING, BASE_NONE,
+           NULL, 0x0, "nr5g_rlcmac_Cmac_BWP_UPLINKDEDICATEDt", HFILL }},
+      { &hf_l2server_ul_bwp_dedicated_len,
+        { "Len", "l2server.ul-bwp-dedicated.len", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ded_pucch_cfg_present,
+        { "PUCCH Config Present", "l2server.pucch-cfg-present", FT_BOOLEAN, 32,
+           NULL, nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_PUCCH_CFG_PRESENT, NULL, HFILL }},
+      { &hf_l2server_ded_pusch_cfg_present,
+        { "PUCCH Config Present", "l2server.pusch-cfg-present", FT_BOOLEAN, 32,
+           NULL, nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_PUSCH_CFG_PRESENT, NULL, HFILL }},
+      { &hf_l2server_ded_srs_present,
+        { "SRS Config Present", "l2server.srs-cfg-present", FT_BOOLEAN, 32,
+           NULL, nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_SRS_CFG_PRESENT, NULL, HFILL }},
+      { &hf_l2server_ded_configured_grant_present,
+        { "Configured Grant Config Present", "l2server.configured-grant-cfg-present", FT_BOOLEAN, 32,
+           NULL, nr5g_rlcmac_Cmac_STRUCT_BWP_UPLINK_DED_CONFIGURED_GRANT_PRESENT, NULL, HFILL }},
+
+      { &hf_l2server_nb_pucch_conf_ded_to_add,
+        { "Nb PUCCH Conf Ded To Add", "l2server.nb-pucch-conf-ded-to-add", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ul_bwp_common_pdcch,
+        { "UL BWP Common PDCCH", "l2server.ul-bwp-common-pdcch", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ul_bwp_common_search_space_sib1,
+        { "Search Space SIB1", "l2server.search-space-sib1", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_search_space_sib,
+        { "Search Space SIB", "l2server.search-space-sib", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_pag_search_space,
+        { "Page Search Space", "l2server.pag-search-space", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_ra_search_space,
+        { "RA Search Space", "l2server.ra-search-space", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_ra_ctrl_res_set,
+        { "RA Ctrl Res Set", "l2server.ra-ctrl-res-set", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_nb_common_ctrl_res_sets,
+        { "Nb Common Ctrl Res Sets", "l2server.nb-common-ctrl-res-set", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_nb_common_search_spaces,
+        { "Nb Common Search Spaces", "l2server.nb-common-search-spaces", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_control_resource_set_zero,
+        { "Control Resource Set Zero", "l2server.control-resource-set-zero", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_search_space_zero,
+        { "Search space zero", "l2server.search-space-zero", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po_valid,
+        { "First PDCCH Monitor Occ of Po Valid", "l2server.first-pdcch-monit-of-po-valid", FT_UINT8, BASE_DEC,
+           VALS(pdcch_moni_occ_of_po_valid_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_nb_first_pdcch_monit_occ_of_po,
+        { "Nb First PDCCH Monitor Occ of Po", "l2server.nb-first-pdcch-monit-of-po", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_bwp_common_nb_common_search_spaces_ext,
+        { "Nb Common Search Spaces Ext", "l2server.nb-common-search-spaces-ext", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ul_bwp_common_first_pdcch_moni_occ_of_po,
+        { "First PDCCH Moni Occ of Po", "l2server.first-pdcch-moni-occ-of-po", FT_UINT16, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_bwp_common_pdsch,
+        { "BWP Common PDSCH", "l2server.bwp-common-pdsch", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_rach_common,
+        { "RACH Common", "l2server.rach-common", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_rach_generic,
+        { "RACH Generic", "l2server.rach-generic", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_msg1_fdm,
+        { "Msg1 FDM", "l2server.msg1-fdm", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_msg1_frequency_start,
+        { "Msg1 Frequency Start", "l2server.msg1-frequency-start", FT_UINT16, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_zero_corr_zone,
+        { "Zero Corr Zone", "l2server.zero-corr-zone", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_preamble_rec_target_pwr,
+        { "Preamble Rec Target Pwr", "l2server.preamble-rec-target-pwr", FT_UINT16, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_msg1_subcarrier_spacing,
+        { "Msg1 Subcarrier Spacing", "l2server.msg-subcarrier-spacing", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rest_set_conf,
+        { "Rest Set Conf", "l2server.rest-set-conf", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_msg3_tranform_precoding,
+        { "Msg3 Transform Precoding", "l2server.msg-transform-precoding", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rsrp_threshold_ssb,
+        { "RSRP Threshold SSB", "l2server.rsrp-threshold-ssb", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rsrp_threshold_ssb_sul,
+        { "RSRP Threshold SSB SUL", "l2server.rsrp-threshold-ssb-sul", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_prach_root_seq_index_is_valid,
+        { "PRACHSeqRootIndexIsValid", "l2server.prach-root-seq-index-is-valid", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ssb_per_rach_is_valid,
+        { "SSBPerRACH", "l2server.ssb-per-rach", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_prach_root_seq_index,
+        { "PRACHSeqRootIndex", "l2server.prach-root-seq-index", FT_INT16, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ssb_per_rach,
+        { "SSBPerRACH", "l2server.ssb-per-rach", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_group_b_configured,
+        { "Group B Configured", "l2server.group-b-configured", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ra_msg3_size_group_a,
+        { "RA Msg3 Size Group A", "l2server.ra-msg3-size-group-a", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_message_power_offset_group_b,
+        { "Message Power Offset Group B", "l2server.message-power-offset-group-b", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_number_of_ra_preambles_group_a,
+        { "Number of RA Preambles Group A", "l2server.number-of-ra-preambles-group-a", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ra_contention_resolution_timer,
+        { "RA-ContentionResolutionTimer", "l2server.ca-contention-resolution-timer", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_freq_info_dl,
+        { "Freq Info DL", "l2server.freq-info-dl", FT_STRING, BASE_NONE,
+           NULL, 0x0, "bb_nr5g_FREQINFO_DLt", HFILL }},
+      { &hf_l2server_abs_freq_ssb,
+        { "Abs Freq SSB", "l2server.abs-freq-ssb", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_abs_freq_point_a,
+        { "Abs Freq Point A", "l2server.abs-freq-point-a", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ssb_subcarrier_offset,
+        { "SSB Subcarrier Offset", "l2server.ssb-subcarrier-offset", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_freq_band_list,
+        { "Nb Freq Band List", "l2server.nb-freq-band-list", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_scs_spec_carrier,
+        { "Nb SCS Spec Carrier", "l2server.nb-scs-spec-carrier", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_freq_band_list,
+        { "Freq Band List", "l2server.freq-band-list", FT_INT16, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ssb_periodicity_serv_cell,
+        { "SSB Periodicity Serv Cell", "l2server.ssb-periodicity-serv-cell", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_dmrs_type_a_pos,
+        { "DMRS TypeA Pos", "l2server.dmrs-typea-pos", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sub_car_spacing,
+        { "Sub Car Spacing", "l2server.sub-car-spacing", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ssb_pos_in_burst_is_valid,
+        { "SSB Pos In Burst is valid", "l2server.ssb-pos-in-burst-is-valid", FT_INT8, BASE_DEC,
+           VALS(ssb_pos_in_burst_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_n_timing_advance_offset,
+        { "N Timing Advance Offset", "l2server.n-timing-advance-offset", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ssb_pos_in_burst_short,
+        { "SSB Pos in burst (Short)", "l2server.ssb-pos-in-burst-short", FT_UINT8, BASE_HEX,
+           NULL, 0x0f, NULL, HFILL }},
+      { &hf_l2server_ssb_pos_in_burst_medium,
+        { "SSB Pos in burst (Medium)", "l2server.ssb-pos-in-burst-medium", FT_UINT8, BASE_HEX,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ssb_pos_in_burst_long,
+        { "SSB Pos in burst (Long)", "l2server.ssb-pos-in-burst-long", FT_UINT64, BASE_HEX,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pbch_block_power,
+        { "PBCH Block Power", "l2server.pbch-block-power", FT_INT16, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nb_rate_match_pattern_to_add_mod,
+        { "Nb Rate Match Pattern To Add/Mod", "l2server.nb-rate-match-pattern-to-add-mod", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_rate_match_pattern_to_del,
+        { "Nb Rate Match Pattern To Del", "l2server.nb-rate-match-pattern-to-del", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_bwp_dl_common,
+        { "BWP DL Common", "l2server.bwp-dl-common", FT_STRING, BASE_NONE,
+           NULL, 0x0, "bb_nr5g_BWP_DOWNLINKCOMMONt", HFILL }},
+      { &hf_l2server_freq_info_ul_common,
+        { "FreqInfo UL Common", "l2server.freqinfo-ul-common", FT_STRING, BASE_NONE,
+           NULL, 0x0, "bb_nr5g_FREQINFO_ULt", HFILL }},
+      { &hf_l2server_bwp_ul_common,
+        { "BWP UL Common", "l2server.bwp-ul-common", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_freq_info_sul_common,
+        { "FreqInfo SUL Common", "l2server.freqinfo-sul-common", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_bwp_sul_common,
+        { "BWP SUL Common", "l2server.bwp-sul-common", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_tdd_common,
+        { "TDD Common", "l2server.tdd-common", FT_STRING, BASE_NONE,
+           NULL, 0x0, "bb_nr5g_TDD_UL_DL_CONFIG_COMMONt", HFILL }},
+
+      { &hf_l2server_beamid,
+        { "BeamId", "l2server.beamid", FT_INT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_verbosity,
+        { "Verbosity", "l2server.verbosity", FT_UINT32, BASE_HEX_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_rlcmac_verbosity,
+        { "RLCMAC Verbosity", "l2server.rlcmac-verbosity", FT_UINT32, BASE_HEX_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_verbosity_drx_set,
+        { "DRX", "l2server.rlcmac-verbosity.drx", FT_BOOLEAN, 32,
+           NULL, 0x00010000, NULL, HFILL }},
+      { &hf_l2server_verbosity_phr_set,
+        { "PHR", "l2server.rlcmac-verbosity.phr", FT_BOOLEAN, 32,
+           NULL, 0x00004000, NULL, HFILL }},
+      { &hf_l2server_verbosity_dci_set,
+        { "DCI", "l2server.rlcmac-verbosity.dci", FT_BOOLEAN, 32,
+           NULL, 0x00002000, NULL, HFILL }},
+      { &hf_l2server_verbosity_rlc_status_set,
+        { "RLC Status", "l2server.rlcmac-verbosity.rlc-status", FT_BOOLEAN, 32,
+           NULL, 0x00001000, NULL, HFILL }},
+      { &hf_l2server_verbosity_ulsched_set,
+        { "UL SCHED", "l2server.rlcmac-verbosity.ulsched", FT_BOOLEAN, 32,
+           NULL, 0x00000800, NULL, HFILL }},
+      { &hf_l2server_verbosity_l1_set,
+        { "L2", "l2server.rlcmac-verbosity.l2", FT_BOOLEAN, 32,
+           NULL, 0x00000400, "L1-L2 communication", HFILL }},
+      { &hf_l2server_verbosity_rlc_set,
+        { "RLC", "l2server.rlcmac-verbosity.rlc", FT_BOOLEAN, 32,
+           NULL, 0x00000040, NULL, HFILL }},
+      { &hf_l2server_verbosity_bsr_set,
+        { "BSR", "l2server.rlcmac-verbosity.bsr", FT_BOOLEAN, 32,
+           NULL, 0x00000004, NULL, HFILL }},
+      { &hf_l2server_verbosity_sr_set,
+        { "SR", "l2server.rlcmac-verbosity.sr", FT_BOOLEAN, 32,
+           NULL, 0x00000002, NULL, HFILL }},
+      { &hf_l2server_verbosity_mac_config_set,
+        { "MAC Config", "l2server.rlcmac-verbosity.mac-config", FT_BOOLEAN, 32,
+           NULL, 0x00000001, NULL, HFILL }},
+
+      { &hf_l2server_pdcp_verbosity,
+        { "PDCP Verbosity", "l2server.pdcp-verbosity", FT_UINT32, BASE_HEX_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_dl_harq_mode,
+        { "DL HARQ Mode", "l2server.dl-harq-mode", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_fs_advance,
+        { "UL FS Advance", "l2server.ul-fs-advance", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_max_rach,
+        { "Max RACH", "l2server.max-rach", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_num_lte_cell,
+        { "Num Lte Cells", "l2server.num-lte-cells", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_num_nr_cell,
+        { "Num Nr Cells", "l2server.num-nr-cells", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_num_up_stk_ppu,
+        { "Num Up Stk PPUs", "l2server.num-up-stk-ppu", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_num_dwn_stk_ppu,
+        { "Num Dwn Stk PPUs", "l2server.num-dwn-stk-ppu", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_num_lte_pro_ppu,
+        { "Num Lte Pro PPUs", "l2server.num-lte-pro-ppu", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_num_nr_pro_ppu,
+        { "Num Nr Pro PPUs", "l2server.num-nr-pro-ppu", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_up_stk_ppu,
+        { "Up Stk PPU", "l2server.up-stk-ppu", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_dwn_stk_ppu,
+        { "Dwn Stk PPU", "l2server.dwn-stk-ppu", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nr_pro_ppu,
+        { "NR Pro PPU", "l2server.nr-pro-ppu", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_setup_reconf,
+        { "Setup/Reconf", "l2server.setup-reconf", FT_UINT8, BASE_DEC,
+           VALS(setup_reconf_vals), 0x0, NULL, HFILL }},
+
+      { &hf_l2server_mac_config,
+        { "MAC Config", "l2server.mac-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, "nr5g_rlcmac_Cmac_CONFIG_CMD_t", HFILL }},
+
+      { &hf_l2server_lch_basedprioritization_r16,
+        { "LCH-based Prioritization R16", "l2server.lch-based-prioritization-r16", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_first_active_dl_bwp,
+        { "First Active DL BWP", "l2server.first-active-dl-bwp", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_dl_bwp_scs_spec_carrier,
+        { "Nb DL BWP Scs Spec Carriers", "l2server.nb-bwp-scs-spec-carrier", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_dl_bwp_id_to_del,
+        { "DL BwpId to Delete", "l2server.dl-bwpid-to-del", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+
+      { &hf_l2server_initial_dl_bwp_present,
+        { "Initial DL BWP Present", "l2server.initial-dl-bwp-present", FT_BOOLEAN, 32,
+           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_INITIAL_DL_BWP_PRESENT, NULL, HFILL }},
+      { &hf_l2server_pdsch_setup,
+        { "PDSCH Setup", "l2server.pdsch-setup", FT_BOOLEAN, 32,
+           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDSCH_SETUP, NULL, HFILL }},
+      { &hf_l2server_pdsch_release,
+        { "PDSCH Release", "l2server.pdsch-release", FT_BOOLEAN, 32,
+           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDSCH_RELEASE, NULL, HFILL }},
+      { &hf_l2server_pdcch_setup,
+        { "PDCCH Setup", "l2server.pdcch-setup", FT_BOOLEAN, 32,
+           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDCCH_SETUP, NULL, HFILL }},
+      { &hf_l2server_pdcch_release,
+        { "PDCCH Release", "l2server.pdcch-release", FT_BOOLEAN, 32,
+           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_PDCCH_RELEASE, NULL, HFILL }},
+      { &hf_l2server_csi_meas_config_setup,
+        { "CSI Meas Config Setup", "l2server.csi-meas-config-setup", FT_BOOLEAN, 32,
+           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_CSI_MEAS_CFG_SETUP, NULL, HFILL }},
+      { &hf_l2server_csi_meas_config_release,
+        { "CSI Meas Config Release", "l2server.csi-meas-config-release", FT_BOOLEAN, 32,
+           NULL, bb_nr5g_STRUCT_DOWNLINK_DEDICATED_CONFIG_CSI_MEAS_CFG_RELEASE, NULL, HFILL }},
+
+      { &hf_l2server_bwp_dl_dedicated,
+        { "BWP DL Dedicated", "l2server.bwp-dl-dedicated", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nb_sps_conf_to_add_r16,
+        { "Nb SPS Conf to add (r16)", "l2server.nb-sps-conf-to-add-r16", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_config_deactivation_state_r16,
+        { "Nb Config Deactivation State r16", "l2server.nb-config-deactivation-state-r16", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_pdsch_serving_cell,
+        { "PDSCH ServingCell", "l2server.pdsch-serving-cell", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_xoverhead,
+        { "XOverhead", "l2server.xoverhead", FT_INT8, BASE_DEC,
+           VALS(xoverhead_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_harq_processes_for_pdsch,
+        { "Nb HARQ Processes for PDSCH", "l2server.nb-harq-processes-for-pdsch", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pucch_cell,
+        { "PUCCH cell", "l2server.pucch-cell", FT_INT16, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_max_mimo_layers,
+        { "Max MIMO Layers", "l2server.max-mimo-layers", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_processing_type2_enabled,
+        { "Processing Type2 Enabled", "l2server.processing-type2-enabled", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_max_code_block_groups_per_tb,
+        { "Max Code Block Groups Per TB", "l2server.max-code-block-groups-per-tb", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_code_block_group_flush_indicator,
+        { "Code Block Group Flush Indicator", "l2server.code-code-block-group-flush-indicator", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nb_code_block_group_transmission_r16,
+        { "Nb code block group transmission r16", "l2server.nb-code-block-group-transmission-r16", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+//      { &hf_l2server_bwp_dl_common,
+//        { "BWP DL Common", "l2server.bwp-dl-common", FT_STRING, BASE_NONE,
+//           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_pdcch_serving_cell,
+        { "PDCCH ServingCell", "l2server.pdcch-serving-cell", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_csi_meas_config,
+        { "CSI Meas Config", "l2server.csi-meas-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, "bb_nr5g_CSI_MEAS_CFGt", HFILL }},
+
+      { &hf_l2server_nb_nzp_csi_rs_res_to_add,
+        { "Nb NZP CSI RS Res To Add", "l2server.nb-nzp-csi-rs-res-to-add", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_nzp_csi_rs_res_to_del,
+        { "Nb NZP CSI RS Res To Del", "l2server.nb-nzp-csi-rs-res-to-del", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_nzp_csi_rs_res_set_to_add,
+        { "Nb NZP CSI RS Res Set To Add", "l2server.nb-nzp-rs-csi-rs-res-set-to-add", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_nzp_csi_rs_res_set_to_del,
+        { "Nb NZP CSI RS Res Set To Del", "l2server.nb-nzp-rs-csi-rs-res-set-to-del", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_im_res_to_add,
+        { "Nb CSI Im Res To Add", "l2server.nb-csi-im-res-to-add", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_im_res_to_del,
+        { "Nb CSI Im Res To Del", "l2server.nb-csi-im-res-to-del", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_im_res_set_to_add,
+        { "Nb CSI Im Res Set To Add", "l2server.nb-csi-im-res-set-to-add", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_im_res_set_to_del,
+        { "Nb CSI Im Res Set To Del", "l2server.nb-csi-im-res-set-to-del", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_ssb_res_set_to_add,
+        { "Nb CSI SSB Res Set To Add", "l2server.nb-csi-ssb-res-set-to-add", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_ssb_res_set_to_del,
+        { "Nb CSI SSB Res Set To Del", "l2server.nb-csi-ssb-res-set-to-del", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_res_cfg_to_add,
+        { "Nb CSI Res Cfg To Add", "l2server.nb-csi-res-cfg-to-add", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_res_cfg_to_del,
+        { "Nb CSI Res Cfg To Del", "l2server.nb-csi-res-cfg-to-del", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_rep_cfg_to_add,
+        { "Nb CSI Rep Cfg To Add", "l2server.nb-csi-rep-cfg-to-add", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_rep_cfg_to_del,
+        { "Nb CSI Rep Cfg To Del", "l2server.nb-csi-rep-cfg-to-del", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_aper_trigger_state_list,
+        { "Nb Aper Trigger State List", "l2server.nb-aper-trigger-state-list", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_sp_on_pusch_trigger_state,
+        { "Nb SP On PUSCH Trigger State", "l2server.nb-sp-on-pusch-trigger-state", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_report_trigger_size,
+        { "Report Trigger Size", "l2server.report-trigger-size", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_report_trigger_size_dci02_r16,
+        { "Report Trigger Size DCI02-r16", "l2server.report-trigger-size-dci02-r16", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nzp_csi_rs_res_config,
+        { "NZP CSO RS Res Config", "l2server.nzp-csi-rs-res-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_resource_id,
+        { "Resource Id", "l2server.resource-id", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_power_control_offset,
+        { "Power Control Offset", "l2server.power-control-offset", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_power_control_offset_ss,
+        { "Power Control Offset SS", "l2server.power-control-offset-SS", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_qcl_info_periodic_csi_rs,
+        { "QCL Info Periodic CSI RS", "l2server.qcl-info-periodic-csi-rs", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_scramblingid,
+        { "ScramblingId", "l2server.scrambling-id", FT_UINT16, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nzp_csi_rs_res_set_config,
+        { "NZP CSO RS Res Set Config", "l2server.nzp-csi-rs-res-set-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_resource_set_id,
+        { "Resource Set Id", "l2server.resource-set-id", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_repetition,
+        { "Repetition", "l2server.repetition", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_aper_trigger_offset,
+        { "Aper Trigger Offset", "l2server.aper-trigger-offset", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_trs_info,
+        { "TRS Info", "l2server.trs-info", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_aper_trigger_offset_r16,
+        { "Aper Trigger Offset r16", "l2server.aper-trigger-offset-r16", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nb_nzp_csi_rs_res_lis,
+        { "Nb NZP CSI RS Res", "l2server.nb-nzp-csi-rs-res-list", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nzp_csi_rs_res,
+        { "NZP CSI RS Res", "l2server.nb-nzp-csi-rs-res", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_csi_im_res_config,
+        { "CSI IM Res Config", "l2server.csi-im-res-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_csi_im_res_set_config,
+        { "CSI IM Res Set Config", "l2server.csi-im-res-set-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_res_set_id,
+        { "Res Set Id", "l2server.res-set-id", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_csi_im_res_list,
+        { "Nb CSI IM Res List", "l2server.nb-csi-im-res-list", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_csi_ssb_res_set_config,
+        { "CSI SSB Res Set Config", "l2server.csi-ssb-res-set-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_ssb_res_list,
+        { "CSI SSB Res List", "l2server.csi-ssb-res-list", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_csi_res_config,
+        { "CSI Res Config", "l2server.csi-res-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_res_id,
+        { "CSI Res Id", "l2server.csi-res-id", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_res_type,
+        { "CSI Res Type", "l2server.csi-res-type", FT_UINT8, BASE_DEC,
+           VALS(csi_res_type_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_rs_res_set_list_is_valid,
+        { "CSI Res Set List is Valid", "l2server.csi-res-type-list-is-valid", FT_UINT8, BASE_DEC,
+           VALS(csi_rs_res_set_list_is_valid_vals), 0x0, NULL, HFILL }},
+
+      { &hf_l2server_csi_rep_config,
+        { "CSI Report Config", "l2server.csi-rep-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_carrier,
+        { "Carrier", "l2server.carrier", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_rep_config_id,
+        { "CSI Report Config Id", "l2server.csi-rep-config-id", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_mon_pmi_port_ind,
+        { "Nb Mon PMI Port Ind", "l2server.nb-mon-pmi-port-ind", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_report_config_type_is_valid,
+        { "Report Config Type Is Valid", "l2server.report-config-type-is-valid", FT_UINT8, BASE_DEC,
+           VALS(report_config_type_is_valid_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_report_quantity_is_valid,
+        { "Report Quantity Is Valid", "l2server.report-quantity-is-valid", FT_UINT8, BASE_DEC,
+           VALS(report_quantity_is_valid_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_cri_ri_pmi_cqi,
+        { "CRI CI PCI CQI", "l2server.cri-ri-pmi-cqi", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_semipersistent_on_pucch,
+        { "Semi-persistent on PUCCH", "l2server.semi-persistent", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_codebook_config,
+        { "Codebook Config", "l2server.codebook-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_codebook_type_is_valid,
+        { "Codebook Type Is Valid", "l2server.codebook-type-is-valid", FT_UINT8, BASE_DEC,
+           VALS(codebook_type_is_valid_vals), 0x0, NULL, HFILL }},
+
+      { &hf_l2server_codebook_config_type1,
+        { "Codebook Config Type1", "l2server.codebook-config-type1", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_codebook_subtype1_is_valid,
+        { "Codebook Type1 Is Valid", "l2server.codebook-subtype1-is-valid", FT_UINT8, BASE_DEC,
+           VALS(subtype1_is_valid_vals), 0x0, NULL, HFILL }},
+
+      { &hf_l2server_codebook_config_type1_single_panel,
+        { "Single Panel", "l2server.codebook-config-type1-single-panel", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_of_ant_ports_is_valid,
+        { "Nb Of Ant Posts Is Valid", "l2server.nb-of-ant-ports-is-valid", FT_UINT8, BASE_DEC,
+           VALS(nb_of_ant_ports_is_valid_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_typei_single_panel_ri_restr,
+        { "TypeISinglePanelRiRestr", "l2server.typei-single-panel-ri-restr", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_aperiodic,
+        { "APeriodic", "l2server.aperiodic", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_rep_slow_offset_list,
+        { "Nb Rep Slow Offset List", "l2server.nb-rep-slow-offset-list", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_rep_slow_offset,
+        { "Nb Rep Slow Offset", "l2server.nb-rep-slow-offset", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_csi_report_freq_config,
+        { "Report Freq Config", "l2server.report-freq-config", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_cqi_cmd_indicator,
+        { "CQI Cmd Indicator", "l2server.qci-cmd-indicator", FT_UINT8, BASE_DEC,
+           VALS(cqi_fmt_indicator_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_pmi_cmd_indicator,
+        { "PMI Cmd Indicator", "l2server.pmi-cmd-indicator", FT_UINT8, BASE_DEC,
+           VALS(pmi_fmt_indicator_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_reporting_band_is_valid,
+        { "CSI Reporting Band is valid", "l2server.csi-reporting-band-is-valid", FT_UINT8, BASE_DEC,
+           VALS(csi_reporting_band_id_valid_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_reporting_band,
+        { "CSI Reporting Band", "l2server.csi-reporting-band", FT_INT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ul_am_cnf_frame,
+        { "CNF Frame", "l2server.ul-am-cnf-frame", FT_FRAMENUM, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_am_req_frame,
+        { "REQ Frame", "l2server.ul-am-req-frame", FT_FRAMENUM, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ul_am_req_time_delta,
+        { "Time since REQ (ms)", "l2server.ul-am-req-time-delta", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nzp_csi_rs_res_to_del,
+        { "NZP CSI RS Resource to delete", "l2server.nzp-csi-rs-res-to-del", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nzp_csi_rs_res_set_to_del,
+        { "NZP CSI RS Resource Set to delete", "l2server.nzp-csi-rs-res-set-to-del", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_im_res_to_del,
+        { "CSI IM Resource to delete", "l2server.csi-im-res-to-del", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_im_res_set_to_del,
+        { "CSI IM Resource Set to delete", "l2server.csi-im-res-set-to-del", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_ssb_res_set_to_del,
+        { "CSI SSB Resource Set to delete", "l2server.csi-ssb-res-set-to-del", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_res_cfg_to_del,
+        { "CSI Res Config to delete", "l2server.csi-res-cfg-to-del", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_rep_cfg_to_del,
+        { "CSI Rep Config to delete", "l2server.csi-rep-cfg-to-del", FT_UINT32, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_control_res_set,
+        { "Control Res Set", "l2server.control-res-set", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_control_res_set_id,
+        { "Control Res Set Id", "l2server.control-res-set-id", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_control_res_set_duration,
+        { "Control Res Set Duration", "l2server.control-res-set-duration", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_prec_granualarity,
+        { "Prec Granularity", "l2server.prec-granularity", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_cce_reg_map_type,
+        { "CCE Reg Map Type", "l2server.cce-reg-map-type", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_reg_bundle_size,
+        { "Reg Bundle Size", "l2server.reg-bundle-size", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_interleave_size,
+        { "Interleave Size", "l2server.interleave-size", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_shift_index,
+        { "Shift Index", "l2server.shift-index", FT_INT16, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_freq_dom_res,
+        { "Freq Dom Res", "l2server.freq-dom-res", FT_UINT64, BASE_HEX,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_search_space,
+        { "Search Space", "l2server.search-space", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_search_space_id,
+        { "Search Space Id", "l2server.search-space-id", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_n1n2,
+        { "NIN2", "l2server.n1n2", FT_BYTES, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_scellindex,
+        { "SCellIndex", "l2server.scellindex", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_lsucellid,
+        { "LsuCellId", "l2server.lsucellid", FT_UINT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_scs_spec_carrier,
+        { "SCS Spec Carrier", "l2server.scs_spec_carrier", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_k0,
+        { "K0", "l2server.k0", FT_INT8, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_offset_to_carrier,
+        { "Offset to carrier", "l2server.offset-to-carrier", FT_UINT16, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_carrier_bandwidth,
+        { "Carrier Bandwidth", "l2server.carrier-bandwidth", FT_UINT16, BASE_DEC,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pdcch_dmrs_scrambling_id,
+       { "PDCCH DMRS Scrambling Id", "l2server.pdcch-dmrs-scrambling-id", FT_UINT16, BASE_DEC,
+          NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pdcch_dmrs_scrambling_id_is_valid,
+       { "PDCCH DMRS Scrambling Id is valid", "l2server.pdcch-dmrs-scrambling-id-is-valid", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_tci_present_in_dci,
+       { "TCI Present in DCI", "l2server.tci-present-in-dci", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_tci_states,
+       { "Nb TCI States", "l2server.nb-tci-states", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_tci_state,
+       { "TCI State", "l2server.tci-state", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_monitor_symbs_in_slot,
+       { "Monitor Symbols in slot", "l2server.monitor-symbols-in-slot", FT_UINT16, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_monitor_slot_is_valid,
+       { "Monitor Slot is valid", "l2server.monitor-slot-is-valid", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_search_space_type_is_valid,
+       { "Search Space type is valid", "l2server.search-space-type-is-valid", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_monitor_slot,
+       { "Monitor Slot", "l2server.monitor-slot", FT_UINT16, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_agg_lev1,
+       { "Agg Level 1", "l2server.agg-level-1", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_agg_lev2,
+       { "Agg Level 2", "l2server.agg-level-2", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_agg_lev4,
+       { "Agg Level 4", "l2server.agg-level-4", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_agg_lev8,
+       { "Agg Level 8", "l2server.agg-level-8", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_agg_lev16,
+       { "Agg Level 16", "l2server.agg-level-16", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ccs_ext,
+        { "Common Search Spaces Ext r16", "l2server.common-search-spaces-ext-r16", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_nb_pdsch_alloc,
+       { "Nb PDSCH Alloc", "l2server.nb-pdsch-alloc", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_zp_csi_rs_resource_to_add,
+       { "Nb Zp CSI RS Resource to add", "l2server.nb-zp-csi-rs-resource-to-add", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pdsch_alloc,
+        { "PDSSCH Alloc", "l2server.pdsch-alloc", FT_STRING, BASE_NONE,
+           NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_mapping_type,
+       { "Mapping Type", "l2server.mapping-type", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_start_sym_and_len,
+       { "Start Symbol and length", "l2server.start-sym-and-len", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_add_spectrum_emission,
+       { "Add Spectrum Emission", "l2server.add-spectrum-emission", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_freq_shift_7p5khz,
+       { "Freq Shift 7p5khz", "l2server.freq-shift-7p5khz", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pmax,
+       { "Pmax", "l2server.pmax", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_freq_band,
+       { "Freq Band", "l2server.freq-band", FT_UINT16, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_genbwp,
+       { "GenBwp", "l2server.genbwp", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_loc_and_bw,
+       { "LocAndBw", "l2server.loc-and-bw", FT_UINT16, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_cyclic_prefix,
+       { "CyclicPrefix", "l2server.cyclic-prefix", FT_INT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_pusch_common,
+       { "PUSCH Common", "l2server.pusch-common", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_group_hop_enabled_transf_precoding,
+       { "Group Hopping enabled for Transform Precoding", "l2server.group-hop-enabled-transf-precoding", FT_INT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_msg3_delta_preamble,
+       { "Msg3 Delta Preamble", "l2server.msg3-delta-preamble", FT_INT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_p0_nom_with_grant,
+       { "P0 Nom With Grant", "l2server.p0-nom-with-grant", FT_UINT16, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_pusch_time_dom_res_alloc,
+       { "Nb PUSCH Time Domain Res Alloc", "l2server.nb-pusch-time-dom-res-alloc", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_pusch_time_domain_res_alloc,
+       { "PUSCH TimeDomainResAlloc", "l2server.pusch-time-domain-res-alloc", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_k2,
+       { "K2", "l2server.k2", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_pucch_common,
+       { "PUCCH Common", "l2server.pucch-common", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pucch_res_common,
+       { "PUCCH Res Common", "l2server.pucch-res-common", FT_INT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pucch_group_hop,
+       { "PUCCH Group Hop", "l2server.pucch-group-hop", FT_INT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_pucch_hopping_id,
+       { "PUCCH Hopping Id", "l2server.pucch-hopping-id", FT_UINT16, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_p0_nom,
+       { "P0-nom", "l2server.p0-nom", FT_UINT16, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_ref_sub_car_spacing,
+       { "Ref Sub Carrier Spacing", "l2server.ref-sub-car-spacing", FT_INT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_skip_uplink_tx_dynamic,
+       { "Skip Uplink Tx Dynamic", "l2server.skip-uplink-tx-dynamic", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_ho_flag,
+       { "HO Flag", "l2server.ho-flag", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_data_inactivity_timer,
+       { "Data Inactivity Timer", "l2server.data-inactivity-timer", FT_INT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_sr_config,
+       { "SR Config", "l2server.sr-config", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_n_sr_to_add,
+       { "SRs to add", "l2server.n-sr-to-add", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sr,
+       { "SR", "l2server.sr", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sr_config_index,
+       { "SR Config Index", "l2server.sr-config-index", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sr_prohibit_timer,
+       { "SR Prohibit Timer", "l2server.sr-prohibit-timer", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sr_transmax,
+       { "SR TransMax", "l2server.sr-transmax", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_n_sr_to_del,
+       { "SRs to del", "l2server.n-sr-to-del", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sr_to_del,
+       { "SR to del", "l2server.sr-to-del", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_bsr_config,
+       { "BSR Config", "l2server.bsr-config", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_periodicbsr_timer,
+       { "Periodic BSR Timer", "l2server.periodicbsr-timer", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_retxbsr_timer,
+       { "Retx BSR Timer", "l2server.retxbsr-timer", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_logicalchannelsr_delaytimer,
+       { "LogicalChannel SR Timer", "l2server.logicalchannelsr-delaytimer", FT_INT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_tag_config,
+       { "TAG Config", "l2server.tag-config", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_time_alignment_timer,
+       { "Time Alignment Timer", "l2server.time-alignment-timer", FT_INT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_phr_config,
+       { "PHR Config", "l2server.phr-config", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_phr_periodic_timer,
+       { "PHR PeriodicTimer", "l2server.phr-periodic-timer", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_phr_prohibit_timer,
+       { "PHR ProhibitTimer", "l2server.phr-prohibit-timer", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_phr_tx_power_factor_change,
+       { "PHR Tx Power Factor Change", "l2server.phr-tx-power-factor-change", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_phr_multiple_phr,
+       { "PHR MultiplePHR", "l2server.phr-multiple-phr", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_phr_type2_spcell,
+       { "PHR Type2 SpCell", "l2server.phr-typ2-spcell", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_phr_type2_othercell,
+       { "PHR Type2 Other Cell", "l2server.phr-type2-other-cell", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_phr_mode_other_cg,
+       { "PHR Mode Other Cg", "l2server.phr-mode-other-cg", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_pdcch_conf_dedicated,
+       { "PDCCH Config Dedicated", "l2server.pdcch-config-dedicated", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_ded_ctrl_res_sets_to_add,
+       { "Nb Dedicated Resource Sets to add", "l2server.nb-ded-ctrl-res-sets-to-add", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_ded_ctrl_res_sets_to_del,
+       { "Nb Dedicated Resource Sets to del", "l2server.nb-ded-ctrl-res-sets-to-adel", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_ded_search_spaces_to_add,
+       { "Nb Dedicated Search Spaces to add", "l2server.nb-ded-search-spaces-to-add", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_ded_search_spaces_to_del,
+       { "Nb Dedicated Search Spaces to del", "l2server.nb-ded-search-spaces-to-del", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_pdsch_conf_dedicated,
+       { "PDSCH Config Dedicated", "l2server.pdsch-config-dedicated", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_data_scr_identity,
+       { "Data Scr Identity", "l2server.data-scr-identity", FT_INT16, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      // TODO: VALS()
+      { &hf_l2server_vrb_to_prb_interl,
+       { "Vrb to Prb Interl", "l2server.vrb-to-prb-interl", FT_INT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_res_alloc_scope,
+       { "Res Alloc Scope", "l2server.res-alloc-scope", FT_INT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_aggregation_factor,
+       { "Aggregation Factor", "l2server.aggregation-factor", FT_INT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      // TODO: VALS()
+      { &hf_l2server_rbg_size,
+       { "RBG Size", "l2server.rbg-size", FT_INT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_mcs_table,
+       { "MCS Table", "l2server.mcs-table", FT_INT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_max_cw_sched_by_dci,
+       { "Max Cw Sched By DCI", "l2server.max-cw-sched-by-dci", FT_INT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_tci_states_to_add,
+       { "Nb TCI States to add", "l2server.nb-tci-states-to-add", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_uplink_ded_pucch_config,
+       { "Uplink Ded PUCCH", "l2server.uplink-ded-pucch", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_uplink_ded_pucch_len,
+       { "Len", "l2server.uplink-ded-pucch.len", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_sched_req_res_config_to_add,
+       { "Nb Sched Req Res Config To Add", "l2server.nb-sched-req-res-config-to-add", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_sched_req_res_config_to_del,
+       { "Nb Sched Req Res Config To Del", "l2server.nb-sched-req-res-config-to-del", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nb_resource_ded_to_add,
+       { "Nb Resource Ded To Add", "l2server.nb-resource-ded-to-add", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_uplink_ded_pusch_config,
+       { "Uplink Ded PUSCH", "l2server.uplink-ded-pusch", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_uplink_ded_pusch_len,
+       { "Len", "l2server.uplink-ded-pusch.len", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_sr_resource,
+       { "SR Resource Cfg", "l2server.sr-resource", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sr_resource_len,
+       { "Len", "l2server.sr-resource.len", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sr_resource_id,
+       { "SR Resource Id", "l2server.sr-resource-id", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sr_id,
+       { "SR Id", "l2server.sr-id", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_sr_period_and_offset_is_valid,
+       { "SR Period and offset is valid", "l2server.sr-period-and-offset-is-valid", FT_UINT8, BASE_DEC,
+         VALS(sr_period_and_offset_is_valid_vals), 0x0, NULL, HFILL }},
+      { &hf_l2server_sr_period_and_offset,
+       { "SR Period and offset", "l2server.sr-period-and-offset", FT_UINT16, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_bindump_version,
+       { "Version", "l2server.bindump-version", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_bindump_event_dl,
+       { "Bindump Event DL", "l2server.bindump-event-dl", FT_UINT64, BASE_HEX,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_bindump_event_ul,
+       { "Bindump Event UL", "l2server.bindump-event-ul", FT_UINT64, BASE_HEX,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_csi_meas_cfg,
+       { "CSI Meas Cfg", "l2server.csi-meas-config", FT_STRING, BASE_NONE,
+         NULL, 0x0, "nr5g_rlcmac_Cmac_CSI_MEAS_CFGt", HFILL }},
+      { &hf_l2server_csi_meas_cfg_len,
+       { "Len", "l2server.csi-meas-config.len", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_sps_conf_dedicated,
+       { "SPS Config Dedicated", "l2server.sps-config-dedicated", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_dbeam,
+       { "Dbeam", "l2server.dbeam", FT_STRING, BASE_NONE,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_getinfo_type,
+       { "Type", "l2server.getinfo-type", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_getinfo_flags,
+       { "Flags", "l2server.getinfo-flags", FT_UINT32, BASE_HEX,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_getinfo_nos,
+       { "NOs", "l2server.getinfo-nos", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_getinfo_info,
+       { "Info", "l2server.getinfo-info", FT_UINT16, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_aper_trigger_state_config,
+       { "Aperiodic Trigger State Config", "l2server.aperiodic-trigger-state-config", FT_STRING, BASE_NONE,
+         NULL, 0x0, "bb_nr5g_CSI_APERIODIC_TRIGGER_STATE_CFGt", HFILL }},
+      { &hf_l2server_nb_ass_rep_cf_info_list,
+       { "Nb Ass Rep Cf Info List", "l2server.nb-ass-rep-cf-info-list", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_csi_associated_report_cfg,
+       { "CSI Associated Report Cfg", "l2server.csi-associated-report-cfg", FT_STRING, BASE_NONE,
+         NULL, 0x0, "bb_nr5g_CSI_ASSOCIATED_REPORT_CFG_INFOt", HFILL }},
+      { &hf_l2server_rep_cfg_id,
+       { "Rep Cfg Id", "l2server.rep-cfg-id", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_csi_im_res_for_interference,
+       { "CSI IM Res For Interference", "l2server.csi-im-res-for-interference", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nzp_csi_rs_res_for_interference,
+       { "NZP CSI Rs Res For Interference", "l2server.nzp-csi-rs-res-for-interference", FT_UINT8, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_code,
+       { "Code", "l2server.code", FT_UINT16, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_version_hash,
+       { "Version Hash", "l2server.version-hash", FT_UINT32, BASE_HEX,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_rlcbuffer,
+       { "RlcBuffer", "l2server.rlcbuffer", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_rlcstatus,
+       { "RlcStatus", "l2server.rlcstatus", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_nrcurrentrate,
+       { "NrCurrentRate", "l2server.nr-currentrate", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_dmrs_typea_setup_present,
+       { "DMRS TypeA Setup Present", "l2server.dmrs-typea-setup-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_DMRS_TYPEA_SETUP, NULL, HFILL }},
+      { &hf_l2server_dmrs_typea_release_present,
+       { "DMRS TypeA Release Present", "l2server.dmrs-typea-release-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_DMRS_TYPEA_RELEASE, NULL, HFILL }},
+      { &hf_l2server_dmrs_typeb_setup_present,
+       { "DMRS TypeB Setup Present", "l2server.dmrs-typeb-setup-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_DMRS_TYPEB_SETUP, NULL, HFILL }},
+      { &hf_l2server_dmrs_typeb_release_present,
+       { "DMRS TypeB Release Present", "l2server.dmrs-typeb-release-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_DMRS_TYPEB_RELEASE, NULL, HFILL }},
+      { &hf_l2server_p_zp_csi_rs_resource_set_setup_present,
+       { "P ZP RS Resource Set Setup Present", "l2server.p-zp-csi-rs-resource-setup-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_P_ZP_CSI_RS_RESOURCE_SET_SETUP, NULL, HFILL }},
+      { &hf_l2server_p_zp_csi_rs_resource_set_release_present,
+       { "P ZP RS Resource Set Release Present", "l2server.p-zp-csi-rs-resource-release-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_P_ZP_CSI_RS_RESOURCE_SET_RELEASE, NULL, HFILL }},
+      { &hf_l2server_r16_ies_present,
+       { "R16 IEs Present", "l2server.r17-ies-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_PDSCH_CONF_DEDICATED_R16_IES_PRESENT, NULL, HFILL }},
+      { &hf_l2server_timedomainresalloc_setup_present,
+       { "TimeDomainResAlloc Setup Present", "l2server.timedomainresalloc-setup-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_PDSCH_CONF_TIMEDOMAINRESALLOC_SETUP, NULL, HFILL }},
+      { &hf_l2server_timedomainresalloc_release_present,
+       { "TimeDomainResAlloc Release Present", "l2server.timedomainresalloc-release-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_PDSCH_CONF_TIMEDOMAINRESALLOC_RELEASE, NULL, HFILL }},
+
+      { &hf_l2server_dmrs_mapping,
+       { "DMRS Mapping", "l2server.dmrs-mapping", FT_STRING, FT_NONE,
+         NULL, 0X0, NULL, HFILL }},
+      { &hf_l2server_p_zp_csi_rs_set,
+       { "PZpCsiRsSet", "l2server.p-zp-csi-rs-set", FT_STRING, FT_NONE,
+         NULL, 0X0, NULL, HFILL }},
+      { &hf_l2server_tci_state_to_add,
+       { "TCI State to add", "l2server.tci-state-to-add", FT_STRING, FT_NONE,
+         NULL, 0X0, NULL, HFILL }},
+
+      { &hf_l2server_orig_cellid,
+       { "OrigCellId", "l2server.orig-cellid", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+      { &hf_l2server_targ_cellid,
+       { "TargCellId", "l2server.target-cellid", FT_UINT32, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_err,
+       { "Err", "l2server.err", FT_INT16, BASE_DEC,
+         NULL, 0x0, NULL, HFILL }},
+
+      { &hf_l2server_si_sched_info,
+       { "SI Scheduling Info", "l2server.si-scheduling-info", FT_STRING, FT_NONE,
+         NULL, 0X0, NULL, HFILL }},
+
+      { &hf_l2server_bwp_dl_common_pdcch_setup_present,
+       { "PDCCH Setup", "l2server.dl-common-pdcch.setup", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDCCH_CFG_SETUP, NULL, HFILL }},
+      { &hf_l2server_bwp_dl_common_pdcch_release_present,
+       { "PDCCH Release", "l2server.dl-common-pdcch.release", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDCCH_CFG_RELEASE, NULL, HFILL }},
+      { &hf_l2server_bwp_dl_common_pdsch_setup_present,
+       { "PDSCH Setup", "l2server.dl-common-pdsch.setup", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDSCH_CFG_SETUP, NULL, HFILL }},
+      { &hf_l2server_bwp_dl_common_pdsch_release_present,
+       { "PDSCH Release", "l2server.dl-common-pdsch.release", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_DOWNLINK_COMMON_PDSCH_CFG_RELEASE, NULL, HFILL }},
+
+      { &hf_l2server_bwp_ul_common_rach_setup_present,
+       { "RACH Setup", "l2server.ul-common-rach.setup", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_UPLINK_COMMON_RACH_CFG_SETUP, NULL, HFILL }},
+      { &hf_l2server_bwp_ul_common_rach_release_present,
+       { "RACH Release", "l2server.ul-common-rach.release", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_UPLINK_COMMON_RACH_CFG_RELEASE, NULL, HFILL }},
+
+      { &hf_l2server_bwp_ul_common_pusch_setup_present,
+       { "PUSCH Setup", "l2server.ul-common-pusch.setup", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_UPLINK_COMMON_PUSCH_CFG_SETUP, NULL, HFILL }},
+      { &hf_l2server_bwp_ul_common_pusch_release_present,
+       { "PUSCH Release", "l2server.ul-common-pusch.release", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_UPLINK_COMMON_PUSCH_CFG_RELEASE, NULL, HFILL }},
+
+      { &hf_l2server_bwp_ul_common_pucch_setup_present,
+       { "PUCCH Setup", "l2server.ul-common-pucch.setup", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_UPLINK_COMMON_PUCCH_CFG_SETUP, NULL, HFILL }},
+      { &hf_l2server_bwp_ul_common_pucch_release_present,
+       { "PUCCH Release", "l2server.ul-common-pucch.release", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_BWP_UPLINK_COMMON_PUCCH_CFG_RELEASE, NULL, HFILL }},
+
+      { &hf_l2server_tdd_ul_dl_pattern1_present,
+       { "Pattern1 present", "l2server.tdd-ul-dl.pattern1-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_TDD_UL_DL_CONFIG_COMMON_PATT1_PRESENT, NULL, HFILL }},
+      { &hf_l2server_tdd_ul_dl_pattern2_present,
+       { "Pattern2 present", "l2server.tdd-ul-dl.pattern2-present", FT_BOOLEAN, 32,
+         NULL, bb_nr5g_STRUCT_TDD_UL_DL_CONFIG_COMMON_PATT2_PRESENT, NULL, HFILL }},
+
+      { &hf_l2server_codebook_config_type1_two_ports,
+       { "Two POrts", "l2server.codebook-config-type1-two-ports", FT_STRING, FT_NONE,
+         NULL, 0X0, NULL, HFILL }},
+    };
+
+    static gint *ett[] = {
+        &ett_l2server,
+        &ett_l2server_header,
+        &ett_l2server_nr5gid,
+        &ett_l2server_ra_info,
+        &ett_l2server_params,
+        &ett_l2server_l2_cell_dedicated_config,
+        &ett_l2server_l1_cell_dedicated_config,
+        &ett_l2server_rb_config,
+        &ett_l2server_rb_release,
+        &ett_l2server_rlc_config_tx,
+        &ett_l2server_rlc_config_rx,
+        &ett_l2server_ph_cell_config,
+        &ett_l2server_sp_cell_cfg_ded,
+        &ett_l2server_sp_cell_cfg_common,
+        &ett_l2server_rx_lch_info,
+        &ett_l2server_tx_lch_info,
+        &ett_l2server_drx_config,
+        &ett_l2server_mac_cell_group_config,
+        &ett_l2server_spcell_config_ded,
+        &ett_l2server_sp_cell_cfg_tdd,
+        &ett_l2server_sp_cell_cfg_dl,
+        &ett_l2server_sp_cell_cfg_ul,
+        &ett_l2server_sp_cell_cfg_sup_ul,
+        &ett_l2server_sp_cell_cfg_cross_carrier_sched,
+        &ett_l2server_sp_cell_cfg_lte_crs_tomatcharound,
+        &ett_l2server_sp_cell_cfg_dormantbwp,
+        &ett_l2server_sp_cell_cfg_lte_crs_pattern_list1,
+        &ett_l2server_sp_cell_cfg_lte_crs_pattern_list2,
+        &ett_l2server_cell_config_cellcfg,
+        &ett_l2server_ul_ded_config,
+        &ett_l2server_initial_ul_bwp,
+        &ett_l2server_ul_bwp,
+        &ett_l2server_ul_bwp_common,
+        &ett_l2server_ul_bwp_common_pdcch,
+        &ett_l2server_ul_bwp_dedicated,
+        &ett_l2server_bwp_common_pdsch,
+        &ett_l2server_rach_common,
+        &ett_l2server_rach_generic,
+        &ett_l2server_freq_info_dl,
+        &ett_l2server_bwp_dl_common,
+        &ett_l2server_freq_info_ul_common,
+        &ett_l2server_bwp_ul_common,
+        &ett_l2server_freq_info_sul_common,
+        &ett_l2server_bwp_sul_common,
+        &ett_l2server_tdd_common,
+        &ett_l2server_mac_config,
+        &ett_l2server_bwp_dl_dedicated,
+        &ett_l2server_pdsch_serving_cell,
+        &ett_l2server_pdcch_serving_cell,
+        &ett_l2server_csi_meas_config,
+        &ett_l2server_nzp_csi_rs_res_config,
+        &ett_l2server_nzp_csi_rs_res_set_config,
+        &ett_l2server_csi_im_res_config,
+        &ett_l2server_csi_im_res_set_config,
+        &ett_l2server_csi_ssb_res_set_config,
+        &ett_l2server_csi_res_config,
+        &ett_l2server_csi_rep_config,
+        &ett_l2server_semipersistent_on_pucch,
+        &ett_l2server_codebook_config,
+        &ett_l2server_codebook_config_type1,
+        &ett_l2server_codebook_config_type1_single_panel,
+        &ett_l2server_aperiodic,
+        &ett_l2server_csi_report_freq_config,
+        &ett_l2server_control_res_set,
+        &ett_l2server_search_space,
+        &ett_l2server_scell_list,
+        &ett_l2server_scell,
+        &ett_l2server_scs_spec_carrier,
+        &ett_l2server_ccs_ext,
+        &ett_l2server_pdsch_alloc,
+        &ett_l2server_genbwp,
+        &ett_l2server_pusch_common,
+        &ett_l2server_pusch_time_domain_res_alloc,
+        &ett_l2server_pucch_common,
+        &ett_l2server_sr_config,
+        &ett_l2server_sr,
+        &ett_l2server_bsr_config,
+        &ett_l2server_tag_config,
+        &ett_l2server_phr_config,
+        &ett_l2server_tdd_ul_dl_pattern,
+        &ett_l2server_spcell_config,
+        &ett_l2server_group_b_configured,
+        &ett_l2server_pdcch_conf_dedicated,
+        &ett_l2server_pdsch_conf_dedicated,
+        &ett_l2server_uplink_ded_pucch_config,
+        &ett_l2server_uplink_ded_pusch_config,
+        &ett_l2server_sr_resource,
+        &ett_l2server_csi_meas_cfg,
+        &ett_l2server_sps_conf_dedicated,
+        &ett_l2server_dbeam,
+        &ett_l2server_aper_trigger_stateconfig,
+        &ett_l2server_csi_associated_report_cfg,
+        &ett_l2server_dmrs_mapping,
+        &ett_l2server_p_zp_csi_rs_set,
+        &ett_l2server_si_sched_info,
+        //&ett_l2server_bwp_dl_common,
+        &ett_l2server_codebook_config_type1_two_ports
+    };
+
+    static ei_register_info ei[] = {
+        { &ei_l2server_sapi_unknown, { "l2server.sapi-unknown", PI_UNDECODED, PI_WARN, "Unknown SAPI", EXPFILL }},
+        { &ei_l2server_type_unknown, { "l2server.type-unknown", PI_UNDECODED, PI_WARN, "Unknown Type for SAPI", EXPFILL }},
+        { &ei_l2server_ul_no_cnf,    { "l2server.ul-no-cnf", PI_SEQUENCE, PI_WARN, "No CNF for UL AM PDU", EXPFILL }},
+        { &ei_l2server_ul_no_req,    { "l2server.ul-no-req", PI_SEQUENCE, PI_WARN, "No REQ for UL AM PDU CNF", EXPFILL }},
+    };
+
+    module_t *l2server_module;
+    expert_module_t* expert_l2server;
+
+    proto_l2server = proto_register_protocol("L2Server", "L2Server", "l2server");
+    proto_register_field_array(proto_l2server, hf, array_length(hf));
+    proto_register_subtree_array(ett, array_length(ett));
+    expert_l2server = expert_register_protocol(proto_l2server);
+    expert_register_field_array(expert_l2server, ei, array_length(ei));
+
+    l2server_message_handle = register_dissector("l2server-message", dissect_l2server_message, proto_l2server);
+    l2server_handle = register_dissector("l2server", dissect_l2server, proto_l2server);
+
+    /* Preferences */
+    l2server_module = prefs_register_protocol(proto_l2server, NULL);
+
+    prefs_register_bool_preference(l2server_module, "call_pdcp_drbs", "Call PDCP for DRBs",
+        "",
+        &global_call_pdcp_for_drb);
+
+    prefs_register_bool_preference(l2server_module, "call_pdcp_srbs", "Call PDCP for SRBs",
+        "",
+        &global_call_pdcp_for_srb);
+
+    prefs_register_bool_preference(l2server_module, "call_pdcp_tm", "Call PDCP for TM PDUs",
+        "",
+        &global_call_pdcp_for_tm);
+
+    prefs_register_enum_preference(l2server_module, "sn_bits_for_drb",
+        "PDCP SN bits for DRB PDUs",
+        "",
+        &global_pdcp_drb_sn_length, pdcp_drb_col_vals, FALSE);
+
+    ul_req_table = wmem_map_new_autoreset(wmem_epan_scope(), wmem_file_scope(), g_direct_hash, g_direct_equal);
+    ul_cnf_table = wmem_map_new_autoreset(wmem_epan_scope(), wmem_file_scope(), g_direct_hash, g_direct_equal);
+}
+
+static void
+apply_l2server_prefs(void)
+{
+    global_l2server_port_range = prefs_get_range_value("l2server", "tcp.port");
+}
+
+void
+proto_reg_handoff_l2server(void)
+{
+    dissector_add_uint_range_with_preference("tcp.port", "4000", l2server_handle);
+    apply_l2server_prefs();
+
+    pdcp_nr_handle = find_dissector("pdcp-nr");
+}
+
+/*
+ * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
+ *
+ * Local variables:
+ * c-basic-offset: 4
+ * tab-width: 8
+ * indent-tabs-mode: nil
+ * End:
+ *
+ * vi: set shiftwidth=4 tabstop=8 expandtab:
+ * :indentSize=4:tabSize=8:noTabs=true:
+ */

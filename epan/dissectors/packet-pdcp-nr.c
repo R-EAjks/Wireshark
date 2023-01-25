@@ -24,6 +24,12 @@
 /* Define these symbols if you have working implementations of SNOW3G/ZUC f8() and f9() available.
    Note that the use of these algorithms is restricted, so a version of Wireshark with these
    ciphering algorithms enabled would not be distributable. */
+#include "snow3g_algorithm.h"
+#define HAVE_SNOW3G
+
+#include "zuc_algorithm.h"
+#define HAVE_ZUC
+
 /* #define HAVE_SNOW3G */
 /* #define HAVE_ZUC */
 
@@ -1296,7 +1302,7 @@ static void show_pdcp_config(packet_info *pinfo, tvbuff_t *tvb, proto_tree *tree
     proto_tree *configuration_tree;
     proto_item *configuration_ti = proto_tree_add_item(tree,
                                                        hf_pdcp_nr_configuration,
-                                                       tvb, 0, 0, ENC_ASCII);
+                                                       tvb, 0, 0, ENC_ASCII|ENC_NA);
     configuration_tree = proto_item_add_subtree(configuration_ti, ett_pdcp_configuration);
 
     /* Direction */

@@ -756,6 +756,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ax25-kiss.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ax25-nol3.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ax4000.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-axe-rpc.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ayiya.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-babel.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-bacapp.c
@@ -987,6 +988,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-distcc.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-discard.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-dji-uav.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-dlblock.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-dlep.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-dlm3.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-dlsw.c
@@ -1053,6 +1055,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-elasticsearch.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-elcom.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-elmi.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-elsucopy.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-enc.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-enip.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-enrp.c
@@ -1288,6 +1291,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-infiniband_sdp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-interlink.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ip.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-ip-udp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ipars.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ipdc.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ipdr.c
@@ -1373,6 +1377,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-kpasswd.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-kt.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-l1-events.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-l2server.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-l2tp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-lacp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-lanforge.c
@@ -1624,6 +1629,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ouch.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-p_mul.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-pa-hbbackup.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-pacs.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-pathport.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-packetbb.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-packetlogger.c
@@ -1638,8 +1644,10 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-pcomtcp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-pcp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-pdc.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-pdcp-gtpu.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-pdcp-lte.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-pdcp-nr.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-pdcp-uu.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-pdu-transport.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-peap.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-peekremote.c
@@ -1900,6 +1908,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-telkonet.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-telnet.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-teredo.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-textlogger.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-text-media.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-tfp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-tftp.c
@@ -1911,6 +1920,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-tivoconnect.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-tls-utils.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-tls.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-tlv.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-tn3270.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-tn5250.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-tnef.c
@@ -1943,6 +1953,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ucp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-udld.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-udp.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-udp_stateless_peer.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-udpcp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-uds.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-udt.c
@@ -1950,6 +1961,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-uftp4.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-uftp5.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-uhd.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-ulgrant.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-uma.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-umts_fp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-umts_mac.c
@@ -2084,6 +2096,8 @@ set(DISSECTOR_SUPPORT_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/errno.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-dcerpc-nt.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-snort-config.c
+	${CMAKE_CURRENT_SOURCE_DIR}/snow3g_algorithm.c
+	${CMAKE_CURRENT_SOURCE_DIR}/zuc_algorithm.c
 	${CMAKE_CURRENT_SOURCE_DIR}/usb.c
 	${CUSTOM_DISSECTOR_SUPPORT_SRC}
 )
