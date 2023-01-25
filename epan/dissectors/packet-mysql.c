@@ -1149,8 +1149,6 @@ static int hf_mysql_pubkey = -1;
 static int hf_mysql_compressed_packet_length = -1;
 static int hf_mysql_compressed_packet_length_uncompressed = -1;
 static int hf_mysql_compressed_packet_number = -1;
-static int hf_mysql_prefix = -1;
-static int hf_mysql_length = -1;
 //static int hf_mariadb_fld_charsetnr = -1;
 static int hf_mariadb_server_language = -1;
 static int hf_mariadb_charset = -1;
@@ -2083,6 +2081,12 @@ mysql_dissect_request(tvbuff_t *tvb,packet_info *pinfo, int offset, proto_tree *
 					offset = mysql_field_add_lestring(tvb, offset, query_attrs_tree, hf_mysql_query_attribute_value);
 				}
 			}
+		} else if ((conn_data->clnt_caps_ext == 0) && (conn_data->srv_caps_ext == 0)){
+			// No server/client capabilities, probably in the middle of a conversation
+			// As the query isn't likely to start with 0x00 this probably means these are
+			// query attributes we need to skip
+			if (tvb_get_guint8(tvb, offset) == 0)
+				offset += 2;
 		}
 		lenstr = my_tvb_strsize(tvb, offset);
 		proto_tree_add_item(req_tree, hf_mysql_query, tvb, offset, lenstr, ENC_ASCII);
@@ -2843,7 +2847,8 @@ mysql_dissect_ok_packet(tvbuff_t *tvb, packet_info *pinfo, int offset,
 		offset = mysql_dissect_server_status(tvb, offset, tree, &server_status);
 
 		/* 4.1+ protocol only: 2 bytes number of warnings */
-		if (conn_data->clnt_caps & conn_data->srv_caps & MYSQL_CAPS_CU) {
+		if ((conn_data->clnt_caps & conn_data->srv_caps & MYSQL_CAPS_CU)
+			|| ((conn_data->clnt_caps == 0) && (conn_data->srv_caps == 0))) {
 			proto_tree_add_item(tree, hf_mysql_num_warn, tvb, offset, 2, ENC_LITTLE_ENDIAN);
 			lenstr = tvb_get_ntohs(tvb, offset);
 			offset += 2;
@@ -2880,6 +2885,12 @@ mysql_dissect_ok_packet(tvbuff_t *tvb, packet_info *pinfo, int offset,
 			}
 		}
 	} else {
+		if ((tvb_reported_length_remaining(tvb, offset) > 0)
+			&& ((conn_data->clnt_caps == 0) && (conn_data->srv_caps == 0))) {
+			// No client or server capabilities to work with, Let's try to skip over session state
+			offset += tvb_get_fle(tvb, tree, offset, &lenstr, NULL);
+		}
+
 		/* optional: message string */
 		if (tvb_reported_length_remaining(tvb, offset) > 0) {
 			if(lenstr > (guint64)tvb_reported_length_remaining(tvb, offset))
@@ -3700,18 +3711,19 @@ my_tvb_strsize(tvbuff_t *tvb, int offset)
    read FLE from packet buffer and store its value and ISNULL flag
    in caller provided variables
 
+   Docs: https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_dt_integers.html
+
  RETURN VALUE
    length of FLE
 */
 static int
-tvb_get_fle(tvbuff_t *tvb, proto_tree *tree, int offset, guint64 *res, guint8 *is_null)
+tvb_get_fle(tvbuff_t *tvb, proto_tree *tree _U_, int offset, guint64 *res, guint8 *is_null)
 {
-	guint32 prefix;
-	proto_item* ti;
-	int num_bytes, len_len;
+	guint8 prefix;
+	int num_bytes;
 	guint64 length;
 
-	ti = proto_tree_add_item_ret_uint(tree, hf_mysql_prefix, tvb, offset, 1, ENC_BIG_ENDIAN, &prefix);
+	prefix = tvb_get_guint8(tvb, offset);
 
 	if (is_null) {
 		*is_null = 0;
@@ -3723,32 +3735,27 @@ tvb_get_fle(tvbuff_t *tvb, proto_tree *tree, int offset, guint64 *res, guint8 *i
 			*res = 0;
 		if (is_null)
 			*is_null = 1;
-		proto_item_append_text(ti, "(NULL)");
 		return 1;
-	case 252:
-		proto_item_append_text(ti, " Length in following 2 bytes");
+	case 252: // 0xFC
 		num_bytes = 3;
-		len_len = 2;
 		offset++;
+		length = (guint64)tvb_get_guint16(tvb, offset, ENC_LITTLE_ENDIAN);
 		break;
-	case 253:
-		proto_item_append_text(ti, " Length in following 3 bytes");
+	case 253: // 0xFD
 		num_bytes = 4;
-		len_len = 3;
 		offset++;
+		length = (guint64)tvb_get_guint24(tvb, offset, ENC_LITTLE_ENDIAN);
 		break;
-	case 254:
-		proto_item_append_text(ti, " Length in following 8 bytes");
+	case 254: // 0xFE
 		num_bytes = 9;
-		len_len = 8;
 		offset++;
+		length = tvb_get_guint64(tvb, offset, ENC_LITTLE_ENDIAN);
 		break;
 	default:
-		len_len = 1;
 		num_bytes = 1;
+		length = tvb_get_guint8(tvb, offset);
 	}
 
-	proto_tree_add_item_ret_uint64(tree, hf_mysql_length, tvb, offset, len_len, ENC_LITTLE_ENDIAN, &length);
 	if (res) {
 		*res = length;
 	}
@@ -5153,16 +5160,6 @@ void proto_register_mysql(void)
 		{ "Row nr", "mariadb.bulk.row_nr",
 		FT_UINT32, BASE_DEC, NULL, 0x00,
 		NULL, HFILL }},
-
-		{ &hf_mysql_prefix,
-		{ "Prefix", "mariadb.prefix",
-		FT_UINT8, BASE_DEC, NULL, 0x00,
-		NULL, HFILL }},
-
-		{ &hf_mysql_length,
-		{ "Length", "mariadb.length",
-		FT_UINT64, BASE_DEC, NULL, 0x00,
-		NULL, HFILL }}
 	};
 
 	static gint *ett[]=
