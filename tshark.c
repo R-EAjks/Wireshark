@@ -34,6 +34,8 @@
 
 #include <glib.h>
 
+#include <tshark.h>
+
 #include <epan/exceptions.h>
 #include <epan/epan.h>
 
@@ -138,8 +140,11 @@
 #define LONGOPT_CAPTURE_COMMENT         LONGOPT_BASE_APPLICATION+6
 #define LONGOPT_HEXDUMP                 LONGOPT_BASE_APPLICATION+7
 #define LONGOPT_SELECTED_FRAME          LONGOPT_BASE_APPLICATION+8
+#define LONGOPT_MACHINE_READABLE        LONGOPT_BASE_APPLICATION+9
 
 capture_file cfile;
+
+gboolean machine_readable = FALSE; /* Display machine-readable values for conversation statistics */
 
 static guint32 cum_bytes;
 static frame_data ref_frame;
@@ -492,6 +497,7 @@ print_usage(FILE *output)
     fprintf(output, "                           specified protocols within the mapping file\n");
     fprintf(output, "  --temp-dir <directory>   write temporary files to this directory\n");
     fprintf(output, "                           (default: %s)\n", g_get_tmp_dir());
+    fprintf(output, "  --machine-readable       display machine-readable values for conversation statistics\n");
     fprintf(output, "\n");
 
     ws_log_print_usage(output);
@@ -817,6 +823,7 @@ main(int argc, char *argv[])
         {"capture-comment", ws_required_argument, NULL, LONGOPT_CAPTURE_COMMENT},
         {"hexdump", ws_required_argument, NULL, LONGOPT_HEXDUMP},
         {"selected-frame", ws_required_argument, NULL, LONGOPT_SELECTED_FRAME},
+        {"machine-readable", ws_no_argument, NULL, LONGOPT_MACHINE_READABLE},
         {0, 0, 0, 0}
     };
     gboolean             arg_error = FALSE;
@@ -1654,7 +1661,10 @@ main(int argc, char *argv[])
                     exit_status = INVALID_OPTION;
                     goto clean_exit;
                 }
-            break;
+                break;
+            case LONGOPT_MACHINE_READABLE: /* Display machine-readable values for conversation statistics */
+                machine_readable = TRUE;
+                break;
             default:
             case '?':        /* Bad flag - print usage message */
                 switch(ws_optopt) {
