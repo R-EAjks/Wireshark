@@ -37,6 +37,9 @@ typedef struct {
 	guint block_option;                     /* Indicates Block1 or Block2 option */
 	guint block_number;
 	guint block_mflag;
+	guint qblock_option;                     /* Indicates Q-Block1 or Q-Block2 option */
+	guint qblock_number;
+	guint qblock_mflag;
 	wmem_strbuf_t *uri_str_strbuf;		/* the maximum is 1024 > 510 = Uri-Host:255 + Uri-Path:255 x 2 */
 	wmem_strbuf_t *uri_query_strbuf;	/* the maximum is 1024 >         765 = Uri-Query:255 x 3 */
 	gboolean is_coap_for_tmf;		/* CoAP for Thread Management Framework */
