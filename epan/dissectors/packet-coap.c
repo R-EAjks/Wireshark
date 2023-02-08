@@ -117,6 +117,11 @@ static dissector_handle_t oscore_handle;
 #define COAP_OCF_VERSION_MINOR_OFFSET 				6
 #define COAP_OCF_VERSION_MAJOR_OFFSET 				11
 
+/* Macros for making Block and Q-Block related code more readable */
+#define BLOCK1_NUMBER						1
+#define BLOCK2_NUMBER						2
+#define IS_QBLOCK						true
+
 /*
  * Transaction Type
  */
@@ -1095,19 +1100,19 @@ dissect_coap_options_main(tvbuff_t *tvb, packet_info *pinfo, proto_tree *coap_tr
 		break;
 	case COAP_OPT_BLOCK2:
 		dissect_coap_opt_block(tvb, item, subtree, offset,
-		    opt_length, coinfo, dissect_hf, false, 1);
+		    opt_length, coinfo, dissect_hf, !IS_QBLOCK, BLOCK1_NUMBER);
 		break;
 	case COAP_OPT_BLOCK1:
 		dissect_coap_opt_block(tvb, item, subtree, offset,
-		    opt_length, coinfo, dissect_hf, false, 2);
+		    opt_length, coinfo, dissect_hf, !IS_QBLOCK, BLOCK2_NUMBER);
 		break;
 	case COAP_OPT_QBLOCK2:
 		dissect_coap_opt_block(tvb, item, subtree, offset,
-		    opt_length, coinfo, dissect_hf, true, 2);
+		    opt_length, coinfo, dissect_hf, IS_QBLOCK, BLOCK2_NUMBER);
 		break;
 	case COAP_OPT_QBLOCK1:
 		dissect_coap_opt_block(tvb, item, subtree, offset,
-		    opt_length, coinfo, dissect_hf, true, 1);
+		    opt_length, coinfo, dissect_hf, IS_QBLOCK, BLOCK1_NUMBER);
 		break;
 	case COAP_OPT_IF_NONE_MATCH:
 		break;
