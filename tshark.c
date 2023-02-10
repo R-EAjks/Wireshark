@@ -315,7 +315,7 @@ list_read_capture_types(void)
         num_file_types++;
     captypes = g_new(struct string_elem, num_file_types);
 
-    fprintf(stderr, "tshark: The available read file types for the \"-X read_format:\" option are:\n");
+    fprintf(stderr, "Available file types for \"-X read_format:<file_type>\" are:\n");
     for (i = 0; i < num_file_types && open_routines[i].name != NULL; i++) {
         captypes[i].sstr = open_routines[i].name;
         captypes[i].lstr = (open_routines[i].type == OPEN_INFO_MAGIC) ? magic : heuristic;
@@ -334,6 +334,18 @@ list_export_pdu_taps(void)
             export_pdu_tap_name_list = g_slist_next(export_pdu_tap_name_list)) {
         fprintf(stderr, "    %s - %s\n", (const char*)(export_pdu_tap_name_list->data), wtap_encap_description(export_pdu_tap_get_encap((const char*)export_pdu_tap_name_list->data)));
     }
+}
+
+static void
+list_extension_options(void) {
+    fprintf(stderr, "tshark's -X extension options are specified as: -X <key>:<value>\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Extension options include:\n");
+    fprintf(stderr, "    lua_script:<lua_script_filename>\n");
+    fprintf(stderr, "    lua_script<num>:<argument>\n");
+    fprintf(stderr, "    read_format:<file_type>\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "For a list of read_format: file types enter `tshark -X read_format:help`\n");
 }
 
 static void
@@ -1555,7 +1567,18 @@ main(int argc, char *argv[])
                 /* already processed; just ignore it now */
                 break;
             case 'X':
-                /* already processed; just ignore it now */
+                if (strcmp("help", ws_optarg) == 0) {
+                    list_extension_options();
+                    exit_status = EXIT_SUCCESS;
+                    goto clean_exit;
+                }
+                if (!g_str_has_prefix(ws_optarg, "lua_script") &&
+                    !g_str_has_prefix(ws_optarg, "read_format:")) {
+                    cmdarg_err("\"%s\" isn't a valid -X extension option", ws_optarg);
+                    list_extension_options();
+                    exit_status = WS_EXIT_INVALID_OPTION;
+                    goto clean_exit;
+                }
                 break;
             case 'Y':
                 dfilter = g_strdup(ws_optarg);
@@ -1658,6 +1681,9 @@ main(int argc, char *argv[])
             default:
             case '?':        /* Bad flag - print usage message */
                 switch(ws_optopt) {
+                    case 'X':
+                        list_extension_options();
+                        break;
                     case 'F':
                         list_capture_types();
                         break;
@@ -2086,10 +2112,17 @@ main(int argc, char *argv[])
         const gchar* name = ex_opt_get_next("read_format");
         in_file_type = open_info_name_to_type(name);
         if (in_file_type == WTAP_TYPE_AUTO) {
-            cmdarg_err("\"%s\" isn't a valid read file format type", name? name : "");
-            list_read_capture_types();
-            exit_status = WS_EXIT_INVALID_OPTION;
-            goto clean_exit;
+            if (name && (strcmp("help", name) == 0)) {
+                fprintf(stderr, "tshark: ");
+                list_read_capture_types();
+                exit_status = EXIT_SUCCESS;
+                goto clean_exit;
+            } else {
+                cmdarg_err("\"%s\" isn't a valid file type for the read format extension option", name ? name : "");
+                list_read_capture_types();
+                exit_status = WS_EXIT_INVALID_OPTION;
+                goto clean_exit;
+            }
         }
     }
 
