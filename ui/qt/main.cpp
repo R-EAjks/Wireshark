@@ -198,6 +198,56 @@ wireshark_cmdarg_err_cont(const char *fmt, va_list ap)
     fprintf(stderr, "\n");
 }
 
+/*
+ *  XXX: The following struct and three functions were copied
+ *  from tshark.c. Should they be somewhere else common?
+ */
+struct string_elem {
+    const char *sstr;   /* The short string */
+    const char *lstr;   /* The long string */
+};
+
+static gint
+string_compare(gconstpointer a, gconstpointer b)
+{
+    return strcmp(((const struct string_elem *)a)->sstr,
+            ((const struct string_elem *)b)->sstr);
+}
+
+static void
+string_elem_print(gpointer data)
+{
+    fprintf(stderr, "    %s - %s\n",
+            ((struct string_elem *)data)->sstr,
+            ((struct string_elem *)data)->lstr);
+}
+
+static void
+list_read_capture_types(void)
+{
+    guint               i;
+    size_t              num_file_types;
+    struct string_elem *captypes;
+    GSList             *list = NULL;
+    const char *magic = "Magic-value-based";
+    const char *heuristic = "Heuristics-based";
+
+    /* How many readable file types are there? */
+    num_file_types = 0;
+    for (i = 0; open_routines[i].name != NULL; i++)
+        num_file_types++;
+    captypes = g_new(struct string_elem, num_file_types);
+
+    fprintf(stderr, "Available file types for \"-X read_format:<file_type>\" are:\n");
+    for (i = 0; i < num_file_types && open_routines[i].name != NULL; i++) {
+        captypes[i].sstr = open_routines[i].name;
+        captypes[i].lstr = (open_routines[i].type == OPEN_INFO_MAGIC) ? magic : heuristic;
+        list = g_slist_insert_sorted(list, &captypes[i], string_compare);
+    }
+    g_slist_free_full(list, string_elem_print);
+    g_free(captypes);
+}
+
 void
 gather_wireshark_qt_compiled_info(feature_list l)
 {
@@ -805,7 +855,21 @@ int main(int argc, char *qt_argv[])
     stat_tap_iterate_tables(register_simple_stat_tables, NULL);
 
     if (ex_opt_count("read_format") > 0) {
-        in_file_type = open_info_name_to_type(ex_opt_get_next("read_format"));
+        const gchar* name = ex_opt_get_next("read_format");
+        in_file_type = open_info_name_to_type(name);
+        if (in_file_type == WTAP_TYPE_AUTO) {
+            if (name && (strcmp("help", name) == 0)) {
+                fprintf(stderr, "wireshark: ");
+                list_read_capture_types();
+                ret_val = EXIT_SUCCESS;
+                goto clean_exit;
+            } else {
+                cmdarg_err("\"%s\" isn't a valid file type for the read format extension option", name ? name : "");
+                list_read_capture_types();
+                ret_val = WS_EXIT_INVALID_OPTION;
+                goto clean_exit;
+            }
+        }
     }
 
 #ifdef DEBUG_STARTUP_TIME

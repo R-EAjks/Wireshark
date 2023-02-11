@@ -217,6 +217,20 @@ static void print_no_capture_support_error(void)
 }
 #endif
 
+static void
+list_extension_options(void)
+{
+    fprintf(stderr, "Wireshark's -X extension options are specified as: -X <key>:<value>\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Extension options include:\n");
+    fprintf(stderr, "    lua_script:<lua_script_filename>\n");
+    fprintf(stderr, "    lua_script<num>:<argument>\n");
+    fprintf(stderr, "    read_format:<file_type>\n");
+    fprintf(stderr, "    stdin_descr:<description>\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "For a list of read_format: file types enter `wireshark -X read_format:help`\n");
+}
+
 void commandline_early_options(int argc, char *argv[])
 {
     int opt;
@@ -568,7 +582,17 @@ void commandline_other_options(int argc, char *argv[], gboolean opt_reset)
                 global_commandline_info.rfilter = ws_optarg;
                 break;
             case 'X':
-                /* ext ops were already processed just ignore them this time*/
+                if (strcmp("help", ws_optarg) == 0) {
+                    list_extension_options();
+                    exit_application(0);
+                }
+                if (!g_str_has_prefix(ws_optarg, "lua_script") &&
+                    !g_str_has_prefix(ws_optarg, "read_format:") &&
+                    !g_str_has_prefix(ws_optarg, "stdin_descr:")) {
+                    cmdarg_err("\"%s\" isn't a valid -X extension option", ws_optarg);
+                    list_extension_options();
+                    exit_application(1);
+                }
                 break;
             case 'Y':
                 global_commandline_info.dfilter = ws_optarg;
@@ -620,6 +644,14 @@ void commandline_other_options(int argc, char *argv[], gboolean opt_reset)
                 break;
             default:
             case '?':        /* Bad flag - print usage message */
+                switch(ws_optopt) {
+                    case 'X':
+                        list_extension_options();
+                        exit_application(1);
+                        break;
+                    default:
+                        break;
+                }
                 arg_error = TRUE;
                 break;
             }
