@@ -38,7 +38,6 @@
 #include "packet-tls.h"
 
 void proto_register_coap(void);
-static gboolean uses_mflag(guint block_option_type, guint8 code_class);
 
 static dissector_table_t coap_tmf_media_type_dissector_table;
 static dissector_table_t media_type_dissector_table;
@@ -1313,6 +1312,13 @@ coap_frame_length(tvbuff_t *tvb, guint offset, gint *size)
 	}
 }
 
+static
+gboolean uses_mflag(guint block_option_type, guint8 code_class) {
+	/* The M bit is used in Block1 Option in a request and in Block2 Option in a response */
+	return ((block_option_type == 1) && (code_class == 0)) ||
+			((block_option_type == 2) && (code_class >= 2) && (code_class <= 5));
+}
+
 static int
 dissect_coap_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, coap_parent_protocol parent_protocol, gboolean is_coap_for_tmf)
 {
@@ -1892,13 +1898,6 @@ proto_reg_handoff_coap(void)
 	dissector_add_for_decode_as("udp.port", coap_for_tmf_handle);
 
 	oscore_handle = find_dissector("oscore");
-}
-
-static
-gboolean uses_mflag(guint block_option_type, guint8 code_class) {
-	/* The M bit is used in Block1 Option in a request and in Block2 Option in a response */
-	return ((block_option_type == 1) && (code_class == 0)) ||
-			((block_option_type == 2) && (code_class >= 2) && (code_class <= 5));
 }
 
 /*
