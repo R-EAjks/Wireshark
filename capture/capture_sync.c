@@ -620,6 +620,7 @@ sync_pipe_start(capture_options *capture_opts, GPtrArray *capture_comments,
     int i;
     guint j;
     interface_options *interface_opts;
+    int* data_pipe_fd_p = NULL;
 
     if (capture_opts->ifaces->len > 1)
         capture_opts->use_pcapng = TRUE;
@@ -865,7 +866,13 @@ sync_pipe_start(capture_options *capture_opts, GPtrArray *capture_comments,
 #endif
 #endif
 
-    if (capture_opts->save_file) {
+    capture_opts->data_pipe_fd = -1;
+    if (capture_opts->use_data_pipe) {
+        /* Tell the child process to output to stdout, and create a pipe. */
+        data_pipe_fd_p = &capture_opts->data_pipe_fd;
+        argv = sync_pipe_add_arg(argv, &argc, "-w");
+        argv = sync_pipe_add_arg(argv, &argc, "-");
+    } else if (capture_opts->save_file) {
         argv = sync_pipe_add_arg(argv, &argc, "-w");
         argv = sync_pipe_add_arg(argv, &argc, capture_opts->save_file);
     }
@@ -880,10 +887,10 @@ sync_pipe_start(capture_options *capture_opts, GPtrArray *capture_comments,
     int ret;
     gchar* msg;
 #ifdef _WIN32
-    ret = sync_pipe_open_command(argv, NULL, &sync_pipe_read_io, &cap_session->signal_pipe_write_fd,
+    ret = sync_pipe_open_command(argv, data_pipe_fd_p, &sync_pipe_read_io, &cap_session->signal_pipe_write_fd,
                                  &cap_session->fork_child, capture_opts->ifaces, &msg, update_cb);
 #else
-    ret = sync_pipe_open_command(argv, NULL, &sync_pipe_read_io, NULL,
+    ret = sync_pipe_open_command(argv, data_pipe_fd_p, &sync_pipe_read_io, NULL,
                                  &cap_session->fork_child, NULL, &msg, update_cb);
 #endif
 

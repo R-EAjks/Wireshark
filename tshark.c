@@ -221,6 +221,10 @@ static gboolean capture_input_new_file(capture_session *cap_session,
         gchar *new_file);
 static void capture_input_new_packets(capture_session *cap_session,
         int to_read);
+static gboolean capture_input_new_pipe(capture_session *cap_session,
+        gchar *new_file);
+static void capture_input_pipe_new_packets(capture_session *cap_session,
+        int to_read);
 static void capture_input_drops(capture_session *cap_session, guint32 dropped,
         const char* interface_name);
 static void capture_input_error(capture_session *cap_session,
@@ -1990,6 +1994,10 @@ main(int argc, char *argv[])
                 /* They didn't specify a "-w" flag, so we won't be saving to a
                    capture file.  Check for options that only make sense if
                    we're saving to a file. */
+                /* XXX: Why not file size? dumpcap knows how many bytes it
+                 * writes, a maximum size for a temp file or bytes written
+                 * to a pipe is a reasonable stop condition.
+                 */
                 if (global_capture_opts.has_autostop_filesize) {
                     cmdarg_err("Maximum capture file size specified, but "
                             "capture isn't being saved to a file.");
@@ -2455,6 +2463,50 @@ main(int argc, char *argv[])
         do_dissection = must_do_dissection(rfcode, dfcode, pdu_export_arg);
 
         /*
+         * We're doing a live capture.
+         *
+         * When do we want dumpcap to write to a pipe instead of to a file or
+         * files, possibly temporary? That means that the capture can't be any
+         * faster than tshark processes packets, which can mean more dropped
+         * packets, if we're doing dissection. Note that the user always has
+         * the alternative of capturing first and dissecting later.
+         *
+         * 1. We have no output file and no autostop constraints. If we do
+         * have autostop constraints it's more ambiguous; the problem of
+         * the temporary file growing without bound is addressed, and the
+         * user may want to minimize dropped packets.
+         *
+         * 2. We're writing multiple output files, in ring buffer mode, and
+         * doing dissection, so tshark needs to actually read each file. We
+         * want to avoid dumpcap erasing files before tshark can read them
+         * (#1650), without violating our ring buffer constraints.
+         *
+         * 3. We're writing an output file, and want to apply a read or display
+         * filter before writing it. Currently we don't allow this. (#2234)
+         *
+         * 4. We're writing to a pipe or FIFO, and we want to do something
+         * that requires dissection. Currently we don't allow this (XXX:
+         * some cases, like the "--color" flag, we don't currently check if
+         * we're writing to a pipe, and can get in a situation where two
+         * processes are both reading the same pipe, causing errors.)
+         *
+         * The only case of these we handle currently is the first, as
+         * we don't yet handle having tshark write output files when
+         * capturing.
+         *
+         * The general form of the workaround for these issues is to run
+         * "dumpcap -w - | tshark -r -", which has dumpcap output to stdout
+         * and tshark read stdout as a capture file. This doesn't work
+         * for case 2 above, because we don't write to multiple files
+         * when reading from a capture file.
+         */
+        if (!global_capture_opts.saving_to_file) {
+            global_capture_opts.use_data_pipe = TRUE;
+            global_capture_session.new_file = capture_input_new_pipe;
+            global_capture_session.new_packets = capture_input_pipe_new_packets;
+        }
+
+        /*
          * XXX - this returns FALSE if an error occurred, but it also
          * returns FALSE if the capture stops because a time limit
          * was reached (and possibly other limits), so we can't assume
@@ -2781,6 +2833,238 @@ capture_input_new_file(capture_session *cap_session, gchar *new_file)
     return TRUE;
 }
 
+static gboolean
+capture_pipe_cb(GIOChannel *source, GIOCondition condition _U_, gpointer user_data)
+{
+    capture_session *cap_session = (capture_session*)user_data;
+
+    gboolean      ret;
+    int           err;
+    gchar        *err_info;
+    gint64        data_offset;
+    capture_file *cf = cap_session->cf;
+    gboolean      filtering_tap_listeners;
+    guint         tap_flags;
+    gboolean      stop = FALSE;
+
+#ifdef SIGINFO
+    /*
+     * Prevent a SIGINFO handler from writing to the standard error while
+     * we're doing so or writing to the standard output; instead, have it
+     * just set a flag telling us to print that information when we're done.
+     */
+    infodelay = TRUE;
+#endif /* SIGINFO */
+
+    /* Do we have any tap listeners with filters? */
+    filtering_tap_listeners = have_filtering_tap_listeners();
+
+    /* Get the union of the flags for all tap listeners. */
+    tap_flags = union_of_tap_listener_flags();
+
+    if (do_dissection) {
+        gboolean create_proto_tree;
+        epan_dissect_t *edt;
+        wtap_rec rec;
+        Buffer buf;
+
+        /*
+         * Determine whether we need to create a protocol tree.
+         * We do if:
+         *
+         *    we're going to apply a read filter;
+         *
+         *    we're going to apply a display filter;
+         *
+         *    we're going to print the protocol tree;
+         *
+         *    one of the tap listeners is going to apply a filter;
+         *
+         *    one of the tap listeners requires a protocol tree;
+         *
+         *    a postdissector wants field values or protocols
+         *    on the first pass;
+         *
+         *    we have custom columns (which require field values, which
+         *    currently requires that we build a protocol tree).
+         */
+        create_proto_tree =
+            (cf->rfcode || cf->dfcode || print_details || filtering_tap_listeners ||
+             (tap_flags & TL_REQUIRES_PROTO_TREE) || postdissectors_want_hfids() ||
+             have_custom_cols(&cf->cinfo) || dissect_color);
+
+        /* The protocol tree will be "visible", i.e., printed, only if we're
+           printing packet details, which is true if we're printing stuff
+           ("print_packet_info" is true) and we're in verbose mode
+           ("packet_details" is true). */
+        edt = epan_dissect_new(cf->epan, create_proto_tree, print_packet_info && print_details);
+
+        wtap_rec_init(&rec);
+        ws_buffer_init(&buf, 1514);
+
+        if (cf->provider.wth) {
+            ret = wtap_read(cf->provider.wth, &rec, &buf, &err, &err_info, &data_offset);
+            reset_epan_mem(cf, edt, create_proto_tree, print_packet_info && print_details);
+            if (ret == FALSE) {
+                /* read from file failed, tell the capture child to stop */
+                sync_pipe_stop(cap_session);
+                wtap_close(cf->provider.wth);
+                cf->provider.wth = NULL;
+                stop = TRUE;
+            } else {
+                ret = process_packet_single_pass(cf, edt, data_offset, &rec, &buf,
+                        tap_flags);
+            }
+            if (ret != FALSE) {
+                /* packet successfully read and gone through the "Display Filter" */
+                packet_count++;
+            }
+            wtap_rec_reset(&rec);
+        }
+
+        epan_dissect_free(edt);
+
+        wtap_rec_cleanup(&rec);
+        ws_buffer_free(&buf);
+    } else {
+        /*
+         * Dumpcap's doing all the work; we're not doing any dissection.
+         * Read the pipe so it doesn't stall.
+         */
+        unsigned char buf[1514];
+        size_t bytes_read;
+        GError *error = NULL;
+        g_io_channel_read_chars(source, buf, 1514, &bytes_read, &error);
+        if (bytes_read == 0) {
+            /* EOF */
+            stop = TRUE;
+        } else if (error) {
+            report_cfile_read_failure(cf->filename, error->code, error->message);
+            g_clear_error(&error);
+            stop = TRUE;
+        }
+    }
+
+#ifdef SIGINFO
+    /*
+     * Allow SIGINFO handlers to write.
+     */
+    infodelay = FALSE;
+
+    /*
+     * If a SIGINFO handler asked us to write out capture counts, do so.
+     */
+    if (infoprint)
+        report_counts();
+#endif /* SIGINFO */
+    return stop ? G_SOURCE_REMOVE : G_SOURCE_CONTINUE;
+}
+
+
+static gboolean
+capture_input_new_pipe(capture_session *cap_session, gchar *new_file _U_)
+{
+    capture_options *capture_opts = cap_session->capture_opts;
+    capture_file *cf = cap_session->cf;
+    GIOChannel *io_chan;
+    int      err;
+
+    /* If dumpcap is sending us a data pipe, then tshark would handle
+     * changing files (XXX: but tshark doesn't write output files in
+     * dumpcap pipe mode yet). */
+    ws_assert(cap_session->state == CAPTURE_PREPARING);
+
+    if (really_quiet == FALSE) {
+        ws_message("Capture started.");
+    }
+
+#ifdef _WIN32
+    io_chan = g_io_channel_win32_new_fd(capture_opts->data_pipe_fd);
+#else
+    io_chan = g_io_channel_unix_new(capture_opts->data_pipe_fd);
+#endif
+    g_io_channel_set_encoding(io_chan, NULL, NULL);
+    g_io_channel_set_buffered(io_chan, FALSE);
+    g_io_channel_set_close_on_unref(io_chan, TRUE);
+
+    /* if we are in real-time mode, open the capture file now */
+    if (do_dissection) {
+        /* this is probably unecessary, but better safe than sorry */
+        cap_session->cf->open_type = WTAP_TYPE_AUTO;
+        /* Attempt to open the capture file and set up to read from it. */
+        switch (cf_ioopen(cap_session->cf, io_chan, WTAP_TYPE_AUTO, &err)) {
+            case CF_OK:
+                break;
+            case CF_ERROR:
+                return FALSE;
+        }
+    } else if (quiet) {
+        cf->state = FILE_READ_ABORTED;
+    }
+
+    cap_session->state = CAPTURE_RUNNING;
+    /* dumpcap writes the packets first and then sends notifications to the
+     * sync pipe. We have to drain the data pipe so that it doesn't fill
+     * and result in deadlock.
+     */
+    g_io_add_watch_full(io_chan, G_PRIORITY_HIGH, G_IO_IN | G_IO_HUP, capture_pipe_cb, cap_session, NULL);
+
+    return TRUE;
+}
+
+static void
+capture_input_pipe_new_packets(capture_session *cap_session _U_, int to_read)
+{
+#ifdef SIGINFO
+    /*
+     * Prevent a SIGINFO handler from writing to the standard error while
+     * we're doing so or writing to the standard output; instead, have it
+     * just set a flag telling us to print that information when we're done.
+     */
+    infodelay = TRUE;
+#endif /* SIGINFO */
+
+    if (do_dissection) {
+        /* We'll get the real count when we read from the data pipe directly
+         * and dissect each packet (where we could see if they pass a filter.)
+         * We can track how many packets dumpcap has notified us of for
+         * comparison.
+         */
+        static guint32 packet_count2 = 0;
+        packet_count2 += to_read;
+        ws_noisy("Packets notified: %u Packets read:%u\n", packet_count2, packet_count);
+    } else {
+        /*
+         * Dumpcap's doing all the work; we're not doing any dissection.
+         * Count all the packets it told us it wrote to the pipe; we're
+         * just discarding what we read out of the pipe, so we don't count
+         * it there.
+         */
+        packet_count += to_read;
+    }
+
+    if (print_packet_counts) {
+        /* We're printing packet counts. */
+        if (packet_count != 0) {
+            fprintf(stderr, "\r%u ", packet_count);
+            /* stderr could be line buffered */
+            fflush(stderr);
+        }
+    }
+#ifdef SIGINFO
+    /*
+     * Allow SIGINFO handlers to write.
+     */
+    infodelay = FALSE;
+
+    /*
+     * If a SIGINFO handler asked us to write out capture counts, do so.
+     */
+    if (infoprint)
+        report_counts();
+#endif /* SIGINFO */
+    return;
+}
 
 /* capture child tells us we have new packets to read */
 static void
@@ -4490,19 +4774,11 @@ cf_close(capture_file *cf)
     cf->state = FILE_CLOSED;
 }
 
-cf_status_t
-cf_open(capture_file *cf, const char *fname, unsigned int type, gboolean is_tempfile, int *err)
+static void
+cf_open_common(capture_file *cf, const char* fname, unsigned int type, gboolean is_tempfile)
 {
-    wtap  *wth;
-    gchar *err_info;
-
-    wth = wtap_open_offline(fname, type, err, &err_info, perform_two_pass_analysis);
-    if (wth == NULL)
-        goto fail;
-
     /* The open succeeded.  Fill in the information for this file. */
 
-    cf->provider.wth = wth;
     cf->f_datalen = 0; /* not used, but set it anyway */
 
     /* Set the file name because we need it to set the follow stream filter.
@@ -4536,11 +4812,45 @@ cf_open(capture_file *cf, const char *fname, unsigned int type, gboolean is_temp
     wtap_set_cb_new_ipv4(cf->provider.wth, add_ipv4_name);
     wtap_set_cb_new_ipv6(cf->provider.wth, (wtap_new_ipv6_callback_t) add_ipv6_name);
     wtap_set_cb_new_secrets(cf->provider.wth, secrets_wtap_callback);
+}
 
+cf_status_t
+cf_open(capture_file *cf, const char *fname, unsigned int type, gboolean is_tempfile, int *err)
+{
+    wtap  *wth;
+    gchar *err_info;
+
+    wth = wtap_open_offline(fname, type, err, &err_info, perform_two_pass_analysis);
+    if (wth == NULL)
+        goto fail;
+
+    /* The open succeeded.  Fill in the information for this file. */
+    cf->provider.wth = wth;
+    cf_open_common(cf, fname, type, is_tempfile);
     return CF_OK;
 
 fail:
     cfile_open_failure_message(fname, *err, err_info);
+    return CF_ERROR;
+}
+
+cf_status_t
+cf_ioopen(capture_file *cf, GIOChannel *io_chan, unsigned int type, int *err)
+{
+    wtap  *wth;
+    gchar *err_info;
+
+    wth = wtap_open_io(io_chan, type, err, &err_info, perform_two_pass_analysis);
+    if (wth == NULL)
+        goto fail;
+
+    /* The open succeeded.  Fill in the information for this file. */
+    cf->provider.wth = wth;
+    cf_open_common(cf, "", type, FALSE);
+    return CF_OK;
+
+fail:
+    cfile_open_failure_message("pipe", *err, err_info);
     return CF_ERROR;
 }
 

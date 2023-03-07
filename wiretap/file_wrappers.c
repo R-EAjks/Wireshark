@@ -166,7 +166,7 @@ struct wtap_reader_buf {
 };
 
 struct wtap_reader {
-    int fd;                     /* file descriptor */
+    GIOChannel *channel;
     gint64 raw_pos;             /* current position in file (just to not call lseek()) */
     gint64 pos;                 /* current position in uncompressed data */
     guint size;                 /* buffer size */
@@ -266,12 +266,17 @@ buf_read(FILE_T state, struct wtap_reader_buf *buf)
         to_read = space_left;
     }
 
-    ret = ws_read(state->fd, read_ptr, to_read);
-    if (ret < 0) {
-        state->err = errno;
-        state->err_info = NULL;
+    GError *err = NULL;
+    size_t read_bytes;
+    /* The return value doesn't really give anything we can't get by
+     * inspecting read_bytes and err.
+     */
+    g_io_channel_read_chars(state->channel, read_ptr, to_read, &read_bytes, &err);
+    if (err != NULL) {
+        state->err_info = err->message; // XXX: strdup?
         return -1;
     }
+    ret = (ssize_t)read_bytes;
     if (ret == 0)
         state->eof = TRUE;
     state->raw_pos += ret;
@@ -1063,6 +1068,24 @@ gz_reset(FILE_T state)
 FILE_T
 file_fdopen(int fd)
 {
+    if (fd == -1)
+        return NULL;
+
+    GIOChannel *io_chan;
+#ifdef _WIN32
+    io_chan = g_io_channel_win32_new_fd(fd);
+#else
+    io_chan = g_io_channel_unix_new(fd);
+#endif
+    g_io_channel_set_encoding(io_chan, NULL, NULL);
+    g_io_channel_set_buffered(io_chan, FALSE);
+
+    return file_ioopen(io_chan);
+}
+
+FILE_T
+file_ioopen(GIOChannel *io_chan)
+{
     /*
      * XXX - we now check whether we have st_blksize in struct stat;
      * it's not available on all platforms.
@@ -1092,8 +1115,9 @@ file_fdopen(int fd)
 #ifdef USE_LZ4
     size_t ret;
 #endif
+    int fd;
 
-    if (fd == -1)
+    if (io_chan == NULL)
         return NULL;
 
     /* allocate FILE_T structure to return */
@@ -1105,14 +1129,19 @@ file_fdopen(int fd)
     state->fast_seek = NULL;
 
     /* open the file with the appropriate mode (or just use fd) */
-    state->fd = fd;
+    state->channel = io_chan;
 
     /* we don't yet know whether it's compressed */
     state->is_compressed = FALSE;
     state->last_compression = UNKNOWN;
 
     /* save the current position for rewinding (only if reading) */
-    state->start = ws_lseek64(state->fd, 0, SEEK_CUR);
+#ifdef _WIN32
+    fd = g_io_channel_win32_get_fd(state->channel);
+#else
+    fd = g_io_channel_unix_get_fd(state->channel);
+#endif
+    state->start = ws_lseek64(fd, 0, SEEK_CUR);
     if (state->start == -1) state->start = 0;
     state->raw_pos = state->start;
 
@@ -1239,7 +1268,7 @@ err:
 FILE_T
 file_open(const char *path)
 {
-    int fd;
+    GIOChannel *io_chan;
     FILE_T ft;
 #ifdef HAVE_ZLIB
     const char *suffixp;
@@ -1254,13 +1283,16 @@ file_open(const char *path)
        here.  Pre-Large File Summit UN*Xes, and possibly even some
        post-LFS UN*Xes, might require O_LARGEFILE here, though.
        If so, we should probably handle that in ws_open(). */
-    if ((fd = ws_open(path, O_RDONLY|O_BINARY, 0000)) == -1)
+    if ((io_chan = g_io_channel_new_file(path, "r", NULL)) == NULL) {
         return NULL;
+    }
+    g_io_channel_set_encoding(io_chan, NULL, NULL);
+    g_io_channel_set_buffered(io_chan, FALSE);
 
     /* open file handle */
-    ft = file_fdopen(fd);
+    ft = file_ioopen(io_chan);
     if (ft == NULL) {
-        ws_close(fd);
+        g_io_channel_unref(io_chan);
         return NULL;
     }
 
@@ -1434,7 +1466,7 @@ file_seek(FILE_T file, gint64 offset, int whence, int *err)
             off = here->in + (off2 - here->out);
         }
 
-        if (ws_lseek64(file->fd, off, SEEK_SET) == -1) {
+        if (g_io_channel_seek_position(file->channel, off, G_SEEK_SET, NULL) != G_IO_STATUS_NORMAL) {
             *err = errno;
             return -1;
         }
@@ -1514,7 +1546,7 @@ file_seek(FILE_T file, gint64 offset, int whence, int *err)
         /*
          * Yes.  Just seek there within the file.
          */
-        if (ws_lseek64(file->fd, offset - file->out.avail, SEEK_CUR) == -1) {
+        if (g_io_channel_seek_position(file->channel, offset - file->out.avail, G_SEEK_CUR, NULL) != G_IO_STATUS_NORMAL) {
             *err = errno;
             return -1;
         }
@@ -1548,7 +1580,7 @@ file_seek(FILE_T file, gint64 offset, int whence, int *err)
         /* rewind, then skip to offset */
 
         /* back up and start over */
-        if (ws_lseek64(file->fd, file->start, SEEK_SET) == -1) {
+        if (g_io_channel_seek_position(file->channel, file->start, G_SEEK_SET, NULL) != G_IO_STATUS_NORMAL) {
             *err = errno;
             return -1;
         }
@@ -1596,7 +1628,16 @@ file_tell_raw(FILE_T stream)
 int
 file_fstat(FILE_T stream, ws_statb64 *statb, int *err)
 {
-    if (ws_fstat64(stream->fd, statb) == -1) {
+    if (stream->channel == NULL) {
+        return -1;
+    }
+    int fd;
+#ifdef _WIN32
+    fd = g_io_channel_win32_get_fd(stream->channel);
+#else
+    fd = g_io_channel_unix_get_fd(stream->channel);
+#endif
+    if (ws_fstat64(fd, statb) == -1) {
         if (err != NULL)
             *err = errno;
         return -1;
@@ -1885,26 +1926,29 @@ file_clearerr(FILE_T stream)
 void
 file_fdclose(FILE_T file)
 {
-    ws_close(file->fd);
-    file->fd = -1;
+    if (file->channel) {
+        g_io_channel_unref(file->channel);
+        file->channel = NULL;
+    }
 }
 
 gboolean
 file_fdreopen(FILE_T file, const char *path)
 {
-    int fd;
-
-    if ((fd = ws_open(path, O_RDONLY|O_BINARY, 0000)) == -1)
+    /* XXX: Should this check if we're currently closed? */
+    GIOChannel *io_chan;
+    if ((io_chan = g_io_channel_new_file(path, "r", NULL)) == NULL)
         return FALSE;
-    file->fd = fd;
+
+    file->channel = io_chan;
+    g_io_channel_set_encoding(file->channel, NULL, NULL);
+    g_io_channel_set_buffered(file->channel, FALSE);
     return TRUE;
 }
 
 void
 file_close(FILE_T file)
 {
-    int fd = file->fd;
-
     /* free memory and close file */
     if (file->size) {
 #ifdef HAVE_ZLIB
@@ -1922,14 +1966,10 @@ file_close(FILE_T file)
     g_free(file->fast_seek_cur);
     file->err = 0;
     file->err_info = NULL;
+    if (file->channel) {
+        g_io_channel_unref(file->channel);
+    }
     g_free(file);
-    /*
-     * If fd is -1, somebody's done a file_closefd() on us, so
-     * we don't need to close the FD itself, and shouldn't do
-     * so.
-     */
-    if (fd != -1)
-        ws_close(fd);
 }
 
 #ifdef HAVE_ZLIB

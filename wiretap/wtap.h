@@ -1754,6 +1754,22 @@ WS_DLL_PUBLIC
 struct wtap* wtap_open_offline(const char *filename, unsigned int type, int *err,
     gchar **err_info, gboolean do_random);
 
+/** On failure, "wtap_open_io()" returns NULL, and puts into "err" and
+ * possibly "err_info" the reason why it failed.
+ *
+ * @param io_chan the open GIOChannel to read
+ * @param type WTAP_TYPE_AUTO for automatic recognize file format or explicit choose format type
+ * @param[out] err a positive "errno" value if the capture file can't be opened;
+ * a negative number, indicating the type of error, on other failures.
+ * @param[out] err_info for some errors, a string giving more details of
+ * the error
+ * @param do_random TRUE if random access to the file will be done,
+ * FALSE if not
+ */
+WS_DLL_PUBLIC
+struct wtap* wtap_open_io(GIOChannel *io_chan, unsigned int type, int *err,
+    gchar **err_info, gboolean do_random);
+
 /**
  * If we were compiled with zlib and we're at EOF, unset EOF so that
  * wtap_read/gzread has a chance to succeed. This is necessary if
