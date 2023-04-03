@@ -210,6 +210,9 @@ private:
 
 private slots:
     void copyFromProfile(QString filename);
+    void copyFromFile(QString filename);
+    void exportGraphs();
+    void importGraphs();
     void updateWidgets();
     void graphClicked(QMouseEvent *event);
     void mouseMoved(QMouseEvent *event);

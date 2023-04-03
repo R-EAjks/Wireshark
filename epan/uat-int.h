@@ -120,6 +120,14 @@ WS_DLL_PUBLIC
 gboolean uat_save(uat_t *uat, char **error);
 
 /**
+ * Saves the records from an UAT to file.
+ * Returns TRUE on success and FALSE on failure, storing the reason in 'error'
+ * (which must be freed using g_free).
+ */
+WS_DLL_PUBLIC
+gboolean uat_save_with_path(uat_t* uat, const char* path, char** error);
+
+/**
  * Loads the records for all registered UATs from file.
  */
 void uat_load_all(void);
