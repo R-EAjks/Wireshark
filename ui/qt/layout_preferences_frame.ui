@@ -26,7 +26,7 @@
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
-      <widget class="QToolButton" name="layout5ToolButton">
+      <widget class="QToolButton" name="layout3VerticalToolButton">
        <property name="minimumSize">
         <size>
          <width>0</width>
@@ -38,7 +38,7 @@
        </property>
        <property name="icon">
         <iconset resource="../../resources/layout.qrc">
-         <normaloff>:/layout/layout_5.png</normaloff>:/layout/layout_5.png</iconset>
+         <normaloff>:/layout/layout_3_vertical.png</normaloff>:/layout/layout_3_vertical.png</iconset>
        </property>
        <property name="iconSize">
         <size>
@@ -55,13 +55,13 @@
       </widget>
      </item>
      <item>
-      <widget class="QToolButton" name="layout2ToolButton">
+      <widget class="QToolButton" name="layout1Top2BotToolButton">
        <property name="text">
         <string/>
        </property>
        <property name="icon">
         <iconset resource="../../resources/layout.qrc">
-         <normaloff>:/layout/layout_2.png</normaloff>:/layout/layout_2.png</iconset>
+         <normaloff>:/layout/layout_1_top_2_bot.png</normaloff>:/layout/layout_1_top_2_bot.png</iconset>
        </property>
        <property name="iconSize">
         <size>
@@ -78,13 +78,13 @@
       </widget>
      </item>
      <item>
-      <widget class="QToolButton" name="layout1ToolButton">
+      <widget class="QToolButton" name="layout2Top1BotToolButton">
        <property name="text">
         <string/>
        </property>
        <property name="icon">
         <iconset resource="../../resources/layout.qrc">
-         <normaloff>:/layout/layout_1.png</normaloff>:/layout/layout_1.png</iconset>
+         <normaloff>:/layout/layout_2_top_1_bot.png</normaloff>:/layout/layout_2_top_1_bot.png</iconset>
        </property>
        <property name="iconSize">
         <size>
@@ -101,13 +101,13 @@
       </widget>
      </item>
      <item>
-      <widget class="QToolButton" name="layout4ToolButton">
+      <widget class="QToolButton" name="layout1Left2RightToolButton">
        <property name="text">
         <string/>
        </property>
        <property name="icon">
         <iconset resource="../../resources/layout.qrc">
-         <normaloff>:/layout/layout_4.png</normaloff>:/layout/layout_4.png</iconset>
+         <normaloff>:/layout/layout_1_left_2_right.png</normaloff>:/layout/layout_1_left_2_right.png</iconset>
        </property>
        <property name="iconSize">
         <size>
@@ -124,13 +124,13 @@
       </widget>
      </item>
      <item>
-      <widget class="QToolButton" name="layout3ToolButton">
+      <widget class="QToolButton" name="layout2Left1RightToolButton">
        <property name="text">
         <string/>
        </property>
        <property name="icon">
         <iconset resource="../../resources/layout.qrc">
-         <normaloff>:/layout/layout_3.png</normaloff>:/layout/layout_3.png</iconset>
+         <normaloff>:/layout/layout_2_left_1_right.png</normaloff>:/layout/layout_2_left_1_right.png</iconset>
        </property>
        <property name="iconSize">
         <size>
@@ -147,13 +147,59 @@
       </widget>
      </item>
      <item>
-      <widget class="QToolButton" name="layout6ToolButton">
+      <widget class="QToolButton" name="layout3HorizontalToolButton">
        <property name="text">
         <string/>
        </property>
        <property name="icon">
         <iconset resource="../../resources/layout.qrc">
-         <normaloff>:/layout/layout_6.png</normaloff>:/layout/layout_6.png</iconset>
+         <normaloff>:/layout/layout_3_horizontal.png</normaloff>:/layout/layout_3_horizontal.png</iconset>
+       </property>
+       <property name="iconSize">
+        <size>
+         <width>48</width>
+         <height>48</height>
+        </size>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
+       <attribute name="buttonGroup">
+        <string notr="true">layoutButtonGroup</string>
+       </attribute>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="layout4QuadToolButton">
+       <property name="text">
+        <string/>
+       </property>
+       <property name="icon">
+        <iconset resource="../../resources/layout.qrc">
+         <normaloff>:/layout/layout_4_quad.png</normaloff>:/layout/layout_4_quad.png</iconset>
+       </property>
+       <property name="iconSize">
+        <size>
+         <width>48</width>
+         <height>48</height>
+        </size>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
+       <attribute name="buttonGroup">
+        <string notr="true">layoutButtonGroup</string>
+       </attribute>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="layout4HorizontalToolButton">
+       <property name="text">
+        <string/>
+       </property>
+       <property name="icon">
+        <iconset resource="../../resources/layout.qrc">
+         <normaloff>:/layout/layout_4_horizontal.png</normaloff>:/layout/layout_4_horizontal.png</iconset>
        </property>
        <property name="iconSize">
         <size>
@@ -356,6 +402,67 @@
        </item>
       </layout>
      </item>
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout_5">
+       <item>
+        <widget class="QLabel" name="label4">
+         <property name="text">
+          <string>Pane 4:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QRadioButton" name="pane4PacketListRadioButton">
+         <property name="text">
+          <string>Packet List</string>
+         </property>
+         <attribute name="buttonGroup">
+          <string notr="true">pane4ButtonGroup</string>
+         </attribute>
+        </widget>
+       </item>
+       <item>
+        <widget class="QRadioButton" name="pane4PacketDetailsRadioButton">
+         <property name="text">
+          <string>Packet Details</string>
+         </property>
+         <attribute name="buttonGroup">
+          <string notr="true">pane4ButtonGroup</string>
+         </attribute>
+        </widget>
+       </item>
+       <item>
+        <widget class="QRadioButton" name="pane4PacketBytesRadioButton">
+         <property name="text">
+          <string>Packet Bytes</string>
+         </property>
+         <attribute name="buttonGroup">
+          <string notr="true">pane4ButtonGroup</string>
+         </attribute>
+        </widget>
+       </item>
+       <item>
+        <widget class="QRadioButton" name="pane4PacketDiagramRadioButton">
+         <property name="text">
+          <string>Packet Diagram</string>
+         </property>
+         <attribute name="buttonGroup">
+          <string notr="true">pane4ButtonGroup</string>
+         </attribute>
+        </widget>
+       </item>
+       <item>
+        <widget class="QRadioButton" name="pane4NoneRadioButton">
+         <property name="text">
+          <string>None</string>
+         </property>
+         <attribute name="buttonGroup">
+          <string notr="true">pane4ButtonGroup</string>
+         </attribute>
+        </widget>
+       </item>
+      </layout>
+     </item>
     </layout>
    </item>
    <item>
@@ -502,6 +609,7 @@
  <connections/>
  <buttongroups>
   <buttongroup name="layoutButtonGroup"/>
+  <buttongroup name="pane4ButtonGroup"/>
   <buttongroup name="pane3ButtonGroup"/>
   <buttongroup name="pane2ButtonGroup"/>
   <buttongroup name="pane1ButtonGroup"/>

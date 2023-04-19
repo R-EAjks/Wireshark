@@ -30,14 +30,17 @@ LayoutPreferencesFrame::LayoutPreferencesFrame(QWidget *parent) :
     pref_layout_content_1_ = prefFromPrefPtr(&prefs.gui_layout_content_1);
     pref_layout_content_2_ = prefFromPrefPtr(&prefs.gui_layout_content_2);
     pref_layout_content_3_ = prefFromPrefPtr(&prefs.gui_layout_content_3);
+    pref_layout_content_4_ = prefFromPrefPtr(&prefs.gui_layout_content_4);
 
     QString image_pad_ss = "QToolButton { padding: 0.3em; }";
-    ui->layout1ToolButton->setStyleSheet(image_pad_ss);
-    ui->layout2ToolButton->setStyleSheet(image_pad_ss);
-    ui->layout3ToolButton->setStyleSheet(image_pad_ss);
-    ui->layout4ToolButton->setStyleSheet(image_pad_ss);
-    ui->layout5ToolButton->setStyleSheet(image_pad_ss);
-    ui->layout6ToolButton->setStyleSheet(image_pad_ss);
+    ui->layout2Top1BotToolButton->setStyleSheet(image_pad_ss);
+    ui->layout1Top2BotToolButton->setStyleSheet(image_pad_ss);
+    ui->layout2Left1RightToolButton->setStyleSheet(image_pad_ss);
+    ui->layout1Left2RightToolButton->setStyleSheet(image_pad_ss);
+    ui->layout3VerticalToolButton->setStyleSheet(image_pad_ss);
+    ui->layout3HorizontalToolButton->setStyleSheet(image_pad_ss);
+    ui->layout4QuadToolButton->setStyleSheet(image_pad_ss);
+    ui->layout4HorizontalToolButton->setStyleSheet(image_pad_ss);
 
     QStyleOption style_opt;
     QString indent_ss = QString(
@@ -87,23 +90,29 @@ void LayoutPreferencesFrame::showEvent(QShowEvent *)
 void LayoutPreferencesFrame::updateWidgets()
 {
     switch (prefs_get_uint_value_real(pref_layout_type_, pref_stashed)) {
-    case layout_type_5:
-        ui->layout5ToolButton->setChecked(true);
+    case layout_type_2_top_1_bot:
+        ui->layout2Top1BotToolButton->setChecked(true);
         break;
-    case layout_type_2:
-        ui->layout2ToolButton->setChecked(true);
+    case layout_type_1_top_2_bot:
+        ui->layout1Top2BotToolButton->setChecked(true);
         break;
-    case layout_type_1:
-        ui->layout1ToolButton->setChecked(true);
+    case layout_type_2_left_1_right:
+        ui->layout2Left1RightToolButton->setChecked(true);
         break;
-    case layout_type_4:
-        ui->layout4ToolButton->setChecked(true);
+    case layout_type_1_left_2_right:
+        ui->layout1Left2RightToolButton->setChecked(true);
         break;
-    case layout_type_3:
-        ui->layout3ToolButton->setChecked(true);
+    case layout_type_3_vertical:
+        ui->layout3VerticalToolButton->setChecked(true);
         break;
-    case layout_type_6:
-        ui->layout6ToolButton->setChecked(true);
+    case layout_type_3_horizontal:
+        ui->layout3HorizontalToolButton->setChecked(true);
+        break;
+    case layout_type_4_quad:
+        ui->layout4QuadToolButton->setChecked(true);
+        break;
+    case layout_type_4_horizontal:
+        ui->layout4HorizontalToolButton->setChecked(true);
         break;
     }
 
@@ -161,43 +170,73 @@ void LayoutPreferencesFrame::updateWidgets()
         break;
     }
 
+    switch (prefs_get_enum_value(pref_layout_content_4_, pref_stashed)) {
+    case layout_pane_content_plist:
+        ui->pane4PacketListRadioButton->setChecked(true);
+        break;
+    case layout_pane_content_pdetails:
+        ui->pane4PacketDetailsRadioButton->setChecked(true);
+        break;
+    case layout_pane_content_pbytes:
+        ui->pane4PacketBytesRadioButton->setChecked(true);
+        break;
+    case layout_pane_content_pdiagram:
+        ui->pane4PacketDiagramRadioButton->setChecked(true);
+        break;
+    case layout_pane_content_none:
+        ui->pane4NoneRadioButton->setChecked(true);
+        break;
+    }
+
     ui->packetListCachedRowsLineEdit->setText(QString::number(prefs_get_uint_value_real(pref_packet_list_cached_rows_max_, pref_stashed)));
 }
 
-void LayoutPreferencesFrame::on_layout5ToolButton_toggled(bool checked)
+void LayoutPreferencesFrame::on_layout2Top1BotToolButton_toggled(bool checked)
 {
     if (!checked) return;
-    prefs_set_uint_value(pref_layout_type_, layout_type_5, pref_stashed);
+    prefs_set_uint_value(pref_layout_type_, layout_type_2_top_1_bot, pref_stashed);
 }
 
-void LayoutPreferencesFrame::on_layout2ToolButton_toggled(bool checked)
+void LayoutPreferencesFrame::on_layout1Top2BotToolButton_toggled(bool checked)
 {
     if (!checked) return;
-    prefs_set_uint_value(pref_layout_type_, layout_type_2, pref_stashed);
+    prefs_set_uint_value(pref_layout_type_, layout_type_1_top_2_bot, pref_stashed);
 }
 
-void LayoutPreferencesFrame::on_layout1ToolButton_toggled(bool checked)
+void LayoutPreferencesFrame::on_layout1Left2RightToolButton_toggled(bool checked)
 {
     if (!checked) return;
-    prefs_set_uint_value(pref_layout_type_, layout_type_1, pref_stashed);
+    prefs_set_uint_value(pref_layout_type_, layout_type_1_left_2_right, pref_stashed);
 }
 
-void LayoutPreferencesFrame::on_layout4ToolButton_toggled(bool checked)
+void LayoutPreferencesFrame::on_layout2Left1RightToolButton_toggled(bool checked)
 {
     if (!checked) return;
-    prefs_set_uint_value(pref_layout_type_, layout_type_4, pref_stashed);
+    prefs_set_uint_value(pref_layout_type_, layout_type_2_left_1_right, pref_stashed);
 }
 
-void LayoutPreferencesFrame::on_layout3ToolButton_toggled(bool checked)
+void LayoutPreferencesFrame::on_layout3VerticalToolButton_toggled(bool checked)
 {
     if (!checked) return;
-    prefs_set_uint_value(pref_layout_type_, layout_type_3, pref_stashed);
+    prefs_set_uint_value(pref_layout_type_, layout_type_3_vertical, pref_stashed);
 }
 
-void LayoutPreferencesFrame::on_layout6ToolButton_toggled(bool checked)
+void LayoutPreferencesFrame::on_layout3HorizontalToolButton_toggled(bool checked)
 {
     if (!checked) return;
-    prefs_set_uint_value(pref_layout_type_, layout_type_6, pref_stashed);
+    prefs_set_uint_value(pref_layout_type_, layout_type_3_horizontal, pref_stashed);
+}
+
+void LayoutPreferencesFrame::on_layout4QuadToolButton_toggled(bool checked)
+{
+    if (!checked) return;
+    prefs_set_uint_value(pref_layout_type_, layout_type_4_quad, pref_stashed);
+}
+
+void LayoutPreferencesFrame::on_layout4HorizontalToolButton_toggled(bool checked)
+{
+    if (!checked) return;
+    prefs_set_uint_value(pref_layout_type_, layout_type_4_horizontal, pref_stashed);
 }
 
 void LayoutPreferencesFrame::on_pane1PacketListRadioButton_toggled(bool checked)
@@ -208,6 +247,8 @@ void LayoutPreferencesFrame::on_pane1PacketListRadioButton_toggled(bool checked)
         ui->pane2NoneRadioButton->click();
     if (ui->pane3PacketListRadioButton->isChecked())
         ui->pane3NoneRadioButton->click();
+    if (ui->pane4PacketListRadioButton->isChecked())
+        ui->pane4NoneRadioButton->click();
 }
 
 void LayoutPreferencesFrame::on_pane1PacketDetailsRadioButton_toggled(bool checked)
@@ -218,6 +259,8 @@ void LayoutPreferencesFrame::on_pane1PacketDetailsRadioButton_toggled(bool check
         ui->pane2NoneRadioButton->click();
     if (ui->pane3PacketDetailsRadioButton->isChecked())
         ui->pane3NoneRadioButton->click();
+    if (ui->pane4PacketDetailsRadioButton->isChecked())
+        ui->pane4NoneRadioButton->click();
 }
 
 void LayoutPreferencesFrame::on_pane1PacketBytesRadioButton_toggled(bool checked)
@@ -228,6 +271,8 @@ void LayoutPreferencesFrame::on_pane1PacketBytesRadioButton_toggled(bool checked
         ui->pane2NoneRadioButton->click();
     if (ui->pane3PacketBytesRadioButton->isChecked())
         ui->pane3NoneRadioButton->click();
+    if (ui->pane4PacketBytesRadioButton->isChecked())
+        ui->pane4NoneRadioButton->click();
 }
 
 void LayoutPreferencesFrame::on_pane1PacketDiagramRadioButton_toggled(bool checked)
@@ -238,6 +283,8 @@ void LayoutPreferencesFrame::on_pane1PacketDiagramRadioButton_toggled(bool check
         ui->pane2NoneRadioButton->click();
     if (ui->pane3PacketDiagramRadioButton->isChecked())
         ui->pane3NoneRadioButton->click();
+    if (ui->pane4PacketDiagramRadioButton->isChecked())
+        ui->pane4NoneRadioButton->click();
 }
 
 void LayoutPreferencesFrame::on_pane1NoneRadioButton_toggled(bool checked)
@@ -254,6 +301,8 @@ void LayoutPreferencesFrame::on_pane2PacketListRadioButton_toggled(bool checked)
         ui->pane1NoneRadioButton->click();
     if (ui->pane3PacketListRadioButton->isChecked())
         ui->pane3NoneRadioButton->click();
+    if (ui->pane4PacketListRadioButton->isChecked())
+        ui->pane4NoneRadioButton->click();
 }
 
 void LayoutPreferencesFrame::on_pane2PacketDetailsRadioButton_toggled(bool checked)
@@ -264,6 +313,8 @@ void LayoutPreferencesFrame::on_pane2PacketDetailsRadioButton_toggled(bool check
         ui->pane1NoneRadioButton->click();
     if (ui->pane3PacketDetailsRadioButton->isChecked())
         ui->pane3NoneRadioButton->click();
+    if (ui->pane4PacketDetailsRadioButton->isChecked())
+        ui->pane4NoneRadioButton->click();
 }
 
 void LayoutPreferencesFrame::on_pane2PacketBytesRadioButton_toggled(bool checked)
@@ -274,6 +325,8 @@ void LayoutPreferencesFrame::on_pane2PacketBytesRadioButton_toggled(bool checked
         ui->pane1NoneRadioButton->click();
     if (ui->pane3PacketBytesRadioButton->isChecked())
         ui->pane3NoneRadioButton->click();
+    if (ui->pane4PacketBytesRadioButton->isChecked())
+        ui->pane4NoneRadioButton->click();
 }
 
 void LayoutPreferencesFrame::on_pane2PacketDiagramRadioButton_toggled(bool checked)
@@ -284,6 +337,8 @@ void LayoutPreferencesFrame::on_pane2PacketDiagramRadioButton_toggled(bool check
         ui->pane1NoneRadioButton->click();
     if (ui->pane3PacketDiagramRadioButton->isChecked())
         ui->pane3NoneRadioButton->click();
+    if (ui->pane4PacketDiagramRadioButton->isChecked())
+        ui->pane4NoneRadioButton->click();
 }
 
 void LayoutPreferencesFrame::on_pane2NoneRadioButton_toggled(bool checked)
@@ -300,6 +355,8 @@ void LayoutPreferencesFrame::on_pane3PacketListRadioButton_toggled(bool checked)
         ui->pane1NoneRadioButton->click();
     if (ui->pane2PacketListRadioButton->isChecked())
         ui->pane2NoneRadioButton->click();
+    if (ui->pane4PacketListRadioButton->isChecked())
+        ui->pane4NoneRadioButton->click();
 }
 
 void LayoutPreferencesFrame::on_pane3PacketDetailsRadioButton_toggled(bool checked)
@@ -310,6 +367,8 @@ void LayoutPreferencesFrame::on_pane3PacketDetailsRadioButton_toggled(bool check
         ui->pane1NoneRadioButton->click();
     if (ui->pane2PacketDetailsRadioButton->isChecked())
         ui->pane2NoneRadioButton->click();
+    if (ui->pane4PacketDetailsRadioButton->isChecked())
+        ui->pane4NoneRadioButton->click();
 }
 
 void LayoutPreferencesFrame::on_pane3PacketBytesRadioButton_toggled(bool checked)
@@ -320,6 +379,8 @@ void LayoutPreferencesFrame::on_pane3PacketBytesRadioButton_toggled(bool checked
         ui->pane1NoneRadioButton->click();
     if (ui->pane2PacketBytesRadioButton->isChecked())
         ui->pane2NoneRadioButton->click();
+    if (ui->pane4PacketBytesRadioButton->isChecked())
+        ui->pane4NoneRadioButton->click();
 }
 
 void LayoutPreferencesFrame::on_pane3PacketDiagramRadioButton_toggled(bool checked)
@@ -330,6 +391,8 @@ void LayoutPreferencesFrame::on_pane3PacketDiagramRadioButton_toggled(bool check
         ui->pane1NoneRadioButton->click();
     if (ui->pane2PacketDiagramRadioButton->isChecked())
         ui->pane2NoneRadioButton->click();
+    if (ui->pane4PacketDiagramRadioButton->isChecked())
+        ui->pane4NoneRadioButton->click();
 }
 
 void LayoutPreferencesFrame::on_pane3NoneRadioButton_toggled(bool checked)
@@ -338,6 +401,59 @@ void LayoutPreferencesFrame::on_pane3NoneRadioButton_toggled(bool checked)
     prefs_set_enum_value(pref_layout_content_3_, layout_pane_content_none, pref_stashed);
 }
 
+void LayoutPreferencesFrame::on_pane4PacketListRadioButton_toggled(bool checked)
+{
+    if (!checked) return;
+    prefs_set_enum_value(pref_layout_content_4_, layout_pane_content_plist, pref_stashed);
+    if (ui->pane1PacketListRadioButton->isChecked())
+        ui->pane1NoneRadioButton->click();
+    if (ui->pane2PacketListRadioButton->isChecked())
+        ui->pane2NoneRadioButton->click();
+    if (ui->pane3PacketListRadioButton->isChecked())
+        ui->pane3NoneRadioButton->click();
+}
+
+void LayoutPreferencesFrame::on_pane4PacketDetailsRadioButton_toggled(bool checked)
+{
+    if (!checked) return;
+    prefs_set_enum_value(pref_layout_content_4_, layout_pane_content_pdetails, pref_stashed);
+    if (ui->pane1PacketDetailsRadioButton->isChecked())
+        ui->pane1NoneRadioButton->click();
+    if (ui->pane2PacketDetailsRadioButton->isChecked())
+        ui->pane2NoneRadioButton->click();
+    if (ui->pane3PacketDetailsRadioButton->isChecked())
+        ui->pane3NoneRadioButton->click();
+}
+
+void LayoutPreferencesFrame::on_pane4PacketBytesRadioButton_toggled(bool checked)
+{
+    if (!checked) return;
+    prefs_set_enum_value(pref_layout_content_4_, layout_pane_content_pbytes, pref_stashed);
+    if (ui->pane1PacketBytesRadioButton->isChecked())
+        ui->pane1NoneRadioButton->click();
+    if (ui->pane2PacketBytesRadioButton->isChecked())
+        ui->pane2NoneRadioButton->click();
+    if (ui->pane3PacketBytesRadioButton->isChecked())
+        ui->pane3NoneRadioButton->click();
+}
+
+void LayoutPreferencesFrame::on_pane4PacketDiagramRadioButton_toggled(bool checked)
+{
+    if (!checked) return;
+    prefs_set_enum_value(pref_layout_content_4_, layout_pane_content_pdiagram, pref_stashed);
+    if (ui->pane1PacketDiagramRadioButton->isChecked())
+        ui->pane1NoneRadioButton->click();
+    if (ui->pane2PacketDiagramRadioButton->isChecked())
+        ui->pane2NoneRadioButton->click();
+    if (ui->pane3PacketDiagramRadioButton->isChecked())
+        ui->pane3NoneRadioButton->click();
+}
+
+void LayoutPreferencesFrame::on_pane4NoneRadioButton_toggled(bool checked)
+{
+    if (!checked) return;
+    prefs_set_enum_value(pref_layout_content_4_, layout_pane_content_none, pref_stashed);
+}
 void LayoutPreferencesFrame::on_restoreButtonBox_clicked(QAbstractButton *)
 {
     reset_stashed_pref(pref_layout_type_);
@@ -346,6 +462,8 @@ void LayoutPreferencesFrame::on_restoreButtonBox_clicked(QAbstractButton *)
     reset_stashed_pref(pref_layout_content_2_);
     updateWidgets();
     reset_stashed_pref(pref_layout_content_3_);
+    updateWidgets();
+    reset_stashed_pref(pref_layout_content_4_);
     updateWidgets();
 
     ui->packetListSeparatorCheckBox->setChecked(prefs_get_bool_value(pref_packet_list_separator_, pref_default));

@@ -81,14 +81,16 @@ char string_to_name_resolve(const char *string, struct _e_addr_resolve *name_res
  * Types of layout of summary/details/hex panes.
  */
 typedef enum {
-    layout_unused,  /* entry currently unused */
-    layout_type_5,
-    layout_type_2,
-    layout_type_1,
-    layout_type_4,
-    layout_type_3,
-    layout_type_6,
-    layout_type_max
+    layout_unused = 0,  /* entry currently unused */
+    layout_type_2_top_1_bot = 1,
+    layout_type_1_top_2_bot = 2,
+    layout_type_2_left_1_right = 3,
+    layout_type_1_left_2_right = 4,
+    layout_type_3_vertical = 5,
+    layout_type_3_horizontal = 6,
+    layout_type_4_quad = 7,
+    layout_type_4_horizontal = 8,
+    layout_type_max = layout_type_4_horizontal
 } layout_type_e;
 
 /*
@@ -176,6 +178,7 @@ typedef struct _e_prefs {
   layout_pane_content_e gui_layout_content_1;
   layout_pane_content_e gui_layout_content_2;
   layout_pane_content_e gui_layout_content_3;
+  layout_pane_content_e gui_layout_content_4;
   gchar       *gui_interfaces_hide_types;
   gboolean     gui_interfaces_show_hidden;
   gboolean     gui_interfaces_remote_display;

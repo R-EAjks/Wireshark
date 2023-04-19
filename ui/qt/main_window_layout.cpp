@@ -73,14 +73,13 @@ void MainWindow::layoutPanes()
                                                        << prefs.gui_layout_content_1
                                                        << prefs.gui_layout_content_2
                                                        << prefs.gui_layout_content_3
+                                                       << prefs.gui_layout_content_4
                                                        << recent.packet_list_show
                                                        << recent.tree_view_show
                                                        << recent.byte_view_show
                                                        << recent.packet_diagram_show;
 
     if (cur_layout_ == new_layout) return;
-
-    QSplitter *parents[3];
 
     // Reparent all widgets and add them back in the proper order below.
     // This hides each widget as well.
@@ -91,24 +90,29 @@ void MainWindow::layoutPanes()
     packet_diagram_->setParent(main_stack_);
     empty_pane_.setParent(main_stack_);
     extra_split_.setParent(main_stack_);
+    extra_split2_.setParent(main_stack_);
 
     // XXX We should try to preserve geometries if we can, e.g. by
     // checking to see if the layout type is the same.
     switch(prefs.gui_layout_type) {
-    case(layout_type_2):
-    case(layout_type_1):
-        extra_split_.setOrientation(Qt::Horizontal);
-        /* Fall Through */
-    case(layout_type_5):
+        // main orientation is vertical
+    case(layout_type_3_vertical):
+    case(layout_type_1_top_2_bot):
+    case(layout_type_2_top_1_bot):
+    case(layout_type_4_quad):
         master_split_.setOrientation(Qt::Vertical);
+        extra_split_.setOrientation(Qt::Horizontal);
+        extra_split2_.setOrientation(Qt::Horizontal);
         break;
 
-    case(layout_type_4):
-    case(layout_type_3):
-        extra_split_.setOrientation(Qt::Vertical);
-        /* Fall Through */
-    case(layout_type_6):
+        // main orientation is horizontal
+    case(layout_type_1_left_2_right):
+    case(layout_type_2_left_1_right):
+    case(layout_type_3_horizontal):
+    case(layout_type_4_horizontal):
         master_split_.setOrientation(Qt::Horizontal);
+        extra_split_.setOrientation(Qt::Vertical);
+        extra_split2_.setOrientation(Qt::Vertical);
         break;
 
     default:
@@ -116,48 +120,58 @@ void MainWindow::layoutPanes()
     }
 
     switch(prefs.gui_layout_type) {
-    case(layout_type_5):
-    case(layout_type_6):
-        parents[0] = &master_split_;
-        parents[1] = &master_split_;
-        parents[2] = &master_split_;
+
+    case(layout_type_3_vertical):
+    case(layout_type_3_horizontal):
+        master_split_.addWidget(getLayoutWidget(prefs.gui_layout_content_1));
+        master_split_.addWidget(getLayoutWidget(prefs.gui_layout_content_2));
+        master_split_.addWidget(getLayoutWidget(prefs.gui_layout_content_3));
         break;
-    case(layout_type_2):
-    case(layout_type_4):
-        parents[0] = &master_split_;
-        parents[1] = &extra_split_;
-        parents[2] = &extra_split_;
+
+    case(layout_type_1_top_2_bot):
+    case(layout_type_1_left_2_right):
+        master_split_.addWidget(getLayoutWidget(prefs.gui_layout_content_1));
+        master_split_.addWidget(&extra_split_);
+        extra_split_.addWidget(getLayoutWidget(prefs.gui_layout_content_2));
+        extra_split_.addWidget(getLayoutWidget(prefs.gui_layout_content_3));
         break;
-    case(layout_type_1):
-    case(layout_type_3):
-        parents[0] = &extra_split_;
-        parents[1] = &extra_split_;
-        parents[2] = &master_split_;
+
+    case(layout_type_2_top_1_bot):
+    case(layout_type_2_left_1_right):
+        master_split_.addWidget(&extra_split_);
+        extra_split_.addWidget(getLayoutWidget(prefs.gui_layout_content_1));
+        extra_split_.addWidget(getLayoutWidget(prefs.gui_layout_content_2));
+        master_split_.addWidget(getLayoutWidget(prefs.gui_layout_content_3));
         break;
+
+    case(layout_type_4_horizontal):
+        master_split_.addWidget(getLayoutWidget(prefs.gui_layout_content_1));
+        master_split_.addWidget(getLayoutWidget(prefs.gui_layout_content_2));
+        master_split_.addWidget(getLayoutWidget(prefs.gui_layout_content_3));
+        master_split_.addWidget(getLayoutWidget(prefs.gui_layout_content_4));
+        break;
+
+    case(layout_type_4_quad):
+        master_split_.addWidget(&extra_split_);
+        master_split_.addWidget(&extra_split2_);
+        extra_split_.addWidget(getLayoutWidget(prefs.gui_layout_content_1));
+        extra_split_.addWidget(getLayoutWidget(prefs.gui_layout_content_2));
+        extra_split2_.addWidget(getLayoutWidget(prefs.gui_layout_content_3));
+        extra_split2_.addWidget(getLayoutWidget(prefs.gui_layout_content_4));
+        break;
+
     default:
         ws_assert_not_reached();
     }
-
-    if (parents[0] == &extra_split_) {
-        master_split_.addWidget(&extra_split_);
-    }
-
-    parents[0]->addWidget(getLayoutWidget(prefs.gui_layout_content_1));
-
-    if (parents[2] == &extra_split_) {
-        master_split_.addWidget(&extra_split_);
-    }
-
-    parents[1]->addWidget(getLayoutWidget(prefs.gui_layout_content_2));
-    parents[2]->addWidget(getLayoutWidget(prefs.gui_layout_content_3));
 
     // Show the packet list here to prevent pending resize events changing columns
     // when the packet list is set as current widget for the first time.
     packet_list_->show();
 
-    const QList<QWidget *> ms_children = master_split_.findChildren<QWidget *>();
+    const QList<QWidget*> ms_children = master_split_.findChildren<QWidget*>();
 
     extra_split_.setVisible(ms_children.contains(&extra_split_));
+    extra_split2_.setVisible(ms_children.contains(&extra_split2_));
     packet_list_->setVisible(ms_children.contains(packet_list_) && recent.packet_list_show);
     proto_tree_->setVisible(ms_children.contains(proto_tree_) && recent.tree_view_show);
     byte_view_tab_->setVisible(ms_children.contains(byte_view_tab_) && recent.byte_view_show);
