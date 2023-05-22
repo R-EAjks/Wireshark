@@ -225,21 +225,21 @@ class case_tshark_z_expert(subprocesstest.SubprocessTestCase):
     def test_tshark_z_expert_all(self, cmd_tshark, capture_file):
         self.assertRun((cmd_tshark, '-q', '-z', 'expert',
             '-r', capture_file('http-ooo.pcap')))
-        self.assertTrue(self.grepOutput('Errors'))
+        self.assertFalse(self.grepOutput('Errors'))
         self.assertTrue(self.grepOutput('Warns'))
         self.assertTrue(self.grepOutput('Chats'))
 
     def test_tshark_z_expert_error(self, cmd_tshark, capture_file):
         self.assertRun((cmd_tshark, '-q', '-z', 'expert,error',
             '-r', capture_file('http-ooo.pcap')))
-        self.assertTrue(self.grepOutput('Errors'))
+        self.assertFalse(self.grepOutput('Errors'))
         self.assertFalse(self.grepOutput('Warns'))
         self.assertFalse(self.grepOutput('Chats'))
 
     def test_tshark_z_expert_warn(self, cmd_tshark, capture_file):
         self.assertRun((cmd_tshark, '-q', '-z', 'expert,warn',
             '-r', capture_file('http-ooo.pcap')))
-        self.assertTrue(self.grepOutput('Errors'))
+        self.assertFalse(self.grepOutput('Errors'))
         self.assertTrue(self.grepOutput('Warns'))
         self.assertFalse(self.grepOutput('Chats'))
 
@@ -253,7 +253,7 @@ class case_tshark_z_expert(subprocesstest.SubprocessTestCase):
     def test_tshark_z_expert_chat(self, cmd_tshark, capture_file):
         self.assertRun((cmd_tshark, '-q', '-z', 'expert,chat',
             '-r', capture_file('http-ooo.pcap')))
-        self.assertTrue(self.grepOutput('Errors'))
+        self.assertFalse(self.grepOutput('Errors'))
         self.assertTrue(self.grepOutput('Warns'))
         self.assertTrue(self.grepOutput('Chats'))
 
