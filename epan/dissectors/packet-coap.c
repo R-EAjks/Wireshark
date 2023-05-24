@@ -116,6 +116,11 @@ static dissector_handle_t oscore_handle;
 #define COAP_OCF_VERSION_MINOR_OFFSET 				6
 #define COAP_OCF_VERSION_MAJOR_OFFSET 				11
 
+/* Macros for making Block and Q-Block related code more readable */
+#define BLOCK1_NUMBER						1
+#define BLOCK2_NUMBER						2
+#define IS_QBLOCK						true
+
 /*
  * Transaction Type
  */
@@ -784,22 +789,33 @@ dissect_coap_opt_accept(tvbuff_t *tvb, proto_item *head_item, proto_tree *subtre
 }
 
 static void
-dissect_coap_opt_block(tvbuff_t *tvb, proto_item *head_item, proto_tree *subtree, gint offset, gint opt_length, coap_info *coinfo, coap_common_dissect_t *dissect_hf)
+dissect_coap_opt_block(tvbuff_t *tvb, proto_item *head_item, proto_tree *subtree, gint offset, gint opt_length, coap_info *coinfo, coap_common_dissect_t *dissect_hf, gboolean uses_qblock_transfer, guint block_option_type)
 {
 	guint8      val = 0;
 	guint       encoded_block_size;
 	guint       block_esize;
+	guint       block_number = 0;
+	guint       block_mflag = 0;
 
-	if (opt_length == 0) {
-		coinfo->block_number = 0;
-		val = 0;
-	} else {
-		coinfo->block_number = coap_get_opt_uint(tvb, offset, opt_length) >> 4;
+	if (opt_length != 0) {
+		block_number = coap_get_opt_uint(tvb, offset, opt_length) >> 4;
 		val = tvb_get_guint8(tvb, offset + opt_length - 1) & 0x0f;
 	}
 
+	block_mflag = (val & COAP_BLOCK_MFLAG_MASK) >> 3;
+
+	if (uses_qblock_transfer) {
+		coinfo->qblock_option = block_option_type;
+		coinfo->qblock_number = block_number;
+		coinfo->qblock_mflag = block_mflag;
+	} else {
+		coinfo->block_option = block_option_type;
+		coinfo->block_number = block_number;
+		coinfo->block_mflag = block_mflag;
+	}
+
 	proto_tree_add_uint(subtree, dissect_hf->hf.opt_block_number,
-	    tvb, offset, opt_length, coinfo->block_number);
+	    tvb, offset, opt_length, block_number);
 
 	/* More flag in the end of the option */
 	coinfo->block_mflag = (val & COAP_BLOCK_MFLAG_MASK) >> 3;
@@ -814,7 +830,7 @@ dissect_coap_opt_block(tvbuff_t *tvb, proto_item *head_item, proto_tree *subtree
 
 	/* add info to the head of the packet detail */
 	proto_item_append_text(head_item, ": NUM:%u, M:%u, SZX:%u",
-	    coinfo->block_number, coinfo->block_mflag, block_esize);
+	    block_number, block_mflag, block_esize);
 }
 
 static void
@@ -1082,24 +1098,20 @@ dissect_coap_options_main(tvbuff_t *tvb, packet_info *pinfo, proto_tree *coap_tr
 		    opt_length, dissect_hf->hf.opt_no_response);
 		break;
 	case COAP_OPT_BLOCK2:
-		coinfo->block_option = 2;
 		dissect_coap_opt_block(tvb, item, subtree, offset,
-		    opt_length, coinfo, dissect_hf);
+		    opt_length, coinfo, dissect_hf, !IS_QBLOCK, BLOCK1_NUMBER);
 		break;
 	case COAP_OPT_BLOCK1:
-		coinfo->block_option = 1;
 		dissect_coap_opt_block(tvb, item, subtree, offset,
-		    opt_length, coinfo, dissect_hf);
+		    opt_length, coinfo, dissect_hf, !IS_QBLOCK, BLOCK2_NUMBER);
 		break;
 	case COAP_OPT_QBLOCK2:
-		coinfo->block_option = 2;
 		dissect_coap_opt_block(tvb, item, subtree, offset,
-		    opt_length, coinfo, dissect_hf);
+		    opt_length, coinfo, dissect_hf, IS_QBLOCK, BLOCK2_NUMBER);
 		break;
 	case COAP_OPT_QBLOCK1:
-		coinfo->block_option = 1;
 		dissect_coap_opt_block(tvb, item, subtree, offset,
-		    opt_length, coinfo, dissect_hf);
+		    opt_length, coinfo, dissect_hf, IS_QBLOCK, BLOCK1_NUMBER);
 		break;
 	case COAP_OPT_IF_NONE_MATCH:
 		break;
@@ -1300,6 +1312,13 @@ coap_frame_length(tvbuff_t *tvb, guint offset, gint *size)
 	}
 }
 
+static
+gboolean uses_mflag(guint block_option_type, guint8 code_class) {
+	/* The M bit is used in Block1 Option in a request and in Block2 Option in a response */
+	return ((block_option_type == 1) && (code_class == 0)) ||
+			((block_option_type == 2) && (code_class >= 2) && (code_class <= 5));
+}
+
 static int
 dissect_coap_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, coap_parent_protocol parent_protocol, gboolean is_coap_for_tmf)
 {
@@ -1425,6 +1444,9 @@ dissect_coap_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree,
 	coinfo->block_option = 0;
 	coinfo->block_number = DEFAULT_COAP_BLOCK_NUMBER;
 	coinfo->block_mflag  = 0;
+	coinfo->qblock_option = 0;
+	coinfo->qblock_number = DEFAULT_COAP_BLOCK_NUMBER;
+	coinfo->qblock_mflag  = 0;
 	coinfo->uri_str_strbuf   = wmem_strbuf_create(pinfo->pool);
 	coinfo->uri_query_strbuf = wmem_strbuf_create(pinfo->pool);
 	 /* Allocate pointers and static elements of oscore_info_t, arrays are allocated only if object security option is found during option parsing */
@@ -1549,6 +1571,7 @@ dissect_coap_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree,
 			dissect_coap_payload(tvb, pinfo, coap_tree, parent_tree, offset, coap_length,
 					     code_class, coinfo, &dissect_coap_hf, FALSE);
 		} else {
+			// TODO: Deal with Q-Block-Transfer
 			proto_tree_add_bytes_format(coap_tree, hf_block_payload, tvb, offset,
 						    coap_length - offset, NULL, "Block Payload");
 			pi = proto_tree_add_uint(coap_tree, hf_block_length, tvb, offset, 0, coap_length - offset);
@@ -1571,11 +1594,16 @@ dissect_coap_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree,
 	if (coap_token_str != NULL)
 		col_append_fstr(pinfo->cinfo, COL_INFO, ", TKN:%s", coap_token_str);
 	if (coinfo->block_number != DEFAULT_COAP_BLOCK_NUMBER) {
-		/* The M bit is used in Block1 Option in a request and in Block2 Option in a response */
-		gboolean mflag_is_used = (((coinfo->block_option == 1) && (code_class == 0)) ||
-					  ((coinfo->block_option == 2) && (code_class >= 2) && (code_class <= 5)));
+		gboolean mflag_is_used = uses_mflag(coinfo->block_option, code_class);
 		col_append_fstr(pinfo->cinfo, COL_INFO, ", %sBlock #%u",
 				(coinfo->block_mflag || !mflag_is_used) ? "" : "End of ", coinfo->block_number);
+	}
+	if (coinfo->qblock_number != DEFAULT_COAP_BLOCK_NUMBER) {
+		// TODO: Usage of both Block and Q-Block options at the same time should be labelled as
+		//       a malformed packet, see RFC 9177, section 4.1
+		gboolean mflag_is_used = uses_mflag(coinfo->qblock_option, code_class);
+		col_append_fstr(pinfo->cinfo, COL_INFO, ", %sQ-Block #%u",
+				(coinfo->qblock_mflag || !mflag_is_used) ? "" : "End of ", coinfo->qblock_number);
 	}
 	if (wmem_strbuf_get_len(coinfo->uri_str_strbuf) > 0) {
 		col_append_fstr(pinfo->cinfo, COL_INFO, ", %s", format_text(pinfo->pool, wmem_strbuf_get_str(coinfo->uri_str_strbuf), wmem_strbuf_get_len(coinfo->uri_str_strbuf)));
