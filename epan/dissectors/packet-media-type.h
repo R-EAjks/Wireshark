@@ -19,6 +19,14 @@ typedef enum {
 	MEDIA_CONTAINER_OTHER			/* Everything else */
 } media_container_type_t;
 
+/* Used for Media Type Export Object feature */
+typedef struct _media_eo_t {
+        gchar   *hostname;
+        gchar   *filename;
+        gchar   *content_type;
+        tvbuff_t *payload;
+} media_eo_t;
+
 /** Should be passed to dissectors called through the media_type
  *  dissector table. */
 typedef struct {

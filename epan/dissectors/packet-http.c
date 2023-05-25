@@ -55,7 +55,7 @@ void proto_register_message_http(void);
 void proto_reg_handoff_message_http(void);
 
 static int http_tap = -1;
-static int http_eo_tap = -1;
+static int media_eo_tap = -1;
 static int http_follow_tap = -1;
 static int credentials_tap = -1;
 
@@ -413,43 +413,6 @@ static dissector_table_t media_type_subdissector_table;
 static dissector_table_t streaming_content_type_dissector_table;
 static dissector_table_t upgrade_subdissector_table;
 static heur_dissector_list_t heur_subdissector_list;
-
-/* Used for HTTP Export Object feature */
-typedef struct _http_eo_t {
-	guint32  pkt_num;
-	gchar   *hostname;
-	gchar   *filename;
-	gchar   *content_type;
-	guint32  payload_len;
-	const guint8 *payload_data;
-} http_eo_t;
-
-static tap_packet_status
-http_eo_packet(void *tapdata, packet_info *pinfo, epan_dissect_t *edt _U_, const void *data, tap_flags_t flags _U_)
-{
-	export_object_list_t *object_list = (export_object_list_t *)tapdata;
-	const http_eo_t *eo_info = (const http_eo_t *)data;
-	export_object_entry_t *entry;
-
-	if(eo_info) { /* We have data waiting for us */
-		/* These values will be freed when the Export Object window
-		 * is closed. */
-		entry = g_new(export_object_entry_t, 1);
-
-		entry->pkt_num = pinfo->num;
-		entry->hostname = g_strdup(eo_info->hostname);
-		entry->content_type = g_strdup(eo_info->content_type);
-		entry->filename = eo_info->filename ? g_path_get_basename(eo_info->filename) : NULL;
-		entry->payload_len = eo_info->payload_len;
-		entry->payload_data = (guint8 *)g_memdup2(eo_info->payload_data, eo_info->payload_len);
-
-		object_list->add_entry(object_list->gui_data, entry);
-
-		return TAP_PACKET_REDRAW; /* State changed - window should be redrawn */
-	} else {
-		return TAP_PACKET_DONT_REDRAW; /* State unchanged - no window updates needed */
-	}
-}
 
 /* --- HTTP Status Codes */
 /* Note: The reference for uncommented entries is RFC 2616 */
@@ -1204,7 +1167,7 @@ dissect_http_message(tvbuff_t *tvb, int offset, packet_info *pinfo,
 	gboolean	have_seen_http = FALSE;
 	/*guint		i;*/
 	/*http_info_value_t *si;*/
-	http_eo_t       *eo_info;
+	media_eo_t       *eo_info;
 	heur_dtbl_entry_t *hdtbl_entry;
 	int reported_length;
 	guint16 word;
@@ -2144,18 +2107,17 @@ dissecting_body:
 		 * get the headers, so that this is just a fragment of Continuation
 		 * Data and not a complete object?
 		 */
-		if(have_tap_listener(http_eo_tap)) {
-			eo_info = wmem_new0(pinfo->pool, http_eo_t);
+		if(have_tap_listener(media_eo_tap)) {
+			eo_info = wmem_new0(pinfo->pool, media_eo_t);
 
 			if (curr) {
 				eo_info->hostname = curr->http_host;
 				eo_info->filename = curr->request_uri;
 			}
 			eo_info->content_type = headers->content_type;
-			eo_info->payload_len = tvb_captured_length(next_tvb);
-			eo_info->payload_data = tvb_get_ptr(next_tvb, 0, eo_info->payload_len);
+			eo_info->payload = next_tvb;
 
-			tap_queue_packet(http_eo_tap, pinfo, eo_info);
+			tap_queue_packet(media_eo_tap, pinfo, eo_info);
 		}
 
 		/* Send it to Follow HTTP Stream and mark as file data */
@@ -4824,8 +4786,6 @@ proto_register_http(void)
 	register_follow_stream(proto_http, "http_follow", tcp_follow_conv_filter, tcp_follow_index_filter, tcp_follow_address_filter,
 							tcp_port_to_display, follow_tvb_tap_listener,
 							get_tcp_stream_count, NULL);
-	http_eo_tap = register_export_object(proto_http, http_eo_packet, NULL);
-
 	/* compile patterns, exluding "/" */
 	ws_mempbrk_compile(&pbrk_gen_delims, ":?#[]@");
 	/* exlude "=" */
@@ -4910,6 +4870,11 @@ proto_reg_handoff_http(void)
 	dissector_add_uint("acdr.tls_application", TLS_APP_HTTP, http_handle);
 	dissector_add_uint("acdr.tls_application", TLS_APP_TR069, http_handle);
 	dissector_add_uint("ippusb", 0, http_tcp_handle);
+
+	register_eo_t *media_eo = get_eo_by_name("media_type");
+	if (media_eo) {
+		media_eo_tap = find_tap_id(get_eo_tap_listener_name(media_eo));
+	}
 }
 
 /*
