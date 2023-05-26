@@ -48,6 +48,8 @@
 #include <epan/expert.h>
 #include <epan/media_params.h>
 #include <epan/prefs.h>
+#include <epan/export_object.h>
+#include <epan/tap.h>
 #include <wsutil/str_util.h>
 #include "packet-imf.h"
 
@@ -60,6 +62,8 @@ void proto_reg_handoff_multipart(void);
 /* Dissector table for media requiring special attention in multipart
  * encapsulation. */
 static dissector_table_t multipart_media_subdissector_table;
+
+static int media_eo_tap = -1;
 
 /* Initialize the protocol and registered fields */
 static int proto_multipart = -1;
@@ -806,6 +810,15 @@ process_body_part(proto_tree *tree, tvbuff_t *tvb,
             }
 #endif
 
+            if (have_tap_listener(media_eo_tap)) {
+                media_eo_t *eo_info = wmem_new0(pinfo->pool, media_eo_t);
+
+                eo_info->filename = filename;
+                eo_info->content_type = content_type_str;
+                eo_info->payload = tmp_tvb;
+
+                tap_queue_packet(media_eo_tap, pinfo, eo_info);
+            }
             /*
              * First try the dedicated multipart dissector table
              */
@@ -1159,6 +1172,11 @@ proto_reg_handoff_multipart(void)
      */
     dissector_add_string("media_type",
             "multipart/", multipart_handle);
+
+    register_eo_t *media_eo = get_eo_by_name("media_type");
+    if (media_eo) {
+        media_eo_tap = find_tap_id(get_eo_tap_listener_name(media_eo));
+    }
 }
 
 /*
