@@ -610,16 +610,25 @@ class case_dissect_tcp(subprocesstest.SubprocessTestCase):
     def check_tcp_out_of_order(self, cmd_tshark, dirs, extraArgs=[]):
         capture_file = os.path.join(dirs.capture_dir, 'http-ooo.pcap')
         self.assertRun([cmd_tshark,
-                '-r', capture_file,
-                '-otcp.reassemble_out_of_order:TRUE',
-                '-Y', 'http',
-            ] + extraArgs)
+                        '-r', capture_file,
+                        '-otcp.reassemble_out_of_order:TRUE',
+                        '-Y', 'http',
+                        ] + extraArgs)
         self.assertEqual(self.countOutput('HTTP'), 5)
         self.assertTrue(self.grepOutput(r'^\s*4\s.*PUT /1 HTTP/1.1'))
         self.assertTrue(self.grepOutput(r'^\s*7\s.*GET /2 HTTP/1.1'))
         self.assertTrue(self.grepOutput(r'^\s*10\s.*PUT /3 HTTP/1.1'))
         self.assertTrue(self.grepOutput(r'^\s*11\s.*PUT /4 HTTP/1.1'))
         self.assertTrue(self.grepOutput(r'^\s*15\s.*PUT /5 HTTP/1.1'))
+
+    def test_check_tcp_out_of_order_labeled_correctly(self, cmd_tshark, dirs):
+        capture_file = os.path.join(dirs.capture_dir, 'tcp-ooo.pcapng')
+        self.assertRun([cmd_tshark,
+                        '-r', capture_file,
+                        '-otcp.reassemble_out_of_order:TRUE',
+                        '-Y', 'frame.number == 41',
+                        ])
+        self.assertTrue(self.grepOutput(r'\[TCP Out-Of-Order\] , Application Data'))
 
     def test_tcp_out_of_order_onepass(self, cmd_tshark, dirs):
         self.check_tcp_out_of_order(cmd_tshark, dirs)

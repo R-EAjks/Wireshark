@@ -2394,8 +2394,29 @@ finished_fwd:
          *
          * We should still try to flag Spurious Retransmissions though.
          */
-        if (seglen > 1 && tcpd->fwd->tcp_analyze_seq_info->nextseq - 1 == seq) {
+        tcp_analyze_seq_flow_info_t *seq_info = tcpd->fwd->tcp_analyze_seq_info;
+        if (seglen > 1 && seq_info->nextseq - 1 == seq) {
             seq_not_advanced = FALSE;
+        }
+
+        /* This segment should still be considered as advancing the sequence if
+         * its sequence number matches the next expected sequence number.
+         *
+         * However, if the sequence isn't the same as the previous packets next
+         * sequence, then it is out of order.
+         */
+        if(seglen > 1){
+            guint32 assumed_next_seq = seq + seglen + (flags & (TH_SYN | TH_FIN) ? 1 : 0);
+            if(seq_info->nextseq == assumed_next_seq){
+                seq_not_advanced = FALSE;
+                if(seq != seq_info->nextseq){
+                    if(!tcpd->ta){
+                        tcp_analyze_get_acked_struct(pinfo->num, seq, ack, TRUE, tcpd);
+                    }
+                    tcpd->ta->flags|=TCP_A_OUT_OF_ORDER;
+                    goto finished_checking_retransmission_type;
+                }
+            }
         }
 
         /* Check for spurious retransmission. If the current seq + segment length
