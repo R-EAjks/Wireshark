@@ -15,6 +15,7 @@
 
 extern FILE_T file_open(const char *path);
 extern FILE_T file_fdopen(int fildes);
+extern FILE_T file_ioopen(GIOChannel *io_chan);
 extern void file_set_random_access(FILE_T stream, gboolean random_flag, GPtrArray *seek);
 WS_DLL_PUBLIC gint64 file_seek(FILE_T stream, gint64 offset, int whence, int *err);
 WS_DLL_PUBLIC gint64 file_tell(FILE_T stream);

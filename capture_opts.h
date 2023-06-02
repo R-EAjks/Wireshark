@@ -330,6 +330,8 @@ typedef struct capture_options_tag {
     /* internally used (don't touch from outside) */
     gboolean           output_to_pipe;        /**< save_file is a pipe (named or stdout) */
     gboolean           capture_child;         /**< hidden option: Wireshark child mode */
+    gboolean           use_data_pipe;         /**< request dumpcap send data over a pipe to tshark */
+    int                data_pipe_fd;          /**< the fd for the data pipe */
     gboolean           stop_after_extcaps;    /**< request dumpcap stop after last extcap */
     gboolean           wait_for_extcap_cbs;   /**< extcaps terminated, waiting for callbacks */
     gchar             *compress_type;         /**< compress type */

@@ -789,139 +789,14 @@ heuristic_uses_extension(unsigned int i, const char *extension)
 	return FALSE;	/* it's not one of them */
 }
 
-/* Opens a file and prepares a wtap struct.
- * If "do_random" is TRUE, it opens the file twice; the second open
- * allows the application to do random-access I/O without moving
- * the seek offset for sequential I/O, which is used by Wireshark
- * so that it can do sequential I/O to a capture file that's being
- * written to as new packets arrive independently of random I/O done
- * to display protocol trees for packets when they're selected.
- */
-wtap *
-wtap_open_offline(const char *filename, unsigned int type, int *err, char **err_info,
-		  gboolean do_random)
+static wtap *
+wtap_open_common(wtap *wth, const char *filename, unsigned int type, int *err, char **err_info)
 {
-	int	fd;
-	ws_statb64 statb;
-	gboolean ispipe = FALSE;
-	wtap	*wth;
 	unsigned int	i;
-	gboolean use_stdin = FALSE;
 	gchar *extension;
 	wtap_block_t shb;
 
-	*err = 0;
-	*err_info = NULL;
-
-	/* open standard input if filename is '-' */
-	if (strcmp(filename, "-") == 0)
-		use_stdin = TRUE;
-
-	/* First, make sure the file is valid */
-	if (use_stdin) {
-		if (ws_fstat64(0, &statb) < 0) {
-			*err = errno;
-			return NULL;
-		}
-	} else {
-		if (ws_stat64(filename, &statb) < 0) {
-			*err = errno;
-			return NULL;
-		}
-	}
-	if (S_ISFIFO(statb.st_mode)) {
-		/*
-		 * Opens of FIFOs are allowed only when not opening
-		 * for random access.
-		 *
-		 * Currently, we do seeking when trying to find out
-		 * the file type, but our I/O routines do some amount
-		 * of buffering, and do backward seeks within the buffer
-		 * if possible, so at least some file types can be
-		 * opened from pipes, so we don't completely disallow opens
-		 * of pipes.
-		 */
-		if (do_random) {
-			*err = WTAP_ERR_RANDOM_OPEN_PIPE;
-			return NULL;
-		}
-		ispipe = TRUE;
-	} else if (S_ISDIR(statb.st_mode)) {
-		/*
-		 * Return different errors for "this is a directory"
-		 * and "this is some random special file type", so
-		 * the user can get a potentially more helpful error.
-		 */
-		*err = EISDIR;
-		return NULL;
-	} else if (! S_ISREG(statb.st_mode)) {
-		*err = WTAP_ERR_NOT_REGULAR_FILE;
-		return NULL;
-	}
-
-	/*
-	 * We need two independent descriptors for random access, so
-	 * they have different file positions.  If we're opening the
-	 * standard input, we can only dup it to get additional
-	 * descriptors, so we can't have two independent descriptors,
-	 * and thus can't do random access.
-	 */
-	if (use_stdin && do_random) {
-		*err = WTAP_ERR_RANDOM_OPEN_STDIN;
-		return NULL;
-	}
-
-	errno = ENOMEM;
-	wth = g_new0(wtap, 1);
-
-	/* Open the file */
-	errno = WTAP_ERR_CANT_OPEN;
-	if (use_stdin) {
-		/*
-		 * We dup FD 0, so that we don't have to worry about
-		 * a file_close of wth->fh closing the standard
-		 * input of the process.
-		 */
-		fd = ws_dup(0);
-		if (fd < 0) {
-			*err = errno;
-			g_free(wth);
-			return NULL;
-		}
-#ifdef _WIN32
-		if (_setmode(fd, O_BINARY) == -1) {
-			/* "Shouldn't happen" */
-			*err = errno;
-			g_free(wth);
-			return NULL;
-		}
-#endif
-		if (!(wth->fh = file_fdopen(fd))) {
-			*err = errno;
-			ws_close(fd);
-			g_free(wth);
-			return NULL;
-		}
-	} else {
-		if (!(wth->fh = file_open(filename))) {
-			*err = errno;
-			g_free(wth);
-			return NULL;
-		}
-	}
-
-	if (do_random) {
-		if (!(wth->random_fh = file_open(filename))) {
-			*err = errno;
-			file_close(wth->fh);
-			g_free(wth);
-			return NULL;
-		}
-	} else
-		wth->random_fh = NULL;
-
 	/* initialization */
-	wth->ispipe = ispipe;
 	wth->file_encap = WTAP_ENCAP_UNKNOWN;
 	wth->subtype_sequential_close = NULL;
 	wth->subtype_close = NULL;
@@ -1026,7 +901,7 @@ wtap_open_offline(const char *filename, unsigned int type, int *err, char **err_
 
 
 	/* Does this file's name have an extension? */
-	extension = get_file_extension(filename);
+	extension = get_file_extension(wth->pathname);
 	if (extension != NULL) {
 		/* Yes - try the heuristic types that use that extension first. */
 		for (i = heuristic_open_routine_idx; i < open_info_arr->len; i++) {
@@ -1199,6 +1074,280 @@ fail:
 
 success:
 	return wth;
+}
+
+/* Opens a file and prepares a wtap struct.
+ * If "do_random" is TRUE, it opens the file twice; the second open
+ * allows the application to do random-access I/O without moving
+ * the seek offset for sequential I/O, which is used by Wireshark
+ * so that it can do sequential I/O to a capture file that's being
+ * written to as new packets arrive independently of random I/O done
+ * to display protocol trees for packets when they're selected.
+ */
+wtap *
+wtap_open_offline(const char *filename, unsigned int type, int *err, char **err_info,
+		  gboolean do_random)
+{
+	int	fd;
+	ws_statb64 statb;
+	gboolean ispipe = FALSE;
+	wtap	*wth;
+	gboolean use_stdin = FALSE;
+
+	*err = 0;
+	*err_info = NULL;
+
+	/* open standard input if filename is '-' */
+	if (strcmp(filename, "-") == 0)
+		use_stdin = TRUE;
+
+	/* First, make sure the file is valid */
+	if (use_stdin) {
+		if (ws_fstat64(0, &statb) < 0) {
+			*err = errno;
+			return NULL;
+		}
+	} else {
+		if (ws_stat64(filename, &statb) < 0) {
+			*err = errno;
+			return NULL;
+		}
+	}
+	if (S_ISFIFO(statb.st_mode)) {
+		/*
+		 * Opens of FIFOs are allowed only when not opening
+		 * for random access.
+		 *
+		 * Currently, we do seeking when trying to find out
+		 * the file type, but our I/O routines do some amount
+		 * of buffering, and do backward seeks within the buffer
+		 * if possible, so at least some file types can be
+		 * opened from pipes, so we don't completely disallow opens
+		 * of pipes.
+		 */
+		if (do_random) {
+			*err = WTAP_ERR_RANDOM_OPEN_PIPE;
+			return NULL;
+		}
+		ispipe = TRUE;
+	} else if (S_ISDIR(statb.st_mode)) {
+		/*
+		 * Return different errors for "this is a directory"
+		 * and "this is some random special file type", so
+		 * the user can get a potentially more helpful error.
+		 */
+		*err = EISDIR;
+		return NULL;
+	} else if (! S_ISREG(statb.st_mode)) {
+		*err = WTAP_ERR_NOT_REGULAR_FILE;
+		return NULL;
+	}
+
+	/*
+	 * We need two independent descriptors for random access, so
+	 * they have different file positions.  If we're opening the
+	 * standard input, we can only dup it to get additional
+	 * descriptors, so we can't have two independent descriptors,
+	 * and thus can't do random access.
+	 */
+	if (use_stdin && do_random) {
+		*err = WTAP_ERR_RANDOM_OPEN_STDIN;
+		return NULL;
+	}
+
+	errno = ENOMEM;
+	wth = g_new0(wtap, 1);
+
+	/* Open the file */
+	errno = WTAP_ERR_CANT_OPEN;
+	if (use_stdin) {
+		/*
+		 * We dup FD 0, so that we don't have to worry about
+		 * a file_close of wth->fh closing the standard
+		 * input of the process.
+		 * (Since GIOChannels don't set close_on_unref on
+		 * file descriptors by default, maybe we don't need to
+		 * do this now.)
+		 */
+		fd = ws_dup(0);
+		if (fd < 0) {
+			*err = errno;
+			g_free(wth);
+			return NULL;
+		}
+#ifdef _WIN32
+		if (_setmode(fd, O_BINARY) == -1) {
+			/* "Shouldn't happen" */
+			*err = errno;
+			g_free(wth);
+			return NULL;
+		}
+#endif
+		if (!(wth->fh = file_fdopen(fd))) {
+			*err = errno;
+			ws_close(fd);
+			g_free(wth);
+			return NULL;
+		}
+	} else {
+		if (!(wth->fh = file_open(filename))) {
+			*err = errno;
+			g_free(wth);
+			return NULL;
+		}
+	}
+
+	if (do_random) {
+		if (!(wth->random_fh = file_open(filename))) {
+			*err = errno;
+			file_close(wth->fh);
+			g_free(wth);
+			return NULL;
+		}
+	} else
+		wth->random_fh = NULL;
+
+	wth->ispipe = ispipe;
+	return wtap_open_common(wth, filename, type, err, err_info);
+}
+
+/* Prepares a wtap struct using an open GIOChannel.
+ * If "do_random" is TRUE, it opens the file twice; the second open
+ * allows the application to do random-access I/O without moving
+ * the seek offset for sequential I/O, which is used by Wireshark
+ * so that it can do sequential I/O to a capture file that's being
+ * written to as new packets arrive independently of random I/O done
+ * to display protocol trees for packets when they're selected.
+ */
+wtap *
+wtap_open_io(GIOChannel *io_chan, unsigned int type, int *err, char **err_info,
+		  gboolean do_random)
+{
+	ws_statb64 statb;
+	gboolean ispipe = FALSE;
+	wtap	*wth;
+	gboolean use_stdin = FALSE;
+	int fd;
+
+	*err = 0;
+	*err_info = NULL;
+
+	if (io_chan == NULL)
+		return NULL;
+
+#ifdef WIN32
+	fd = g_io_channel_win32_get_fd(io_chan);
+#else
+	fd = g_io_channel_unix_get_fd(io_chan);
+#endif
+
+	if (fd == 0) {
+		use_stdin = TRUE;
+	}
+
+	/* First, make sure the file descriptor is valid */
+	if (ws_fstat64(fd, &statb) < 0) {
+		*err = errno;
+		return NULL;
+	}
+
+	if (S_ISFIFO(statb.st_mode)) {
+		/*
+		 * Opens of FIFOs are allowed only when not opening
+		 * for random access.
+		 *
+		 * Currently, we do seeking when trying to find out
+		 * the file type, but our I/O routines do some amount
+		 * of buffering, and do backward seeks within the buffer
+		 * if possible, so at least some file types can be
+		 * opened from pipes, so we don't completely disallow opens
+		 * of pipes.
+		 */
+		if (do_random) {
+			*err = WTAP_ERR_RANDOM_OPEN_PIPE;
+			return NULL;
+		}
+		ispipe = TRUE;
+	} else if (S_ISDIR(statb.st_mode)) {
+		/*
+		 * Return different errors for "this is a directory"
+		 * and "this is some random special file type", so
+		 * the user can get a potentially more helpful error.
+		 */
+		*err = EISDIR;
+		return NULL;
+	} else if (! S_ISREG(statb.st_mode)) {
+		*err = WTAP_ERR_NOT_REGULAR_FILE;
+		return NULL;
+	}
+
+	/*
+	 * We need two independent descriptors for random access, so
+	 * they have different file positions.  If we're opening the
+	 * standard input, we can only dup it to get additional
+	 * descriptors, so we can't have two independent descriptors,
+	 * and thus can't do random access.
+	 */
+	if (use_stdin && do_random) {
+	      *err = WTAP_ERR_RANDOM_OPEN_STDIN;
+	       return NULL;
+	}
+
+	/*
+	 * If this is a regular file, it will work (but why not use
+	 * wtap_open_offline() instead?). We won't have a filename, unless
+	 * we go to some lengths to find out what filename was used to open
+	 * the file descriptor, and verify that that filename still exists,
+	 * etc. I don't think we need to do so.
+	 */
+
+	errno = ENOMEM;
+	wth = g_new0(wtap, 1);
+
+	/* Open the file */
+	errno = WTAP_ERR_CANT_OPEN;
+
+	/*
+	 * We dup FD 0, so that we don't have to worry about
+	 * a file_close of wth->fh closing the standard
+	 * input of the process.
+	 */
+	if (use_stdin) {
+		fd = ws_dup(0);
+		if (fd < 0) {
+			*err = errno;
+			g_free(wth);
+			return NULL;
+		}
+	}
+#ifdef _WIN32
+	if (_setmode(fd, O_BINARY) == -1) {
+		/* "Shouldn't happen" */
+		*err = errno;
+		g_free(wth);
+		return NULL;
+	}
+#endif
+	if (!(wth->fh = file_ioopen(io_chan))) {
+		*err = errno;
+		ws_close(fd);
+		g_free(wth);
+		return NULL;
+	}
+
+	if (do_random) {
+		if (!(wth->random_fh = file_fdopen(fd))) {
+			*err = errno;
+			file_close(wth->fh);
+			g_free(wth);
+			return NULL;
+		}
+	} else {
+		wth->random_fh = NULL;
+	}
+
+	wth->ispipe = ispipe;
+	return wtap_open_common(wth, "", type, err, err_info);
 }
 
 /*
