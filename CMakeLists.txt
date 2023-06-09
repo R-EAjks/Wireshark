@@ -178,12 +178,13 @@ if(WIN32)
 		if(DEFINED ENV{PLATFORM})
 			string(TOLOWER $ENV{PLATFORM} _vs_platform)
 		else()
-			set(_vs_platform "[undefined]") # x86
+			set(_vs_platform "x64") # Default value
+			message(STATUS "No explicit PLATFORM given. Using x64 as default.")
 		endif()
 		if(
-			(_vs_platform STREQUAL "x64" AND NOT WIRESHARK_TARGET_PLATFORM STREQUAL "win64")
+			(_vs_platform STREQUAL "x86" AND NOT WIRESHARK_TARGET_PLATFORM STREQUAL "win32")
 			OR
-			(_vs_platform STREQUAL "[undefined]" AND NOT WIRESHARK_TARGET_PLATFORM STREQUAL "win32")
+			(_vs_platform STREQUAL "x64" AND NOT WIRESHARK_TARGET_PLATFORM STREQUAL "win64")
 		)
 			message(FATAL_ERROR "The PLATFORM environment variable (${_vs_platform})"
 				" doesn't match the generator platform (${WIRESHARK_TARGET_PLATFORM})")
@@ -207,8 +208,10 @@ and CPU target ${WIRESHARK_TARGET_PROCESSOR_ARCHITECTURE}"
 			file( TO_CMAKE_PATH "$ENV{WIRESHARK_BASE_DIR}" _WS_BASE_DIR )
 			set( _PROJECT_LIB_DIR "${_WS_BASE_DIR}/wireshark-${WIRESHARK_TARGET_PLATFORM}-libs" )
 		else()
-			# Don't know what to do
-			message(FATAL_ERROR "Neither WIRESHARK_BASE_DIR or WIRESHARK_LIB_DIR are defined")
+			file( TO_CMAKE_PATH "${CMAKE_CURRENT_BINARY_DIR}" _WS_BASE_DIR ) # Default
+			set( _PROJECT_LIB_DIR "${_WS_BASE_DIR}/wireshark-${WIRESHARK_TARGET_PLATFORM}-libs" )
+			message(STATUS "Neither WIRESHARK_BASE_DIR or WIRESHARK_LIB_DIR is given. /
+Using ${CMAKE_CURRENT_BINARY_DIR} as default for WIRESHARK_BASE_DIR.")
 		endif()
 
 		# Download third-party libraries
