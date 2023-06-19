@@ -510,8 +510,10 @@ main_ui_->goToLineEdit->setValidator(goToLineQiv);
 #endif
     master_split_.setObjectName("splitterMaster");
     extra_split_.setObjectName("splitterExtra");
+    extra_split2_.setObjectName("splitterExtra2");
     master_split_.setChildrenCollapsible(false);
     extra_split_.setChildrenCollapsible(false);
+    extra_split2_.setChildrenCollapsible(false);
     main_ui_->mainStack->addWidget(&master_split_);
 
     empty_pane_.setObjectName("emptyPane");

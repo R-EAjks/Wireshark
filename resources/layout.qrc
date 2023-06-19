@@ -1,16 +1,20 @@
 <RCC>
     <qresource prefix="/layout">
-        <file>layout_1.png</file>
-        <file>layout_1@2x.png</file>
-        <file>layout_2.png</file>
-        <file>layout_2@2x.png</file>
-        <file>layout_3.png</file>
-        <file>layout_3@2x.png</file>
-        <file>layout_4.png</file>
-        <file>layout_4@2x.png</file>
-        <file>layout_5.png</file>
-        <file>layout_5@2x.png</file>
-        <file>layout_6.png</file>
-        <file>layout_6@2x.png</file>
+        <file>layout_2_top_1_bot.png</file>
+        <file>layout_2_top_1_bot@2x.png</file>
+        <file>layout_1_top_2_bot.png</file>
+        <file>layout_1_top_2_bot@2x.png</file>
+        <file>layout_2_left_1_right.png</file>
+        <file>layout_2_left_1_right@2x.png</file>
+        <file>layout_1_left_2_right.png</file>
+        <file>layout_1_left_2_right@2x.png</file>
+        <file>layout_3_vertical.png</file>
+        <file>layout_3_vertical@2x.png</file>
+        <file>layout_3_horizontal.png</file>
+        <file>layout_3_horizontal@2x.png</file>
+        <file>layout_4_quad.png</file>
+        <file>layout_4_quad@2x.png</file>
+        <file>layout_4_horizontal.png</file>
+        <file>layout_4_horizontal@2x.png</file>
     </qresource>
 </RCC>

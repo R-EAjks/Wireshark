@@ -37,6 +37,7 @@ private:
     pref_t *pref_layout_content_1_;
     pref_t *pref_layout_content_2_;
     pref_t *pref_layout_content_3_;
+    pref_t *pref_layout_content_4_;
     pref_t *pref_packet_list_separator_;
     pref_t *pref_packet_header_column_definition_;
     pref_t *pref_packet_list_hover_style_;
@@ -48,12 +49,14 @@ private:
     void updateWidgets();
 
 private slots:
-    void on_layout5ToolButton_toggled(bool checked);
-    void on_layout2ToolButton_toggled(bool checked);
-    void on_layout1ToolButton_toggled(bool checked);
-    void on_layout4ToolButton_toggled(bool checked);
-    void on_layout3ToolButton_toggled(bool checked);
-    void on_layout6ToolButton_toggled(bool checked);
+    void on_layout2Top1BotToolButton_toggled(bool checked);
+    void on_layout1Top2BotToolButton_toggled(bool checked);
+    void on_layout2Left1RightToolButton_toggled(bool checked);
+    void on_layout1Left2RightToolButton_toggled(bool checked);
+    void on_layout3VerticalToolButton_toggled(bool checked);
+    void on_layout3HorizontalToolButton_toggled(bool checked);
+    void on_layout4QuadToolButton_toggled(bool checked);
+    void on_layout4HorizontalToolButton_toggled(bool checked);
     void on_pane1PacketListRadioButton_toggled(bool checked);
     void on_pane1PacketDetailsRadioButton_toggled(bool checked);
     void on_pane1PacketBytesRadioButton_toggled(bool checked);
@@ -69,6 +72,11 @@ private slots:
     void on_pane3PacketBytesRadioButton_toggled(bool checked);
     void on_pane3PacketDiagramRadioButton_toggled(bool checked);
     void on_pane3NoneRadioButton_toggled(bool checked);
+    void on_pane4PacketListRadioButton_toggled(bool checked);
+    void on_pane4PacketDetailsRadioButton_toggled(bool checked);
+    void on_pane4PacketBytesRadioButton_toggled(bool checked);
+    void on_pane4PacketDiagramRadioButton_toggled(bool checked);
+    void on_pane4NoneRadioButton_toggled(bool checked);
     void on_restoreButtonBox_clicked(QAbstractButton *button);
     void on_packetListSeparatorCheckBox_toggled(bool checked);
     void on_packetListHeaderShowColumnDefinition_toggled(bool checked);

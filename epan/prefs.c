@@ -2438,10 +2438,10 @@ static void
 gui_layout_callback(void)
 {
     if (prefs.gui_layout_type == layout_unused ||
-        prefs.gui_layout_type >= layout_type_max) {
+        prefs.gui_layout_type > layout_type_max) {
       /* XXX - report an error?  It's not a syntax error - we'd need to
          add a way of reporting a *semantic* error. */
-      prefs.gui_layout_type = layout_type_2;
+      prefs.gui_layout_type = layout_type_1_top_2_bot;
     }
 }
 
@@ -3378,7 +3378,7 @@ prefs_register_modules(void)
 
     prefs_register_uint_preference(gui_layout_module, "layout_type",
                                    "Layout type",
-                                   "Layout type (1-6)",
+                                   "Layout type (1-8)",
                                    10,
                                    (guint*)(void*)(&prefs.gui_layout_type));
     prefs_set_effect_flags_by_name(gui_layout_module, "layout_type", layout_gui_flags);
@@ -3400,6 +3400,12 @@ prefs_register_modules(void)
                        "Layout content of the pane 3",
                        (gint*)(void*)(&prefs.gui_layout_content_3), gui_layout_content, FALSE);
     prefs_set_effect_flags_by_name(gui_layout_module, "layout_content_3", layout_gui_flags);
+
+    prefs_register_enum_preference(gui_layout_module, "layout_content_4",
+                       "Layout content of the pane 4",
+                       "Layout content of the pane 4",
+                       (gint*)(void*)(&prefs.gui_layout_content_4), gui_layout_content, FALSE);
+    prefs_set_effect_flags_by_name(gui_layout_module, "layout_content_4", layout_gui_flags);
 
     prefs_register_bool_preference(gui_layout_module, "packet_list_separator.enabled",
                                    "Enable Packet List Separator",
@@ -4123,10 +4129,11 @@ pre_init_prefs(void)
     g_free(prefs.gui_start_title);
     prefs.gui_start_title            = g_strdup("The World's Most Popular Network Protocol Analyzer");
     prefs.gui_version_placement      = version_both;
-    prefs.gui_layout_type            = layout_type_2;
+    prefs.gui_layout_type            = layout_type_1_top_2_bot;
     prefs.gui_layout_content_1       = layout_pane_content_plist;
     prefs.gui_layout_content_2       = layout_pane_content_pdetails;
     prefs.gui_layout_content_3       = layout_pane_content_pbytes;
+    prefs.gui_layout_content_4       = layout_pane_content_pdiagram;
     prefs.gui_packet_list_elide_mode = ELIDE_RIGHT;
     prefs.gui_packet_list_show_related = TRUE;
     prefs.gui_packet_list_show_minimap = TRUE;
@@ -5014,7 +5021,8 @@ prefs_has_layout_pane_content (layout_pane_content_e layout_pane_content)
 {
     return ((prefs.gui_layout_content_1 == layout_pane_content) ||
             (prefs.gui_layout_content_2 == layout_pane_content) ||
-            (prefs.gui_layout_content_3 == layout_pane_content));
+            (prefs.gui_layout_content_3 == layout_pane_content) ||
+            (prefs.gui_layout_content_4 == layout_pane_content));
 }
 
 #define PRS_GUI_FILTER_LABEL             "gui.filter_expressions.label"

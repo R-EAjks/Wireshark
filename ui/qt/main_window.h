@@ -87,6 +87,7 @@ protected:
     WelcomePage *welcome_page_;
     QSplitter master_split_;
     QSplitter extra_split_;
+    QSplitter extra_split2_;
     QWidget empty_pane_;
     QVector<unsigned> cur_layout_;
 
