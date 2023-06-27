@@ -924,20 +924,23 @@ call_dissector_work(dissector_handle_t handle, tvbuff_t *tvb, packet_info *pinfo
 		len = call_dissector_through_handle(handle, tvb, pinfo, tree, data);
 	}
 	if (handle->protocol != NULL && !proto_is_pino(handle->protocol) && add_proto_name &&
-		(len == 0 || (tree && saved_tree_count == tree->tree_data->count))) {
+		(len == 0 || (tree && saved_tree_count == tree->tree_data->count) ||
+			(pinfo->desegment_offset == 0 && pinfo->desegment_len))) {
 		/*
 		 * We've added a layer and either the dissector didn't
 		 * accept the packet or we didn't add any items to the
-		 * tree. Remove it.
+		 * tree, or all the data of tvb was left for subsequent
+		 * dissecting due to reassembly. Remove it.
 		 */
 		while (wmem_list_count(pinfo->layers) > saved_layers_len) {
 			/*
 			 * Only reduce the layer number if the dissector
-			 * rejected the data. Since tree can be NULL on
+			 * rejected the data or all the data of tvb was left for
+			 * subsequent dissecting due to reassembly. Since tree can be NULL on
 			 * the first pass, we cannot check it or it will
 			 * break dissectors that rely on a stable value.
 			 */
-			remove_last_layer(pinfo, len == 0);
+			remove_last_layer(pinfo, (len == 0 || (pinfo->desegment_offset == 0 && pinfo->desegment_len)));
 		}
 	}
 	pinfo->current_proto = saved_proto;
