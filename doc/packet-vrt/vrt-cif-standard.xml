@@ -39,7 +39,7 @@
          <info level="warn" string="Dissector cannot parse the actual lists. Any subsequent fields will be wrong."/>
       </cifEnable>
       <cifEnable name="GPS ASCII" abbrev="gps_ascii" index="9">
-         <cifField name="GPS/INS Manufacturer OUI" abbrev="oui" offset="0" width="24" type="uint" descript="IEEE-registerd Organizationally Unique Idetifier of GPS manufacturer"/>
+         <cifField name="GPS/INS Manufacturer OUI" abbrev="oui" offset="0" width="24" type="uint" descript="IEEE-registered Organizationally Unique Identifier of GPS manufacturer"/>
          <cifField name="value" abbrev="val" offset="32" width="32" type="string" descript=""/>
       </cifEnable>
       <cifEnable name="Ephemeris Ref ID" abbrev="ephem_id" index="10">
@@ -49,7 +49,7 @@
          Rule 9.4.9-1 states it follows ECFEF Ephemeris format as given in Figure 9.4.3-2. However Figure 9.4.9-1: Relative Ephemeris Field Format
          is copied from Figure 9.4.5-1: Formatted GPS and INS Geolocation Fields. Table 9.4-1 also list the size matching the wrong figure -->
       <cifEnable name="Relative Ephemeris" abbrev="ephem" index="11">
-         <cifField name="GPS/INS Manufacturer OUI" abbrev="oui" offset="0" width="24" type="uint" descript="IEEE-registerd Organizationally Unique Idetifier of GPS manufacturer"/>
+         <cifField name="GPS/INS Manufacturer OUI" abbrev="oui" offset="0" width="24" type="uint" descript="IEEE-registered Organizationally Unique Identifier of GPS manufacturer"/>
          <cifField name="Fractional Timestamp Format" abbrev="tsf" offset="24" width="2" type="enum" descript="Format of integer timestamp field">
             <enum key="0" value = "Undefined"/>
             <enum key="1" value = "Sample Count Time"/>
@@ -63,10 +63,10 @@
             <enum key="3" value = "Other"/>
          </cifField>
          <cifField name="integer timestamp of position fix" abbrev="fix_tsi" offset="32" width="32" type="uint" descript="Integer timestamp of last position fix">
-            <info level="warn" string="Integer and Fraction timestamp values are not formated for tsi/tsf selection."/>
+            <info level="warn" string="Integer and Fraction timestamp values are not formatted for tsi/tsf selection."/>
          </cifField>
          <cifField name="fractional timestamp of position fix" abbrev="fix_tsf" offset="64" width="64" type="uint" descript="Fractional timestamp of last position fix">
-            <info level="warn" string="Integer and Fraction timestamp values are not formated for tsi/tsf selection."/>
+            <info level="warn" string="Integer and Fraction timestamp values are not formatted for tsi/tsf selection."/>
          </cifField>
          <cifField name="position x" abbrev="x" offset="128" width="32" type="fixed" point="5" units="meters" descript="Platform position on z axis"/>
          <cifField name="position y" abbrev="y" offset="160" width="32" type="fixed" point="5" units="meters" descript="Platform position on y axis"/>
@@ -79,7 +79,7 @@
          <cifField name="velocity z" abbrev="dz" offset="384" width="32" type="fixed" point="16" units="m/s" descript="Platform velocity along z axis"/>
       </cifEnable>
       <cifEnable name="ECEF Ephemeris" abbrev="ecef" index="12">
-         <cifField name="GPS/INS Manufacturer OUI" abbrev="oui" offset="0" width="24" type="uint" descript="IEEE-registerd Organizationally Unique Idetifier of GPS manufacturer"/>
+         <cifField name="GPS/INS Manufacturer OUI" abbrev="oui" offset="0" width="24" type="uint" descript="IEEE-registered Organizationally Unique Identifier of GPS manufacturer"/>
          <cifField name="Fractional Timestamp Format" abbrev="tsf" offset="24" width="2" type="enum" descript="Format of integer timestamp field">
             <enum key="0" value = "Undefined"/>
             <enum key="1" value = "Sample Count Time"/>
@@ -93,10 +93,10 @@
             <enum key="3" value = "Other"/>
          </cifField>
          <cifField name="integer timestamp of position fix" abbrev="fix_tsi" offset="32" width="32" type="uint" descript="Integer timestamp of last position fix">
-            <info level="warn" string="Integer and Fraction timestamp values are not formated for tsi/tsf selection."/>
+            <info level="warn" string="Integer and Fraction timestamp values are not formatted for tsi/tsf selection."/>
          </cifField>
          <cifField name="fractional timestamp of position fix" abbrev="fix_tsf" offset="64" width="64" type="uint" descript="Fractional timestamp of last position fix">
-            <info level="warn" string="Integer and Fraction timestamp values are not formated for tsi/tsf selection."/>
+            <info level="warn" string="Integer and Fraction timestamp values are not formatted for tsi/tsf selection."/>
          </cifField>
          <cifField name="position x" abbrev="x" offset="128" width="32" type="fixed" point="5" units="meters" descript="Platform position on z axis"/>
          <cifField name="position y" abbrev="y" offset="160" width="32" type="fixed" point="5" units="meters" descript="Platform position on y axis"/>
@@ -109,7 +109,7 @@
          <cifField name="velocity z" abbrev="dz" offset="384" width="32" type="fixed" point="16" units="m/s" descript="Platform velocity along z axis"/>
       </cifEnable>
       <cifEnable name="Formatted INS" abbrev="ins" index="13">
-         <cifField name="GPS/INS Manufacturer OUI" abbrev="oui" offset="0" width="24" type="uint" descript="IEEE-registerd Organizationally Unique Idetifier of GPS manufacturer"/>
+         <cifField name="GPS/INS Manufacturer OUI" abbrev="oui" offset="0" width="24" type="uint" descript="IEEE-registered Organizationally Unique Identifier of GPS manufacturer"/>
          <cifField name="Fractional Timestamp Format" abbrev="tsf" offset="24" width="2" type="enum" descript="Format of integer timestamp field">
             <enum key="0" value = "Undefined"/>
             <enum key="1" value = "Sample Count Time"/>
@@ -123,10 +123,10 @@
             <enum key="3" value = "Other"/>
          </cifField>
          <cifField name="integer timestamp of position fix" abbrev="fix_tsi" offset="32" width="32" type="uint" descript="Integer timestamp of last position fix">
-            <info level="warn" string="Integer and Fraction timestamp values are not formated for tsi/tsf selection."/>
+            <info level="warn" string="Integer and Fraction timestamp values are not formatted for tsi/tsf selection."/>
          </cifField>
          <cifField name="fractional timestamp of position fix" abbrev="fix_tsf" offset="64" width="64" type="uint" descript="Fractional timestamp of last position fix">
-            <info level="warn" string="Integer and Fraction timestamp values are not formated for tsi/tsf selection."/>
+            <info level="warn" string="Integer and Fraction timestamp values are not formatted for tsi/tsf selection."/>
          </cifField>
          <cifField name="latitude" abbrev="lat" offset="128" width="32" type="fixed" point="22" units="degrees" descript="latitude at last position fix"/>
          <cifField name="longitude" abbrev="long" offset="160" width="32" type="fixed" point="22" units="degrees" descript="longitude at last position fix"/>
@@ -137,7 +137,7 @@
          <cifField name="magnetic variation" abbrev="var" offset="320" width="32" type="fixed" point="22" units="degrees" descript="Magnetic variation from true north"/>
       </cifEnable>
       <cifEnable name="Formatted GPS" abbrev="gps" index="14">
-         <cifField name="GPS/INS Manufacturer OUI" abbrev="oui" offset="0" width="24" type="uint" descript="IEEE-registerd Organizationally Unique Idetifier of GPS manufacturer"/>
+         <cifField name="GPS/INS Manufacturer OUI" abbrev="oui" offset="0" width="24" type="uint" descript="IEEE-registered Organizationally Unique Identifier of GPS manufacturer"/>
          <cifField name="Fractional Timestamp Format" abbrev="tsf" offset="24" width="2" type="enum" descript="Format of integer timestamp field">
             <enum key="0" value = "Undefined"/>
             <enum key="1" value = "Sample Count Time"/>
@@ -151,10 +151,10 @@
             <enum key="3" value = "Other"/>
          </cifField>
          <cifField name="integer timestamp of position fix" abbrev="fix_tsi" offset="32" width="32" type="uint" descript="Integer timestamp of last position fix">
-            <info level="warn" string="Integer and Fraction timestamp values are not formated for tsi/tsf selection."/>
+            <info level="warn" string="Integer and Fraction timestamp values are not formatted for tsi/tsf selection."/>
          </cifField>
          <cifField name="fractional timestamp of position fix" abbrev="fix_tsf" offset="64" width="64" type="uint" descript="Fractional timestamp of last position fix">
-            <info level="warn" string="Integer and Fraction timestamp values are not formated for tsi/tsf selection."/>
+            <info level="warn" string="Integer and Fraction timestamp values are not formatted for tsi/tsf selection."/>
          </cifField>
          <cifField name="latitude" abbrev="lat" offset="128" width="32" type="fixed" point="22" units="degrees" descript="latitude at last position fix"/>
          <cifField name="longitude" abbrev="long" offset="160" width="32" type="fixed" point="22" units="degrees" descript="longitude at last position fix"/>
@@ -207,12 +207,12 @@
       </cifEnable>
       <cifEnable name="State-Event Indicators" abbrev="state" index="16">
          <cifField name="user" abbrev="user" offset="0" width="8" type="hex" descript="User defined indicator fields"/>
-         <cifField name="user flag 0" abbrev="u0" offset="8" width="1" type="bool" descript="User defiend indicator bit"/>
+         <cifField name="user flag 0" abbrev="u0" offset="8" width="1" type="bool" descript="User defined indicator bit"/>
          <cifField name="user flag 1" abbrev="u1" offset="9" width="1" type="bool" descript="User defined indicator bit"/>
          <!-- Sample frame is an added V49.2 feature legacy devices might use the bits differently -->
          <cifField name="sample frame" abbrev="frame" offset="10" width="2" type="enum" descript="Position of packet within frame (V49.2 feature)">
-            <enum key="0" vaule="Entire Frame or n/a"/>
-            <enum key="1" vaule="Start of Frame"/>
+            <enum key="0" value="Entire Frame or n/a"/>
+            <enum key="1" value="Start of Frame"/>
             <enum key="2" value="Continuation packet"/>
             <enum key="3" value="End of Frame"/>
          </cifField>
@@ -238,7 +238,7 @@
          <cifField name="calibrated time enable" abbrev="cal_time_en" offset="31" width="1" type="bool" descript="Calibrated time indicator enable"/>
       </cifEnable>
       <cifEnable name="Device Identifier" abbrev="dev_id" index="17">
-         <cifField name="Manufacturer OUI" abbrev="moui" offset="0" width="24" type="uint" descript="IEEE-registerd Organizationally Unique Identifier of device manufacturer"/>
+         <cifField name="Manufacturer OUI" abbrev="moui" offset="0" width="24" type="uint" descript="IEEE-registered Organizationally Unique Identifier of device manufacturer"/>
          <cifField name="Device Code" abbrev="dev" offset="32" width="16" type="uint" descript="Device model"/>
       </cifEnable>
       <cifEnable name="Temperature" abbrev="temp" index="18">
@@ -250,7 +250,7 @@
          </cifField>
       </cifEnable>
       <cifEnable name="Timestamp Adjustment" abbrev="ts_adj" index="20">
-         <cifField name="value" abbrev="val" offset="0" width="64" type="int" units="femto-second" descript="Delay between timestamp of data packet and reference point"/>
+         <cifField name="value" abbrev="val" offset="0" width="64" type="int" units="fs" descript="Delay between timestamp of data packet and reference point"/>
       </cifEnable>
       <cifEnable name="Sample Rate" abbrev="samp_rate" index="21">
          <cifField name="value" abbrev="val" offset="0" width="64" type="ufixed" point="20" units="Hz" descript="Sample rate of paired data packets"/>
@@ -281,7 +281,7 @@
          <cifField name="bandwidth" abbrev="val" offset="0" width="64" type="fixed" point="20" units="Hz" descript="Usable spectrum at output of reference point"/>
       </cifEnable>
       <cifEnable name="Reference Point Identifier" abbrev="ref_id" index="30">
-         <cifField name="Identifier" abbrev="value" offset="0" width="32" type="uint" descript="Stream id assigned of tiemstamp reference point"/>
+         <cifField name="Identifier" abbrev="value" offset="0" width="32" type="uint" descript="Stream id assigned of timestamp reference point"/>
       </cifEnable>
       <cifEnable name="Context Field Change Indicator" abbrev="cfci" index="31" />
    </cifMap>
@@ -469,10 +469,10 @@
          <cifField name="vertical" abbrev="vert" offset="0" width="16" type="fixed" point="7" units="degrees" descript="Vertical 3 dB width of main lobe at reference point"/>
          <cifField name="horizontal" abbrev="hor" offset="16" width="16" type="fixed" point="7" units="degrees" descript="Horizontal 3 dB width of main lobe at reference point"/>
       </cifEnable>
-      <cifEnable name="Spacial Reference Type" abbrev="ref_type" index="26">
-         <cifField name="identifier" abbrev="value" offset="0" width="16" type="hex" descript="User defiend identifier of antenna scan pattern"/>
+      <cifEnable name="Spatial Reference Type" abbrev="ref_type" index="26">
+         <cifField name="identifier" abbrev="value" offset="0" width="16" type="hex" descript="User defined identifier of antenna scan pattern"/>
       </cifEnable>
-      <cifEnable name="Spacial Scan Type" abbrev="scan_type" index="27">
+      <cifEnable name="Spatial Scan Type" abbrev="scan_type" index="27">
          <cifField name="beam type" abbrev="beam" offset="0" width="2" type="enum" descript="">
             <enum key="0" value="Not specified"/>
             <enum key="1" value="Beam or signal direction"/>
@@ -592,11 +592,11 @@
          <cifField name="id" abbrev="id" offset="0" width="16" type="hex" descript="Operator identifier"/>
       </cifEnable>
       <cifEnable name="Country Code" abbrev="country" index="19">
-         <cifField name="id" abbrev="id" offset="0" width="11" type="uint" descript="User defined or ISO 316 numeric code for country"/>
-         <cifField name="ISO 316 enable" abbrev="en" offset="15" width="1" type="bool" descript="Id is a ISO 316 numeric code"/>
+         <cifField name="id" abbrev="id" offset="0" width="11" type="uint" descript="User defined or ISO 3166 numeric code for country"/>
+         <cifField name="ISO 3166 enable" abbrev="en" offset="15" width="1" type="bool" descript="Id is a ISO 3166 numeric code"/>
       </cifEnable>
       <cifEnable name="Track Id" abbrev="track_id" index="20">
-         <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Tag used to identify a commonset of information"/>
+         <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Tag used to identify a common set of information"/>
       </cifEnable>
       <cifEnable name="Information Source" abbrev="info_src" index="21">
          <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Id of information source used to define other ids"/>
@@ -607,11 +607,11 @@
       <cifEnable name="Controller Id" abbrev="ctr_id" index="23">
          <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Controller ID associated with information in this packet"/>
       </cifEnable>
-      <cifEnable name="Controllee UUID" abbrev="cte_uuid" index="24">
-         <cifField name="id" abbrev="id" offset="0" width="128" type="raw" descript="Controllee UUID associated with information in this packet"/>
+      <cifEnable name="Controlee UUID" abbrev="cte_uuid" index="24">
+         <cifField name="id" abbrev="id" offset="0" width="128" type="raw" descript="Controlee UUID associated with information in this packet"/>
       </cifEnable>
-      <cifEnable name="Controllee Id" abbrev="cte_id" index="25">
-         <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Controllee ID associated with information in this packet"/>
+      <cifEnable name="Controlee Id" abbrev="cte_id" index="25">
+         <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Controlee ID associated with information in this packet"/>
       </cifEnable>
       <cifEnable name="Cited Message Id" abbrev="msg_id" index="26">
          <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Previous message id to which information is associated"/>
@@ -629,9 +629,9 @@
          <cifField name="id" abbrev="id" offset="0" width="16" type="hex" descript="Information in this packet refers to cited stream id instead of packet stream id"/>
       </cifEnable>
       <cifEnable name="Bind" abbrev="bind" index="31">
-         <cifField name="bonded indicator" abbrev="b" offset="0" width="1" type="bool" descript="Identifiers at the same packet structre level are bonded to one another"/>
+         <cifField name="bonded indicator" abbrev="b" offset="0" width="1" type="bool" descript="Identifiers at the same packet structure level are bonded to one another"/>
          <!-- The V49.2 spec shows the remaining three fields in the diagram of the fields but does not describe them
-               in the text. It's unclear how they might related to identifer binding, so it may be an error in the spec.  
+               in the text. It's unclear how they might related to identifier binding, so it may be an error in the spec.  
                However, since they are contained within the same 32 bit word, displaying them will not break anything else
          -->
          <cifField name="probability" abbrev="prob" offset="8" width="8" type="int" units="percent" descript=""/>
@@ -642,13 +642,13 @@
 
    <cifMap name="cif3" index="3" descript="Temporal Environmental">
       <cifEnable name="Network Id" abbrev="nid" index="1">
-         <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Tag to associate information to a specific netword"/>
+         <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Tag to associate information to a specific network"/>
       </cifEnable>
       <cifEnable name="Tropospheric State" abbrev="tropo_state" index="2">
          <cifField name="id" abbrev="id" offset="0" width="16" type="hex" descript="Index to user defined table describing state of troposphere"/>
       </cifEnable>
       <cifEnable name="Sea and Swell State" abbrev="sea_state" index="3">
-         <cifField name="sea state" abbrev="sea" offset="0" width="5" type="enum" descript="Standardized decription of sea conditions">
+         <cifField name="sea state" abbrev="sea" offset="0" width="5" type="enum" descript="Standardized description of sea conditions">
             <enum key="0" value="calm (glassy"/>
             <enum key="1" value="calm (rippled)"/>
             <enum key="2" value="smooth (wavelets)"/>
@@ -660,7 +660,7 @@
             <enum key="8" value="very high"/>
             <enum key="9" value="phenomenal"/>
          </cifField>
-         <cifField name="Swell State" abbrev="swell" offset="5" width="5" type="enum" descript="Standardized decription of swell conditions">
+         <cifField name="Swell State" abbrev="swell" offset="5" width="5" type="enum" descript="Standardized description of swell conditions">
             <enum key="0" value="no swell"/>
             <enum key="1" value="very low (short and low wave)"/>
             <enum key="2" value="low (long and low wave)"/>
@@ -675,14 +675,14 @@
          </cifField>
       </cifEnable>
       <cifEnable name="Barometric Pressure" abbrev="pressure" index="4">
-         <cifField name="value" abbrev="val" offset="0" width="17" type="uint" units="? Pascal" descript="Barametric pressure [unit scaling is unclear in spec]">
+         <cifField name="value" abbrev="val" offset="0" width="17" type="uint" units="? Pascal" descript="Barometric pressure [unit scaling is unclear in spec]">
             <info level="warn" string="V49.2 specification is not clear on where the radix point should go"/>
          </cifField>
       </cifEnable>
       <cifEnable name="Humidity" abbrev="humidity" index="5">
          <cifField name="value" abbrev="val" offset="0" width="16" type="ufixed" point="16" units="ratio" descript="Ambient humidity relative to 100%"/>
       </cifEnable>
-      <cifEnable name="Sea-ground Tempurature" abbrev="surf_temp" index="6">
+      <cifEnable name="Sea-ground Temperature" abbrev="surf_temp" index="6">
          <cifField name="value" abbrev="val" offset="0" width="16" type="fixed" point="6" units="degrees,C" descript="Ambient surface temperature at platform"/>
       </cifEnable>
       <cifEnable name="Air Temperature" abbrev="air_temp" index="7">
@@ -723,12 +723,12 @@
          <cifField name="value" abbrev="value" offset="0" width="64" type="int" units="fs" descript="Time for signal to rise from 10% to 90% relative to noise floor"/>
       </cifEnable>
       <cifEnable name="Timestamp Skew" abbrev="t_skew" index="30">
-         <cifField name="value" abbrev="value" offset="0" width="64" type="int" units="fs" descript="Time offset between this signal and adjacent signal as indicated by silbling SID"/>
+         <cifField name="value" abbrev="value" offset="0" width="64" type="int" units="fs" descript="Time offset between this signal and adjacent signal as indicated by sibling SID"/>
       </cifEnable>
       <cifEnable name="Timestamp Details" abbrev="ts_detail" index="31">
          <cifField name="POSIX time offset" abbrev="posix_off" offset="0" width="8" type="int" units="s" descript="Time difference between UTC time and POSIX time (sum of leap seconds)"/>
          <cifField name="POSIX offset enable" abbrev="e" offset="8" width="1" type="bool" descript="Posix time offset is valid"/>
-         <cifField name="time source" abbrev="time_src" offset="9" width="3" type="enum" descript="Discription of timing reference device">
+         <cifField name="time source" abbrev="time_src" offset="9" width="3" type="enum" descript="Description of timing reference device">
             <enum key="0" value="unspecified"/>
             <enum key="1" value="atomic clock"/>
             <enum key="2" value="satellite system"/>
