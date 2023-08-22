@@ -1103,7 +1103,7 @@ static void apply_prefs(void)
 //    vrt_cif_cfg_scope = wmem_allocator_new(WMEM_ALLOCATOR_BLOCK);
     vrt_cif_cfg_scope = wmem_epan_scope();
   }
-  parse_config_file(pref_filename);
+  parse_config_file((const char *) pref_filename);
   build_hf_configuration();
 }
 
@@ -2586,19 +2586,22 @@ static int dissect_vrt_cif(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, 
 
 void proto_register_vrt_cif(void)
 {
-  proto_vrt_cif = proto_register_protocol ("VRT Context Fields", "V49 CIF", "vrt_cif");
+  proto_vrt_cif = proto_register_protocol ("VITA 49 radio transport protocol context fields", "VITA 49 CIF", "vrt_cif");
   register_dissector("vrt_cif", dissect_vrt_cif, proto_vrt_cif);
 
   /* We'll do the field registration later, after the configuration file has been parsed */
   proto_register_prefix("vrt_cif", load_and_register_hf_fields);
 
-  module_t* vrt_cif_module = prefs_register_protocol(proto_vrt_cif, apply_prefs);
-  prefs_register_filename_preference(vrt_cif_module, "cif_filename", "CIF description filename",
-                                     "File describing the format of [Extended] Context Indicator Fields. (may need to restart application)", 
-                                     (const char **) &pref_filename, FALSE);
-  prefs_register_bool_preference(vrt_cif_module, "unknown_class_default", "Fallback to default configuration",
-                                     "If parsed class code has no explicit configuration, use the default configuration instead", 
-                                 &pref_class_fallback);
+  /* Group the settings for the subdissector with its parent */
+  module_t* cif_subtree = prefs_register_protocol_subtree("VITA 49", proto_vrt_cif, apply_prefs);
+  prefs_register_filename_preference(cif_subtree, "cif_filename", 
+     "CIF description filename",
+     "File describing the format of [Extended] Context Indicator Fields. (may need to restart application)", 
+     (const char **) &pref_filename, FALSE);
+  prefs_register_bool_preference(cif_subtree, "unknown_class_default", 
+     "Fallback to default configuration",
+     "If parsed class code has no explicit configuration, use the default configuration instead", 
+     &pref_class_fallback);
 
   register_init_routine( init_dissector );
   register_cleanup_routine( cleanup_dissector );

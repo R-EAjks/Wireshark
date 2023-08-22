@@ -72,7 +72,7 @@
          <cifField name="position y" abbrev="y" offset="160" width="32" type="fixed" point="5" units="meters" descript="Platform position on y axis"/>
          <cifField name="position z" abbrev="z" offset="192" width="32" type="fixed" point="5" units="meters" descript="Platform position on z axis"/>
          <cifField name="attitude alpha" abbrev="alpha" offset="224" width="32" type="fixed" point="22" units="degrees" descript="Platform facing yaw"/>
-         <cifField name="attitude beta" abbrev="beta" offset="256" width="32" type="fixed" point="22" units="degrees" descript="Platform facting pitch "/>
+         <cifField name="attitude beta" abbrev="beta" offset="256" width="32" type="fixed" point="22" units="degrees" descript="Platform facing pitch "/>
          <cifField name="attitude phi" abbrev="phi" offset="288" width="32" type="fixed" point="22" units="degrees" descript="Platform facing roll"/>
          <cifField name="velocity x" abbrev="dx" offset="320" width="32" type="fixed" point="16" units="m/s" descript="Platform velocity along x axis"/>
          <cifField name="velocity y" abbrev="dy" offset="352" width="32" type="fixed" point="16" units="m/s" descript="Platform velocity along y axis"/>
@@ -102,7 +102,7 @@
          <cifField name="position y" abbrev="y" offset="160" width="32" type="fixed" point="5" units="meters" descript="Platform position on y axis"/>
          <cifField name="position z" abbrev="z" offset="192" width="32" type="fixed" point="5" units="meters" descript="Platform position on z axis"/>
          <cifField name="attitude alpha" abbrev="alpha" offset="224" width="32" type="fixed" point="22" units="degrees" descript="Platform facing yaw"/>
-         <cifField name="attitude beta" abbrev="beta" offset="256" width="32" type="fixed" point="22" units="degrees" descript="Platform facting pitch "/>
+         <cifField name="attitude beta" abbrev="beta" offset="256" width="32" type="fixed" point="22" units="degrees" descript="Platform facing pitch "/>
          <cifField name="attitude phi" abbrev="phi" offset="288" width="32" type="fixed" point="22" units="degrees" descript="Platform facing roll"/>
          <cifField name="velocity x" abbrev="dx" offset="320" width="32" type="fixed" point="16" units="m/s" descript="Platform velocity along x axis"/>
          <cifField name="velocity y" abbrev="dy" offset="352" width="32" type="fixed" point="16" units="m/s" descript="Platform velocity along y axis"/>
