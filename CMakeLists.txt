@@ -661,6 +661,9 @@ else() # ! MSVC
 			endif()
 			set(MIN_MACOS_VERSION ${CMAKE_OSX_DEPLOYMENT_TARGET})
 		endif()
+		# Warn against using APIs that were introduced after our target version.
+		# https://developer.apple.com/library/archive/releasenotes/DeveloperTools/RN-Xcode/Chapters/Introduction.html
+		list(APPEND WIRESHARK_COMMON_FLAGS -Werror=unguarded-availability)
 	endif()
 
 	#
