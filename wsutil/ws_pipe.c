@@ -479,30 +479,44 @@ gboolean ws_pipe_spawn_sync(const gchar *working_directory, const gchar *command
 
     GSpawnFlags flags = (GSpawnFlags)0;
     GSpawnChildSetupFunc child_setup = NULL;
+    GError *child_error = NULL;
 #ifdef HAS_G_SPAWN_LINUX_THREAD_SAFETY_BUG
     flags = (GSpawnFlags)(flags | G_SPAWN_LEAVE_DESCRIPTORS_OPEN);
     child_setup = close_non_standard_fds_linux;
 #endif
+    char *local_error = NULL;
     status = g_spawn_sync(working_directory, argv, NULL,
-                          flags, child_setup, NULL, &local_output, NULL, &exit_status, NULL);
+                          flags, child_setup, NULL, &local_output, &local_error, &exit_status, &child_error);
 
     if (status && exit_status != 0)
         status = FALSE;
 #endif
 
-    ws_debug("%s finished in %.3fms", argv[0], (g_get_monotonic_time() - start_time) / 1000.0);
-
     if (status)
     {
+        ws_debug("%s succeeded after %.3fms", argv[0], (g_get_monotonic_time() - start_time) / 1000.0);
         if (local_output != NULL) {
             ws_noisy("spawn output: %s", local_output);
             if (command_output != NULL)
                 *command_output = g_strdup(local_output);
         }
         result = TRUE;
+    } else {
+        const char *msg = child_error ? child_error->message : "Unknown";
+        ws_warning("%s failed with \"%s\" after %.3fms\n%s", command_line, msg, (g_get_monotonic_time() - start_time) / 1000.0, local_error);
+        if (local_output != NULL) {
+            ws_warning("spawn stdout: %s", local_output);
+        }
+        if (local_error != NULL) {
+            ws_warning("spawn stderr: %s", local_error);
+        }
+        if (child_error != NULL) {
+            g_error_free(child_error);
+        }
     }
 
     g_free(local_output);
+    g_free(local_error);
     g_free(command_line);
     g_strfreev(argv);
 
