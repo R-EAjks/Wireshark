@@ -104,6 +104,8 @@ Output:
   -e <field>               field to print if -Tfields selected (e.g. tcp.port,
                            _ws.col.info)
                            this option can be repeated to print multiple fields
+  --fields-xpath           distinguish fields by their location, uses XPath as field name
+                           Applicable for -e <field> and for -T ek|json|pdml
   -E<fieldsoption>=<value> set options for output when -Tfields selected:
      bom=y|n               print a UTF-8 BOM
      header=y|n            switch headers on and off

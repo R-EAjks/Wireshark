@@ -66,8 +66,12 @@ typedef struct {
 
 typedef struct {
     output_fields_t *fields;
+    gboolean         fields_xpath;           /* indicates if fields_xpath should be used */
+    gchar           *current_path;           /* temporary value, string used in recursion */
+    gboolean         print_hex;
     epan_dissect_t  *edt;
 } write_field_data_t;
+
 
 struct _output_fields {
     gboolean      print_bom;
@@ -76,7 +80,9 @@ struct _output_fields {
     gchar         occurrence;
     gchar         aggregator;
     GPtrArray    *fields;
-    GHashTable   *field_indicies;
+    GHashTable   *field_indices;
+    GHashTable   *field_indices_dynamic;
+    GHashTable   *xpath_fields;
     GPtrArray   **field_values;
     wmem_map_t   *protocolfilter;
     gchar         quote;
@@ -94,8 +100,8 @@ static void json_write_field_hex_value(write_json_data *pdata, field_info *fi);
 static gboolean print_hex_data_buffer(print_stream_t *stream, const guchar *cp,
                                       guint length, packet_char_enc encoding,
                                       guint hexdump_options);
-static void write_specified_fields(fields_format format,
-                                   output_fields_t *fields,
+static void write_specified_fields(fields_format format, gboolean fields_xpath,
+                                   gboolean print_hex, output_fields_t *fields,
                                    epan_dissect_t *edt, column_info *cinfo,
                                    FILE *fh,
                                    json_dumper *dumper);
@@ -314,7 +320,7 @@ static gboolean check_protocolfilter(wmem_map_t *protocolfilter, const char *str
 }
 
 void
-write_pdml_proto_tree(output_fields_t* fields, epan_dissect_t *edt, column_info *cinfo, FILE *fh, gboolean use_color)
+write_pdml_proto_tree(output_fields_t* fields, gboolean fields_xpath, epan_dissect_t *edt, column_info *cinfo, FILE *fh, gboolean use_color)
 {
     write_pdml_data data;
     const color_filter_t *cfp;
@@ -347,14 +353,14 @@ write_pdml_proto_tree(output_fields_t* fields, epan_dissect_t *edt, column_info 
                                     &data);
     } else {
         /* Write out specified fields */
-        write_specified_fields(FORMAT_XML, fields, edt, cinfo, fh, NULL);
+        write_specified_fields(FORMAT_XML, fields_xpath, FALSE, fields, edt, cinfo, fh, NULL);
     }
 
     fprintf(fh, "</packet>\n\n");
 }
 
 void
-write_ek_proto_tree(output_fields_t* fields,
+write_ek_proto_tree(output_fields_t* fields, gboolean fields_xpath,
                     gboolean print_summary, gboolean print_hex,
                     epan_dissect_t *edt,
                     column_info *cinfo,
@@ -402,7 +408,7 @@ write_ek_proto_tree(output_fields_t* fields,
             proto_tree_write_node_ek(edt->tree, &data);
         } else {
             /* Write out specified fields */
-            write_specified_fields(FORMAT_EK, fields, edt, cinfo, NULL, data.dumper);
+            write_specified_fields(FORMAT_EK, fields_xpath, print_hex, fields, edt, cinfo, NULL, data.dumper);
         }
 
         json_dumper_end_object(&dumper);
@@ -418,7 +424,7 @@ write_fields_proto_tree(output_fields_t* fields, epan_dissect_t *edt, column_inf
     ws_assert(fh);
 
     /* Create the output */
-    write_specified_fields(FORMAT_CSV, fields, edt, cinfo, fh, NULL);
+    write_specified_fields(FORMAT_CSV, FALSE, FALSE, fields, edt, cinfo, fh, NULL);
 }
 
 /* Indent to the correct level */
@@ -735,7 +741,7 @@ write_json_index(json_dumper *dumper, epan_dissect_t *edt)
 }
 
 void
-write_json_proto_tree(output_fields_t* fields,
+write_json_proto_tree(output_fields_t* fields, gboolean fields_xpath,
                       print_dissections_e print_dissections,
                       gboolean print_hex,
                       epan_dissect_t *edt, column_info *cinfo,
@@ -769,7 +775,7 @@ write_json_proto_tree(output_fields_t* fields,
 
         write_json_proto_node_children(edt->tree, &data);
     } else {
-        write_specified_fields(FORMAT_JSON, fields, edt, cinfo, NULL, dumper);
+        write_specified_fields(FORMAT_JSON, fields_xpath, print_hex, fields, edt, cinfo, NULL, dumper);
     }
 
     json_dumper_end_object(dumper);
@@ -2035,11 +2041,20 @@ void output_fields_free(output_fields_t* fields)
     if (NULL != fields->fields) {
         gsize i;
 
-        if (NULL != fields->field_indicies) {
+        if (NULL != fields->field_indices) {
             /* Keys are stored in fields->fields, values are
              * integers.
              */
-            g_hash_table_destroy(fields->field_indicies);
+            g_hash_table_destroy(fields->field_indices);
+        }
+
+        if (NULL != fields->field_indices_dynamic) {
+            /* Keys are stored in fields->field_indices_dynamic, values are integers. */
+            g_hash_table_destroy(fields->field_indices_dynamic);
+        }
+
+        if (NULL != fields->xpath_fields) {
+            g_hash_table_destroy(fields->xpath_fields);
         }
 
         if (NULL != fields->field_values) {
@@ -2372,6 +2387,7 @@ static void proto_tree_get_node_field_values(proto_node *node, gpointer data)
     write_field_data_t *call_data;
     field_info *fi;
     gpointer    field_index;
+    gchar      *key = NULL;
 
     call_data = (write_field_data_t *)data;
     fi = PNODE_FINFO(node);
@@ -2379,25 +2395,122 @@ static void proto_tree_get_node_field_values(proto_node *node, gpointer data)
     /* dissection with an invisible proto tree? */
     ws_assert(fi);
 
-    field_index = g_hash_table_lookup(call_data->fields->field_indicies, fi->hfinfo->abbrev);
+    /* calculate xpath */
+    gchar *xpath = NULL;
+    if (call_data->fields_xpath) {
+        int idx = 1;
+        do {
+            g_free(xpath);
+            if (call_data->current_path == NULL) {
+                xpath = g_strdup_printf("/%s[%d]", fi->hfinfo->abbrev, idx);
+            } else {
+                xpath = g_strdup_printf("%s/%s[%d]", call_data->current_path, fi->hfinfo->abbrev, idx);
+            }
+            idx++;
+        } while (g_hash_table_lookup(call_data->fields->xpath_fields, xpath) != NULL);
+
+        // if xpath does not exist in hash map, create it and append value
+        if (g_hash_table_lookup(call_data->fields->xpath_fields, xpath) == NULL) {
+            g_hash_table_insert(call_data->fields->xpath_fields, g_strdup(xpath), GUINT_TO_POINTER(1));
+        }
+    }
+
+    /* no fields path included */
+    field_index = g_hash_table_lookup(call_data->fields->field_indices, fi->hfinfo->abbrev);
     if (NULL != field_index) {
-        format_field_values(call_data->fields, field_index,
-                            get_node_field_value(fi, call_data->edt) /* g_ alloc'd string */
-            );
+
+        // calculate hash key
+        // if the key exist, iterate while the key does not exist
+        if (!call_data->fields_xpath) {
+            key = g_strdup(fi->hfinfo->abbrev);
+        } else {
+            key = g_strdup(xpath);
+        }
+
+        // if key does not exist in hash map, create it and append value
+        if (g_hash_table_lookup(call_data->fields->field_indices_dynamic, key) == NULL) {
+            int i = g_hash_table_size(call_data->fields->field_indices_dynamic);
+            g_hash_table_insert(call_data->fields->field_indices_dynamic, g_strdup(key), GUINT_TO_POINTER(i + 1));  // index is 1 .. N
+        }
+
+        // add value into hash key
+        field_index = g_hash_table_lookup(call_data->fields->field_indices_dynamic, key);
+        if (NULL != field_index) {
+            if (call_data->print_hex) {
+                format_field_values(call_data->fields, field_index,
+                                get_field_hex_value(call_data->edt->pi.data_src, fi) /* g_ alloc'd string */
+                    );
+            }
+
+            format_field_values(call_data->fields, field_index,
+                                get_node_field_value(fi, call_data->edt) /* g_ alloc'd string */
+                );
+
+        }
+
     }
 
     /* Recurse here. */
     if (node->first_child != NULL) {
+        gchar *current_path_before_recurse = g_strdup(call_data->current_path);
+        // replace current_path
+        if (xpath != NULL) {
+            g_free(call_data->current_path);
+            call_data->current_path = g_strdup(xpath);
+        }
+
         proto_tree_children_foreach(node, proto_tree_get_node_field_values,
                                     call_data);
+
+        if (call_data != NULL && current_path_before_recurse != NULL && current_path_before_recurse != call_data->current_path) {
+            g_free(call_data->current_path);
+            call_data->current_path = current_path_before_recurse;
+        }
+        else {
+            g_free(call_data->current_path);
+            call_data->current_path = NULL;
+        }
     }
+
+    g_free(xpath);
+    g_free(key);
+    g_free(call_data->current_path);
+    call_data->current_path = NULL;
 }
 
-static void write_specified_fields(fields_format format, output_fields_t *fields, epan_dissect_t *edt, column_info *cinfo _U_, FILE *fh, json_dumper *dumper)
+/* Get collected fields supplementary function */
+static GList* get_collected_fields(gboolean fields_xpath, GPtrArray *fields, GHashTable *field_indices_dynamic) {
+    if (fields == NULL || field_indices_dynamic == NULL) {
+        return NULL;
+    }
+
+    GList *collected_fields;
+    if (!fields_xpath) {
+        collected_fields = NULL;
+        for(gsize k = 0; k < fields->len; ++k) {
+            collected_fields = g_list_append(collected_fields, (gchar *)g_ptr_array_index(fields, k));
+        }
+    } else {
+        collected_fields = g_hash_table_get_keys(field_indices_dynamic);
+    }
+    return collected_fields;
+}
+
+
+static void write_specified_fields(fields_format format, gboolean fields_xpath, gboolean print_hex, output_fields_t *fields, epan_dissect_t *edt, column_info *cinfo _U_, FILE *fh, json_dumper *dumper)
 {
     gsize     i;
+    gint      col;
+    gchar    *col_name;
+    gpointer  field_index;
 
     write_field_data_t data;
+
+    /* Variables used to iterate the field_indices_dynamic hash map
+     * The hash map holds in the key the field name or the field xpath */
+    GList *collected_fields = NULL;         // List of collected fields
+    GList *collected_field = NULL;          // Individual field
+    gchar* collected_field_string = NULL;   // Individual field in string format
 
     ws_assert(fields);
     ws_assert(fields->fields);
@@ -2410,11 +2523,14 @@ static void write_specified_fields(fields_format format, output_fields_t *fields
     }
 
     data.fields = fields;
+    data.fields_xpath = fields_xpath;
+    data.current_path = NULL;
+    data.print_hex = print_hex;
     data.edt = edt;
 
-    if (NULL == fields->field_indicies) {
+    if (NULL == fields->field_indices) {
         /* Prepare a lookup table from string abbreviation for field to its index. */
-        fields->field_indicies = g_hash_table_new(g_str_hash, g_str_equal);
+        fields->field_indices = g_hash_table_new(g_str_hash, g_str_equal);
 
         i = 0;
         while (i < fields->fields->len) {
@@ -2423,8 +2539,17 @@ static void write_specified_fields(fields_format format, output_fields_t *fields
              * and can be distinguished from NULL as a pointer.
              */
             ++i;
-            g_hash_table_insert(fields->field_indicies, field, GUINT_TO_POINTER(i));
+            g_hash_table_insert(fields->field_indices, field, GUINT_TO_POINTER(i));
         }
+
+    }
+
+    if (NULL == fields->field_indices_dynamic) {
+        fields->field_indices_dynamic = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+    }
+
+    if (NULL == fields->xpath_fields) {
+        fields->xpath_fields = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
     }
 
     /* Array buffer to store values for this packet              */
@@ -2439,13 +2564,53 @@ static void write_specified_fields(fields_format format, output_fields_t *fields
     proto_tree_children_foreach(edt->tree, proto_tree_get_node_field_values,
                                 &data);
 
+    /* Add columns to fields */
+    if (fields->includes_col_fields) {
+        for (col = 0; col < cinfo->num_cols; col++) {
+            if (!get_column_visible(col))
+                continue;
+            /* Prepend COLUMN_FIELD_FILTER as the field name */
+            col_name = g_strdup_printf("%s%s", COLUMN_FIELD_FILTER, cinfo->columns[col].col_title);
+            field_index = g_hash_table_lookup(fields->field_indices, col_name);
+
+            guint      indx;
+            GPtrArray* fv_p;
+            indx = GPOINTER_TO_UINT(field_index) - 1;
+            if (indx <= g_ptr_array_len(*fields->field_values)) {
+                fv_p = fields->field_values[indx];
+
+                // if key does not exist in hash map, create it and append value
+                if (g_hash_table_lookup(fields->field_indices_dynamic, col_name) == NULL) {
+                    int j = g_ptr_array_len(fv_p);
+                    g_ptr_array_add(fv_p, NULL);
+                    g_hash_table_insert(fields->field_indices_dynamic, g_strdup(col_name), GUINT_TO_POINTER(j + 1));  // index is 1 .. N
+                }
+
+                // add value into hash key
+                field_index = g_hash_table_lookup(fields->field_indices_dynamic, col_name);
+
+                if (NULL != field_index) {
+                    format_field_values(fields, field_index, g_strdup(get_column_text(cinfo, col)));
+                }
+            }
+
+            g_free(col_name);
+        }
+    }
+
     switch (format) {
     case FORMAT_CSV:
-        for(i = 0; i < fields->fields->len; ++i) {
-            if (0 != i) {
+        collected_fields = get_collected_fields(fields_xpath, fields->fields, fields->field_indices_dynamic);
+
+        for(collected_field = collected_fields; collected_field; collected_field = collected_field->next) {
+            if (NULL != collected_field_string) {
                 fputc(fields->separator, fh);
             }
-            if (NULL != fields->field_values[i]) {
+
+            collected_field_string = (gchar*)collected_field->data;
+
+            i = GPOINTER_TO_UINT(g_hash_table_lookup(fields->field_indices_dynamic, collected_field_string)) - 1;
+            if ((int)i >= 0) {
                 GPtrArray *fv_p;
                 gchar * str;
                 gsize j;
@@ -2473,12 +2638,17 @@ static void write_specified_fields(fields_format format, output_fields_t *fields
                 fields->field_values[i] = NULL;
             }
         }
+        g_list_free(collected_fields);
+
         break;
     case FORMAT_XML:
-        for(i = 0; i < fields->fields->len; ++i) {
-            gchar *field = (gchar *)g_ptr_array_index(fields->fields, i);
+        collected_fields = get_collected_fields(fields_xpath, fields->fields, fields->field_indices_dynamic);
 
-            if (NULL != fields->field_values[i]) {
+        for(collected_field = collected_fields; collected_field; collected_field = collected_field->next) {
+            collected_field_string = (gchar*)collected_field->data;
+
+            i = GPOINTER_TO_UINT(g_hash_table_lookup(fields->field_indices_dynamic, collected_field_string)) - 1;
+            if ((int)i >= 0) {
                 GPtrArray *fv_p;
                 gchar * str;
                 gsize j;
@@ -2488,7 +2658,7 @@ static void write_specified_fields(fields_format format, output_fields_t *fields
                 for (j = 0; j < (g_ptr_array_len(fv_p)); j++ ) {
                     str = (gchar *)g_ptr_array_index(fv_p, j);
 
-                    fprintf(fh, "  <field name=\"%s\" value=", field);
+                    fprintf(fh, "  <field name=\"%s\" value=", collected_field_string);
                     fputs("\"", fh);
                     print_escaped_xml(fh, str);
                     fputs("\"/>\n", fh);
@@ -2497,19 +2667,25 @@ static void write_specified_fields(fields_format format, output_fields_t *fields
                 fields->field_values[i] = NULL;
             }
         }
+        g_list_free(collected_fields);
+
         break;
     case FORMAT_JSON:
-        json_dumper_begin_object(dumper);
-        for(i = 0; i < fields->fields->len; ++i) {
-            gchar *field = (gchar *)g_ptr_array_index(fields->fields, i);
+        collected_fields = get_collected_fields(fields_xpath, fields->fields, fields->field_indices_dynamic);
 
-            if (NULL != fields->field_values[i]) {
+        json_dumper_begin_object(dumper);
+
+        for(collected_field = collected_fields; collected_field; collected_field = collected_field->next) {
+            collected_field_string = (gchar*)collected_field->data;
+
+            i = GPOINTER_TO_UINT(g_hash_table_lookup(fields->field_indices_dynamic, collected_field_string)) - 1;
+            if ((int)i >= 0) {
                 GPtrArray *fv_p;
                 gchar * str;
                 gsize j;
                 fv_p = fields->field_values[i];
 
-                json_dumper_set_member_name(dumper, field);
+                json_dumper_set_member_name(dumper, collected_field_string);
                 json_dumper_begin_array(dumper);
 
                 /* Output the array of (partial) field values */
@@ -2524,19 +2700,24 @@ static void write_specified_fields(fields_format format, output_fields_t *fields
                 fields->field_values[i] = NULL;
             }
         }
+        g_list_free(collected_fields);
+
         json_dumper_end_object(dumper);
         break;
     case FORMAT_EK:
-        for(i = 0; i < fields->fields->len; ++i) {
-            gchar *field = (gchar *)g_ptr_array_index(fields->fields, i);
+        collected_fields = get_collected_fields(fields_xpath, fields->fields, fields->field_indices_dynamic);
 
-            if (NULL != fields->field_values[i]) {
+        for(collected_field = collected_fields; collected_field; collected_field = collected_field->next) {
+            collected_field_string = (gchar*)collected_field->data;
+
+            i = GPOINTER_TO_UINT(g_hash_table_lookup(fields->field_indices_dynamic, collected_field_string)) - 1;
+            if ((int)i >= 0) {
                 GPtrArray *fv_p;
                 gchar * str;
                 gsize j;
                 fv_p = fields->field_values[i];
 
-                json_dumper_set_member_name(dumper, field);
+                json_dumper_set_member_name(dumper, collected_field_string);
                 json_dumper_begin_array(dumper);
 
                 /* Output the array of (partial) field values */
@@ -2551,12 +2732,32 @@ static void write_specified_fields(fields_format format, output_fields_t *fields
                 fields->field_values[i] = NULL;
             }
         }
+        g_list_free(collected_fields);
+
         break;
 
     default:
         fprintf(stderr, "Unknown fields format %d\n", format);
         ws_assert_not_reached();
         break;
+    }
+
+
+    /* Release */
+    if (NULL != data.fields->field_indices_dynamic) {
+        /* Keys are stored in fields->fields, values are integers */
+        g_hash_table_destroy(data.fields->field_indices_dynamic);
+        data.fields->field_indices_dynamic = NULL;
+    }
+
+    if (NULL != data.fields->xpath_fields) {
+        g_hash_table_destroy(data.fields->xpath_fields);
+        data.fields->xpath_fields = NULL;
+    }
+
+    if (data.current_path != NULL) {
+        g_free(data.current_path);
+        data.current_path = NULL;
     }
 }
 
@@ -2698,7 +2899,9 @@ output_fields_t* output_fields_new(void)
     fields->occurrence          = 'a';
     fields->aggregator          = ',';
     fields->fields              = NULL; /*Do lazy initialisation */
-    fields->field_indicies      = NULL;
+    fields->field_indices           = NULL;
+    fields->field_indices_dynamic   = NULL;
+    fields->xpath_fields            = NULL;
     fields->field_values        = NULL;
     fields->protocolfilter      = NULL;
     fields->quote               ='\0';
