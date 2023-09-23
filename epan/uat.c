@@ -366,32 +366,43 @@ static void putfld(FILE* fp, void* rec, uat_field_t* f) {
 }
 
 gboolean uat_save(uat_t* uat, char** error) {
-    guint i;
-    gchar* fname = uat_get_actual_filename(uat,TRUE);
-    FILE* fp;
 
-    if (! fname ) return FALSE;
+    gchar* path = uat_get_actual_filename(uat, TRUE);
+    gboolean result = uat_save_with_path(uat, path, error);
 
-    fp = ws_fopen(fname,"w");
-
-    if (!fp && errno == ENOENT) {
+    if (!result && errno == ENOENT) {
         /* Parent directory does not exist, try creating first */
-        gchar *pf_dir_path = NULL;
+        gchar* pf_dir_path = NULL;
         if (create_persconffile_dir(&pf_dir_path) != 0) {
             *error = ws_strdup_printf("uat_save: error creating '%s'", pf_dir_path);
-            g_free (pf_dir_path);
+            g_free(pf_dir_path);
             return FALSE;
         }
-        fp = ws_fopen(fname,"w");
+        result = uat_save_with_path(uat, path, error);
     }
 
+    g_free(path);
+
+    return result;
+}
+
+gboolean uat_save_with_path(uat_t* uat, const char* path, char** error) {
+    guint i;
+    FILE* fp;
+
+    if (!path) {
+        *error = ws_strdup_printf("uat_save: path must not be null");
+        return FALSE;
+    }
+
+    fp = ws_fopen(path,"w");
+
     if (!fp) {
-        *error = ws_strdup_printf("uat_save: error opening '%s': %s",fname,g_strerror(errno));
+        *error = ws_strdup_printf("uat_save: error opening '%s': %s", path,g_strerror(errno));
         return FALSE;
     }
 
     *error = NULL;
-    g_free (fname);
 
     /* Ensure raw_data is synced with user_data and all "good" entries have been accounted for */
 

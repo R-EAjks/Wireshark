@@ -359,6 +359,12 @@ IOGraphDialog::IOGraphDialog(QWidget &parent, CaptureFile &cf, QString displayFi
     ui->buttonBox->addButton(copy_button, QDialogButtonBox::ActionRole);
     connect(copy_button, &CopyFromProfileButton::copyProfile, this, &IOGraphDialog::copyFromProfile);
 
+    QPushButton* import_button = ui->buttonBox->addButton(tr("Import…"), QDialogButtonBox::ActionRole);
+    connect(import_button, SIGNAL(clicked()), this, SLOT(importGraphs()));
+
+    QPushButton* export_button = ui->buttonBox->addButton(tr("Export…"), QDialogButtonBox::ActionRole);
+    connect(export_button, SIGNAL(clicked()), this, SLOT(exportGraphs()));
+
     QPushButton *close_bt = ui->buttonBox->button(QDialogButtonBox::Close);
     if (close_bt) {
         close_bt->setDefault(true);
@@ -483,6 +489,11 @@ IOGraphDialog::~IOGraphDialog()
 
 void IOGraphDialog::copyFromProfile(QString filename)
 {
+    copyFromFile(filename);
+}
+
+void IOGraphDialog::copyFromFile(QString filename)
+{
     guint orig_data_len = iog_uat_->raw_data->len;
 
     gchar *err = NULL;
@@ -496,6 +507,44 @@ void IOGraphDialog::copyFromProfile(QString filename)
         report_failure("Error while loading %s: %s", iog_uat_->name, err);
         g_free(err);
     }
+}
+
+void IOGraphDialog::exportGraphs()
+{
+    QString file_name, extension;
+    QString filter = tr("uat (*.uat);;");
+    QString initial_file_path = mainApp->lastOpenDir().canonicalPath() + "/iograph.uat";
+    QString title = mainApp->windowTitleString(tr("Export Graphs…"));
+    file_name = WiresharkFileDialog::getSaveFileName(this, title, initial_file_path, filter, &extension);
+
+    if (file_name.length() <= 0) {
+        return;
+    }
+
+    mainApp->setLastOpenDirFromFilename(file_name);
+
+    QByteArray native_file_name_array = file_name.toUtf8();
+
+    gchar* error = NULL;
+    const char* path = native_file_name_array.constData();
+
+    if (!uat_save_with_path(iog_uat_, path, &error))
+    {
+        report_failure("Error while exporting %s: %s", path, error);
+        g_free(error);
+    }
+}
+
+void IOGraphDialog::importGraphs()
+{
+    QString file_name, extension;
+    QString filter = tr("uat (*.uat);;");
+    QString initial_file_path = mainApp->lastOpenDir().canonicalPath();
+    QString title = mainApp->windowTitleString(tr("Import Graphs…"));
+
+    file_name = WiresharkFileDialog::getOpenFileName(this, title, initial_file_path, filter, &extension);
+
+    copyFromProfile(file_name);
 }
 
 void IOGraphDialog::addGraph(bool checked, QString name, QString dfilter, QRgb color_idx, IOGraph::PlotStyles style, io_graph_item_unit_t value_units, QString yfield, int moving_average, int y_axis_factor)
