@@ -2,14 +2,6 @@
 <ui version="4.0">
  <class>SearchFrame</class>
  <widget class="AccordionFrame" name="SearchFrame">
-  <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>1026</width>
-    <height>34</height>
-   </rect>
-  </property>
   <property name="windowTitle">
    <string>Frame</string>
   </property>
@@ -19,15 +11,7 @@
   <property name="frameShadow">
    <enum>QFrame::Plain</enum>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout">
-   <property name="topMargin">
-    <number>0</number>
-   </property>
-   <property name="bottomMargin">
-    <number>0</number>
-   </property>
-  <item>
-  <layout class="QHBoxLayout" name="horizontalLayout" stretch="3,0,0,0,1,0,0">
+  <layout class="FlowLayout" name="verticalLayout">
    <property name="topMargin">
     <number>0</number>
    </property>
@@ -120,6 +104,12 @@
        <verstretch>0</verstretch>
       </sizepolicy>
      </property>
+     <property name="minimumSize">
+      <size>
+       <width>160</width>
+       <height>0</height>
+      </size>
+     </property>
     </widget>
    </item>
    <item>
@@ -151,16 +141,6 @@
      </property>
     </widget>
    </item>
-  </layout>
-  </item>
-  <item>
-  <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="3,0,0,0,0,0,0,1">
-   <property name="topMargin">
-    <number>0</number>
-   </property>
-   <property name="bottomMargin">
-    <number>0</number>
-   </property>
    <item>
     <spacer name="horizontalSpacer_4">
      <property name="orientation">
@@ -257,8 +237,6 @@
     </widget>
    </item>
   </layout>
-  </item>
-  </layout>
  </widget>
  <customwidgets>
   <customwidget>
@@ -266,6 +244,11 @@
    <extends>QFrame</extends>
    <header>accordion_frame.h</header>
    <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>FlowLayout</class>
+   <extends>QLayout</extends>
+   <header>widgets/flowlayout.h</header>
   </customwidget>
   <customwidget>
    <class>DisplayFilterEdit</class>

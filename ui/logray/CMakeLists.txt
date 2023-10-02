@@ -37,6 +37,7 @@ set(WIRESHARK_WIDGET_HEADERS
 	../qt/widgets/field_filter_edit.h
 	../qt/widgets/filter_expression_toolbar.h
 	../qt/widgets/find_line_edit.h
+	../qt/widgets/flowlayout.h
 	../qt/widgets/interface_toolbar_lineedit.h
 	../qt/widgets/label_stack.h
 	../qt/widgets/overlay_scroll_bar.h
@@ -267,6 +268,7 @@ set(WIRESHARK_WIDGET_SRCS
 	../qt/widgets/field_filter_edit.cpp
 	../qt/widgets/filter_expression_toolbar.cpp
 	../qt/widgets/find_line_edit.cpp
+	../qt/widgets/flowlayout.cpp
 	../qt/widgets/interface_toolbar_lineedit.cpp
 	../qt/widgets/label_stack.cpp
 	../qt/widgets/overlay_scroll_bar.cpp
