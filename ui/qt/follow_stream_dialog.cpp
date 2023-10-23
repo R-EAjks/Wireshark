@@ -288,11 +288,14 @@ void FollowStreamDialog::saveAs()
         return;
     }
 
+    // XXX: What if truncated_ is true? Should we try to save the entire
+    // stream somehow?
     // Unconditionally save data as UTF-8 (even if data is decoded otherwise).
     QByteArray bytes = ui->teStreamContent->toPlainText().toUtf8();
     if (recent.gui_follow_show == SHOW_RAW) {
         // The "Raw" format is currently displayed as hex data and needs to be
-        // converted to binary data.
+        // converted to binary data. fromHex() skips over non hex characters
+        // including line breaks, which is what we want.
         bytes = QByteArray::fromHex(bytes);
     }
 
@@ -615,14 +618,20 @@ void FollowStreamDialog::addText(QString text, gboolean is_from_server, guint32 
     }
     ui->teStreamContent->setCurrentCharFormat(tcf);
 
-    ui->teStreamContent->insertPlainText(text);
+    // appendPlainText appends the text as a new paragraph, which means
+    // that it adds a hard line break (so don't include line breaks in
+    // the text we send.) It is *much* faster than insertPlainText for
+    // large documents (there's apparently an O(N) algorithm to seek to
+    // the current cursor position.)
+    //ui->teStreamContent->insertPlainText(text);
+    ui->teStreamContent->appendPlainText(text);
     text_pos_to_packet_[ui->teStreamContent->textCursor().anchor()] = packet_num;
 
     if (truncated_) {
         tcf = ui->teStreamContent->currentCharFormat();
         tcf.setBackground(palette().window().color());
         tcf.setForeground(palette().windowText().color());
-        ui->teStreamContent->insertPlainText("\n" + tr("[Stream output truncated]"));
+        ui->teStreamContent->appendPlainText(tr("[Stream output truncated]"));
         ui->teStreamContent->moveCursor(QTextCursor::End);
     } else {
         ui->teStreamContent->verticalScrollBar()->setValue(cur_pos);
@@ -678,18 +687,25 @@ void FollowStreamDialog::keyPressEvent(QKeyEvent *event)
     QDialog::keyPressEvent(event);
 }
 
-static inline void sanitize_buffer(char *buffer, size_t nchars) {
+// Replaces non printable ASCII characters in the QByteArray with .
+// Causes buffer to detach/deep copy *only* if a character has to be
+// replaced.
+static inline void sanitize_buffer(QByteArray &buffer, size_t nchars) {
     for (size_t i = 0; i < nchars; i++) {
-        if (buffer[i] == '\n' || buffer[i] == '\r' || buffer[i] == '\t')
+        if (buffer.at(i) == '\n' || buffer.at(i) == '\r' || buffer.at(i) == '\t')
             continue;
-        if (! g_ascii_isprint((guchar)buffer[i])) {
+        if (! g_ascii_isprint((guchar)buffer.at(i))) {
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+            buffer[static_cast<unsigned>(i)] = '.';
+#else
             buffer[i] = '.';
+#endif
         }
     }
 }
 
 frs_return_t
-FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_server, guint32 packet_num,
+FollowStreamDialog::showBuffer(QByteArray &buffer, size_t nchars, gboolean is_from_server, guint32 packet_num,
                                 nstime_t abs_ts, guint32 *global_pos)
 {
     gchar initbuf[256];
@@ -701,10 +717,9 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
     case SHOW_EBCDIC:
     {
         /* If our native arch is ASCII, call: */
-        EBCDIC_to_ASCII((guint8*)buffer, (guint) nchars);
+        EBCDIC_to_ASCII((uint8_t*)buffer.data(), (guint) nchars);
         sanitize_buffer(buffer, nchars);
-        QByteArray ba = QByteArray(buffer, (int)nchars);
-        addText(ba, is_from_server, packet_num);
+        addText(buffer, is_from_server, packet_num);
         break;
     }
 
@@ -714,8 +729,7 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
          * ASCII_TO_EBCDIC(buffer, nchars);
          */
         sanitize_buffer(buffer, nchars);
-        QByteArray ba = QByteArray(buffer, (int)nchars);
-        addText(ba, is_from_server, packet_num);
+        addText(buffer, is_from_server, packet_num);
         break;
     }
 
@@ -727,8 +741,7 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
         // two stateful QTextDecoders, one for each direction, presumably in
         // on_cbCharset_currentIndexChanged()
         QTextCodec *codec = QTextCodec::codecForName(ui->cbCharset->currentText().toUtf8());
-        QByteArray ba = QByteArray(buffer, (int)nchars);
-        QString decoded = codec->toUnicode(ba);
+        QString decoded = codec->toUnicode(buffer);
         addText(decoded, is_from_server, packet_num);
         break;
     }
@@ -752,9 +765,9 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
             ascii_start = cur + 49 + 2;
             for (i = 0; i < 16 && current_pos + i < nchars; i++) {
                 *cur++ =
-                        hexchars[(buffer[current_pos + i] & 0xf0) >> 4];
+                        hexchars[(buffer.at(current_pos + i) & 0xf0) >> 4];
                 *cur++ =
-                        hexchars[buffer[current_pos + i] & 0x0f];
+                        hexchars[buffer.at(current_pos + i) & 0x0f];
                 *cur++ = ' ';
                 if (i == 7)
                     *cur++ = ' ';
@@ -766,15 +779,14 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
             /* Now dump bytes as text */
             for (i = 0; i < 16 && current_pos + i < nchars; i++) {
                 *cur++ =
-                        (g_ascii_isprint((guchar)buffer[current_pos + i]) ?
-                            buffer[current_pos + i] : '.');
+                        (g_ascii_isprint((guchar)buffer.at(current_pos + i)) ?
+                            buffer.at(current_pos + i) : '.');
                 if (i == 7) {
                     *cur++ = ' ';
                 }
             }
             current_pos += i;
             (*global_pos) += i;
-            *cur++ = '\n';
             *cur = 0;
 
             addText(hexbuf, is_from_server, packet_num);
@@ -799,9 +811,9 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
                 hexbuf[cur++] = '0';
                 hexbuf[cur++] = 'x';
                 hexbuf[cur++] =
-                        hexchars[(buffer[current_pos + i] & 0xf0) >> 4];
+                        hexchars[(buffer.at(current_pos + i) & 0xf0) >> 4];
                 hexbuf[cur++] =
-                        hexchars[buffer[current_pos + i] & 0x0f];
+                        hexchars[buffer.at(current_pos + i) & 0x0f];
 
                 /* Delimit array entries with a comma */
                 if (current_pos + i + 1 < nchars)
@@ -818,7 +830,6 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
 
             current_pos += i;
             (*global_pos) += i;
-            hexbuf[cur++] = '\n';
             hexbuf[cur] = 0;
             addText(hexbuf, is_from_server, packet_num);
         }
@@ -839,26 +850,26 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
             char *port0 = get_follow_port_to_display(follower_)(NULL, follow_info_.client_port);
             char *port1 = get_follow_port_to_display(follower_)(NULL, follow_info_.server_port);
 
-            addText("peers:\n", false, 0, false);
+            addText(QStringLiteral("peers:"), false, 0, false);
 
             addText(QString(
                 "  - peer: 0\n"
                 "    host: %1\n"
-                "    port: %2\n")
+                "    port: %2")
                 .arg(hostname0)
                 .arg(port0), false, 0);
 
             addText(QString(
                 "  - peer: 1\n"
                 "    host: %1\n"
-                "    port: %2\n")
+                "    port: %2")
                 .arg(hostname1)
                 .arg(port1), true, 0);
 
             wmem_free(NULL, port0);
             wmem_free(NULL, port1);
 
-            addText("packets:\n", false, 0, false);
+            addText(QStringLiteral("packets:"), false, 0, false);
         }
 
         if (packet_num != last_packet_) {
@@ -871,11 +882,11 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
             yaml_text.append(QString("    timestamp: %1.%2\n")
                     .arg(abs_ts.secs)
                     .arg(abs_ts.nsecs, 9, 10, QChar('0')));
-            yaml_text.append(QString("    data: !!binary |\n"));
+            yaml_text.append(QStringLiteral("    data: !!binary |"));
         }
         while (current_pos < nchars) {
             int len = current_pos + base64_raw_len < nchars ? base64_raw_len : (int) nchars - current_pos;
-            QByteArray base64_data(&buffer[current_pos], len);
+            QByteArray base64_data(&buffer.constData()[current_pos], len);
 
             /* XXX: GCC 12.1 has a bogus stringop-overread warning using the Qt
              * conversions from QByteArray to QString at -O2 and higher due to
@@ -884,7 +895,7 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
 #if WS_IS_AT_LEAST_GNUC_VERSION(12,1)
 DIAG_OFF(stringop-overread)
 #endif
-            yaml_text += "      " + base64_data.toBase64() + "\n";
+            yaml_text += "\n      " + base64_data.toBase64();
 #if WS_IS_AT_LEAST_GNUC_VERSION(12,1)
 DIAG_ON(stringop-overread)
 #endif
@@ -898,9 +909,7 @@ DIAG_ON(stringop-overread)
 
     case SHOW_RAW:
     {
-        QByteArray ba = QByteArray(buffer, (int)nchars).toHex();
-        ba += '\n';
-        addText(ba, is_from_server, packet_num);
+        addText(buffer.toHex(), is_from_server, packet_num);
         break;
     }
 
@@ -1143,6 +1152,7 @@ FollowStreamDialog::readFollowStream()
     frs_return_t frs_return;
     follow_record_t *follow_record;
     QElapsedTimer elapsed_timer;
+    QByteArray buffer;
 
     elapsed_timer.start();
 
@@ -1167,14 +1177,14 @@ FollowStreamDialog::readFollowStream()
             }
         }
 
-        QByteArray buffer;
         if (!skip) {
-            // We want a deep copy.
-            buffer.clear();
-            buffer.append((const char *) follow_record->data->data,
-                                     follow_record->data->len);
+            // This will only detach / deep copy if the buffer data is
+            // modified. Try to avoid doing that as much as possible
+            // (and avoid new memory allocations that have to be freed),
+            // which get expensive in long streams.
+            buffer.setRawData((char*)follow_record->data->data, follow_record->data->len);
             frs_return = showBuffer(
-                        buffer.data(),
+                        buffer,
                         follow_record->data->len,
                         follow_record->is_server,
                         follow_record->packet_num,
