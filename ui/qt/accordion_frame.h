@@ -26,8 +26,9 @@ signals:
     void visibilityChanged(bool visible);
 
 protected:
-    virtual void hideEvent(QHideEvent *) { emit visibilityChanged(false); }
-    virtual void showEvent(QShowEvent *) { emit visibilityChanged(true); }
+    virtual void hideEvent(QHideEvent *) override { emit visibilityChanged(false); }
+    virtual void showEvent(QShowEvent *) override { emit visibilityChanged(true); }
+    void resizeEvent(QResizeEvent *event) override;
 
 private:
     int frame_height_;

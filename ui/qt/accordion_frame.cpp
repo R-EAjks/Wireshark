@@ -61,6 +61,9 @@ void AccordionFrame::animatedShow()
             frame_height_ = height();
             hide();
         }
+        if (layout()->hasHeightForWidth()) {
+            frame_height_ = layout()->heightForWidth(width());
+        }
         if (frame_height_ > 0) {
             animation_->setStartValue(0);
             animation_->setEndValue(frame_height_);
@@ -92,4 +95,18 @@ void AccordionFrame::animationFinished()
         hide();
         setMaximumHeight(frame_height_);
     }
+}
+
+void AccordionFrame::resizeEvent(QResizeEvent *event)
+{
+    if (!display_is_remote() && layout()->hasHeightForWidth() && layout()->heightForWidth(width()) != frame_height_) {
+        int old_frame_height = frame_height_;
+        frame_height_ = layout()->heightForWidth(width());
+        if (frame_height_ > 0) {
+            animation_->setStartValue(old_frame_height);
+            animation_->setEndValue(frame_height_);
+            animation_->start();
+        }
+    }
+    QFrame::resizeEvent(event);
 }
