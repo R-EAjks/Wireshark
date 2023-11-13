@@ -101,7 +101,6 @@ void proto_reg_handoff_protobuf(void);
 static void protobuf_reinit(int target);
 
 static int proto_protobuf = -1;
-static int proto_protobuf_json_mapping = -1;
 
 static gboolean protobuf_dissector_called = FALSE;
 
@@ -126,7 +125,6 @@ static int hf_protobuf_value_uint32 = -1;
 static int hf_protobuf_value_bool = -1;
 static int hf_protobuf_value_string = -1;
 static int hf_protobuf_value_repeated = -1;
-static int hf_json_mapping_line = -1;
 
 /* expert */
 static expert_field ei_protobuf_failed_parse_tag = EI_INIT;
@@ -145,7 +143,6 @@ static int ett_protobuf_message = -1;
 static int ett_protobuf_field = -1;
 static int ett_protobuf_value = -1;
 static int ett_protobuf_packed_repeated = -1;
-static int ett_protobuf_json = -1;
 
 /* preferences */
 static gboolean try_dissect_as_string = FALSE;
@@ -181,6 +178,7 @@ static GHashTable *pbf_hf_hash = NULL;
 static dissector_table_t protobuf_field_subdissector_table;
 
 static dissector_handle_t protobuf_handle;
+static dissector_handle_t json_handle;
 
 /* store varint tvb info */
 typedef struct {
@@ -1519,12 +1517,12 @@ static int
 dissect_protobuf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
     proto_item *ti;
-    proto_tree *protobuf_tree, *protobuf_json_tree;
+    proto_tree *protobuf_tree;
     guint offset = 0;
     guint i;
     const PbwDescriptor* message_desc = NULL;
     const gchar* data_str = NULL;
-    gchar *json_str, *p, *q;
+    gchar *json_str;
 
     /* initialize only the first time the protobuf dissector is called */
     if (!protobuf_dissector_called) {
@@ -1626,24 +1624,20 @@ dissect_protobuf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data
             protobuf_tree, message_desc, -1, pinfo->ptype == PT_UDP, &dumper, NULL, NULL);
 
         DISSECTOR_ASSERT_HINT(json_dumper_finish(&dumper), "Bad json_dumper state");
-        ti = proto_tree_add_item(tree, proto_protobuf_json_mapping, tvb, 0, -1, ENC_NA);
-        protobuf_json_tree = proto_item_add_subtree(ti, ett_protobuf_json);
 
         json_str = g_string_free(dumper.output_string, FALSE);
         if (json_str != NULL) {
-            p = json_str;
-            q = NULL;
-            /* add each line of json to the protobuf_json_tree */
-            do {
-                q = strchr(p, '\n');
-                if (q != NULL) {
-                    *(q++) = '\0'; /* replace the '\n' to '\0' */
-                } /* else (q == NULL) means this is the last line of the JSON */
-                proto_tree_add_string_format(protobuf_json_tree, hf_json_mapping_line, tvb, 0, -1, p, "%s", p);
-                p = q;
-                q = NULL;
-            } while (p);
+            guint json_tvb_len = (guint)strlen(json_str);
+            tvbuff_t* json_tvb = tvb_new_real_data(g_strdup(json_str), json_tvb_len, json_tvb_len);
+            tvb_set_free_cb(json_tvb, g_free);
+            add_new_data_source(pinfo, json_tvb, "Protobuf JSON Mapping");
 
+            const char* old_match_string = pinfo->match_string;
+            pinfo->match_string = pbw_Descriptor_full_name(message_desc);
+
+            call_dissector(json_handle, json_tvb, pinfo, tree);
+
+            pinfo->match_string = old_match_string;
             g_free(json_str);
         }
     } else {
@@ -2107,24 +2101,12 @@ proto_register_protobuf(void)
         }
     };
 
-    static hf_register_info json_hf[] = {
-        { &hf_json_mapping_line,
-            { "JSON Mapping Line", "protobuf_json.line",
-               FT_STRING, BASE_NONE, NULL, 0x0,
-              "One line of the protobuf json mapping", HFILL }
-        }
-    };
-
     static gint *ett[] = {
         &ett_protobuf,
         &ett_protobuf_message,
         &ett_protobuf_field,
         &ett_protobuf_value,
         &ett_protobuf_packed_repeated
-    };
-
-    static gint *ett_json[] = {
-        &ett_protobuf_json
     };
 
     /* Setup protocol expert items */
@@ -2187,13 +2169,9 @@ proto_register_protobuf(void)
     uat_t* protobuf_udp_message_types_uat;
 
     proto_protobuf = proto_register_protocol("Protocol Buffers", "ProtoBuf", "protobuf");
-    proto_protobuf_json_mapping = proto_register_protocol("Protocol Buffers (as JSON Mapping View)", "ProtoBuf_JSON", "protobuf_json");
 
     proto_register_field_array(proto_protobuf, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
-
-    proto_register_field_array(proto_protobuf_json_mapping, json_hf, array_length(json_hf));
-    proto_register_subtree_array(ett_json, array_length(ett_json));
 
     protobuf_module = prefs_register_protocol(proto_protobuf, proto_reg_handoff_protobuf);
 
@@ -2329,6 +2307,9 @@ proto_reg_handoff_protobuf(void)
         protobuf_reinit(PREFS_UPDATE_ALL);
     }
     old_dissect_bytes_as_string = dissect_bytes_as_string;
+
+    json_handle = find_dissector_add_dependency("json", proto_protobuf);
+
     dissector_add_string("grpc_message_type", "application/grpc", protobuf_handle);
     dissector_add_string("grpc_message_type", "application/grpc+proto", protobuf_handle);
     dissector_add_string("grpc_message_type", "application/grpc-web", protobuf_handle);
