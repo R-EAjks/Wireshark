@@ -452,6 +452,7 @@ static expert_field ei_tcp_analysis_duplicate_ack = EI_INIT;
 static expert_field ei_tcp_analysis_zero_window_probe = EI_INIT;
 static expert_field ei_tcp_analysis_zero_window = EI_INIT;
 static expert_field ei_tcp_analysis_zero_window_probe_ack = EI_INIT;
+static expert_field ei_tcp_analysis_suspicious_packet = EI_INIT;
 static expert_field ei_tcp_analysis_tfo_syn = EI_INIT;
 static expert_field ei_tcp_analysis_tfo_ack = EI_INIT;
 static expert_field ei_tcp_analysis_tfo_ignored = EI_INIT;
@@ -1692,6 +1693,7 @@ static gboolean mptcp_intersubflows_retransmission  = FALSE;
 #define TCP_A_WINDOW_FULL             0x1000
 #define TCP_A_REUSED_PORTS            0x2000
 #define TCP_A_SPURIOUS_RETRANSMISSION 0x4000
+#define TCP_A_SUSPICIOUS_PACKET       0x8000
 
 /* This flag for desegment_tcp to exclude segments with previously
  * seen sequence numbers.
@@ -2260,6 +2262,18 @@ tcp_analyze_sequence_number(packet_info *pinfo, guint32 seq, guint32 ack, guint3
             tcp_analyze_get_acked_struct(pinfo->num, seq, ack, TRUE, tcpd);
         }
         tcpd->ta->flags|=TCP_A_ZERO_WINDOW;
+    }
+
+
+    /* PACKET FROM A NON EXISTING PAST
+     * If this segment is preceeding the conversation beginning,
+     * this is a suspiscious event
+     */
+    if(GT_SEQ(tcpd->fwd->base_seq, seq)) {
+        if(!tcpd->ta) {
+            tcp_analyze_get_acked_struct(pinfo->num, seq, ack, TRUE, tcpd);
+        }
+        tcpd->ta->flags|=TCP_A_SUSPICIOUS_PACKET;
     }
 
 
@@ -3095,6 +3109,20 @@ tcp_sequence_number_analysis_print_zero_window(packet_info * pinfo,
     }
 }
 
+/* Prints results of the sequence number analysis concerning suspicious packets */
+static void
+tcp_sequence_number_analysis_print_suspicious(packet_info * pinfo,
+                      proto_item * flags_item,
+                      struct tcp_acked *ta
+                      )
+{
+    /* TCP Suspicious Packets */
+    if (ta->flags & TCP_A_SUSPICIOUS_PACKET) {
+        expert_add_info(pinfo, flags_item, &ei_tcp_analysis_suspicious_packet);
+        col_prepend_fence_fstr(pinfo->cinfo, COL_INFO,
+                               "[TCP Suspicious packet] ");
+    }
+}
 
 /* Prints results of the sequence number analysis concerning how many bytes of data are in flight */
 static void
@@ -3561,6 +3589,9 @@ tcp_print_sequence_number_analysis(packet_info *pinfo, tvbuff_t *tvb, proto_tree
 
         /* print results for tcp zero window  */
         tcp_sequence_number_analysis_print_zero_window(pinfo, item, ta);
+
+        /* print results for suspicious packets */
+        tcp_sequence_number_analysis_print_suspicious(pinfo, item, ta);
 
     }
 
@@ -9712,6 +9743,7 @@ proto_register_tcp(void)
         { &ei_tcp_analysis_zero_window_probe, { "tcp.analysis.zero_window_probe", PI_SEQUENCE, PI_NOTE, "TCP Zero Window Probe", EXPFILL }},
         { &ei_tcp_analysis_zero_window, { "tcp.analysis.zero_window", PI_SEQUENCE, PI_WARN, "TCP Zero Window segment", EXPFILL }},
         { &ei_tcp_analysis_zero_window_probe_ack, { "tcp.analysis.zero_window_probe_ack", PI_SEQUENCE, PI_NOTE, "ACK to a TCP Zero Window Probe", EXPFILL }},
+        { &ei_tcp_analysis_suspicious_packet, { "tcp.analysis.suspicious_packet", PI_SEQUENCE, PI_NOTE, "This frame is suspicious because SEQ or ACK is out of the expected range", EXPFILL }},
         { &ei_tcp_analysis_tfo_syn, { "tcp.analysis.tfo_syn", PI_SEQUENCE, PI_NOTE, "TCP SYN with TFO Cookie", EXPFILL }},
         { &ei_tcp_analysis_tfo_ack, { "tcp.analysis.tfo_ack", PI_SEQUENCE, PI_NOTE, "TCP SYN-ACK accepting TFO data", EXPFILL }},
         { &ei_tcp_analysis_tfo_ignored, { "tcp.analysis.tfo_ignored", PI_SEQUENCE, PI_NOTE, "TCP SYN-ACK ignoring TFO data", EXPFILL }},
