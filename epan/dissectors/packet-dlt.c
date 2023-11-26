@@ -3,6 +3,7 @@
  * By Dr. Lars Voelker <lars.voelker@technica-engineering.de>
  * Copyright 2013-2019 Dr. Lars Voelker, BMW
  * Copyright 2020-2023 Dr. Lars Voelker, Technica Engineering GmbH
+ * Enhanced for non verbose 2023 Matthias Bilger <matthias@bilger.info>
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -20,6 +21,7 @@
 /* This dissector currently only supports Version 1 of DLT. */
 
 #include <config.h>
+#include <limits.h>
 
 #include <epan/packet.h>
 #include "packet-tcp.h"
@@ -215,6 +217,19 @@ static int hf_dlt_double;
 static int hf_dlt_rawd;
 static int hf_dlt_string;
 
+static int hf_dlt_non_verbose_payload;
+static int hf_dlt_non_verbose_message_name;
+static int hf_dlt_non_verbose_argument;
+static int hf_dlt_non_verbose_base;
+static int hf_dlt_non_verbose_stattic;
+static int hf_dlt_non_verbose_struct;
+static int hf_dlt_non_verbose_array;
+static int hf_dlt_non_verbose_array_string;
+static int hf_dlt_non_verbose_static;
+static int hf_dlt_non_verbose_array_length_field_8bit;
+static int hf_dlt_non_verbose_array_length_field_16bit;
+static int hf_dlt_non_verbose_array_length_field_32bit;
+
 static int hf_dlt_service_options;
 static int hf_dlt_service_application_id;
 static int hf_dlt_service_context_id;
@@ -238,6 +253,13 @@ static int hf_dlt_storage_tstamp_us;
 static int hf_dlt_storage_ecu_name;
 static int hf_dlt_storage_reserved;
 
+static hf_register_info* dynamic_hf_list                               = NULL;
+static guint dynamic_hf_list_size                                      = 0;
+static hf_register_info* dynamic_hf_array                               = NULL;
+static guint dynamic_hf_array_size                                      = 0;
+static hf_register_info* dynamic_hf_struct                              = NULL;
+static guint dynamic_hf_struct_size                                     = 0;
+
 /* subtrees */
 static gint ett_dlt;
 static gint ett_dlt_hdr_type;
@@ -247,6 +269,10 @@ static gint ett_dlt_payload;
 static gint ett_dlt_service_app_ids;
 static gint ett_dlt_service_app_id;
 static gint ett_dlt_service_ctx_id;
+static gint ett_dlt_non_verbose_payload;
+static gint ett_dlt_non_verbose_struct;
+static gint ett_dlt_non_verbose_array;
+static gint ett_dlt_non_verbose_array_dim;
 
 static gint ett_dlt_storage;
 
@@ -376,6 +402,797 @@ static const value_string dlt_service_options[] = {
 #define DLT_SERVICE_OPTIONS_WITH_LOG_TRACE              6
 #define DLT_SERVICE_OPTIONS_WITH_LOG_TRACE_TEXT         7
 
+/* User Configuration for dissecting non verbose dlt message payload  */
+#define DATAFILE_DLT_MESSAGES  "DLT_messages"
+#define DATAFILE_DLT_STRUCTS   "DLT_structs"
+#define DATAFILE_DLT_ARRAYS    "DLT_arrays"
+#define DATAFILE_DLT_BASETYPES "DLT_basetypes"
+#define DATAFILE_DLT_STATICS   "DLT_statics"
+
+static GHashTable *data_dlt_argument_list      = NULL;
+static GHashTable *data_dlt_argument_basetypes = NULL;
+static GHashTable *data_dlt_argument_arrays    = NULL;
+static GHashTable *data_dlt_argument_structs   = NULL;
+static GHashTable *data_dlt_argument_statics   = NULL;
+
+#define DLT_NONE_TYPE_ID     0x0
+#define DLT_BASETYPE_TYPE_ID 0x1
+#define DLT_STRUCT_TYPE_ID   0x2
+#define DLT_ARRAY_TYPE_ID    0x3
+#define DLT_STATIC_TYPE_ID   0x4
+
+/* User config helper macros */
+#define COPY_UAT_CSTRING(old_rec, new_rec, name)  \
+    do {\
+        if (old_rec->name) { \
+            new_rec->name = g_strdup(old_rec->name); \
+        } else { \
+            new_rec->name = NULL; \
+        } \
+    } while(0)
+
+#define CHECK_UAT_CSTRING_NOT_EMPTY(field, fieldname)  \
+    do {\
+        if (field == NULL || field[0] == 0) {\
+            *err = ws_strdup_printf(fieldname " cannot be empty");\
+            return FALSE;\
+        }\
+    } while(0)
+#define CHECK_UAT_DATATYPE_ID(field, identifier)  \
+    do {\
+        if (field > 0x0fffffffu) {\
+            *err = ws_strdup_printf("DataTypes must not have the upper 4 bits set. Incorrect at at %s. value is %08x",  identifier, field);\
+            return FALSE;\
+        }\
+    } while(0)
+#define CHECK_UAT_DATATYPE(type_field, id_field, identifier)  \
+    do {\
+        if (make_data_type_ref(type_field, id_field) == 0) {\
+            *err = ws_strdup_printf("DataTypes has an unrecognized value %s for %s", type_field, identifier);\
+            return FALSE;\
+        }\
+        if (id_field > 0x0fffffffu) {\
+            *err = ws_strdup_printf("DataTypes must not have the upper 4 bits set. Incorrect at at %s. value is %08x",  identifier, id_field);\
+            return FALSE;\
+        }\
+    } while(0)
+#define DLT_MAKE_ID(type, id) ((type & 0xF) << 28U) | (id & 0x0FFFFFFFU)
+#define DLT_GET_TYPE(id) ((id & 0xF0000000U) >> 28U)
+
+typedef struct _dlt_non_verbose_argument {
+    gchar       *name;
+    gint        *hf_id;
+    guint32     data_type_ref;
+} dlt_non_verbose_argument_t;
+
+typedef struct _dlt_non_verbose_argument_list {
+    gchar       *ecu_id;
+    guint32     messageid;
+    gchar       *name;
+    gchar       *application_id;
+    gchar       *context_id;
+    guint32     num_of_items;
+    dlt_non_verbose_argument_t *items;
+} dlt_non_verbose_argument_list_t;
+
+typedef struct _dlt_non_verbose_argument_list_uat {
+    gchar       *ecu_id;
+    guint32     messageid;
+    gchar       *message_name;
+    gchar       *application_id;
+    gchar       *context_id;
+    guint32     num_of_items;
+    guint32     pos;
+    gchar       *name;
+    gchar       *data_type;
+    guint32     data_type_ref;
+} dlt_non_verbose_argument_list_uat_t;
+
+typedef struct _dlt_non_verbose_argument_struct {
+    guint32     id;
+    gchar       *name;
+    guint32     num_of_items;
+    dlt_non_verbose_argument_t *items;
+} dlt_non_verbose_argument_struct_t;
+
+typedef struct _dlt_non_verbose_argument_struct_uat {
+    guint32     id;
+    gchar       *struct_name;
+    guint32     num_of_items;
+    guint32     pos;
+    gchar       *name;
+    gchar       *data_type;
+    guint32     data_type_ref;
+} dlt_non_verbose_argument_struct_uat_t;
+
+typedef struct _dlt_non_verbose_argument_array_dimension {
+    gchar       *name;
+    gint        *hf_id;
+    guint8      length;
+} dlt_non_verbose_argument_array_dimension_t;
+
+typedef struct _dlt_non_verbose_argument_array {
+    guint32     id;
+    gchar       *name;
+    guint32     data_type_ref;
+    guint32     length;
+    gboolean    isstring;
+    guint32     encoding;
+    gboolean    dynamic_length;
+    guint8      length_size;
+    gboolean    ndim;
+    dlt_non_verbose_argument_array_dimension_t *array_dimensions;
+} dlt_non_verbose_argument_array_t;
+
+typedef struct _dlt_non_verbose_argument_array_uat {
+    guint32     id;
+    gchar       *name;
+    gchar       *data_type;
+    guint32     data_type_ref;
+    guint32     length;
+    gboolean    isstring;
+    gchar       *encoding;
+    gboolean    dynamic_length;
+    guint32     length_size;
+    gboolean    ndim;
+    guint32     dimension_size;
+    guint32     dimension_pos;
+    gchar       *dimension_name;
+} dlt_non_verbose_argument_array_uat_t;
+
+typedef struct _dlt_non_verbose_argument_static {
+    guint32     id;
+    gchar       *name;
+} dlt_non_verbose_argument_static_t;
+
+typedef struct _dlt_non_verbose_argument_basetype {
+    guint32     id;
+    gchar       *name;
+    guint8      bitsize;
+    gboolean    issigned;
+    gboolean    isfloat;
+} dlt_non_verbose_argument_basetype_t;
+
+typedef struct _dlt_non_verbose_argument_basetype_uat {
+    guint32     id;
+    gchar       *name;
+    guint32     bitsize;
+    gboolean    issigned;
+    gboolean    isfloat;
+} dlt_non_verbose_argument_basetype_uat_t;
+
+typedef dlt_non_verbose_argument_static_t dlt_non_verbose_argument_static_uat_t;
+
+static dlt_non_verbose_argument_basetype_uat_t * dlt_non_verbose_argument_basetypes = NULL;
+static guint dlt_non_verbose_argument_basetypes_num = 0;
+
+static dlt_non_verbose_argument_static_uat_t *dlt_non_verbose_argument_statics = NULL;
+static guint dlt_non_verbose_argument_statics_num = 0;
+
+static dlt_non_verbose_argument_struct_uat_t *dlt_non_verbose_argument_structs = NULL;
+static guint dlt_non_verbose_argument_structs_num = 0;
+
+static dlt_non_verbose_argument_array_uat_t *dlt_non_verbose_argument_arrays = NULL;
+static guint dlt_non_verbose_argument_arrays_num = 0;
+
+static dlt_non_verbose_argument_list_uat_t *dlt_non_verbose_argument_lists = NULL;
+static guint dlt_non_verbose_argument_lists_num = 0;
+
+static void update_dynamic_hf_entries_dlt_argument_list(void);
+static void update_dynamic_hf_entries_dlt_argument_arrays(void);
+static void update_dynamic_hf_entries_dlt_argument_structs(void);
+
+/*** DLT Messages ***/
+UAT_CSTRING_CB_DEF    (dlt_non_verbose_argument_lists,     ecu_id,         dlt_non_verbose_argument_list_uat_t)
+UAT_HEX_CB_DEF        (dlt_non_verbose_argument_lists,     messageid,      dlt_non_verbose_argument_list_uat_t)
+UAT_CSTRING_CB_DEF    (dlt_non_verbose_argument_lists,     message_name,   dlt_non_verbose_argument_list_uat_t)
+UAT_CSTRING_CB_DEF    (dlt_non_verbose_argument_lists,     application_id, dlt_non_verbose_argument_list_uat_t)
+UAT_CSTRING_CB_DEF    (dlt_non_verbose_argument_lists,     context_id,     dlt_non_verbose_argument_list_uat_t)
+UAT_DEC_CB_DEF        (dlt_non_verbose_argument_lists,     num_of_items,   dlt_non_verbose_argument_list_uat_t)
+UAT_DEC_CB_DEF        (dlt_non_verbose_argument_lists,     pos,            dlt_non_verbose_argument_list_uat_t)
+UAT_CSTRING_CB_DEF    (dlt_non_verbose_argument_lists,     name,           dlt_non_verbose_argument_list_uat_t)
+UAT_CSTRING_CB_DEF    (dlt_non_verbose_argument_lists,     data_type,      dlt_non_verbose_argument_list_uat_t)
+UAT_HEX_CB_DEF        (dlt_non_verbose_argument_lists,     data_type_ref,  dlt_non_verbose_argument_list_uat_t)
+/*** DLT Structs ***/
+UAT_HEX_CB_DEF        (dlt_non_verbose_argument_structs,   id,             dlt_non_verbose_argument_struct_uat_t)
+UAT_CSTRING_CB_DEF    (dlt_non_verbose_argument_structs,   struct_name,    dlt_non_verbose_argument_struct_uat_t)
+UAT_DEC_CB_DEF        (dlt_non_verbose_argument_structs,   num_of_items,   dlt_non_verbose_argument_struct_uat_t)
+UAT_DEC_CB_DEF        (dlt_non_verbose_argument_structs,   pos,            dlt_non_verbose_argument_struct_uat_t)
+UAT_CSTRING_CB_DEF    (dlt_non_verbose_argument_structs,   name,           dlt_non_verbose_argument_struct_uat_t)
+UAT_CSTRING_CB_DEF    (dlt_non_verbose_argument_structs,   data_type,      dlt_non_verbose_argument_struct_uat_t)
+UAT_HEX_CB_DEF        (dlt_non_verbose_argument_structs,   data_type_ref,  dlt_non_verbose_argument_struct_uat_t)
+/*** DLT Array ***/
+UAT_HEX_CB_DEF        (dlt_non_verbose_argument_arrays,    id,             dlt_non_verbose_argument_array_uat_t)
+UAT_CSTRING_CB_DEF    (dlt_non_verbose_argument_arrays,    name,           dlt_non_verbose_argument_array_uat_t)
+UAT_CSTRING_CB_DEF    (dlt_non_verbose_argument_arrays,    data_type,      dlt_non_verbose_argument_array_uat_t)
+UAT_HEX_CB_DEF        (dlt_non_verbose_argument_arrays,    data_type_ref,  dlt_non_verbose_argument_array_uat_t)
+UAT_DEC_CB_DEF        (dlt_non_verbose_argument_arrays,    length,         dlt_non_verbose_argument_array_uat_t)
+UAT_BOOL_CB_DEF       (dlt_non_verbose_argument_arrays,    isstring,       dlt_non_verbose_argument_array_uat_t)
+UAT_CSTRING_CB_DEF    (dlt_non_verbose_argument_arrays,    encoding,       dlt_non_verbose_argument_array_uat_t)
+UAT_BOOL_CB_DEF       (dlt_non_verbose_argument_arrays,    dynamic_length, dlt_non_verbose_argument_array_uat_t)
+UAT_DEC_CB_DEF        (dlt_non_verbose_argument_arrays,    length_size,    dlt_non_verbose_argument_array_uat_t)
+UAT_BOOL_CB_DEF       (dlt_non_verbose_argument_arrays,    ndim,           dlt_non_verbose_argument_array_uat_t)
+UAT_DEC_CB_DEF        (dlt_non_verbose_argument_arrays,    dimension_size, dlt_non_verbose_argument_array_uat_t)
+UAT_DEC_CB_DEF        (dlt_non_verbose_argument_arrays,    dimension_pos,  dlt_non_verbose_argument_array_uat_t)
+UAT_CSTRING_CB_DEF    (dlt_non_verbose_argument_arrays,    dimension_name, dlt_non_verbose_argument_array_uat_t)
+/*** DLT Static ***/
+UAT_HEX_CB_DEF        (dlt_non_verbose_argument_statics,   id,             dlt_non_verbose_argument_static_uat_t)
+UAT_CSTRING_CB_DEF    (dlt_non_verbose_argument_statics,   name,           dlt_non_verbose_argument_static_uat_t)
+/*** DLT Basetype ***/
+UAT_HEX_CB_DEF        (dlt_non_verbose_argument_basetypes, id,             dlt_non_verbose_argument_basetype_uat_t)
+UAT_CSTRING_CB_DEF    (dlt_non_verbose_argument_basetypes, name,           dlt_non_verbose_argument_basetype_uat_t)
+UAT_DEC_CB_DEF        (dlt_non_verbose_argument_basetypes, bitsize,        dlt_non_verbose_argument_basetype_uat_t)
+UAT_BOOL_CB_DEF       (dlt_non_verbose_argument_basetypes, issigned,       dlt_non_verbose_argument_basetype_uat_t)
+UAT_BOOL_CB_DEF       (dlt_non_verbose_argument_basetypes, isfloat,        dlt_non_verbose_argument_basetype_uat_t)
+
+static guint32 make_data_type_ref(const gchar* data_type, guint32 data_type_ref){
+    guint typeid = DLT_NONE_TYPE_ID;
+    if(g_strcmp0(data_type, "base") == 0){
+        typeid = DLT_BASETYPE_TYPE_ID;
+    }else if(g_strcmp0(data_type, "struct") == 0){
+        typeid = DLT_STRUCT_TYPE_ID;
+    }else if(g_strcmp0(data_type, "array") == 0){
+        typeid = DLT_ARRAY_TYPE_ID;
+    }else if(g_strcmp0(data_type, "static") == 0){
+        typeid = DLT_STATIC_TYPE_ID;
+    }else{
+        return 0;
+    }
+    return DLT_MAKE_ID(typeid, data_type_ref);
+}
+
+static void
+dlt_free_key(gpointer key) {
+    wmem_free(wmem_epan_scope(), key);
+}
+
+/* Argument Elements */
+static void *
+copy_dlt_argument_list_cb(void *n, const void *o, size_t size _U_) {
+    dlt_non_verbose_argument_list_uat_t        *new_rec = (dlt_non_verbose_argument_list_uat_t *)n;
+    const dlt_non_verbose_argument_list_uat_t  *old_rec = (const dlt_non_verbose_argument_list_uat_t *)o;
+
+    COPY_UAT_CSTRING(old_rec, new_rec, ecu_id);
+    COPY_UAT_CSTRING(old_rec, new_rec, message_name);
+    COPY_UAT_CSTRING(old_rec, new_rec, application_id);
+    COPY_UAT_CSTRING(old_rec, new_rec, context_id);
+    COPY_UAT_CSTRING(old_rec, new_rec, name);
+    COPY_UAT_CSTRING(old_rec, new_rec, data_type);
+
+    new_rec->messageid     = old_rec->messageid;
+    new_rec->num_of_items  = old_rec->num_of_items;
+    new_rec->pos           = old_rec->pos;
+    new_rec->data_type_ref = old_rec->data_type_ref;
+
+    return new_rec;
+}
+
+static bool
+update_dlt_argument_list_cb(void *r, char **err) {
+    dlt_non_verbose_argument_list_uat_t *rec = (dlt_non_verbose_argument_list_uat_t *)r;
+
+    CHECK_UAT_CSTRING_NOT_EMPTY(rec->ecu_id, "Ecu Id");
+    CHECK_UAT_CSTRING_NOT_EMPTY(rec->name, "Name");
+
+    if (rec->num_of_items > 0 && rec->pos >= rec->num_of_items) {
+        *err = ws_strdup_printf("Position >= Number of Arguments");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static void
+free_dlt_argument_list_cb(void *r) {
+    dlt_non_verbose_argument_list_uat_t *rec = (dlt_non_verbose_argument_list_uat_t *)r;
+
+    if (rec->message_name) {
+        g_free(rec->message_name);
+        rec->message_name = NULL;
+    }
+
+    if (rec->name) {
+        g_free(rec->name);
+        rec->name = NULL;
+    }
+
+    if (rec->ecu_id) {
+        g_free(rec->ecu_id);
+        rec->ecu_id = NULL;
+    }
+
+    if (rec->application_id) {
+        g_free(rec->application_id);
+        rec->application_id = NULL;
+    }
+
+    if (rec->context_id) {
+        g_free(rec->context_id);
+        rec->context_id = NULL;
+    }
+}
+
+static void
+reset_dlt_argument_list_cb(void) {
+    /* destroy old hash table, if it exists */
+    if (data_dlt_argument_list) {
+        g_hash_table_destroy(data_dlt_argument_list);
+        data_dlt_argument_list = NULL;
+    }
+}
+
+static void
+free_dlt_non_verbose_argument_list(gpointer data) {
+    dlt_non_verbose_argument_list_t *list = (dlt_non_verbose_argument_list_t *)data;
+
+    if (list->items != NULL) {
+        wmem_free(wmem_epan_scope(), (void *)(list->items));
+        list->items = NULL;
+    }
+
+    wmem_free(wmem_epan_scope(), (void *)data);
+}
+
+static void
+post_update_dlt_argument_list_cb(void) {
+    guint i=0;
+    gint64         *key = NULL;
+    dlt_non_verbose_argument_list_t       *list = NULL;
+    dlt_non_verbose_argument_t *item = NULL;
+    reset_dlt_argument_list_cb();
+
+    /* create new hash table */
+    data_dlt_argument_list = g_hash_table_new_full(g_int64_hash, g_int64_equal, &dlt_free_key, &free_dlt_non_verbose_argument_list);
+    if (data_dlt_argument_list == NULL || dlt_non_verbose_argument_lists == NULL || dlt_non_verbose_argument_lists_num == 0) {
+        return;
+    }
+
+    for (i = 0; i < dlt_non_verbose_argument_lists_num; i++) {
+        key = wmem_new(wmem_epan_scope(), gint64);
+        *key = ((gint64)dlt_ecu_id_to_gint32(dlt_non_verbose_argument_lists[i].ecu_id)) << 32 | dlt_non_verbose_argument_lists[i].messageid;
+
+        list = (dlt_non_verbose_argument_list_t *)g_hash_table_lookup(data_dlt_argument_list, key);
+        if (list == NULL) {
+            /* create new entry */
+            list = wmem_new(wmem_epan_scope(), dlt_non_verbose_argument_list_t);
+
+            list->ecu_id         = dlt_non_verbose_argument_lists[i].ecu_id;
+            list->messageid      = dlt_non_verbose_argument_lists[i].messageid;
+            list->name           = dlt_non_verbose_argument_lists[i].message_name;
+            list->application_id = dlt_non_verbose_argument_lists[i].application_id;
+            list->context_id     = dlt_non_verbose_argument_lists[i].context_id;
+            list->num_of_items   = dlt_non_verbose_argument_lists[i].num_of_items;
+
+            list->items = (dlt_non_verbose_argument_t *)wmem_alloc0_array(wmem_epan_scope(), dlt_non_verbose_argument_t, list->num_of_items);
+
+            /* create new entry ... */
+            g_hash_table_insert(data_dlt_argument_list, key, list);
+        } else {
+            /* don't need the key anymore, as the initial entry already exists and will be reused */
+            wmem_free(wmem_epan_scope(), key);
+        }
+
+        if (dlt_non_verbose_argument_lists[i].num_of_items == list->num_of_items && dlt_non_verbose_argument_lists[i].pos < list->num_of_items) {
+            item = &(list->items[dlt_non_verbose_argument_lists[i].pos]);
+
+            /* we do not care if we overwrite param */
+            item->hf_id         = NULL;
+            item->name          = dlt_non_verbose_argument_lists[i].name;
+            item->data_type_ref = make_data_type_ref(dlt_non_verbose_argument_lists[i].data_type, dlt_non_verbose_argument_lists[i].data_type_ref);
+        }
+    }
+    update_dynamic_hf_entries_dlt_argument_list();
+}
+
+
+
+
+/* Struct Elements */
+static void *
+copy_dlt_argument_struct_cb(void *n, const void *o, size_t size _U_) {
+    dlt_non_verbose_argument_struct_uat_t        *new_rec = (dlt_non_verbose_argument_struct_uat_t *)n;
+    const dlt_non_verbose_argument_struct_uat_t  *old_rec = (const dlt_non_verbose_argument_struct_uat_t *)o;
+
+    COPY_UAT_CSTRING(old_rec, new_rec, struct_name);
+    COPY_UAT_CSTRING(old_rec, new_rec, name);
+    COPY_UAT_CSTRING(old_rec, new_rec, data_type);
+
+    new_rec->id            = old_rec->id;
+    new_rec->num_of_items  = old_rec->num_of_items;
+    new_rec->pos           = old_rec->pos;
+    new_rec->data_type_ref = old_rec->data_type_ref;
+
+    return new_rec;
+}
+
+static bool
+update_dlt_argument_struct_cb(void *r, char **err) {
+    dlt_non_verbose_argument_struct_uat_t *rec = (dlt_non_verbose_argument_struct_uat_t *)r;
+
+    CHECK_UAT_DATATYPE_ID(rec->id, rec->name);
+    CHECK_UAT_CSTRING_NOT_EMPTY(rec->struct_name, "Struct Name");
+    CHECK_UAT_DATATYPE(rec->data_type, rec->data_type_ref, rec->name);
+    CHECK_UAT_CSTRING_NOT_EMPTY(rec->name, "Name");
+
+    if (rec->pos >= rec->num_of_items) {
+        *err = ws_strdup_printf("Position >= Number of Arguments");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static void
+free_dlt_argument_struct_cb(void *r) {
+    dlt_non_verbose_argument_struct_uat_t *rec = (dlt_non_verbose_argument_struct_uat_t *)r;
+
+    if (rec->name) {
+        g_free(rec->name);
+        rec->name = NULL;
+    }
+
+    if (rec->struct_name) {
+        g_free(rec->struct_name);
+        rec->struct_name = NULL;
+    }
+}
+
+static void
+reset_dlt_argument_struct_cb(void) {
+    /* destroy old hash table, if it exists */
+    if (data_dlt_argument_structs) {
+        g_hash_table_destroy(data_dlt_argument_structs);
+        data_dlt_argument_structs = NULL;
+    }
+}
+
+
+static void
+free_dlt_non_verbose_argument_struct(gpointer data) {
+    dlt_non_verbose_argument_struct_t *list = (dlt_non_verbose_argument_struct_t *)data;
+
+    if (list->items != NULL) {
+        wmem_free(wmem_epan_scope(), (void *)(list->items));
+        list->items = NULL;
+    }
+
+    wmem_free(wmem_epan_scope(), (void *)data);
+}
+
+static void
+post_update_dlt_argument_struct_cb(void) {
+    guint i=0;
+    gint64         *key = NULL;
+    dlt_non_verbose_argument_struct_t       *list = NULL;
+    dlt_non_verbose_argument_t *item = NULL;
+    reset_dlt_argument_struct_cb();
+
+    /* create new hash table */
+    data_dlt_argument_structs = g_hash_table_new_full(g_int_hash, g_int_equal, &dlt_free_key, &free_dlt_non_verbose_argument_struct);
+    if (data_dlt_argument_structs == NULL || dlt_non_verbose_argument_structs == NULL || dlt_non_verbose_argument_structs_num == 0) {
+        return;
+    }
+
+    for (i = 0; i < dlt_non_verbose_argument_structs_num; i++) {
+        key = wmem_new(wmem_epan_scope(), gint64);
+        *key = DLT_MAKE_ID(DLT_STRUCT_TYPE_ID, dlt_non_verbose_argument_structs[i].id);
+
+        list = (dlt_non_verbose_argument_struct_t *)g_hash_table_lookup(data_dlt_argument_structs, key);
+        if (list == NULL) {
+            /* create new entry */
+            list = wmem_new(wmem_epan_scope(), dlt_non_verbose_argument_struct_t);
+
+            list->id           = dlt_non_verbose_argument_structs[i].id;
+            list->name         = dlt_non_verbose_argument_structs[i].struct_name;
+            list->num_of_items = dlt_non_verbose_argument_structs[i].num_of_items;
+
+            list->items = (dlt_non_verbose_argument_t *)wmem_alloc0_array(wmem_epan_scope(), dlt_non_verbose_argument_t, list->num_of_items);
+
+            /* create new entry ... */
+            g_hash_table_insert(data_dlt_argument_structs, key, list);
+        } else {
+            /* don't need the key anymore, as the initial entry already exists and will be reused */
+            wmem_free(wmem_epan_scope(), key);
+        }
+
+        if (dlt_non_verbose_argument_structs[i].num_of_items == list->num_of_items && dlt_non_verbose_argument_structs[i].pos < list->num_of_items) {
+            item = &(list->items[dlt_non_verbose_argument_structs[i].pos]);
+
+            /* we do not care if we overwrite param */
+            item->hf_id         = NULL;
+            item->name          = dlt_non_verbose_argument_structs[i].name;
+            item->data_type_ref = make_data_type_ref(dlt_non_verbose_argument_structs[i].data_type, dlt_non_verbose_argument_structs[i].data_type_ref);
+        }
+    }
+    update_dynamic_hf_entries_dlt_argument_structs();
+}
+
+
+
+/* Array Elements */
+static void *
+copy_dlt_argument_array_cb(void *n, const void *o, size_t size _U_) {
+    dlt_non_verbose_argument_array_uat_t        *new_rec = (dlt_non_verbose_argument_array_uat_t *)n;
+    const dlt_non_verbose_argument_array_uat_t  *old_rec = (const dlt_non_verbose_argument_array_uat_t *)o;
+
+    COPY_UAT_CSTRING(old_rec, new_rec, name);
+    COPY_UAT_CSTRING(old_rec, new_rec, encoding);
+    COPY_UAT_CSTRING(old_rec, new_rec, dimension_name);
+    COPY_UAT_CSTRING(old_rec, new_rec, data_type);
+
+    new_rec->id             = old_rec->id;
+    new_rec->data_type_ref  = old_rec->data_type_ref;
+    new_rec->length         = old_rec->length;
+    new_rec->isstring       = old_rec->isstring;
+    new_rec->dynamic_length = old_rec->dynamic_length;
+    new_rec->length_size    = old_rec->length_size;
+    new_rec->ndim           = old_rec->ndim;
+    new_rec->dimension_pos  = old_rec->dimension_pos;
+    new_rec->dimension_size = old_rec->dimension_size;
+
+    return new_rec;
+}
+
+static bool
+update_dlt_argument_array_cb(void *r, char **err) {
+    dlt_non_verbose_argument_array_uat_t *rec = (dlt_non_verbose_argument_array_uat_t *)r;
+
+    CHECK_UAT_DATATYPE_ID(rec->id, rec->name);
+    CHECK_UAT_DATATYPE(rec->data_type, rec->data_type_ref, rec->name);
+    CHECK_UAT_CSTRING_NOT_EMPTY(rec->name, "Name");
+
+    if (rec->dynamic_length && rec->ndim) {
+        *err = ws_strdup_printf("Array cannot be multidimensional and variable length");
+        return FALSE;
+    }
+
+    if (rec->dimension_pos >= rec->length) {
+        *err = ws_strdup_printf("Position >= Number of Arguments");
+        return FALSE;
+    }
+
+    if(rec->isstring){
+        if ((g_strcmp0(rec->encoding, "utf8") == 0) || (g_strcmp0(rec->encoding, "utf16") == 0) || (g_strcmp0(rec->encoding, "ascii") == 0)) {
+            *err = ws_strdup_printf("Encoding must be utf8, utf16 or ascii");
+            return FALSE;
+        }
+    }
+
+
+    return TRUE;
+}
+
+static void
+free_dlt_argument_array_cb(void *r) {
+    dlt_non_verbose_argument_array_uat_t *rec = (dlt_non_verbose_argument_array_uat_t *)r;
+
+    if (rec->name) {
+        g_free(rec->name);
+        rec->name = NULL;
+    }
+}
+
+static void
+reset_dlt_argument_array_cb(void) {
+    /* destroy old hash table, if it exists */
+    if (data_dlt_argument_arrays) {
+        g_hash_table_destroy(data_dlt_argument_arrays);
+        data_dlt_argument_arrays = NULL;
+    }
+}
+
+static void
+free_dlt_non_verbose_argument_array(gpointer data) {
+    dlt_non_verbose_argument_array_t *list = (dlt_non_verbose_argument_array_t *)data;
+
+    if (list->array_dimensions != NULL) {
+        wmem_free(wmem_epan_scope(), (void *)(list->array_dimensions));
+        list->array_dimensions = NULL;
+    }
+
+    wmem_free(wmem_epan_scope(), (void *)data);
+}
+
+static void
+post_update_dlt_argument_array_cb(void) {
+    guint i=0;
+    gint64         *key = NULL;
+    dlt_non_verbose_argument_array_t       *array = NULL;
+    dlt_non_verbose_argument_array_dimension_t *item = NULL;
+    reset_dlt_argument_array_cb();
+
+    /* create new hash table */
+    data_dlt_argument_arrays = g_hash_table_new_full(g_int_hash, g_int_equal, &dlt_free_key, &free_dlt_non_verbose_argument_array);
+
+    if (data_dlt_argument_arrays == NULL || dlt_non_verbose_argument_arrays == NULL || dlt_non_verbose_argument_arrays_num == 0) {
+        return;
+    }
+
+    for (i = 0; i < dlt_non_verbose_argument_arrays_num; i++) {
+        key = wmem_new(wmem_epan_scope(), gint64);
+        *key = DLT_MAKE_ID(DLT_ARRAY_TYPE_ID, dlt_non_verbose_argument_arrays[i].id);
+
+        array = (dlt_non_verbose_argument_array_t *)g_hash_table_lookup(data_dlt_argument_arrays, key);
+        if (array == NULL) {
+            /* create new entry */
+            array = wmem_new(wmem_epan_scope(), dlt_non_verbose_argument_array_t);
+
+            array->id             = dlt_non_verbose_argument_arrays[i].id;
+            array->name           = dlt_non_verbose_argument_arrays[i].name;
+            array->data_type_ref  = make_data_type_ref(dlt_non_verbose_argument_arrays[i].data_type, dlt_non_verbose_argument_arrays[i].data_type_ref);
+            array->length         = dlt_non_verbose_argument_arrays[i].length;
+            array->isstring       = dlt_non_verbose_argument_arrays[i].isstring;
+            array->dynamic_length = dlt_non_verbose_argument_arrays[i].dynamic_length;
+            array->length_size    = dlt_non_verbose_argument_arrays[i].length_size;
+            array->ndim           = dlt_non_verbose_argument_arrays[i].ndim;
+
+            if(array->ndim){
+                array->array_dimensions = (dlt_non_verbose_argument_array_dimension_t *)wmem_alloc0_array(wmem_epan_scope(), dlt_non_verbose_argument_array_dimension_t, array->length);
+            }else{
+                array->array_dimensions = NULL;
+            }
+            if (array->isstring){
+                if (g_strcmp0(dlt_non_verbose_argument_arrays[i].encoding, "ascii") == 0){
+                    array->encoding = ENC_ASCII;
+                } else if (g_strcmp0(dlt_non_verbose_argument_arrays[i].encoding, "utf16") == 0){
+                    array->encoding = ENC_UTF_16;
+                }else {
+                    array->encoding = ENC_UTF_8;
+                }
+            }else{
+                    array->encoding = 0;
+            }
+
+            /* create new entry ... */
+            g_hash_table_insert(data_dlt_argument_arrays, key, array);
+        } else {
+            /* don't need the key anymore, as the initial entry already exists and will be reused */
+            wmem_free(wmem_epan_scope(), key);
+        }
+
+        if(array->ndim){
+            if (dlt_non_verbose_argument_arrays[i].length == array->length && dlt_non_verbose_argument_arrays[i].dimension_pos < array->length) {
+                item = &(array->array_dimensions[dlt_non_verbose_argument_arrays[i].dimension_pos]);
+
+                /* we do not care if we overwrite param */
+                item->name   = dlt_non_verbose_argument_arrays[i].dimension_name;
+                item->length = dlt_non_verbose_argument_arrays[i].length_size;
+                item->hf_id  = NULL;
+            }
+        }
+    }
+    update_dynamic_hf_entries_dlt_argument_arrays();
+}
+
+
+/* Static Elements */
+static void *
+copy_dlt_argument_static_cb(void *n, const void *o, size_t size _U_) {
+    dlt_non_verbose_argument_static_uat_t        *new_rec = (dlt_non_verbose_argument_static_uat_t *)n;
+    const dlt_non_verbose_argument_static_uat_t  *old_rec = (const dlt_non_verbose_argument_static_uat_t *)o;
+
+    COPY_UAT_CSTRING(old_rec, new_rec, name);
+    new_rec->id    = old_rec->id;
+
+    return new_rec;
+}
+
+static bool
+update_dlt_argument_static_cb(void *r, char **err) {
+    dlt_non_verbose_argument_static_uat_t *rec = (dlt_non_verbose_argument_static_uat_t *)r;
+    CHECK_UAT_DATATYPE_ID(rec->id, rec->name);
+
+    CHECK_UAT_CSTRING_NOT_EMPTY(rec->name, "Name");
+    return TRUE;
+}
+
+static void
+free_dlt_argument_static_cb(void *r) {
+    dlt_non_verbose_argument_static_uat_t *rec = (dlt_non_verbose_argument_static_uat_t *)r;
+
+    if (rec->name) {
+        g_free(rec->name);
+        rec->name = NULL;
+    }
+}
+
+static void
+reset_dlt_argument_static_cb(void) {
+    /* destroy old hash table, if it exists */
+    if (data_dlt_argument_statics) {
+        g_hash_table_destroy(data_dlt_argument_statics);
+        data_dlt_argument_statics = NULL;
+    }
+}
+
+static void
+post_update_dlt_argument_static_cb(void) {
+    gint64 *key = NULL;
+    guint i =0;
+    reset_dlt_argument_static_cb();
+
+    /* create new hash table */
+    data_dlt_argument_statics = g_hash_table_new_full(g_int_hash, g_int_equal, &dlt_free_key, NULL);
+    for (i = 0; i < dlt_non_verbose_argument_statics_num; i++) {
+        key = wmem_new(wmem_epan_scope(), gint64);
+        *key = DLT_MAKE_ID(DLT_STATIC_TYPE_ID, dlt_non_verbose_argument_statics[i].id);
+        g_hash_table_insert(data_dlt_argument_statics, key, &dlt_non_verbose_argument_statics[i]);
+    }
+}
+
+
+
+
+static void *
+copy_dlt_argument_basetype_cb(void *n, const void *o, size_t size _U_) {
+    dlt_non_verbose_argument_basetype_uat_t        *new_rec = (dlt_non_verbose_argument_basetype_uat_t *)n;
+    const dlt_non_verbose_argument_basetype_uat_t  *old_rec = (const dlt_non_verbose_argument_basetype_uat_t *)o;
+
+    COPY_UAT_CSTRING(old_rec, new_rec, name);
+
+    new_rec->id       = old_rec->id;
+    new_rec->bitsize  = old_rec->bitsize;
+    new_rec->issigned = old_rec->issigned;
+    new_rec->isfloat = old_rec->isfloat;
+
+    return new_rec;
+}
+
+static bool
+update_dlt_argument_basetype_cb(void *r, char **err) {
+    dlt_non_verbose_argument_basetype_uat_t *rec = (dlt_non_verbose_argument_basetype_uat_t *)r;
+
+    CHECK_UAT_DATATYPE_ID(rec->id, rec->name);
+    CHECK_UAT_CSTRING_NOT_EMPTY(rec->name, "Name");
+
+    if (rec->bitsize != 8 &&  rec->bitsize != 16 && rec->bitsize != 32 && rec->bitsize != 64) {
+        *err = ws_strdup_printf("Bitsize can only be 8, 16, 32 or 64 bits");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static void
+free_dlt_argument_basetype_cb(void *r) {
+    dlt_non_verbose_argument_basetype_uat_t *rec = (dlt_non_verbose_argument_basetype_uat_t *)r;
+
+    if (rec->name) {
+        g_free(rec->name);
+        rec->name = NULL;
+    }
+}
+
+static void
+reset_dlt_argument_basetype_cb(void) {
+    /* destroy old hash table, if it exists */
+    if (data_dlt_argument_basetypes) {
+        g_hash_table_destroy(data_dlt_argument_basetypes);
+        data_dlt_argument_basetypes = NULL;
+    }
+}
+
+static void
+post_update_dlt_argument_basetype_cb(void) {
+    gint64 *key = NULL;
+    guint i =0;
+
+    reset_dlt_argument_basetype_cb();
+
+    /* create new hash table */
+    data_dlt_argument_basetypes = g_hash_table_new_full(g_int_hash, g_int_equal, &dlt_free_key, NULL);
+
+    if (data_dlt_argument_basetypes == NULL || dlt_non_verbose_argument_basetypes == NULL || dlt_non_verbose_argument_basetypes_num == 0) {
+        return;
+    }
+
+    for (i = 0; i < dlt_non_verbose_argument_basetypes_num; i++) {
+        key = wmem_new(wmem_epan_scope(), gint64);
+        *key = DLT_MAKE_ID(DLT_BASETYPE_TYPE_ID, dlt_non_verbose_argument_basetypes[i].id);
+        g_hash_table_insert(data_dlt_argument_basetypes, key, &dlt_non_verbose_argument_basetypes[i]);
+    }
+}
+
 /*************************
  ****** Expert Info ******
  *************************/
@@ -386,9 +1203,14 @@ static expert_field ei_dlt_unsupported_string_coding;
 static expert_field ei_dlt_unsupported_non_verbose_msg_type;
 static expert_field ei_dlt_buffer_too_short;
 static expert_field ei_dlt_parsing_error;
+static expert_field ei_dlt_non_verbose_parsing_error;
+static expert_field ei_dlt_non_verbose_missing_message_error;
+static expert_field ei_dlt_non_verbose_datatype_unknown;
+static expert_field ei_dlt_non_verbose_trucated;
+static expert_field ei_dlt_non_verbose_invalid_length;
 
 static void
-expert_dlt_unsupported_parameter(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, gint offset, gint length) {
+expert_dlt_unsupported_parameter(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, guint offset, gint length) {
     if (tvb!=NULL) {
         proto_tree_add_expert(tree, pinfo, &ei_dlt_unsupported_datatype, tvb, offset, length);
     }
@@ -396,7 +1218,7 @@ expert_dlt_unsupported_parameter(proto_tree *tree, packet_info *pinfo, tvbuff_t 
 }
 
 static void
-expert_dlt_unsupported_length_datatype(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, gint offset, gint length) {
+expert_dlt_unsupported_length_datatype(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, guint offset, gint length) {
     if (tvb != NULL) {
         proto_tree_add_expert(tree, pinfo, &ei_dlt_unsupported_length_datatype, tvb, offset, length);
     }
@@ -404,7 +1226,7 @@ expert_dlt_unsupported_length_datatype(proto_tree *tree, packet_info *pinfo, tvb
 }
 
 static void
-expert_dlt_unsupported_string_coding(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, gint offset, gint length) {
+expert_dlt_unsupported_string_coding(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, guint offset, gint length) {
     if (tvb != NULL) {
         proto_tree_add_expert(tree, pinfo, &ei_dlt_unsupported_string_coding, tvb, offset, length);
     }
@@ -412,7 +1234,7 @@ expert_dlt_unsupported_string_coding(proto_tree *tree, packet_info *pinfo, tvbuf
 }
 
 static void
-expert_dlt_unsupported_non_verbose_msg_type(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, gint offset, gint length) {
+expert_dlt_unsupported_non_verbose_msg_type(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, guint offset, gint length) {
     if (tvb != NULL) {
         proto_tree_add_expert(tree, pinfo, &ei_dlt_unsupported_non_verbose_msg_type, tvb, offset, length);
     }
@@ -420,7 +1242,7 @@ expert_dlt_unsupported_non_verbose_msg_type(proto_tree *tree, packet_info *pinfo
 }
 
 static void
-expert_dlt_buffer_too_short(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, gint offset, gint length) {
+expert_dlt_buffer_too_short(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, guint offset, gint length) {
     if (tvb != NULL) {
         proto_tree_add_expert(tree, pinfo, &ei_dlt_buffer_too_short, tvb, offset, length);
     }
@@ -428,12 +1250,56 @@ expert_dlt_buffer_too_short(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb,
 }
 
 static void
-expert_dlt_parsing_error(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, gint offset, gint length) {
+expert_dlt_parsing_error(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, guint offset, gint length) {
     if (tvb != NULL) {
         proto_tree_add_expert(tree, pinfo, &ei_dlt_parsing_error, tvb, offset, length);
     }
     col_append_str(pinfo->cinfo, COL_INFO, " [DLT: Parsing Error!]");
 }
+
+/*
+static void
+expert_dlt_non_verbose_parsing_error(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, guint offset, gint length) {
+    if (tvb != NULL) {
+        proto_tree_add_expert(tree, pinfo, &ei_dlt_non_verbose_parsing_error, tvb, offset, length);
+    }
+    col_append_str(pinfo->cinfo, COL_INFO, " [DLT: Non-Verbose Parsing Error!]");
+}
+*/
+
+static void
+expert_dlt_non_verbose_message_missing(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, guint offset, gint length) {
+    if (tvb != NULL) {
+        proto_tree_add_expert(tree, pinfo, &ei_dlt_non_verbose_missing_message_error, tvb, offset, length);
+    }
+    col_append_str(pinfo->cinfo, COL_INFO, " [DLT: Non-Verbose Message Configuration Missing!]");
+}
+
+static void
+expert_dlt_non_verbose_datatype_unknown(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, guint offset, gint length) {
+    if (tvb != NULL) {
+        proto_tree_add_expert(tree, pinfo, &ei_dlt_non_verbose_datatype_unknown, tvb, offset, length);
+    }
+    col_append_str(pinfo->cinfo, COL_INFO, " [DLT: Non-Verbose datatype unknown!]");
+}
+
+static void
+expert_dlt_non_verbose_truncated(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, guint offset, gint length) {
+    if (tvb != NULL) {
+        proto_tree_add_expert(tree, pinfo, &ei_dlt_non_verbose_trucated, tvb, offset, length);
+    }
+    col_append_str(pinfo->cinfo, COL_INFO, " [DLT: Non-Verbose data truncated!]");
+}
+
+
+static void
+expert_dlt_non_verbose_invalid_length(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, guint offset, gint length) {
+    if (tvb != NULL) {
+        proto_tree_add_expert(tree, pinfo, &ei_dlt_non_verbose_invalid_length, tvb, offset, length);
+    }
+    col_append_str(pinfo->cinfo, COL_INFO, " [DLT: Non-Verbose dynamic length invalid!]");
+}
+
 
 
 /*****************************
@@ -991,9 +1857,397 @@ dissect_dlt_non_verbose_payload_message(tvbuff_t *tvb, packet_info *pinfo _U_, p
     return ret;
 }
 
+char*
+dlt_lookup_message(guint32 messageid) {
+    if (data_dlt_argument_list == NULL) {
+        return NULL;
+    }
+
+    return (char *)g_hash_table_lookup(data_dlt_argument_list, &messageid);
+}
+
+static gpointer
+get_generic_config(GHashTable *ht, gint64 id) {
+    if (ht == NULL) {
+        return NULL;
+    }
+
+    return (gpointer)g_hash_table_lookup(ht, &id);
+}
+
+static dlt_non_verbose_argument_list_t*
+get_message_config(const gchar* ecu_id, guint32 messageid) {
+    dlt_non_verbose_argument_list_t *tmp = NULL;
+
+    if (data_dlt_argument_list == NULL) {
+        return NULL;
+    }
+    guint64 key = (((guint64)dlt_ecu_id_to_gint32(ecu_id)) << 32) | messageid;
+
+    tmp = (dlt_non_verbose_argument_list_t *)get_generic_config(data_dlt_argument_list, key);
+
+    return tmp;
+}
+
+static dlt_non_verbose_argument_basetype_t*
+get_basetype_config(guint32 id) {
+    if (DLT_GET_TYPE(id) != DLT_BASETYPE_TYPE_ID){
+        return NULL;
+    }
+    if (data_dlt_argument_basetypes == NULL) {
+        return NULL;
+    }
+    return (dlt_non_verbose_argument_basetype_t *)get_generic_config(data_dlt_argument_basetypes, (gint64)id);
+}
+
+static dlt_non_verbose_argument_struct_t*
+get_struct_config(guint32 id) {
+    if (DLT_GET_TYPE(id) != DLT_STRUCT_TYPE_ID){
+        return NULL;
+    }
+    if (data_dlt_argument_structs == NULL) {
+        return NULL;
+    }
+    return (dlt_non_verbose_argument_struct_t *)get_generic_config(data_dlt_argument_structs, (gint64)id);
+}
+
+static dlt_non_verbose_argument_static_t*
+get_static_config(guint32 id) {
+    if (DLT_GET_TYPE(id) != DLT_STATIC_TYPE_ID){
+        return NULL;
+    }
+    if (data_dlt_argument_statics == NULL) {
+        return NULL;
+    }
+    return (dlt_non_verbose_argument_static_t *)get_generic_config(data_dlt_argument_statics, (gint64)id);
+}
+
+static dlt_non_verbose_argument_array_t*
+get_array_config(guint32 id) {
+    if (DLT_GET_TYPE(id) != DLT_ARRAY_TYPE_ID){
+        return NULL;
+    }
+    if (data_dlt_argument_arrays == NULL) {
+        return NULL;
+    }
+    return (dlt_non_verbose_argument_array_t *)get_generic_config(data_dlt_argument_arrays, (gint64)id);
+}
+
+
+static int dissect_dlt_non_verbose_argument(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, dlt_info_t *dlt_info, guint offset, gchar* name, guint32 datatype, int* hf_id);
+
+static gint64
+dissect_dlt_dynamic_length_field(tvbuff_t *tvb, packet_info *pinfo, proto_tree *subtree, guint offset, gint length_of_length_field) {
+    proto_item *ti;
+    guint32     tmp = 0;
+    int hf_id = hf_dlt_non_verbose_array_length_field_8bit;
+    gint remaining;
+    guint8 length = 0;
+
+    (void) subtree;
+    (void) pinfo;
+
+    remaining = tvb_captured_length_remaining(tvb, offset);
+    length = length_of_length_field / 8;
+    switch (length_of_length_field) {
+    case 8:
+        hf_id = hf_dlt_non_verbose_array_length_field_8bit;
+        break;
+    case 16:
+        hf_id = hf_dlt_non_verbose_array_length_field_16bit;
+        break;
+    case 32:
+        hf_id = hf_dlt_non_verbose_array_length_field_32bit;
+        break;
+    default:
+        return -1;
+    }
+
+    if(remaining < length){
+        expert_dlt_non_verbose_truncated(subtree, pinfo, tvb, offset, remaining);
+        return -1;
+    }
+    ti = proto_tree_add_item_ret_uint(subtree, hf_id, tvb, offset, length_of_length_field / 8, ENC_BIG_ENDIAN, &tmp);
+    proto_item_set_hidden(ti);
+
+    return (gint64)tmp;
+}
+
+static int dissect_dlt_non_verbose_argument_array_element(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, dlt_info_t *dlt_info, guint offset, guint index, guint32 datatype, int* hf_id){
+    dlt_non_verbose_argument_basetype_t* type;
+    proto_item *ti = NULL;
+    gint        param_length = -1;
+    gint remaining = -1;
+    int hfid = hf_dlt_non_verbose_array;
+    if (hf_id !=NULL){
+        hfid = *hf_id;
+    }
+
+
+    type = get_basetype_config(datatype);
+    if (type == NULL){
+        expert_dlt_non_verbose_datatype_unknown(tree, pinfo, tvb, offset, 0);
+        return 0;
+    }
+
+    param_length = (gint)((type->bitsize) / 8);
+    remaining = tvb_captured_length_remaining(tvb, offset);
+    if(param_length > remaining){
+        expert_dlt_non_verbose_truncated(tree, pinfo, tvb, offset, remaining);
+        return remaining;
+    }
+    ti = proto_tree_add_item(tree, hfid, tvb, offset, param_length, dlt_info->little_endian ? ENC_LITTLE_ENDIAN : ENC_BIG_ENDIAN);
+    proto_item_prepend_text(ti, "[%i] ", index);
+    return param_length;
+
+}
+
+static int dissect_dlt_non_verbose_argument_array_dim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, dlt_info_t *dlt_info, guint offset, dlt_non_verbose_argument_array_t* array, guint8 dimension){
+    guint      i        = 0;
+    gint       length   = 0;
+    proto_tree *subtree = NULL;
+    proto_item *ti;
+    dlt_non_verbose_argument_array_dimension_t* dim = &(array->array_dimensions[dimension]);
+    if (dimension == (array->length -1)){
+        /* last dimension, do basetype stuff here */
+       for (i = 0; i < dim->length; i++){
+           length += dissect_dlt_non_verbose_argument_array_element(tvb, tree, pinfo, dlt_info, (guint)(offset+length), i, array->data_type_ref, dim->hf_id);
+       }
+    }else{
+       for (i = 0; i < dim->length; i++){
+           ti = proto_tree_add_string_format(tree, hf_dlt_non_verbose_array, tvb, (gint)(offset+length), 0, dim->name, "dim %s[%i]", dim->name, i);
+           subtree = proto_item_add_subtree(ti, ett_dlt_non_verbose_array_dim);
+           length += dissect_dlt_non_verbose_argument_array_dim(tvb, pinfo, subtree, dlt_info, (guint)(offset+length), array, dimension+1);
+           proto_item_set_end(ti, tvb, (gint)(offset+length));
+       }
+    }
+
+    return (gint)length;
+}
+
+static int dissect_dlt_non_verbose_argument_array(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, dlt_info_t *dlt_info, guint offset, gchar* name, guint32 datatype){
+    dlt_non_verbose_argument_array_t* type = NULL;
+    proto_item *ti      = NULL;
+    proto_tree *subtree = NULL;
+    gint       length   = 0;
+    guint      i        = 0;
+    gint       remaining = -1;
+
+    type = get_array_config(datatype);
+    if (type == NULL){
+        expert_dlt_non_verbose_datatype_unknown(tree, pinfo, tvb, offset, 0);
+        return 0;
+    }
+
+    if (name != NULL){
+         ti = proto_tree_add_string_format(tree, hf_dlt_non_verbose_base, tvb, offset, 0, type->name, "array %s [%s] dims: %i", name, type->name, type->length);
+    }else{
+         ti = proto_tree_add_string_format(tree, hf_dlt_non_verbose_base, tvb, offset, 0, type->name, "array [%s] dims: %i", type->name, type->length);
+    }
+
+    subtree = proto_item_add_subtree(ti, ett_dlt_non_verbose_array);
+
+
+    remaining = tvb_captured_length_remaining(tvb, offset);
+    if(type->ndim){
+        /* Handle multi dimensional array */
+        length = dissect_dlt_non_verbose_argument_array_dim(tvb, pinfo, subtree, dlt_info, offset, type, 0);
+    }else if (type->isstring){
+        guint length_of_array = type->length;
+        if (type->dynamic_length){
+            gint64 tmp_length;
+            tmp_length = dissect_dlt_dynamic_length_field(tvb, pinfo, subtree, (guint)(offset+length),  type->length_size);
+            if (tmp_length < 0){
+                return remaining;
+            }
+            length_of_array = (guint32)tmp_length;
+            length += (type->length_size/8);
+            remaining -= (type->length_size/8);
+            if (length_of_array > type->length || length_of_array > INT_MAX){
+                expert_dlt_non_verbose_invalid_length(tree, pinfo, tvb, offset, (gint)length);
+                return (gint)(remaining + length);
+            }
+        }
+        if (remaining < (gint)length_of_array){
+            expert_dlt_non_verbose_truncated(tree, pinfo, tvb, offset, remaining);
+            return remaining;
+        }
+        proto_tree_add_item(tree, hf_dlt_non_verbose_array_string, tvb, offset, length_of_array, ENC_ASCII | ENC_NA);
+    }else{
+        /* simple array */
+        guint length_of_array = type->length;
+        if (type->dynamic_length){
+            gint64 tmp_length;
+            tmp_length = dissect_dlt_dynamic_length_field(tvb, pinfo, subtree, (guint)(offset+length),  type->length_size);
+            if (tmp_length < 0){
+                return remaining;
+            }
+            length_of_array = (guint32)tmp_length;
+            length += (type->length_size/8);
+            remaining -= (type->length_size/8);
+            if (length_of_array > type->length || length_of_array > INT_MAX){
+                expert_dlt_non_verbose_invalid_length(tree, pinfo, tvb, offset, (gint)length);
+                return remaining + length;
+            }
+        }
+        for (i = 0; i < length_of_array && tvb_captured_length_remaining(tvb, (gint)(offset + length)) > 0; i++) {
+            dlt_non_verbose_argument_array_dimension_t *item = &(type->array_dimensions[i]);
+            length += dissect_dlt_non_verbose_argument(tvb, pinfo, subtree, dlt_info, (guint)(offset+length), NULL, type->data_type_ref, item->hf_id);
+        }
+    }
+
+    proto_item_set_end(ti, tvb, (gint)(offset+length));
+    return length;
+}
+
+static int dissect_dlt_non_verbose_argument_struct(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, dlt_info_t *dlt_info, guint offset, gchar* name, guint32 datatype){
+    dlt_non_verbose_argument_struct_t* type;
+    dlt_non_verbose_argument_t *item;
+    proto_item *ti      = NULL;
+    proto_tree *subtree = NULL;
+    gint       length   = 0;
+    guint      i        = 0;
+
+    type = get_struct_config(datatype);
+    if (type == NULL){
+        expert_dlt_non_verbose_datatype_unknown(tree, pinfo, tvb, offset, 0);
+        return 0;
+    }
+
+    if (name != NULL){
+         ti = proto_tree_add_string_format(tree, hf_dlt_non_verbose_base, tvb, offset, 0, type->name, "struct %s [%s]", name, type->name);
+    }else{
+         ti = proto_tree_add_string_format(tree, hf_dlt_non_verbose_base, tvb, offset, 0, type->name, "struct [%s]", type->name);
+    }
+
+    subtree = proto_item_add_subtree(ti, ett_dlt_non_verbose_struct);
+    for (i = 0; i < type->num_of_items && tvb_captured_length_remaining(tvb, offset + length) > 0; i++) {
+        item = &(type->items[i]);
+        length += dissect_dlt_non_verbose_argument(tvb, pinfo, subtree, dlt_info, (guint)(offset+length), item->name, item->data_type_ref, item->hf_id);
+    }
+    proto_item_set_end(ti, tvb, (gint)(offset+length));
+    return length;
+}
+
+static int dissect_dlt_non_verbose_argument_basetype(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, dlt_info_t *dlt_info, guint offset, guint32 datatype, int* hf_id){
+    dlt_non_verbose_argument_basetype_t* type;
+    gint param_length = -1;
+    gint remaining = -1;
+
+    type = get_basetype_config(datatype);
+    if (type == NULL){
+        expert_dlt_non_verbose_datatype_unknown(tree, pinfo, tvb, offset, 0);
+        return 0;
+    }
+    param_length = (gint)((type->bitsize) / 8);
+    remaining = tvb_captured_length_remaining(tvb, offset);
+    if(param_length > remaining){
+        expert_dlt_non_verbose_truncated(tree, pinfo, tvb, offset, remaining);
+        return remaining;
+    }
+    proto_tree_add_item(tree, *hf_id, tvb, offset, param_length, dlt_info->little_endian ? ENC_LITTLE_ENDIAN : ENC_BIG_ENDIAN);
+    return param_length;
+
+}
+
+static int dissect_dlt_non_verbose_argument_static(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, dlt_info_t *dlt_info, guint offset, guint32 datatype){
+    dlt_non_verbose_argument_static_t* type;
+
+    type = get_static_config(datatype);
+    if (type == NULL){
+        expert_dlt_non_verbose_datatype_unknown(tree, pinfo, tvb, offset, 0);
+        return 0;
+    }
+
+    (void) dlt_info;
+
+    proto_tree_add_string(tree, hf_dlt_non_verbose_static, tvb, offset, 0, type->name);
+    return 0;
+}
+
+static int dissect_dlt_non_verbose_argument(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, dlt_info_t *dlt_info, guint offset, gchar* name, guint32 datatype, int* hf_id){
+    int (*fct)(tvbuff_t*, packet_info*, proto_tree*, dlt_info_t*, guint, gchar*, guint32) = NULL;
+
+    switch(DLT_GET_TYPE(datatype)){
+        case DLT_BASETYPE_TYPE_ID:
+            return dissect_dlt_non_verbose_argument_basetype(tvb, pinfo, tree, dlt_info, offset, datatype, hf_id);
+            break;
+        case DLT_STRUCT_TYPE_ID:
+            fct = dissect_dlt_non_verbose_argument_struct;
+            break;
+        case DLT_ARRAY_TYPE_ID:
+            fct = dissect_dlt_non_verbose_argument_array;
+            break;
+        case DLT_STATIC_TYPE_ID:
+            return dissect_dlt_non_verbose_argument_static(tvb, pinfo, tree, dlt_info, offset, datatype);
+        default:
+            fct = NULL;
+    }
+    if (fct == NULL){
+        expert_dlt_non_verbose_datatype_unknown(tree, pinfo, tvb, offset, 0);
+        return 0;
+    }
+    return fct(tvb, pinfo, tree, dlt_info, offset, name, datatype);
+}
+
+static int dissect_dlt_non_verbose(tvbuff_t *tvb, packet_info *pinfo, proto_tree *dlt_tree, proto_tree *payload_tree, dlt_info_t *dlt_info){
+    dlt_non_verbose_argument_list_t* messageinfo = NULL;
+    dlt_non_verbose_argument_t *item;
+    gint        offset = 0;
+    messageinfo = get_message_config(dlt_info->ecu_id, dlt_info->message_id);
+    if (messageinfo == NULL){
+        expert_dlt_non_verbose_message_missing(dlt_tree, pinfo, tvb, offset, 0);
+        return 0;
+    }
+
+    if (messageinfo->num_of_items == 0 || messageinfo->items == NULL) {
+        /* no items for this message, so nothing to do */
+        return 0;
+    }else{
+        guint32 i;
+        proto_item     *ti = NULL;
+        proto_tree     *non_verbose_subtree;
+
+        proto_tree_add_item(payload_tree, hf_dlt_payload_data, tvb, offset, tvb_captured_length_remaining(tvb, offset), dlt_info->little_endian);
+
+        ti = proto_tree_add_item(dlt_tree, hf_dlt_non_verbose_payload, tvb, offset, -1, ENC_NA);
+        non_verbose_subtree = proto_item_add_subtree(ti, ett_dlt_non_verbose_payload);
+
+        proto_tree_add_string_format(non_verbose_subtree, hf_dlt_service_application_id, tvb, offset, 0, messageinfo->application_id, "%s", messageinfo->application_id);
+        proto_tree_add_string_format(non_verbose_subtree, hf_dlt_service_context_id, tvb, offset, 0, messageinfo->context_id, "%s", messageinfo->context_id);
+
+        col_append_fstr(pinfo->cinfo, COL_INFO, " <%s", messageinfo->ecu_id);
+        if (messageinfo->application_id !=NULL){
+            col_append_fstr(pinfo->cinfo, COL_INFO, ", %s", messageinfo->application_id);
+        }
+        if (messageinfo->context_id !=NULL){
+            col_append_fstr(pinfo->cinfo, COL_INFO, ", %s", messageinfo->context_id);
+        }
+        col_append_fstr(pinfo->cinfo, COL_INFO, ">");
+
+        if (messageinfo->name != NULL){
+            proto_tree_add_string_format(non_verbose_subtree, hf_dlt_non_verbose_message_name, tvb, offset, 0, messageinfo->name, "%s", messageinfo->name);
+            col_append_fstr(pinfo->cinfo, COL_INFO, " %s", messageinfo->name);
+        }else{
+            col_append_fstr(pinfo->cinfo, COL_INFO, " %08x", messageinfo->messageid);
+        }
+
+        for (i = 0; i < messageinfo->num_of_items && tvb_captured_length_remaining(tvb, offset) > 0; i++) {
+            item = &(messageinfo->items[i]);
+            offset += dissect_dlt_non_verbose_argument(tvb, pinfo, non_verbose_subtree, dlt_info, offset, item->name, item->data_type_ref, item->hf_id);
+        }
+        if (i < messageinfo-> num_of_items - 1){
+            /*expert_dlt_non_verbose_parsing_error(dlt_tree, pinfo, tvb, offset, 0);*/
+        }
+       proto_item_set_end(ti, tvb, offset);
+    }
+    return offset;
+}
+
+
 static int
-dissect_dlt_non_verbose_payload_message_handoff(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean payload_le,
-                                                guint8 msg_type, guint8 msg_type_info_comb, guint32 message_id, const guint8 *ecu_id) {
+dissect_dlt_non_verbose_payload_message_handoff(tvbuff_t *tvb, packet_info *pinfo, proto_tree *root_tree, proto_tree *dlt_tree, proto_tree *subtree, gboolean payload_le,
+                                                guint8 msg_type, guint8 msg_type_info_comb, guint32 message_id, const guint8 *ecu_id, guint32 msg_length) {
 
     dlt_info_t dlt_info;
 
@@ -1001,28 +2255,34 @@ dissect_dlt_non_verbose_payload_message_handoff(tvbuff_t *tvb, packet_info *pinf
     dlt_info.little_endian = payload_le;
     dlt_info.message_type = msg_type;
     dlt_info.message_type_info_comb = msg_type_info_comb;
+    dlt_info.message_length = msg_length;
     dlt_info.ecu_id = (const gchar *)ecu_id;
 
-    return dissector_try_heuristic(heur_subdissector_list, tvb, pinfo, tree, &heur_dtbl_entry, &dlt_info);
+    if(dissect_dlt_non_verbose(tvb, pinfo, dlt_tree, subtree, &dlt_info)){
+        return 1;
+    }
+
+    return dissector_try_heuristic(heur_subdissector_list, tvb, pinfo, root_tree, &heur_dtbl_entry, &dlt_info);
 }
 
 static int
-dissect_dlt_non_verbose_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *root_tree, proto_tree *tree, guint32 offset, gboolean payload_le,
-                                guint8 msg_type, guint8 msg_type_info_comb, const guint8 *ecu_id) {
-    guint32         message_id = 0;
+dissect_dlt_non_verbose_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *root_tree, proto_tree *dlt_tree, proto_tree *payload_tree, guint32 offset, gboolean payload_le,
+                                guint8 msg_type, guint8 msg_type_info_comb, const guint8 *ecu_id, guint32 length) {
+    guint32        message_id = 0;
     tvbuff_t       *subtvb = NULL;
-    guint32         offset_orig = offset;
+    guint32        offset_orig = offset;
     const gchar    *message_id_name = NULL;
     proto_item     *ti;
 
     if (payload_le) {
-        ti = proto_tree_add_item(tree, hf_dlt_message_id, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        ti = proto_tree_add_item(payload_tree, hf_dlt_message_id, tvb, offset, 4, ENC_LITTLE_ENDIAN);
         message_id = tvb_get_letohl(tvb, offset);
     } else {
-        ti = proto_tree_add_item(tree, hf_dlt_message_id, tvb, offset, 4, ENC_BIG_ENDIAN);
+        ti = proto_tree_add_item(payload_tree, hf_dlt_message_id, tvb, offset, 4, ENC_BIG_ENDIAN);
         message_id = tvb_get_ntohl(tvb, offset);
     }
     offset += 4;
+    length -= 4;
 
     if (msg_type==DLT_MSG_TYPE_CTRL_MSG && (msg_type_info_comb==DLT_MSG_TYPE_INFO_CTRL_REQ || msg_type_info_comb==DLT_MSG_TYPE_INFO_CTRL_RES)) {
         if (tvb_captured_length_remaining(tvb, offset) == 0) {
@@ -1039,17 +2299,228 @@ dissect_dlt_non_verbose_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *r
         }
 
         subtvb = tvb_new_subset_remaining(tvb, offset);
-        dissect_dlt_non_verbose_payload_message(subtvb, pinfo, tree, 0, payload_le, msg_type, msg_type_info_comb, message_id);
+        dissect_dlt_non_verbose_payload_message(subtvb, pinfo, payload_tree, 0, payload_le, msg_type, msg_type_info_comb, message_id);
     } else if(msg_type == DLT_MSG_TYPE_LOG_MSG) {
         subtvb = tvb_new_subset_remaining(tvb, offset);
-        if (dissect_dlt_non_verbose_payload_message_handoff(subtvb, pinfo, root_tree, payload_le, msg_type, msg_type_info_comb, message_id, ecu_id) <= 0) {
-            proto_tree_add_item(tree, hf_dlt_payload_data, tvb, offset, tvb_captured_length_remaining(tvb, offset), payload_le);
+        if (dissect_dlt_non_verbose_payload_message_handoff(subtvb, pinfo, root_tree, dlt_tree, payload_tree, payload_le, msg_type, msg_type_info_comb, message_id, ecu_id, length) <= 0) {
+            proto_tree_add_item(payload_tree, hf_dlt_payload_data, tvb, offset, tvb_captured_length_remaining(tvb, offset), payload_le);
         }
     } else {
-        expert_dlt_unsupported_non_verbose_msg_type(tree, pinfo, tvb, offset, 0);
+        expert_dlt_unsupported_non_verbose_msg_type(payload_tree, pinfo, tvb, offset, 0);
     }
 
     return offset - offset_orig;
+}
+
+static void
+deregister_dynamic_hf_data(hf_register_info **hf_array, guint *hf_size) {
+    if (*hf_array) {
+        /* Unregister all fields used before */
+        for (guint i = 0; i < *hf_size; i++) {
+            if ((*hf_array)[i].p_id != NULL) {
+                proto_deregister_field(proto_dlt, *((*hf_array)[i].p_id));
+                g_free((*hf_array)[i].p_id);
+                (*hf_array)[i].p_id = NULL;
+            }
+        }
+        proto_add_deregistered_data(*hf_array);
+        *hf_array = NULL;
+        *hf_size = 0;
+    }
+}
+
+static void
+allocate_dynamic_hf_data(hf_register_info **hf_array, guint *hf_size, guint new_size) {
+    *hf_array = g_new0(hf_register_info, new_size);
+    *hf_size = new_size;
+}
+
+typedef struct _argument_return_attibutes_t {
+    enum ftenum     type;
+    int             display_base;
+    gchar          *basetype_name;
+} argument_return_attributes_t;
+
+static argument_return_attributes_t
+get_argument_attributes(guint32 data_type_ref) {
+    argument_return_attributes_t ret;
+    dlt_non_verbose_argument_basetype_t *tmp = get_basetype_config(data_type_ref);
+
+    ret.type = FT_NONE;
+    ret.display_base = BASE_NONE;
+    ret.basetype_name = NULL;
+
+    if (tmp == NULL){
+        return ret;
+    }
+    ret.basetype_name = tmp->name;
+    ret.display_base = BASE_DEC;
+    if (g_strcmp0(tmp->name, "boolean") == 0) {
+        ret.type = FT_BOOLEAN;
+        ret.display_base = 8;
+    }else if (tmp->isfloat){
+        if (tmp->bitsize == 32) {
+            ret.type = FT_FLOAT;
+            ret.display_base = BASE_NONE;
+        } else if (tmp->bitsize == 64) {
+            ret.type = FT_DOUBLE;
+            ret.display_base = BASE_NONE;
+        }
+    }else{
+        if (tmp->issigned){
+            if(tmp->bitsize == 8){
+                ret.type = FT_UINT8;
+            }else if(tmp->bitsize == 16){
+                ret.type = FT_UINT16;
+            }else if(tmp->bitsize == 32){
+                ret.type = FT_UINT32;
+            }else if(tmp->bitsize == 64){
+                ret.type = FT_UINT64;
+            }
+        }else{
+            if(tmp->bitsize == 8){
+                ret.type = FT_INT8;
+            }else if(tmp->bitsize == 16){
+                ret.type = FT_INT16;
+            }else if(tmp->bitsize == 32){
+                ret.type = FT_INT32;
+            }else if(tmp->bitsize == 64){
+                ret.type = FT_INT64;
+            }
+        }
+    }
+
+    return ret;
+}
+
+static gint*
+update_dynamic_hf_entry(hf_register_info *hf_array, int pos, guint data_type_ref, char *param_name) {
+    argument_return_attributes_t   attribs;
+    gint                       *hf_id;
+
+    attribs = get_argument_attributes(data_type_ref);
+    if (hf_array == NULL || attribs.type == FT_NONE) {
+        return NULL;
+    }
+
+    hf_id = g_new(gint, 1);
+    *hf_id = -1;
+    hf_array[pos].p_id = hf_id;
+
+    hf_array[pos].hfinfo.strings = NULL;
+    hf_array[pos].hfinfo.bitmask = 0;
+    hf_array[pos].hfinfo.blurb   = NULL;
+
+    if (attribs.basetype_name == NULL) {
+        hf_array[pos].hfinfo.name = g_strdup(param_name);
+    } else {
+        hf_array[pos].hfinfo.name = ws_strdup_printf("%s [%s]", param_name, attribs.basetype_name);
+    }
+
+    hf_array[pos].hfinfo.abbrev = ws_strdup_printf("dlt.non_verbose.%s", param_name);
+    hf_array[pos].hfinfo.type = attribs.type;
+    hf_array[pos].hfinfo.display = attribs.display_base;
+
+    HFILL_INIT(hf_array[pos]);
+
+    return hf_id;
+}
+
+static void
+update_dynamic_argument_hf_entry(gpointer key _U_, gpointer value, gpointer data) {
+    guint32                    *pos = (guint32 *)data;
+    dlt_non_verbose_argument_list_t    *list = (dlt_non_verbose_argument_list_t *)value;
+    guint                       i = 0;
+
+    for (i = 0; i < list->num_of_items ; i++) {
+        if (*pos >= dynamic_hf_list_size) {
+            return;
+        }
+
+        dlt_non_verbose_argument_t *item = &(list->items[i]);
+
+        item->hf_id = update_dynamic_hf_entry(dynamic_hf_list, *pos, item->data_type_ref, item->name);
+
+        if (item->hf_id != NULL) {
+            (*pos)++;
+        }
+    }
+}
+
+static void
+update_dynamic_array_hf_entry(gpointer key _U_, gpointer value, gpointer data) {
+    guint32                    *pos = (guint32 *)data;
+    dlt_non_verbose_argument_array_t   *array = (dlt_non_verbose_argument_array_t *)value;
+    guint                               i = 0;
+
+    if (!array->ndim){
+        return;
+    }
+    for (i = 0; i < array->length; i++) {
+        if (*pos >= dynamic_hf_array_size) {
+            return;
+        }
+        dlt_non_verbose_argument_array_dimension_t *item = &(array->array_dimensions[i]);
+
+        item->hf_id = update_dynamic_hf_entry(dynamic_hf_array, *pos, array->data_type_ref, item->name);
+
+        if (item->hf_id != NULL) {
+            (*pos)++;
+        }
+    }
+}
+
+static void
+update_dynamic_struct_hf_entry(gpointer key _U_, gpointer value, gpointer data) {
+    guint32                            *pos = (guint32 *)data;
+    dlt_non_verbose_argument_struct_t  *list = (dlt_non_verbose_argument_struct_t *)value;
+    guint                               i = 0;
+
+    for (i = 0; i < list->num_of_items; i++) {
+        if (*pos >= dynamic_hf_struct_size) {
+            return;
+        }
+        dlt_non_verbose_argument_t *item = &(list->items[i]);
+
+        item->hf_id = update_dynamic_hf_entry(dynamic_hf_struct, *pos, item->data_type_ref, item->name);
+
+        if (item->hf_id != NULL) {
+            (*pos)++;
+        }
+    }
+}
+
+static void
+update_dynamic_hf_entries_dlt_argument_list(void) {
+    if (data_dlt_argument_list != NULL) {
+        deregister_dynamic_hf_data(&dynamic_hf_list, &dynamic_hf_list_size);
+        allocate_dynamic_hf_data(&dynamic_hf_list, &dynamic_hf_list_size, dlt_non_verbose_argument_lists_num);
+        guint32 pos = 0;
+        g_hash_table_foreach(data_dlt_argument_list, update_dynamic_argument_hf_entry, &pos);
+        proto_register_field_array(proto_dlt, dynamic_hf_list, pos);
+    }
+}
+
+static void
+update_dynamic_hf_entries_dlt_argument_arrays(void) {
+    if (data_dlt_argument_arrays != NULL) {
+        deregister_dynamic_hf_data(&dynamic_hf_array, &dynamic_hf_array_size);
+        allocate_dynamic_hf_data(&dynamic_hf_array, &dynamic_hf_array_size, dlt_non_verbose_argument_arrays_num);
+        guint32 pos = 0;
+        g_hash_table_foreach(data_dlt_argument_arrays, update_dynamic_array_hf_entry, &pos);
+        proto_register_field_array(proto_dlt, dynamic_hf_array, pos);
+    }
+}
+
+static void
+update_dynamic_hf_entries_dlt_argument_structs(void) {
+    if (data_dlt_argument_structs != NULL) {
+        deregister_dynamic_hf_data(&dynamic_hf_struct, &dynamic_hf_struct_size);
+        allocate_dynamic_hf_data(&dynamic_hf_struct, &dynamic_hf_struct_size, dlt_non_verbose_argument_structs_num);
+        guint32 pos = 0;
+        g_hash_table_foreach(data_dlt_argument_structs, update_dynamic_struct_hf_entry, &pos);
+        proto_register_field_array(proto_dlt, dynamic_hf_struct, pos);
+    }
 }
 
 static int
@@ -1058,12 +2529,14 @@ dissect_dlt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_,
     proto_tree     *dlt_tree = NULL;
     proto_tree     *ext_hdr_tree = NULL;
     proto_tree     *subtree = NULL;
+    proto_tree     *payload_tree = NULL;
     guint32         offset = offset_orig;
 
     guint8          header_type = 0;
     gboolean        ext_header = FALSE;
     gboolean        payload_le = FALSE;
     guint16         length = 0;
+    guint16         header_length = 0;
 
     guint8          msg_info = 0;
     gboolean        verbose = FALSE;
@@ -1160,14 +2633,15 @@ dissect_dlt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_,
     }
 
     ti = proto_tree_add_item(dlt_tree, hf_dlt_payload, tvb, offset, length - offset, ENC_NA);
-    subtree = proto_item_add_subtree(ti, ett_dlt_payload);
+    payload_tree = proto_item_add_subtree(ti, ett_dlt_payload);
 
+    header_length = offset;
     col_append_fstr(pinfo->cinfo, COL_INFO, ":");
 
     if (!ext_header || !verbose) {
-        offset += dissect_dlt_non_verbose_payload(tvb, pinfo, tree, subtree, offset, payload_le, msg_type, msg_type_info_comb, ecu_id);
+        offset += dissect_dlt_non_verbose_payload(tvb, pinfo, tree, dlt_tree, payload_tree, offset, payload_le, msg_type, msg_type_info_comb, ecu_id, length - header_length);
     } else {
-        offset += dissect_dlt_verbose_payload(tvb, pinfo, subtree, offset, payload_le, num_of_args);
+        offset += dissect_dlt_verbose_payload(tvb, pinfo, payload_tree, offset, payload_le, num_of_args);
     }
 
     col_set_fence(pinfo->cinfo, COL_INFO);
@@ -1221,7 +2695,13 @@ dissect_dlt_storage_header(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
 }
 
 void proto_register_dlt(void) {
+    module_t        *dlt_module;
     expert_module_t    *expert_module_DLT;
+    uat_t *dlt_argument_list_uat;
+    uat_t *dlt_argument_struct_uat;
+    uat_t *dlt_argument_array_uat;
+    uat_t *dlt_argument_static_uat;
+    uat_t *dlt_argument_basetype_uat;
 
     static hf_register_info hf_dlt[] = {
         { &hf_dlt_header_type, {
@@ -1338,6 +2818,45 @@ void proto_register_dlt(void) {
             "(string)", "dlt.data.string",
             FT_STRING, BASE_NONE, NULL, 0x00, NULL, HFILL } },
 
+
+        { &hf_dlt_non_verbose_payload, {
+            "Non-Verbose Payload", "dlt.non_verbose",
+            FT_NONE, BASE_NONE, NULL, 0x0, NULL, HFILL } },
+        { &hf_dlt_non_verbose_message_name, {
+            "Messge Name", "dlt.non_verbose.message_name",
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL } },
+        { &hf_dlt_non_verbose_argument, {
+            "Argument", "dlt.non_verbose.argument",
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL } },
+        { &hf_dlt_non_verbose_base, {
+            "(string)", "dlt.non_verbose.base",
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL } },
+        { &hf_dlt_non_verbose_stattic, {
+            "(base)", "dlt.non_verbose.static",
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL } },
+        { &hf_dlt_non_verbose_struct, {
+            "(struct)", "dlt.non_verbose.struct",
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL } },
+        { &hf_dlt_non_verbose_array, {
+            "(array)", "dlt.non_verbose.array",
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL } },
+        { &hf_dlt_non_verbose_array_string, {
+            "(string)", "dlt.non_verbose.string",
+            FT_STRING, BASE_NONE, NULL, 0x00, NULL, HFILL } },
+        { &hf_dlt_non_verbose_static, {
+            "(static)", "dlt.non_verbose.static",
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL } },
+        { &hf_dlt_non_verbose_array_length_field_8bit,
+            { "Length", "dlt.non_verbose.array_length",
+            FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL } },
+        { &hf_dlt_non_verbose_array_length_field_16bit,
+            { "Length", "dlt.non_verbose.array_length",
+            FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL } },
+        { &hf_dlt_non_verbose_array_length_field_32bit,
+            { "Length", "dlt.non_verbose.array_length",
+            FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL } },
+
+
         { &hf_dlt_service_options, {
             "Options", "dlt.service.options",
             FT_UINT8, BASE_DEC, VALS(dlt_service_options), 0x0, NULL, HFILL } },
@@ -1397,9 +2916,14 @@ void proto_register_dlt(void) {
         &ett_dlt_ext_hdr,
         &ett_dlt_msg_info,
         &ett_dlt_payload,
+        &ett_dlt_non_verbose_payload,
+        &ett_dlt_non_verbose_struct,
+        &ett_dlt_non_verbose_array,
+        &ett_dlt_non_verbose_array_dim,
         &ett_dlt_service_app_ids,
         &ett_dlt_service_app_id,
         &ett_dlt_service_ctx_id,
+
     };
 
     static ei_register_info ei[] = {
@@ -1421,6 +2945,77 @@ void proto_register_dlt(void) {
         { &ei_dlt_parsing_error, {
             "dlt.parsing_error", PI_MALFORMED, PI_ERROR,
             "DLT: Parsing Error!", EXPFILL } },
+        { &ei_dlt_non_verbose_parsing_error, {
+            "dlt.non_verbose.parsing_error", PI_MALFORMED, PI_ERROR,
+            "DLT: Non-Verbose Parsing Error!", EXPFILL } },
+        { &ei_dlt_non_verbose_missing_message_error, {
+            "dlt.non_verbose.missing_message_config", PI_UNDECODED, PI_NOTE,
+            "DLT: Non-Verbose Message Configuration missing!", EXPFILL } },
+        { &ei_dlt_non_verbose_datatype_unknown, {
+            "dlt.non_verbose.datatype_unknown", PI_UNDECODED, PI_NOTE,
+            "DLT: Non-Verbose provided datatype is unknown/undefined!", EXPFILL } },
+        { &ei_dlt_non_verbose_trucated, {
+            "dlt.non_verbose.truncated", PI_MALFORMED, PI_WARN,
+            "DLT: Non-Verbose data seems truncated, check message and config.", EXPFILL } },
+        { &ei_dlt_non_verbose_invalid_length, {
+            "dlt.non_verbose.invalid_length", PI_MALFORMED, PI_ERROR,
+            "DLT: Non-Verbose dynamic length field exceeds maximum.", EXPFILL } },
+
+
+    };
+
+    /* UATs for user_data fields */
+    static uat_field_t dlt_non_verbose_argument_list_uat_fields[] = {
+        UAT_FLD_CSTRING    (dlt_non_verbose_argument_lists,     ecu_id,         "Ecu Id",              "Ecu Id"),
+        UAT_FLD_HEX        (dlt_non_verbose_argument_lists,     messageid,      "MessageId",           "Non Verbose Message Id"),
+        UAT_FLD_CSTRING    (dlt_non_verbose_argument_lists,     message_name,   "Name",                "Message Name"),
+        UAT_FLD_CSTRING    (dlt_non_verbose_argument_lists,     application_id, "Application Id",      "Application Id"),
+        UAT_FLD_CSTRING    (dlt_non_verbose_argument_lists,     context_id,     "Context Id",          "Context Id"),
+        UAT_FLD_DEC        (dlt_non_verbose_argument_lists,     num_of_items,   "# args",              "Number of arguments"),
+        UAT_FLD_DEC        (dlt_non_verbose_argument_lists,     pos,            "pos arg",             "Position of argument"),
+        UAT_FLD_CSTRING    (dlt_non_verbose_argument_lists,     name,           "Argname",             "Name of Argument"),
+        UAT_FLD_CSTRING    (dlt_non_verbose_argument_lists,     data_type,      "Data Type",           "Type of datatype (base, array, struct, static)"),
+        UAT_FLD_HEX        (dlt_non_verbose_argument_lists,     data_type_ref,  "Datatype ID",         "ID of the Datatype"),
+        UAT_END_FIELDS
+    };
+    static uat_field_t dlt_non_verbose_argument_struct_uat_fields[] = {
+        UAT_FLD_HEX        (dlt_non_verbose_argument_structs,   id,             "Datatype ID",         "DataTypeId (28bit)"),
+        UAT_FLD_CSTRING    (dlt_non_verbose_argument_structs,   struct_name,    "Name",                "Name of struct"),
+        UAT_FLD_DEC        (dlt_non_verbose_argument_structs,   num_of_items,   "# items",             "Number of Items in Struct"),
+        UAT_FLD_DEC        (dlt_non_verbose_argument_structs,   pos,            "pos item",            "Position in Struct"),
+        UAT_FLD_CSTRING    (dlt_non_verbose_argument_structs,   name,           "Itemname",            "Name of Element"),
+        UAT_FLD_CSTRING    (dlt_non_verbose_argument_structs,   data_type,      "Data Type",           "Type of datatype (base, array, struct, static)"),
+        UAT_FLD_HEX        (dlt_non_verbose_argument_structs,   data_type_ref,  "Element Datatype ID", "Datatype of Element"),
+        UAT_END_FIELDS
+    };
+    static uat_field_t dlt_non_verbose_argument_array_uat_fields[] = {
+        UAT_FLD_HEX        (dlt_non_verbose_argument_arrays,    id,             "Datatype ID",         "DataTypeId (28bit)"),
+        UAT_FLD_CSTRING    (dlt_non_verbose_argument_arrays,    name,           "Name",                "Name of Array"),
+        UAT_FLD_CSTRING    (dlt_non_verbose_argument_arrays,    data_type,      "Data Type",           "Type of datatype (base, array, struct, static)"),
+        UAT_FLD_HEX        (dlt_non_verbose_argument_arrays,    data_type_ref,  "Datatype ID",         "Datatype of Element"),
+        UAT_FLD_DEC        (dlt_non_verbose_argument_arrays,    length,         "Length/Dimensions",   "Length/Dimension of Array (1Dimenstional: length, n-Dimenational: dimensions)"),
+        UAT_FLD_BOOL       (dlt_non_verbose_argument_arrays,    isstring,       "String?",             "Is this array a string"),
+        UAT_FLD_CSTRING    (dlt_non_verbose_argument_arrays,    encoding,       "Encoding",            "one of: ascii, utf8, utf16"),
+        UAT_FLD_BOOL       (dlt_non_verbose_argument_arrays,    dynamic_length, "Dynamic Length?",     "Is the array of dynamic length?"),
+        UAT_FLD_DEC        (dlt_non_verbose_argument_arrays,    length_size,    "Bits Lengthfiel",     "Size of the length field for dynamic length array"),
+        UAT_FLD_BOOL       (dlt_non_verbose_argument_arrays,    ndim,           "N-Dimensional?",      "Is this array n dimensional"),
+        UAT_FLD_DEC        (dlt_non_verbose_argument_arrays,    dimension_size, "SubDimension Size",   "Number of sub dimensions"),
+        UAT_FLD_DEC        (dlt_non_verbose_argument_arrays,    dimension_pos,  "Dimension Position",  "Which Dimension Position is this"),
+        UAT_FLD_CSTRING    (dlt_non_verbose_argument_arrays,    dimension_name, "Dimension Name",      "Name for dimension"),
+        UAT_END_FIELDS
+    };
+    static uat_field_t dlt_non_verbose_argument_static_uat_fields[] = {
+        UAT_FLD_HEX        (dlt_non_verbose_argument_statics,   id,             "Datatype ID",         "DataTypeId (28bit)"),
+        UAT_FLD_CSTRING    (dlt_non_verbose_argument_statics,   name,           "String/Name",         "Static String"),
+        UAT_END_FIELDS
+    };
+    static uat_field_t dlt_non_verbose_argument_basetype_uat_fields[] = {
+        UAT_FLD_HEX        (dlt_non_verbose_argument_basetypes, id,             "Datatype ID",         "DataTypeId (28bit)"),
+        UAT_FLD_CSTRING    (dlt_non_verbose_argument_basetypes, name,           "Name",                "Name of type"),
+        UAT_FLD_DEC        (dlt_non_verbose_argument_basetypes, bitsize,        "Bitsize",             "Bitsize (8,16,32,64)"),
+        UAT_FLD_BOOL       (dlt_non_verbose_argument_basetypes, issigned,       "Signed?",             "is the type signed"),
+        UAT_FLD_BOOL       (dlt_non_verbose_argument_basetypes, isfloat,        "Float?",              "Type is a float"),
+        UAT_END_FIELDS
     };
 
     /* Register the protocol name and description */
@@ -1436,11 +3031,147 @@ void proto_register_dlt(void) {
     expert_register_field_array(expert_module_DLT, ei, array_length(ei));
 
     heur_subdissector_list = register_heur_dissector_list("dlt", proto_dlt);
+
+    /* Register preferences */
+    dlt_module = prefs_register_protocol(proto_dlt, &proto_reg_handoff_dlt);
+
+    /* UATs */
+    dlt_argument_list_uat = uat_new("DLT Messages",
+        sizeof(dlt_non_verbose_argument_list_uat_t), /* record size           */
+        DATAFILE_DLT_MESSAGES,                       /* filename              */
+        TRUE,                                        /* from profile          */
+        (void **) &dlt_non_verbose_argument_lists,   /* data_ptr              */
+        &dlt_non_verbose_argument_lists_num,         /* numitems_ptr          */
+        UAT_AFFECTS_DISSECTION,                      /* but not fields        */
+        NULL,                                        /* help                  */
+        copy_dlt_argument_list_cb,                   /* copy callback         */
+        update_dlt_argument_list_cb,                 /* update callback       */
+        free_dlt_argument_list_cb,                   /* free callback         */
+        post_update_dlt_argument_list_cb,                  /* post update callback  */
+        reset_dlt_argument_list_cb,                     /* reset callback        */
+        dlt_non_verbose_argument_list_uat_fields
+    );
+
+    prefs_register_uat_preference(dlt_module, "messages", "DLT Non Verbose Mesages",
+        "A table to define DLT non verbose messages", dlt_argument_list_uat);
+
+    dlt_argument_struct_uat = uat_new("DLT Structures",
+        sizeof(dlt_non_verbose_argument_struct_uat_t), /* record size           */
+        DATAFILE_DLT_STRUCTS,                       /* filename              */
+        TRUE,                                        /* from profile          */
+        (void **) &dlt_non_verbose_argument_structs,   /* data_ptr              */
+        &dlt_non_verbose_argument_structs_num,         /* numitems_ptr          */
+        UAT_AFFECTS_DISSECTION,                      /* but not fields        */
+        NULL,                                        /* help                  */
+        copy_dlt_argument_struct_cb,                   /* copy callback         */
+        update_dlt_argument_struct_cb,                 /* update callback       */
+        free_dlt_argument_struct_cb,                   /* free callback         */
+        post_update_dlt_argument_struct_cb,                  /* post update callback  */
+        reset_dlt_argument_struct_cb,                     /* reset callback        */
+        dlt_non_verbose_argument_struct_uat_fields
+    );
+
+    prefs_register_uat_preference(dlt_module, "structures", "DLT Argument Structures",
+        "A table to define DLT non verbose messages structs", dlt_argument_struct_uat);
+
+    dlt_argument_array_uat = uat_new("DLT Arrays",
+        sizeof(dlt_non_verbose_argument_array_uat_t), /* record size           */
+        DATAFILE_DLT_ARRAYS,                       /* filename              */
+        TRUE,                                        /* from profile          */
+        (void **) &dlt_non_verbose_argument_arrays,   /* data_ptr              */
+        &dlt_non_verbose_argument_arrays_num,         /* numitems_ptr          */
+        UAT_AFFECTS_DISSECTION,                      /* but not fields        */
+        NULL,                                        /* help                  */
+        copy_dlt_argument_array_cb,                   /* copy callback         */
+        update_dlt_argument_array_cb,                 /* update callback       */
+        free_dlt_argument_array_cb,                   /* free callback         */
+        post_update_dlt_argument_array_cb,                  /* post update callback  */
+        reset_dlt_argument_array_cb,                     /* reset callback        */
+        dlt_non_verbose_argument_array_uat_fields
+    );
+
+    prefs_register_uat_preference(dlt_module, "arrays", "DLT Argument Arrays",
+        "A table to define DLT non verbose messages arrays", dlt_argument_array_uat);
+
+    dlt_argument_static_uat = uat_new("DLT Static Values",
+        sizeof(dlt_non_verbose_argument_static_uat_t), /* record size           */
+        DATAFILE_DLT_STATICS,                       /* filename              */
+        TRUE,                                        /* from profile          */
+        (void **) &dlt_non_verbose_argument_statics,   /* data_ptr              */
+        &dlt_non_verbose_argument_statics_num,         /* numitems_ptr          */
+        UAT_AFFECTS_DISSECTION,                      /* but not fields        */
+        NULL,                                        /* help                  */
+        copy_dlt_argument_static_cb,                   /* copy callback         */
+        update_dlt_argument_static_cb,                 /* update callback       */
+        free_dlt_argument_static_cb,                   /* free callback         */
+        post_update_dlt_argument_static_cb,                  /* post update callback  */
+        reset_dlt_argument_static_cb,                     /* reset callback        */
+        dlt_non_verbose_argument_static_uat_fields
+    );
+
+    prefs_register_uat_preference(dlt_module, "statics", "DLT Argument static values",
+        "A table to define DLT non verbose static statics", dlt_argument_static_uat);
+
+    dlt_argument_basetype_uat = uat_new("DLT Base Types",
+        sizeof(dlt_non_verbose_argument_basetype_uat_t), /* record size           */
+        DATAFILE_DLT_BASETYPES,                       /* filename              */
+        TRUE,                                        /* from profile          */
+        (void **) &dlt_non_verbose_argument_basetypes,   /* data_ptr              */
+        &dlt_non_verbose_argument_basetypes_num,         /* numitems_ptr          */
+        UAT_AFFECTS_DISSECTION,                      /* but not fields        */
+        NULL,                                        /* help                  */
+        copy_dlt_argument_basetype_cb,                   /* copy callback         */
+        update_dlt_argument_basetype_cb,                 /* update callback       */
+        free_dlt_argument_basetype_cb,                   /* free callback         */
+        post_update_dlt_argument_basetype_cb,                  /* post update callback  */
+        reset_dlt_argument_basetype_cb,                     /* reset callback        */
+        dlt_non_verbose_argument_basetype_uat_fields
+    );
+
+    prefs_register_uat_preference(dlt_module, "bae_types", "DLT Argument Base Types",
+        "A table to define DLT non verbose base type", dlt_argument_basetype_uat);
+}
+
+static void
+clean_all_hashtables_with_empty_uat(void) {
+    /* On config change, we delete all hashtables which should have 0 entries! */
+    /* Usually this is already done in the post update cb of the uat.*/
+    /* Unfortunately, Wireshark does not call the post_update_cb on config errors. :( */
+    if (data_dlt_argument_list && dlt_non_verbose_argument_lists_num==0) {
+        g_hash_table_destroy(data_dlt_argument_list);
+        data_dlt_argument_list = NULL;
+    }
+    if (data_dlt_argument_basetypes && dlt_non_verbose_argument_basetypes_num==0) {
+        g_hash_table_destroy(data_dlt_argument_basetypes);
+        data_dlt_argument_basetypes = NULL;
+    }
+    if (data_dlt_argument_arrays && dlt_non_verbose_argument_arrays_num==0) {
+        g_hash_table_destroy(data_dlt_argument_arrays);
+        data_dlt_argument_arrays = NULL;
+    }
+    if (data_dlt_argument_structs && dlt_non_verbose_argument_structs_num == 0) {
+        g_hash_table_destroy(data_dlt_argument_structs);
+        data_dlt_argument_structs = NULL;
+    }
+    if (data_dlt_argument_statics && dlt_non_verbose_argument_statics_num==0) {
+        g_hash_table_destroy(data_dlt_argument_statics);
+        data_dlt_argument_statics = NULL;
+    }
 }
 
 void proto_reg_handoff_dlt(void) {
-    dissector_add_uint_with_preference("udp.port", 0, dlt_handle_udp);
-    dissector_add_uint_with_preference("tcp.port", 0, dlt_handle_tcp);
+    static gboolean initialized = FALSE;
+
+    if (!initialized) {
+        dissector_add_uint_with_preference("udp.port", 0, dlt_handle_udp);
+        dissector_add_uint_with_preference("tcp.port", 0, dlt_handle_tcp);
+        initialized = TRUE;
+    } else {
+        clean_all_hashtables_with_empty_uat();
+    }
+    update_dynamic_hf_entries_dlt_argument_list();
+    update_dynamic_hf_entries_dlt_argument_arrays();
+    update_dynamic_hf_entries_dlt_argument_structs();
 }
 
 void proto_register_dlt_storage_header(void) {
