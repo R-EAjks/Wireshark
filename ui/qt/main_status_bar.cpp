@@ -566,26 +566,32 @@ void MainStatusBar::showProfileMenu(const QPoint &global_pos, Qt::MouseButton bu
             enable_edit = true;
 
         profile_menu->setTitle(tr("Switch to"));
-        QAction * action = ctx_menu_->addAction(tr("Manage Profiles…"), this, SLOT(manageProfile()));
-        action->setProperty("dialog_action_", (int)ProfileDialog::ShowProfiles);
+        ctx_menu_->addAction(tr("Manage Profiles…"), this, [=]() {
+            manageProfile(ProfileDialog::ShowProfiles);
+        }, Qt::QueuedConnection);
 
         ctx_menu_->addSeparator();
-        action = ctx_menu_->addAction(tr("New…"), this, SLOT(manageProfile()));
-        action->setProperty("dialog_action_", (int)ProfileDialog::NewProfile);
-        action = ctx_menu_->addAction(tr("Edit…"), this, SLOT(manageProfile()));
-        action->setProperty("dialog_action_", (int)ProfileDialog::EditCurrentProfile);
+        ctx_menu_->addAction(tr("New…"), this, [=]() {
+            manageProfile(ProfileDialog::NewProfile);
+        }, Qt::QueuedConnection);
+        QAction * action = ctx_menu_->addAction(tr("Edit…"), this, [=]() {
+            manageProfile(ProfileDialog::EditCurrentProfile);
+        }, Qt::QueuedConnection);
         action->setEnabled(enable_edit);
-        action = ctx_menu_->addAction(tr("Delete"), this, SLOT(manageProfile()));
-        action->setProperty("dialog_action_", (int)ProfileDialog::DeleteCurrentProfile);
+        action = ctx_menu_->addAction(tr("Delete"), this, [=]() {
+            manageProfile(ProfileDialog::DeleteCurrentProfile);
+        }, Qt::QueuedConnection);
         action->setEnabled(enable_edit);
         ctx_menu_->addSeparator();
 
 #ifdef HAVE_MINIZIP
         QMenu * importMenu = new QMenu(tr("Import"), ctx_menu_);
-        action = importMenu->addAction(tr("From Zip File..."), this, SLOT(manageProfile()));
-        action->setProperty("dialog_action_", (int)ProfileDialog::ImportZipProfile);
-        action = importMenu->addAction(tr("From Directory..."), this, SLOT(manageProfile()));
-        action->setProperty("dialog_action_", (int)ProfileDialog::ImportDirProfile);
+        importMenu->addAction(tr("From Zip File..."), this, [=]() {
+            manageProfile(ProfileDialog::ImportZipProfile);
+        }, Qt::QueuedConnection);
+        importMenu->addAction(tr("From Directory..."), this, [=]() {
+            manageProfile(ProfileDialog::ImportDirProfile);
+        }, Qt::QueuedConnection);
         ctx_menu_->addMenu(importMenu);
 
         if (model.userProfilesExist())
@@ -593,18 +599,21 @@ void MainStatusBar::showProfileMenu(const QPoint &global_pos, Qt::MouseButton bu
             QMenu * exportMenu = new QMenu(tr("Export"), ctx_menu_);
             if (enable_edit)
             {
-                action = exportMenu->addAction(tr("Selected Personal Profile..."), this, SLOT(manageProfile()));
-                action->setProperty("dialog_action_", (int)ProfileDialog::ExportSingleProfile);
+                action = exportMenu->addAction(tr("Selected Personal Profile..."), this, [=]() {
+                    manageProfile(ProfileDialog::ExportSingleProfile);
+                }, Qt::QueuedConnection);
                 action->setEnabled(enable_edit);
             }
-            action = exportMenu->addAction(tr("All Personal Profiles..."), this, SLOT(manageProfile()));
-            action->setProperty("dialog_action_", (int)ProfileDialog::ExportAllProfiles);
+            exportMenu->addAction(tr("All Personal Profiles..."), this, [=]() {
+                manageProfile(ProfileDialog::ExportAllProfiles);
+            }, Qt::QueuedConnection);
             ctx_menu_->addMenu(exportMenu);
         }
 
 #else
-        action = ctx_menu_->addAction(tr("Import"), this, SLOT(manageProfile()));
-        action->setProperty("dialog_action_", (int)ProfileDialog::ImportDirProfile);
+        ctx_menu_->addAction(tr("Import"), this, [=]() {
+            manageProfile(ProfileDialog::ImportDirProfile);
+        }, Qt::QueuedConnection);
 #endif
         ctx_menu_->addSeparator();
 
@@ -637,17 +646,11 @@ void MainStatusBar::switchToProfile()
     }
 }
 
-void MainStatusBar::manageProfile()
+void MainStatusBar::manageProfile(ProfileDialog::ProfileAction action)
 {
-    QAction *pa = qobject_cast<QAction*>(sender());
-
-    if (pa) {
-        ProfileDialog * cp_dialog = new ProfileDialog(this);
-        cp_dialog->setAttribute(Qt::WA_DeleteOnClose);
-
-        int profileAction = pa->property("dialog_action_").toInt();
-        cp_dialog->execAction(static_cast<ProfileDialog::ProfileAction>(profileAction));
-    }
+    ProfileDialog * cp_dialog = new ProfileDialog(this);
+    cp_dialog->setAttribute(Qt::WA_DeleteOnClose);
+    cp_dialog->execAction(action);
 }
 
 void MainStatusBar::captureEventHandler(CaptureEvent ev)

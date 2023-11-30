@@ -19,6 +19,7 @@
 #include <ui/qt/utils/field_information.h>
 #include <ui/qt/widgets/label_stack.h>
 #include <ui/qt/widgets/clickable_label.h>
+#include "profile_dialog.h"
 #include "progress_frame.h"
 #include "wireshark_application.h"
 
@@ -73,6 +74,8 @@ private:
     void pushGenericStatus(StatusContext status, const QString &message, const QString &messagetip = QString());
     void popGenericStatus(StatusContext status);
 
+    void manageProfile(ProfileDialog::ProfileAction);
+
 signals:
     void showExpertInfo();
     void editCaptureComment();
@@ -94,7 +97,6 @@ private slots:
     void toggleBackground(bool enabled);
     void setProfileName();
     void switchToProfile();
-    void manageProfile();
     void showProfileMenu(const QPoint &global_pos, Qt::MouseButton button);
 
     friend MainApplication;
