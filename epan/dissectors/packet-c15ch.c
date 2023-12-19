@@ -49,6 +49,11 @@ void proto_reg_handoff_c15ch(void);
 #define C15_TCAP           25
 #define C15_CLLI           26
 #define C15_INFO           27
+#define C15_GENERIC_MSG_1  28	/* TMG new */
+#define C15_GENERIC_MSG_2  29	/* TMG new */
+#define C15_GENERIC_MSG_3  30	/* TMG new */
+#define C15_GENERIC_MSG_4  31	/* TMG new */
+#define C15_GENERIC_MSG_5  32	/* TMG new */
 
 #define HEADER_SZ 36 /* length of complete c15ch header in bytes */
 
@@ -120,6 +125,11 @@ static const value_string c15_msg_types[] = {
     { C15_TCAP, "TCAP" },
     { C15_CLLI, "CLLI" },
     { C15_INFO, "C15_INFO" },
+	{ C15_GENERIC_MSG_1, "C15_GENERIC_MSG_1" },	/* TMG new */
+	{ C15_GENERIC_MSG_2, "C15_GENERIC_MSG_2" },	/* TMG new */
+	{ C15_GENERIC_MSG_3, "C15_GENERIC_MSG_3" },	/* TMG new */
+	{ C15_GENERIC_MSG_4, "C15_GENERIC_MSG_4" },	/* TMG new */
+	{ C15_GENERIC_MSG_5, "C15_GENERIC_MSG_5" },	/* TMG new */
     { 0, NULL }
 };
 static value_string_ext c15_msg_types_ext = VALUE_STRING_EXT_INIT(c15_msg_types);
@@ -563,6 +573,7 @@ static int hf_c15ch_nitnxlate_parm_4;
 static int hf_c15ch_nitnxlate_key;
 static int hf_c15ch_nitnxlate_user_tid;
 static int hf_c15ch_nitnxlate_host;
+static int hf_c15ch_nitnxlate_sip_call_id_64;			/* TMG	*/
 static int hf_c15ch_nitnxlate_tg_num;
 static int hf_c15ch_nitnxlate_mgcp_line_id;
 static int hf_c15ch_nitnxlate_gateway;
@@ -585,6 +596,16 @@ static const value_string ett_c15ch_nitnxlate_gwe_types[] = {
     { 3, "MGCP_LN" },
     { 4, "H248_LN" },
     { 5, "NCS_LN" },
+    /* 6 is unused */
+    /* 7 is unused */
+    /* 8 is unused */
+    /* 9 is unused */
+    /* 10 is unused */
+    /* 11 is unused */
+	{ 12, "LTRK" },     /* NFEC missing */
+	{ 13, "DTRK" },     /* NFEC missing */
+	{ 14, "SIP_LTG" },  /* NFEC missing */
+	{ 15, "SIP_TG" },   /* NFEC missing */
     { 0, NULL }
 };
 
@@ -1391,8 +1412,17 @@ static const value_string c15ch_tcap_local_ssn_types[] = {
     { 11, "E800_SUBSYS6" },
     { 12, "E800_SUBSYS7" },
     { 13, "E800_SUBSYS8" },
-    { 14, "AIN_SUBSYS" },
-    { 15, "MDSI_SUBSYS" },
+    { 14, "E800_SUBSYS9" },     /* TMG rename  */
+    { 15, "E800_SUBSYS10" },	/* TMG rename  */
+    { 16, "E800_SUBSYS11" },	/* TMG missing */
+    { 17, "E800_SUBSYS12" },	/* TMG missing */
+    { 18, "E800_SUBSYS13" },	/* TMG missing */
+    { 19, "E800_SUBSYS14" },	/* TMG missing */
+    { 20, "E800_SUBSYS15" },	/* TMG missing */
+    { 21, "E800_SUBSYS16" },	/* TMG missing */
+    { 22, "E800_SUBSYS17" },	/* TMG missing */
+    { 23, "AIN_SUBSYS" },		/* TMG rename  */
+    { 24, "MDSI_SUBSYS" },		/* TMG rename  */
     { 0, NULL }
 };
 
@@ -3963,6 +3993,35 @@ static int hf_c15ch_tone_tone_control;
 static int hf_c15ch_tone_tone_control_device_id;
 static int hf_c15ch_tone_tone_control_tone_type;
 
+/* TMG */
+/* New fields for Generic Messages */
+
+static int hf_c15ch_c15_generic_msg_1;
+static int hf_c15ch_c15_generic_msg_2;
+static int hf_c15ch_c15_generic_msg_3;
+static int hf_c15ch_c15_generic_msg_4;
+static int hf_c15ch_c15_generic_msg_5;
+static int hf_c15ch_c15_generic_msg_parm_1;
+static int hf_c15ch_c15_generic_msg_parm_2;
+static int hf_c15ch_c15_generic_msg_parm_3;
+static int hf_c15ch_c15_generic_msg_parm_4;
+static int hf_c15ch_c15_generic_msg_parm_5;
+static int hf_c15ch_c15_generic_msg_data_len;
+static int hf_c15ch_c15_generic_msg_cr_ptr_val;
+static int hf_c15ch_c15_generic_msg_dr_ptr_val;
+static int hf_c15ch_c15_generic_msg_spr_int_1;
+static int hf_c15ch_c15_generic_msg_spr_int_2;
+static int hf_c15ch_c15_generic_msg_spr_uptr_1;
+static int hf_c15ch_c15_generic_msg_spr_uptr_2;
+static int hf_c15ch_c15_generic_msg_spr_pptr_1;
+static int hf_c15ch_c15_generic_msg_spr_pptr_2;
+static int hf_c15ch_c15_generic_msg_gen_msg_field_1;
+static int hf_c15ch_c15_generic_msg_gen_msg_field_2;
+static int hf_c15ch_c15_generic_msg_gen_msg_field_3;
+static int hf_c15ch_c15_generic_msg_gen_msg_field_4;
+static int hf_c15ch_c15_generic_msg_gen_msg_field_5;
+static int hf_c15ch_c15_generic_msg_gen_msg_string;
+static int hf_c15ch_c15_generic_msg_gen_data_large;
 
 /* util functions */
 /* static void add_digits_string(int hf, tvbuff_t *tvb, proto_tree *tree,
@@ -4736,6 +4795,7 @@ static int dissect_c15ch_nitnxlate(tvbuff_t *tvb, packet_info *pinfo, proto_tree
     guint32 gwtype_val;
     guint32 frame_val, shelf_val, lsg_val, unit_val;
     guint32 key_val;
+	guint32 tgnum_val;   /* NFEC */
 
     /* sitestring */
     str_start = 12;
@@ -4911,20 +4971,35 @@ static int dissect_c15ch_nitnxlate(tvbuff_t *tvb, packet_info *pinfo, proto_tree
         /* host */
         str_start = 116;
         gwtype_val = tvb_get_ntohl( tvb, 27 );
-        if ( gwtype_val )
+        if (( gwtype_val == 3 ) ||		/* TMG only output hostname if MGCP_LN or	*/       
+		    ( gwtype_val == 5 ) )  	  	/* NCS_LN						      		*/ 
         {
             add_string_field( c15ch_nitnxlate_tree, tvb, str_start, 65, hf_c15ch_nitnxlate_host );
+			/* moving MGCP_Line_ID here into this block as it is only valid for MGCP / NCS lines	*/
+			add_string_field( c15ch_nitnxlate_tree, tvb, 185, 5, hf_c15ch_nitnxlate_mgcp_line_id);
         }
+		
+		/* SIP Call-ID-64 */
+		if (( gwtype_val == 2  ) ||		/* Output SIP Call-ID up to 64 characters if SIP_LN or		*/
+			( gwtype_val == 14 ) ||		/* SIP_LTG													*/
+			( gwtype_val == 15 ) )		/* SIP_TG													*/
+		{
+			add_string_field( c15ch_nitnxlate_tree, tvb, str_start, 65, hf_c15ch_nitnxlate_sip_call_id_64 );
+			/* Also placing this parameter as "host" for call correlation with external tools 	*/
+			add_string_field( c15ch_nitnxlate_tree, tvb, str_start, 65, hf_c15ch_nitnxlate_host );
+		}
 
         /* target group number */
-        if ( g_strcmp0( "PTRK", equipname_string ) == 0 )
-        {
-            proto_tree_add_item(c15ch_nitnxlate_tree, hf_c15ch_nitnxlate_tg_num,
+		tgnum_val = tvb_get_ntohl( tvb, 181 );  /* NFEC */
+		/* if ( g_strcmp0( "PTRK", equipname_string ) == 0 ) */ /* NFEC */
+		if ( tgnum_val )
+			{
+				proto_tree_add_item(c15ch_nitnxlate_tree, hf_c15ch_nitnxlate_tg_num,
                             tvb, 181, 4, ENC_BIG_ENDIAN);
-        }
+			}
 
 
-         add_string_field( c15ch_nitnxlate_tree, tvb, 185, 5, hf_c15ch_nitnxlate_mgcp_line_id);
+         // add_string_field( c15ch_nitnxlate_tree, tvb, 185, 5, hf_c15ch_nitnxlate_mgcp_line_id);
 
     }
     return tvb_reported_length(tvb);
@@ -7311,6 +7386,131 @@ static int dissect_c15ch_tone_tone_control(tvbuff_t *tvb, packet_info *pinfo _U_
     return tvb_reported_length(tvb);
 }
 
+/* TMG */
+/* Second level for new Generic Messages */
+/* Generic Message 1 is for a 1232 character ASCII string */ 
+static int dissect_c15ch_c15_generic_msg_1(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data _U_)
+{
+    proto_item * ti = NULL;
+    proto_tree * c15ch_c15_generic_msg_1_tree = NULL;
+	gint length = 0;
+	
+	length = tvb_reported_length(tvb);
+
+    if (tree)
+    {
+		if (length > 0)
+		{		
+			ti = proto_tree_add_item( tree, hf_c15ch_c15_generic_msg_1, tvb, 0, length, ENC_NA );
+			col_append_fstr(pinfo->cinfo, COL_INFO, ", Length: %d", length);
+			c15ch_c15_generic_msg_1_tree = proto_item_add_subtree( ti, ett_c15ch_second_level );
+			proto_tree_add_item(c15ch_c15_generic_msg_1_tree, hf_c15ch_c15_generic_msg_parm_1,
+								tvb, 0, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_1_tree, hf_c15ch_c15_generic_msg_parm_2,
+								tvb, 4, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_1_tree, hf_c15ch_c15_generic_msg_parm_3,
+								tvb, 8, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_1_tree, hf_c15ch_c15_generic_msg_parm_4,
+								tvb, 12, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_1_tree, hf_c15ch_c15_generic_msg_parm_5,
+								tvb, 16, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_1_tree, hf_c15ch_c15_generic_msg_data_len,
+								tvb, 20, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_1_tree, hf_c15ch_c15_generic_msg_cr_ptr_val,
+								tvb, 24, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_1_tree, hf_c15ch_c15_generic_msg_dr_ptr_val,
+								tvb, 28, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_1_tree, hf_c15ch_c15_generic_msg_spr_int_1,
+								tvb, 32, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_1_tree, hf_c15ch_c15_generic_msg_spr_int_2,
+								tvb, 36, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_1_tree, hf_c15ch_c15_generic_msg_spr_uptr_1,
+								tvb, 40, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_1_tree, hf_c15ch_c15_generic_msg_spr_uptr_2,
+								tvb, 44, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_1_tree, hf_c15ch_c15_generic_msg_spr_pptr_1,
+								tvb, 48, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_1_tree, hf_c15ch_c15_generic_msg_spr_pptr_2,
+								tvb, 52, 4, ENC_BIG_ENDIAN);								
+			proto_tree_add_item(c15ch_c15_generic_msg_1_tree, hf_c15ch_c15_generic_msg_gen_msg_field_1,
+								tvb, 56, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_1_tree, hf_c15ch_c15_generic_msg_gen_msg_field_2,
+								tvb, 60, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_1_tree, hf_c15ch_c15_generic_msg_gen_msg_field_3,
+								tvb, 64, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_1_tree, hf_c15ch_c15_generic_msg_gen_msg_field_4,
+								tvb, 68, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_1_tree, hf_c15ch_c15_generic_msg_gen_msg_field_5,
+								tvb, 72, 4, ENC_BIG_ENDIAN);
+			add_string_field( c15ch_c15_generic_msg_1_tree, tvb, 76, (length - 76),
+                             hf_c15ch_c15_generic_msg_gen_msg_string);
+		}
+    }
+
+    return tvb_reported_length(tvb);
+}
+
+/* Generic Message 2 is for a 1232 hex bytes */ 
+static int dissect_c15ch_c15_generic_msg_2(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data _U_)
+{
+    proto_item * ti = NULL;
+    proto_tree * c15ch_c15_generic_msg_2_tree = NULL;
+	gint length = 0;
+	
+	length = tvb_reported_length(tvb);
+
+    if (tree)
+    {
+		if (length > 0)
+		{		
+			ti = proto_tree_add_item( tree, hf_c15ch_c15_generic_msg_2, tvb, 0, length, ENC_NA );
+			col_append_fstr(pinfo->cinfo, COL_INFO, ", Length: %d", length);
+			c15ch_c15_generic_msg_2_tree = proto_item_add_subtree( ti, ett_c15ch_second_level );
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_parm_1,
+								tvb, 0, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_parm_2,
+								tvb, 4, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_parm_3,
+								tvb, 8, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_parm_4,
+								tvb, 12, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_parm_5,
+								tvb, 16, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_data_len,
+								tvb, 20, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_cr_ptr_val,
+								tvb, 24, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_dr_ptr_val,
+								tvb, 28, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_spr_int_1,
+								tvb, 32, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_spr_int_2,
+								tvb, 36, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_spr_uptr_1,
+								tvb, 40, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_spr_uptr_2,
+								tvb, 44, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_spr_pptr_1,
+								tvb, 48, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_spr_pptr_2,
+								tvb, 52, 4, ENC_BIG_ENDIAN);								
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_gen_msg_field_1,
+								tvb, 56, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_gen_msg_field_2,
+								tvb, 60, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_gen_msg_field_3,
+								tvb, 64, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_gen_msg_field_4,
+								tvb, 68, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_gen_msg_field_5,
+								tvb, 72, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_gen_data_large,
+								tvb, 76, (length - 76), ENC_BIG_ENDIAN);
+		}
+    }
+
+    return tvb_reported_length(tvb);
+}
 /* register functions */
 /* fields for c15 heartbeat dissector */
 void proto_register_c15ch_hbeat(void)
@@ -8151,6 +8351,12 @@ void proto_register_c15ch(void)
             NULL,
             0x0, NULL, HFILL}
         },
+        { &hf_c15ch_nitnxlate_sip_call_id_64,					/* TMG						*/
+            { "SIP Call-ID-64", "c15.nitnxlate.sip_call_id-64",	/* Output for SIP Call-ID	*/
+            FT_STRINGZ, BASE_NONE,
+            NULL,
+            0x0, NULL, HFILL}
+        },		
         { &hf_c15ch_nitnxlate_tg_num,
             { "Target Group Num", "c15.nitnxlate.tg_num",
             FT_UINT32, BASE_DEC,
@@ -10192,6 +10398,146 @@ void proto_register_c15ch(void)
             FT_PROTOCOL, BASE_NONE,
             NULL,
             0x0, NULL, HFILL}
+        },
+		/* TMG */
+		/* new Generic Messages */
+		{ &hf_c15ch_c15_generic_msg_1,
+            { "C15 Generic Message 1", "c15.generic_msg_1",
+            FT_PROTOCOL, BASE_NONE,
+            NULL,
+            0x0, NULL, HFILL}
+        },
+		{ &hf_c15ch_c15_generic_msg_2,
+            { "C15 Generic Message 2", "c15.generic_msg_1",
+            FT_PROTOCOL, BASE_NONE,
+            NULL,
+            0x0, NULL, HFILL}
+        },
+		{ &hf_c15ch_c15_generic_msg_parm_1,
+            { "Parameter 1", "c15.parm_1",
+            FT_UINT32, BASE_DEC,
+            NULL,
+            0x0, NULL, HFILL}
+        },
+		{ &hf_c15ch_c15_generic_msg_parm_2,
+            { "Parameter 2", "c15.parm_2",
+            FT_UINT32, BASE_DEC,
+            NULL,
+            0x0, NULL, HFILL}
+        },
+		{ &hf_c15ch_c15_generic_msg_parm_3,
+            { "Parameter 3", "c15.parm_3",
+            FT_UINT32, BASE_DEC,
+            NULL,
+            0x0, NULL, HFILL}
+        },
+		{ &hf_c15ch_c15_generic_msg_parm_4,
+            { "Parameter 4", "c15.parm_4",
+            FT_UINT32, BASE_HEX,
+            NULL,
+            0x0, NULL, HFILL}
+        },
+		{ &hf_c15ch_c15_generic_msg_parm_5,
+            { "Parameter 5", "c15.parm_5",
+            FT_UINT32, BASE_HEX,
+            NULL,
+            0x0, NULL, HFILL}
+        },
+		{ &hf_c15ch_c15_generic_msg_data_len,
+            { "Data Length", "c15.data_len",
+            FT_UINT32, BASE_DEC,
+            NULL,
+            0x0, NULL, HFILL}
+        },
+		{ &hf_c15ch_c15_generic_msg_cr_ptr_val,
+            { "CR Pointer Value", "c15.cr_ptr_val",
+            FT_UINT32, BASE_HEX,
+            NULL,
+            0x0, NULL, HFILL }
+        },
+		{ &hf_c15ch_c15_generic_msg_dr_ptr_val,
+            { "DR Pointer Value", "c15.dr_ptr_val",
+            FT_UINT32, BASE_HEX,
+            NULL,
+            0x0, NULL, HFILL }
+        },
+		{ &hf_c15ch_c15_generic_msg_spr_int_1,
+            { "Spare Integer 1", "c15.spr_int_1",
+            FT_UINT32, BASE_DEC,
+            NULL,
+            0x0, NULL, HFILL }
+        },
+		{ &hf_c15ch_c15_generic_msg_spr_int_2,
+            { "Spare Integer 2", "c15.spr_int_2",
+            FT_UINT32, BASE_DEC,
+            NULL,
+            0x0, NULL, HFILL }
+        },
+		{ &hf_c15ch_c15_generic_msg_spr_uptr_1,
+            { "Spare Unprotected Pointer 1", "c15.spr_uptr_1",
+            FT_UINT32, BASE_HEX,
+            NULL,
+            0x0, NULL, HFILL }
+        },
+		{ &hf_c15ch_c15_generic_msg_spr_uptr_2,
+            { "Spare Unprotected Pointer 2", "c15.spr_uptr_2",
+            FT_UINT32, BASE_HEX,
+            NULL,
+            0x0, NULL, HFILL }
+        },
+		{ &hf_c15ch_c15_generic_msg_spr_pptr_1,
+            { "Spare Protected Pointer 1", "c15.spr_pptr_1",
+            FT_UINT32, BASE_HEX,
+            NULL,
+            0x0, NULL, HFILL }
+        },
+		{ &hf_c15ch_c15_generic_msg_spr_pptr_2,
+            { "Spare Protected Pointer 2", "c15.spr_pptr_2",
+            FT_UINT32, BASE_HEX,
+            NULL,
+            0x0, NULL, HFILL }
+        },		
+		{ &hf_c15ch_c15_generic_msg_gen_msg_field_1,
+            { "Generic Message Field 1", "c15.gen_msg_field_1",
+            FT_UINT32, BASE_DEC,
+            NULL,
+            0x0, NULL, HFILL}
+        },
+		{ &hf_c15ch_c15_generic_msg_gen_msg_field_2,
+            { "Generic Message Field 2", "c15.gen_msg_field_2",
+            FT_UINT32, BASE_DEC,
+            NULL,
+            0x0, NULL, HFILL}
+        },
+		{ &hf_c15ch_c15_generic_msg_gen_msg_field_3,
+            { "Generic Message Field 3", "c15.gen_msg_field_3",
+            FT_UINT32, BASE_DEC,
+            NULL,
+            0x0, NULL, HFILL}
+        },
+		{ &hf_c15ch_c15_generic_msg_gen_msg_field_4,
+            { "Generic Message Field 4", "c15.gen_msg_field_4",
+            FT_UINT32, BASE_DEC,
+            NULL,
+            0x0, NULL, HFILL}
+        },
+		{ &hf_c15ch_c15_generic_msg_gen_msg_field_5,
+            { "Generic Message Field 5", "c15.gen_msg_field_5",
+            FT_UINT32, BASE_DEC,
+            NULL,
+            0x0, NULL, HFILL}
+        },
+		{ &hf_c15ch_c15_generic_msg_gen_msg_string,
+            { "Message", "c15.msg_string",
+            FT_STRINGZ, BASE_NONE,
+            NULL,
+            0x0, NULL, HFILL}
+        },
+		{ &hf_c15ch_c15_generic_msg_gen_data_large,
+            { "Hex Message", "c15.data_large",
+            FT_BYTES, BASE_NONE,
+            NULL,
+            0x0, NULL, HFILL }
         }
     };
     static gint *ett_second_level[] = {
@@ -11991,6 +12337,14 @@ void proto_reg_handoff_c15ch(void)
 
     c15ch_second_level_handle = create_dissector_handle(dissect_c15ch_c15_info, proto_c15ch_second_level);
     dissector_add_uint("c15", C15_INFO, c15ch_second_level_handle);
+	
+	/* TMG */
+	/* Second level for new Generic Messages */
+	c15ch_second_level_handle = create_dissector_handle(dissect_c15ch_c15_generic_msg_1, proto_c15ch_second_level);
+    dissector_add_uint("c15", C15_GENERIC_MSG_1, c15ch_second_level_handle);
+
+	c15ch_second_level_handle = create_dissector_handle(dissect_c15ch_c15_generic_msg_2, proto_c15ch_second_level);
+    dissector_add_uint("c15", C15_GENERIC_MSG_2, c15ch_second_level_handle);
 
     /* third level */
     /* tone */
