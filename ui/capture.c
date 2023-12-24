@@ -52,7 +52,7 @@ typedef struct if_stat_cache_item_s {
 } if_stat_cache_item_t;
 
 struct if_stat_cache_s {
-    int stat_fd;
+    GIOChannel *stat_io;
     ws_process_id fork_child;
     GList *cache_list;  /* List of if_stat_chache_entry_t */
 };
@@ -845,10 +845,61 @@ capture_input_closed(capture_session *cap_session, gchar *msg)
     }
 }
 
+static void
+capture_stat_cache_update(if_stat_cache_t *sc)
+{
+    gchar *stat_line;
+    size_t length;
+    gchar **stat_parts;
+    GList *sc_entry;
+    if_stat_cache_item_t *sc_item;
+
+    if (!sc || sc->fork_child == WS_INVALID_PID) {
+        return;
+    }
+
+    g_io_channel_read_line(sc->stat_io, &stat_line, &length, NULL, NULL);
+    if (length) {
+        ws_debug("read stat line of length %zu", length);
+        g_strstrip(stat_line);
+        stat_parts = g_strsplit(stat_line, "\t", 3);
+        g_free(stat_line);
+        if (stat_parts[0] == NULL || stat_parts[1] == NULL ||
+                stat_parts[2] == NULL) {
+            g_strfreev(stat_parts);
+            return;
+        }
+        for (sc_entry = sc->cache_list; sc_entry != NULL; sc_entry = g_list_next(sc_entry)) {
+            sc_item = (if_stat_cache_item_t *)sc_entry->data;
+            if (strcmp(sc_item->name, stat_parts[0]) == 0) {
+                sc_item->ps.ps_recv = (u_int) strtoul(stat_parts[1], NULL, 10);
+                sc_item->ps.ps_drop = (u_int) strtoul(stat_parts[2], NULL, 10);
+            }
+        }
+        g_strfreev(stat_parts);
+    }
+}
+
+static gboolean
+stat_io_cb(GIOChannel *source _U_, GIOCondition condition, gpointer data)
+{
+    if_stat_cache_t *sc = (if_stat_cache_t*)data;
+
+    if ((condition & G_IO_HUP) == G_IO_HUP) {
+        ws_info("hung up");
+        return FALSE;
+    }
+
+    capture_stat_cache_update(sc);
+
+    return TRUE;
+}
+
+
 if_stat_cache_t *
 capture_stat_start(capture_options *capture_opts)
 {
-    int stat_fd;
+    GIOChannel *stat_io;
     ws_process_id fork_child;
     gchar *msg;
     if_stat_cache_t *sc = g_new0(if_stat_cache_t, 1);
@@ -856,7 +907,7 @@ capture_stat_start(capture_options *capture_opts)
     guint i;
     interface_t *device;
 
-    sc->stat_fd = -1;
+    sc->stat_io = NULL;
     sc->fork_child = WS_INVALID_PID;
 
     /* Fire up dumpcap. */
@@ -878,8 +929,8 @@ capture_stat_start(capture_options *capture_opts)
      * mechanism, so opening all the devices and presenting packet
      * counts might not always be a good idea.
      */
-    if (sync_interface_stats_open(&stat_fd, &fork_child, NULL, &msg, NULL) == 0) {
-        sc->stat_fd = stat_fd;
+    if (sync_interface_stats_open(&stat_io, &fork_child, NULL, &msg, NULL) == 0) {
+        sc->stat_io = stat_io;
         sc->fork_child = fork_child;
 
         /* Initialize the cache */
@@ -892,6 +943,8 @@ capture_stat_start(capture_options *capture_opts)
                 sc->cache_list = g_list_prepend(sc->cache_list, sc_item);
             }
         }
+
+        g_io_add_watch(stat_io, G_IO_IN|G_IO_HUP, stat_io_cb, sc);
     } else {
         ws_warning("%s", msg);
         g_free(msg); /* XXX: should we display this to the user via the GUI? */
@@ -902,14 +955,14 @@ capture_stat_start(capture_options *capture_opts)
 if_stat_cache_t *
 capture_interface_stat_start(capture_options *capture_opts _U_, GList **if_list)
 {
-    int stat_fd;
+    GIOChannel *stat_io;
     ws_process_id fork_child;
     gchar *msg;
     if_stat_cache_t *sc = g_new0(if_stat_cache_t, 1);
     if_stat_cache_item_t *sc_item;
     char *data = NULL;
 
-    sc->stat_fd = -1;
+    sc->stat_io = NULL;
     sc->fork_child = WS_INVALID_PID;
 
     /* Fire up dumpcap. */
@@ -932,7 +985,7 @@ capture_interface_stat_start(capture_options *capture_opts _U_, GList **if_list)
      * counts might not always be a good idea.
      */
     int status;
-    status = sync_interface_stats_open(&stat_fd, &fork_child, &data, &msg, NULL);
+    status = sync_interface_stats_open(&stat_io, &fork_child, &data, &msg, NULL);
     /* In order to initialize the stat cache (below), we need to have
      * filled in capture_opts->all_ifaces
      *
@@ -948,7 +1001,7 @@ capture_interface_stat_start(capture_options *capture_opts _U_, GList **if_list)
         g_free(err_msg);
     }
     if (status == 0) {
-        sc->stat_fd = stat_fd;
+        sc->stat_io = stat_io;
         sc->fork_child = fork_child;
 
         /* Initialize the cache */
@@ -964,6 +1017,8 @@ capture_interface_stat_start(capture_options *capture_opts _U_, GList **if_list)
             sc_item->name = g_strdup(if_info->name);
             sc->cache_list = g_list_prepend(sc->cache_list, sc_item);
         }
+
+        g_io_add_watch(stat_io, G_IO_IN|G_IO_HUP, stat_io_cb, sc);
     } else {
         ws_warning("%s", msg);
         g_free(msg); /* XXX: should we display this to the user via the GUI? */
@@ -977,39 +1032,6 @@ capture_interface_stat_start(capture_options *capture_opts _U_, GList **if_list)
     return sc;
 }
 
-#define MAX_STAT_LINE_LEN 500
-
-static void
-capture_stat_cache_update(if_stat_cache_t *sc)
-{
-    gchar stat_line[MAX_STAT_LINE_LEN] = "";
-    gchar **stat_parts;
-    GList *sc_entry;
-    if_stat_cache_item_t *sc_item;
-
-    if (!sc || sc->fork_child == WS_INVALID_PID) {
-        return;
-    }
-
-    while (sync_pipe_gets_nonblock(sc->stat_fd, stat_line, MAX_STAT_LINE_LEN) > 0) {
-        g_strstrip(stat_line);
-        stat_parts = g_strsplit(stat_line, "\t", 3);
-        if (stat_parts[0] == NULL || stat_parts[1] == NULL ||
-                stat_parts[2] == NULL) {
-            g_strfreev(stat_parts);
-            continue;
-        }
-        for (sc_entry = sc->cache_list; sc_entry != NULL; sc_entry = g_list_next(sc_entry)) {
-            sc_item = (if_stat_cache_item_t *)sc_entry->data;
-            if (strcmp(sc_item->name, stat_parts[0]) == 0) {
-                sc_item->ps.ps_recv = (u_int) strtoul(stat_parts[1], NULL, 10);
-                sc_item->ps.ps_drop = (u_int) strtoul(stat_parts[2], NULL, 10);
-            }
-        }
-        g_strfreev(stat_parts);
-    }
-}
-
 gboolean
 capture_stats(if_stat_cache_t *sc, char *ifname, struct pcap_stat *ps)
 {
@@ -1020,7 +1042,6 @@ capture_stats(if_stat_cache_t *sc, char *ifname, struct pcap_stat *ps)
         return FALSE;
     }
 
-    capture_stat_cache_update(sc);
     for (sc_entry = sc->cache_list; sc_entry != NULL; sc_entry = g_list_next(sc_entry)) {
         sc_item = (if_stat_cache_item_t *)sc_entry->data;
         if (strcmp(sc_item->name, ifname) == 0) {
@@ -1044,7 +1065,7 @@ capture_stat_stop(if_stat_cache_t *sc)
     }
 
     if (sc->fork_child != WS_INVALID_PID) {
-        ret = sync_interface_stats_close(&sc->stat_fd, &sc->fork_child, &msg);
+        ret = sync_interface_stats_close(sc->stat_io, &sc->fork_child, &msg);
         if (ret == -1) {
             /* XXX - report failure? */
             g_free(msg);

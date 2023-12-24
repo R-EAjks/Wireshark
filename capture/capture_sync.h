@@ -101,11 +101,11 @@ sync_if_list_capabilities_open(GList *ifqueries,
 
 /** Start getting interface statistics using dumpcap. */
 extern int
-sync_interface_stats_open(int *read_fd, ws_process_id *fork_child, char **data, char **msg, void (*update_cb)(void));
+sync_interface_stats_open(GIOChannel **read_io, ws_process_id *fork_child, char **data, char **msg, void (*update_cb)(void));
 
 /** Stop gathering statistics. */
 extern int
-sync_interface_stats_close(int *read_fd, ws_process_id *fork_child, char **msg);
+sync_interface_stats_close(GIOChannel *read_io, ws_process_id *fork_child, char **msg);
 
 /** Read a line from a pipe, similar to fgets.  Non-blocking. */
 extern int
