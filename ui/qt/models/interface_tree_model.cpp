@@ -198,6 +198,17 @@ QVariant InterfaceTreeModel::data(const QModelIndex &index, int role) const
 
                 return linkname;
             }
+            else if (col == IFTREE_COL_IP_ADDRESSES)
+            {
+                if (device->no_addresses > 0)
+                {
+                    return QString(device->addresses);
+                }
+                else
+                {
+                    return QString("<None>");
+                }
+            }
             else
             {
                 /* Return empty string for every other DisplayRole */
@@ -327,6 +338,10 @@ QVariant InterfaceTreeModel::headerData(int section, Qt::Orientation orientation
             else if (section == IFTREE_COL_CAPTURE_FILTER)
             {
                 return tr("Capture Filter");
+            }
+            else if (section == IFTREE_COL_IP_ADDRESSES)
+            {
+                return tr("IP Addresses");
             }
         }
     }
