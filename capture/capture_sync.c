@@ -300,18 +300,19 @@ pipe_io_cb(GIOChannel *pipe_io, GIOCondition condition _U_, void * user_data)
 #define ARGV_NUMBER_LEN 24
 static int
 #ifdef _WIN32
-sync_pipe_open_command(char **argv, int *data_read_fd,
+sync_pipe_open_command(char **argv, GIOChannel **data_read_io,
                        GIOChannel **message_read_io, int *signal_write_fd,
                        ws_process_id *fork_child, GArray *ifaces,
                        char **msg, void(*update_cb)(void))
 #else
-sync_pipe_open_command(char **argv, int *data_read_fd,
+sync_pipe_open_command(char **argv, GIOChannel **data_read_io,
                        GIOChannel **message_read_io, int *signal_write_fd _U_,
                        ws_process_id *fork_child, GArray *ifaces _U_,
                        char **msg, void(*update_cb)(void))
 #endif
 {
     enum PIPES { PIPE_READ, PIPE_WRITE };   /* Constants 0 and 1 for PIPE_READ and PIPE_WRITE */
+    int data_read_fd = -1;
     int message_read_fd = -1;
     char sync_id[ARGV_NUMBER_LEN];
 #ifdef _WIN32
@@ -336,8 +337,8 @@ sync_pipe_open_command(char **argv, int *data_read_fd,
     int data_pipe[2];                       /* pipe used to send data from child to parent */
 #endif
     *fork_child = WS_INVALID_PID;
-    if (data_read_fd != NULL) {
-        *data_read_fd = -1;
+    if (data_read_io != NULL) {
+        *data_read_io = NULL;
     }
     *message_read_io = NULL;
     ws_debug("sync_pipe_open_command");
@@ -383,7 +384,7 @@ sync_pipe_open_command(char **argv, int *data_read_fd,
         return -1;
     }
 
-    if (data_read_fd != NULL) {
+    if (data_read_io != NULL) {
         /* Create a pipe for the child process to send us data */
         /* (increase this value if you have trouble while fast capture file switches) */
         if (! CreatePipe(&data_pipe[PIPE_READ], &data_pipe[PIPE_WRITE], &sa, PIPE_BUF_SIZE)) {
@@ -403,8 +404,8 @@ sync_pipe_open_command(char **argv, int *data_read_fd,
          * (See http://www.flounder.com/handles.htm for information on various
          * types of file handle in C/C++ on Windows.)
          */
-        *data_read_fd = _open_osfhandle( (intptr_t) data_pipe[PIPE_READ], _O_BINARY);
-        if (*data_read_fd == -1) {
+        data_read_fd = _open_osfhandle( (intptr_t) data_pipe[PIPE_READ], _O_BINARY);
+        if (data_read_fd == -1) {
             *msg = ws_strdup_printf("Couldn't get C file handle for data read pipe: %s", g_strerror(errno));
             g_strfreev(argv);
             CloseHandle(data_pipe[PIPE_READ]);
@@ -463,7 +464,7 @@ sync_pipe_open_command(char **argv, int *data_read_fd,
     si.dwFlags = STARTF_USESTDHANDLES|STARTF_USESHOWWINDOW;
     si.wShowWindow  = SW_HIDE;  /* this hides the console window */
 
-    if (data_read_fd == NULL) {
+    if (data_read_io == NULL) {
         si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
         si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
     } else {
@@ -532,8 +533,8 @@ sync_pipe_open_command(char **argv, int *data_read_fd,
                              CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi)) {
         *msg = ws_strdup_printf("Couldn't run %s in child process: %s",
                                args->str, win32strerror(GetLastError()));
-        if (data_read_fd) {
-            ws_close(*data_read_fd);       /* Should close data_pipe[PIPE_READ] */
+        if (data_read_io) {
+            ws_close(data_read_fd);       /* Should close data_pipe[PIPE_READ] */
             CloseHandle(data_pipe[PIPE_WRITE]);
         } else {
             ws_close(signal_pipe_write_fd);
@@ -564,7 +565,7 @@ sync_pipe_open_command(char **argv, int *data_read_fd,
         return -1;
     }
 
-    if (data_read_fd != NULL) {
+    if (data_read_io != NULL) {
         /* Create a pipe for the child process to send us data */
         if (pipe(data_pipe) < 0) {
             /* Couldn't create the data pipe between parent and child. */
@@ -581,7 +582,7 @@ sync_pipe_open_command(char **argv, int *data_read_fd,
          * Child process - run dumpcap with the right arguments to make
          * it just capture with the specified capture parameters
          */
-        if (data_read_fd != NULL) {
+        if (data_read_io != NULL) {
             dup2(data_pipe[PIPE_WRITE], 1);
             ws_close(data_pipe[PIPE_READ]);
             ws_close(data_pipe[PIPE_WRITE]);
@@ -612,8 +613,8 @@ sync_pipe_open_command(char **argv, int *data_read_fd,
     if (fetch_dumpcap_pid && *fork_child > 0)
         fetch_dumpcap_pid(*fork_child);
 
-    if (data_read_fd != NULL) {
-        *data_read_fd = data_pipe[PIPE_READ];
+    if (data_read_io != NULL) {
+        data_read_fd = data_pipe[PIPE_READ];
     }
     message_read_fd = sync_pipe[PIPE_READ];
 
@@ -627,40 +628,59 @@ sync_pipe_open_command(char **argv, int *data_read_fd,
        an EOF indication, if the child closes them (either deliberately
        or by exiting abnormally). */
 #ifdef _WIN32
-    if (data_read_fd != NULL) {
+    if (data_read_io != NULL) {
         CloseHandle(data_pipe[PIPE_WRITE]);
     }
-    CloseHandle(sync_pipe[PIPE_WRITE]);
+    if (message_read_io != NULL) {
+        CloseHandle(sync_pipe[PIPE_WRITE]);
+    }
 #else
-    if (data_read_fd != NULL) {
+    if (data_read_io != NULL) {
         ws_close(data_pipe[PIPE_WRITE]);
     }
-    ws_close(sync_pipe[PIPE_WRITE]);
+    if (message_read_io != NULL) {
+        ws_close(sync_pipe[PIPE_WRITE]);
+    }
 #endif
 
     if (*fork_child == WS_INVALID_PID) {
         /* We couldn't even create the child process. */
         *msg = ws_strdup_printf("Couldn't create child process: %s", g_strerror(errno));
-        if (data_read_fd != NULL) {
-            ws_close(*data_read_fd);
+        if (data_read_io != NULL) {
+            ws_close(data_read_fd);
         }
 #ifdef _WIN32
         if (signal_write_fd != NULL) {
             ws_close(signal_pipe_write_fd);
         }
 #endif
-        ws_close(message_read_fd);
+        if (message_read_io != NULL) {
+            ws_close(message_read_fd);
+        }
         return -1;
     }
 
+    if (message_read_io) {
 #ifdef _WIN32
-    *message_read_io = g_io_channel_win32_new_fd(message_read_fd);
+        *message_read_io = g_io_channel_win32_new_fd(message_read_fd);
 #else
-    *message_read_io = g_io_channel_unix_new(message_read_fd);
+        *message_read_io = g_io_channel_unix_new(message_read_fd);
 #endif
-    g_io_channel_set_encoding(*message_read_io, NULL, NULL);
-    g_io_channel_set_buffered(*message_read_io, false);
-    g_io_channel_set_close_on_unref(*message_read_io, true);
+        g_io_channel_set_encoding(*message_read_io, NULL, NULL);
+        g_io_channel_set_buffered(*message_read_io, false);
+        g_io_channel_set_close_on_unref(*message_read_io, true);
+    }
+
+    if (data_read_io) {
+#ifdef _WIN32
+        *data_read_io = g_io_channel_win32_new_fd(data_read_fd);
+#else
+        *data_read_io = g_io_channel_unix_new(data_read_fd);
+#endif
+        /* UTF-8 encoding is probably fine too, as we send text. */
+        g_io_channel_set_encoding(*data_read_io, NULL, NULL);
+        g_io_channel_set_close_on_unref(*data_read_io, true);
+    }
 
     /* we might wait for a moment till child is ready, so update screen now */
     if (update_cb) update_cb();
@@ -993,10 +1013,10 @@ sync_pipe_start(capture_options *capture_opts, GPtrArray *capture_comments,
  * latter case, *msgp must be freed with g_free().
  */
 static int
-sync_pipe_close_command(int *data_read_fd, GIOChannel *message_read_io,
+sync_pipe_close_command(GIOChannel *data_read_io, GIOChannel *message_read_io,
 	ws_process_id *fork_child, char **msgp)
 {
-    ws_close(*data_read_fd);
+    g_io_channel_unref(data_read_io);
     if (message_read_io != NULL)
         g_io_channel_unref(message_read_io);
 
@@ -1025,8 +1045,8 @@ sync_pipe_run_command_actual(char **argv, char **data, char **primary_msg,
                       char **secondary_msg,  void(*update_cb)(void))
 {
     char *msg;
-    int data_pipe_read_fd, ret;
-    GIOChannel *sync_pipe_read_io;
+    int ret;
+    GIOChannel *data_pipe_read_io, *sync_pipe_read_io;
     ws_process_id fork_child;
     char *wait_msg;
     char buffer[PIPE_BUF_SIZE+1] = {0};
@@ -1038,10 +1058,9 @@ sync_pipe_run_command_actual(char **argv, char **data, char **primary_msg,
     int  secondary_msg_len;
     char *secondary_msg_text;
     char *combined_msg;
-    GString *data_buf = NULL;
-    ssize_t count;
+    GError *err = NULL;
 
-    ret = sync_pipe_open_command(argv, &data_pipe_read_fd, &sync_pipe_read_io, NULL,
+    ret = sync_pipe_open_command(argv, &data_pipe_read_io, &sync_pipe_read_io, NULL,
                                  &fork_child, NULL, &msg, update_cb);
     if (ret == -1) {
         *primary_msg = msg;
@@ -1108,7 +1127,7 @@ sync_pipe_run_command_actual(char **argv, char **data, char **primary_msg,
         /*
          * Pick up the child status.
          */
-        ret = sync_pipe_close_command(&data_pipe_read_fd, sync_pipe_read_io,
+        ret = sync_pipe_close_command(data_pipe_read_io, sync_pipe_read_io,
                                       &fork_child, &msg);
         if (ret == -1) {
             /*
@@ -1148,7 +1167,7 @@ sync_pipe_run_command_actual(char **argv, char **data, char **primary_msg,
         /*
          * Pick up the child status.
          */
-        ret = sync_pipe_close_command(&data_pipe_read_fd, sync_pipe_read_io,
+        ret = sync_pipe_close_command(data_pipe_read_io, sync_pipe_read_io,
                                       &fork_child, &msg);
         if (ret == -1) {
             /*
@@ -1178,16 +1197,22 @@ sync_pipe_run_command_actual(char **argv, char **data, char **primary_msg,
 
     case SP_SUCCESS:
         /* read the output from the command */
-        data_buf = g_string_new("");
-        while ((count = ws_read(data_pipe_read_fd, buffer, PIPE_BUF_SIZE)) > 0) {
-            buffer[count] = '\0';
-            g_string_append(data_buf, buffer);
+        g_io_channel_read_to_end(data_pipe_read_io, data, NULL, &err);
+        if (err != NULL) {
+            ws_debug("read from pipe %p: error(%u): %s", data_pipe_read_io, err->code, err->message);
+            *primary_msg = ws_strdup_printf("Error command output from data pipe: %s", err->message);
+            g_clear_error(&err);
+            *secondary_msg = NULL;
+            g_free(*data);
+            *data = NULL;
+            ret = -1;
+            break;
         }
 
         /*
          * Pick up the child status.
          */
-        ret = sync_pipe_close_command(&data_pipe_read_fd, sync_pipe_read_io,
+        ret = sync_pipe_close_command(data_pipe_read_io, sync_pipe_read_io,
                                       &fork_child, &msg);
         if (ret == -1) {
             /*
@@ -1196,7 +1221,7 @@ sync_pipe_run_command_actual(char **argv, char **data, char **primary_msg,
              */
             *primary_msg = msg;
             *secondary_msg = NULL;
-            g_string_free(data_buf, true);
+            g_free(*data);
             *data = NULL;
         } else {
             /*
@@ -1204,7 +1229,6 @@ sync_pipe_run_command_actual(char **argv, char **data, char **primary_msg,
              */
             *primary_msg = NULL;
             *secondary_msg = NULL;
-            *data = g_string_free(data_buf, false);
         }
         break;
 
@@ -1212,7 +1236,7 @@ sync_pipe_run_command_actual(char **argv, char **data, char **primary_msg,
         /*
          * Pick up the child status.
          */
-        ret = sync_pipe_close_command(&data_pipe_read_fd, sync_pipe_read_io,
+        ret = sync_pipe_close_command(data_pipe_read_io, sync_pipe_read_io,
                                       &fork_child, &msg);
         if (ret == -1) {
             /*
@@ -1455,7 +1479,7 @@ sync_if_list_capabilities_open(GList *if_queries,
  * serialization of the list of local interfaces and their capabilities.
  */
 int
-sync_interface_stats_open(int *data_read_fd, ws_process_id *fork_child, char **data, char **msg, void (*update_cb)(void))
+sync_interface_stats_open(GIOChannel **data_read_io, ws_process_id *fork_child, char **data, char **msg, void (*update_cb)(void))
 {
     int argc;
     char **argv;
@@ -1500,7 +1524,7 @@ sync_interface_stats_open(int *data_read_fd, ws_process_id *fork_child, char **d
     argv = sync_pipe_add_arg(argv, &argc, dummy_control_id);
 #endif
 #endif
-    ret = sync_pipe_open_command(argv, data_read_fd, &message_read_io, NULL,
+    ret = sync_pipe_open_command(argv, data_read_io, &message_read_io, NULL,
                                  fork_child, NULL, msg, update_cb);
     if (ret == -1) {
         return -1;
@@ -1527,7 +1551,7 @@ sync_interface_stats_open(int *data_read_fd, ws_process_id *fork_child, char **d
                the next time, cleaning itself up then. */
             ret = sync_pipe_wait_for_child(*fork_child, &wait_msg);
             g_io_channel_unref(message_read_io);
-            ws_close(*data_read_fd);
+            g_io_channel_unref(*data_read_io);
             if(nread == 0) {
                 /* We got an EOF from the sync pipe.  That means that it exited
                    before giving us any data to read.  If ret is -1, we report
@@ -1566,7 +1590,7 @@ sync_interface_stats_open(int *data_read_fd, ws_process_id *fork_child, char **d
             /*
              * Pick up the child status.
              */
-            sync_pipe_close_command(data_read_fd, message_read_io,
+            sync_pipe_close_command(*data_read_io, message_read_io,
                                     fork_child, msg);
             ret = -1;
             break;
@@ -1589,7 +1613,7 @@ sync_interface_stats_open(int *data_read_fd, ws_process_id *fork_child, char **d
             /*
              * Pick up the child status.
              */
-            ret = sync_pipe_close_command(data_read_fd, message_read_io,
+            ret = sync_pipe_close_command(*data_read_io, message_read_io,
                                           fork_child, msg);
             if (ret == -1) {
                 /*
@@ -1631,7 +1655,7 @@ sync_interface_stats_open(int *data_read_fd, ws_process_id *fork_child, char **d
             /*
              * Pick up the child status.
              */
-            ret = sync_pipe_close_command(data_read_fd, message_read_io,
+            ret = sync_pipe_close_command(*data_read_io, message_read_io,
                                           fork_child, msg);
             if (ret == -1) {
                 /*
@@ -1655,7 +1679,7 @@ sync_interface_stats_open(int *data_read_fd, ws_process_id *fork_child, char **d
 
 /* Close down the stats process */
 int
-sync_interface_stats_close(int *read_fd, ws_process_id *fork_child, char **msg)
+sync_interface_stats_close(GIOChannel *read_io, ws_process_id *fork_child, char **msg)
 {
 #ifdef _WIN32
     CloseHandle(dummy_signal_pipe);
@@ -1667,7 +1691,7 @@ sync_interface_stats_close(int *read_fd, ws_process_id *fork_child, char **msg)
      */
     sync_pipe_kill(*fork_child);
 #endif
-    return sync_pipe_close_command(read_fd, NULL, fork_child, msg);
+    return sync_pipe_close_command(read_io, NULL, fork_child, msg);
 }
 
 /* read a number of bytes from a pipe */
