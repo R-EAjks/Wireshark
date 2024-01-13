@@ -18,6 +18,7 @@ typedef struct dlt_info {
     guint32         message_id;
     gboolean        little_endian;
     guint8          message_type;
+    guint32         message_length;
     guint8          message_type_info_comb;
 } dlt_info_t;
 
