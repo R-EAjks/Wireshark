@@ -370,7 +370,8 @@ known_non_contiguous_fields = { 'wlan.fixed.capabilities.cfpoll.sta',
                                 'hf_hiqnet_flags',
                                 'hf_hiqnet_flagmask',
                                 'hf_h223_mux_mpl',
-                                'rdp.flags.pkt'
+                                'rdp.flags.pkt',
+                                'erf.flags.if_raw'  # confirmed by Stephen Donnelly
                               }
 ##################################################################################################
 
@@ -1030,7 +1031,7 @@ class Item:
     def check_bit(self, value, n):
         return (value & (0x1 << n)) != 0
 
-    # Output a warning if non-contigous bits are found in the mask (guint64).
+    # Output a warning if non-contiguous bits are found in the mask (guint64).
     # Note that this legimately happens in several dissectors where multiple reserved/unassigned
     # bits are conflated into one field.
     # - there is probably a cool/efficient way to check this (+1 => 1-bit set?)
@@ -1459,6 +1460,7 @@ def isGeneratedFile(filename):
     return False
 
 
+# TODO: could also look for macros in header file(s)
 def find_macros(filename):
     # Pre-populate with some useful values..
     macros = { 'BASE_NONE' : 0,  'BASE_DEC' : 1 }
