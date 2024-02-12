@@ -208,18 +208,16 @@ static const value_string show_bytes_decode_values[] = {
 };
 
 static void
-free_col_width_data(gpointer data, gpointer user_data _U_)
+free_col_width_data(gpointer data)
 {
     col_width_data *cfmt = (col_width_data *)data;
-    g_free(cfmt->cfield);
     g_free(cfmt);
 }
 
-static void
-free_col_width_info(recent_settings_t *rs)
+void
+recent_free_column_width_info(recent_settings_t *rs)
 {
-    g_list_foreach(rs->col_width_list, free_col_width_data, NULL);
-    g_list_free(rs->col_width_list);
+    g_list_free_full(rs->col_width_list, free_col_width_data);
     rs->col_width_list = NULL;
 }
 
@@ -1312,8 +1310,6 @@ read_set_recent_pair_static(gchar *key, const gchar *value,
     char *p;
     GList *col_l, *col_l_elt;
     col_width_data *cfmt;
-    const gchar *cust_format = col_format_to_string(COL_CUSTOM);
-    int cust_format_len = (int) strlen(cust_format);
 
     if (strcmp(key, RECENT_KEY_MAIN_TOOLBAR_SHOW) == 0) {
         parse_recent_boolean(value, &recent.main_toolbar_show);
@@ -1440,63 +1436,18 @@ read_set_recent_pair_static(gchar *key, const gchar *value,
             prefs_clear_string_list(col_l);
             return PREFS_SET_SYNTAX_ERR;
         }
-        /* Check to make sure all column formats are valid.  */
-        col_l_elt = g_list_first(col_l);
-        while (col_l_elt) {
-            fmt_data cfmt_check;
-
-            /* Make sure the format isn't empty.  */
-            if (strcmp((const char *)col_l_elt->data, "") == 0) {
-                /* It is.  */
-                prefs_clear_string_list(col_l);
-                return PREFS_SET_SYNTAX_ERR;
-            }
-
-            /* Some predefined columns have been migrated to use custom
-             * columns. We'll convert these silently here */
-            try_convert_to_custom_column((char **)&col_l_elt->data);
-
-            /* Check the format.  */
-            if (!parse_column_format(&cfmt_check, (char *)col_l_elt->data)) {
-                /* It's not a valid column format.  */
-                prefs_clear_string_list(col_l);
-                return PREFS_SET_SYNTAX_ERR;
-            }
-            if (cfmt_check.fmt == COL_CUSTOM) {
-                /* We don't need the custom column field on this pass. */
-                g_free(cfmt_check.custom_fields);
-            }
-
-            /* Go past the format.  */
-            col_l_elt = col_l_elt->next;
-
-            /* Go past the width.  */
-            col_l_elt = col_l_elt->next;
-        }
-        free_col_width_info(&recent);
+        recent_free_column_width_info(&recent);
         recent.col_width_list = NULL;
         col_l_elt = g_list_first(col_l);
         while (col_l_elt) {
-            gchar *fmt = g_strdup((const gchar *)col_l_elt->data);
             cfmt = g_new(col_width_data, 1);
-            if (strncmp(fmt, cust_format, cust_format_len) != 0) {
-                cfmt->cfmt   = get_column_format_from_str(fmt);
-                cfmt->cfield = NULL;
-            } else {
-                cfmt->cfmt   = COL_CUSTOM;
-                cfmt->cfield = g_strdup(&fmt[cust_format_len+1]);  /* add 1 for ':' */
-            }
-            g_free (fmt);
-            if (cfmt->cfmt == -1) {
-                g_free(cfmt->cfield);
-                g_free(cfmt);
-                return PREFS_SET_SYNTAX_ERR;   /* string was bad */
-            }
-
+            /* Skip the column format, we don't use it anymore because the
+             * column indices are in sync and the key since 4.4. Format is
+             * still written for backwards compatibility.
+             */
             col_l_elt      = col_l_elt->next;
             cfmt->width    = (gint)strtol((const char *)col_l_elt->data, &p, 0);
             if (p == col_l_elt->data || (*p != '\0' && *p != ':')) {
-                g_free(cfmt->cfield);
                 g_free(cfmt);
                 return PREFS_SET_SYNTAX_ERR;    /* number was bad */
             }
@@ -1696,7 +1647,7 @@ recent_read_profile_static(char **rf_path_return, int *rf_errno_return)
     }
 
     if (recent.col_width_list) {
-        free_col_width_info(&recent);
+        recent_free_column_width_info(&recent);
     }
 
     if (recent.gui_fileopen_remembered_dir) {
@@ -1801,30 +1752,42 @@ recent_read_dynamic(char **rf_path_return, int *rf_errno_return)
     return TRUE;
 }
 
+void
+recent_insert_column(int col)
+{
+    col_width_data *col_w;
+
+    col_w = g_new(col_width_data, 1);
+    col_w->width = -1;
+    col_w->xalign = COLUMN_XALIGN_DEFAULT;
+    recent.col_width_list = g_list_insert(recent.col_width_list, col_w, col);
+}
+
+void
+recent_remove_column(int col)
+{
+    GList *col_l = g_list_nth(recent.col_width_list, col);
+    col_width_data *col_w;
+
+    if (!col_l) return;
+
+    col_w = (col_width_data*)col_l->data;
+
+    if (col_w) {
+        free_col_width_data(col_w);
+    }
+
+    recent.col_width_list = g_list_delete_link(recent.col_width_list, col_l);
+}
+
 gint
 recent_get_column_width(gint col)
 {
-    GList *col_l;
     col_width_data *col_w;
-    gint cfmt;
-    const gchar *cfield = NULL;
 
-    cfmt = get_column_format(col);
-    if (cfmt == COL_CUSTOM) {
-        cfield = get_column_custom_fields(col);
-    }
-
-    col_l = g_list_first(recent.col_width_list);
-    while (col_l) {
-        col_w = (col_width_data *) col_l->data;
-        if (col_w->cfmt == cfmt) {
-            if (cfmt != COL_CUSTOM) {
-                return col_w->width;
-            } else if (cfield && strcmp (cfield, col_w->cfield) == 0) {
-                return col_w->width;
-            }
-        }
-        col_l = col_l->next;
+    col_w = g_list_nth_data(recent.col_width_list, col);
+    if (col_w) {
+        return col_w->width;
     }
 
     return -1;
@@ -1833,103 +1796,35 @@ recent_get_column_width(gint col)
 void
 recent_set_column_width(gint col, gint width)
 {
-    GList *col_l;
     col_width_data *col_w;
-    gint cfmt;
-    const gchar *cfield = NULL;
-    gboolean found = FALSE;
 
-    cfmt = get_column_format(col);
-    if (cfmt == COL_CUSTOM) {
-        cfield = get_column_custom_fields(col);
-    }
-
-    col_l = g_list_first(recent.col_width_list);
-    while (col_l) {
-        col_w = (col_width_data *) col_l->data;
-        if (col_w->cfmt == cfmt) {
-            if (cfmt != COL_CUSTOM || strcmp (cfield, col_w->cfield) == 0) {
-                col_w->width = width;
-                found = TRUE;
-                break;
-            }
-        }
-        col_l = col_l->next;
-    }
-
-    if (!found) {
-        col_w = g_new(col_width_data, 1);
-        col_w->cfmt = cfmt;
-        col_w->cfield = g_strdup(cfield);
+    col_w = g_list_nth_data(recent.col_width_list, col);
+    if (col_w) {
         col_w->width = width;
-        col_w->xalign = COLUMN_XALIGN_DEFAULT;
-        recent.col_width_list = g_list_append(recent.col_width_list, col_w);
     }
 }
 
 gchar
 recent_get_column_xalign(gint col)
 {
-    GList *col_l;
     col_width_data *col_w;
-    gint cfmt;
-    const gchar *cfield = NULL;
 
-    cfmt = get_column_format(col);
-    if (cfmt == COL_CUSTOM) {
-        cfield = get_column_custom_fields(col);
+    col_w = g_list_nth_data(recent.col_width_list, col);
+    if (col_w) {
+        return col_w->xalign;
     }
 
-    col_l = g_list_first(recent.col_width_list);
-    while (col_l) {
-        col_w = (col_width_data *) col_l->data;
-        if (col_w->cfmt == cfmt) {
-            if (cfmt != COL_CUSTOM) {
-                return col_w->xalign;
-            } else if (cfield && strcmp (cfield, col_w->cfield) == 0) {
-                return col_w->xalign;
-            }
-        }
-        col_l = col_l->next;
-    }
-
-    return 0;
+    return COLUMN_XALIGN_DEFAULT;
 }
 
 void
 recent_set_column_xalign(gint col, gchar xalign)
 {
-    GList *col_l;
     col_width_data *col_w;
-    gint cfmt;
-    const gchar *cfield = NULL;
-    gboolean found = FALSE;
 
-    cfmt = get_column_format(col);
-    if (cfmt == COL_CUSTOM) {
-        cfield = get_column_custom_fields(col);
-    }
-
-    col_l = g_list_first(recent.col_width_list);
-    while (col_l) {
-        col_w = (col_width_data *) col_l->data;
-        if (col_w->cfmt == cfmt) {
-            if (cfmt != COL_CUSTOM || strcmp (cfield, col_w->cfield) == 0) {
-                col_w->xalign = xalign;
-                found = TRUE;
-                break;
-            }
-        }
-        col_l = col_l->next;
-    }
-
-    if (!found) {
-        col_w = g_new(col_width_data, 1);
-        col_w->cfmt = cfmt;
-        col_w->cfield = g_strdup(cfield);
-        col_w->width = 40;
+    col_w = g_list_nth_data(recent.col_width_list, col);
+    if (col_w) {
         col_w->xalign = xalign;
-        recent.col_width_list = g_list_append(recent.col_width_list, col_w);
     }
 }
 
@@ -1942,7 +1837,7 @@ recent_init(void)
 void
 recent_cleanup(void)
 {
-    free_col_width_info(&recent);
+    recent_free_column_width_info(&recent);
     g_free(recent.gui_geometry_main);
     g_free(recent.gui_geometry_main_master_split);
     g_free(recent.gui_geometry_main_extra_split);

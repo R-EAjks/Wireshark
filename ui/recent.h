@@ -41,8 +41,6 @@ extern "C" {
 #define RECENT_KEY_REMOTE_HOST          "recent.remote_host"
 
 typedef struct _col_width_data {
-    gint   cfmt;
-    gchar *cfield;
     gint   width;
     gchar  xalign;
 } col_width_data;
@@ -231,6 +229,28 @@ extern gboolean recent_read_dynamic(char **rf_path_return, int *rf_errno_return)
  * @return PREFS_SET_OK or PREFS_SET_SYNTAX_ERR
  */
 extern int recent_set_arg(char *prefarg);
+
+/** Free the recent settings list of column width information
+ *
+ * @param rs the recent settings (currently a global)
+ */
+extern void recent_free_column_width_info(recent_settings_t *rs);
+
+/** Insert an entry in the recent column width setting for
+ * the given column, which should have been just added to
+ * the column list preference. (This keeps them in sync.)
+ *
+ * @param col column number
+ */
+extern void recent_insert_column(int col);
+
+/** Remove an entry in the recent column width setting for
+ * the given column, which should have been just removed to
+ * the column list preference. (This keeps them in sync.)
+ *
+ * @param col column number
+ */
+extern void recent_remove_column(int col);
 
 /** Get the column width for the given column
  *
