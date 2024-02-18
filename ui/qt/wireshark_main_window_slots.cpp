@@ -3564,8 +3564,35 @@ void WiresharkMainWindow::statCommandIOGraph(const char *, void *)
     if (df_edit)
         displayFilter = df_edit->text();
 
-    IOGraphDialog *iog_dialog = new IOGraphDialog(*this, capture_file_, displayFilter);
+    QVector<QString> conv_filters;
+    IOGraphDialog *iog_dialog = new IOGraphDialog(*this, capture_file_, displayFilter, false, conv_filters);
     connect(iog_dialog, SIGNAL(goToPacket(int)), packet_list_, SLOT(goToPacket(int)));
+    connect(this, SIGNAL(reloadFields()), iog_dialog, SLOT(reloadFields()));
+    iog_dialog->show();
+}
+
+void WiresharkMainWindow::openIOGraph(bool filtered, QVector<int> typed_conv_ids)
+{
+    const DisplayFilterEdit *df_edit = qobject_cast<DisplayFilterEdit *>(df_combo_box_->lineEdit());
+    QString displayFilter;
+    if (df_edit && filtered)
+        displayFilter = df_edit->text();
+
+    /* the filters to open the IOGraph dialog with */
+    QVector<QString> conv_filters;
+
+    /* the list received should contain at least 2 elements (conv type + conv ids) */
+    if(typed_conv_ids.size()>1) {
+        const QString pfname = proto_get_protocol_filter_name(typed_conv_ids.at(0));
+
+        // parse the conversations Vector and build the Display Filters Vector
+        for(int i=1; i<typed_conv_ids.size(); i++) {
+            conv_filters.append(pfname + ".stream eq " + QString::number(typed_conv_ids.at(i)));
+        }
+    }
+
+    IOGraphDialog *iog_dialog = new IOGraphDialog(*this, capture_file_, displayFilter, true, conv_filters);
+    //connect(iog_dialog, SIGNAL(goToPacket(int)), packet_list_, SLOT(goToPacket(int)));
     connect(this, SIGNAL(reloadFields()), iog_dialog, SLOT(reloadFields()));
     iog_dialog->show();
 }
@@ -3910,6 +3937,8 @@ void WiresharkMainWindow::showConversationsDialog()
         this, SLOT(openFollowStreamDialog(int, guint, guint)));
     connect(conv_dialog, SIGNAL(openTcpStreamGraph(int)),
         this, SLOT(openTcpStreamDialog(int)));
+    connect(conv_dialog, SIGNAL(openIOGraph(bool, QVector<int>)),
+        this, SLOT(openIOGraph(bool, QVector<int>)));
     conv_dialog->show();
 }
 

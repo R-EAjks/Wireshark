@@ -134,7 +134,7 @@ class IOGraphDialog : public WiresharkDialog
     Q_OBJECT
 
 public:
-    explicit IOGraphDialog(QWidget &parent, CaptureFile &cf, QString displayFilter = QString());
+    explicit IOGraphDialog(QWidget &parent, CaptureFile &cf, QString displayFilter = QString(), gboolean is_sibling_dialog = false, const QVector<QString> convFilters = QVector<QString>());
     ~IOGraphDialog();
 
     enum UatColumns { colEnabled = 0, colName, colDFilter, colColor, colStyle, colYAxis, colYField, colSMAPeriod, colYAxisFactor, colMaxNum};

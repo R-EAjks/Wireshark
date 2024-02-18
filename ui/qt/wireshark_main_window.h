@@ -468,6 +468,7 @@ private slots:
 
     void openFollowStreamDialog(int proto_id, guint stream_num, guint sub_stream_num, bool use_stream_index = true);
     void openFollowStreamDialog(int proto_id);
+    void openIOGraph(bool filtered, QVector<int> conv_ids);
 
     void statCommandExpertInfo(const char *, void *);
 

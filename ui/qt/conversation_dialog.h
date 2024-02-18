@@ -29,16 +29,19 @@ protected:
 
 signals:
     void openFollowStreamDialog(int proto_id, guint stream_num, guint sub_stream_num);
+    void openIOGraph(bool filtered, QVector<int> conv_ids);
 
 private:
     QPushButton *follow_bt_;
     QPushButton *graph_bt_;
+    QPushButton *iograph_bt_;
 
     bool tcp_graph_requested_;
 
 private slots:
     void followStream();
     void graphTcp();
+    void showGraphIO();
     void on_buttonBox_helpRequested();
     void displayFilterSuccess(bool success);
     void tabChanged(int idx);

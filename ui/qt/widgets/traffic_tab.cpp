@@ -130,7 +130,26 @@ QTreeView * TrafficTab::createTree(int protoId)
 
         QItemSelectionModel * ism = new QItemSelectionModel(proxyModel, tree);
         tree->setSelectionModel(ism);
-        connect(ism, &QItemSelectionModel::currentChanged, this, &TrafficTab::doCurrentIndexChange);
+
+        /* The default (historical) selection mode is 'Single'
+         * However, we allow some protocols (IP/TCP/UDP..) to use 'Extended'
+         * for I/O Graph facility
+         */
+        QString protoname = proto_get_protocol_short_name(find_protocol_by_id(protoId));
+        gboolean useExtendedSelection = protoname.toUtf8().data()== QString("TCP") ||
+                                        protoname.toUtf8().data()== QString("UDP") ||
+                                        protoname.toUtf8().data()== QString("IPv4") ||
+                                        protoname.toUtf8().data()== QString("IPv6") ||
+                                        protoname.toUtf8().data()== QString("Ethernet");
+
+        if(useExtendedSelection) {
+            tree->setSelectionMode(QAbstractItemView::ExtendedSelection);
+            connect(ism, &QItemSelectionModel::selectionChanged, this, [=](const QItemSelection &sel, const QItemSelection &prev){ doSelectionChange(sel, prev); });
+        }
+        else {
+            tree->setSelectionMode(QAbstractItemView::SingleSelection);
+            connect(ism, &QItemSelectionModel::currentChanged, this, &TrafficTab::doCurrentIndexChange);
+        }
 
         tree->applyRecentColumns();
 
@@ -244,9 +263,9 @@ void TrafficTab::insertProtoTab(int protoId, bool emitSignals)
         }
     }
 
-    QTreeView * tree = createTree(protoId);
     QString tableName = proto_get_protocol_short_name(find_protocol_by_id(protoId));
     TabData tabData(tableName, protoId);
+    QTreeView * tree = createTree(protoId);
     QVariant storage;
     storage.setValue(tabData);
     if (tree->model()->rowCount() > 0)
@@ -317,7 +336,30 @@ void TrafficTab::doCurrentIndexChange(const QModelIndex & cur, const QModelIndex
         return;
 
     int tabId = _tabs[model->protoId()];
-    emit tabDataChanged(tabId);
+    emit tabDataChanged(tabId, 0);
+}
+
+void TrafficTab::doSelectionChange(__attribute__((unused)) const QItemSelection &selected, __attribute__((unused)) const QItemSelection &deselected)
+{
+    int tabId = -1;
+
+    QTreeView * tree = qobject_cast<QTreeView *>(currentWidget());
+    if (tree) {
+        const QModelIndexList indexes = tree->selectionModel()->selectedIndexes();
+        for (const QModelIndex &index : indexes) {
+            const TrafficDataFilterProxy * proxy = qobject_cast<const TrafficDataFilterProxy *>(index.model());
+            if(proxy) {
+                ATapDataModel * model = qobject_cast<ATapDataModel *>(proxy->sourceModel());
+                if(model) {
+                    tabId = _tabs[model->protoId()];
+                    break;
+                }
+            }
+        }
+    }
+
+    if(tabId >= 0)
+        emit tabDataChanged(tabId, 0);
 }
 
 QVariant TrafficTab::currentItemData(int role)
@@ -336,6 +378,56 @@ QVariant TrafficTab::currentItemData(int role)
     }
 
     return QVariant();
+}
+
+qlonglong TrafficTab::countSelectedItems(int role)
+{
+    qlonglong selectedCount = 0;
+    QTreeView * tree = qobject_cast<QTreeView *>(currentWidget());
+    if (tree && role>=0) {
+        QModelIndex idx = tree->selectionModel()->currentIndex();
+
+        /* In case no selection has been made yet, we select the topmostleft index,
+         * to ensure proper handling. Especially ConversationDialog depends on this
+         * method always returning data */
+        if (!idx.isValid()) {
+            TrafficDataFilterProxy * model = modelForTabIndex(currentIndex());
+            idx = model->index(0, 0);
+        }
+        QModelIndexList idxs = tree->selectionModel()->selectedIndexes();
+
+        const QModelIndexList indexes = tree->selectionModel()->selectedRows();
+        selectedCount = indexes.size();
+    }
+
+    return selectedCount;
+}
+
+QList<QVariant> TrafficTab::selectedItemsData(int role)
+{
+    QList<QVariant> lst_selectedData;
+
+    QTreeView * tree = qobject_cast<QTreeView *>(currentWidget());
+    if (tree) {
+        QModelIndex idx = tree->selectionModel()->currentIndex();
+
+        /* In case no selection has been made yet, we select the topmostleft index,
+         * to ensure proper handling. Especially ConversationDialog depends on this
+         * method always returning data */
+        if (!idx.isValid()) {
+            TrafficDataFilterProxy * model = modelForTabIndex(currentIndex());
+            idx = model->index(0, 0);
+            return lst_selectedData;
+        }
+
+        const QModelIndexList lst_indexes = tree->selectionModel()->selectedRows();
+
+        for (const QModelIndex &index : lst_indexes) {
+            lst_selectedData.append(index.data(role));
+        }
+    }
+
+    return lst_selectedData;
 }
 
 void TrafficTab::modelReset()
@@ -362,7 +454,7 @@ void TrafficTab::modelReset()
             setTabText(tabIdx, tabData.name() + QString(" %1 %2").arg(UTF8_MIDDLE_DOT).arg(qsfpm->rowCount()));
     }
 
-    emit tabDataChanged(tabIdx);
+    emit tabDataChanged(tabIdx, 0);
 }
 
 TrafficDataFilterProxy * TrafficTab::modelForTabIndex(int tabIdx)
@@ -430,7 +522,7 @@ void TrafficTab::setNameResolution(bool checked)
     _nameResolution = checked;
 
     /* Send the signal, that all tabs have potentially changed */
-    emit tabDataChanged(-1);
+    emit tabDataChanged(-1, 0);
 }
 
 bool TrafficTab::hasNameResolution(int tabIdx)
