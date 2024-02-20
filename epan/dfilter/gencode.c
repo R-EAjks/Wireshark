@@ -19,6 +19,8 @@
 #include "ftypes/ftypes.h"
 #include <wsutil/ws_assert.h>
 
+// NOLINT(misc-no-recursion)
+
 static void
 fixup_jumps(void *data, void *user_data);
 
@@ -420,7 +422,7 @@ gen_relation(dfwork_t *dfw, dfvm_opcode_t op, stmatch_t how,
 	val1 = gen_entity(dfw, st_arg1, &jumps);
 	val2 = gen_entity(dfw, st_arg2, &jumps);
 
-	/* Then combine them in a DFVM insruction */
+	/* Then combine them in a DFVM instruction */
 	op = select_opcode(op, how);
 	gen_relation_insn(dfw, op, val1, val2, NULL);
 
