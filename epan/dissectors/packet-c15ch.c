@@ -49,11 +49,12 @@ void proto_reg_handoff_c15ch(void);
 #define C15_TCAP           25
 #define C15_CLLI           26
 #define C15_INFO           27
-#define C15_GENERIC_MSG_1  28	/* TMG new */
-#define C15_GENERIC_MSG_2  29	/* TMG new */
-#define C15_GENERIC_MSG_3  30	/* TMG new */
-#define C15_GENERIC_MSG_4  31	/* TMG new */
-#define C15_GENERIC_MSG_5  32	/* TMG new */
+#define C15_GENERIC_MSG_1  28	/* TMG */
+#define C15_GENERIC_MSG_2  29	/* TMG */
+#define C15_GENERIC_MSG_3  30	/* TMG */
+#define C15_GENERIC_MSG_4  31	/* TMG */
+#define C15_GENERIC_MSG_5  32	/* TMG */
+#define C15_CORRELATE_MSG  33	/* TMG */
 
 #define HEADER_SZ 36 /* length of complete c15ch header in bytes */
 
@@ -125,11 +126,12 @@ static const value_string c15_msg_types[] = {
     { C15_TCAP, "TCAP" },
     { C15_CLLI, "CLLI" },
     { C15_INFO, "C15_INFO" },
-	{ C15_GENERIC_MSG_1, "C15_GENERIC_MSG_1" },	/* TMG new */
-	{ C15_GENERIC_MSG_2, "C15_GENERIC_MSG_2" },	/* TMG new */
-	{ C15_GENERIC_MSG_3, "C15_GENERIC_MSG_3" },	/* TMG new */
-	{ C15_GENERIC_MSG_4, "C15_GENERIC_MSG_4" },	/* TMG new */
-	{ C15_GENERIC_MSG_5, "C15_GENERIC_MSG_5" },	/* TMG new */
+	{ C15_GENERIC_MSG_1, "C15_GENERIC_MSG_1" },	/* TMG */
+	{ C15_GENERIC_MSG_2, "C15_GENERIC_MSG_2" },	/* TMG */
+	{ C15_GENERIC_MSG_3, "C15_GENERIC_MSG_3" },	/* TMG */
+	{ C15_GENERIC_MSG_4, "C15_GENERIC_MSG_4" },	/* TMG */
+	{ C15_GENERIC_MSG_5, "C15_GENERIC_MSG_5" },	/* TMG */
+	{ C15_CORRELATE_MSG, "C15_CORRELATE_MSG" }, /* TMG */	
     { 0, NULL }
 };
 static value_string_ext c15_msg_types_ext = VALUE_STRING_EXT_INIT(c15_msg_types);
@@ -4001,6 +4003,7 @@ static int hf_c15ch_c15_generic_msg_2;
 static int hf_c15ch_c15_generic_msg_3;
 static int hf_c15ch_c15_generic_msg_4;
 static int hf_c15ch_c15_generic_msg_5;
+static int hf_c15ch_c15_correlate_msg;
 static int hf_c15ch_c15_generic_msg_parm_1;
 static int hf_c15ch_c15_generic_msg_parm_2;
 static int hf_c15ch_c15_generic_msg_parm_3;
@@ -7511,6 +7514,222 @@ static int dissect_c15ch_c15_generic_msg_2(tvbuff_t *tvb, packet_info *pinfo _U_
 
     return tvb_reported_length(tvb);
 }
+
+/* Generic Message 3 is for a 616 character string - 616 hex bytes  */ 
+static int dissect_c15ch_c15_generic_msg_3(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data _U_)
+{
+    proto_item * ti = NULL;
+    proto_tree * c15ch_c15_generic_msg_3_tree = NULL;
+	gint length = 0;
+	
+	length = tvb_reported_length(tvb);
+
+    if (tree)
+    {
+		if (length > 0)
+		{		
+			ti = proto_tree_add_item( tree, hf_c15ch_c15_generic_msg_3, tvb, 0, length, ENC_NA );
+			col_append_fstr(pinfo->cinfo, COL_INFO, ", Length: %d", length);
+			c15ch_c15_generic_msg_3_tree = proto_item_add_subtree( ti, ett_c15ch_second_level );
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_parm_1,
+								tvb, 0, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_parm_2,
+								tvb, 4, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_parm_3,
+								tvb, 8, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_parm_4,
+								tvb, 12, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_parm_5,
+								tvb, 16, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_data_len,
+								tvb, 20, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_cr_ptr_val,
+								tvb, 24, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_dr_ptr_val,
+								tvb, 28, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_spr_int_1,
+								tvb, 32, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_spr_int_2,
+								tvb, 36, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_spr_uptr_1,
+								tvb, 40, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_spr_uptr_2,
+								tvb, 44, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_spr_pptr_1,
+								tvb, 48, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_spr_pptr_2,
+								tvb, 52, 4, ENC_BIG_ENDIAN);								
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_gen_msg_field_1,
+								tvb, 56, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_gen_msg_field_2,
+								tvb, 60, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_gen_msg_field_3,
+								tvb, 64, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_gen_msg_field_4,
+								tvb, 68, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_gen_msg_field_5,
+								tvb, 72, 4, ENC_BIG_ENDIAN);
+			add_string_field( c15ch_c15_generic_msg_3_tree, tvb, 76, 616,
+                             hf_c15ch_c15_generic_msg_gen_msg_string);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_gen_data_large,
+								tvb, 692, 616, ENC_BIG_ENDIAN);
+		}
+    }
+
+    return tvb_reported_length(tvb);
+}
+
+/* Generic Message 4 is for a 924 character string - 308 hex bytes  */ 
+static int dissect_c15ch_c15_generic_msg_4(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data _U_)
+{
+    proto_item * ti = NULL;
+    proto_tree * c15ch_c15_generic_msg_4_tree = NULL;
+	gint length = 0;
+	
+	length = tvb_reported_length(tvb);
+
+    if (tree)
+    {
+		if (length > 0)
+		{		
+			ti = proto_tree_add_item( tree, hf_c15ch_c15_generic_msg_4, tvb, 0, length, ENC_NA );
+			col_append_fstr(pinfo->cinfo, COL_INFO, ", Length: %d", length);
+			c15ch_c15_generic_msg_4_tree = proto_item_add_subtree( ti, ett_c15ch_second_level );
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_parm_1,
+								tvb, 0, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_parm_2,
+								tvb, 4, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_parm_3,
+								tvb, 8, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_parm_4,
+								tvb, 12, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_parm_5,
+								tvb, 16, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_data_len,
+								tvb, 20, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_cr_ptr_val,
+								tvb, 24, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_dr_ptr_val,
+								tvb, 28, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_spr_int_1,
+								tvb, 32, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_spr_int_2,
+								tvb, 36, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_spr_uptr_1,
+								tvb, 40, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_spr_uptr_2,
+								tvb, 44, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_spr_pptr_1,
+								tvb, 48, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_spr_pptr_2,
+								tvb, 52, 4, ENC_BIG_ENDIAN);								
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_gen_msg_field_1,
+								tvb, 56, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_gen_msg_field_2,
+								tvb, 60, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_gen_msg_field_3,
+								tvb, 64, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_gen_msg_field_4,
+								tvb, 68, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_gen_msg_field_5,
+								tvb, 72, 4, ENC_BIG_ENDIAN);
+			add_string_field( c15ch_c15_generic_msg_4_tree, tvb, 76, 924,
+                             hf_c15ch_c15_generic_msg_gen_msg_string);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_gen_data_large,
+								tvb, 1000, 308, ENC_BIG_ENDIAN);
+		}
+    }
+
+    return tvb_reported_length(tvb);
+}
+
+/* Generic Message 5 is for a 308 character string - 924 hex bytes  */ 
+static int dissect_c15ch_c15_generic_msg_5(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data _U_)
+{
+    proto_item * ti = NULL;
+    proto_tree * c15ch_c15_generic_msg_5_tree = NULL;
+	gint length = 0;
+	
+	length = tvb_reported_length(tvb);
+
+    if (tree)
+    {
+		if (length > 0)
+		{		
+			ti = proto_tree_add_item( tree, hf_c15ch_c15_generic_msg_5, tvb, 0, length, ENC_NA );
+			col_append_fstr(pinfo->cinfo, COL_INFO, ", Length: %d", length);
+			c15ch_c15_generic_msg_5_tree = proto_item_add_subtree( ti, ett_c15ch_second_level );
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_parm_1,
+								tvb, 0, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_parm_2,
+								tvb, 4, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_parm_3,
+								tvb, 8, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_parm_4,
+								tvb, 12, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_parm_5,
+								tvb, 16, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_data_len,
+								tvb, 20, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_cr_ptr_val,
+								tvb, 24, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_dr_ptr_val,
+								tvb, 28, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_spr_int_1,
+								tvb, 32, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_spr_int_2,
+								tvb, 36, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_spr_uptr_1,
+								tvb, 40, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_spr_uptr_2,
+								tvb, 44, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_spr_pptr_1,
+								tvb, 48, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_spr_pptr_2,
+								tvb, 52, 4, ENC_BIG_ENDIAN);								
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_gen_msg_field_1,
+								tvb, 56, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_gen_msg_field_2,
+								tvb, 60, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_gen_msg_field_3,
+								tvb, 64, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_gen_msg_field_4,
+								tvb, 68, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_gen_msg_field_5,
+								tvb, 72, 4, ENC_BIG_ENDIAN);
+			add_string_field( c15ch_c15_generic_msg_5_tree, tvb, 76, 308,
+                             hf_c15ch_c15_generic_msg_gen_msg_string);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_gen_data_large,
+								tvb, 384, 924, ENC_BIG_ENDIAN);
+		}
+    }
+
+    return tvb_reported_length(tvb);
+}
+
+/* CORRELATE MSG */ 
+static int dissect_c15ch_c15_correlate_msg(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data _U_)
+{
+    proto_item * ti = NULL;
+    proto_tree * c15ch_c15_correlate_msg_tree = NULL;
+	gint length = 0;
+	
+	length = tvb_reported_length(tvb);
+
+    if (tree)
+    {
+		if (length > 0)
+		{		
+			ti = proto_tree_add_item( tree, hf_c15ch_c15_correlate_msg, tvb, 0, length, ENC_NA );
+			col_append_fstr(pinfo->cinfo, COL_INFO, ", Length: %d", length);
+			c15ch_c15_correlate_msg_tree = proto_item_add_subtree( ti, ett_c15ch_second_level );
+			proto_tree_add_item(c15ch_c15_correlate_msg_tree, hf_c15ch_call_ref, tvb, 0, 4, ENC_BIG_ENDIAN);
+		}
+    }
+
+    return tvb_reported_length(tvb);
+}
+
 /* register functions */
 /* fields for c15 heartbeat dissector */
 void proto_register_c15ch_hbeat(void)
@@ -10408,7 +10627,31 @@ void proto_register_c15ch(void)
             0x0, NULL, HFILL}
         },
 		{ &hf_c15ch_c15_generic_msg_2,
-            { "C15 Generic Message 2", "c15.generic_msg_1",
+            { "C15 Generic Message 2", "c15.generic_msg_2",
+            FT_PROTOCOL, BASE_NONE,
+            NULL,
+            0x0, NULL, HFILL}
+        },
+		{ &hf_c15ch_c15_generic_msg_3,
+            { "C15 Generic Message 3", "c15.generic_msg_3",
+            FT_PROTOCOL, BASE_NONE,
+            NULL,
+            0x0, NULL, HFILL}
+        },
+		{ &hf_c15ch_c15_generic_msg_4,
+            { "C15 Generic Message 4", "c15.generic_msg_4",
+            FT_PROTOCOL, BASE_NONE,
+            NULL,
+            0x0, NULL, HFILL}
+        },
+		{ &hf_c15ch_c15_generic_msg_5,
+            { "C15 Generic Message 5", "c15.generic_msg_5",
+            FT_PROTOCOL, BASE_NONE,
+            NULL,
+            0x0, NULL, HFILL}
+        },
+		{ &hf_c15ch_c15_correlate_msg,
+            { "C15 Correlate Message", "c15.correlate_msg",
             FT_PROTOCOL, BASE_NONE,
             NULL,
             0x0, NULL, HFILL}
@@ -12339,12 +12582,24 @@ void proto_reg_handoff_c15ch(void)
     dissector_add_uint("c15", C15_INFO, c15ch_second_level_handle);
 	
 	/* TMG */
-	/* Second level for new Generic Messages */
+	/* Second level for new Generic Messages and Correlate m */
 	c15ch_second_level_handle = create_dissector_handle(dissect_c15ch_c15_generic_msg_1, proto_c15ch_second_level);
     dissector_add_uint("c15", C15_GENERIC_MSG_1, c15ch_second_level_handle);
 
 	c15ch_second_level_handle = create_dissector_handle(dissect_c15ch_c15_generic_msg_2, proto_c15ch_second_level);
     dissector_add_uint("c15", C15_GENERIC_MSG_2, c15ch_second_level_handle);
+	
+	c15ch_second_level_handle = create_dissector_handle(dissect_c15ch_c15_generic_msg_3, proto_c15ch_second_level);
+    dissector_add_uint("c15", C15_GENERIC_MSG_3, c15ch_second_level_handle);
+	
+	c15ch_second_level_handle = create_dissector_handle(dissect_c15ch_c15_generic_msg_4, proto_c15ch_second_level);
+    dissector_add_uint("c15", C15_GENERIC_MSG_4, c15ch_second_level_handle);
+	
+	c15ch_second_level_handle = create_dissector_handle(dissect_c15ch_c15_generic_msg_5, proto_c15ch_second_level);
+    dissector_add_uint("c15", C15_GENERIC_MSG_5, c15ch_second_level_handle);
+	
+	c15ch_second_level_handle = create_dissector_handle(dissect_c15ch_c15_correlate_msg, proto_c15ch_second_level);
+    dissector_add_uint("c15", C15_CORRELATE_MSG, c15ch_second_level_handle);
 
     /* third level */
     /* tone */
