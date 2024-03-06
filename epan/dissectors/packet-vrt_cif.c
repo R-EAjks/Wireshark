@@ -282,27 +282,29 @@ typedef struct vrt_cif_field_display_cb_data_struct
 void proto_register_vrt_cif(void);
 void proto_reg_handoff_vrt_cif(void);
 
+static dissector_handle_t vrt_cif_handle;
+
 static const gchar *pref_filename = NULL;
 static gboolean pref_class_fallback = FALSE;
 static wmem_allocator_t *vrt_cif_cfg_scope = NULL;
 
-static int proto_vrt_cif = -1;
+static int proto_vrt_cif;
 
 /* PIDs for default fields */
-static int hf_vrt_cif_raw = -1; /* Undecoded payload */
-static gint ett_top = -1;
+static int hf_vrt_cif_raw; /* Undecoded payload */
+static gint ett_top;
 
-static int hf_vrt_cif_warn = -1;
-static gint ett_warn = -1;
-static int hf_vrt_cif_err = -1;
-static gint ett_err = -1;
+static int hf_vrt_cif_warn;
+static gint ett_warn;
+static int hf_vrt_cif_err;
+static gint ett_err;
 
-static expert_field ei_proto_err = EI_INIT;
-static expert_field ei_proto_warn = EI_INIT;
-static expert_field ei_proto_note = EI_INIT;
-static expert_field ei_cfg_err = EI_INIT;
-static expert_field ei_cfg_warn = EI_INIT;
-static expert_field ei_cfg_note = EI_INIT;
+static expert_field ei_proto_err;
+static expert_field ei_proto_warn;
+static expert_field ei_proto_note;
+static expert_field ei_cfg_err;
+static expert_field ei_cfg_war;
+static expert_field ei_cfg_note;
 
 static vrt_cif_register_info_t vrt_cif_register_info = { NULL, 0, NULL, 0, 0, 0 };
 static vrt_cif_configuration_t *vrt_cif_configuration = NULL;
@@ -2587,7 +2589,7 @@ static int dissect_vrt_cif(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, 
 void proto_register_vrt_cif(void)
 {
   proto_vrt_cif = proto_register_protocol ("VITA 49 radio transport protocol context fields", "VITA 49 CIF", "vrt_cif");
-  register_dissector("vrt_cif", dissect_vrt_cif, proto_vrt_cif);
+  vrt_cif_handle = register_dissector("vrt_cif", dissect_vrt_cif, proto_vrt_cif);
 
   /* We'll do the field registration later, after the configuration file has been parsed */
   proto_register_prefix("vrt_cif", load_and_register_hf_fields);
@@ -2613,10 +2615,8 @@ void proto_register_vrt_cif(void)
 void
 proto_reg_handoff_vrt_cif(void)
 {
-  //dissector_handle_t vrt_handle;
-  //vrt_handle = create_dissector_handle(dissect_vrt_cif, proto_vrt_cif);
-  create_dissector_handle(dissect_vrt_cif, proto_vrt_cif);
-    /* This dissector is explicitly called, so no protocol to register */
+  /* This dissector is explicitly called, so no protocol to register */
+  ;
 }
 
 

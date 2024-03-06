@@ -26,9 +26,7 @@
 void proto_register_vrt(void);
 void proto_reg_handoff_vrt(void);
 
-static dissector_handle_t vrt_handle;
-
-#define VITA_49_PORT    4991
+#define VITA_49_PORT    "4991"
 
 typedef int (*complex_dissector_t)(proto_tree *tree, tvbuff_t *tvb, int offset);
 
@@ -66,11 +64,14 @@ typedef struct {
     int mag_var; /* 32-bit magnetic variation */
 } formatted_gps_ins_fields;
 
+
 static gboolean vrt_use_ettus_uhd_header_format = FALSE;
 static gboolean vrt_limit_to_49_0 = TRUE;
 static gboolean vrt_use_cif_cfg_file = FALSE;
 
 static int proto_vrt;
+static dissector_handle_t vrt_handle;
+static dissector_handle_t cif_handle;
 
 /* fields */
 static int hf_vrt_header; /* 32-bit header */
@@ -78,12 +79,17 @@ static int hf_vrt_type; /* 4-bit pkt type */
 static int hf_vrt_cidflag; /* 1-bit class ID flag */
 static int hf_vrt_tflag; /* 1-bit trailer flag */
 static int hf_vrt_tsmflag; /* 1-bit timestamp mode */
+static int hf_vrt_ackflag; /* 1-bit acknowledge packet flag */
+static int hf_vrt_clflag; /* 1-bit acknowledge packet flag */
+static int hf_vrt_nd0flag; /* 1-bit compatibility flag */
+static int hf_vrt_sflag; /* 1-bit spectrum flag */
 static int hf_vrt_tsi; /* 2-bit timestamp type */
 static int hf_vrt_tsf; /* 2-bit fractional timestamp type */
 static int hf_vrt_seq; /* 4-bit sequence number */
 static int hf_vrt_len; /* 16-bit length */
 static int hf_vrt_sid; /* 32-bit stream ID (opt.) */
 static int hf_vrt_cid; /* 64-bit class ID (opt.) */
+static int hf_vrt_cid_pad; /* 5-bit pad bit count */
 static int hf_vrt_cid_oui; /* 24-bit class ID OUI */
 static int hf_vrt_cid_icc; /* 16-bit class ID ICC */
 static int hf_vrt_cid_pcc; /* 16-bit class ID PCC */
@@ -207,6 +213,29 @@ static int hf_vrt_context_ver_user; /* 10-bit user defined */
 static int hf_vrt_ts_int; /* 32-bit integer timestamp (opt.) */
 static int hf_vrt_ts_frac_picosecond; /* 64-bit fractional timestamp (opt.) */
 static int hf_vrt_ts_frac_sample; /* 64-bit fractional timestamp (opt.) */
+static int hf_vrt_cam; /* 32-bit control/acknowledge mode (opt.) */
+static int hf_vrt_cam_controllee; /* 2-bit flag describing controllee format */
+static int hf_vrt_cam_controller; /* 2-bit flag describing controller format */
+static int hf_vrt_cam_partial; /* partial packet execution permitted */
+static int hf_vrt_cam_warnings; /* allow execution with warnings */
+static int hf_vrt_cam_errors; /*  allow execution with errors */
+static int hf_vrt_cam_action; /* 2-bit command action */
+static int hf_vrt_cam_nack; /* provide ack only on error/warning */
+static int hf_vrt_cam_reqv; /* validation response */
+static int hf_vrt_cam_reqx; /* execution response */
+static int hf_vrt_cam_reqs; /* schedule response */
+static int hf_vrt_cam_reqw; /* request additional warning description */
+static int hf_vrt_cam_reqer; /* request additional error description */
+static int hf_vrt_cam_requ; /* user defined request */
+static int hf_vrt_cam_timing_control; /* 3-bit timing control mode */
+static int hf_vrt_cam_ackp; /* partial packet acknowledge */
+static int hf_vrt_cam_schx; /* Action complete flag */
+static int hf_vrt_cam_user; /* User control/acknowledge mode flags (extention command packets) */
+static int hf_vrt_message_id; /* 32-bit message id (opt.) */
+static int hf_vrt_controllee_id; /* 32-bit controllee id (opt.) */
+static int hf_vrt_controller_id; /* 32-bit controller id (opt.) */
+static int hf_vrt_controllee_uuid; /* 128-bit controllee uuid (opt.) */
+static int hf_vrt_controller_uuid; /* 128-bit controller uuid (opt.) */
 static int hf_vrt_data; /* data */
 static int hf_vrt_trailer; /* 32-bit trailer (opt.) */
 static int hf_vrt_trailer_enables; /* trailer indicator enables */
@@ -225,6 +254,7 @@ static int hf_vrt_trailer_en_user0; /* User indicator 0 */
 static int hf_vrt_trailer_en_user1; /* User indicator 1 */
 static int hf_vrt_trailer_en_user2; /* User indicator 2 */
 static int hf_vrt_trailer_en_user3; /* User indicator 3 */
+static int hf_vrt_trailer_en_frame; /* Frame mode indicator 0 */
 static int hf_vrt_trailer_ind_caltime; /* calibrated time indicator */
 static int hf_vrt_trailer_ind_valid; /* valid data ind */
 static int hf_vrt_trailer_ind_reflock; /* reference locked ind */
@@ -237,12 +267,7 @@ static int hf_vrt_trailer_ind_user0; /* User indicator 0 */
 static int hf_vrt_trailer_ind_user1; /* User indicator 1 */
 static int hf_vrt_trailer_ind_user2; /* User indicator 2 */
 static int hf_vrt_trailer_ind_user3; /* User indicator 3 */
-
-/* fixed sizes (in bytes) of context packet CIF field bits */
-static int context_size_cif0[32] = { 0, 4, 4, 4, 4, 4, 4, 4, 8, 8, 4, 52, 52, 44, 44, 8,
-    4, 8, 4, 4, 8, 8, 4, 4, 4, 8, 8, 8, 8, 8, 4, 0 };
-static int context_size_cif1[32] = { 0, 8, 4, 4, 4, 8, 4, 0, 0, 0, 52, 0, 0, 8, 4, 8,
-    4, 4, 4, 4, 4, 0, 0, 0, 4, 4, 4, 4, 0, 4, 4, 4 };
+static int hf_vrt_trailer_ind_frame; /* Frame mode indicator */
 
 /* fixed sizes (in bytes) of context packet CIF field bits */
 static int context_size_cif0[32] = { 0, 4, 4, 4, 4, 4, 4, 4, 8, 8, 4, 52, 52, 44, 44, 8,
@@ -257,6 +282,7 @@ static gint ett_trailer;
 static gint ett_indicators;
 static gint ett_ind_enables;
 static gint ett_cid;
+static gint ett_cam;
 static gint ett_cif0;
 static gint ett_cif1;
 static gint ett_gain;
@@ -2916,7 +2942,7 @@ proto_register_vrt(void)
 void
 proto_reg_handoff_vrt(void)
 {
-    dissector_add_uint_with_preference("udp.port", VITA_49_PORT, vrt_handle);
+    dissector_add_uint_range_with_preference("udp.port", VITA_49_PORT, vrt_handle);
     cif_handle = find_dissector_add_dependency("vrt_cif", proto_vrt);
 
     dissector_add_string("rtp_dyn_payload_type","VITA 49", vrt_handle);
