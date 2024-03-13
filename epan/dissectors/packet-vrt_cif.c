@@ -290,6 +290,7 @@ static wmem_allocator_t *vrt_cif_cfg_scope = NULL;
 
 static int proto_vrt_cif;
 
+static int is_loaded = 0;
 /* PIDs for default fields */
 static int hf_vrt_cif_raw; /* Undecoded payload */
 static gint ett_top;
@@ -303,7 +304,7 @@ static expert_field ei_proto_err;
 static expert_field ei_proto_warn;
 static expert_field ei_proto_note;
 static expert_field ei_cfg_err;
-static expert_field ei_cfg_war;
+static expert_field ei_cfg_warn;
 static expert_field ei_cfg_note;
 
 static vrt_cif_register_info_t vrt_cif_register_info = { NULL, 0, NULL, 0, 0, 0 };
@@ -1038,9 +1039,9 @@ static void load_and_register_hf_fields(const char *match _U_)
 
 static void deregister_hf_fields(void)
 {
-  /* skip the loop if array was never registered, using the default pid as proxy */
+  /* skip the loop if array was never registered */
   /* this isn't required as proto_deregister_field() will just return if called with cleared pid */
-  if(hf_vrt_cif_raw == -1) return;
+  if (!is_loaded) return;
 
   hf_register_info *hf = vrt_cif_register_info.hf;
   for (guint i = 0; i < vrt_cif_register_info.hf_size; ++i) {
@@ -2339,9 +2340,10 @@ static int dissect_vrt_cif(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, 
         col_append_str(pinfo->cinfo, COL_INFO, "- Map without cid");
     }
 
-    /* Use a default field as a proxy to make sure field array has been registered */
-    if (hf_vrt_cif_raw == -1) {
-        load_and_register_hf_fields(NULL);
+    /* Make sure field array has been registered */
+    if (!is_loaded) {
+      load_and_register_hf_fields(NULL);
+      is_loaded = 1;
     }
 
     if(tree) {
