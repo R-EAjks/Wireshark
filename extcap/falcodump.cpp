@@ -31,6 +31,7 @@
 #include <plugin_manager.h>
 
 #include <scap_engines.h>
+#include <stdlib.h>
 
 #define WS_LOG_DOMAIN "falcodump"
 
@@ -114,7 +115,7 @@ struct plugin_configuration {
         json_dumper_finish(&dumper);
         std::string config_blob = dumper.output_string->str;
         ws_debug("configuration: %s", dumper.output_string->str);
-        g_string_free(dumper.output_string, TRUE);
+        g_string_free(dumper.output_string, true);
         return config_blob;
     }
 };
@@ -142,7 +143,7 @@ void print_cloudtrail_aws_profile_config(int arg_num, const char *display, const
     // Look in files as specified in https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html
     char *cred_path = g_strdup(g_getenv("AWS_SHARED_CREDENTIALS_FILE"));
     if (cred_path == NULL) {
-        cred_path = g_build_filename(g_get_home_dir(), ".aws", "credentials", (gchar *)NULL);
+        cred_path = g_build_filename(g_get_home_dir(), ".aws", "credentials", (char *)NULL);
     }
 
     aws_fp = ws_fopen(cred_path, "r");
@@ -162,7 +163,7 @@ void print_cloudtrail_aws_profile_config(int arg_num, const char *display, const
 
     char *conf_path = g_strdup(g_getenv("AWS_CONFIG_FILE"));
     if (conf_path == NULL) {
-        conf_path = g_build_filename(g_get_home_dir(), ".aws", "config", (gchar *)NULL);
+        conf_path = g_build_filename(g_get_home_dir(), ".aws", "config", (char *)NULL);
     }
 
     aws_fp = ws_fopen(conf_path, "r");
@@ -526,7 +527,7 @@ const std::pair<const std::string,bool> get_schema_properties(const std::string 
             default_value,
         };
         property_list.push_back(properties);
-        g_free((gpointer)call);
+        g_free((void *)call);
         idx += prop_tokens;
         opt_idx++;
     }
@@ -862,10 +863,12 @@ int main(int argc, char **argv)
 
     help_header = ws_strdup_printf(
             " %s --extcap-interfaces\n"
+            " %s --extcap-interface=%s --extcap-capture-filter=<filter>\n"
             " %s --extcap-interface=%s --extcap-dlts\n"
             " %s --extcap-interface=%s --extcap-config\n"
-            " %s --extcap-interface=%s --fifo=<filename> --capture --plugin-source=<source url>\n",
+            " %s --extcap-interface=%s --fifo=<filename> --capture --plugin-source=<source url> [--extcap-capture-filter=<filter>]\n",
             argv[0],
+            argv[0], FALCODUMP_PLUGIN_PLACEHOLDER,
             argv[0], FALCODUMP_PLUGIN_PLACEHOLDER,
             argv[0], FALCODUMP_PLUGIN_PLACEHOLDER,
             argv[0], FALCODUMP_PLUGIN_PLACEHOLDER);
@@ -978,7 +981,7 @@ int main(int argc, char **argv)
         goto end;
     }
 
-    if (extcap_conf->capture) {
+    if (extcap_conf->capture || extcap_conf->capture_filter) {
         bool builtin_capture = false;
 
 #ifdef DEBUG_SINSP
@@ -1012,7 +1015,12 @@ int main(int argc, char **argv)
 #endif
         {
             if (plugin_source.empty()) {
-                ws_warning("Missing or invalid parameter: --plugin-source");
+                if (extcap_conf->capture) {
+                    ws_warning("Missing or invalid parameter: --plugin-source");
+                } else {
+                    // XXX Can we bypass this somehow?
+                    fprintf(stdout, "Validating a capture filter requires a plugin source");
+                }
                 goto end;
             }
 
@@ -1040,6 +1048,20 @@ int main(int argc, char **argv)
                 // scap_dump_open handles "-"
             } catch (sinsp_exception &e) {
                 ws_warning("%s", e.what());
+                goto end;
+            }
+        }
+
+        if (extcap_conf->capture_filter) {
+            try {
+                sinsp_filter_compiler compiler(&inspector, extcap_conf->capture_filter);
+                compiler.compile();
+            } catch (sinsp_exception &e) {
+                fprintf(stdout, "%s", e.what());
+                goto end;
+            }
+            if (!extcap_conf->capture) {
+                ret = EXIT_SUCCESS;
                 goto end;
             }
         }
