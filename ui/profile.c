@@ -316,6 +316,7 @@ init_profile_list(void)
     WS_DIR        *dir;             /* scanned directory */
     WS_DIRENT     *file;            /* current file */
     const gchar   *name;
+    gchar         *message;
     GList         *local_profiles = NULL;
     GList         *global_profiles = NULL;
     GList         *iter;
@@ -331,6 +332,12 @@ init_profile_list(void)
     if ((dir = ws_dir_open(profiles_dir, 0, NULL)) != NULL) {
         while ((file = ws_dir_read_name(dir)) != NULL) {
             name = ws_dir_get_name(file);
+            message = profile_name_is_valid(name);
+            if (message != NULL) {
+                g_free(message);
+                continue;
+            }
+
             filename = ws_strdup_printf ("%s%s%s", profiles_dir, G_DIR_SEPARATOR_S, name);
 
             if (test_for_directory(filename) == EISDIR) {
@@ -354,6 +361,12 @@ init_profile_list(void)
     if ((dir = ws_dir_open(profiles_dir, 0, NULL)) != NULL) {
         while ((file = ws_dir_read_name(dir)) != NULL) {
             name = ws_dir_get_name(file);
+            message = profile_name_is_valid(name);
+            if (message != NULL) {
+                g_free(message);
+                continue;
+            }
+
             filename = ws_strdup_printf ("%s%s%s", profiles_dir, G_DIR_SEPARATOR_S, name);
 
             if (test_for_directory(filename) == EISDIR) {
@@ -382,6 +395,11 @@ profile_name_is_valid(const gchar *name)
     gchar *reason = NULL;
     gchar *message;
 
+    if (name[0] == '.' || name[strlen(name)-1] == '.') {
+        /* Profile name cannot start or end with period */
+        reason = ws_strdup_printf("cannot start or end with the character \".\"");
+    }
+
 #ifdef _WIN32
     char *invalid_dir_char = "\\/:*?\"<>|";
     gboolean invalid = FALSE;
@@ -393,12 +411,8 @@ profile_name_is_valid(const gchar *name)
             invalid = TRUE;
         }
     }
-    if (name[0] == '.' || name[strlen(name)-1] == '.') {
-        /* Profile name cannot start or end with period */
-        invalid = TRUE;
-    }
     if (invalid) {
-        reason = ws_strdup_printf("start or end with period (.), or contain any of the following characters:\n"
+        reason = ws_strdup_printf("contain any of the following characters:\n"
                 "   \\ / : * ? \" &lt; &gt; |");
     }
 #else
