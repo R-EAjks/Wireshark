@@ -1,0 +1,797 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cifClass type="cif" id="0" idmask="0" descript="Standard VITA49.2-2017 fields" xmlns:xi="http://www.w3.org/2001/XInclude">
+   <!-- The configuration descriptions  encoded by this file were extracted from: ANSI/VITA 49.2-2017: VITA Radio 
+        Transport (VRT) Standard for Electromagnetic Spectrum: Signals and Applications, August 3, 2017. 
+        Copyright (c) 2017 by VITA -->
+   <xi:include href="vrt-cif-warnerr.xml" />
+   <!-- For each defined bit of CIF: offset = bit -->
+   <cifMap name="cif0" index="0" descript="Legacy Fields">
+      <!-- CIF enable bits have a single cifMap subelement -->
+      <cifEnable name="CIF 1 Enable" abbrev="cif1_en" index="1"> 
+         <cifMap name="cif1" index="1" />
+      </cifEnable>
+      <cifEnable name="CIF 2 Enable" abbrev="cif2_en" index="2"> 
+         <cifMap name="cif2" index="2" />
+      </cifEnable>
+      <cifEnable name="CIF 3 Enable" abbrev="cif3_en" index="3"> 
+         <cifMap name="cif3" index="3" />
+      </cifEnable>
+      <cifEnable name="CIF 4 Enable" abbrev="cif4_en" index="4"> 
+         <cifMap name="cif4" index="4" />
+      </cifEnable>
+      <cifEnable name="CIF 5 Enable" abbrev="cif5_en" index="5"> 
+         <cifMap name="cif5" index="5" />
+      </cifEnable>
+      <cifEnable name="CIF 6 Enable" abbrev="cif6_en" index="6"> 
+         <cifMap name="cif6" index="6" />
+      </cifEnable>
+      <cifEnable name="CIF 7 Enable" abbrev="cif7_en" index="7"> 
+         <cifMap name="cif7" index="7" />
+      </cifEnable>
+      <!-- The context association list has a variable length format not supported by the dissection software.
+        The size fields will be parsed, but the remainder of the packet is left as unparsed -->
+      <cifEnable name="Context Association List" abbrev="cal" index="8">
+         <cifField name="system list size" abbrev="val" offset="0" width="9" type="uint" descript=""/>
+         <cifField name="source list size" abbrev="val" offset="16" width="9" type="uint" descript=""/>
+         <cifField name="asynchronous list size" abbrev="val" offset="32" width="15" type="uint" descript=""/>
+         <cifField name="value" abbrev="val" offset="47" width="1" type="bool" descript=""/>
+         <cifField name="vector-component list size" abbrev="val" offset="48" width="16" type="uint" descript=""/>
+         <info level="warn" string="Dissector cannot parse the actual lists. Any subsequent fields will be wrong."/>
+      </cifEnable>
+      <cifEnable name="GPS ASCII" abbrev="gps_ascii" index="9">
+         <cifField name="GPS/INS Manufacturer OUI" abbrev="oui" offset="0" width="24" type="uint" descript="IEEE-registered Organizationally Unique Identifier of GPS manufacturer"/>
+         <cifField name="value" abbrev="val" offset="32" width="32" type="string" descript=""/>
+      </cifEnable>
+      <cifEnable name="Ephemeris Ref ID" abbrev="ephem_id" index="10">
+         <cifField name="value" abbrev="val" offset="0" width="32" type="uint" descript="Stream ID of stream containing ECEF ephemeris necessary to translate relative ephemeris"/>
+      </cifEnable>
+      <!-- The spec has conflicting formats for the Relative Ephemeris field.
+         Rule 9.4.9-1 states it follows ECFEF Ephemeris format as given in Figure 9.4.3-2. However Figure 9.4.9-1: Relative Ephemeris Field Format
+         is copied from Figure 9.4.5-1: Formatted GPS and INS Geolocation Fields. Table 9.4-1 also list the size matching the wrong figure -->
+      <cifEnable name="Relative Ephemeris" abbrev="ephem" index="11">
+         <cifField name="GPS/INS Manufacturer OUI" abbrev="oui" offset="0" width="24" type="uint" descript="IEEE-registered Organizationally Unique Identifier of GPS manufacturer"/>
+         <cifField name="Fractional Timestamp Format" abbrev="tsf" offset="24" width="2" type="enum" descript="Format of integer timestamp field">
+            <enum key="0" value = "Undefined"/>
+            <enum key="1" value = "Sample Count Time"/>
+            <enum key="2" value = "Real Time (ps)"/>
+            <enum key="3" value = "Free-running Count Time"/>
+         </cifField>
+         <cifField name="Integer Timestamp Format" abbrev="tsi" offset="26" width="2" type="enum" descript="Format of fractional timestamp field">
+            <enum key="0" value = "Undefined"/>
+            <enum key="1" value = "UTC"/>
+            <enum key="2" value = "GPS Time"/>
+            <enum key="3" value = "Other"/>
+         </cifField>
+         <cifField name="integer timestamp of position fix" abbrev="fix_tsi" offset="32" width="32" type="uint" descript="Integer timestamp of last position fix">
+            <info level="warn" string="Integer and Fraction timestamp values are not formatted for tsi/tsf selection."/>
+         </cifField>
+         <cifField name="fractional timestamp of position fix" abbrev="fix_tsf" offset="64" width="64" type="uint" descript="Fractional timestamp of last position fix">
+            <info level="warn" string="Integer and Fraction timestamp values are not formatted for tsi/tsf selection."/>
+         </cifField>
+         <cifField name="position x" abbrev="x" offset="128" width="32" type="fixed" point="5" units="meters" descript="Platform position on z axis"/>
+         <cifField name="position y" abbrev="y" offset="160" width="32" type="fixed" point="5" units="meters" descript="Platform position on y axis"/>
+         <cifField name="position z" abbrev="z" offset="192" width="32" type="fixed" point="5" units="meters" descript="Platform position on z axis"/>
+         <cifField name="attitude alpha" abbrev="alpha" offset="224" width="32" type="fixed" point="22" units="degrees" descript="Platform facing yaw"/>
+         <cifField name="attitude beta" abbrev="beta" offset="256" width="32" type="fixed" point="22" units="degrees" descript="Platform facing pitch "/>
+         <cifField name="attitude phi" abbrev="phi" offset="288" width="32" type="fixed" point="22" units="degrees" descript="Platform facing roll"/>
+         <cifField name="velocity x" abbrev="dx" offset="320" width="32" type="fixed" point="16" units="m/s" descript="Platform velocity along x axis"/>
+         <cifField name="velocity y" abbrev="dy" offset="352" width="32" type="fixed" point="16" units="m/s" descript="Platform velocity along y axis"/>
+         <cifField name="velocity z" abbrev="dz" offset="384" width="32" type="fixed" point="16" units="m/s" descript="Platform velocity along z axis"/>
+      </cifEnable>
+      <cifEnable name="ECEF Ephemeris" abbrev="ecef" index="12">
+         <cifField name="GPS/INS Manufacturer OUI" abbrev="oui" offset="0" width="24" type="uint" descript="IEEE-registered Organizationally Unique Identifier of GPS manufacturer"/>
+         <cifField name="Fractional Timestamp Format" abbrev="tsf" offset="24" width="2" type="enum" descript="Format of integer timestamp field">
+            <enum key="0" value = "Undefined"/>
+            <enum key="1" value = "Sample Count Time"/>
+            <enum key="2" value = "Real Time (ps)"/>
+            <enum key="3" value = "Free-running Count Time"/>
+         </cifField>
+         <cifField name="Integer Timestamp Format" abbrev="tsi" offset="26" width="2" type="enum" descript="Format of fractional timestamp field">
+            <enum key="0" value = "Undefined"/>
+            <enum key="1" value = "UTC"/>
+            <enum key="2" value = "GPS Time"/>
+            <enum key="3" value = "Other"/>
+         </cifField>
+         <cifField name="integer timestamp of position fix" abbrev="fix_tsi" offset="32" width="32" type="uint" descript="Integer timestamp of last position fix">
+            <info level="warn" string="Integer and Fraction timestamp values are not formatted for tsi/tsf selection."/>
+         </cifField>
+         <cifField name="fractional timestamp of position fix" abbrev="fix_tsf" offset="64" width="64" type="uint" descript="Fractional timestamp of last position fix">
+            <info level="warn" string="Integer and Fraction timestamp values are not formatted for tsi/tsf selection."/>
+         </cifField>
+         <cifField name="position x" abbrev="x" offset="128" width="32" type="fixed" point="5" units="meters" descript="Platform position on z axis"/>
+         <cifField name="position y" abbrev="y" offset="160" width="32" type="fixed" point="5" units="meters" descript="Platform position on y axis"/>
+         <cifField name="position z" abbrev="z" offset="192" width="32" type="fixed" point="5" units="meters" descript="Platform position on z axis"/>
+         <cifField name="attitude alpha" abbrev="alpha" offset="224" width="32" type="fixed" point="22" units="degrees" descript="Platform facing yaw"/>
+         <cifField name="attitude beta" abbrev="beta" offset="256" width="32" type="fixed" point="22" units="degrees" descript="Platform facing pitch "/>
+         <cifField name="attitude phi" abbrev="phi" offset="288" width="32" type="fixed" point="22" units="degrees" descript="Platform facing roll"/>
+         <cifField name="velocity x" abbrev="dx" offset="320" width="32" type="fixed" point="16" units="m/s" descript="Platform velocity along x axis"/>
+         <cifField name="velocity y" abbrev="dy" offset="352" width="32" type="fixed" point="16" units="m/s" descript="Platform velocity along y axis"/>
+         <cifField name="velocity z" abbrev="dz" offset="384" width="32" type="fixed" point="16" units="m/s" descript="Platform velocity along z axis"/>
+      </cifEnable>
+      <cifEnable name="Formatted INS" abbrev="ins" index="13">
+         <cifField name="GPS/INS Manufacturer OUI" abbrev="oui" offset="0" width="24" type="uint" descript="IEEE-registered Organizationally Unique Identifier of GPS manufacturer"/>
+         <cifField name="Fractional Timestamp Format" abbrev="tsf" offset="24" width="2" type="enum" descript="Format of integer timestamp field">
+            <enum key="0" value = "Undefined"/>
+            <enum key="1" value = "Sample Count Time"/>
+            <enum key="2" value = "Real Time (ps)"/>
+            <enum key="3" value = "Free-running Count Time"/>
+         </cifField>
+         <cifField name="Integer Timestamp Format" abbrev="tsi" offset="26" width="2" type="enum" descript="Format of fractional timestamp field">
+            <enum key="0" value = "Undefined"/>
+            <enum key="1" value = "UTC"/>
+            <enum key="2" value = "GPS Time"/>
+            <enum key="3" value = "Other"/>
+         </cifField>
+         <cifField name="integer timestamp of position fix" abbrev="fix_tsi" offset="32" width="32" type="uint" descript="Integer timestamp of last position fix">
+            <info level="warn" string="Integer and Fraction timestamp values are not formatted for tsi/tsf selection."/>
+         </cifField>
+         <cifField name="fractional timestamp of position fix" abbrev="fix_tsf" offset="64" width="64" type="uint" descript="Fractional timestamp of last position fix">
+            <info level="warn" string="Integer and Fraction timestamp values are not formatted for tsi/tsf selection."/>
+         </cifField>
+         <cifField name="latitude" abbrev="lat" offset="128" width="32" type="fixed" point="22" units="degrees" descript="latitude at last position fix"/>
+         <cifField name="longitude" abbrev="long" offset="160" width="32" type="fixed" point="22" units="degrees" descript="longitude at last position fix"/>
+         <cifField name="altitude" abbrev="alt" offset="192" width="32" type="fixed" point="5" units="meters" descript="altitude at last position fix"/>
+         <cifField name="speed over ground" abbrev="speed" offset="224" width="32" type="fixed" point="16" units="m/s" descript="Platform speed over ground"/>
+         <cifField name="heading angle" abbrev="head" offset="256" width="32" type="fixed" point="22" units="degrees" descript="Platform orientation with respect to true north"/>
+         <cifField name="track angle" abbrev="track" offset="288" width="32" type="fixed" point="22" units="degrees" descript="Platform direction of travel with respect to true north"/>
+         <cifField name="magnetic variation" abbrev="var" offset="320" width="32" type="fixed" point="22" units="degrees" descript="Magnetic variation from true north"/>
+      </cifEnable>
+      <cifEnable name="Formatted GPS" abbrev="gps" index="14">
+         <cifField name="GPS/INS Manufacturer OUI" abbrev="oui" offset="0" width="24" type="uint" descript="IEEE-registered Organizationally Unique Identifier of GPS manufacturer"/>
+         <cifField name="Fractional Timestamp Format" abbrev="tsf" offset="24" width="2" type="enum" descript="Format of integer timestamp field">
+            <enum key="0" value = "Undefined"/>
+            <enum key="1" value = "Sample Count Time"/>
+            <enum key="2" value = "Real Time (ps)"/>
+            <enum key="3" value = "Free-running Count Time"/>
+         </cifField>
+         <cifField name="Integer Timestamp Format" abbrev="tsi" offset="26" width="2" type="enum" descript="Format of fractional timestamp field">
+            <enum key="0" value = "Undefined"/>
+            <enum key="1" value = "UTC"/>
+            <enum key="2" value = "GPS Time"/>
+            <enum key="3" value = "Other"/>
+         </cifField>
+         <cifField name="integer timestamp of position fix" abbrev="fix_tsi" offset="32" width="32" type="uint" descript="Integer timestamp of last position fix">
+            <info level="warn" string="Integer and Fraction timestamp values are not formatted for tsi/tsf selection."/>
+         </cifField>
+         <cifField name="fractional timestamp of position fix" abbrev="fix_tsf" offset="64" width="64" type="uint" descript="Fractional timestamp of last position fix">
+            <info level="warn" string="Integer and Fraction timestamp values are not formatted for tsi/tsf selection."/>
+         </cifField>
+         <cifField name="latitude" abbrev="lat" offset="128" width="32" type="fixed" point="22" units="degrees" descript="latitude at last position fix"/>
+         <cifField name="longitude" abbrev="long" offset="160" width="32" type="fixed" point="22" units="degrees" descript="longitude at last position fix"/>
+         <cifField name="altitude" abbrev="alt" offset="192" width="32" type="fixed" point="5" units="meters" descript="altitude at last position fix"/>
+         <cifField name="speed over ground" abbrev="speed" offset="224" width="32" type="fixed" point="16" units="m/s" descript="Platform speed over ground"/>
+         <cifField name="heading angle" abbrev="head" offset="256" width="32" type="fixed" point="22" units="degrees" descript="Platform orientation with respect to true north"/>
+         <cifField name="track angle" abbrev="track" offset="288" width="32" type="fixed" point="22" units="degrees" descript="Platform direction of travel with respect to true north"/>
+         <cifField name="magnetic variation" abbrev="var" offset="320" width="32" type="fixed" point="22" units="degrees" descript="Magnetic variation from true north"/>
+      </cifEnable>
+      <cifEnable name="Signal Data Payload Format" abbrev="data_fmt" index="15">
+         <cifField name="data item size" abbrev="item_size" offset="0" width="6" type="uint" descript="Number of bits per data item (less 1)"/>
+         <cifField name="item packing field size" abbrev="field_size" offset="6" width="6" type="uint" descript="Number of bit in packing field (less 1)"/>
+         <cifField name="data item fractional size" abbrev="fract_size" offset="12" width="4" type="uint" descript="Number of fractional bits for non-normalized ufixed-point formats"/>
+         <cifField name="channel tag item size" abbrev="ch_size" offset="16" width="4" type="uint" descript="Number of bits in channel tag"/>
+         <cifField name="event tag size" abbrev="ev_size" offset="20" width="3" type="uint" descript="Number of bits in event tag"/>
+         <cifField name="sample repeat" abbrev="rpt" offset="23" width="1" type="bool" descript="Sample repeating is used"/>
+         <cifField name="data item format" abbrev="item_size" offset="24" width="5" type="enum" descript="Type of data contained in packet">
+            <enum key="0" value="Signed Fixed-point"/>
+            <enum key="1" value="Signed VRT, 1-bit exponent"/>
+            <enum key="2" value="Signed VRT, 2-bit exponent"/>
+            <enum key="3" value="Signed VRT, 3-bit exponent"/>
+            <enum key="4" value="Signed VRT, 4-bit exponent"/>
+            <enum key="5" value="Signed VRT, 5-bit exponent"/>
+            <enum key="6" value="Signed VRT, 6-bit exponent"/>
+            <enum key="7" value="Signed Fixed-point Non-normalized"/>
+            <enum key="13" value="IEEE-754 Half-precision Floating-point"/>
+            <enum key="14" value="IEEE-754 Single-precision Floating-point"/>
+            <enum key="15" value="IEEE-754 Double-precision Floating-point"/>
+            <enum key="16" value="Unsigned Fixed-point"/>
+            <enum key="17" value="Unsigned VRT, 1-bit exponent"/>
+            <enum key="18" value="Unsigned VRT, 2-bit exponent"/>
+            <enum key="19" value="Unsigned VRT, 3-bit exponent"/>
+            <enum key="20" value="Unsigned VRT, 4-bit exponent"/>
+            <enum key="21" value="Unsigned VRT, 5-bit exponent"/>
+            <enum key="22" value="Unsigned VRT, 6-bit exponent"/>
+            <enum key="23" value="Unsigned Fixed-point Non-normalized"/>
+         </cifField>
+         <cifField name="real" abbrev="item_size" offset="29" width="2" type="enum" descript="Real or Complex data">
+            <enum key="0" value="Real"/>
+            <enum key="1" value="Complex, Cartesian"/>
+            <enum key="2" value="Complex, Polar"/>
+         </cifField>
+         <cifField name="packing method" abbrev="item_size" offset="31" width="1" type="enum" descript="Data arranged in link-efficient format">
+            <enum key="0" value = "Processing-efficient"/>
+            <enum key="1" value = "Link-efficient"/>
+         </cifField>
+         <cifField name="vector size" abbrev="item_size" offset="32" width="16" type="uint" descript="Vector count of packet (less 1)"/>
+         <cifField name="repeat count" abbrev="item_size" offset="48" width="16" type="uint" descript="Channel or sample component repeating count (less 1)"/>
+
+      </cifEnable>
+      <cifEnable name="State-Event Indicators" abbrev="state" index="16">
+         <cifField name="user" abbrev="user" offset="0" width="8" type="hex" descript="User defined indicator fields"/>
+         <cifField name="user flag 0" abbrev="u0" offset="8" width="1" type="bool" descript="User defined indicator bit"/>
+         <cifField name="user flag 1" abbrev="u1" offset="9" width="1" type="bool" descript="User defined indicator bit"/>
+         <!-- Sample frame is an added V49.2 feature legacy devices might use the bits differently -->
+         <cifField name="sample frame" abbrev="frame" offset="10" width="2" type="enum" descript="Position of packet within frame (V49.2 feature)">
+            <enum key="0" value="Entire Frame or n/a"/>
+            <enum key="1" value="Start of Frame"/>
+            <enum key="2" value="Continuation packet"/>
+            <enum key="3" value="End of Frame"/>
+         </cifField>
+         <cifField name="sample loss" abbrev="loss" offset="12" width="1" type="bool" descript="At least one time discontinuity contained in data packet"/>
+         <cifField name="over-range" abbrev="ovr" offset="13" width="1" type="bool" descript="At least one sample in data packet exceeds representable range"/>
+         <cifField name="spectral inversion" abbrev="spec_inv" offset="14" width="1" type="bool" descript="Data packets signal is spectrally inverted with respect to the reference point"/>
+         <cifField name="detected signal" abbrev="detect" offset="15" width="1" type="bool" descript="Data packets contain signal of interest"/>
+         <cifField name="agc-mgc" abbrev="agc" offset="16" width="1" type="bool" descript="Automatic gain control is active"/>
+         <cifField name="reference lock" abbrev="ref" offset="17" width="1" type="bool" descript="All PLLs impacting the data are locked"/>
+         <cifField name="valid" abbrev="valid" offset="18" width="1" type="bool" descript="Data packet contains valid data"/>
+         <cifField name="calibrated time" abbrev="cal_time" offset="19" width="1" type="bool" descript="Data packet timestamp is calibrated to external reference"/>
+         <cifField name="user flag 0" abbrev="u0_en" offset="20" width="1" type="bool" descript="User flag 0 indicator enable"/>
+         <cifField name="user flag 1" abbrev="u1_en" offset="21" width="1" type="bool" descript="User flag 1 indicator enable"/>
+         <cifField name="sample frame enable 0" abbrev="frame_en" offset="22" width="1" type="bool" descript="Frame indicator enable"/>
+         <cifField name="sample frame enable 1" abbrev="frame_en" offset="23" width="1" type="bool" descript="Redundant frame indicator enable (should match bit 22)"/>
+         <cifField name="sample loss enable" abbrev="loss_en" offset="24" width="1" type="bool" descript="Sample loss indicator enable"/>
+         <cifField name="over-range enable" abbrev="ovr_en" offset="25" width="1" type="bool" descript="Over-range Indicator enable"/>
+         <cifField name="spectral inversion enable" abbrev="spec_inv_en" offset="26" width="1" type="bool" descript="Spectral inversion indicator enable"/>
+         <cifField name="detected signal enable" abbrev="sig_lock_en" offset="27" width="1" type="bool" descript="Detected signal indicator enable"/>
+         <cifField name="agc-mgc enable" abbrev="agc_en" offset="28" width="1" type="bool" descript="Automatic/manual gain control indicator enable"/>
+         <cifField name="reference lock enable" abbrev="ref_loc_en" offset="29" width="1" type="bool" descript="Reference lock indicator enable"/>
+         <cifField name="valid enable" abbrev="valid_en" offset="30" width="1" type="bool" descript="Valid indicator enable"/>
+         <cifField name="calibrated time enable" abbrev="cal_time_en" offset="31" width="1" type="bool" descript="Calibrated time indicator enable"/>
+      </cifEnable>
+      <cifEnable name="Device Identifier" abbrev="dev_id" index="17">
+         <cifField name="Manufacturer OUI" abbrev="moui" offset="0" width="24" type="uint" descript="IEEE-registered Organizationally Unique Identifier of device manufacturer"/>
+         <cifField name="Device Code" abbrev="dev" offset="32" width="16" type="uint" descript="Device model"/>
+      </cifEnable>
+      <cifEnable name="Temperature" abbrev="temp" index="18">
+         <cifField name="value" abbrev="val" offset="0" width="16" type="fixed" point="6" units="degrees,C" descript="Temperature of device"/>
+      </cifEnable>
+      <cifEnable name="Timestamp Calibration Time" abbrev="ts_cal" index="19">
+         <cifField name="value" abbrev="val" offset="0" width="32" type="uint" descript="Time at which timestamp was known to be accurate (unformatted)">
+            <info level="warn" string="Interpret timestamp based on packet TSI setting."/>
+         </cifField>
+      </cifEnable>
+      <cifEnable name="Timestamp Adjustment" abbrev="ts_adj" index="20">
+         <cifField name="value" abbrev="val" offset="0" width="64" type="int" units="fs" descript="Delay between timestamp of data packet and reference point"/>
+      </cifEnable>
+      <cifEnable name="Sample Rate" abbrev="samp_rate" index="21">
+         <cifField name="value" abbrev="val" offset="0" width="64" type="ufixed" point="20" units="Hz" descript="Sample rate of paired data packets"/>
+      </cifEnable>
+      <cifEnable name="Over-range Count" abbrev="over_range" index="22">
+         <cifField name="value" abbrev="val" offset="0" width="32" type="uint" descript="Number of over-range samples in associated data packet"/>
+      </cifEnable>
+      <cifEnable name="Gain" abbrev="gain" index="23">
+         <cifField name="stage1" abbrev="stage1" offset="0" width="16" type="fixed" point="7" units="dB" descript="Front-end/IF (or total, if stage 2 does not apply) gain relative to reference point"/>
+         <cifField name="stage2" abbrev="stage2" offset="16" width="16" type="fixed" point="7" units="dB" descript="Back-end/RF gain relative to reference"/>
+      </cifEnable>
+      <cifEnable name="Reference Level" abbrev="ref_lev" index="24">
+         <cifField name="value" abbrev="val" offset="0" width="16" type="fixed" point="7" units="dBm" descript="AC power of unit scale sinusoid at reference point"/>
+      </cifEnable>
+      <cifEnable name="IF Band Offset" abbrev="if_off" index="25">
+         <cifField name="value" abbrev="val" offset="0" width="64" type="fixed" point="20" units="Hz" descript="Additional offset of center of band to IF Reference Frequency"/>
+      </cifEnable>
+      <cifEnable name="RF Reference Frequency Offset" abbrev="rf_off" index="26">
+         <cifField name="value" abbrev="val" offset="0" width="64" type="fixed" point="20" units="Hz" descript="Additional RF frequency delta of signal at reference point"/>
+      </cifEnable>
+      <cifEnable name="RF Reference Frequency" abbrev="rf_freq" index="27">
+         <cifField name="value" abbrev="val" offset="0" width="64" type="fixed" point="20" units="Hz" descript="Original RF frequency of signal at reference point"/>
+      </cifEnable>
+      <cifEnable name="IF Reference Frequency" abbrev="if_freq" index="28">
+         <cifField name="value" abbrev="val" offset="0" width="64" type="fixed" point="20" units="Hz" descript="Center of band of signal after translation"/>
+      </cifEnable>
+      <cifEnable name="Bandwidth" abbrev="bw" index="29">
+         <cifField name="bandwidth" abbrev="val" offset="0" width="64" type="fixed" point="20" units="Hz" descript="Usable spectrum at output of reference point"/>
+      </cifEnable>
+      <cifEnable name="Reference Point Identifier" abbrev="ref_id" index="30">
+         <cifField name="Identifier" abbrev="value" offset="0" width="32" type="uint" descript="Stream id assigned of timestamp reference point"/>
+      </cifEnable>
+      <cifEnable name="Context Field Change Indicator" abbrev="cfci" index="31" />
+   </cifMap>
+
+   <cifMap name="cif1" index="1" descript="Spatial Signal Spectral">
+      <cifEnable name="Buffer Size" abbrev="buf_size" index="1">
+         <cifField name="Buffer Size" abbrev="size" offset="0" width="32" type="uint" units="bytes" descript="Number of bytes buffer can hold"/>
+         <cifField name="Status" abbrev="status" offset="32" width="8" type="hex" descript="Buffer status (see documentation for interpretation)"/>
+         <cifField name="Level" abbrev="level" offset="40" width="8" type="uint" descript="Current level of buffer"/>
+      </cifEnable>
+      <cifEnable name="Version and Build Code" abbrev="ver" index="2">
+         <cifField name="User" abbrev="user" offset="0" width="10" type="uint" descript="User defined version code"/>
+         <cifField name="Revision" abbrev="rev" offset="10" width="6" type="uint" descript="Version on given day/year"/>
+         <cifField name="Day" abbrev="day" offset="16" width="9" type="uint" descript="Day of year from 1 = Jan 1"/>
+         <cifField name="Year" abbrev="yr" offset="25" width="7" type="uint" descript="Build Year relative to 2000"/>
+      </cifEnable>
+      <cifEnable name="V49 Spec Compliance" abbrev="v49_spec" index="3">
+         <cifField name="value" abbrev="value" offset="0" width="32" type="enum" descript="V49 Standard and Specification Compliance Number">
+            <enum key="1" value="V49.0"/>
+            <enum key="2" value="V49.1"/>
+            <enum key="3" value="V49A"/>
+            <enum key="4" value="V49.2"/>
+         </cifField>
+      </cifEnable>
+      <cifEnable name="Health Status" abbrev="health" index="4">
+         <cifField name="Identifier" abbrev="id" offset="0" width="16" type="hex" descript="Health and Status Information (see documentation)"/>
+      </cifEnable>
+      <cifEnable name="Discrete IO Long" abbrev="dio_long" index="5">
+         <cifField name="value" abbrev="value" offset="0" width="64" type="hex" descript="Discrete IO (see documentation)"/>
+      </cifEnable>
+      <cifEnable name="Discrete IO Short" abbrev="dio_short" index="6">
+         <cifField name="value" abbrev="value" offset="0" width="32" type="hex" descript="Discrete IO (see documentation)"/>
+      </cifEnable>
+      <!-- limited parsing of the index list is available with available configuration description s-->
+      <cifEnable name="Index List" abbrev="idx_lst" index="7">
+         <cifField name="list" abbrev="value" offset="0" width="32" type="dynamic" descript="List of record indices to act on"/>
+      </cifEnable>
+      <!-- limited parsing of the array is available with available configuration descriptions -->
+      <cifEnable name="Sector Scan Step" abbrev="sec_scan" index="9">
+         <cifField name="array" abbrev="value" offset="0" width="32" type="dynamic" descript="Descriptor array to set up scan/step"/>
+      </cifEnable>
+      <cifEnable name="Spectrum" abbrev="spectrum" index="10">
+         <cifField name="spectrum type" abbrev="type" offset="0" width="8" type="enum" descript="Type of spectral data">
+            <enum key="0" value="No setting"/>
+            <enum key="1" value="log power - dB"/>
+            <enum key="2" value="cartesian - IQ"/>
+            <enum key="3" value="polar - magnitude phase"/>
+            <enum key="4" value="magnitude"/>
+         </cifField>
+         <cifField name="linear averaging" abbrev="lin_avg" offset="8" width="1" type="bool" descript="Apply linear averaging"/>
+         <cifField name="peak-hold" abbrev="peak_hold" offset="9" width="1" type="bool" descript="Select maximum value in window"/>
+         <cifField name="min-hold" abbrev="min_hold" offset="10" width="1" type="bool" descript="Select minimum value in window"/>
+         <cifField name="exponential averaging" abbrev="exp_avg" offset="11" width="1" type="bool" descript="Apply exponential averaging"/>
+         <cifField name="median averaging" abbrev="median_avg" offset="12" width="1" type="bool" descript="Select the median value in the window"/>
+         <cifField name="smoothing" abbrev="smooth" offset="13" width="1" type="bool" descript="Apply averaging within sample frame"/>
+         <cifField name="window time delta type" abbrev="win_dt_type" offset="16" width="4" type="enum" descript="Format of window time delta field">
+            <enum key="0" value="No overlap control"/>
+            <enum key="1" value="percent overlap"/>
+            <enum key="2" value="samples"/>
+            <enum key="3" value="time"/>
+         </cifField>
+         <cifField name="window type" abbrev="win_type" offset="32" width="8" type="enum" descript="Type of window applied in time domain before transform">
+            <enum key="0" value="rectangular"/>
+            <enum key="1" value="triangular"/>
+            <enum key="2" value="hanning, alpha = 1"/>
+            <enum key="3" value="hanning, alpha = 2"/>
+            <enum key="4" value="hanning, alpha = 3"/>
+            <enum key="5" value="hanning, alpha = 4"/>
+            <enum key="6" value="hamming"/>
+            <enum key="7" value="riesz"/>
+            <enum key="8" value="riemann"/>
+            <enum key="9" value="de la valle poussin"/>
+            <enum key="10" value="tukey, alpha = 0.25"/>
+            <enum key="11" value="tukey, alpha = 0.50"/>
+            <enum key="12" value="tukey, alpha = 0.75"/>
+            <enum key="13" value="bohman"/>
+            <enum key="14" value="poisson, alpha = 2"/>
+            <enum key="15" value="poisson, alpha = 3"/>
+            <enum key="16" value="poisson, alpha = 4"/>
+            <enum key="17" value="hanning poisson, alpha = 0.5"/>
+            <enum key="18" value="hanning poisson, alpha = 1.0"/>
+            <enum key="19" value="hanning poisson, alpha = 2.0"/>
+            <enum key="20" value="cauchy, alpha = 3"/>
+            <enum key="21" value="cauchy, alpha = 4"/>
+            <enum key="22" value="cauchy, alpha = 5"/>
+            <enum key="23" value="gaussian, alpha = 2.5"/>
+            <enum key="24" value="gaussian, alpha = 3.0"/>
+            <enum key="25" value="gaussian, alpha = 4.0"/>
+            <enum key="26" value="dolph-chebyshev, alpha = 2.5"/>
+            <enum key="27" value="dolph-chebyshev, alpha = 3.0"/>
+            <enum key="28" value="dolph-chebyshev, alpha = 3.5"/>
+            <enum key="29" value="dolph-chebyshev, alpha = 4.0"/>
+            <enum key="30" value="kaiser bessel, alpha = 2.0"/>
+            <enum key="31" value="kaiser bessel, alpha = 2.5"/>
+            <enum key="32" value="kaiser bessel, alpha = 3.0"/>
+            <enum key="33" value="kaiser bessel, alpha = 3.5"/>
+            <enum key="34" value="barcilon temes, alpha = 3.0"/>
+            <enum key="35" value="barcilon temes, alpha = 3.5"/>
+            <enum key="36" value="barcilon temes, alpha = 4.0"/>
+            <enum key="37" value="exact blackmann"/>
+            <enum key="38" value="blackmann"/>
+            <enum key="39" value="blackmann harris, min 3 sample"/>
+            <enum key="40" value="blackmann harris, min 4 sample"/>
+            <enum key="41" value="blackmann harris, 61 dB 3 sample"/>
+            <enum key="42" value="blackmann harris, 74 dB 3 sample"/>
+            <enum key="43" value="kaiser bessel, 4 sample alpha = 3"/>
+         </cifField>
+         <cifField name="number of transform points" abbrev="n_pts" offset="64" width="32" type="uint" descript="Number of points in the spectral transform"/>
+         <cifField name="number of window points" abbrev="n_win_pts" offset="96" width="32" type="uint" descript="Number of in the spectral transform window"/>
+         <cifField name="resolution" abbrev="res" offset="128" width="64" type="fixed" point="20" units="Hz" descript="Resolution of spectral points"/>
+         <cifField name="span" abbrev="span" offset="192" width="64" type="fixed" point="20" units="Hz" descript="Overall bandwidth of spectral data"/>
+         <cifField name="number of averages" abbrev="n_avg" offset="256" width="32" type="uint" descript="Extent of smoothing on data; exact meaning depends on averaging type"/>
+         <cifField name="weighting factor" abbrev="wt_factor" offset="288" width="32" type="uint" descript="Coefficient for nonlinear averaging"/>
+         <cifField name="spectrum F1 indices" abbrev="idx" offset="320" width="32" type="int" descript="First frequency bin of transform results transmitted"/>
+         <cifField name="spectrum F2 indices" abbrev="idx" offset="352" width="32" type="int" descript="Last frequency bin of transform results transmitted"/>
+         <cifField name="window time delta" abbrev="win_dt" offset="384" width="32" type="ufixed" point="12" descript="Overlap between spectral transforms (time in ns, samples, or % overlap)"/>
+      </cifEnable>
+      <cifEnable name="Array of CIFS" abbrev="arr_cif" index="11">
+         <cifField name="array" abbrev="array" offset="0" width="32" type="dynamic" descript="Array of CIFs (no decoding available)."/>
+         <!-- It should be possible to set this up using the array format.
+              CIF0 uses the required bitmap slot while CIF1,2,3,7 use general required header words
+              ALL CIFS are required, even if empty for a fixed decoding, so we don't have to choose
+              based on bitmapped enables. The records follow, based on the bits in any of the 5 cifs.
+              Encoding that here though would duplicate the majority of this file, so we should look
+              for a more compact way to reference the already defined cifs. (support a cifmap instead
+              of the cifField?) For now just dump the entire field as a dynamic array instead.
+
+         <cifField name="array" abbrev="array" offset="0" width="32" type="array" descript="Array of CIFs (no decoding available).">
+            <info level="warn" string="Recursive decoding of the records is not supported."/>
+            <headerEnable name="CIF1" abbrev="cif1">
+               <cifField name="map" abbrev="map" offset="0" width="32" type="uint"  descript="">
+               </cifField>
+            </headerEnable>
+            <headerEnable name="CIF2" abbrev="cif2">
+               <cifField name="map" abbrev="map" offset="0" width="32" type="uint"  descript="">
+               </cifField>
+            </headerEnable>
+            <headerEnable name="CIF3" abbrev="cif3">
+               <cifField name="map" abbrev="map" offset="0" width="32" type="uint"  descript="">
+               </cifField>
+            </headerEnable>
+            <headerEnable name="CIF7" abbrev="cif7">
+               <cifField name="map" abbrev="map" offset="0" width="32" type="uint"  descript="">
+               </cifField>
+            </headerEnable>
+            <recordEnable name="..." abbrev="abbrev" index="0">
+               <cifField name="index" abbrev="idx" offset="0" width="32" type="uint"  descript="Record index number"/>
+            </recordEnable>            
+         </cifField>
+         -->
+      </cifEnable>
+      <cifEnable name="Aux Bandwidth" abbrev="aux_bw" index="13">
+         <cifField name="bandwidth" abbrev="val" offset="0" width="64" type="fixed" point="20" units="Hz" descript="Alternate usable spectrum at output of reference point"/>
+      </cifEnable>
+      <cifEnable name="Aux Gain" abbrev="aux_gain" index="14">
+         <cifField name="stage1" abbrev="stage1" offset="0" width="16" type="fixed" point="7" units="dB" descript="Alternate front-end/IF (or total, if stage 2 does not apply) gain relative to reference point"/>
+         <cifField name="stage2" abbrev="stage2" offset="16" width="16" type="fixed" point="7" units="dB" descript="Alternate back-end/RF gain relative to reference"/>
+      </cifEnable>
+      <cifEnable name="Aux Frequency" abbrev="aux_freq" index="15">
+         <cifField name="value" abbrev="val" offset="0" width="64" type="fixed" point="20" units="Hz" descript="Alternate frequency of signal at reference point"/>
+      </cifEnable>
+      <cifEnable name="SNR Noise Figure" abbrev="snr" index="16">
+         <cifField name="noise figure" abbrev="noise" offset="0" width="16" type="fixed" point="7" units="dB" descript="Noise figure at reference point"/>
+         <cifField name="SNR" abbrev="snr" offset="16" width="16" type="fixed" point="7" units="dB" descript="Signal-to-noise ratio at reference point"/>
+      </cifEnable>
+      <cifEnable name="Intercept Points" abbrev="int_pt" index="17">
+         <cifField name="third order intercept" abbrev="intercept2" offset="0" width="16" type="fixed" point="7" units="dBm" descript="Third order input intercept point at reference point"/>
+         <cifField name="second order intercept" abbrev="intercept3" offset="16" width="16" type="fixed" point="7" units="dBm" descript="Second order input intercept point at reference point"/>
+      </cifEnable>
+      <cifEnable name="Compression Point" abbrev="compress_pt" index="18">
+         <cifField name="one dB compression point" abbrev="value" offset="0" width="16" type="fixed" point="7" units="dBm" descript="1 dB Compression point at  reference point"/>
+      </cifEnable>
+      <cifEnable name="Threshold" abbrev="threshold" index="19">
+         <cifField name="stage1" abbrev="stage1" offset="0" width="16" type="fixed" point="7" units="dB" descript="Signal level at reference point at which primary action should be taken"/>
+         <cifField name="stage2" abbrev="stage2" offset="16" width="16" type="fixed" point="7" units="dB" descript="Signal level at reference point at which secondary action should be taken"/>
+      </cifEnable>
+      <cifEnable name="EbN0 BER" abbrev="ebno" index="20">
+         <cifField name="BER" abbrev="ber" offset="0" width="16" type="fixed" point="7" units="dB" descript="Bit error rate at reference point"/>
+         <cifField name="EbN0" abbrev="ebno" offset="16" width="16" type="fixed" point="7" units="dB" descript="Energy per bit to noise power bandwidth ratio at reference point"/>
+      </cifEnable>
+      <cifEnable name="Range" abbrev="range" index="24">
+         <cifField name="value" abbrev="value" offset="0" width="32" type="ufixed" point="6" units="m" descript="Distance from reference point (target defined by class)"/>
+      </cifEnable>
+      <cifEnable name="Beam Width" abbrev="beam_width" index="25">
+         <cifField name="vertical" abbrev="vert" offset="0" width="16" type="fixed" point="7" units="degrees" descript="Vertical 3 dB width of main lobe at reference point"/>
+         <cifField name="horizontal" abbrev="hor" offset="16" width="16" type="fixed" point="7" units="degrees" descript="Horizontal 3 dB width of main lobe at reference point"/>
+      </cifEnable>
+      <cifEnable name="Spatial Reference Type" abbrev="ref_type" index="26">
+         <cifField name="identifier" abbrev="value" offset="0" width="16" type="hex" descript="User defined identifier of antenna scan pattern"/>
+      </cifEnable>
+      <cifEnable name="Spatial Scan Type" abbrev="scan_type" index="27">
+         <cifField name="beam type" abbrev="beam" offset="0" width="2" type="enum" descript="">
+            <enum key="0" value="Not specified"/>
+            <enum key="1" value="Beam or signal direction"/>
+            <enum key="2" value="Null"/>
+         </cifField>
+         <cifField name="defined reference" abbrev="ref" offset="2" width="2" type="enum" descript="">
+            <enum key="0" value="Not specified"/>
+            <enum key="1" value="ECEF"/>
+            <enum key="2" value="Platform centered"/>
+            <enum key="3" value="Array centered"/>
+         </cifField>
+         <cifField name="spatial identifier" abbrev="id" offset="16" width="16" type="hex" descript="User defined identifier for spatial reference"/>
+      </cifEnable>
+      <cifEnable name="Pointing Vector Structure" abbrev="pvs" index="28">
+         <cifField name="array" abbrev="array" offset="0" width="32" type="array" descript="Array of pointing vectors (no decoding available).">
+            <!-- This is an optional field selected by header size rather than a index bit -->
+            <headerEnable name="GLOBAL header word" abbrev="GLOBAL">
+               <cifField name="beam type" abbrev="beam" offset="0" width="2" type="enum" descript="">
+                  <enum key="0" value="Not specified"/>
+                  <enum key="1" value="Beam or signal direction"/>
+                  <enum key="2" value="Null"/>
+               </cifField>
+               <cifField name="system reference" abbrev="ref" offset="2" width="2" type="enum" descript="">
+                  <enum key="0" value="Not specified"/>
+                  <enum key="1" value="ECEF"/>
+                  <enum key="2" value="Platform centered"/>
+                  <enum key="3" value="Array centered"/>
+               </cifField>
+            </headerEnable>
+            <recordEnable name="reference/beam fields" abbrev="ref_beam" index="31">
+               <cifField name="beam type" abbrev="beam" offset="0" width="2" type="enum" descript="">
+                  <enum key="0" value="Not specified"/>
+                  <enum key="1" value="Beam or signal direction"/>
+                  <enum key="2" value="Null"/>
+               </cifField>
+               <cifField name="system reference" abbrev="ref" offset="2" width="2" type="enum" descript="">
+                  <enum key="0" value="Not specified"/>
+                  <enum key="1" value="ECEF"/>
+                  <enum key="2" value="Platform centered"/>
+                  <enum key="3" value="Array centered"/>
+               </cifField>
+               <cifField name="index" abbrev="idx" offset="16" width="16" type="uint" descript=""/>
+            </recordEnable>
+            <recordEnable name="Pointing Vector" abbrev="pv" index="30">
+               <cifField name="azimuth" abbrev="az" offset="0" width="16" type="fixed" point="7" units="degrees" descript="Azimuth angle measured clockwise from compass north"/>
+               <cifField name="elevation" abbrev="elv" offset="16" width="16" type="fixed" point="7" units="degrees" descript="Elevation angle relative to reference with positive toward zenith"/>
+            </recordEnable>
+         </cifField>
+      </cifEnable>
+      <cifEnable name="Pointing Vector" abbrev="pv" index="29">
+         <cifField name="azimuth" abbrev="az" offset="0" width="16" type="fixed" point="7" units="degrees" descript="Azimuth angle measured clockwise from compass north"/>
+         <cifField name="elevation" abbrev="elv" offset="16" width="16" type="fixed" point="7" units="degrees" descript="Elevation angle relative to reference with positive toward zenith"/>
+      </cifEnable>
+      <cifEnable name="Polarization" abbrev="polarization" index="30">
+         <cifField name="ellipticity" abbrev="elp" offset="0" width="16" type="fixed" point="13" units="radians" descript="Ellipticity angle describing the antenna polarization"/>
+         <cifField name="tilt" abbrev="tilt" offset="16" width="16" type="fixed" point="13" units="radians" descript="Tilt (inclination) angle describing the antenna polarization"/>
+      </cifEnable>
+      <cifEnable name="Phase Offset" abbrev="phase" index="31">
+         <cifField name="phase offset" abbrev="phase" offset="0" width="16" type="fixed" point="7" units="radians" descript="Phase difference of described signal at reference point"/>
+      </cifEnable>
+   </cifMap>
+
+   <cifMap name="cif2" index="2" descript="Identifiers">
+      <cifEnable name="RF Footprint Range" abbrev="rf_range" index="3">
+         <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Tag describing antenna geographical footprint, linked to KLM record"/>
+      </cifEnable>
+      <cifEnable name="RF Footprint" abbrev="rf_footprint" index="4">
+         <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Tag describing antenna geographical footprint, linked to KLM record"/>
+      </cifEnable>
+      <cifEnable name="Communication Priority Id" abbrev="comm_id" index="5">
+         <cifField name="id" abbrev="id" offset="0" width="16" type="hex" descript="Tag to indicate relative priority of information"/>
+      </cifEnable>
+      <cifEnable name="Function Priority Id" abbrev="func_prior_id" index="6">
+         <cifField name="id" abbrev="id" offset="0" width="16" type="hex" descript="Tag to indicate relative priority of function on multi-fucntion device"/>
+      </cifEnable>
+      <cifEnable name="Event Id" abbrev="event_id" index="7">
+         <cifField name="id" abbrev="id" offset="0" width="16" type="hex" descript="Tag to associate stream to different events that impact the interpretation of information"/>
+      </cifEnable>
+      <cifEnable name="Mode Id" abbrev="mode_id" index="8">
+         <cifField name="id" abbrev="id" offset="0" width="16" type="hex" descript="Tag to associate stream to current stte of device"/>
+      </cifEnable>
+      <cifEnable name="Function Id" abbrev="func_id" index="9">
+         <cifField name="id" abbrev="id" offset="0" width="16" type="hex" descript="Tag to associate stream to function"/>
+      </cifEnable>
+      <cifEnable name="Modulation Type" abbrev="mod_type" index="10">
+         <cifField name="id" abbrev="id" offset="0" width="16" type="hex" descript="Tag to associate stream to modulation by type"/>
+      </cifEnable>
+      <cifEnable name="Modulation Class" abbrev="mod_class" index="11">
+         <cifField name="id" abbrev="id" offset="0" width="16" type="hex" descript="Tag to associate stream to modulation by class"/>
+      </cifEnable>
+      <cifEnable name="EMS Device Instance" abbrev="ems_inst" index="12">
+         <cifField name="id" abbrev="id" offset="0" width="16" type="hex" descript="Tag to associate stream to EMS device by instance"/>
+      </cifEnable>
+      <cifEnable name="EMS Device Type" abbrev="ems_type" index="13">
+         <cifField name="id" abbrev="id" offset="0" width="16" type="hex" descript="Tag to associate stream to EMS device by type"/>
+      </cifEnable>
+      <cifEnable name="EMS Device Class" abbrev="ems_class" index="14">
+         <cifField name="id" abbrev="id" offset="0" width="12" type="hex" descript="Tag to associate stream to EMS device by class"/>
+         <cifField name="receiver" abbrev="rx" offset="12" width="1" type="bool" descript="Device is a receiver"/>
+         <cifField name="exciter" abbrev="tx" offset="13" width="1" type="bool" descript="Device is an exciter"/>
+         <cifField name="organization relationship" abbrev="org" offset="14" width="2" type="enum" descript="Relationship of EMS device">
+            <enum key="0" value="coalition"/>
+            <enum key="1" value="known"/>
+            <enum key="2" value="unknown"/>
+         </cifField>
+      </cifEnable>
+      <cifEnable name="Platform Display" abbrev="plat_disp" index="15">
+         <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Tag to associate stream to platform by display"/>
+      </cifEnable>
+      <cifEnable name="Platform Instance" abbrev="plat_inst" index="16">
+         <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Tag to associate stream to platform by instance"/>
+      </cifEnable>
+      <cifEnable name="Platform Class" abbrev="plat_class" index="17">
+         <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Tag to associate stream to platform by class"/>
+      </cifEnable>
+      <cifEnable name="Operator" abbrev="operator" index="18">
+         <cifField name="id" abbrev="id" offset="0" width="16" type="hex" descript="Operator identifier"/>
+      </cifEnable>
+      <cifEnable name="Country Code" abbrev="country" index="19">
+         <cifField name="id" abbrev="id" offset="0" width="11" type="uint" descript="User defined or ISO 3166 numeric code for country"/>
+         <cifField name="ISO 3166 enable" abbrev="en" offset="15" width="1" type="bool" descript="Id is a ISO 3166 numeric code"/>
+      </cifEnable>
+      <cifEnable name="Track Id" abbrev="track_id" index="20">
+         <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Tag used to identify a common set of information"/>
+      </cifEnable>
+      <cifEnable name="Information Source" abbrev="info_src" index="21">
+         <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Id of information source used to define other ids"/>
+      </cifEnable>
+      <cifEnable name="Controller UUID" abbrev="ctr_uuid" index="22">
+         <cifField name="id" abbrev="id" offset="0" width="128" type="raw" descript="Controller UUID associated with information in this packet"/>
+      </cifEnable>
+      <cifEnable name="Controller Id" abbrev="ctr_id" index="23">
+         <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Controller ID associated with information in this packet"/>
+      </cifEnable>
+      <cifEnable name="Controlee UUID" abbrev="cte_uuid" index="24">
+         <cifField name="id" abbrev="id" offset="0" width="128" type="raw" descript="Controlee UUID associated with information in this packet"/>
+      </cifEnable>
+      <cifEnable name="Controlee Id" abbrev="cte_id" index="25">
+         <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Controlee ID associated with information in this packet"/>
+      </cifEnable>
+      <cifEnable name="Cited Message Id" abbrev="msg_id" index="26">
+         <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Previous message id to which information is associated"/>
+      </cifEnable>
+      <cifEnable name="Children SID" abbrev="child_sid" index="27">
+         <cifField name="id" abbrev="id" offset="0" width="16" type="hex" descript="Stream id of component begin sourced information by this one"/>
+      </cifEnable>
+      <cifEnable name="Parent SID" abbrev="parent_sid" index="28">
+         <cifField name="id" abbrev="id" offset="0" width="16" type="hex" descript="Stream id of component sourcing information to this one"/>
+      </cifEnable>
+      <cifEnable name="Sibling SID" abbrev="sib_sid" index="29">
+         <cifField name="id" abbrev="id" offset="0" width="16" type="hex" descript="Stream id of associated channel, particularly for metrics which measure a delta"/>
+      </cifEnable>
+      <cifEnable name="Cited SID" abbrev="cited_sid" index="30">
+         <cifField name="id" abbrev="id" offset="0" width="16" type="hex" descript="Information in this packet refers to cited stream id instead of packet stream id"/>
+      </cifEnable>
+      <cifEnable name="Bind" abbrev="bind" index="31">
+         <cifField name="bonded indicator" abbrev="b" offset="0" width="1" type="bool" descript="Identifiers at the same packet structure level are bonded to one another"/>
+         <!-- The V49.2 spec shows the remaining three fields in the diagram of the fields but does not describe them
+               in the text. It's unclear how they might related to identifier binding, so it may be an error in the spec.  
+               However, since they are contained within the same 32 bit word, displaying them will not break anything else
+         -->
+         <cifField name="probability" abbrev="prob" offset="8" width="8" type="int" units="percent" descript=""/>
+         <cifField name="probability function" abbrev="prob_func" offset="16" width="8" type="int" descript=""/>
+         <cifField name="confidence" abbrev="conf" offset="24" width="8" type="int" units="percent" descript=""/>
+      </cifEnable>
+   </cifMap>
+
+   <cifMap name="cif3" index="3" descript="Temporal Environmental">
+      <cifEnable name="Network Id" abbrev="nid" index="1">
+         <cifField name="id" abbrev="id" offset="0" width="32" type="hex" descript="Tag to associate information to a specific network"/>
+      </cifEnable>
+      <cifEnable name="Tropospheric State" abbrev="tropo_state" index="2">
+         <cifField name="id" abbrev="id" offset="0" width="16" type="hex" descript="Index to user defined table describing state of troposphere"/>
+      </cifEnable>
+      <cifEnable name="Sea and Swell State" abbrev="sea_state" index="3">
+         <cifField name="sea state" abbrev="sea" offset="0" width="5" type="enum" descript="Standardized description of sea conditions">
+            <enum key="0" value="calm (glassy"/>
+            <enum key="1" value="calm (rippled)"/>
+            <enum key="2" value="smooth (wavelets)"/>
+            <enum key="3" value="slight"/>
+            <enum key="4" value="moderate"/>
+            <enum key="5" value="rough"/>
+            <enum key="6" value="very rough"/>
+            <enum key="7" value="high"/>
+            <enum key="8" value="very high"/>
+            <enum key="9" value="phenomenal"/>
+         </cifField>
+         <cifField name="Swell State" abbrev="swell" offset="5" width="5" type="enum" descript="Standardized description of swell conditions">
+            <enum key="0" value="no swell"/>
+            <enum key="1" value="very low (short and low wave)"/>
+            <enum key="2" value="low (long and low wave)"/>
+            <enum key="3" value="light (short and moderate wave)"/>
+            <enum key="4" value="moderate (average and moderate wave)"/>
+            <enum key="5" value="moderate rough (long and moderate wave)"/>
+            <enum key="6" value="rough (short and heavy wave)"/>
+            <enum key="7" value="high (average and heavy wave)"/>"/>
+            <enum key="8" value="very high (long and heavy wave)"/>
+            <enum key="9" value="confused (wavelength and height indefinable)"/>
+            <cifField name="user" abbrev="user" offset="10" width="6" type="hex" descript="User defined sea state information"/>
+         </cifField>
+      </cifEnable>
+      <cifEnable name="Barometric Pressure" abbrev="pressure" index="4">
+         <cifField name="value" abbrev="val" offset="0" width="17" type="uint" units="? Pascal" descript="Barometric pressure [unit scaling is unclear in spec]">
+            <info level="warn" string="V49.2 specification is not clear on where the radix point should go"/>
+         </cifField>
+      </cifEnable>
+      <cifEnable name="Humidity" abbrev="humidity" index="5">
+         <cifField name="value" abbrev="val" offset="0" width="16" type="ufixed" point="16" units="ratio" descript="Ambient humidity relative to 100%"/>
+      </cifEnable>
+      <cifEnable name="Sea-ground Temperature" abbrev="surf_temp" index="6">
+         <cifField name="value" abbrev="val" offset="0" width="16" type="fixed" point="6" units="degrees,C" descript="Ambient surface temperature at platform"/>
+      </cifEnable>
+      <cifEnable name="Air Temperature" abbrev="air_temp" index="7">
+         <cifField name="value" abbrev="val" offset="0" width="16" type="fixed" point="6" units="degrees,C" descript="Ambient temperature of air at platform"/>
+      </cifEnable>
+      <cifEnable name="Shelf Life" abbrev="life" index="16">
+         <cifField name="integer" abbrev="val" offset="0" width="32" type="uint" units="s" descript="Timestamp at which current state will expire">
+            <info level="error" string="Field size based on packet TSI/TSF settings which are not available to CIF dissector. Remaining packet may be misaligned."/>
+         </cifField>
+      </cifEnable>
+      <cifEnable name="Age" abbrev="age" index="17">
+         <cifField name="integer" abbrev="val" offset="0" width="32" type="uint" units="s" descript="Timestamp at which current state became valid">
+            <info level="error" string="Field size based on packet TSI/TSF settings which are not available to CIF dissector. Remaining packet may be misaligned."/>
+         </cifField>
+      </cifEnable>
+      <cifEnable name="Jitter" abbrev="jitter" index="20">
+         <cifField name="value" abbrev="value" offset="0" width="64" type="int" units="fs" descript="Uncertainty of time measurements (+/-)"/>
+      </cifEnable>
+      <cifEnable name="Dwell" abbrev="dwell" index="21">
+         <cifField name="value" abbrev="value" offset="0" width="64" type="int" units="fs" descript="Time over which signal exists"/>
+      </cifEnable>
+      <cifEnable name="Duration" abbrev="duration" index="22">
+         <cifField name="value" abbrev="value" offset="0" width="64" type="int" units="fs" descript="Time over which expected pattern exists"/>
+      </cifEnable>
+      <cifEnable name="Period" abbrev="period" index="23">
+         <cifField name="value" abbrev="value" offset="0" width="64" type="int" units="fs" descript="Time interval of one cycle of cyclic behavior"/>
+      </cifEnable>
+      <cifEnable name="Pulse Width" abbrev="pulse_width" index="24">
+         <cifField name="value" abbrev="value" offset="0" width="64" type="int" units="fs" descript="Time between two alternate edges of the signal"/>
+      </cifEnable>
+      <cifEnable name="Offset Time" abbrev="t_off" index="25">
+         <cifField name="value" abbrev="value" offset="0" width="64" type="int" units="fs" descript="Latency between packet timestamp and timing edge configuration became valid"/>
+      </cifEnable>
+      <cifEnable name="Fall Time" abbrev="t_fall" index="26">
+        <cifField name="value" abbrev="value" offset="0" width="64" type="int" units="fs" descript="Time for signal to fall from 90% to 10% relative to noise floor"/>
+      </cifEnable>
+      <cifEnable name="Rise Time" abbrev="t_rise" index="27">
+         <cifField name="value" abbrev="value" offset="0" width="64" type="int" units="fs" descript="Time for signal to rise from 10% to 90% relative to noise floor"/>
+      </cifEnable>
+      <cifEnable name="Timestamp Skew" abbrev="t_skew" index="30">
+         <cifField name="value" abbrev="value" offset="0" width="64" type="int" units="fs" descript="Time offset between this signal and adjacent signal as indicated by sibling SID"/>
+      </cifEnable>
+      <cifEnable name="Timestamp Details" abbrev="ts_detail" index="31">
+         <cifField name="POSIX time offset" abbrev="posix_off" offset="0" width="8" type="int" units="s" descript="Time difference between UTC time and POSIX time (sum of leap seconds)"/>
+         <cifField name="POSIX offset enable" abbrev="e" offset="8" width="1" type="bool" descript="Posix time offset is valid"/>
+         <cifField name="time source" abbrev="time_src" offset="9" width="3" type="enum" descript="Description of timing reference device">
+            <enum key="0" value="unspecified"/>
+            <enum key="1" value="atomic clock"/>
+            <enum key="2" value="satellite system"/>
+            <enum key="3" value="terrestrial radio"/>
+            <enum key="4" value="PTP"/>
+            <enum key="5" value="NTP or SNTP"/>
+            <enum key="6" value="User defined 6"/>
+            <enum key="7" value="User defined 7"/>
+         </cifField>
+         <cifField name="leap second present code" abbrev="lsp" offset="12" width="2" type="enum" descript="Number of seconds in current day">
+            <enum key="0" value="Not specified"/>
+            <enum key="1" value="86399 s"/>
+            <enum key="2" value="86400 s"/>
+            <enum key="3" value="86401 s"/>
+         </cifField>
+         <cifField name="leap second handling code" abbrev="lsh" offset="14" width="2" type="enum" descript="Indicate how lead seconds are handled">
+            <enum key="0" value="not applicable"/>
+            <enum key="1" value="counted as normal"/>
+            <enum key="2" value="observed via duplication"/>
+            <enum key="3" value="observed via overflow"/>
+         </cifField>
+         <cifField name="timestamp epoch code" abbrev="tse" offset="16" width="2" type="enum" descript="Reference point for timestamp epoch offset below">
+            <enum key="0" value="Not specified"/>
+            <enum key="1" value="UTC epoch"/>
+            <enum key="2" value="GPS epoch"/>
+            <enum key="3" value="posix epoch"/>
+         </cifField>
+         <cifField name="global time source" abbrev="g" offset="18" width="1" type="bool" descript="Timestamp details apply globally to stream id, not just for paired data"/>
+         <cifField name="user" abbrev="user" offset="24" width="8" type="hex" descript="User defined timestamp details field "/>
+         <cifField name="timestamp epoch offset" abbrev="epoch_off" offset="32" width="32" type="uint" units="s" descript="Start of timestamp epoch after referenced epoch"/>
+      </cifEnable>
+   </cifMap>
+   <!-- CIF4-6 are not defined and reserved for future use but may be enabled in CIF0 with empty values -->
+   <cifMap name="Reserved for cif4" index="4" descript="Attributes">
+      <info level="error" string="CIF_ENABLE[4] is not defined in spec."/>
+   </cifMap>
+   <cifMap name="Reserved for cif5" index="5" descript="Attributes">
+      <info level="error" string="CIF_ENABLE[5] is not defined in spec."/>
+   </cifMap>
+   <cifMap name="Reserved for cif6" index="6" descript="Attributes">
+      <info level="error" string="CIF_ENABLE[6] is not defined in spec."/>
+   </cifMap>
+   <!-- CIF7 has special behavior in that it modifies the interpretation of other fields
+        This behavior is not supported by the dissector. The bits are defined here as empty
+        enables to allow the bits to be displayed, but parsing of the remaining fields is
+        likely wrong.
+    -->
+   <cifMap name="cif7" index="7" descript="Attributes">
+      <info level="error" string="Dissector Does not support redefinition of field format (CIF7). All fields are probably wrong."/>
+      <cifEnable name="current value" abbrev="cur_val" index="31" />
+      <cifEnable name="average value" abbrev="avg_val" index="30" />
+      <cifEnable name="median value" abbrev="med_val" index="29" />
+      <cifEnable name="standard deviation" abbrev="sigma" index="28" />
+      <cifEnable name="max value" abbrev="max_val" index="27" />
+      <cifEnable name="min value" abbrev="min_val" index="26" />
+      <cifEnable name="precision" abbrev="precision" index="25" />
+      <cifEnable name="accuracy" abbrev="accuracy" index="24" />
+      <cifEnable name="first derivative" abbrev="deriv_1" index="23" />
+      <cifEnable name="second derivative" abbrev="deriv_2" index="22" />
+      <cifEnable name="third derivative" abbrev="deriv_3" index="21" />
+      <cifEnable name="probability" abbrev="prob" index="20" />
+      <cifEnable name="belief" abbrev="belief" index="19" />
+   </cifMap>
+
+</cifClass>
+

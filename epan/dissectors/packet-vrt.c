@@ -3,6 +3,7 @@
  * Copyright 2012 Ettus Research LLC - Nick Foster <nick@ettus.com>: original dissector
  * Copyright 2013 Alexander Chemeris <alexander.chemeris@gmail.com>: dissector improvement
  * Copyright 2013 Dario Lombardo (lomato@gmail.com): Official Wireshark port
+ * Copyright 2020 The MITRE Corporation: Extended to support VITA 49.2 changes; support configurable CIF parsing
  * Copyright 2022 Amazon.com, Inc. or its affiliates - Cody Planteen <codplant@amazon.com>: context packet decoding
  *
  * Original dissector repository: https://github.com/bistromath/vrt-dissector
@@ -18,14 +19,14 @@
 #include "config.h"
 #include <epan/packet.h>
 #include <epan/prefs.h>
+#include <epan/expert.h>
+#include "packet-vrt.h"
 #include <math.h>
 
 void proto_register_vrt(void);
 void proto_reg_handoff_vrt(void);
 
-static dissector_handle_t vrt_handle;
-
-#define VITA_49_PORT    4991
+#define VITA_49_PORT    "4991"
 
 typedef int (*complex_dissector_t)(proto_tree *tree, tvbuff_t *tvb, int offset);
 
@@ -63,11 +64,14 @@ typedef struct {
     int mag_var; /* 32-bit magnetic variation */
 } formatted_gps_ins_fields;
 
-typedef int (*complex_dissector_t)(proto_tree *tree, tvbuff_t *tvb, int offset);
 
 static gboolean vrt_use_ettus_uhd_header_format = FALSE;
+static gboolean vrt_limit_to_49_0 = TRUE;
+static gboolean vrt_use_cif_cfg_file = FALSE;
 
 static int proto_vrt;
+static dissector_handle_t vrt_handle;
+static dissector_handle_t cif_handle;
 
 /* fields */
 static int hf_vrt_header; /* 32-bit header */
@@ -75,12 +79,17 @@ static int hf_vrt_type; /* 4-bit pkt type */
 static int hf_vrt_cidflag; /* 1-bit class ID flag */
 static int hf_vrt_tflag; /* 1-bit trailer flag */
 static int hf_vrt_tsmflag; /* 1-bit timestamp mode */
+static int hf_vrt_ackflag; /* 1-bit acknowledge packet flag */
+static int hf_vrt_clflag; /* 1-bit acknowledge packet flag */
+static int hf_vrt_nd0flag; /* 1-bit compatibility flag */
+static int hf_vrt_sflag; /* 1-bit spectrum flag */
 static int hf_vrt_tsi; /* 2-bit timestamp type */
 static int hf_vrt_tsf; /* 2-bit fractional timestamp type */
 static int hf_vrt_seq; /* 4-bit sequence number */
 static int hf_vrt_len; /* 16-bit length */
 static int hf_vrt_sid; /* 32-bit stream ID (opt.) */
 static int hf_vrt_cid; /* 64-bit class ID (opt.) */
+static int hf_vrt_cid_pad; /* 5-bit pad bit count */
 static int hf_vrt_cid_oui; /* 24-bit class ID OUI */
 static int hf_vrt_cid_icc; /* 16-bit class ID ICC */
 static int hf_vrt_cid_pcc; /* 16-bit class ID PCC */
@@ -204,6 +213,29 @@ static int hf_vrt_context_ver_user; /* 10-bit user defined */
 static int hf_vrt_ts_int; /* 32-bit integer timestamp (opt.) */
 static int hf_vrt_ts_frac_picosecond; /* 64-bit fractional timestamp (opt.) */
 static int hf_vrt_ts_frac_sample; /* 64-bit fractional timestamp (opt.) */
+static int hf_vrt_cam; /* 32-bit control/acknowledge mode (opt.) */
+static int hf_vrt_cam_controllee; /* 2-bit flag describing controllee format */
+static int hf_vrt_cam_controller; /* 2-bit flag describing controller format */
+static int hf_vrt_cam_partial; /* partial packet execution permitted */
+static int hf_vrt_cam_warnings; /* allow execution with warnings */
+static int hf_vrt_cam_errors; /*  allow execution with errors */
+static int hf_vrt_cam_action; /* 2-bit command action */
+static int hf_vrt_cam_nack; /* provide ack only on error/warning */
+static int hf_vrt_cam_reqv; /* validation response */
+static int hf_vrt_cam_reqx; /* execution response */
+static int hf_vrt_cam_reqs; /* schedule response */
+static int hf_vrt_cam_reqw; /* request additional warning description */
+static int hf_vrt_cam_reqer; /* request additional error description */
+static int hf_vrt_cam_requ; /* user defined request */
+static int hf_vrt_cam_timing_control; /* 3-bit timing control mode */
+static int hf_vrt_cam_ackp; /* partial packet acknowledge */
+static int hf_vrt_cam_schx; /* Action complete flag */
+static int hf_vrt_cam_user; /* User control/acknowledge mode flags (extention command packets) */
+static int hf_vrt_message_id; /* 32-bit message id (opt.) */
+static int hf_vrt_controllee_id; /* 32-bit controllee id (opt.) */
+static int hf_vrt_controller_id; /* 32-bit controller id (opt.) */
+static int hf_vrt_controllee_uuid; /* 128-bit controllee uuid (opt.) */
+static int hf_vrt_controller_uuid; /* 128-bit controller uuid (opt.) */
 static int hf_vrt_data; /* data */
 static int hf_vrt_trailer; /* 32-bit trailer (opt.) */
 static int hf_vrt_trailer_enables; /* trailer indicator enables */
@@ -222,6 +254,7 @@ static int hf_vrt_trailer_en_user0; /* User indicator 0 */
 static int hf_vrt_trailer_en_user1; /* User indicator 1 */
 static int hf_vrt_trailer_en_user2; /* User indicator 2 */
 static int hf_vrt_trailer_en_user3; /* User indicator 3 */
+static int hf_vrt_trailer_en_frame; /* Frame mode indicator 0 */
 static int hf_vrt_trailer_ind_caltime; /* calibrated time indicator */
 static int hf_vrt_trailer_ind_valid; /* valid data ind */
 static int hf_vrt_trailer_ind_reflock; /* reference locked ind */
@@ -234,6 +267,7 @@ static int hf_vrt_trailer_ind_user0; /* User indicator 0 */
 static int hf_vrt_trailer_ind_user1; /* User indicator 1 */
 static int hf_vrt_trailer_ind_user2; /* User indicator 2 */
 static int hf_vrt_trailer_ind_user3; /* User indicator 3 */
+static int hf_vrt_trailer_ind_frame; /* Frame mode indicator */
 
 /* fixed sizes (in bytes) of context packet CIF field bits */
 static int context_size_cif0[32] = { 0, 4, 4, 4, 4, 4, 4, 4, 8, 8, 4, 52, 52, 44, 44, 8,
@@ -248,6 +282,7 @@ static gint ett_trailer;
 static gint ett_indicators;
 static gint ett_ind_enables;
 static gint ett_cid;
+static gint ett_cam;
 static gint ett_cif0;
 static gint ett_cif1;
 static gint ett_gain;
@@ -290,13 +325,17 @@ static const int ETT_IDX_ASSOC_LISTS = 17;
 static const int ETT_IDX_POL = 18;
 static const int ETT_IDX_VER = 19;
 
+static expert_field ei_config_file_msg;
+
 static const value_string packet_types[] = {
-    {0x00, "IF data packet without stream ID"},
-    {0x01, "IF data packet with stream ID"},
-    {0x02, "Extension data packet without stream ID"},
-    {0x03, "Extension data packet with stream ID"},
-    {0x04, "IF context packet"},
-    {0x05, "Extension context packet"},
+    {vrt_type_sig,      "IF data packet without stream ID"},
+    {vrt_type_sig_sid,  "IF data packet with stream ID"},
+    {vrt_type_edat,     "Extension data packet without stream ID"},
+    {vrt_type_edat_sid, "Extension data packet with stream ID"},
+    {vrt_type_ctx,      "IF context packet"},
+    {vrt_type_ectx,     "Extension context packet"},
+    {vrt_type_cmd,      "Command packet"},
+    {vrt_type_ecmd,     "Extension command packet"},
     {0, NULL}
 };
 
@@ -319,6 +358,44 @@ static const value_string tsf_types[] = {
 static const value_string tsm_types[] = {
     {0x00, "Precise timestamp resolution"},
     {0x01, "General timestamp resolution"},
+    {0, NULL}
+};
+
+static const value_string signal_type_types[] = {
+    {0x00, "Signal Time Data"},
+    {0x01, "Signal Spectral Data"},
+    {0, NULL}
+};
+
+static const value_string cam_control_types[] = {
+    {0x00, "No id"},
+    {0x01, "No id (UUID)"},
+    {0x02, "32-bit id"},
+    {0x03, "128-bit UUID"},
+    {0, NULL}
+};
+
+static const value_string cam_action_types[] = {
+    {0x00, "No-action"},
+    {0x01, "Dry run"},
+    {0x02, "Execute"},
+    {0, NULL}
+};
+
+static const value_string cam_timing_types[] = {
+    {0x00, "Ignore"},
+    {0x01, "Precise"},
+    {0x02, "Allow late"},
+    {0x03, "Allow early"},
+    {0x04, "Windowed"},
+    {0, NULL}
+};
+
+static const value_string frame_mode_types[] = {
+    {0x00, "Full frame"},
+    {0x01, "Start of frame"},
+    {0x02, "Middle of frame"},
+    {0x03, "End of frame"},
     {0, NULL}
 };
 
@@ -398,7 +475,8 @@ static int * const ind_hfs[] = {
 
 static void dissect_header(tvbuff_t *tvb, proto_tree *tree, int type, int offset);
 static void dissect_trailer(tvbuff_t *tvb, proto_tree *tree, int offset);
-static void dissect_cid(tvbuff_t *tvb, proto_tree *tree, int offset);
+static void dissect_cid(tvbuff_t *tvb, proto_tree *tree, int offset, vrt_packet_description_t *descript);
+static int dissect_command(tvbuff_t *tvb, proto_tree *tree, int initial_offset, vrt_packet_description_t *descript);
 static int dissect_context(tvbuff_t *tvb, proto_tree *tree, int offset);
 static int dissect_context_as_cif(tvbuff_t *tvb, proto_tree *tree, int offset, uint32_t cif, complex_dissector_t
     *complex_fptr, int **item_ptr, const int *size_ptr, int stop);
@@ -474,24 +552,46 @@ static int dissect_vrt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
     if (tree) { /* we're being asked for details */
         guint8  sidflag;
         guint8  cidflag;
-        guint8  tflag;
+        guint8  tflag = 0;
+        guint8  ackflag = 0;
+        //guint8  clflag = 0;
         guint8  tsitype;
         guint8  tsftype;
         guint16 len;
         guint16 nsamps;
+        vrt_packet_description_t descript;
 
         proto_tree *vrt_tree;
         proto_item *ti;
 
         /* get SID, CID, T flags and TSI, TSF types */
-        sidflag = (((type & 0x01) != 0) || (type == 4)) ? 1 : 0;
+        /* [TODO] Check for reserved packet type - how we handle sidflag is undefined! */
+        sidflag = (((type == vrt_type_sig) || (type == vrt_type_edat)) ? 0 : 1);
         cidflag = (tvb_get_guint8(tvb, offset) >> 3) & 0x01;
-        /* tflag is in data packets but not context packets */
-        tflag =   (tvb_get_guint8(tvb, offset) >> 2) & 0x01;
-        if (type == 4)
-            tflag = 0; /* this should be unnecessary but we do it just in case */
-        /* tsmflag is in context packets but not data packets
-           tsmflag = (tvb_get_guint8(tvb, offset) >> 0) & 0x01; */
+        descript.type = type;
+        descript.cam = 0;
+        descript.has_cid = cidflag;
+        /* Grab the flags we need for further decoding the packet; The actual tree is built elsewhere */
+        if(vrt_limit_to_49_0) {
+            if ((type == vrt_type_ctx) || (type == vrt_type_ectx)) {
+                /* tsmflag is in context packets but not data packets
+                tsmflag = (tvb_get_guint8(tvb, offset) >> 0) & 0x01; */
+                ;
+            } else {
+               tflag =   (tvb_get_guint8(tvb, offset) >> 2) & 0x01;
+            }
+        } else {
+            if ((type == vrt_type_cmd) || (type == vrt_type_ecmd)) {
+                ackflag = (tvb_get_guint8(tvb, offset) >> 2) & 0x01;
+                // clflag = (tvb_get_guint8(tvb, offset) >> 0) & 0x01;
+            } else if ((type == vrt_type_sig) || (type == vrt_type_sig_sid)) {
+                tflag = (tvb_get_guint8(tvb, offset) >> 2) & 0x01;
+            } else if ((type == vrt_type_edat) || (type == vrt_type_edat_sid)) {
+                tflag = (tvb_get_guint8(tvb, offset) >> 2) & 0x01;
+            }
+        }
+        descript.is_ack = ackflag;
+
         tsitype = (tvb_get_guint8(tvb, offset+1) >> 6) & 0x03;
         tsftype = (tvb_get_guint8(tvb, offset+1) >> 4) & 0x03;
         len     = tvb_get_ntohs(tvb, offset+2);
@@ -509,12 +609,11 @@ static int dissect_vrt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
             proto_tree_add_item(vrt_tree, hf_vrt_sid, tvb, offset, 4, ENC_BIG_ENDIAN);
             nsamps -= 1;
             offset += 4;
-
         }
 
         /* if there's a class ID (cidflag), put the class ID here */
         if (cidflag) {
-            dissect_cid(tvb, vrt_tree, offset);
+            dissect_cid(tvb, vrt_tree, offset, &descript);
             nsamps -= 2;
             offset += 8;
         }
@@ -535,24 +634,101 @@ static int dissect_vrt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
             offset += 8;
         }
 
+        /* account for the trailer before parsing the payload */
         if (tflag) {
             nsamps -= 1;
         }
 
-        /* now we've got either a context packet or a data packet */
-        if (type == 4) {
-            /* parse context packet */
-            int num_v49_words = dissect_context(tvb, vrt_tree, offset);
-            nsamps -= num_v49_words;
-            offset += 4*num_v49_words;
+        /* Parsing of the payload depend on the packet type */
+        tvbuff_t *payload;
+        switch(type) {
+            case vrt_type_ctx:
+                if(vrt_use_cif_cfg_file) {
+                    // Hand off to the configurable CIF dissection
+                    payload = tvb_new_subset_length_caplen(tvb, offset, nsamps*4, nsamps*4);
+                    call_dissector_with_data(cif_handle, payload, pinfo, vrt_tree, (void *) &descript);
+                } else {
+                    // Use the explicitly defined parsing functions
+                    dissect_context(tvb, vrt_tree, offset);
+                }
+                break;
+            case vrt_type_ectx:
+                if(vrt_use_cif_cfg_file) {
+                    payload = tvb_new_subset_length_caplen(tvb, offset, nsamps*4, nsamps*4);
+                    call_dissector_with_data(cif_handle, payload, pinfo, vrt_tree, (void *) &descript);
+                } else {
+                    // no extension context packet parsing without configuration file
+                    if (nsamps != 0) {
+                        proto_item *it = proto_tree_add_item(vrt_tree, hf_vrt_data, tvb, offset, nsamps*4, ENC_NA);
+                        expert_add_info_format(pinfo, it, &ei_config_file_msg, "Consider adding CIF configuration file");
+                    }
+                }
+                break;
+            case vrt_type_cmd:
+                if(vrt_limit_to_49_0) {
+                    /* This is not a valid type for 49.0; just show the rest as bytes */
+                    if (nsamps != 0) {
+                        proto_tree_add_item(vrt_tree, hf_vrt_data, tvb, offset, nsamps*4, ENC_NA);
+                    }
+                } else {
+                    int delta_offset = dissect_command(tvb, vrt_tree, offset, &descript);
+                    nsamps -= delta_offset/4;
+                    offset += delta_offset;
+                    if(vrt_use_cif_cfg_file) {
+                        payload = tvb_new_subset_length_caplen(tvb, offset, nsamps*4, nsamps*4);
+                        call_dissector_with_data(cif_handle, payload, pinfo, vrt_tree, (void *) &descript);
+                    } else {
+                        // no command packet cif parsing without configuration file
+                        // [TODO] it should be possible to apply the default context parsing here
+                        if (nsamps != 0) {
+                            proto_item *it = proto_tree_add_item(vrt_tree, hf_vrt_data, tvb, offset, nsamps*4, ENC_NA);
+                            expert_add_info_format(pinfo, it, &ei_config_file_msg, "Consider adding CIF configuration file");
+                        }
+                    }
+                }
+                break;
+            case vrt_type_ecmd:
+                if(vrt_limit_to_49_0) {
+                    /* This is not a valid type for 49.0; just show the rest as bytes */
+                    if (nsamps != 0) {
+                        proto_tree_add_item(vrt_tree, hf_vrt_data, tvb, offset, nsamps*4, ENC_NA);
+                    }
+                } else {
+                    int delta_offset = dissect_command(tvb, vrt_tree, offset, &descript);
+                    nsamps -= delta_offset/4;
+                    offset += delta_offset;
+                    if(vrt_use_cif_cfg_file) {
+                        payload = tvb_new_subset_length_caplen(tvb, offset, nsamps*4, nsamps*4);
+                        call_dissector_with_data(cif_handle, payload, pinfo, vrt_tree, (void *) &descript);
+                    } else {
+                        // no extension context packet parsing without configuration file
+                        if (nsamps != 0) {
+                            proto_item *it = proto_tree_add_item(vrt_tree, hf_vrt_data, tvb, offset, nsamps*4, ENC_NA);
+                            expert_add_info_format(pinfo, it, &ei_config_file_msg, "Consider adding CIF configuration file");
+                        }
+                    }
+                }
+                break;
+            case vrt_type_sig:
+            case vrt_type_sig_sid:
+                /* [TODO] Add parsing of IF Data into fields; packing fields structure is a function
+                   of class id and requires additional information to parse. Use new config table or
+                   perhaps add a few selectable common encodings (e.g. packed/padded N-bit integers)? 
+                   But for now just dump the the raw payload*/
+                if (nsamps != 0) {
+                  proto_tree_add_item(vrt_tree, hf_vrt_data, tvb, offset, nsamps*4, ENC_NA);
+                }
+                break;
+            default:
+                /* no further processing for other types */
+                if (nsamps != 0) {
+                  proto_tree_add_item(vrt_tree, hf_vrt_data, tvb, offset, nsamps*4, ENC_NA);
+                }
         }
-
-        /* we're into the data */
-        if (nsamps != 0) {
-            proto_tree_add_item(vrt_tree, hf_vrt_data, tvb, offset, nsamps*4, ENC_NA);
-        }
-
-        offset += nsamps*4;
+        /* The packet type specific parsing is expected to consume all remaing data 
+           (excect the optional trailer which was already accounted for above) */
+        offset += nsamps * 4;
+        nsamps -= nsamps;
 
         if (tflag) {
             dissect_trailer(tvb, vrt_tree, offset);
@@ -571,11 +747,37 @@ static void dissect_header(tvbuff_t *tvb, proto_tree *tree, int type, int offset
     hdr_tree = proto_item_add_subtree(hdr_item, ett_header);
     proto_tree_add_item(hdr_tree, hf_vrt_type, tvb, offset, 1, ENC_BIG_ENDIAN);
     proto_tree_add_item(hdr_tree, hf_vrt_cidflag, tvb, offset, 1, ENC_BIG_ENDIAN);
-    if (type == 4) {
-        proto_tree_add_item(hdr_tree, hf_vrt_tsmflag, tvb, offset, 1, ENC_BIG_ENDIAN);
+
+    if(vrt_limit_to_49_0) {
+        if ((type == vrt_type_ctx) || (type == vrt_type_ectx)) {
+            proto_tree_add_item(hdr_tree, hf_vrt_tsmflag, tvb, offset, 1, ENC_BIG_ENDIAN);
+        } else {
+            proto_tree_add_item(hdr_tree, hf_vrt_tflag, tvb, offset, 1, ENC_BIG_ENDIAN);
+        }
     } else {
-        proto_tree_add_item(hdr_tree, hf_vrt_tflag, tvb, offset, 1, ENC_BIG_ENDIAN);
+        /* decode packet specific indicator bits based on packet type */
+        switch(type) {
+            case vrt_type_sig:
+            case vrt_type_sig_sid:
+                proto_tree_add_item(hdr_tree, hf_vrt_tflag, tvb, offset, 1, ENC_BIG_ENDIAN);
+                proto_tree_add_item(hdr_tree, hf_vrt_nd0flag, tvb, offset, 1, ENC_BIG_ENDIAN);
+                proto_tree_add_item(hdr_tree, hf_vrt_sflag, tvb, offset, 1, ENC_BIG_ENDIAN);
+                break;
+            case vrt_type_ctx:
+            case vrt_type_ectx:
+                proto_tree_add_item(hdr_tree, hf_vrt_nd0flag, tvb, offset, 1, ENC_BIG_ENDIAN);
+                proto_tree_add_item(hdr_tree, hf_vrt_tsmflag, tvb, offset, 1, ENC_BIG_ENDIAN);
+                break;
+            case vrt_type_cmd:
+            case vrt_type_ecmd:
+                proto_tree_add_item(hdr_tree, hf_vrt_ackflag, tvb, offset, 1, ENC_BIG_ENDIAN);
+                proto_tree_add_item(hdr_tree, hf_vrt_clflag, tvb, offset, 1, ENC_BIG_ENDIAN);
+                break;
+            default:
+                proto_tree_add_item(hdr_tree, hf_vrt_tflag, tvb, offset, 1, ENC_BIG_ENDIAN);
+        }
     }
+
     offset += 1;
     proto_tree_add_item(hdr_tree, hf_vrt_tsi, tvb, offset, 1, ENC_BIG_ENDIAN);
     proto_tree_add_item(hdr_tree, hf_vrt_tsf, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -608,11 +810,36 @@ static void dissect_trailer(tvbuff_t *tvb, proto_tree *tree, int offset)
     if (en_bits) {
         enable_tree = proto_item_add_subtree(enable_item, ett_ind_enables);
         ind_tree = proto_item_add_subtree(ind_item, ett_indicators);
-        for (i = 11; i >= 0; i--) {
-            if (en_bits & (1<<i)) {
-                /* XXX: Display needs to be improved ... */
-                proto_tree_add_item(enable_tree, *enable_hfs[i], tvb, offset,   2, ENC_BIG_ENDIAN);
-                proto_tree_add_item(ind_tree, *ind_hfs[i],       tvb, offset+1, 2, ENC_BIG_ENDIAN);
+        if(vrt_limit_to_49_0) {
+            for (i = 11; i >= 0; i--) {
+                if (en_bits & (1<<i)) {
+                    /* XXX: Display needs to be improved ... */
+                    proto_tree_add_item(enable_tree, *enable_hfs[i], tvb, offset,   2, ENC_BIG_ENDIAN);
+                    proto_tree_add_item(ind_tree, *ind_hfs[i],       tvb, offset+1, 2, ENC_BIG_ENDIAN);
+                }
+            }
+        } else {
+            /* In V49.2 some of the user bits are redefined so special case the end */
+            if (en_bits & 0x000C) {
+                proto_tree_add_item(trailer_tree, hf_vrt_trailer_ind_frame,   tvb, offset+1, 2, ENC_BIG_ENDIAN);
+            }
+            for (i = 11; i >= 4; i--) {
+                if (en_bits & (1<<i)) {
+                    /* XXX: Display needs to be improved ... */
+                    proto_tree_add_item(enable_tree, *enable_hfs[i], tvb, offset,   2, ENC_BIG_ENDIAN);
+                    proto_tree_add_item(ind_tree, *ind_hfs[i],       tvb, offset+1, 2, ENC_BIG_ENDIAN);
+                }
+            }
+            if (en_bits & 0x000C) {
+                proto_tree_add_item(enable_tree, hf_vrt_trailer_en_frame,   tvb, offset, 2, ENC_BIG_ENDIAN);
+            }
+            if (en_bits & 0x0002) {
+                proto_tree_add_item(enable_tree, *enable_hfs[1], tvb, offset,   2, ENC_BIG_ENDIAN);
+                proto_tree_add_item(ind_tree, *ind_hfs[1],       tvb, offset+1, 2, ENC_BIG_ENDIAN);
+            }
+            if (en_bits & 0x0001) {
+                proto_tree_add_item(enable_tree, *enable_hfs[0], tvb, offset,   2, ENC_BIG_ENDIAN);
+                proto_tree_add_item(ind_tree, *ind_hfs[0],       tvb, offset+1, 2, ENC_BIG_ENDIAN);
             }
         }
     }
@@ -621,22 +848,84 @@ static void dissect_trailer(tvbuff_t *tvb, proto_tree *tree, int offset)
     proto_tree_add_item(trailer_tree, hf_vrt_trailer_acpc, tvb, offset, 1, ENC_BIG_ENDIAN);
 }
 
-static void dissect_cid(tvbuff_t *tvb, proto_tree *tree, int offset)
+static void dissect_cid(tvbuff_t *tvb, proto_tree *tree, int offset, vrt_packet_description_t *descript)
 {
     proto_item *cid_item;
     proto_tree *cid_tree;
+    guint32 ret;
 
     cid_item = proto_tree_add_item(tree, hf_vrt_cid, tvb, offset, 8, ENC_BIG_ENDIAN);
     cid_tree = proto_item_add_subtree(cid_item, ett_cid);
 
+    proto_tree_add_item(cid_tree, hf_vrt_cid_pad, tvb, offset, 1, ENC_BIG_ENDIAN);
     offset += 1;
-    proto_tree_add_item(cid_tree, hf_vrt_cid_oui, tvb, offset, 3, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint(cid_tree, hf_vrt_cid_oui, tvb, offset, 3, ENC_BIG_ENDIAN, &ret);
+    descript->oui = ret & 0x00FFFFFF;
     offset += 3;
-    proto_tree_add_item(cid_tree, hf_vrt_cid_icc, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint(cid_tree, hf_vrt_cid_icc, tvb, offset, 2, ENC_BIG_ENDIAN, &ret);
+    descript->info_class_code = ret & 0xFFFF;
     offset += 2;
-    proto_tree_add_item(cid_tree, hf_vrt_cid_pcc, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint(cid_tree, hf_vrt_cid_pcc, tvb, offset, 2, ENC_BIG_ENDIAN, &ret);
+    descript->packet_class_code = ret & 0xFFFF;
 }
 
+/* return the number of bytes parsed so we can keep track of our postion */
+/* using pointers for offset might be cleaner, but it does not follow the 
+   model of the other dissect_xxx functions */
+static int dissect_command(tvbuff_t *tvb, proto_tree *tree, int initial_offset, vrt_packet_description_t *descript)
+{
+    int offset = initial_offset;
+    proto_item *cam_item;
+    proto_tree *cam_tree;
+    guint32 ee_mode;
+    guint32 er_mode;
+
+    /* Not all of these fields have meaning for all packet types, but we decode them
+       all anyway. They should be 0 when not valid. */
+    cam_item = proto_tree_add_item_ret_uint(tree, hf_vrt_cam, tvb, offset, 4, ENC_BIG_ENDIAN, &descript->cam);
+    cam_tree = proto_item_add_subtree(cam_item, ett_cam);
+    proto_tree_add_item_ret_uint(cam_tree, hf_vrt_cam_controllee, tvb, offset, 4, ENC_BIG_ENDIAN, &ee_mode);
+    proto_tree_add_item_ret_uint(cam_tree, hf_vrt_cam_controller, tvb, offset, 4, ENC_BIG_ENDIAN, &er_mode);
+    proto_tree_add_item(cam_tree, hf_vrt_cam_partial, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(cam_tree, hf_vrt_cam_warnings, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(cam_tree, hf_vrt_cam_errors, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(cam_tree, hf_vrt_cam_action, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(cam_tree, hf_vrt_cam_nack, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(cam_tree, hf_vrt_cam_reqv, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(cam_tree, hf_vrt_cam_reqx, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(cam_tree, hf_vrt_cam_reqs, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(cam_tree, hf_vrt_cam_reqw, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(cam_tree, hf_vrt_cam_reqer, tvb, offset, 4, ENC_BIG_ENDIAN);
+    if(tvb_get_guint32(tvb, offset, ENC_BIG_ENDIAN) & (1<<15)) {   /* only display if set */
+      proto_tree_add_item(cam_tree, hf_vrt_cam_requ, tvb, offset, 4, ENC_BIG_ENDIAN);
+    }
+    proto_tree_add_item(cam_tree, hf_vrt_cam_timing_control, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(cam_tree, hf_vrt_cam_ackp, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(cam_tree, hf_vrt_cam_schx, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(cam_tree, hf_vrt_cam_user, tvb, offset, 4, ENC_BIG_ENDIAN);
+    offset += 4;
+
+    proto_tree_add_item(tree, hf_vrt_message_id, tvb, offset, 4, ENC_BIG_ENDIAN);
+    offset += 4;
+    if(ee_mode == 2) {
+        proto_tree_add_item(tree, hf_vrt_controllee_id, tvb, offset, 4, ENC_BIG_ENDIAN);
+        offset += 4;
+    } else if(ee_mode == 3) {
+        proto_tree_add_item(tree, hf_vrt_controllee_uuid, tvb, offset, 16, ENC_BIG_ENDIAN);
+        offset += 16;
+    }
+    if(er_mode == 2) {
+        proto_tree_add_item(tree, hf_vrt_controller_id, tvb, offset, 4, ENC_BIG_ENDIAN);
+        offset += 4;
+    } else if(er_mode == 3) {
+        proto_tree_add_item(tree, hf_vrt_controller_uuid, tvb, offset, 16, ENC_BIG_ENDIAN);
+        offset += 16;
+    }
+
+    return offset - initial_offset;
+}
+
+/* return the number of bytes parsed so we can keep track of our postion */
 static int dissect_context(tvbuff_t *tvb, proto_tree *tree, int offset)
 {
     uint32_t cif[8] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -1106,10 +1395,34 @@ proto_register_vrt(void)
             NULL, 0x04,
             NULL, HFILL }
         },
+        { &hf_vrt_nd0flag,
+            { "Not V49.0 Compatible", "vrt.nd0flag",
+            FT_BOOLEAN, 8,
+            NULL, 0x02,
+            NULL, HFILL }
+        },
+        { &hf_vrt_sflag,
+            { "Spectral Data mode", "vrt.qflag",
+            FT_UINT8, BASE_DEC,
+            VALS(signal_type_types), 0x01,
+            NULL, HFILL }
+        },
         { &hf_vrt_tsmflag,
             { "Timestamp mode", "vrt.tsmflag",
             FT_UINT8, BASE_DEC,
             VALS(tsm_types), 0x01,
+            NULL, HFILL }
+        },
+        { &hf_vrt_ackflag,
+            { "Acknowledge Packet", "vrt.ackflag",
+            FT_BOOLEAN, 8,
+            NULL, 0x04,
+            NULL, HFILL }
+        },
+        { &hf_vrt_clflag,
+            { "Cancelation Packet", "vrt.clflag",
+            FT_BOOLEAN, 8,
+            NULL, 0x01,
             NULL, HFILL }
         },
         { &hf_vrt_tsi,
@@ -1163,6 +1476,144 @@ proto_register_vrt(void)
         { &hf_vrt_cid,
             { "Class ID", "vrt.cid",
             FT_UINT64, BASE_HEX,
+            NULL, 0x00,
+            NULL, HFILL }
+        },
+        { &hf_vrt_cam,
+            { "VRT Control/Acknowledge Mode", "vrt.cam",
+            FT_UINT32, BASE_HEX,
+            NULL, 0x00,
+            NULL, HFILL }
+        },
+        { &hf_vrt_cam_controllee,
+            { "Controllee Field Format", "vrt.cam_controllee",
+            FT_UINT32, BASE_DEC,
+            VALS(cam_control_types), 0xC0000000,
+            NULL, HFILL }
+        },
+        { &hf_vrt_cam_controller,
+            { "Controller Field Format", "vrt.cam_controller",
+            FT_UINT32, BASE_DEC,
+            VALS(cam_control_types), 0x30000000,
+            NULL, HFILL }
+        },
+        { &hf_vrt_cam_partial,
+            { "Allow Execution of partial packet", "vrt.cam_partial",
+            FT_BOOLEAN, 32,
+            NULL, 0x08000000,
+            NULL, HFILL }
+        },
+        { &hf_vrt_cam_warnings,
+            { "Allow execution with warnings", "vrt.cam_warnings",
+            FT_BOOLEAN, 32,
+            NULL, 0x04000000,
+            NULL, HFILL }
+        },
+        { &hf_vrt_cam_errors,
+            { "Allow execution with errors", "vrt.cam_errors",
+            FT_BOOLEAN, 32,
+            NULL, 0x02000000,
+            NULL, HFILL }
+        },
+        { &hf_vrt_cam_action,
+            { "Command Action", "vrt.cam_action",
+            FT_UINT32, BASE_DEC,
+            VALS(cam_action_types), 0x01800000,
+            NULL, HFILL }
+        },
+        { &hf_vrt_cam_nack,
+            { "Response only on error/warning", "vrt.cam_nack",
+            FT_BOOLEAN, 32,
+            NULL, 0x00400000,
+            NULL, HFILL }
+        },
+        { &hf_vrt_cam_reqv,
+            { "Validation Response", "vrt.cam_reqv",
+            FT_BOOLEAN, 32,
+            NULL, 0x00100000,
+            NULL, HFILL }
+        },
+        { &hf_vrt_cam_reqx,
+            { "Execution Response", "vrt.cam_reqx",
+            FT_BOOLEAN, 32,
+            NULL, 0x00080000,
+            NULL, HFILL }
+        },
+        { &hf_vrt_cam_reqs,
+            { "Schedule Response", "vrt.cam_reqs",
+            FT_BOOLEAN, 32,
+            NULL, 0x00040000,
+            NULL, HFILL }
+        },
+        { &hf_vrt_cam_reqw,
+            { "Request additional warning description", "vrt.cam_reqw",
+            FT_BOOLEAN, 32,
+            NULL, 0x00020000,
+            NULL, HFILL }
+        },
+        { &hf_vrt_cam_reqer,
+            { "Request additional error description", "vrt.cam_reqer",
+            FT_BOOLEAN, 32,
+            NULL, 0x00010000,
+            NULL, HFILL }
+        },
+        { &hf_vrt_cam_requ,
+            { "Request extension packet specific response", "vrt.cam_requ",
+            FT_BOOLEAN, 32,
+            NULL, 0x00008000,
+            NULL, HFILL }
+        },
+        { &hf_vrt_cam_timing_control,
+            { "Command timing control mode", "vrt.cam_timing_control",
+            FT_UINT32, BASE_DEC,
+            VALS(cam_timing_types), 0x00007000,
+            NULL, HFILL }
+        },
+        { &hf_vrt_cam_ackp,
+            { "Partial Action Acknowledge", "vrt.cam_ackp",
+            FT_BOOLEAN, 32,
+            NULL, 0x00000800,
+            NULL, HFILL }
+        },
+        { &hf_vrt_cam_schx,
+            { "Requested Action complete", "vrt.cam_schx",
+            FT_BOOLEAN, 32,
+            NULL, 0x00000400,
+            NULL, HFILL }
+        },
+        { &hf_vrt_cam_user,
+            { "User Control/Acknowledge Mode Flags (for Extended Command Packets)", "vrt.cam_user",
+            FT_UINT32, BASE_DEC,
+            NULL, 0x000000FF,
+            NULL, HFILL }
+        },
+        { &hf_vrt_message_id,
+            { "Message Id", "vrt.message_id",
+            FT_UINT32, BASE_HEX,
+            NULL, 0x00,
+            NULL, HFILL }
+        },
+        { &hf_vrt_controllee_id,
+            { "Controllee Id", "vrt.controllee_id",
+            FT_UINT32, BASE_HEX,
+            NULL, 0x00,
+            NULL, HFILL }
+        },
+        { &hf_vrt_controller_id,
+            { "Controller Id", "vrt.controller_id",
+            FT_UINT32, BASE_HEX,
+            NULL, 0x00,
+            NULL, HFILL }
+        },
+        { &hf_vrt_controllee_uuid,
+            { "Controllee UUID", "vrt.controllee_uuid",
+            FT_GUID, BASE_NONE,
+            NULL, 0x00,
+            NULL, HFILL }
+        },
+        { &hf_vrt_controller_uuid,
+            { "Controller UUID", "vrt.controller_uuid",
+            FT_GUID, BASE_NONE,
             NULL, 0x00,
             NULL, HFILL }
         },
@@ -2324,6 +2775,12 @@ proto_register_vrt(void)
             NULL, 0x0001,
             NULL, HFILL }
         },
+        { &hf_vrt_trailer_ind_frame,
+            { "Frame Mode Indicator", "vrt.frame_mode",
+            FT_UINT16, BASE_DEC,
+            VALS(frame_mode_types), 0x000C,
+            NULL, HFILL }
+        },
         { &hf_vrt_trailer_en_caltime,
             { "Calibrated time indicator enable", "vrt.caltime_en",
             FT_BOOLEAN, 16,
@@ -2396,6 +2853,18 @@ proto_register_vrt(void)
             NULL, 0x0010,
             NULL, HFILL }
         },
+        { &hf_vrt_trailer_en_frame,
+            { "Frame mode indicator enable", "vrt.frame_mode_en",
+            FT_UINT16, BASE_DEC,
+            NULL, 0x00C0,
+            NULL, HFILL }
+        },
+        { &hf_vrt_cid_pad,
+            { "Class ID Pad Bit Count", "vrt.pad_count",
+            FT_UINT8, BASE_DEC,
+            NULL, 0xF8,
+            NULL, HFILL }
+        },
         { &hf_vrt_cid_oui,
             { "Class ID Organizationally Unique ID", "vrt.oui",
             FT_UINT24, BASE_HEX,
@@ -2416,7 +2885,6 @@ proto_register_vrt(void)
         }
     };
 
-    // update ETT_IDX_* as new items added to track indices
     static gint *ett[] = {
         &ett_vrt,
         &ett_header,
@@ -2424,6 +2892,7 @@ proto_register_vrt(void)
         &ett_indicators,
         &ett_ind_enables,
         &ett_cid,
+        &ett_cam,
         &ett_cif0,
         &ett_cif1,
         &ett_gain, // ETT_IDX_GAIN
@@ -2437,13 +2906,21 @@ proto_register_vrt(void)
         &ett_gps_ascii, // ETT_IDX_GPS_ASCII
         &ett_assoc_lists, // ETT_IDX_ASSOC_LISTS
         &ett_pol, // ETT_IDX_POL
-        &ett_ver, // ETT_IDX_VER
+        &ett_ver  // ETT_IDX_VER
      };
+
+    static ei_register_info ei[] = {
+        { &ei_config_file_msg, { "vrt.note.expert", PI_PROTOCOL, PI_NOTE, 
+                                 "Dissector can support extension packets with CIF configuration file", 
+                                 EXPFILL }}
+    };
 
     proto_vrt = proto_register_protocol ("VITA 49 radio transport protocol", "VITA 49", "vrt");
 
     proto_register_field_array(proto_vrt, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
+    expert_module_t *expert_vrt = expert_register_protocol(proto_vrt);
+    expert_register_field_array(expert_vrt, ei, array_length(ei));
 
     vrt_handle = register_dissector("vrt", dissect_vrt, proto_vrt);
 
@@ -2452,12 +2929,21 @@ proto_register_vrt(void)
         "Use Ettus UHD header format",
         "Activate workaround for weird Ettus UHD header offset on data packets",
         &vrt_use_ettus_uhd_header_format);
+    prefs_register_bool_preference(vrt_module, "limit_to_49_0_format",
+        "Limit dissection to VITA 49.0 format",
+        "Use the original field defintion for fields modified in VITA 49.2",
+        &vrt_limit_to_49_0);
+    prefs_register_bool_preference(vrt_module, "use_cif_cfg_file",
+        "Use file for CIF definitions",
+        "If set, all CIF definitions are parsed from a configuration file, otherwise a set of fixed standard definitions are used",
+        &vrt_use_cif_cfg_file);
 }
 
 void
 proto_reg_handoff_vrt(void)
 {
-    dissector_add_uint_with_preference("udp.port", VITA_49_PORT, vrt_handle);
+    dissector_add_uint_range_with_preference("udp.port", VITA_49_PORT, vrt_handle);
+    cif_handle = find_dissector_add_dependency("vrt_cif", proto_vrt);
 
     dissector_add_string("rtp_dyn_payload_type","VITA 49", vrt_handle);
     dissector_add_uint_range_with_preference("rtp.pt", "", vrt_handle);

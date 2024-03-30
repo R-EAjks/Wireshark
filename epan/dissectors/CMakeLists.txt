@@ -2055,6 +2055,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-vpp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-vrrp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-vrt.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-vrt_cif.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-vsip.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-vsock.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-vssmonitoring.c

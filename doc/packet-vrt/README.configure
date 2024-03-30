@@ -1,0 +1,39 @@
+# Quickstart
+1. Copy the configuration files to a convenient location
+2. Run wireshark and update the preferences
+   - Select Edit->Preferences...
+   - Select Protocols->VITA 49
+   - Uncheck "Use Ettus" and "Limit dissection"; set port number list (4991 typical). You can enter multiple ports separated by commas, and/or ranges with a dash.
+   - Select Protocols->V49 CIF
+   - Set filename to location of top configuration file; Check "Fallback" to enable default class id.
+3. Load example capture file. A sample pcap file is provided to verify the installation. This is a constructed file intended to highlight some of the parsing features and may not illustrate meaningful traffic at the system level.
+4. For live captures, apply a display filter to limit display (e.g., "vrt" for only VITA 49 packet)
+
+ ## Note on example file
+ The example file may have been created from a raw byte sequence. You can load the byte sequence directly with the "File->Import from Hex Dump..." menu item. Select the UDP radio button and indicate a port you have designated for V49 (e.g., 4992). The dump file will contain comments on the expected results.
+
+# Key Features added with this dissector
+## Changes to VITA 49 Protocol (packet-vrt):
+
+* Added preference "Limit dissection to VITA 49.0 format"
+   If enabled, the dissector should behave primarily as it did before with no extra interpretation of
+   new V49.2 fields.
+
+* Added parsing of new header fields as defiend by V49.2
+
+* Added link to new dissector for context and command packets
+
+## New V49 CIF Protocol (packet-vrt-cif):
+* Parse and display payload of context, extended context, control, and extended control packets
+
+* Preference "CIF description filename" set the top XML file to describe field parsing
+   - vrt-cif-standard-top.xml :   Top level for public field parsing only
+   - vrt-cif-warnerr.xml :        Common definitions of the warn/err bits (included from top)
+   - vrt-cif-standard.xml :       Description of fields described in V49.2 section 9 (included from top)
+   - vrt-cif-*project*.xml :      Description of extension fields defined for project (included from top)
+
+   VRT is not a specification, but a framework within which a specifications can be defined. It may be useful to refine the dissector to display only information from the standard which falls within the subset used by the system under test and flag variations. Since there are a large number of valid variations, this selection is not suited to a set of simple configuration properties. The dissector supports the customization by allowing the user to edit vrt-cif-standard.xml to describe their specific use of the standard. Similarly, the extended context/command packets are completely user specific, but if they are formatted in a similar fashion to the standard context/command packets as recommended by the standard, they can be described and parsed by the dissector with an additional xml file.
+
+* Preference "Fallback to default configuration" allows the default (no class id) configuration
+   to be used when a class id is provided but does not match one(s) defined.
+
