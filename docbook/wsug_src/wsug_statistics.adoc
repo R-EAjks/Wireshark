@@ -228,7 +228,9 @@ exported without special formatting, but this can be enabled if needed.
 
 The btn:[Follow Stream...] button will show the stream contents as described
 in <<ChAdvFollowStream>> dialog. The btn:[Graph...] button will show a graph
-as described in <<ChStatIOGraphs>>.
+as described in <<ChStatTCPStreamGraphs>>. Similarly the btn:[I/O Graph...] will
+show the I/O graph as described in <<ChStatIOGraphs>>, this one allowing multiple
+selections.
 
 btn:[Conversation Types] lets you choose which traffic type tabs are shown.
 See <<ChStatEndpoints>> for a list of endpoint types. The enabled types

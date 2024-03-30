@@ -3050,7 +3050,9 @@ void LograyMainWindow::statCommandIOGraph(const char *, void *)
     if (df_edit)
         displayFilter = df_edit->text();
 
-    IOGraphDialog *iog_dialog = new IOGraphDialog(*this, capture_file_, displayFilter);
+
+    QVector<QString> no_conv_filters;
+    IOGraphDialog *iog_dialog = new IOGraphDialog(*this, capture_file_, displayFilter, false, no_conv_filters);
     connect(iog_dialog, SIGNAL(goToPacket(int)), packet_list_, SLOT(goToPacket(int)));
     connect(this, SIGNAL(reloadFields()), iog_dialog, SLOT(reloadFields()));
     iog_dialog->show();

@@ -55,6 +55,7 @@ signals:
     void filterAction(QString filter, FilterAction::Action action, FilterAction::ActionType type);
     void openFollowStreamDialog(int proto_id);
     void openTcpStreamGraph(int graph_type);
+    void openIOGraph(bool filtered, QVector<int> conv_ids);
 
 protected:
     Ui::TrafficTableDialog *ui;
