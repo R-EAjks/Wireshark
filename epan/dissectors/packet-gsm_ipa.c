@@ -12,6 +12,8 @@
 
 #include "config.h"
 
+#include "packet-tcp.h"
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
 
@@ -65,6 +67,7 @@ static dissector_handle_t ipa_tcp_handle;
 static dissector_handle_t ipa_udp_handle;
 static gboolean global_ipa_in_root = FALSE;
 static gboolean global_ipa_in_info = FALSE;
+static gboolean global_tcp_desegment = FALSE;
 
 /* Initialize the protocol and registered fields */
 static int proto_ipa;
@@ -371,11 +374,27 @@ dissect_ipa(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean is_udp
 }
 
 static int
-dissect_ipa_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
+_dissect_ipa_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 {
 	if (!dissect_ipa(tvb, pinfo, tree, FALSE))
 		return 0;
 	return tvb_captured_length(tvb);
+}
+
+static guint
+get_dissect_ipa_tcp_len(packet_info *pinfo _U_, tvbuff_t *tvb,
+			int offset, void *data _U_)
+{
+	/* +2 for u16(data_len), +1 for u8(protocol) */
+	return tvb_get_ntohs(tvb, offset + 0) + 2 + 1;
+}
+
+static int
+dissect_ipa_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
+{
+	tcp_dissect_pdus(tvb, pinfo, tree, global_tcp_desegment, 2,
+			 get_dissect_ipa_tcp_len, _dissect_ipa_tcp, data);
+	return tvb_reported_length(tvb);
 }
 
 static int
@@ -468,6 +487,9 @@ void proto_register_ipa(void)
 	prefs_register_bool_preference(ipa_module, "hsl_debug_in_info",
 					"HSL Debug messages in INFO column",
 					NULL, &global_ipa_in_info);
+	prefs_register_bool_preference(ipa_module, "desegment",
+				       "Desegment IPA messages spanning multiple TCP segments",
+				       NULL, &global_tcp_desegment);
 
 	ipa_tcp_handle = register_dissector("gsm_ipa.tcp", dissect_ipa_tcp, proto_ipa);
 	ipa_udp_handle = register_dissector("gsm_ipa.udp", dissect_ipa_udp, proto_ipa);
