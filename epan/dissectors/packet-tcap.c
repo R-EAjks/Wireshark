@@ -183,7 +183,7 @@ static range_t *ssn_range;
    or when the same TCAP transcation identifier is reused */
 static guint gtcap_RepetitionTimeout = 10;
 static guint gtcap_LostTimeout = 30;
-gboolean gtcap_PersistentSRT=FALSE;
+static bool gtcap_PersistentSRT=false;
 gboolean gtcap_DisplaySRT=FALSE;
 gboolean gtcap_StatSRT=FALSE;
 
@@ -3142,7 +3142,7 @@ dissect_tcap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* d
       }
     }
     if (p_tcap_context && p_tcap_context->callback) {
-      /* Callback fonction for the upper layer */
+      /* Callback function for the upper layer */
       (p_tcap_context->callback)(tvb, pinfo, tcap_stat_tree, p_tcap_context);
     }
   }

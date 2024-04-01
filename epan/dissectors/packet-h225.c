@@ -1136,9 +1136,9 @@ static gint ett_h225_T_result;
 
 /* Preferences */
 static guint h225_tls_port = TLS_PORT_CS;
-static gboolean h225_reassembly = TRUE;
-static gboolean h225_h245_in_tree = TRUE;
-static gboolean h225_tp_in_tree = TRUE;
+static bool h225_reassembly = true;
+static bool h225_h245_in_tree = true;
+static bool h225_tp_in_tree = true;
 
 /* Global variables */
 static guint32 ipv4_address;
@@ -3967,7 +3967,7 @@ static const per_sequence_t EnumeratedParameter_sequence[] = {
 
 static int
 dissect_h225_EnumeratedParameter(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-  // EnumeratedParameter → Content → Content/compound → EnumeratedParameter
+  // EnumeratedParameter -> Content -> Content/compound -> EnumeratedParameter
   actx->pinfo->dissection_depth += 3;
   increment_dissection_depth(actx->pinfo);
   gef_ctx_t *parent_gefx;
@@ -3992,7 +3992,7 @@ static const per_sequence_t GenericData_sequence[] = {
 
 int
 dissect_h225_GenericData(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-  // GenericData → GenericData/parameters → EnumeratedParameter → Content → Content/nested → GenericData
+  // GenericData -> GenericData/parameters -> EnumeratedParameter -> Content -> Content/nested -> GenericData
   actx->pinfo->dissection_depth += 5;
   increment_dissection_depth(actx->pinfo);
   void *priv_data = actx->private_data;

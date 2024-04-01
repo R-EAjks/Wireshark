@@ -1015,7 +1015,7 @@ static const value_string o43pxeclient_boot_menu_types[] = {
 	{  0, NULL },
 };
 
-static gboolean novell_string = FALSE;
+static bool novell_string = false;
 
 static gint dhcp_uuid_endian = ENC_LITTLE_ENDIAN;
 
@@ -8531,7 +8531,7 @@ proto_register_dhcp(void)
 
 	       /* AEROHIVE (Extremenetworks) vendor suboptions */
 	       { &hf_dhcp_option43_aerohive_suboption,
-		 { "Option 43 Suboption", "dhcp.option.vendor.cisco.suboption",
+		 { "Option 43 Suboption", "dhcp.option.vendor.aerohive.suboption",
 		   FT_UINT8, BASE_DEC, VALS(option43_aerohive_suboption_vals), 0x0,
 		   "Option 43:AEROHIVE Suboption", HFILL }},
 

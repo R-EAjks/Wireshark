@@ -81,9 +81,9 @@ static int proto_tcpcl_exts;
 static const char *const proto_name_tcpcl = "TCPCL";
 
 static gint tcpcl_chdr_missing = CHDRMSN_V4FIRST;
-static gboolean tcpcl_desegment_transfer = TRUE;
-static gboolean tcpcl_analyze_sequence = TRUE;
-static gboolean tcpcl_decode_bundle = TRUE;
+static bool tcpcl_desegment_transfer = true;
+static bool tcpcl_analyze_sequence = true;
+static bool tcpcl_decode_bundle = true;
 
 /* For Reassembling TCP Convergence Layer segments */
 static reassembly_table xfer_reassembly_table;
@@ -1949,11 +1949,8 @@ static guint chdr_missing_tls(packet_info *pinfo, tvbuff_t *tvb, int offset,
         return 0;
     }
     guint8 rectype = tvb_get_guint8(tvb, offset);
-    offset += 1;
-    guint16 recvers = tvb_get_guint16(tvb, offset, ENC_BIG_ENDIAN);
-    offset += 2;
-    guint16 reclen = tvb_get_guint16(tvb, offset, ENC_BIG_ENDIAN);
-    offset += 2;
+    guint16 recvers = tvb_get_guint16(tvb, offset+1, ENC_BIG_ENDIAN);
+    guint16 reclen = tvb_get_guint16(tvb, offset+1+2, ENC_BIG_ENDIAN);
 
     switch(rectype) {
         // These overlap with TCPCLV3_DATA_SEGMENT but have invalid flags

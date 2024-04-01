@@ -413,7 +413,7 @@ static gboolean ldap_found_in_frame = FALSE;
 #define UDP_PORT_CLDAP                  389
 
 /* desegmentation of LDAP */
-static gboolean ldap_desegment = TRUE;
+static bool ldap_desegment = true;
 static guint global_ldaps_tcp_port = TCP_PORT_LDAPS;
 static guint ssl_port = 0;
 
@@ -2173,7 +2173,7 @@ static const ber_choice_t Filter_choice[] = {
 
 static int
 dissect_ldap_Filter(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-  // Filter → Filter/and → Filter/and/_item → Filter
+  // Filter -> Filter/and -> Filter/and/_item -> Filter
   actx->pinfo->dissection_depth += 3;
   increment_dissection_depth(actx->pinfo);
   proto_tree *tr;

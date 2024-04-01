@@ -1292,8 +1292,8 @@ void gcp_analyze_msg(proto_tree* gcp_tree, packet_info* pinfo, tvbuff_t* gcp_tvb
 /* END Gateway Control Protocol -- Context Tracking */
 
 #define H248_PORT 2945
-static gboolean keep_persistent_data = FALSE;
-static gboolean h248_desegment = TRUE;
+static bool keep_persistent_data = false;
+static bool h248_desegment = true;
 
 
 
@@ -4247,7 +4247,7 @@ static const ber_sequence_t SecondEventsDescriptor_sequence[] = {
 
 static int
 dissect_h248_SecondEventsDescriptor(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-  // SecondEventsDescriptor → SecondEventsDescriptor/eventList → SecondRequestedEvent → SecondRequestedActions → NotifyBehaviour → RegulatedEmbeddedDescriptor → SecondEventsDescriptor
+  // SecondEventsDescriptor -> SecondEventsDescriptor/eventList -> SecondRequestedEvent -> SecondRequestedActions -> NotifyBehaviour -> RegulatedEmbeddedDescriptor -> SecondEventsDescriptor
   actx->pinfo->dissection_depth += 6;
   increment_dissection_depth(actx->pinfo);
   offset = dissect_ber_sequence(implicit_tag, actx, tree, tvb, offset,

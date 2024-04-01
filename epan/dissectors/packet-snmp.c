@@ -78,8 +78,8 @@ static int snmp_tap;
 static int proto_snmp;
 static int proto_smux;
 
-static gboolean display_oid = TRUE;
-static gboolean snmp_var_in_tree = TRUE;
+static bool display_oid = true;
+static bool snmp_var_in_tree = true;
 
 void proto_register_snmp(void);
 void proto_reg_handoff_snmp(void);
@@ -178,7 +178,7 @@ static snmp_usm_params_t usm_p = {FALSE,FALSE,0,0,0,0,NULL,NULL,NULL,NULL,NULL,N
 #define TH_REPORT 0x04
 
 /* desegmentation of SNMP-over-TCP */
-static gboolean snmp_desegment = TRUE;
+static bool snmp_desegment = true;
 
 /* Global variables */
 
@@ -819,7 +819,7 @@ dissect_snmp_VarBind(bool implicit_tag _U_, tvbuff_t *tvb, int offset,
 		return dissect_unknown_ber(actx->pinfo, tvb, value_start, pt);
 	}
 
-	/* Now, we know where everithing is */
+	/* Now, we know where everything is */
 
 	/* fetch ObjectName and its relative oid_info */
 	oid_bytes = (guint8*)tvb_memdup(actx->pinfo->pool, tvb, name_offset, name_len);

@@ -124,10 +124,10 @@ static const enum_val_t dvb_s2_modeadapt_enum[] = {
     {NULL, NULL, -1}
 };
 
-static gboolean dvb_s2_full_dissection = FALSE;
-static gboolean dvb_s2_df_dissection = FALSE;
+static bool dvb_s2_full_dissection = false;
+static bool dvb_s2_df_dissection = false;
 static gint dvb_s2_default_modeadapt = DVB_S2_MODEADAPT_TYPE_L3;
-static gboolean dvb_s2_try_all_modeadapt = TRUE;
+static bool dvb_s2_try_all_modeadapt = true;
 
 /* Initialize the protocol and registered fields */
 static int proto_dvb_s2_modeadapt;
@@ -1310,7 +1310,7 @@ static int dissect_dvb_s2_gse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
             next_tvb = process_reassembled_data(tvb, new_off, pinfo, "Reassembled GSE",
                 dvbs2_frag_head, &dvb_s2_gse_frag_items, &update_col_info, tree);
 
-            if (next_tvb != NULL) {
+            if (next_tvb != NULL && subpacket_data) {
                 /* We have a reassembled packet. */
                 complete = TRUE;
                 labeltype = subpacket_data->labeltype;

@@ -751,6 +751,7 @@ proto_cleanup(void)
 }
 
 static gboolean
+// NOLINTNEXTLINE(misc-no-recursion)
 proto_tree_traverse_pre_order(proto_tree *tree, proto_tree_traverse_func func,
 			      gpointer data)
 {
@@ -770,6 +771,7 @@ proto_tree_traverse_pre_order(proto_tree *tree, proto_tree_traverse_func func,
 		 */
 		current = child;
 		child   = current->next;
+		// We recurse here, but we're limited by prefs.gui_max_tree_depth
 		if (proto_tree_traverse_pre_order((proto_tree *)current, func, data))
 			return TRUE;
 	}
@@ -8509,6 +8511,7 @@ proto_is_pino(const protocol_t *protocol)
 }
 
 gboolean
+// NOLINTNEXTLINE(misc-no-recursion)
 proto_is_protocol_enabled(const protocol_t *protocol)
 {
 	if (protocol == NULL)
@@ -8522,6 +8525,7 @@ proto_is_protocol_enabled(const protocol_t *protocol)
 }
 
 gboolean
+// NOLINTNEXTLINE(misc-no-recursion)
 proto_is_protocol_enabled_by_default(const protocol_t *protocol)
 {
 	//parent protocol determines enable/disable for helper dissectors
@@ -8532,6 +8536,7 @@ proto_is_protocol_enabled_by_default(const protocol_t *protocol)
 }
 
 gboolean
+// NOLINTNEXTLINE(misc-no-recursion)
 proto_can_toggle_protocol(const int proto_id)
 {
 	protocol_t *protocol;
@@ -11176,8 +11181,8 @@ typedef struct {
 } ffdata_t;
 
 /* Helper function for proto_find_info() */
-static gboolean
-find_finfo(proto_node *node, gpointer data)
+static bool
+find_finfo(proto_node *node, void * data)
 {
 	field_info *fi = PNODE_FINFO(node);
 	if (fi && fi->hfinfo) {
@@ -11187,11 +11192,11 @@ find_finfo(proto_node *node, gpointer data)
 	}
 
 	/* Don't stop traversing. */
-	return FALSE;
+	return false;
 }
 
 /* Helper function for proto_find_first_info() */
-static gboolean
+static bool
 find_first_finfo(proto_node *node, gpointer data)
 {
 	field_info *fi = PNODE_FINFO(node);
@@ -11200,12 +11205,12 @@ find_first_finfo(proto_node *node, gpointer data)
 			g_ptr_array_add(((ffdata_t*)data)->array, fi);
 
 			/* Stop traversing. */
-			return TRUE;
+			return true;
 		}
 	}
 
 	/* Continue traversing. */
-	return FALSE;
+	return false;
 }
 
 /* Return GPtrArray* of field_info pointers for all hfindex that appear in a tree.
@@ -11247,8 +11252,8 @@ proto_find_first_finfo(proto_tree *tree, const int id)
 }
 
 /* Helper function for proto_all_finfos() */
-static gboolean
-every_finfo(proto_node *node, gpointer data)
+static bool
+every_finfo(proto_node *node, void * data)
 {
 	field_info *fi = PNODE_FINFO(node);
 	if (fi && fi->hfinfo) {
@@ -11256,7 +11261,7 @@ every_finfo(proto_node *node, gpointer data)
 	}
 
 	/* Don't stop traversing. */
-	return FALSE;
+	return false;
 }
 
 /* Return GPtrArray* of field_info pointers containing all hfindexes that appear in a tree. */
@@ -11281,8 +11286,8 @@ typedef struct {
 	tvbuff_t   *tvb;
 } offset_search_t;
 
-static gboolean
-check_for_offset(proto_node *node, gpointer data)
+static bool
+check_for_offset(proto_node *node, void * data)
 {
 	field_info	*fi        = PNODE_FINFO(node);
 	offset_search_t	*offsearch = (offset_search_t *)data;
@@ -11293,10 +11298,10 @@ check_for_offset(proto_node *node, gpointer data)
 				offsearch->offset < (guint) (fi->start + fi->length)) {
 
 			offsearch->finfo = fi;
-			return FALSE; /* keep traversing */
+			return false; /* keep traversing */
 		}
 	}
-	return FALSE; /* keep traversing */
+	return false; /* keep traversing */
 }
 
 /* Search a proto_tree backwards (from leaves to root) looking for the field
@@ -11326,8 +11331,8 @@ typedef struct {
 	gchar *buf;
 } decoded_data_t;
 
-static gboolean
-check_for_undecoded(proto_node *node, gpointer data)
+static bool
+check_for_undecoded(proto_node *node, void * data)
 {
 	field_info *fi = PNODE_FINFO(node);
 	decoded_data_t* decoded = (decoded_data_t*)data;
@@ -11343,7 +11348,7 @@ check_for_undecoded(proto_node *node, gpointer data)
 		}
 	}
 
-	return FALSE;
+	return false;
 }
 
 gchar*
