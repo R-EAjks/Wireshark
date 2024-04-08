@@ -27,8 +27,6 @@ WSLUA_CLASS_DEFINE(FileHandler,NOP);
     A FileHandler object, created by a call to FileHandler.new(arg1, arg2, ...).
     The FileHandler object lets you create a file-format reader, or writer, or
     both, by setting your own read_open/read or write_open/write functions.
-
-    @since 1.11.3
  */
 
 static int filehandler_cb_error_handler(lua_State* L) {
@@ -52,7 +50,7 @@ static GSList *registered_file_handlers;
 /* During file routines, we cannot allow the FileHandler to get deregistered, since
    that would change the GArray's in file_access.c and hilarity would ensue. So we
    set this to true right before pcall(), and back to false afterwards */
-static bool in_routine = false;
+static bool in_routine;
 
 static void
 report_error(int *err, char **err_info, const char *fmt, ...)
@@ -1043,7 +1041,7 @@ WSLUA_ATTRIBUTE_FUNC_SETTER(FileHandler,write_close);
 
 /* WSLUA_ATTRIBUTE FileHandler_type RO The internal file type.  This is automatically set with a new
     number when the FileHandler is registered. */
-WSLUA_ATTRIBUTE_NAMED_NUMBER_GETTER(FileHandler,type,file_type);
+WSLUA_ATTRIBUTE_NAMED_INTEGER_GETTER(FileHandler,type,file_type);
 
 /* WSLUA_ATTRIBUTE FileHandler_extensions RW One or more semicolon-separated file extensions that this file type usually uses.
 
