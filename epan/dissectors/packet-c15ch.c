@@ -4025,6 +4025,10 @@ static int hf_c15ch_c15_generic_msg_gen_msg_field_4;
 static int hf_c15ch_c15_generic_msg_gen_msg_field_5;
 static int hf_c15ch_c15_generic_msg_gen_msg_string;
 static int hf_c15ch_c15_generic_msg_gen_data_large;
+static int hf_c15ch_c15_usage_id;
+static int hf_c15ch_c15_opt_parm_2;
+static int hf_c15ch_c15_opt_parm_3;
+
 
 /* util functions */
 /* static void add_digits_string(int hf, tvbuff_t *tvb, proto_tree *tree,
@@ -7723,7 +7727,14 @@ static int dissect_c15ch_c15_correlate_msg(tvbuff_t *tvb, packet_info *pinfo _U_
 			ti = proto_tree_add_item( tree, hf_c15ch_c15_correlate_msg, tvb, 0, length, ENC_NA );
 			col_append_fstr(pinfo->cinfo, COL_INFO, ", Length: %d", length);
 			c15ch_c15_correlate_msg_tree = proto_item_add_subtree( ti, ett_c15ch_second_level );
-			proto_tree_add_item(c15ch_c15_correlate_msg_tree, hf_c15ch_call_ref, tvb, 0, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_correlate_msg_tree, hf_c15ch_call_ref, 
+				tvb, 0, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_correlate_msg_tree, hf_c15ch_c15_usage_id,
+				tvb, 4, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_correlate_msg_tree, hf_c15ch_c15_opt_parm_2,
+				tvb, 8, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_correlate_msg_tree, hf_c15ch_c15_opt_parm_3,
+				tvb, 12, 4, ENC_BIG_ENDIAN);	
 		}
     }
 
@@ -10781,7 +10792,25 @@ void proto_register_c15ch(void)
             FT_BYTES, BASE_NONE,
             NULL,
             0x0, NULL, HFILL }
-        }
+        },
+		{ &hf_c15ch_c15_usage_id,
+            { "Usage ID", "c15.usage_id",
+            FT_UINT32, BASE_DEC,
+            NULL,
+            0x0, NULL, HFILL}
+		},
+		{ &hf_c15ch_c15_opt_parm_2,
+            { "Optional Parameter 2", "c15.opt_parm_2",
+            FT_UINT32, BASE_DEC,
+            NULL,
+            0x0, NULL, HFILL}
+		},
+		{ &hf_c15ch_c15_opt_parm_3,
+            { "Optional Parameter 3", "c15.opt_parm_3",
+            FT_UINT32, BASE_DEC,
+            NULL,
+            0x0, NULL, HFILL}
+		}
     };
     static gint *ett_second_level[] = {
         &ett_c15ch_second_level,
