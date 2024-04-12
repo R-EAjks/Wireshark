@@ -88,6 +88,7 @@ public:
     QCPGraph *graph() const { return graph_; }
     QCPBars *bars() const { return bars_; }
     double startOffset() const;
+    nstime_t startTime() const;
     int packetFromTime(double ts) const;
     bool hasItemToShow(int idx, double value) const;
     double getItemValue(int idx, const capture_file *cap_file) const;
@@ -116,6 +117,8 @@ private:
 
     void removeTapListener();
 
+    bool showsZero() const;
+
     template<class DataMap> double maxValueFromGraphData(const DataMap &map);
     template<class DataMap> void scaleGraphData(DataMap &map, int scalar);
 
@@ -134,7 +137,7 @@ private:
     QString vu_field_;
     int hf_index_;
     int interval_;
-    double start_time_;
+    nstime_t start_time_;
 
     // Cached data. We should be able to change the Y axis without retapping as
     // much as is feasible.
@@ -194,7 +197,7 @@ private:
     QCPGraph *base_graph_;
     QCPItemTracer *tracer_;
     uint32_t packet_num_;
-    double start_time_;
+    nstime_t start_time_;
     bool mouse_drags_;
     QRubberBand *rubber_band_;
     QPoint rb_origin_;
