@@ -4984,7 +4984,7 @@ ssl3_check_mac(SslDecoder*decoder,int ct,guint8* data,
     if(memcmp(mac,dgst,len))
         return -1;
 
-    return(0);
+    return 0;
 }
 
 static gint
@@ -5075,7 +5075,7 @@ dtls_check_mac(SslDecryptSession *ssl, SslDecoder*decoder, gint ct, guint8* data
     if(memcmp(mac,buf,len))
         return -1;
 
-    return(0);
+    return 0;
 }
 /* Decryption integrity check }}} */
 
@@ -9479,7 +9479,7 @@ ssl_is_authoritative_version_message(guint8 content_type, guint8 handshake_type,
  */
 bool
 tls_scan_server_hello(tvbuff_t *tvb, guint32 offset, guint32 offset_end,
-                      guint16 *server_version, gboolean *is_hrr)
+                      guint16 *server_version, bool *is_hrr)
 {
     /* SHA256("HelloRetryRequest") */
     static const guint8 tls13_hrr_random_magic[] = {
