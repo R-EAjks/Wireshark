@@ -1641,11 +1641,7 @@ static const value_string iuc_vals[] = {
   {0, NULL}
 };
 
-static const true_false_string mer_vals = {"measure RxMER at the CMTS on this probe", "do not measure RxMER at the CMTS on this probe"};
-
 static const true_false_string pw_vals = {"transmit using alternate power setting specified by the Start Subc field.", "transmit using normal power settings"};
-
-static const true_false_string eq_vals = {"equalizer disabled", "equalizer enabled"};
 
 static const value_string map_ect_vals[] = {
   {0, "Ranging probe"},
@@ -8235,8 +8231,8 @@ proto_register_docsis_mgmt (void)
       NULL, HFILL}
     },
     {&hf_docsis_map_mer,
-     {"MER", "docsis_map.mer",
-      FT_BOOLEAN, 32, TFS(&mer_vals), 0x00020000,
+     {"MER (CMTS RxMER Measurement)", "docsis_map.mer",
+      FT_BOOLEAN, 32, TFS(&tfs_on_off), 0x00020000,
       NULL, HFILL}
     },
     {&hf_docsis_map_pw,
@@ -8245,8 +8241,8 @@ proto_register_docsis_mgmt (void)
       NULL, HFILL}
     },
     {&hf_docsis_map_eq,
-     {"EQ (TX Equalization)", "docsis_map.eq",
-      FT_BOOLEAN, 32, TFS(&eq_vals), 0x00008000,
+     {"EQ (Tx Equalization)", "docsis_map.eq",
+      FT_BOOLEAN, 32, TFS(&tfs_disabled_enabled), 0x00008000,
       NULL, HFILL}
     },
     {&hf_docsis_map_st,
