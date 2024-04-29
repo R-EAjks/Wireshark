@@ -15,12 +15,14 @@
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include <epan/tap.h>
+#include <epan/asn1.h>
 
 #include "packet-bluetooth.h"
 #include "packet-bthci_cmd.h"
 #include "packet-bthci_evt.h"
 
 static int proto_bthci_vendor_broadcom;
+static int proto_bthci_vendor_apple;
 
 static int hf_broadcom_opcode;
 static int hf_broadcom_opcode_ogf;
@@ -359,6 +361,209 @@ static const value_string broadcom_target_id_vals[] = {
     { 0xFF,  "Undefined" },
     { 0, NULL }
 };
+
+
+static dissector_handle_t bthci_vendor_apple_handle;
+
+static int hf_apple_entry;
+static int hf_apple_opcode;
+static int hf_apple_parameter_length;
+static int hf_apple_data;
+static int hf_apple_bd_addr;
+static int hf_apple_service;
+static int hf_apple_bd_addr_extension;
+static int hf_apple_bd_addr_type;
+
+static gint ett_apple;
+static gint ett_apple_opcode;
+
+static expert_field ei_apple_undecoded;
+
+static dissector_handle_t btle_apple_handle;
+
+void proto_register_bthci_vendor_apple(void);
+
+
+static gint
+dissect_bthci_vendor_apple_ext(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, gint tlv_type, gint tlv_length) {
+    proto_item        *opcode_item;
+    proto_tree        *opcode_tree;
+    gint              length = 0;
+    gint              offset = 2;
+
+    length = tvb_captured_length(tvb);
+
+    opcode_item = proto_tree_add_item(tree, hf_apple_entry, tvb, 0, tvb_captured_length(tvb), ENC_NA);
+    opcode_tree = proto_item_add_subtree(opcode_item, ett_apple_opcode);
+
+    proto_tree_add_item(opcode_tree, hf_apple_opcode, tvb, 0, 1, ENC_NA);
+    proto_tree_add_item(opcode_tree, hf_apple_parameter_length, tvb, 1, 1, ENC_NA);
+    proto_tree_add_item(opcode_tree, hf_apple_data, tvb, 2, tlv_length, ENC_NA);
+
+    switch (tlv_type) {
+        case 0x10:
+            while (offset < length) {
+                proto_tree_add_item(opcode_tree, hf_apple_service, tvb, offset, 2, ENC_NA);
+
+                offset += 2;
+            }
+        break;
+    }
+
+    return tvb_captured_length(tvb);
+}
+
+static gint
+dissect_bthci_vendor_apple(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
+{
+    gint               offset = 0;
+    gint               length = 0;
+    gint               tlv_length = 0;
+    gint               tlv_type = 0;
+    gint               tlv_length_length = 0;
+    proto_item        *main_item;
+    proto_tree        *main_tree;
+
+    tvbuff_t *data_tvb;
+
+    length = tvb_captured_length(tvb);
+
+    main_item = proto_tree_add_item(tree, proto_bthci_vendor_apple, tvb, 0, tvb_captured_length(tvb), ENC_NA);
+    main_tree = proto_item_add_subtree(main_item, ett_apple);
+
+    tlv_type = tvb_get_guint8(tvb, offset);
+
+    while (offset < length) {
+        tlv_length_length = 1;
+        tlv_length = tvb_get_guint8(tvb, offset + 1);
+
+        data_tvb = tvb_new_subset_length(tvb, offset, 1 + tlv_length_length + tlv_length);
+        offset += dissect_bthci_vendor_apple_ext(data_tvb, pinfo, main_tree, tlv_type, tlv_length);
+    }
+
+    return length;
+}
+
+
+static const value_string btle_apple_types[] = {
+    { 0, NULL }
+};
+
+void
+proto_register_bthci_vendor_apple(void)
+{
+    expert_module_t  *expert_module;
+
+    static hf_register_info hf[] = {
+        {
+            &hf_apple_entry,
+            {
+                "Extension Entry",
+                "btle_vendor.apple",
+                FT_NONE, BASE_NONE, NULL, 0x0,
+                NULL, HFILL
+            }
+        },
+        {
+            &hf_apple_opcode,
+            {
+                "Command Opcode",
+                "btle_vendor.apple.opcode",
+                FT_UINT8, BASE_HEX, VALS(btle_apple_types), 0x0,
+                NULL, HFILL
+            }
+        },
+        {
+            &hf_apple_parameter_length,
+            {
+                "Parameter Total Length",
+                "btle_vendor.apple.parameter_length",
+                FT_UINT8, BASE_DEC, NULL, 0x0,
+                NULL, HFILL
+            },
+        },
+        {
+            &hf_apple_bd_addr_extension,
+            {
+                "BT Addr Extension",
+                "btle_vendor.apple.bd_addr.ext",
+                FT_UINT8, BASE_DEC, NULL, 0x0,
+                NULL, HFILL
+            },
+        },
+        {
+            &hf_apple_bd_addr_type,
+            {
+                "BT Addr Type",
+                "btle_vendor.apple.bd_addr.type",
+                FT_UINT8, BASE_DEC, NULL, 0x0,
+                NULL, HFILL
+            },
+        },
+        {
+            &hf_apple_bd_addr,
+            {
+                "BD_ADDR",
+                "btle_vendor.apple.bd_addr",
+                FT_ETHER, BASE_NONE, NULL, 0x0,
+                "Bluetooth Device Address", HFILL
+            }
+        },
+        {
+            &hf_apple_service,
+            {
+                "CoreBluetooth Service",
+                "btle_vendor.apple.svc",
+                FT_UINT16, BASE_HEX, NULL, 0x0,
+                NULL, HFILL
+            }
+        },
+        {
+            &hf_apple_data,
+            {
+                "Data",
+                "btle_vendor.apple.data",
+                FT_NONE, BASE_NONE, NULL, 0x0,
+                NULL, HFILL
+            }
+        },
+    };
+
+    static gint *ett[] = {
+        &ett_apple,
+        &ett_apple_opcode,
+    };
+
+    static ei_register_info ei[] = {
+        {
+            &ei_apple_undecoded,
+            {
+                "bthci_vendor.apple.undecoded",
+                PI_UNDECODED, PI_NOTE, "Undecoded", EXPFILL
+            }
+        },
+    };
+
+    proto_bthci_vendor_apple = proto_register_protocol("Bluetooth LE Apple", "BTLE Apple", "btle_vendor.apple");
+
+    bthci_vendor_apple_handle = register_dissector("btle_vendor.apple", dissect_bthci_vendor_apple, proto_bthci_vendor_apple);
+
+    proto_register_field_array(proto_bthci_vendor_apple, hf, array_length(hf));
+    proto_register_subtree_array(ett, array_length(ett));
+
+    expert_module = expert_register_protocol(proto_bthci_vendor_apple);
+    expert_register_field_array(expert_module, ei, array_length(ei));
+}
+
+void
+proto_reg_handoff_bthci_vendor_apple(void)
+{
+    btle_apple_handle  = find_dissector_add_dependency("btle",  proto_bthci_vendor_apple);
+
+    dissector_add_for_decode_as("btle_cmd.vendor", bthci_vendor_apple_handle);
+
+    dissector_add_uint("btcommon.eir_ad.manufacturer_company_id", 0x004C, bthci_vendor_apple_handle);
+}
 
 
 void proto_register_bthci_vendor_broadcom(void);
