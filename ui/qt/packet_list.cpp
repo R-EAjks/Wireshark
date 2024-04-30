@@ -601,7 +601,7 @@ void PacketList::selectionChanged (const QItemSelection & selected, const QItemS
     if (cap_file_->edt->tree) {
         packet_info *pi = &cap_file_->edt->pi;
         related_packet_delegate_.setCurrentFrame(pi->num);
-        conversation_t *conv = find_conversation_pinfo_ro(pi);
+        conversation_t *conv = find_conversation_pinfo_ro(pi, 0);
         if (conv) {
             related_packet_delegate_.setConversation(conv);
         }
@@ -657,7 +657,7 @@ void PacketList::contextMenuEvent(QContextMenuEvent *event)
 
         for (unsigned i = 0; i < finfo_array->len; i++) {
             field_info *fi = (field_info *)g_ptr_array_index (finfo_array, i);
-            header_field_info *hfinfo =  fi->hfinfo;
+            const header_field_info *hfinfo =  fi->hfinfo;
 
             if (prefs_is_registered_protocol(hfinfo->abbrev)) {
                 if (hfinfo->parent == -1) {
