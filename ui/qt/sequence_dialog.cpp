@@ -35,8 +35,8 @@
 #include <QPoint>
 
 // To do:
-// - Resize or show + hide the Time and Comment axes, possibly via one of
-//   the following:
+// - Resize or show + hide the Time and Comment axes (#4972), possibly via
+//   one of the following:
 //   - Split the time, diagram, and comment sections into three separate
 //     widgets inside a QSplitter. This would resemble the GTK+ UI, but we'd
 //     have to coordinate between the three and we'd lose time and comment
@@ -47,15 +47,18 @@
 //     Drawing a QCPItemLine or QCPItemPixmap over each Y axis might make
 //     this easier.
 // - For general flows, let the user show columns other than COL_INFO.
+//   (#12549)
 // - Add UTF8 to text dump
 // - Save to XMI? https://www.spinellis.gr/umlgraph/
-// - Time: abs vs delta
+// - Save to SVG? https://www.qcustomplot.com/index.php/support/forum/1677
+// - Time: abs vs delta (XXX - This is currently achieved by changing
+//   View->Time Display Format before opening the dialog.)
 // - Hide nodes
-// - Clickable time + comments?
+// - Clickable time + comments? (XXX - Clicking on them selects the item for
+//   the row, is there anything else?)
 // - Incorporate packet comments?
 // - Change line_style to seq_type (i.e. draw ACKs dashed)
 // - Create WSGraph subclasses with common behavior.
-// - Help button and text
 
 static const double min_top_ = -1.0;
 static const double min_left_ = -0.5;
@@ -86,6 +89,7 @@ SequenceDialog::SequenceDialog(QWidget &parent, CaptureFile &cf, SequenceInfo *i
     if (!info_) {
         info_ = new SequenceInfo(sequence_analysis_info_new());
         info_->sainfo()->name = "any";
+        info_->sainfo()->any_addr = true;
     } else {
         info_->ref();
         sequence_analysis_free_nodes(info_->sainfo());
@@ -162,7 +166,15 @@ SequenceDialog::SequenceDialog(QWidget &parent, CaptureFile &cf, SequenceInfo *i
     action->setEnabled(false);
     set_action_shortcuts_visible_in_context_menu(ctx_menu_.actions());
 
-    ui->addressComboBox->setCurrentIndex(0);
+    ui->addressComboBox->addItem(tr("Any"), QVariant(true));
+    ui->addressComboBox->addItem(tr("Network"), QVariant(false));
+    ui->addressComboBox->setCurrentIndex(ui->addressComboBox->findData(QVariant(true)));
+
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+    connect(ui->addressComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &SequenceDialog::addressChanged);
+#else
+    connect(ui->addressComboBox, &QComboBox::currentIndexChanged, this, &SequenceDialog::addressChanged);
+#endif
 
     sequence_items_t item_data;
 
@@ -198,6 +210,11 @@ SequenceDialog::SequenceDialog(QWidget &parent, CaptureFile &cf, SequenceInfo *i
 
     loadGeometry(parent.width(), parent.height() * 4 / 5);
 
+    if (cf.isValid() && cf.displayFilter().length() > 0) {
+        ui->displayFilterCheckBox->setChecked(true);
+    }
+
+    connect(ui->displayFilterCheckBox, &QCheckBox::toggled, this, &SequenceDialog::displayFilterCheckBoxToggled);
     connect(ui->horizontalScrollBar, SIGNAL(valueChanged(int)), this, SLOT(hScrollBarChanged(int)));
     connect(ui->verticalScrollBar, SIGNAL(valueChanged(int)), this, SLOT(vScrollBarChanged(int)));
     connect(sp->xAxis2, SIGNAL(rangeChanged(QCPRange)), this, SLOT(xAxisChanged(QCPRange)));
@@ -605,12 +622,12 @@ void SequenceDialog::resetAxes(bool keep_lower)
     sp->yAxis->setRange(top_pos, range_span + top_pos);
 
     double rmin = sp->xAxis2->range().size() / 2;
-    ui->horizontalScrollBar->setRange((rmin - 0.5) * 100, (info_->sainfo()->num_nodes - 0.5 - rmin) * 100);
+    ui->horizontalScrollBar->setRange((rmin + min_left_) * 100, (info_->sainfo()->num_nodes - 0.5 - rmin) * 100);
     xAxisChanged(sp->xAxis2->range());
     ui->horizontalScrollBar->setValue(ui->horizontalScrollBar->minimum()); // Shouldn't be needed.
 
     rmin = (sp->yAxis->range().size() / 2);
-    ui->verticalScrollBar->setRange((rmin - 1.0) * 100, (num_items_ - 0.5 - rmin) * 100);
+    ui->verticalScrollBar->setRange((rmin + min_top_) * 100, (num_items_ - 0.5 - rmin) * 100);
     yAxisChanged(sp->yAxis->range());
 
     sp->replot(QCustomPlot::rpQueuedReplot);
@@ -707,7 +724,7 @@ void SequenceDialog::goToAdjacentPacket(bool next)
     }
 }
 
-void SequenceDialog::on_displayFilterCheckBox_toggled(bool)
+void SequenceDialog::displayFilterCheckBoxToggled(bool)
 {
     fillDiagram();
 }
@@ -723,16 +740,15 @@ void SequenceDialog::on_flowComboBox_activated(int index)
     fillDiagram();
 }
 
-void SequenceDialog::on_addressComboBox_activated(int index)
+void SequenceDialog::addressChanged(int)
 {
     if (!info_->sainfo()) return;
 
-    if (index == 0) {
-        info_->sainfo()->any_addr = true;
-    } else {
-        info_->sainfo()->any_addr = false;
+    QVariant data = ui->addressComboBox->currentData();
+    if (data.isValid()) {
+        info_->sainfo()->any_addr = data.toBool();
+        fillDiagram();
     }
-    fillDiagram();
 }
 
 void SequenceDialog::on_actionMoveRight10_triggered()
