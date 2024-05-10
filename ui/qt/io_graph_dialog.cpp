@@ -819,19 +819,24 @@ void IOGraphDialog::keyPressEvent(QKeyEvent *event)
     QDialog::keyPressEvent(event);
 }
 
-void IOGraphDialog::reject()
+void IOGraphDialog::applyChanges()
 {
-    if (!uat_model_)
+    if (!static_uat_model_)
         return;
 
     // Changes to the I/O Graphs settings are always saved,
     // there is no possibility for "rejection".
     QString error;
-    if (uat_model_->applyChanges(error)) {
+    if (static_uat_model_->applyChanges(error)) {
         if (!error.isEmpty()) {
             report_failure("%s", qPrintable(error));
         }
     }
+}
+
+void IOGraphDialog::reject()
+{
+    applyChanges();
 
     QDialog::reject();
 }
@@ -1126,13 +1131,10 @@ void IOGraphDialog::updateLegend()
 
     // Create a legend with a Title label at top.
     // Legend Title thanks to: https://www.qcustomplot.com/index.php/support/forum/443
-    QCPStringLegendItem* legendTitle = qobject_cast<QCPStringLegendItem*>(iop->legend->elementAt(0));
-    if (legendTitle == NULL) {
-        legendTitle = new QCPStringLegendItem(iop->legend, QString(""));
-        iop->legend->insertRow(0);
-        iop->legend->addElement(0, 0, legendTitle);
-    }
-    legendTitle->setText(QString(intervalText + " Intervals "));
+    iop->legend->clearItems();
+    QCPStringLegendItem *legendTitle = new QCPStringLegendItem(iop->legend, QString(tr("%1 Intervals ").arg(intervalText)));
+    iop->legend->insertRow(0);
+    iop->legend->addElement(0, 0, legendTitle);
 
     if (uat_model_ != NULL) {
         for (int row = 0; row < uat_model_->rowCount(); row++) {
@@ -1140,8 +1142,6 @@ void IOGraphDialog::updateLegend()
             if (iog) {
                 if (graphIsEnabled(row)) {
                     iog->addToLegend();
-                } else {
-                    iog->removeFromLegend();
                 }
             }
         }
@@ -1380,6 +1380,7 @@ void IOGraphDialog::loadProfileGraphs()
         }
 
         static_uat_model_ = new UatModel(mainApp, iog_uat_);
+        connect(mainApp, &MainApplication::profileChanging, IOGraphDialog::applyChanges);
     }
 
     uat_model_ = static_uat_model_;
@@ -1529,6 +1530,7 @@ void IOGraphDialog::modelRowsMoved(const QModelIndex &source, int sourceStart, i
             iog->bars()->setLayer(iog->bars()->layer());
         }
     }
+    updateLegend();
     ui->ioPlot->replot();
 }
 
