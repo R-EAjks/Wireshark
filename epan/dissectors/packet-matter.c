@@ -22,6 +22,7 @@
 #include <config.h>
 
 #include <epan/packet.h>
+#include <epan/conversation.h>
 
 /* Prototypes */
 /* (Required to prevent [-Wmissing-prototypes] warnings */
@@ -46,6 +47,8 @@ static int hf_message_counter;
 static int hf_message_src_id;
 static int hf_message_dest_id;
 static int hf_message_privacy_header;
+static int hf_session_idx;
+static int hf_retransmit_in;
 
 static int hf_payload;
 static int hf_payload_exchange_flags;
@@ -105,6 +108,98 @@ static const value_string session_type_vals[] = {
     { 0, NULL }
 };
 
+enum matter_session_type {
+    SESSION_TYPE_UNKNOWN,
+    SESSION_TYPE_UNSECURED,
+    SESSION_TYPE_UNICAST,
+    SESSION_TYPE_GROUP,
+};
+
+/**
+ * Matter-specific proto data in conversations.
+ *
+ * Conversations are identified by IP-port pairs using the standard
+ * find_or_create_conversation function. Each conversation can then have
+ * information about multiple sessions.
+ */
+typedef struct {
+    /**
+     * Array of sessions in this conversation.
+     *
+     * Values are matter_session_t*.
+     */
+    wmem_array_t* sessions;
+} matter_conv_t;
+
+typedef struct {
+    uint32_t counter;
+    uint32_t framenum;
+} counter_map_entry_t;
+
+typedef struct {
+    enum matter_session_type session_type;
+    uint32_t session_idx; ///< sequential session number, not part of the protocol
+    uint64_t ephemeral_initiator_id;
+
+    // arrays contain counter_map_entry_t
+    wmem_array_t* i2r_counters;
+    wmem_array_t* r2i_counters;
+
+} matter_session_t;
+
+typedef struct {
+    enum matter_session_type session_type;
+
+    uint64_t source_id, dest_id;
+    uint32_t session_id;
+    uint32_t counter;
+} matter_message_t;
+
+static matter_conv_t* get_or_create_matter_conv_info(conversation_t* conversation) {
+    matter_conv_t* conv_info = conversation_get_proto_data(conversation, proto_matter);
+    if (!conv_info) {
+        conv_info = wmem_new0(wmem_file_scope(), matter_conv_t);
+        conv_info->sessions = wmem_array_new(wmem_file_scope(), sizeof(matter_session_t*));
+        conversation_add_proto_data(conversation, proto_matter, conv_info);
+    }
+    return conv_info;
+}
+
+static matter_session_t* get_or_create_unsecured_session(matter_conv_t* conv_info, uint64_t ephemeral_id) {
+    // look for an existing session in the array
+    for (unsigned int i=0; i<wmem_array_get_count(conv_info->sessions); ++i) {
+        matter_session_t* sess = *(matter_session_t**)wmem_array_index(conv_info->sessions, i);
+        if (sess->session_type == SESSION_TYPE_UNSECURED &&
+            sess->ephemeral_initiator_id == ephemeral_id) {
+
+            return sess;
+        }
+    }
+
+    // we didn't find the session, create a new one
+    matter_session_t* sess = wmem_new0(wmem_file_scope(), matter_session_t);
+    sess->session_type = SESSION_TYPE_UNSECURED;
+    sess->ephemeral_initiator_id = ephemeral_id;
+    sess->i2r_counters = wmem_array_new(wmem_file_scope(), sizeof(counter_map_entry_t));
+    sess->r2i_counters = wmem_array_new(wmem_file_scope(), sizeof(counter_map_entry_t));
+
+    sess->session_idx = wmem_array_get_count(conv_info->sessions)+1;
+    wmem_array_append_one(conv_info->sessions, sess);
+
+    return sess;
+}
+static uint32_t session_lookup_counter(matter_session_t* session, bool initiator, uint32_t counter) {
+    wmem_array_t* counter_arr = initiator ? session->i2r_counters : session->r2i_counters;
+
+    for (unsigned int i=0; i<wmem_array_get_count(counter_arr); ++i) {
+        counter_map_entry_t* entryp = (counter_map_entry_t*)wmem_array_index(counter_arr, i);
+        if (entryp->counter == counter) {
+            return entryp->framenum;
+        }
+    }
+    return 0;
+}
+
 static int
 dissect_matter_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pl_tree);
 
@@ -113,6 +208,7 @@ dissect_matter(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
 {
     proto_item *ti;
     proto_tree *matter_tree;
+    proto_item *it;
     uint32_t    offset = 0;
 
     /* info extracted from the packet */
@@ -120,7 +216,7 @@ dissect_matter(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
     uint8_t security_flags = 0;
     uint8_t message_dsiz = 0;
     uint8_t message_session_type = 0;
-    uint32_t session_id = 0;
+    matter_message_t msg_info = {};
 
     /* Check that the packet is long enough for it to belong to us. */
     if (tvb_reported_length(tvb) < MATTER_MIN_LENGTH)
@@ -154,7 +250,7 @@ dissect_matter(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
     offset += 1;
 
     // Section 4.4.1.3
-    proto_tree_add_item_ret_uint(matter_tree, hf_message_session_id, tvb, offset, 2, ENC_LITTLE_ENDIAN, &session_id);
+    proto_tree_add_item_ret_uint(matter_tree, hf_message_session_id, tvb, offset, 2, ENC_LITTLE_ENDIAN, &msg_info.session_id);
     offset += 2;
 
     // Section 4.4.1.4
@@ -183,17 +279,17 @@ dissect_matter(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
     } else {
 
         // Section 4.4.1.5
-        proto_tree_add_item(matter_tree, hf_message_counter, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item_ret_uint(matter_tree, hf_message_counter, tvb, offset, 4, ENC_LITTLE_ENDIAN, &msg_info.counter);
         offset += 4;
 
         // Section 4.4.1.6
         if (message_flags & MESSAGE_FLAG_HAS_SOURCE) {
-            proto_tree_add_item(matter_tree, hf_message_src_id, tvb, offset, 8, ENC_LITTLE_ENDIAN);
+            proto_tree_add_item_ret_uint64(matter_tree, hf_message_src_id, tvb, offset, 8, ENC_LITTLE_ENDIAN, &msg_info.source_id);
             offset += 8;
         }
         // Section 4.4.1.7
         if (message_dsiz == MESSAGE_FLAG_HAS_DEST_NODE) {
-            proto_tree_add_item(matter_tree, hf_message_dest_id, tvb, offset, 8, ENC_LITTLE_ENDIAN);
+            proto_tree_add_item_ret_uint64(matter_tree, hf_message_dest_id, tvb, offset, 8, ENC_LITTLE_ENDIAN, &msg_info.dest_id);
             offset += 8;
         } else if (message_dsiz == MESSAGE_FLAG_HAS_DEST_GROUP) {
             proto_tree_add_item(matter_tree, hf_message_dest_id, tvb, offset, 2, ENC_LITTLE_ENDIAN);
@@ -202,10 +298,56 @@ dissect_matter(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
 
     }
 
+    // find conversation by IP:port pair
+    conversation_t* conversation = find_or_create_conversation(pinfo);
+    matter_conv_t* conv_info = get_or_create_matter_conv_info(conversation);
+    matter_session_t* session_info = NULL;
+
+    if (message_session_type == 0 && msg_info.session_id == 0) {
+        // Unsecured session: look up the session by Ephemeral Initiator ID,
+        // which is either the source or destination node ID.
+        //
+        // Note that node ID 0 is known not to appear in real messages, it's
+        // reserved by the spec "to mark uninitialized, missing, or invalid
+        // Node IDs", so we can use it for that purpose here.
+        uint64_t ephemeral_init_id = 0;
+        bool is_initiator;
+
+        if (msg_info.source_id) {
+            ephemeral_init_id = msg_info.source_id;
+            is_initiator = true;
+        } else if (msg_info.dest_id) {
+            ephemeral_init_id = msg_info.dest_id;
+            is_initiator = false;
+        }
+
+        if (ephemeral_init_id) {
+            session_info = get_or_create_unsecured_session(conv_info, ephemeral_init_id);
+
+            it = proto_tree_add_uint(matter_tree, hf_session_idx, tvb, 0, 0, session_info->session_idx);
+            proto_item_set_generated(it);
+
+            uint32_t framenum = session_lookup_counter(session_info, is_initiator, msg_info.counter);
+            if (framenum == 0) {
+                // we didn't know about this counter yet, add it to the list
+                counter_map_entry_t entry;
+                entry.counter = msg_info.counter;
+                entry.framenum = pinfo->num;
+                wmem_array_append_one(is_initiator ? session_info->i2r_counters : session_info->r2i_counters, entry);
+
+            } else if (framenum < pinfo->num) {
+                // this counter was already associated to an earlier frame number,
+                // mark this one as a duplicate.
+                it = proto_tree_add_uint(matter_tree, hf_retransmit_in, tvb, 0, 0, framenum);
+                proto_item_set_generated(it);
+            }
+        }
+    }
+
     // Section 4.4.1.4: "The Unsecured Session SHALL be indicated
     // when both Session Type and Session ID are set to 0."
     // Secured sessions not yet supported in the dissector.
-    if (message_session_type == 0 && session_id == 0) {
+    if (message_session_type == 0 && msg_info.session_id == 0) {
         proto_item *payload_item = proto_tree_add_none_format(matter_tree, hf_payload, tvb, offset, -1, "Protocol Payload");
         proto_tree *payload_tree = proto_item_add_subtree(payload_item, ett_payload);
         tvbuff_t *next_tvb = tvb_new_subset_remaining(tvb, offset);
@@ -357,6 +499,16 @@ proto_register_matter(void)
           { "Encrypted header fields", "matter.message.privacy_header",
             FT_BYTES, BASE_NONE, NULL, 0,
             "Headers encrypted with message privacy", HFILL }
+        },
+        { &hf_session_idx,
+          { "Session index", "matter.session_index",
+            FT_UINT32, BASE_DEC, NULL, 0,
+            NULL, HFILL }
+        },
+        { &hf_retransmit_in,
+          { "Retransmission of frame", "matter.retransmission",
+            FT_FRAMENUM, BASE_NONE, FRAMENUM_TYPE(FT_FRAMENUM_RETRANS_PREV), 0,
+            NULL, HFILL }
         },
         { &hf_payload,
           { "Payload", "matter.payload",
