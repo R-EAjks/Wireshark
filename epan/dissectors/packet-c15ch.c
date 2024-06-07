@@ -7562,7 +7562,7 @@ static int dissect_c15ch_c15_generic_msg_2(tvbuff_t *tvb, packet_info *pinfo _U_
 								tvb, 68, 4, ENC_BIG_ENDIAN);
 			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_gen_msg_field_5,
 								tvb, 72, 4, ENC_BIG_ENDIAN);
-			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_gen_data_large, tvb, 76, 1232, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_gen_data_large, tvb, 76, 1232, ENC_NA);
 		}
     }
 
@@ -7625,7 +7625,7 @@ static int dissect_c15ch_c15_generic_msg_3(tvbuff_t *tvb, packet_info *pinfo _U_
 								tvb, 72, 4, ENC_BIG_ENDIAN);
 			add_string_field( c15ch_c15_generic_msg_3_tree, tvb, 76, 616,
                              hf_c15ch_c15_generic_msg_gen_msg_string);
-			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_gen_data_large, tvb, 692, 616, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_gen_data_large, tvb, 692, 616, ENC_NA);
 		}
     }
 
@@ -7688,7 +7688,7 @@ static int dissect_c15ch_c15_generic_msg_4(tvbuff_t *tvb, packet_info *pinfo _U_
 								tvb, 72, 4, ENC_BIG_ENDIAN);
 			add_string_field( c15ch_c15_generic_msg_4_tree, tvb, 76, 924,
                              hf_c15ch_c15_generic_msg_gen_msg_string);
-			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_gen_data_large, tvb, 1000, 308, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_gen_data_large, tvb, 1000, 308, ENC_NA);
 		}
     }
 
@@ -7751,7 +7751,7 @@ static int dissect_c15ch_c15_generic_msg_5(tvbuff_t *tvb, packet_info *pinfo _U_
 								tvb, 72, 4, ENC_BIG_ENDIAN);
 			add_string_field( c15ch_c15_generic_msg_5_tree, tvb, 76, 308,
                              hf_c15ch_c15_generic_msg_gen_msg_string);
-			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_gen_data_large, tvb, 384, 924, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_gen_data_large, tvb, 384, 924, ENC_NA);
 		}
     }
 
