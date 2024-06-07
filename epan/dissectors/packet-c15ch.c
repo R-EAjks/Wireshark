@@ -56,8 +56,8 @@ void proto_reg_handoff_c15ch(void);
 #define C15_GENERIC_MSG_5  32
 #define C15_CORRELATE_MSG  33
 #define C15_SIP_REG_SUBS_REPORT 34
-#define C15_SYS_ALARM      35 
-#define C15_TTY_MSG        36 
+#define C15_SYS_ALARM      35
+#define C15_TTY_MSG        36
 
 #define HEADER_SZ 36 /* length of complete c15ch header in bytes */
 
@@ -134,7 +134,7 @@ static const value_string c15_msg_types[] = {
 	{ C15_GENERIC_MSG_3,       "C15_GENERIC_MSG_3"      },
 	{ C15_GENERIC_MSG_4,       "C15_GENERIC_MSG_4"      },
 	{ C15_GENERIC_MSG_5,       "C15_GENERIC_MSG_5"      },
-	{ C15_CORRELATE_MSG,       "C15_CORRELATE_MSG"      }, 
+	{ C15_CORRELATE_MSG,       "C15_CORRELATE_MSG"      },
 	{ C15_SIP_REG_SUBS_REPORT, "C15_SIP_REG_SUBS_REPORT"},
 	{ C15_SYS_ALARM,           "C15_SYSTEM_ALARM"       },
 	{ C15_TTY_MSG,             "C15_TTY_MESSAGE"        },
@@ -5031,7 +5031,7 @@ static int dissect_c15ch_nitnxlate(tvbuff_t *tvb, packet_info *pinfo, proto_tree
         /* host */
         str_start = 116;
         gwtype_val = tvb_get_ntohl( tvb, 27 );
-        if (( gwtype_val == 3 ) ||     
+        if (( gwtype_val == 3 ) ||
 		    ( gwtype_val == 5 ) )
         {
             add_string_field( c15ch_nitnxlate_tree, tvb, str_start, 65, hf_c15ch_nitnxlate_host );
@@ -7562,8 +7562,7 @@ static int dissect_c15ch_c15_generic_msg_2(tvbuff_t *tvb, packet_info *pinfo _U_
 								tvb, 68, 4, ENC_BIG_ENDIAN);
 			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_gen_msg_field_5,
 								tvb, 72, 4, ENC_BIG_ENDIAN);
-			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_gen_data_large,
-                                tvb, 76, 1232, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_2_tree, hf_c15ch_c15_generic_msg_gen_data_large, tvb, 76, 1232, ENC_BIG_ENDIAN);
 		}
     }
 
@@ -7626,8 +7625,7 @@ static int dissect_c15ch_c15_generic_msg_3(tvbuff_t *tvb, packet_info *pinfo _U_
 								tvb, 72, 4, ENC_BIG_ENDIAN);
 			add_string_field( c15ch_c15_generic_msg_3_tree, tvb, 76, 616,
                              hf_c15ch_c15_generic_msg_gen_msg_string);
-			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_gen_data_large,
-                                tvb, 692, 616, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_3_tree, hf_c15ch_c15_generic_msg_gen_data_large, tvb, 692, 616, ENC_BIG_ENDIAN);
 		}
     }
 
@@ -7690,8 +7688,7 @@ static int dissect_c15ch_c15_generic_msg_4(tvbuff_t *tvb, packet_info *pinfo _U_
 								tvb, 72, 4, ENC_BIG_ENDIAN);
 			add_string_field( c15ch_c15_generic_msg_4_tree, tvb, 76, 924,
                              hf_c15ch_c15_generic_msg_gen_msg_string);
-			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_gen_data_large,
-                                tvb, 1000, 308, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_4_tree, hf_c15ch_c15_generic_msg_gen_data_large, tvb, 1000, 308, ENC_BIG_ENDIAN);
 		}
     }
 
@@ -7754,8 +7751,7 @@ static int dissect_c15ch_c15_generic_msg_5(tvbuff_t *tvb, packet_info *pinfo _U_
 								tvb, 72, 4, ENC_BIG_ENDIAN);
 			add_string_field( c15ch_c15_generic_msg_5_tree, tvb, 76, 308,
                              hf_c15ch_c15_generic_msg_gen_msg_string);
-			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_gen_data_large,
-                                tvb, 384, 924, ENC_BIG_ENDIAN);
+			proto_tree_add_item(c15ch_c15_generic_msg_5_tree, hf_c15ch_c15_generic_msg_gen_data_large, tvb, 384, 924, ENC_BIG_ENDIAN);
 		}
     }
 
@@ -7935,7 +7931,7 @@ static int dissect_c15ch_c15_tty_msg(tvbuff_t *tvb, packet_info *pinfo _U_, prot
     if (tree)
     {
 		if (length > 0)
-		{	
+		{
 			ti = proto_tree_add_item( tree, hf_c15ch_c15_tty_msg, tvb, 0, length, ENC_NA );
 			col_append_fstr(pinfo->cinfo, COL_INFO, ", Length: %d", length);
 			c15ch_c15_tty_msg_tree = proto_item_add_subtree( ti, ett_c15ch_second_level );
@@ -13140,7 +13136,7 @@ void proto_reg_handoff_c15ch(void)
 
 	c15ch_second_level_handle = create_dissector_handle(dissect_c15ch_c15_sip_reg_subs_report, proto_c15ch_second_level);
 	dissector_add_uint("c15", C15_SIP_REG_SUBS_REPORT, c15ch_second_level_handle);
-	
+
 	c15ch_second_level_handle = create_dissector_handle(dissect_c15ch_c15_sys_alarm, proto_c15ch_second_level);
 	dissector_add_uint("c15", C15_SYS_ALARM, c15ch_second_level_handle);
 
