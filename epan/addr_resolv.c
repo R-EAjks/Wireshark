@@ -297,7 +297,7 @@ e_addr_resolve gbl_resolv_flags = {
     FALSE,  /* network_name */
     FALSE,  /* transport_name */
     TRUE,   /* dns_pkt_addr_resolution */
-    FALSE,   /* handshake_sni_addr_resolution */
+    FALSE,  /* handshake_sni_addr_resolution */
     TRUE,   /* use_external_net_name_resolver */
     FALSE,  /* vlan_name */
     FALSE,  /* ss7 point code names */
