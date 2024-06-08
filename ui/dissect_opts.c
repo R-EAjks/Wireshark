@@ -74,6 +74,7 @@ dissect_opts_handle_opt(int opt, char *optarg_str_p)
                             "\t'm' to enable MAC address resolution\n"
                             "\t'n' to enable network address resolution\n"
                             "\t'N' to enable using external resolvers (e.g., DNS)\n"
+                            "\t's' to enable address resolution using SNI information found in captured handshake packets\n"
                             "\t    for network address resolution\n"
                             "\t't' to enable transport-layer port number resolution\n"
                             "\t'v' to enable VLAN IDs to names resolution");
