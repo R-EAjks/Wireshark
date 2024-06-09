@@ -42,6 +42,9 @@ valid field expression.
 Many improvements and fixes to the graphing dialogs, including
 I/O Graphs, Flow Graph / VoIP Calls, and TCP Stream Graphs.
 
+Possibillity to use zlib-ng to open and write zip compressed files. Zlib-ng is substantionally faster. Windows and MacOS brew
+packages have this feature included.
+
 Many other improvements have been made.
 See the “New and Updated Features” section below for more details.
 
@@ -178,6 +181,16 @@ The following features are new (or have been significantly updated) since versio
   present in the file (not including information from static files), and
   selected rows or the entire table can be saved or copied to the clipboard
   in several formats. wsbuglink:16419[]
+
+* Dumpcap and wireshark support the `-F` option when capturing a file
+  at the command line. wsbuglink:18009[]
+
+* When capturing at the command line dumpcap accepts a `-Q` option that is
+  quieter than `-q` and prints only errors to standard error, similar to tshark.
+  wsbuglink:14491[]
+
+* When capturing a file and requesting the `pcap` format, nanosecond resolution
+  time stamps will be written if the device and version of libpcap supports it.
 
 * When capturing a file, the maximum filesize at which to stop, or to switch
   files in multiple file mode, can be 2 TB, up from 2GiB. Note that you may
