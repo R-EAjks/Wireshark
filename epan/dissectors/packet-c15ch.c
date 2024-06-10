@@ -7635,7 +7635,7 @@ static int dissect_c15ch_c15_generic_msg_4(tvbuff_t *tvb, packet_info *pinfo, pr
     length = tvb_reported_length(tvb);
 
     if (length > 0)
-    {  
+    {
         ti = proto_tree_add_item( tree, hf_c15ch_c15_generic_msg_4, tvb, 0, length, ENC_NA );
         col_append_fstr(pinfo->cinfo, COL_INFO, ", Length: %d", length);
         c15ch_c15_generic_msg_4_tree = proto_item_add_subtree( ti, ett_c15ch_second_level );
