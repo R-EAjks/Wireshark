@@ -11103,25 +11103,25 @@ void proto_register_c15ch(void)
             0x0, NULL, HFILL}
         },
         { &hf_c15ch_c15_ovd084,
-            { "OVD084 Occurences in Last Hour", "c15.ovd084",
+            { "OVD084 Occurrences in Last Hour", "c15.ovd084",
             FT_UINT32, BASE_DEC,
             NULL,
             0x0, NULL, HFILL}
         },
         { &hf_c15ch_c15_ovd086,
-            { "OVD086 Occurences in Last Hour", "c15.ovd086",
+            { "OVD086 Occurrences in Last Hour", "c15.ovd086",
             FT_UINT32, BASE_DEC,
             NULL,
             0x0, NULL, HFILL}
         },
         { &hf_c15ch_c15_ovd088,
-            { "OVD088 Occurences in Last Hour", "c15.ovd088",
+            { "OVD088 Occurrences in Last Hour", "c15.ovd088",
             FT_UINT32, BASE_DEC,
             NULL,
             0x0, NULL, HFILL}
         },
         { &hf_c15ch_c15_sip104,
-            { "SIP104 Occurences in Last Hour", "c15.sip104",
+            { "SIP104 Occurrences in Last Hour", "c15.sip104",
             FT_UINT32, BASE_DEC,
             NULL,
             0x0, NULL, HFILL}
