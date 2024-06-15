@@ -54,6 +54,7 @@ typedef struct _fragment_item {
 	guint32 frame;			/* XXX - does this apply to reassembly heads? */
 	guint32	offset;			/* XXX - does this apply to reassembly heads? */
 	guint32	len;			/* XXX - does this apply to reassembly heads? */
+	guint ref_count; 		/**< reference count in reassembled_table */
 	guint32 fragment_nr_offset;	/**< offset for frame numbering, for sequences, where the
 					 * provided fragment number of the first fragment does
 					 * not start with 0
