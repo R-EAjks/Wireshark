@@ -128,6 +128,8 @@ capture_opts_init(capture_options *capture_opts, GList *(*get_iface_list)(int *,
     capture_opts->autostop_filesize               = 1000;             /* 1 MB */
     capture_opts->has_autostop_duration           = FALSE;
     capture_opts->autostop_duration               = 60.0;             /* 1 min */
+    capture_opts->has_autostop_displayed_packets  = FALSE;
+    capture_opts->autostop_displayed_packets      = 1;
 
     capture_opts->output_to_pipe                  = FALSE;
     capture_opts->capture_child                   = FALSE;

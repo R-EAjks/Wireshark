@@ -1184,6 +1184,11 @@ bool CaptureOptionsDialog::saveOptionsToPreferences()
         global_capture_opts.autostop_files = ui->stopFilesSpinBox->value();
     }
 
+    global_capture_opts.has_autostop_displayed_packets = ui->stopDisplayedPacketsCheckBox->isChecked();
+    if (global_capture_opts.has_autostop_displayed_packets) {
+        global_capture_opts.autostop_displayed_packets = ui->stopDisplayedPacketsSpinBox->value();
+    }
+
     interface_t *device;
 
     for (int col = col_link_; col <= col_filter_; col++) {

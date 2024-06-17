@@ -36,6 +36,11 @@
 #include <QToolButton>
 #include <QLatin1Char>
 
+#include "ui/capture_globals.h"
+#ifdef HAVE_LIBPCAP
+#include "ui/capture.h"
+#endif
+
 // To do:
 // - Use the CaptureFile class.
 
@@ -472,6 +477,18 @@ void MainStatusBar::showCaptureStatistics()
     pushGenericStatus(STATUS_CTX_MAIN, packets_str);
 }
 
+static void check_displayed_packets_stop_condition(capture_session *cap_session)
+{
+   if (global_capture_opts.has_autostop_displayed_packets
+      && cap_session && cap_session->cf)
+   {
+      if (cap_session->cf->displayed_count >= global_capture_opts.autostop_displayed_packets)
+      {
+         capture_stop(cap_session);
+      }
+   }
+}
+
 void MainStatusBar::updateCaptureStatistics(capture_session *cap_session)
 {
     cs_fixed_ = false;
@@ -484,6 +501,9 @@ void MainStatusBar::updateCaptureStatistics(capture_session *cap_session)
     } else {
         cs_count_ = 0;
     }
+
+    check_displayed_packets_stop_condition(cap_session);
+
 #endif // HAVE_LIBPCAP
 
     showCaptureStatistics();

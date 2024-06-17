@@ -321,6 +321,8 @@ typedef struct capture_options_tag {
     gboolean           has_autostop_duration; /**< TRUE if maximum capture duration
                                                    is specified */
     gdouble            autostop_duration;     /**< Maximum capture duration */
+    gboolean           has_autostop_displayed_packets; /**< TRUE if number of displayed packets is specified */
+    guint32            autostop_displayed_packets;     /**< Maximum number of displayed packets */
 
     gboolean           print_file_names;      /**< TRUE if printing names of completed
                                                    files as we close them */
