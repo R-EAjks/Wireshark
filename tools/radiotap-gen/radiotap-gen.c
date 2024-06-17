@@ -109,7 +109,7 @@ static void gen_u_sig_pkts(pcap_dumper_t *dumper)
 	hdr.caplen = sizeof(struct complete_pkt);
 	hdr.len = sizeof(struct complete_pkt);
 
-	pcap_dump((u_char *)dumper, &hdr, (u_char *)&pkt);
+	pcap_dump((uint8_t *)dumper, &hdr, (uint8_t *)&pkt);
 
 	/* Dump another with different 160MHz */
 	/*
@@ -126,7 +126,7 @@ static void gen_u_sig_pkts(pcap_dumper_t *dumper)
 	pkt.radiotap.u_sig_hdr.value = 0x0001183F;
 
 	/* We should probably update the timestamp */
-	pcap_dump((u_char *)dumper, &hdr, (u_char *)&pkt);
+	pcap_dump((uint8_t *)dumper, &hdr, (uint8_t *)&pkt);
 
 	/* Dump another with different 160MHz */
 	/*
@@ -142,7 +142,7 @@ static void gen_u_sig_pkts(pcap_dumper_t *dumper)
 	pkt.radiotap.u_sig_hdr.mask =  0x003fbec0;
 	pkt.radiotap.u_sig_hdr.value = 0x0001183F;
 
-	pcap_dump((u_char *)dumper, &hdr, (u_char *)&pkt);
+	pcap_dump((uint8_t *)dumper, &hdr, (uint8_t *)&pkt);
 }
 
 int main(int argc, char *argv[])

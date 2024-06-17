@@ -2450,7 +2450,7 @@ pcap_process_pseudo_header(FILE_T fh, bool is_nokia, int wtap_encap,
  * Set the "unsliced length" field of the packet header to that value.
  */
 static void
-fix_linux_usb_mmapped_length(wtap_rec *rec, const u_char *bp)
+fix_linux_usb_mmapped_length(wtap_rec *rec, const uint8_t *bp)
 {
 	const struct linux_usb_phdr *hdr;
 	u_int bytes_left;
