@@ -479,7 +479,7 @@ static bool extcap_dumper_dump(struct extcap_dumper extcap_dumper,
     pcap_header.ts.tv_sec = seconds;
     pcap_header.ts.tv_usec = nanoseconds / 1000;
 
-    pcap_dump((u_char *) extcap_dumper.dumper.pcap, &pcap_header, buffer);
+    pcap_dump((uint8_t *) extcap_dumper.dumper.pcap, &pcap_header, buffer);
     if (pcap_dump_flush(extcap_dumper.dumper.pcap) == -1) {
         ws_warning("Write to %s failed: %s", fifo, g_strerror(errno));
     }

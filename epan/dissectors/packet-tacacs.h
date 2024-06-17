@@ -210,42 +210,42 @@ enum {
 #if 0
 /* Packet structures */
 typedef struct  {
-	u_char version;
-	u_char type;
-	u_char seq_no;
-	u_char flags;
+	uint8_t version;
+	uint8_t type;
+	uint8_t seq_no;
+	uint8_t flags;
 	guint32 session_id;
 	guint32 length;
 } tacplus_pkt_hdr;
 
 /* Authentication START packet */
 typedef	struct {
-	u_char	action;
-	u_char	priv_lvl;
-	u_char	authen_type;
-	u_char	service;
-	u_char	user_len;
-	u_char	port_len;
-	u_char	rem_addr_len;
-	u_char	data_len;
-	u_char	vardata[1];
+	uint8_t	action;
+	uint8_t	priv_lvl;
+	uint8_t	authen_type;
+	uint8_t	service;
+	uint8_t	user_len;
+	uint8_t	port_len;
+	uint8_t	rem_addr_len;
+	uint8_t	data_len;
+	uint8_t	vardata[1];
 } tacplus_authen_start ;
 
 /* Authentication CONTINUE packet */
 typedef struct {
 	guint16	user_len;
 	guint16 data_len;
-	u_char	flags;
-	u_char	vardata[1];
+	uint8_t	flags;
+	uint8_t	vardata[1];
 } tacplus_authen_continue ;
 
 /* Authentication REPLY packet */
 typedef struct {
-	u_char	status;
-	u_char	flags;
+	uint8_t	status;
+	uint8_t	flags;
 	guint16	srv_msg_len;
 	guint16	data_len;
-	u_char	vardata[1];
+	uint8_t	vardata[1];
 } tacplus_authen_reply;
 
 
@@ -259,23 +259,23 @@ typedef union {
 /* AUTHORIZATION request */
 
 typedef struct {
-	u_char	authen_method;
-	u_char	priv_lvl;
-	u_char	authen_type;
-	u_char	authen_service;
-	u_char	user_len;
-	u_char	port_len;
-	u_char	rem_addr_len;
-	u_char	arg_cnt;
-	u_char	vardata[1];
+	uint8_t	authen_method;
+	uint8_t	priv_lvl;
+	uint8_t	authen_type;
+	uint8_t	authen_service;
+	uint8_t	user_len;
+	uint8_t	port_len;
+	uint8_t	rem_addr_len;
+	uint8_t	arg_cnt;
+	uint8_t	vardata[1];
 } tacplus_author_request;
 
 typedef struct {
-	u_char	status;
-	u_char	arg_cnt;
+	uint8_t	status;
+	uint8_t	arg_cnt;
 	guint16	srv_msg_len;
 	guint16	data_len;
-	u_char	vardata[1];
+	uint8_t	vardata[1];
 } tacplus_author_reply;
 
 typedef union {
@@ -285,23 +285,23 @@ typedef union {
 
 /* ACCOUNTING request */
 typedef struct {
-	u_char	flags;
-	u_char	authen_method;
-	u_char	priv_lvl;
-	u_char	authen_type;
-	u_char	authen_service;
-	u_char	user_len;
-	u_char	port_len;
-	u_char	rem_addr_len;
-	u_char	arg_cnt;
-	u_char	vardata[1];
+	uint8_t	flags;
+	uint8_t	authen_method;
+	uint8_t	priv_lvl;
+	uint8_t	authen_type;
+	uint8_t	authen_service;
+	uint8_t	user_len;
+	uint8_t	port_len;
+	uint8_t	rem_addr_len;
+	uint8_t	arg_cnt;
+	uint8_t	vardata[1];
 } tacplus_account_request;
 
 typedef struct {
 	guint16	srv_msg_len;
 	guint16 data_len;
-	u_char	status;
-	u_char	vardata[1];
+	uint8_t	status;
+	uint8_t	vardata[1];
 } tacplus_account_reply;
 
 typedef union {
