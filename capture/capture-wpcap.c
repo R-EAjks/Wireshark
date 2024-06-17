@@ -69,7 +69,7 @@ static const char *(*p_pcap_datalink_val_to_description) (int);
 static void    (*p_pcap_breakloop) (pcap_t *);
 static const char *(*p_pcap_lib_version) (void);
 static int     (*p_pcap_setbuff) (pcap_t *, int dim);
-static int     (*p_pcap_next_ex) (pcap_t *, struct pcap_pkthdr **pkt_header, const u_char **pkt_data);
+static int     (*p_pcap_next_ex) (pcap_t *, struct pcap_pkthdr **pkt_header, const uint8_t **pkt_data);
 #ifdef HAVE_PCAP_REMOTE
 static pcap_t* (*p_pcap_open) (const char *, int, int, int,
 			       struct pcap_rmtauth *, char *);
@@ -760,7 +760,7 @@ int pcap_setbuff(pcap_t *a, int b)
 	return p_pcap_setbuff(a, b);
 }
 
-int pcap_next_ex(pcap_t *a, struct pcap_pkthdr **b, const u_char **c)
+int pcap_next_ex(pcap_t *a, struct pcap_pkthdr **b, const uint8_t **c)
 {
 	ws_assert(has_wpcap);
 	return p_pcap_next_ex(a, b, c);
