@@ -61,6 +61,7 @@
  * RFC 7291: DHCP Options for the Port Control Protocol (PCP)
  * RFC 7618: Dynamic Allocation of Shared IPv4 Addresses
  * RFC 7710: Captive-Portal Identification Using DHCP or Router Advertisements (RAs)
+ * RFC 7724: Active DHCPv4 Lease Query
  * RFC 7839: Access-Network-Identifier Option in DHCP
  * RFC 8357: Generalized UDP Source Port for DHCP Relay
  * RFC 8910: Captive-Portal Identification in DHCP and Router Advertisements (RAs)
@@ -981,6 +982,10 @@ static const value_string bulk_lease_dhcp_status_code_vals[] = {
 	{ 2, "QueryTerminated" },
 	{ 3, "MalformedQuery" },
 	{ 4, "NotAllowed" },
+	{ 5, "DataMissing" },
+	{ 6, "ConnectionActive" },
+	{ 7, "CatchUpComplete" },
+	{ 8, "TLSConnectionRefused" },
 	{ 0, NULL },
 };
 
