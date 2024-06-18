@@ -623,6 +623,8 @@ static int hf_dhcp_option_rdnss_pref;				/* 146 */
 static int hf_dhcp_option_rdnss_prim_dns_server;			/* 146 */
 static int hf_dhcp_option_rdnss_sec_dns_server;			/* 146 */
 static int hf_dhcp_option_rdnss_domain;				/* 146 */
+static int hf_dhcp_option_dots_ri;				/* 147 */
+static int hf_dhcp_option_dots_address;				/* 148 */
 static int hf_dhcp_option_tftp_server_address;			/* 150 */
 static int hf_dhcp_option_bulk_lease_status_code;			/* 151 */
 static int hf_dhcp_option_bulk_lease_status_message;		/* 151 */
@@ -1575,8 +1577,8 @@ static const struct opt_info default_dhcp_opt[DHCP_OPT_NUM] = {
 /* 144 */ { "Geospatial Location [TODO:RFC6225]",	opaque, NULL },
 /* 145 */ { "Forcerenew Nonce Capable",			special, NULL },
 /* 146 */ { "RDNSS Selection",				special, NULL },
-/* 147 */ { "Unassigned",				opaque, NULL },
-/* 148 */ { "Unassigned",				opaque, NULL },
+/* 147 */ { "DOTS Reference Identifier",		string, &hf_dhcp_option_dots_ri },
+/* 148 */ { "DOTS Address",				ipv4_list, &hf_dhcp_option_dots_address },
 /* 149 */ { "Unassigned",				opaque, NULL },
 /* 150 */ { "TFTP Server Address",			ipv4_list, &hf_dhcp_option_tftp_server_address },
 /* 151 */ { "Leasequery Status code",			special, NULL },
@@ -9967,6 +9969,16 @@ proto_register_dhcp(void)
 		  { "Domains and networks", "dhcp.option.rdnss.domain",
 		    FT_STRING, BASE_NONE, NULL, 0x00,
 		    "RDNSS Domains and networks", HFILL }},
+
+		{ &hf_dhcp_option_dots_ri,
+		  { "DOTS Reference Identifier", "dhcp.option.dots.ri",
+		    FT_STRING, BASE_NONE, NULL, 0x00,
+		    "Peer DOTS Agent name", HFILL }},
+
+		{ &hf_dhcp_option_dots_address,
+		  { "DOTS Address", "dhcp.option.dots.address",
+		    FT_IPv4, BASE_NONE, NULL, 0x00,
+		    "Peer DOTS Agent Address", HFILL }},
 
 		{ &hf_dhcp_option_tftp_server_address,
 		  { "TFTP Server Address", "dhcp.option.tftp_server_address",
