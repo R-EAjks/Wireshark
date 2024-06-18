@@ -2804,35 +2804,37 @@ mysql_dissect_request(tvbuff_t *tvb,packet_info *pinfo, int offset, proto_tree *
 					proto_tree_add_uint64(req_tree, hf_mysql_num_params, tvb, offset, lenfle, param_count);
 					offset += lenfle;
 				}
-				guint8 stmt_bound;
-				offset += (param_count + 7) / 8; /* NULL bitmap */
-				proto_tree_add_item(req_tree, hf_mysql_new_parameter_bound_flag, tvb, offset, 1, ENC_NA);
-				stmt_bound = tvb_get_guint8(tvb, offset);
-				offset += 1;
-				if (stmt_bound == 1) {
-					if (conn_data->clnt_caps_ext & MYSQL_CAPS_QA) {
-						param_offset = mysql_exec_param_offset(tvb, req_tree, offset, (guint)param_count);
-					} else {
-						param_offset = offset + (guint)param_count * 2;
-					}
-					guint8 flags;
-					/* The character set for a parameter
-					 * is character_set_client. */
-					unsigned encoding = my_frame_data->encoding_client;
-					for (stmt_pos = 0; stmt_pos < (int)param_count; stmt_pos++) {
-						if (stmt_pos >= stmt_data->param_metas.count) {
-							// With Query Attributes we can have more params than during the prepare.
-							// this means we don't have flags for them.
-							flags = 0;
+				if (param_count != 0) {
+					guint8 stmt_bound;
+					offset += (param_count + 7) / 8; /* NULL bitmap */
+					proto_tree_add_item(req_tree, hf_mysql_new_parameter_bound_flag, tvb, offset, 1, ENC_NA);
+					stmt_bound = tvb_get_guint8(tvb, offset);
+					offset += 1;
+					if (stmt_bound == 1) {
+						if (conn_data->clnt_caps_ext & MYSQL_CAPS_QA) {
+							param_offset = mysql_exec_param_offset(tvb, req_tree, offset, (guint)param_count);
 						} else {
-							flags = (guint8)stmt_data->param_metas.flags[stmt_pos];
+							param_offset = offset + (guint)param_count * 2;
 						}
-						if (!mysql_dissect_exec_param(req_tree, tvb, &offset, &param_offset,
-									      flags, pinfo, encoding,
-									      conn_data->clnt_caps_ext & MYSQL_CAPS_QA))
-							break;
+						guint8 flags;
+						/* The character set for a parameter
+						* is character_set_client. */
+						unsigned encoding = my_frame_data->encoding_client;
+						for (stmt_pos = 0; stmt_pos < (int)param_count; stmt_pos++) {
+							if (stmt_pos >= stmt_data->param_metas.count) {
+								// With Query Attributes we can have more params than during the prepare.
+								// this means we don't have flags for them.
+								flags = 0;
+							} else {
+								flags = (guint8)stmt_data->param_metas.flags[stmt_pos];
+							}
+							if (!mysql_dissect_exec_param(req_tree, tvb, &offset, &param_offset,
+											flags, pinfo, encoding,
+											conn_data->clnt_caps_ext & MYSQL_CAPS_QA))
+								break;
+						}
+						offset = param_offset;
 					}
-					offset = param_offset;
 				}
 			}
 		} else {
