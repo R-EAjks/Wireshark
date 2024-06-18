@@ -66,6 +66,7 @@
  * RFC 8357: Generalized UDP Source Port for DHCP Relay
  * RFC 8910: Captive-Portal Identification in DHCP and Router Advertisements (RAs)
  * RFC 8925: IPv6-Only Preferred Option for DHCPv4
+ * RFC 8973: DDoS Open Threat Signaling (DOTS) Agent Discovery
  * draft-ietf-dhc-fqdn-option-07.txt
  * TFTP Server Address Option for DHCPv4 [draft-raj-dhc-tftp-addr-option-06.txt: https://tools.ietf.org/html/draft-raj-dhc-tftp-addr-option-06]
  * BOOTP and DHCP Parameters
