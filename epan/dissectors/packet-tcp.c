@@ -4512,6 +4512,9 @@ again:
         if (!PINFO_FD_VISITED(pinfo)) {
             msp->last_frame=pinfo->num;
             msp->last_frame_time=pinfo->abs_ts;
+
+            /* see issue #13388 */
+            tcpd->fwd->maxnextseq = nxtseq;
         }
 
         /* OK, this PDU was found, which means the segment continues
