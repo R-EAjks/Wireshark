@@ -1296,24 +1296,77 @@ dissector_add_range_preference(const char *name, dissector_handle_t handle, cons
 	 */
 	range = wmem_new0(wmem_epan_scope(), range_t*);
 
-	/* If the dissector already has a preference module, use it */
-	module = prefs_find_module(proto_get_protocol_filter_name(proto_id));
+	/* If the dissector's protocol already has a preference module, use it */
+	const char* module_name = proto_get_protocol_filter_name(proto_id);
+	module = prefs_find_module(module_name);
 	if (module == NULL) {
 		/* Otherwise create a new one */
 		module = prefs_register_protocol(proto_id, NULL);
 	}
+
+	/* We support assigning multiple dissectors for the same protocol to
+	 * the same table now (instead of having to use PINOs), by giving
+	 * the dissectors descriptions. If the dissector doesn't have a
+	 * description, then fetching the description returns the protocol's
+	 * short name (which is what we used to use.)
+	 *
+	 * If it has a description, then we shouldn't use the table name alone
+	 * as the preference name in its protocol's module, because we might
+	 * register other dissectors for the protocol to the same table.
+	 *
+	 * We can't call dissector_table_foreach_handle, because we might
+	 * not be done registering handles to this table, and we want the
+	 * prefs to be consistent regardless of the order of registration.
+	 */
+	const char *handle_desc = dissector_handle_get_description(handle);
+	const char *short_name = dissector_handle_get_protocol_short_name(handle);
+	if (g_strcmp0(handle_desc, short_name) != 0) {
+		/* We have a description, so add the dissector name to the pref.
+		 *
+		 * XXX - The dissector name is unique. But that, while more
+		 * parsing-friendly than descriptions, can still have values we
+		 * don't allow in prefs (uppercase and '-'.)
+		 * If the dissector name is the same as the module name (i.e.
+		 * (the protocol_filter_name) or the module name followed by
+		 * a period or underscore, then the prefs will disallow it
+		 * to avoid apparent redundancy, so it's easier to put the
+		 * dissector name at the end.
+		 * The name might also be NULL, if a NULL name was passed to
+		 * create_dissector_handle_with_name_and_description().
+		 *
+		 * Options:
+		 * 1) Enforce those rules and change a few dissector names.
+		 * 2) Transform those names to legal pref names, hope no collision.
+		 *    That means changing to lowercase, changing '-' to '_'.
+		 * 3) Override the pref name checking.
+		 *
+		 * These prefs can be used with the -o flag from the command
+		 * line (so some scripts won't work), and a number of dissectors
+		 * call "prefs_get_range_value(MODULE_NAME, TABLE_NAME)" to get
+		 * the range registered from these auto-preferences. So if we
+		 * change the name we will need to change those calls.
+		 * We don't write these prefs to preference files (just decode_as),
+		 * so we don't have to worry about compability between versions.
+		 */
+		const char *dissector_name = dissector_handle_get_dissector_name(handle);
+		if (dissector_name && g_strcmp0(dissector_name, module_name) != 0) {
+			name = wmem_strdup_printf(wmem_epan_scope(), "%s.%s",
+				name, dissector_name);
+		}
+	}
+
 	/* Some preference callback functions use the proto_reg_handoff_
 		routine to apply preferences, which could duplicate the
 		registration of a preference.  Check for that here */
 	if (prefs_find_preference(module, name) == NULL) {
 		if (g_strcmp0(range_str, "") > 0) {
 			description = wmem_strdup_printf(wmem_epan_scope(), "%s %s(s) (default: %s)",
-									    proto_get_protocol_short_name(handle->protocol), pref_dissector_table->ui_name, range_str);
+									    handle_desc, pref_dissector_table->ui_name, range_str);
 		} else {
 			description = wmem_strdup_printf(wmem_epan_scope(), "%s %s(s)",
-									    proto_get_protocol_short_name(handle->protocol), pref_dissector_table->ui_name);
+									    handle_desc, pref_dissector_table->ui_name);
 		}
-		title = wmem_strdup_printf(wmem_epan_scope(), "%s(s)", pref_dissector_table->ui_name);
+		title = wmem_strdup_printf(wmem_epan_scope(), "%s %s(s)", handle_desc, pref_dissector_table->ui_name);
 
 		/* Max value is based on datatype of dissector table */
 		switch (pref_dissector_table->type) {

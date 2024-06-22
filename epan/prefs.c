@@ -2218,7 +2218,13 @@ pref_unstash(pref_t *pref, void *unstash_data_p)
             if (unstash_data->handle_decode_as) {
                 sub_dissectors = find_dissector_table(pref->name);
                 if (sub_dissectors != NULL) {
-                    handle = dissector_table_get_dissector_handle(sub_dissectors, unstash_data->module->title);
+                    char *handle_desc = wmem_strdup(NULL, prefs_get_title(pref));
+                    char *pos = strstr(handle_desc, get_dissector_table_ui_name(pref->name));
+                    if (pos && pos > handle_desc) {
+                        *(--pos) = '\0';
+                        handle = dissector_table_get_dissector_handle(sub_dissectors, handle_desc);
+                    }
+                    wmem_free(NULL, handle_desc);
                     if (handle != NULL) {
                         /* Set the current handle to NULL for all the old values
                          * in the dissector table. If there isn't an initial
