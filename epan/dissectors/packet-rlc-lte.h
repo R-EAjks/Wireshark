@@ -68,6 +68,9 @@ void set_rlc_lte_drb_pdcp_seqnum_length(packet_info *pinfo, guint16 ueid, guint8
 /* Configure LI field for AM DRB channels. */
 void set_rlc_lte_drb_li_field(packet_info *pinfo, guint16 ueid, guint8 drbid, gboolean ul_ext_li_field, gboolean dl_ext_li_field);
 
+/* Indicate that a given UEId is requesting to (re)connect */
+void set_rlc_lte_ue_connection_request(packet_info *pinfo, guint16 ueid);
+
 /**********************************************************************/
 /* UDP framing format                                                 */
 /* -----------------------                                            */

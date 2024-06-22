@@ -2434,7 +2434,13 @@ SoundingRS-UL-ConfigDedicated/setup/duration STRINGS=TFS(&lte_rrc_duration_val)
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "RRCConnectionReestablishmentRequest");
 
 #.FN_HDR RRCConnectionRequest
-
+  /* Inform RLC - need UE identifier */
+  mac_lte_info *p_mac_lte_info = (mac_lte_info *)p_get_proto_data(wmem_file_scope(), actx->pinfo, proto_mac_lte, 0);
+  if (p_mac_lte_info) {
+    /* Tell RLC this UE is trying to (re)connect */
+    set_rlc_lte_ue_connection_request(actx->pinfo, p_mac_lte_info->ueid);
+  }
+  /* TODO: should we also notify PDCP?  Will its bearers SNs also be reset? */
   col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "RRCConnectionRequest");
 
 #.FN_HDR RRCConnectionResumeRequest-r13
