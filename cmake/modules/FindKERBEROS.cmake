@@ -50,7 +50,15 @@ if(KERBEROS_FOUND)
     #
     find_library(_abspath_${_library} NAMES ${_library}
                  HINTS ${KERBEROS_LIBDIR} ${KERBEROS_LIBRARY_DIRS})
-    list(APPEND KERBEROS_LIBRARIES ${_abspath_${_library}})
+    if(${_abspath_${_library}} STREQUAL "${_abspath_${_library}}-NOTFOUND")
+      set(KERBEROS_FOUND)
+      set(KERBEROS_DEFINITIONS)
+      set(KERBEROS_LIBRARIES)
+      set(KERBEROS_INCLUDE_DIRS)
+      break()
+    else()
+      list(APPEND KERBEROS_LIBRARIES ${_abspath_${_library}})
+    endif()
   endforeach()
 else()
   # Fallback detection if pkg-config files are not installed.
