@@ -121,6 +121,7 @@ set(WSUTIL_PUBLIC_HEADERS
 	processes.h
 	regex.h
 	report_message.h
+	saplzclzh.h
 	sign_ext.h
 	sober128.h
 	socket.h
@@ -189,6 +190,8 @@ set(WSUTIL_COMMON_FILES
 	privileges.c
 	regex.c
 	rsa.c
+	saplzclzh.c
+	saplzclzh/csdecompr.c
 	sober128.c
 	socket.c
 	strnatcmp.c
